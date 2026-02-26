@@ -36,7 +36,7 @@ from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
 from ._plugin import Plugin
 from ._tuning import WorkerTuner
-from ._workflow import _WorkflowWorker
+from ._workflow import _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY, _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
@@ -142,6 +142,7 @@ class Worker:
             maximum=5
         ),
         disable_payload_error_limit: bool = False,
+        max_concurrent_payload_conversions: int = _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -322,6 +323,9 @@ class Worker:
                 and cause a task failure if the size limit is exceeded. The default is False.
                 See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
                 details.
+            max_concurrent_payload_conversions: Maximum number of payload
+                encode/decode calls that may run concurrently within a single
+                workflow activation. Defaults to 1.
 
         """
         config = WorkerConfig(
@@ -367,6 +371,7 @@ class Worker:
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
             disable_payload_error_limit=disable_payload_error_limit,
+            max_concurrent_payload_conversions=max_concurrent_payload_conversions,
         )
 
         plugins_from_client = cast(
@@ -510,6 +515,9 @@ class Worker:
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
+                max_concurrent_payload_conversions=config.get(
+                    "max_concurrent_payload_conversions", _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY
+                ),
             )
 
         tuner = config.get("tuner")
@@ -944,6 +952,7 @@ class WorkerConfig(TypedDict, total=False):
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
     disable_payload_error_limit: bool
+    max_concurrent_payload_conversions: int
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(

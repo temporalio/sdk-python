@@ -23,7 +23,7 @@ import temporalio.workflow
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
 from ._worker import load_default_build_id
-from ._workflow import _WorkflowWorker
+from ._workflow import _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY, _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
@@ -51,6 +51,7 @@ class Replayer:
         runtime: temporalio.runtime.Runtime | None = None,
         disable_safe_workflow_eviction: bool = False,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        max_concurrent_payload_conversions: int = _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -81,6 +82,7 @@ class Replayer:
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
+            max_concurrent_payload_conversions=max_concurrent_payload_conversions,
         )
         self._initial_config = self._config.copy()
 
@@ -265,6 +267,9 @@ class Replayer:
                     "header_codec_behavior", HeaderCodecBehavior.NO_CODEC
                 )
                 != HeaderCodecBehavior.NO_CODEC,
+                max_concurrent_payload_conversions=self._config.get(
+                    "max_concurrent_payload_conversions", _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY
+                ),
             )
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
@@ -401,6 +406,7 @@ class ReplayerConfig(TypedDict, total=False):
     runtime: temporalio.runtime.Runtime | None
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior
+    max_concurrent_payload_conversions: int
 
 
 @dataclass(frozen=True)
