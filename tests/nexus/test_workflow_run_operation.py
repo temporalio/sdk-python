@@ -67,16 +67,17 @@ class RequestDeadlineService:
 
 @service_handler(service=RequestDeadlineService)
 class RequestDeadlineHandler:
+    def __init__(self) -> None:
+        self.start_deadlines_received: list[datetime | None] = []
+
     @workflow_run_operation
     async def op(
-        self, ctx: WorkflowRunOperationContext, _input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[str]:
-        assert (
-            ctx.request_deadline is not None
-        ), "request_deadline should be set in workflow_run_operation"
+        self.start_deadlines_received.append(ctx.request_deadline)
         return await ctx.start_workflow(
             EchoWorkflow.run,
-            str(ctx.request_deadline),
+            input.value,
             id=str(uuid.uuid4()),
         )
 
@@ -165,17 +166,23 @@ async def test_request_deadline_is_accessible_in_workflow_run_operation(
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
     await env.create_nexus_endpoint(endpoint_name, task_queue)
+    service_handler = RequestDeadlineHandler()
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[RequestDeadlineHandler()],
+        nexus_service_handlers=[service_handler],
         workflows=[RequestDeadlineWorkflow, EchoWorkflow],
     ):
-        result = await client.execute_workflow(
+        await client.execute_workflow(
             RequestDeadlineWorkflow.run,
             args=[Input(value="test"), task_queue],
             task_queue=task_queue,
             id=str(uuid.uuid4()),
         )
-        parsed = datetime.fromisoformat(result)
-        assert parsed.tzinfo is timezone.utc, "request_deadline should be in utc"
+
+        assert len(service_handler.start_deadlines_received) == 1
+        deadline = service_handler.start_deadlines_received[0]
+        assert (
+            deadline is not None
+        ), "request_deadline should be set in WorkflowRunOperationContext"
+        assert deadline.tzinfo is timezone.utc, "request_deadline should be in utc"
