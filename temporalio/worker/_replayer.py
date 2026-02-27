@@ -268,7 +268,8 @@ class Replayer:
                 )
                 != HeaderCodecBehavior.NO_CODEC,
                 max_concurrent_payload_conversions=self._config.get(
-                    "max_concurrent_payload_conversions", _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY
+                    "max_concurrent_payload_conversions",
+                    _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
                 ),
             )
             # Create bridge worker
