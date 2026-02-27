@@ -21,7 +21,7 @@ from temporalio.converter import (
 
 
 @dataclass(frozen=True)
-class DriverClaim:
+class StorageDriverClaim:
     """Claim for an externally stored payload.
 
     .. warning::
@@ -33,8 +33,8 @@ class DriverClaim:
 
 
 @dataclass(frozen=True)
-class DriverContext:
-    """Context passed to :class:`Driver` and :class:`DriverSelector` calls.
+class StorageDriverContext:
+    """Context passed to :class:`StorageDriver` and :class:`DriverSelector` calls.
 
     .. warning::
            This API is experimental.
@@ -46,7 +46,7 @@ class DriverContext:
     """
 
 
-class Driver(ABC):
+class StorageDriver(ABC):
     """Base driver for storing and retrieve payloads from external storage systems.
 
     .. warning::
@@ -57,7 +57,7 @@ class Driver(ABC):
     def name(self) -> str:
         """Returns the name of this driver instance. A driver may allow its name
         to be parameterized at construction time so that multiple instances of
-        the same driver class can coexist in :attr:`StorageOptions.drivers` with
+        the same driver class can coexist in :attr:`StorageConfig.drivers` with
         distinct names.
         """
         raise NotImplementedError
@@ -75,10 +75,10 @@ class Driver(ABC):
     @abstractmethod
     async def store(
         self,
-        context: DriverContext,
+        context: StorageDriverContext,
         payloads: Sequence[Payload],
-    ) -> list[DriverClaim]:
-        """Stores payloads in external storage and returns a :class:`DriverClaim`
+    ) -> list[StorageDriverClaim]:
+        """Stores payloads in external storage and returns a :class:`StorageDriverClaim`
         for each one. The returned list must be the same length as ``payloads``.
         """
         raise NotImplementedError
@@ -86,10 +86,10 @@ class Driver(ABC):
     @abstractmethod
     async def retrieve(
         self,
-        context: DriverContext,
-        claims: Sequence[DriverClaim],
+        context: StorageDriverContext,
+        claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
-        """Retrieves payloads from external storage for the given :class:`DriverClaim`
+        """Retrieves payloads from external storage for the given :class:`StorageDriverClaim`
         list. The returned list must be the same length as ``claims``.
 
         Raise :class:`PayloadNotFoundError` when a retrieval attempt confirms
@@ -101,14 +101,14 @@ class Driver(ABC):
 
 
 @dataclass(frozen=True)
-class StorageOptions(WithSerializationContext):
+class StorageConfig(WithSerializationContext):
     """Configuration for external storage behavior.
 
     .. warning::
            This API is experimental.
     """
 
-    drivers: Sequence[Driver]
+    drivers: Sequence[StorageDriver]
     """Drivers available for storing and retrieving payloads. At least one
     driver must be provided.
 
@@ -120,7 +120,9 @@ class StorageOptions(WithSerializationContext):
     retrieval, so each driver must have a unique name.
     """
 
-    driver_selector: Callable[[DriverContext, Payload], Driver | None] | None = None
+    driver_selector: (
+        Callable[[StorageDriverContext, Payload], StorageDriver | None] | None
+    ) = None
     """Controls which driver stores a given payload. Accepts either a
     :class:`DriverSelector` instance or a callable of the form
     ``(DriverContext, Payload) -> Driver | None``.
@@ -138,7 +140,7 @@ class StorageOptions(WithSerializationContext):
 
     payload_codec: PayloadCodec | None = None
     """Optional codec applied to payloads before they are handed to a
-    :class:`Driver` for storage, and after they are retrieved. When ``None``,
+    :class:`StorageDriver` for storage, and after they are retrieved. When ``None``,
     payloads are stored as-is by the driver.
     """
 
@@ -186,10 +188,10 @@ class StorageWarning(RuntimeWarning):
 @dataclass(frozen=True)
 class _StorageReference:
     driver_name: str
-    driver_claim: DriverClaim
+    driver_claim: StorageDriverClaim
 
 
-class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
+class _StorageImpl:  # type:ignore[reportUnusedClass]
     # Claim payload encoding is fixed and independent of any user configuration.
     _claim_converter: JSONPlainPayloadConverter = JSONPlainPayloadConverter(
         encoding="json/external-storage-reference"
@@ -197,25 +199,27 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
 
     def __init__(
         self,
-        options: StorageOptions | None,
+        options: StorageConfig | None,
         context: SerializationContext | None = None,
     ):
         self._options = options
         self._context = context
-        self._driver_map: dict[str, Driver] = {}
+        self._driver_map: dict[str, StorageDriver] = {}
         if options is not None:
             for driver in options.drivers:
                 name = driver.name()
                 if name in self._driver_map:
                     warnings.warn(
-                        f"StorageOptions.drivers contains multiple drivers with name '{name}'. "
+                        f"StorageConfig.drivers contains multiple drivers with name '{name}'. "
                         "The first one will be used.",
                         category=StorageWarning,
                     )
                 else:
                     self._driver_map[name] = driver
 
-    def _select_driver(self, context: DriverContext, payload: Payload) -> Driver | None:
+    def _select_driver(
+        self, context: StorageDriverContext, payload: Payload
+    ) -> StorageDriver | None:
         """Returns the driver to use for this payload, or None to pass through."""
         assert self._options is not None
         selector = self._options.driver_selector
@@ -230,7 +234,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
             raise RuntimeError(f"No driver found with name '{driver.name()}'")
         return registered
 
-    def _get_driver_by_name(self, name: str) -> Driver:
+    def _get_driver_by_name(self, name: str) -> StorageDriver:
         """Looks up a driver by name, raising :class:`RuntimeError` if not found."""
         driver = self._driver_map.get(name)
         if driver is None:
@@ -248,7 +252,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         ):
             return payload
 
-        context = DriverContext(serialization_context=self._context)
+        context = StorageDriverContext(serialization_context=self._context)
 
         driver = self._select_driver(context, payload)
         if driver is None:
@@ -285,11 +289,11 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
             return [await self.store_payload(payloads[0])]
 
         results = list(payloads)
-        context = DriverContext(serialization_context=self._context)
+        context = StorageDriverContext(serialization_context=self._context)
 
         # First pass: determine which payloads to store and which driver to use for each.
         # Provide unencoded payloads to give maximal context information to the selector.
-        to_store: list[tuple[int, Payload, Driver]] = []
+        to_store: list[tuple[int, Payload, StorageDriver]] = []
         for index, payload in enumerate(payloads):
             size_bytes = payload.ByteSize()
             if (
@@ -315,7 +319,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
 
         # Group encoded payloads by driver for batched store calls
         # driver -> [(original_index, encoded_payload)]
-        driver_groups: dict[Driver, list[tuple[int, Payload]]] = {}
+        driver_groups: dict[StorageDriver, list[tuple[int, Payload]]] = {}
         for i, (orig_index, _, driver) in enumerate(to_store):
             driver_groups.setdefault(driver, []).append(
                 (orig_index, encoded_payloads[i])
@@ -364,7 +368,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
                     )
                 elif len(self._options.drivers) == 0:
                     warnings.warn(
-                        "StorageOptions.drivers is empty, but detected external storage references.",
+                        "StorageConfig.drivers is empty, but detected external storage references.",
                         category=StorageWarning,
                     )
             return payload
@@ -377,7 +381,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
             return payload
 
         driver = self._get_driver_by_name(reference.driver_name)
-        context = DriverContext(serialization_context=self._context)
+        context = StorageDriverContext(serialization_context=self._context)
 
         stored_payloads = await driver.retrieve(context, [reference.driver_claim])
 
@@ -405,7 +409,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
                     )
                 elif len(self._options.drivers) == 0:
                     warnings.warn(
-                        "StorageOptions.drivers is empty, but detected external storage references.",
+                        "StorageConfig.drivers is empty, but detected external storage references.",
                         category=StorageWarning,
                     )
             return results
@@ -415,7 +419,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
 
         # Group claims by driver for batched retrieve calls
         # driver -> [(original_index, claim)]
-        driver_claims: dict[Driver, list[tuple[int, DriverClaim]]] = {}
+        driver_claims: dict[StorageDriver, list[tuple[int, StorageDriverClaim]]] = {}
         for index, payload in enumerate(payloads):
             if len(payload.external_payloads) == 0:
                 continue
@@ -430,7 +434,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         if not driver_claims:
             return results
 
-        context = DriverContext(serialization_context=self._context)
+        context = StorageDriverContext(serialization_context=self._context)
         stored_by_index: dict[int, Payload] = {}
 
         # Retrieve from all drivers concurrently
@@ -471,7 +475,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         return results
 
     def _validate_claim_length(
-        self, claims: Sequence[DriverClaim], expected: int, driver: Driver
+        self, claims: Sequence[StorageDriverClaim], expected: int, driver: StorageDriver
     ) -> None:
         if len(claims) != expected:
             raise RuntimeError(
@@ -479,7 +483,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
             )
 
     def _validate_payload_length(
-        self, payloads: Sequence[Payload], expected: int, driver: Driver
+        self, payloads: Sequence[Payload], expected: int, driver: StorageDriver
     ) -> None:
         if len(payloads) != expected:
             raise RuntimeError(

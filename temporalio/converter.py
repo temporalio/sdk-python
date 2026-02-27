@@ -1364,7 +1364,7 @@ class DataConverter(WithSerializationContext):
     payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
     """Settings for payload size limits."""
 
-    external_storage: temporalio.extstore.StorageOptions | None = None
+    external_storage: temporalio.extstore.StorageConfig | None = None
     """Options for external storage. If None, external storage is disabled.
     
     .. warning::
@@ -1374,8 +1374,8 @@ class DataConverter(WithSerializationContext):
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
-    _external_storage_middleware: temporalio.extstore._ExternalStorageMiddleware = (
-        dataclasses.field(init=False)
+    _external_storage_middleware: temporalio.extstore._StorageImpl = dataclasses.field(
+        init=False
     )
 
     _payload_error_limits: _ServerPayloadErrorLimits | None = None
@@ -1497,9 +1497,7 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(
             self,
             "_external_storage_middleware",
-            temporalio.extstore._ExternalStorageMiddleware(
-                self.external_storage, context
-            ),
+            temporalio.extstore._StorageImpl(self.external_storage, context),
         )
 
     def _with_payload_error_limits(

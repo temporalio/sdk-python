@@ -18,16 +18,16 @@ from temporalio.converter import (
 )
 from temporalio.exceptions import ApplicationError
 from temporalio.extstore import (
-    Driver,
-    DriverClaim,
-    DriverContext,
-    StorageOptions,
+    StorageConfig,
+    StorageDriver,
+    StorageDriverClaim,
+    StorageDriverContext,
     StorageWarning,
     _StorageReference,
 )
 
 
-class InMemoryTestDriver(Driver):
+class InMemoryTestDriver(StorageDriver):
     """In-memory storage driver for testing."""
 
     def __init__(
@@ -44,9 +44,9 @@ class InMemoryTestDriver(Driver):
 
     async def store(
         self,
-        context: DriverContext,
+        context: StorageDriverContext,
         payloads: Sequence[Payload],
-    ) -> list[DriverClaim]:
+    ) -> list[StorageDriverClaim]:
         self._store_calls += 1
         start_index = len(self._storage)
 
@@ -56,17 +56,17 @@ class InMemoryTestDriver(Driver):
         ]
         self._storage.update(entries)
 
-        return [DriverClaim(data={"key": key}) for key, _ in entries]
+        return [StorageDriverClaim(data={"key": key}) for key, _ in entries]
 
     async def retrieve(
         self,
-        context: DriverContext,
-        claims: Sequence[DriverClaim],
+        context: StorageDriverContext,
+        claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
         self._retrieve_calls += 1
 
         def parse_claim(
-            claim: DriverClaim,
+            claim: StorageDriverClaim,
         ) -> Payload:
             key = claim.data["key"]
             if key not in self._storage:
@@ -92,11 +92,13 @@ class WorkflowIdFeatureFlagDriverSelector(WithSerializationContext):
     configuration store.
     """
 
-    def __init__(self, driver: Driver, enabled: bool = False):
+    def __init__(self, driver: StorageDriver, enabled: bool = False):
         self._driver = driver
         self._enabled = enabled
 
-    def __call__(self, _context: DriverContext, _payload: Payload) -> Driver | None:
+    def __call__(
+        self, _context: StorageDriverContext, _payload: Payload
+    ) -> StorageDriver | None:
         return self._driver if self._enabled else None
 
     def with_context(self, context: SerializationContext) -> Self:
@@ -130,7 +132,7 @@ class TestDataConverterExternalStorage:
 
         # Configure with 100-byte threshold
         converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver],
                 payload_size_threshold=100,
             )
@@ -159,7 +161,7 @@ class TestDataConverterExternalStorage:
     async def test_extstore_reference_structure(self):
         """Test that external storage creates proper reference structure."""
         converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[InMemoryTestDriver("test-driver")],
                 payload_size_threshold=50,
             )
@@ -182,7 +184,7 @@ class TestDataConverterExternalStorage:
 
         assert isinstance(reference, _StorageReference)
         assert "test-driver" == reference.driver_name
-        assert isinstance(reference.driver_claim, DriverClaim)
+        assert isinstance(reference.driver_claim, StorageDriverClaim)
         assert "key" in reference.driver_claim.data
 
     async def test_extstore_composite_conditional(self):
@@ -190,7 +192,7 @@ class TestDataConverterExternalStorage:
         hot_driver = InMemoryTestDriver("hot-storage")
         cold_driver = InMemoryTestDriver("cold-storage")
 
-        options = StorageOptions(
+        options = StorageConfig(
             drivers=[hot_driver, cold_driver],
             driver_selector=lambda context, payload: hot_driver
             if payload.ByteSize() < 500
@@ -236,7 +238,7 @@ class TestDataConverterExternalStorage:
         # or if the workflow ID doesn't end with "-extstore". This is an example of feature flagging
         # external storage using the workflow ID. This is an advanced secnario and requires the "can_store"
         # filter to be a WithSerializationContext.
-        options = StorageOptions(
+        options = StorageConfig(
             drivers=[driver],
             driver_selector=WorkflowIdFeatureFlagDriverSelector(driver),
             payload_size_threshold=1024,
@@ -294,7 +296,7 @@ class TestDataConverterExternalStorage:
         assert driver._store_calls == 1
 
 
-class NotFoundDriver(Driver):
+class NotFoundDriver(StorageDriver):
     """Driver that stores normally but raises non-retryable ApplicationError on retrieve."""
 
     def __init__(self, driver_name: str = "not-found-driver"):
@@ -306,20 +308,20 @@ class NotFoundDriver(Driver):
 
     async def store(
         self,
-        context: DriverContext,
+        context: StorageDriverContext,
         payloads: Sequence[Payload],
-    ) -> list[DriverClaim]:
+    ) -> list[StorageDriverClaim]:
         entries = [
             (f"payload-{i}", payload.SerializeToString())
             for i, payload in enumerate(payloads)
         ]
         self._storage.update(entries)
-        return [DriverClaim(data={"key": key}) for key, _ in entries]
+        return [StorageDriverClaim(data={"key": key}) for key, _ in entries]
 
     async def retrieve(
         self,
-        context: DriverContext,
-        claims: Sequence[DriverClaim],
+        context: StorageDriverContext,
+        claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
         assert len(claims) > 0, "NotFoundDriver expected claims to be provided"
         raise ApplicationError("Payload not found.", non_retryable=True)
@@ -333,13 +335,13 @@ class TestDriverError:
 
         class _NoClaimsDriver(InMemoryTestDriver):
             async def store(
-                self, context: DriverContext, payloads: Sequence[Payload]
-            ) -> list[DriverClaim]:
+                self, context: StorageDriverContext, payloads: Sequence[Payload]
+            ) -> list[StorageDriverClaim]:
                 return []
 
         driver = _NoClaimsDriver()
         converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver],
                 payload_size_threshold=10,
             )
@@ -353,7 +355,7 @@ class TestDriverError:
     async def test_decode_wrong_payload_count_raises_runtime_error(self):
         """retrieve() returning fewer payloads than claims must raise RuntimeError."""
         good_converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[InMemoryTestDriver()],
                 payload_size_threshold=10,
             )
@@ -362,13 +364,15 @@ class TestDriverError:
 
         class _NoPayloadsDriver(InMemoryTestDriver):
             async def retrieve(
-                self, context: DriverContext, claims: Sequence[DriverClaim]
+                self,
+                context: StorageDriverContext,
+                claims: Sequence[StorageDriverClaim],
             ) -> list[Payload]:
                 return []
 
         driver = _NoPayloadsDriver()
         bad_converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver],
                 payload_size_threshold=10,
             )
@@ -424,7 +428,7 @@ class TestPayloadCodecWithExternalStorage:
 
         converter = DataConverter(
             payload_codec=dc_codec,
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver],
                 payload_size_threshold=50,
             ),
@@ -452,7 +456,7 @@ class TestPayloadCodecWithExternalStorage:
         assert driver._retrieve_calls == 1
 
     async def test_external_converter_without_codec_does_not_encode_stored_bytes(self):
-        """When DataConverter.payload_codec is set but StorageOptions.payload_codec
+        """When DataConverter.payload_codec is set but StorageConfig.payload_codec
         is None, stored bytes are NOT encoded – even though
         DataConverter.payload_codec is active for the reference payload in history."""
         driver = InMemoryTestDriver()
@@ -460,7 +464,7 @@ class TestPayloadCodecWithExternalStorage:
 
         converter = DataConverter(
             payload_codec=dc_codec,
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver],
                 payload_size_threshold=50,
             ),
@@ -488,9 +492,9 @@ class TestPayloadCodecWithExternalStorage:
         assert driver._retrieve_calls == 1
 
     async def test_external_converter_codec_independent_from_dc_codec(self):
-        """When both DataConverter.payload_codec and StorageOptions.payload_codec
+        """When both DataConverter.payload_codec and StorageConfig.payload_codec
         are set, the reference payload in history uses DataConverter.payload_codec
-        and the bytes stored by the driver use StorageOptions.payload_codec –
+        and the bytes stored by the driver use StorageConfig.payload_codec –
         independently."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
@@ -498,7 +502,7 @@ class TestPayloadCodecWithExternalStorage:
 
         converter = DataConverter(
             payload_codec=dc_codec,
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver],
                 payload_size_threshold=50,
                 payload_codec=ext_codec,
@@ -534,7 +538,7 @@ class TestPayloadCodecWithExternalStorage:
 
 
 class TestMultiDriver:
-    """Tests for StorageOptions with multiple drivers."""
+    """Tests for StorageConfig with multiple drivers."""
 
     async def test_no_selector_uses_first_driver_for_store(self):
         """Without a driver_selector the first driver in the list handles all
@@ -543,7 +547,7 @@ class TestMultiDriver:
         second = InMemoryTestDriver("driver-second")
 
         converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[first, second],
                 payload_size_threshold=50,
             )
@@ -576,7 +580,7 @@ class TestMultiDriver:
 
         # Store with driver-b as the sole driver.
         store_converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver_b],
                 payload_size_threshold=50,
             )
@@ -587,7 +591,7 @@ class TestMultiDriver:
         # Retrieve with driver-a listed first, driver-b second.
         # The "driver-b" name in the reference must route to driver-b.
         retrieve_converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver_a, driver_b],
                 payload_size_threshold=50,
             )
@@ -611,7 +615,7 @@ class TestMultiDriver:
             return driver_a if payload.ByteSize() < 500 else driver_b
 
         converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver_a, driver_b],
                 driver_selector=selector,
                 payload_size_threshold=50,
@@ -639,7 +643,7 @@ class TestMultiDriver:
         driver = InMemoryTestDriver("driver-a")
 
         converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[driver],
                 driver_selector=lambda _ctx, _payload: None,
                 payload_size_threshold=50,
@@ -658,12 +662,12 @@ class TestMultiDriver:
 
     async def test_selector_returns_unregistered_driver_raises(self):
         """A selector that returns a Driver whose name is not present in
-        StorageOptions.drivers raises RuntimeError during encode."""
+        StorageConfig.drivers raises RuntimeError during encode."""
         registered = InMemoryTestDriver("registered")
         unregistered = InMemoryTestDriver("not-in-list")
 
         converter = DataConverter(
-            external_storage=StorageOptions(
+            external_storage=StorageConfig(
                 drivers=[registered],
                 driver_selector=lambda _ctx, _payload: unregistered,
                 payload_size_threshold=50,
@@ -686,7 +690,7 @@ class TestMultiDriver:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             converter = DataConverter(
-                external_storage=StorageOptions(
+                external_storage=StorageConfig(
                     drivers=[first, duplicate],
                     payload_size_threshold=50,
                 )
