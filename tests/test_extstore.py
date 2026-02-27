@@ -21,8 +21,6 @@ from temporalio.extstore import (
     Driver,
     DriverClaim,
     DriverContext,
-    DriverError,
-    DriverNotFoundError,
     DriverSelector,
     PayloadNotFoundError,
     StorageOptions,
@@ -330,7 +328,6 @@ class TestPayloadNotFoundError:
         assert issubclass(PayloadNotFoundError, TemporalError)
         assert not issubclass(PayloadNotFoundError, ApplicationError)
         assert not issubclass(PayloadNotFoundError, FailureError)
-        assert not issubclass(PayloadNotFoundError, DriverError)
 
     def test_default_message(self):
         claim = DriverClaim(data={"key": "my-key"})
@@ -344,7 +341,6 @@ class TestPayloadNotFoundError:
         assert err.driver_name == "my-driver"
 
     async def test_middleware_propagates_not_found(self):
-        """PayloadNotFoundError from a driver must not be wrapped in DriverError."""
         converter = DataConverter(
             external_storage=StorageOptions(
                 drivers=[NotFoundDriver()],
@@ -356,16 +352,15 @@ class TestPayloadNotFoundError:
         encoded = await converter.encode(["hello world " * 20])
         assert len(encoded[0].external_payloads) > 0
 
-        # Retrieving should raise PayloadNotFoundError, not DriverError
         with pytest.raises(PayloadNotFoundError):
             await converter.decode(encoded, [str])
 
 
 class TestDriverError:
-    """Tests for DriverError raised when a driver violates its contract."""
+    """Tests for RuntimeError raised when a driver violates its contract."""
 
-    async def test_encode_wrong_claim_count_raises_driver_error(self):
-        """store() returning fewer claims than payloads must raise DriverError."""
+    async def test_encode_wrong_claim_count_raises_runtime_error(self):
+        """store() returning fewer claims than payloads must raise RuntimeError."""
 
         class _NoClaimsDriver(InMemoryTestDriver):
             async def store(
@@ -373,17 +368,21 @@ class TestDriverError:
             ) -> list[DriverClaim]:
                 return []
 
+        driver = _NoClaimsDriver()
         converter = DataConverter(
             external_storage=StorageOptions(
-                drivers=[_NoClaimsDriver()],
+                drivers=[driver],
                 payload_size_threshold=10,
             )
         )
-        with pytest.raises(DriverError, match="Driver returned 0 claims, expected 1"):
+        with pytest.raises(
+            RuntimeError,
+            match=f"Driver '{driver.name()}' returned 0 claims, expected 1",
+        ):
             await converter.encode(["x" * 200])
 
-    async def test_decode_wrong_payload_count_raises_driver_error(self):
-        """retrieve() returning fewer payloads than claims must raise DriverError."""
+    async def test_decode_wrong_payload_count_raises_runtime_error(self):
+        """retrieve() returning fewer payloads than claims must raise RuntimeError."""
         good_converter = DataConverter(
             external_storage=StorageOptions(
                 drivers=[InMemoryTestDriver()],
@@ -398,19 +397,21 @@ class TestDriverError:
             ) -> list[Payload]:
                 return []
 
+        driver = _NoPayloadsDriver()
         bad_converter = DataConverter(
             external_storage=StorageOptions(
-                drivers=[
-                    _NoPayloadsDriver()
-                ],  # same default name as InMemoryTestDriver
+                drivers=[driver],
                 payload_size_threshold=10,
             )
         )
-        with pytest.raises(DriverError, match="Driver returned 0 payloads, expected 1"):
+        with pytest.raises(
+            RuntimeError,
+            match=f"Driver '{driver.name()}' returned 0 payloads, expected 1",
+        ):
             await bad_converter.decode(encoded, [str])
 
-    async def test_encode_driver_exception_wrapped_in_driver_error(self):
-        """Exception raised by store() must be wrapped in DriverError."""
+    async def test_encode_driver_exception_wrapped_in_runtime_error(self):
+        """Exception raised by store() must be wrapped in RuntimeError."""
 
         class _StoreError(Exception):
             pass
@@ -427,12 +428,12 @@ class TestDriverError:
                 payload_size_threshold=10,
             )
         )
-        with pytest.raises(DriverError) as exc_info:
+        with pytest.raises(RuntimeError) as exc_info:
             await converter.encode(["x" * 200])
         assert isinstance(exc_info.value.__cause__, _StoreError)
 
-    async def test_decode_driver_exception_wrapped_in_driver_error(self):
-        """Exception raised by retrieve() must be wrapped in DriverError."""
+    async def test_decode_driver_exception_wrapped_in_runtime_error(self):
+        """Exception raised by retrieve() must be wrapped in RuntimeError."""
 
         class _RetrieveError(Exception):
             pass
@@ -459,7 +460,7 @@ class TestDriverError:
                 payload_size_threshold=10,
             )
         )
-        with pytest.raises(DriverError) as exc_info:
+        with pytest.raises(RuntimeError) as exc_info:
             await bad_converter.decode(encoded, [str])
         assert isinstance(exc_info.value.__cause__, _RetrieveError)
 
@@ -742,7 +743,7 @@ class TestMultiDriver:
 
     async def test_selector_returns_unregistered_driver_raises(self):
         """A selector that returns a Driver whose name is not present in
-        StorageOptions.drivers raises DriverNotFoundError during encode."""
+        StorageOptions.drivers raises RuntimeError during encode."""
         registered = InMemoryTestDriver("registered")
         unregistered = InMemoryTestDriver("not-in-list")
 
@@ -754,9 +755,8 @@ class TestMultiDriver:
             )
         )
 
-        with pytest.raises(DriverNotFoundError) as exc_info:
+        with pytest.raises(RuntimeError):
             await converter.encode(["x" * 200])
-        assert exc_info.value.driver_name == "not-in-list"
 
     async def test_duplicate_driver_names_warns_and_first_wins_for_retrieval(self):
         """Registering two drivers with identical names emits StorageWarning.

@@ -8,6 +8,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+
 from typing_extensions import Self
 
 from temporalio.api.common.v1 import Payload
@@ -196,42 +197,6 @@ class StorageOptions(WithSerializationContext):
         return cloned
 
 
-class DriverError(TemporalError):
-    """Raised when an error occurs related to a specific driver.
-
-    .. warning::
-            This API is experimental.
-    """
-
-    def __init__(self, message: str, driver_name: str) -> None:
-        """Initialize with an error message and the name of the driver that failed."""
-        super().__init__(message)
-        self._driver_name = driver_name
-
-    @property
-    def driver_name(self) -> str:
-        """Name of the driver that caused this error."""
-        return self._driver_name
-
-
-class DriverNotFoundError(DriverError):
-    """Raised when a driver name cannot be resolved to a driver in
-    :attr:`StorageOptions.drivers`. This can occur during retrieval when a
-    :class:`DriverClaim` references a driver name that is not present, or
-    during storage when the :attr:`StorageOptions.driver_selector` returns a
-    :class:`Driver` whose :meth:`Driver.name` is not registered.
-
-    .. warning::
-           This API is experimental.
-    """
-
-    def __init__(self, driver_name: str) -> None:
-        """Initialize with the name of the driver that could not be resolved."""
-        super().__init__(
-            f"No driver found with name '{driver_name}'", driver_name=driver_name
-        )
-
-
 class PayloadNotFoundError(TemporalError):
     """Raised when a payload cannot be retrieved because it does not exist
     at the location indicated by its :class:`DriverClaim`.
@@ -239,9 +204,6 @@ class PayloadNotFoundError(TemporalError):
     When raised during workflow execution this error fails the **workflow**
     rather than the workflow task. Drivers should raise this when a retrieval
     attempt confirms the payload is absent.
-
-    This error is intentionally not a subclass of :class:`DriverError` to
-    avoid accidentally handling it and treating as a workflow task failure.
 
     .. warning::
            This API is experimental.
@@ -324,14 +286,14 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
             return None
         registered = self._driver_map.get(driver.name())
         if registered is None:
-            raise DriverNotFoundError(driver.name())
+            raise RuntimeError(f"No driver found with name '{driver.name()}'")
         return registered
 
     def _get_driver_by_name(self, name: str) -> Driver:
-        """Looks up a driver by name, raising :class:`DriverNotFoundError` if not found."""
+        """Looks up a driver by name, raising :class:`RuntimeError` if not found."""
         driver = self._driver_map.get(name)
         if driver is None:
-            raise DriverNotFoundError(name)
+            raise RuntimeError(f"No driver found with name '{name}'")
         return driver
 
     async def store_payload(self, payload: Payload) -> Payload:
@@ -359,7 +321,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         try:
             claims = await driver.store(context, [encoded_payload])
         except Exception as err:
-            raise DriverError("Driver store failed", driver.name()) from err
+            raise RuntimeError(
+                f"Driver store failed for driver '{driver.name()}'"
+            ) from err
 
         self._validate_claim_length(claims, expected=1, driver=driver)
 
@@ -409,7 +373,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         payloads_to_encode = [payload for _, payload, _ in to_store]
         encoded_payloads = payloads_to_encode
         if self._options.payload_codec:
-            encoded_payloads = await self._options.payload_codec.encode(payloads_to_encode)
+            encoded_payloads = await self._options.payload_codec.encode(
+                payloads_to_encode
+            )
 
         # Group encoded payloads by driver for batched store calls
         # driver -> [(original_index, encoded_payload)]
@@ -429,7 +395,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
             try:
                 return await driver.store(context, store_batch)
             except Exception as err:
-                raise DriverError("Driver store failed", driver.name()) from err
+                raise RuntimeError(
+                    f"Driver store failed for driver '{driver.name()}'"
+                ) from err
 
         all_claims = await asyncio.gather(
             *(
@@ -491,7 +459,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         except PayloadNotFoundError:
             raise
         except Exception as err:
-            raise DriverError("Driver retrieve failed", driver.name()) from err
+            raise RuntimeError(
+                f"Driver retrieve failed for driver '{driver.name()}'"
+            ) from err
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
 
@@ -557,7 +527,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
             except PayloadNotFoundError:
                 raise
             except Exception as err:
-                raise DriverError("Driver retrieve failed", driver.name()) from err
+                raise RuntimeError(
+                    f"Driver retrieve failed for driver '{driver.name()}'"
+                ) from err
 
         all_stored = await asyncio.gather(
             *(
@@ -597,16 +569,14 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         self, claims: Sequence[DriverClaim], expected: int, driver: Driver
     ) -> None:
         if len(claims) != expected:
-            raise DriverError(
-                f"Driver returned {len(claims)} claims, expected {expected}",
-                driver.name(),
+            raise RuntimeError(
+                f"Driver '{driver.name()}' returned {len(claims)} claims, expected {expected}",
             )
 
     def _validate_payload_length(
         self, payloads: Sequence[Payload], expected: int, driver: Driver
     ) -> None:
         if len(payloads) != expected:
-            raise DriverError(
-                f"Driver returned {len(payloads)} payloads, expected {expected}",
-                driver.name(),
+            raise RuntimeError(
+                f"Driver '{driver.name()}' returned {len(payloads)} payloads, expected {expected}",
             )

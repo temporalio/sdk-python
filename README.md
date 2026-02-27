@@ -524,7 +524,7 @@ Some things to note about driver selection:
 
 * When no `driver_selector` is set, the first driver in `Options.drivers` is always used for storing.
 * Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
-* The driver returned by the selector must be registered in `Options.drivers`. If it is not, a `DriverNotFoundError` is raised.
+* The driver returned by the selector must be registered in `Options.drivers`. If it is not, a `RuntimeError` is raised.
 
 ###### Custom Drivers
 

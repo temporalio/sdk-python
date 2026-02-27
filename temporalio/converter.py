@@ -929,7 +929,6 @@ class DefaultFailureConverter(FailureConverter):
     ) -> None:
         """See base class."""
         from temporalio.extstore import (
-            DriverError,
             PayloadNotFoundError,
         )
 
@@ -938,32 +937,6 @@ class DefaultFailureConverter(FailureConverter):
             self._error_to_failure(exception, payload_converter, failure)
         elif isinstance(exception, nexusrpc.HandlerError):
             self._nexus_handler_error_to_failure(exception, payload_converter, failure)
-        elif isinstance(exception, PayloadNotFoundError):
-            # Convert to failure error
-            failure_error = temporalio.exceptions.ApplicationError(
-                str(exception),
-                {
-                    "driver_name": exception.driver_name,
-                    "driver_claim": exception.driver_claim,
-                },
-                type=exception.__class__.__name__,
-                non_retryable=True,
-            )
-            failure_error.__traceback__ = exception.__traceback__
-            failure_error.__cause__ = exception.__cause__
-            self._error_to_failure(failure_error, payload_converter, failure)
-        elif isinstance(exception, DriverError):
-            # Convert to failure error
-            failure_error = temporalio.exceptions.ApplicationError(
-                str(exception),
-                {
-                    "driver_name": exception.driver_name,
-                },
-                type=exception.__class__.__name__,
-            )
-            failure_error.__traceback__ = exception.__traceback__
-            failure_error.__cause__ = exception.__cause__
-            self._error_to_failure(failure_error, payload_converter, failure)
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
@@ -971,6 +944,7 @@ class DefaultFailureConverter(FailureConverter):
                 type="PayloadSizeError"
                 if isinstance(exception, _PayloadSizeError)
                 else exception.__class__.__name__,
+                non_retryable=isinstance(exception, PayloadNotFoundError),
             )
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__
