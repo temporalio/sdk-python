@@ -928,7 +928,6 @@ class DefaultFailureConverter(FailureConverter):
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
         """See base class."""
-
         # If already a failure error, use that
         if isinstance(exception, temporalio.exceptions.FailureError):
             self._error_to_failure(exception, payload_converter, failure)
