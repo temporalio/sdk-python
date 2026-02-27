@@ -101,25 +101,6 @@ class Driver(ABC):
         raise NotImplementedError
 
 
-class DriverSelector(ABC):
-    """Determines which :class:`Driver` stores a given payload.
-
-    Implement this class and set it as :attr:`StorageOptions.driver_selector` when you
-    need stateful or class-based selection logic. For simple cases a plain
-    callable ``(DriverContext, Payload) -> Driver | None`` can be used instead.
-
-    .. warning::
-           This API is experimental.
-    """
-
-    @abstractmethod
-    def select_driver(self, context: DriverContext, payload: Payload) -> Driver | None:
-        """Returns the driver to use to externally store the payload, or None to decline to
-        externally store the payload.
-        """
-        pass
-
-
 @dataclass(frozen=True)
 class StorageOptions(WithSerializationContext):
     """Configuration for external storage behavior.
@@ -140,9 +121,7 @@ class StorageOptions(WithSerializationContext):
     retrieval, so each driver must have a unique name.
     """
 
-    driver_selector: (
-        DriverSelector | Callable[[DriverContext, Payload], Driver | None] | None
-    ) = None
+    driver_selector: Callable[[DriverContext, Payload], Driver | None] | None = None
     """Controls which driver stores a given payload. Accepts either a
     :class:`DriverSelector` instance or a callable of the form
     ``(DriverContext, Payload) -> Driver | None``.
@@ -278,8 +257,6 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         selector = self._options.driver_selector
         if selector is None:
             return self._options.drivers[0] if self._options.drivers else None
-        elif isinstance(selector, DriverSelector):
-            driver = selector.select_driver(context, payload)
         else:
             driver = selector(context, payload)
         if driver is None:

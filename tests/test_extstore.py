@@ -21,7 +21,6 @@ from temporalio.extstore import (
     Driver,
     DriverClaim,
     DriverContext,
-    DriverSelector,
     PayloadNotFoundError,
     StorageOptions,
     StorageWarning,
@@ -80,14 +79,23 @@ class InMemoryTestDriver(Driver):
         return [parse_claim(claim) for claim in claims]
 
 
-class WorkflowIdFeatureFlagDriverSelector(DriverSelector, WithSerializationContext):
-    """Example selector that conditionally stores based on workflow ID feature flag."""
+class WorkflowIdFeatureFlagDriverSelector(WithSerializationContext):
+    """Example selector that conditionally stores based on workflow ID feature flag.
+
+    This example shows how a callable can implement WithSerializationContext if it
+    needs to precompute data from the serialization context instead of doing it on
+    every payload selection call.
+
+    The feature flag in this example is a simple check on the workflow ID length, but in
+    a real implementation this could be a call to a feature flag service or a lookup in a
+    configuration store.
+    """
 
     def __init__(self, driver: Driver, enabled: bool = False):
         self._driver = driver
         self._enabled = enabled
 
-    def select_driver(self, context: DriverContext, payload: Payload) -> Driver | None:
+    def __call__(self, _context: DriverContext, _payload: Payload) -> Driver | None:
         return self._driver if self._enabled else None
 
     def with_context(self, context: SerializationContext) -> Self:
