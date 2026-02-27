@@ -260,20 +260,17 @@ async def test_concurrent_throughput():
         ),
     )
 
+    visitor_default = SlowVisitor()
+    await PayloadVisitor().visit(visitor_default, completion)
+
+    assert visitor_default.visit_count == N_CMDS * N_ARGS
+    assert visitor_default.max_concurrent == 1
+
     visitor_concurrent = SlowVisitor()
-    start = time.perf_counter()
     await PayloadVisitor(concurrency_limit=10).visit(visitor_concurrent, completion)
-    elapsed_concurrent = time.perf_counter() - start
 
     assert visitor_concurrent.visit_count == N_CMDS * N_ARGS
-
-    visitor_serialized = SlowVisitor()
-    start = time.perf_counter()
-    await PayloadVisitor().visit(visitor_serialized, completion)
-    elapsed_serialized = time.perf_counter() - start
-
-    assert visitor_serialized.visit_count == N_CMDS * N_ARGS
-    assert elapsed_concurrent < elapsed_serialized
+    assert visitor_concurrent.max_concurrent == 10
 
 
 async def test_bridge_encoding():
