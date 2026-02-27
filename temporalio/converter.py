@@ -1563,14 +1563,17 @@ class DataConverter(WithSerializationContext):
         return payload
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
-        encoded_payloads = await self._encode_payload_sequence(payloads.payloads)
-        del payloads.payloads[:]
-        payloads.payloads.extend(encoded_payloads)
+        await self._external_storage_middleware.store_payloads(payloads)
+        if self.payload_codec:
+            await self.payload_codec.encode_wrapper(payloads)
+        self._validate_payload_limits(payloads.payloads)
 
     async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        result = await self._external_storage_middleware.store_payloads(payloads)
+        result = await self._external_storage_middleware.store_payload_sequence(
+            payloads
+        )
         if self.payload_codec:
             result = await self.payload_codec.encode(result)
         self._validate_payload_limits(result)
@@ -1585,9 +1588,9 @@ class DataConverter(WithSerializationContext):
         return payload
 
     async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
-        decoded_payloads = await self._decode_payload_sequence(payloads.payloads)
-        del payloads.payloads[:]
-        payloads.payloads.extend(decoded_payloads)
+        if self.payload_codec:
+            await self.payload_codec.decode_wrapper(payloads)
+        await self._external_storage_middleware.retrieve_payloads(payloads)
 
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
@@ -1595,7 +1598,9 @@ class DataConverter(WithSerializationContext):
         result = list(payloads)
         if self.payload_codec:
             result = await self.payload_codec.decode(result)
-        result = await self._external_storage_middleware.retrieve_payloads(result)
+        result = await self._external_storage_middleware.retrieve_payload_sequence(
+            result
+        )
         return result
 
     @staticmethod

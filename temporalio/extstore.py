@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Self
 
-from temporalio.api.common.v1 import Payload
+from temporalio.api.common.v1 import Payload, Payloads
 from temporalio.converter import (
     JSONPlainPayloadConverter,
     PayloadCodec,
@@ -278,7 +278,12 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         )
         return reference_payload
 
-    async def store_payloads(
+    async def store_payloads(self, payloads: Payloads):
+        stored_payloads = await self.store_payload_sequence(payloads.payloads)
+        for i, payload in enumerate(stored_payloads):
+            payloads.payloads[i].CopyFrom(payload)
+
+    async def store_payload_sequence(
         self,
         payloads: Sequence[Payload],
     ) -> list[Payload]:
@@ -392,7 +397,12 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
 
         return stored_payloads[0]
 
-    async def retrieve_payloads(
+    async def retrieve_payloads(self, payloads: Payloads):
+        stored_payloads = await self.retrieve_payload_sequence(payloads.payloads)
+        for i, payload in enumerate(stored_payloads):
+            payloads.payloads[i].CopyFrom(payload)
+
+    async def retrieve_payload_sequence(
         self,
         payloads: Sequence[Payload],
     ) -> list[Payload]:
