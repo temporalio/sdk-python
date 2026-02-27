@@ -16,12 +16,11 @@ from temporalio.converter import (
     WithSerializationContext,
     WorkflowSerializationContext,
 )
-from temporalio.exceptions import ApplicationError, FailureError, TemporalError
+from temporalio.exceptions import ApplicationError
 from temporalio.extstore import (
     Driver,
     DriverClaim,
     DriverContext,
-    PayloadNotFoundError,
     StorageOptions,
     StorageWarning,
     _StorageReference,
@@ -71,7 +70,9 @@ class InMemoryTestDriver(Driver):
         ) -> Payload:
             key = claim.data["key"]
             if key not in self._storage:
-                raise PayloadNotFoundError(driver_claim=claim, driver_name=self.name())
+                raise ApplicationError(
+                    f"Payload not found for key '{key}'", non_retryable=True
+                )
             payload = Payload()
             payload.ParseFromString(self._storage[key])
             return payload
@@ -294,7 +295,7 @@ class TestDataConverterExternalStorage:
 
 
 class NotFoundDriver(Driver):
-    """Driver that stores normally but raises PayloadNotFoundError on retrieve."""
+    """Driver that stores normally but raises non-retryable ApplicationError on retrieve."""
 
     def __init__(self, driver_name: str = "not-found-driver"):
         self._driver_name = driver_name
@@ -321,47 +322,7 @@ class NotFoundDriver(Driver):
         claims: Sequence[DriverClaim],
     ) -> list[Payload]:
         assert len(claims) > 0, "NotFoundDriver expected claims to be provided"
-        raise PayloadNotFoundError(
-            "Payload not found in not-found-driver",
-            driver_claim=claims[0],
-            driver_name=self.name(),
-        )
-
-
-class TestPayloadNotFoundError:
-    """Tests for PayloadNotFoundError class and middleware behaviour."""
-
-    def test_class_hierarchy(self):
-        """PayloadNotFoundError must be TemporalError but not ApplicationError or FailureError."""
-        assert issubclass(PayloadNotFoundError, TemporalError)
-        assert not issubclass(PayloadNotFoundError, ApplicationError)
-        assert not issubclass(PayloadNotFoundError, FailureError)
-
-    def test_default_message(self):
-        claim = DriverClaim(data={"key": "my-key"})
-        err = PayloadNotFoundError(driver_claim=claim, driver_name="my-driver")
-        assert str(err) == "Payload not found for driver 'my-driver'"
-
-    def test_properties(self):
-        claim = DriverClaim(data={"key": "my-key"})
-        err = PayloadNotFoundError("gone", driver_claim=claim, driver_name="my-driver")
-        assert err.driver_claim is claim
-        assert err.driver_name == "my-driver"
-
-    async def test_middleware_propagates_not_found(self):
-        converter = DataConverter(
-            external_storage=StorageOptions(
-                drivers=[NotFoundDriver()],
-                payload_size_threshold=1,  # store everything
-            )
-        )
-
-        # Store a payload so we have a reference to retrieve
-        encoded = await converter.encode(["hello world " * 20])
-        assert len(encoded[0].external_payloads) > 0
-
-        with pytest.raises(PayloadNotFoundError):
-            await converter.decode(encoded, [str])
+        raise ApplicationError("Payload not found.", non_retryable=True)
 
 
 class TestDriverError:
@@ -417,60 +378,6 @@ class TestDriverError:
             match=f"Driver '{driver.name()}' returned 0 payloads, expected 1",
         ):
             await bad_converter.decode(encoded, [str])
-
-    async def test_encode_driver_exception_wrapped_in_runtime_error(self):
-        """Exception raised by store() must be wrapped in RuntimeError."""
-
-        class _StoreError(Exception):
-            pass
-
-        class _RaisingStoreDriver(InMemoryTestDriver):
-            async def store(
-                self, context: DriverContext, payloads: Sequence[Payload]
-            ) -> list[DriverClaim]:
-                raise _StoreError("store failed")
-
-        converter = DataConverter(
-            external_storage=StorageOptions(
-                drivers=[_RaisingStoreDriver()],
-                payload_size_threshold=10,
-            )
-        )
-        with pytest.raises(RuntimeError) as exc_info:
-            await converter.encode(["x" * 200])
-        assert isinstance(exc_info.value.__cause__, _StoreError)
-
-    async def test_decode_driver_exception_wrapped_in_runtime_error(self):
-        """Exception raised by retrieve() must be wrapped in RuntimeError."""
-
-        class _RetrieveError(Exception):
-            pass
-
-        class _RaisingRetrieveDriver(InMemoryTestDriver):
-            async def retrieve(
-                self, context: DriverContext, claims: Sequence[DriverClaim]
-            ) -> list[Payload]:
-                raise _RetrieveError("retrieve failed")
-
-        good_converter = DataConverter(
-            external_storage=StorageOptions(
-                drivers=[InMemoryTestDriver()],
-                payload_size_threshold=10,
-            )
-        )
-        encoded = await good_converter.encode(["x" * 200])
-
-        bad_converter = DataConverter(
-            external_storage=StorageOptions(
-                drivers=[
-                    _RaisingRetrieveDriver()
-                ],  # same default name as InMemoryTestDriver
-                payload_size_threshold=10,
-            )
-        )
-        with pytest.raises(RuntimeError) as exc_info:
-            await bad_converter.decode(encoded, [str])
-        assert isinstance(exc_info.value.__cause__, _RetrieveError)
 
 
 class RecordingPayloadCodec(PayloadCodec):

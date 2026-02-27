@@ -18,7 +18,6 @@ from temporalio.converter import (
     SerializationContext,
     WithSerializationContext,
 )
-from temporalio.exceptions import TemporalError
 
 
 @dataclass(frozen=True)
@@ -176,41 +175,6 @@ class StorageOptions(WithSerializationContext):
         return cloned
 
 
-class PayloadNotFoundError(TemporalError):
-    """Raised when a payload cannot be retrieved because it does not exist
-    at the location indicated by its :class:`DriverClaim`.
-
-    When raised during workflow execution this error fails the **workflow**
-    rather than the workflow task. Drivers should raise this when a retrieval
-    attempt confirms the payload is absent.
-
-    .. warning::
-           This API is experimental.
-    """
-
-    def __init__(
-        self,
-        message: str | None = None,
-        *,
-        driver_claim: DriverClaim,
-        driver_name: str,
-    ) -> None:
-        """Initialize a payload not found error."""
-        super().__init__(message or f"Payload not found for driver '{driver_name}'")
-        self._driver_claim = driver_claim
-        self._driver_name = driver_name
-
-    @property
-    def driver_claim(self) -> DriverClaim:
-        """The :class:`DriverClaim` for the payload that could not be found."""
-        return self._driver_claim
-
-    @property
-    def driver_name(self) -> str:
-        """Name of the driver that reported the payload as not found."""
-        return self._driver_name
-
-
 class StorageWarning(RuntimeWarning):
     """Warning for external storage issues.
 
@@ -295,12 +259,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         if self._options.payload_codec:
             encoded_payload = (await self._options.payload_codec.encode([payload]))[0]
 
-        try:
-            claims = await driver.store(context, [encoded_payload])
-        except Exception as err:
-            raise RuntimeError(
-                f"Driver store failed for driver '{driver.name()}'"
-            ) from err
+        claims = await driver.store(context, [encoded_payload])
 
         self._validate_claim_length(claims, expected=1, driver=driver)
 
@@ -365,20 +324,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         # Store all driver groups concurrently then build reference payloads
         driver_group_list = list(driver_groups.items())
 
-        async def _store_group(
-            driver: Driver, indexed_payloads: list[tuple[int, Payload]]
-        ) -> list[DriverClaim]:
-            store_batch = [p for _, p in indexed_payloads]
-            try:
-                return await driver.store(context, store_batch)
-            except Exception as err:
-                raise RuntimeError(
-                    f"Driver store failed for driver '{driver.name()}'"
-                ) from err
-
         all_claims = await asyncio.gather(
             *(
-                _store_group(driver, indexed_payloads)
+                driver.store(context, [p for _, p in indexed_payloads])
                 for driver, indexed_payloads in driver_group_list
             )
         )
@@ -431,14 +379,7 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         driver = self._get_driver_by_name(reference.driver_name)
         context = DriverContext(serialization_context=self._context)
 
-        try:
-            stored_payloads = await driver.retrieve(context, [reference.driver_claim])
-        except PayloadNotFoundError:
-            raise
-        except Exception as err:
-            raise RuntimeError(
-                f"Driver retrieve failed for driver '{driver.name()}'"
-            ) from err
+        stored_payloads = await driver.retrieve(context, [reference.driver_claim])
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
 
@@ -495,22 +436,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         # Retrieve from all drivers concurrently
         driver_claim_list = list(driver_claims.items())
 
-        async def _retrieve_group(
-            driver: Driver, indexed_claims: list[tuple[int, DriverClaim]]
-        ) -> list[Payload]:
-            claims_to_retrieve = [claim for _, claim in indexed_claims]
-            try:
-                return await driver.retrieve(context, claims_to_retrieve)
-            except PayloadNotFoundError:
-                raise
-            except Exception as err:
-                raise RuntimeError(
-                    f"Driver retrieve failed for driver '{driver.name()}'"
-                ) from err
-
         all_stored = await asyncio.gather(
             *(
-                _retrieve_group(driver, indexed_claims)
+                driver.retrieve(context, [claim for _, claim in indexed_claims])
                 for driver, indexed_claims in driver_claim_list
             )
         )

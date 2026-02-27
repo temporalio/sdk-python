@@ -16,7 +16,6 @@ from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.extstore import (
     DriverClaim,
     DriverContext,
-    PayloadNotFoundError,
     StorageOptions,
     StorageWarning,
 )
@@ -100,9 +99,10 @@ class BadTestDriver(InMemoryTestDriver):
         if self._no_retrieve:
             return []
         if self._raise_payload_not_found:
-            raise PayloadNotFoundError(
-                driver_claim=claims[0],
-                driver_name=self.name(),
+            raise ApplicationError(
+                "Payload not found",
+                type="PayloadNotFoundError",
+                non_retryable=True,
             )
         return await super().retrieve(context, claims)
 
@@ -236,7 +236,7 @@ async def test_extstore_worker_missing_driver(
 async def test_extstore_payload_not_found_fails_workflow(
     env: WorkflowEnvironment,
 ):
-    """When a PayloadNotFoundError is raised while retrieving workflow input,
+    """When a non-retryable ApplicationError is raised while retrieving workflow input,
     the workflow must fail terminally (not retry as a task failure).
     """
     client = await Client.connect(
@@ -388,8 +388,8 @@ async def test_replay_extstore_history_fails_with_empty_driver(
             ),
         ),
     ).replay_workflow(history, raise_on_replay_failure=False)
-    # InMemoryTestDriver raises PayloadNotFoundError for absent keys.
-    # PayloadNotFoundError is re-raised without wrapping, so it propagates
+    # InMemoryTestDriver raises ApplicationError for absent keys.
+    # ApplicationError is re-raised without wrapping, so it propagates
     # through decode_activation (before the workflow task runs).  The core SDK
     # receives an activation failure, issues a FailWorkflow command, but the
     # next history event is ActivityTaskScheduled — causing a NondeterminismError.

@@ -941,9 +941,6 @@ class DefaultFailureConverter(FailureConverter):
                 type="PayloadSizeError"
                 if isinstance(exception, _PayloadSizeError)
                 else exception.__class__.__name__,
-                non_retryable=isinstance(
-                    exception, temporalio.extstore.PayloadNotFoundError
-                ),
             )
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__

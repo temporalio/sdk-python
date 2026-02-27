@@ -1783,8 +1783,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def workflow_is_failure_exception(self, err: BaseException) -> bool:
         # An exception causes the workflow to fail (rather than the task) if it
-        # is already a failure error, a timeout error, a PayloadNotFoundError
-        # (unrecoverable missing external payload), or an instance of any of the
+        # is already a failure error, a timeout error, or an instance of any of the
         # failure exception types configured at the worker or workflow level.
         wf_failure_exception_types = self._defn.failure_exception_types
         if self._dynamic_failure_exception_types is not None:
@@ -1792,7 +1791,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         return (
             isinstance(err, temporalio.exceptions.FailureError)
             or isinstance(err, asyncio.TimeoutError)
-            or isinstance(err, temporalio.extstore.PayloadNotFoundError)
             or any(isinstance(err, typ) for typ in wf_failure_exception_types)
             or any(
                 isinstance(err, typ)

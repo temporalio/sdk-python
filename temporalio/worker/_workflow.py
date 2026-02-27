@@ -25,7 +25,6 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
-from temporalio.extstore import PayloadNotFoundError
 
 from . import _command_aware_visitor
 from ._interceptor import (
@@ -341,7 +340,10 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 "Failed handling activation on workflow with run ID %s", act.run_id
             )
 
-            if isinstance(err, PayloadNotFoundError):
+            if (
+                isinstance(err, temporalio.exceptions.ApplicationError)
+                and err.non_retryable
+            ):
                 # Fail the workflow execution terminally rather than failing the task
                 command = completion.successful.commands.add()
                 failure = command.fail_workflow_execution.failure
