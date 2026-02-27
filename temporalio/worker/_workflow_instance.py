@@ -57,7 +57,6 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.extstore
 import temporalio.workflow
 from temporalio.service import __version__
 
