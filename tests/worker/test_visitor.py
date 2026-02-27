@@ -260,16 +260,16 @@ async def test_concurrent_throughput():
         ),
     )
 
-    visitor_max_parallel = SlowVisitor()
+    visitor_concurrent = SlowVisitor()
     start = time.perf_counter()
-    await PayloadVisitor().visit(visitor_max_parallel, completion)
+    await PayloadVisitor(concurrency_limit=10).visit(visitor_concurrent, completion)
     elapsed_concurrent = time.perf_counter() - start
 
-    assert visitor_max_parallel.visit_count == N_CMDS * N_ARGS
+    assert visitor_concurrent.visit_count == N_CMDS * N_ARGS
 
     visitor_serialized = SlowVisitor()
     start = time.perf_counter()
-    await PayloadVisitor(concurrency_limit=1).visit(visitor_serialized, completion)
+    await PayloadVisitor().visit(visitor_serialized, completion)
     elapsed_serialized = time.perf_counter() - start
 
     assert visitor_serialized.visit_count == N_CMDS * N_ARGS
