@@ -1373,9 +1373,7 @@ class DataConverter(WithSerializationContext):
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
-    _external_storage_middleware: temporalio.extstore._StorageImpl = dataclasses.field(
-        init=False
-    )
+    _storage_impl: temporalio.extstore._StorageImpl = dataclasses.field(init=False)
 
     _payload_error_limits: _ServerPayloadErrorLimits | None = None
     """Server-reported limits for payloads."""
@@ -1556,14 +1554,14 @@ class DataConverter(WithSerializationContext):
     async def _encode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
-        payload = await self._external_storage_middleware.store_payload(payload)
+        payload = await self._storage_impl.store_payload(payload)
         if self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
         self._validate_payload_limits([payload])
         return payload
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
-        await self._external_storage_middleware.store_payloads(payloads)
+        await self._storage_impl.store_payloads(payloads)
         if self.payload_codec:
             await self.payload_codec.encode_wrapper(payloads)
         self._validate_payload_limits(payloads.payloads)
@@ -1571,9 +1569,7 @@ class DataConverter(WithSerializationContext):
     async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        result = await self._external_storage_middleware.store_payload_sequence(
-            payloads
-        )
+        result = await self._storage_impl.store_payload_sequence(payloads)
         if self.payload_codec:
             result = await self.payload_codec.encode(result)
         self._validate_payload_limits(result)
@@ -1584,13 +1580,13 @@ class DataConverter(WithSerializationContext):
     ) -> temporalio.api.common.v1.Payload:
         if self.payload_codec:
             payload = (await self.payload_codec.decode([payload]))[0]
-        payload = await self._external_storage_middleware.retrieve_payload(payload)
+        payload = await self._storage_impl.retrieve_payload(payload)
         return payload
 
     async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
         if self.payload_codec:
             await self.payload_codec.decode_wrapper(payloads)
-        await self._external_storage_middleware.retrieve_payloads(payloads)
+        await self._storage_impl.retrieve_payloads(payloads)
 
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
@@ -1598,9 +1594,7 @@ class DataConverter(WithSerializationContext):
         result = list(payloads)
         if self.payload_codec:
             result = await self.payload_codec.decode(result)
-        result = await self._external_storage_middleware.retrieve_payload_sequence(
-            result
-        )
+        result = await self._storage_impl.retrieve_payload_sequence(result)
         return result
 
     @staticmethod
