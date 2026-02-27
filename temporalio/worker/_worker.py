@@ -516,7 +516,8 @@ class Worker:
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
                 max_concurrent_payload_conversions=config.get(
-                    "max_concurrent_payload_conversions", _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY
+                    "max_concurrent_payload_conversions",
+                    _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
                 ),
             )
 

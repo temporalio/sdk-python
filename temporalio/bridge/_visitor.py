@@ -67,9 +67,7 @@ class PayloadVisitor:
 
     async def visit(self, fs: VisitorFunctions, root: Any) -> None:
         """Visits the given root message with the given function."""
-        fs = _BoundedVisitorFunctions(
-            fs, asyncio.Semaphore(self._concurrency_limit)
-        )
+        fs = _BoundedVisitorFunctions(fs, asyncio.Semaphore(self._concurrency_limit))
         method_name = "_visit_" + root.DESCRIPTOR.full_name.replace(".", "_")
         method = getattr(self, method_name, None)
         if method is not None:
