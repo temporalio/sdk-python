@@ -267,10 +267,10 @@ async def test_concurrent_throughput():
     assert visitor_default.max_concurrent == 1
 
     visitor_concurrent = SlowVisitor()
-    await PayloadVisitor(concurrency_limit=10).visit(visitor_concurrent, completion)
+    await PayloadVisitor(concurrency_limit=5).visit(visitor_concurrent, completion)
 
     assert visitor_concurrent.visit_count == N_CMDS * N_ARGS
-    assert visitor_concurrent.max_concurrent == 10
+    assert visitor_concurrent.max_concurrent == 5
 
 
 async def test_bridge_encoding():
