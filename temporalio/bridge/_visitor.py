@@ -62,6 +62,8 @@ class PayloadVisitor:
                 call, so it limits I/O-level concurrency without risking
                 deadlock in the recursive traversal.
         """
+        if concurrency_limit < 1:
+            raise ValueError("concurrency_limit must be positive")
         self.skip_search_attributes = skip_search_attributes
         self.skip_headers = skip_headers
         self._concurrency_limit = concurrency_limit

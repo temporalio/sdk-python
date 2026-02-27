@@ -65,6 +65,8 @@ class Replayer:
         will be shared across all replay calls and never explicitly shut down.
         Users are encouraged to provide their own if needing more control.
         """
+        if max_concurrent_payload_conversions < 1:
+            raise ValueError("max_concurrent_payload_conversions must be positive")
         self._config = ReplayerConfig(
             workflows=list(workflows),
             workflow_task_executor=(
