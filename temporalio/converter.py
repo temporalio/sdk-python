@@ -46,7 +46,7 @@ import temporalio.exceptions
 import temporalio.types
 
 if TYPE_CHECKING:
-    from temporalio.extstore import StorageOptions, _ExternalStorageMiddleware
+    import temporalio.extstore  # avoid circular import at runtime
 
 if sys.version_info < (3, 11):
     # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
@@ -928,9 +928,6 @@ class DefaultFailureConverter(FailureConverter):
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
         """See base class."""
-        from temporalio.extstore import (
-            PayloadNotFoundError,
-        )
 
         # If already a failure error, use that
         if isinstance(exception, temporalio.exceptions.FailureError):
@@ -944,7 +941,9 @@ class DefaultFailureConverter(FailureConverter):
                 type="PayloadSizeError"
                 if isinstance(exception, _PayloadSizeError)
                 else exception.__class__.__name__,
-                non_retryable=isinstance(exception, PayloadNotFoundError),
+                non_retryable=isinstance(
+                    exception, temporalio.extstore.PayloadNotFoundError
+                ),
             )
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__
@@ -1368,7 +1367,7 @@ class DataConverter(WithSerializationContext):
     payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
     """Settings for payload size limits."""
 
-    external_storage: StorageOptions | None = None
+    external_storage: temporalio.extstore.StorageOptions | None = None
     """Options for external storage. If None, external storage is disabled.
     
     .. warning::
@@ -1378,8 +1377,8 @@ class DataConverter(WithSerializationContext):
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
-    _external_storage_middleware: "_ExternalStorageMiddleware" = dataclasses.field(
-        init=False
+    _external_storage_middleware: temporalio.extstore._ExternalStorageMiddleware = (
+        dataclasses.field(init=False)
     )
 
     _payload_error_limits: _ServerPayloadErrorLimits | None = None
@@ -1496,13 +1495,14 @@ class DataConverter(WithSerializationContext):
     def _reset_external_storage_middleware(
         self, context: SerializationContext | None = None
     ) -> None:
-        # Lazy import to avoid circular dependency
-        from temporalio.extstore import _ExternalStorageMiddleware
+        import temporalio.extstore  # lazy import to avoid circular dependency
 
         object.__setattr__(
             self,
             "_external_storage_middleware",
-            _ExternalStorageMiddleware(self.external_storage, context),
+            temporalio.extstore._ExternalStorageMiddleware(
+                self.external_storage, context
+            ),
         )
 
     def _with_payload_error_limits(
