@@ -6,7 +6,7 @@ import asyncio
 import dataclasses
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from typing_extensions import Self
@@ -28,7 +28,7 @@ class StorageDriverClaim:
            This API is experimental.
     """
 
-    data: dict[str, str]
+    data: Mapping[str, str]
     """Driver-defined data for identifying and retrieving an externally stored payload."""
 
 
