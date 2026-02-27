@@ -415,6 +415,12 @@ class Worker:
             raise ValueError(
                 "deployment_config cannot be used with build_id or use_worker_versioning"
             )
+        max_concurrent_payload_conversions = config.get(
+            "max_concurrent_payload_conversions",
+            _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
+        )
+        if max_concurrent_payload_conversions < 1:
+            raise ValueError("max_concurrent_payload_conversions must be positive")
 
         # Prepend applicable client interceptors to the given ones
         client_config = config["client"].config(active_config=True)  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -515,10 +521,7 @@ class Worker:
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
-                max_concurrent_payload_conversions=config.get(
-                    "max_concurrent_payload_conversions",
-                    _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
-                ),
+                max_concurrent_payload_conversions=max_concurrent_payload_conversions,
             )
 
         tuner = config.get("tuner")
