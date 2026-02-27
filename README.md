@@ -488,7 +488,7 @@ Some things to note about external payload storage:
 
 * Only payloads that meet or exceed `Options.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
 * External payload storage applies transparently to workflow inputs/outputs, activity inputs/outputs, signals, updates, queries, and failure details.
-* The `DataConverter`'s `payload_codec` (if configured) is applied to the *reference* payload stored in workflow history, not to the externally stored bytes. To encrypt or compress the bytes handed to a driver, use `Options.external_converter`.
+* The `DataConverter`'s `payload_codec` (if configured) is applied to the *reference* payload stored in workflow history, not to the externally stored bytes. To encrypt or compress the bytes handed to a driver, use `Options.payload_codec`.
 * Setting `Options.payload_size_threshold` to `None` causes every payload to be considered for external payload storage regardless of size.
 
 ###### Multiple Drivers and Driver Selection

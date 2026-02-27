@@ -8,20 +8,16 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
 from typing_extensions import Self
 
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import (
     JSONPlainPayloadConverter,
+    PayloadCodec,
     SerializationContext,
     WithSerializationContext,
 )
 from temporalio.exceptions import TemporalError
-
-if TYPE_CHECKING:
-    from temporalio.converter import PayloadCodec
 
 
 @dataclass(frozen=True)
@@ -124,37 +120,6 @@ class DriverSelector(ABC):
 
 
 @dataclass(frozen=True)
-class StorageConverter(WithSerializationContext):
-    """Converters for converting and encoding external payloads to/from Python values.
-
-    .. warning::
-           This API is experimental.
-    """
-
-    payload_codec: PayloadCodec | None
-    """Optional codec applied to payloads before they are handed to a
-    :class:`Driver` for storage, and after they are retrieved. When ``None``,
-    payloads are stored as-is by the driver.
-    """
-
-    def with_context(self, context: SerializationContext) -> Self:
-        """Return a copy of this converter with the serialization context applied.
-
-        If :attr:`payload_codec` implements :class:`WithSerializationContext`,
-        a new instance is created with the context propagated to it. If nothing
-        changed, ``self`` is returned unchanged.
-        """
-        payload_codec = self.payload_codec
-        if isinstance(payload_codec, WithSerializationContext):
-            payload_codec = payload_codec.with_context(context)
-        if payload_codec == self.payload_codec:
-            return self
-        cloned = dataclasses.replace(self)
-        object.__setattr__(cloned, "payload_codec", payload_codec)
-        return cloned
-
-
-@dataclass(frozen=True)
 class StorageOptions(WithSerializationContext):
     """Configuration for external storage behavior.
 
@@ -192,20 +157,17 @@ class StorageOptions(WithSerializationContext):
     external storage regardless of size.
     """
 
-    external_converter: StorageConverter | None = None
-    """Converter applied to payload bytes before they are passed to a driver
-    for storage, and after they are retrieved. When ``None``, payload bytes are
-    handed to the driver without any additional encoding. Note that the
-    ``DataConverter``'s ``payload_codec`` is applied to the reference payload
-    that replaces the original in workflow history, not to the externally stored
-    bytes themselves.
+    payload_codec: PayloadCodec | None = None
+    """Optional codec applied to payloads before they are handed to a
+    :class:`Driver` for storage, and after they are retrieved. When ``None``,
+    payloads are stored as-is by the driver.
     """
 
     def with_context(self, context: SerializationContext) -> Self:
         """Return a copy of these options with the serialization context applied.
 
         Propagates *context* to any drivers, the driver selector, and the
-        external converter that implement :class:`WithSerializationContext`.
+        payload codec that implement :class:`WithSerializationContext`.
         If none of those fields changed, ``self`` is returned unchanged.
         """
         drivers = list(self.drivers)
@@ -215,22 +177,22 @@ class StorageOptions(WithSerializationContext):
         driver_selector = self.driver_selector
         if isinstance(driver_selector, WithSerializationContext):
             driver_selector = driver_selector.with_context(context)
-        external_converter = self.external_converter
-        if isinstance(external_converter, WithSerializationContext):
-            external_converter = external_converter.with_context(context)
+        payload_codec = self.payload_codec
+        if isinstance(payload_codec, WithSerializationContext):
+            payload_codec = payload_codec.with_context(context)
         if all(
             new is orig
             for new, orig in [
                 (drivers, self.drivers),
                 (driver_selector, self.driver_selector),
-                (external_converter, self.external_converter),
+                (payload_codec, self.payload_codec),
             ]
         ):
             return self
         cloned = dataclasses.replace(self)
         object.__setattr__(cloned, "drivers", drivers)
         object.__setattr__(cloned, "driver_selector", driver_selector)
-        object.__setattr__(cloned, "external_converter", external_converter)
+        object.__setattr__(cloned, "payload_codec", payload_codec)
         return cloned
 
 
@@ -332,15 +294,9 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         self,
         options: StorageOptions | None,
         context: SerializationContext | None = None,
-        payload_codec: PayloadCodec | None = None,
     ):
         self._options = options
         self._context = context
-        self._payload_codec = (
-            options.external_converter.payload_codec
-            if options and options.external_converter
-            else payload_codec
-        )
         self._driver_map: dict[str, Driver] = {}
         if options is not None:
             for driver in options.drivers:
@@ -397,8 +353,8 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
 
         # Optionally encode the payload before externally storing it
         encoded_payload = payload
-        if self._payload_codec:
-            encoded_payload = (await self._payload_codec.encode([payload]))[0]
+        if self._options.payload_codec:
+            encoded_payload = (await self._options.payload_codec.encode([payload]))[0]
 
         try:
             claims = await driver.store(context, [encoded_payload])
@@ -452,8 +408,8 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         # Optionally encode all payloads destined for external storage
         payloads_to_encode = [payload for _, payload, _ in to_store]
         encoded_payloads = payloads_to_encode
-        if self._payload_codec:
-            encoded_payloads = await self._payload_codec.encode(payloads_to_encode)
+        if self._options.payload_codec:
+            encoded_payloads = await self._options.payload_codec.encode(payloads_to_encode)
 
         # Group encoded payloads by driver for batched store calls
         # driver -> [(original_index, encoded_payload)]
@@ -539,8 +495,8 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
 
-        if self._payload_codec:
-            stored_payloads = await self._payload_codec.decode(stored_payloads)
+        if self._options.payload_codec:
+            stored_payloads = await self._options.payload_codec.decode(stored_payloads)
 
         return stored_payloads[0]
 
@@ -629,8 +585,8 @@ class _ExternalStorageMiddleware:  # type:ignore[reportUnusedClass]
         stored_list = [stored_by_index[idx] for idx in retrieve_indices]
 
         decoded_payloads = stored_list
-        if self._payload_codec:
-            decoded_payloads = await self._payload_codec.decode(stored_list)
+        if self._options.payload_codec:
+            decoded_payloads = await self._options.payload_codec.decode(stored_list)
 
         for i, retrieved_payload in enumerate(decoded_payloads):
             results[retrieve_indices[i]] = retrieved_payload

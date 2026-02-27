@@ -25,7 +25,6 @@ from temporalio.extstore import (
     DriverNotFoundError,
     DriverSelector,
     PayloadNotFoundError,
-    StorageConverter,
     StorageOptions,
     StorageWarning,
     _StorageReference,
@@ -537,8 +536,8 @@ class TestPayloadCodecWithExternalStorage:
         assert driver._retrieve_calls == 1
 
     async def test_external_converter_without_codec_does_not_encode_stored_bytes(self):
-        """When DataConverter.payload_codec is set but StorageOptions.external_converter
-        has no payload_codec, stored bytes are NOT encoded – even though
+        """When DataConverter.payload_codec is set but StorageOptions.payload_codec
+        is None, stored bytes are NOT encoded – even though
         DataConverter.payload_codec is active for the reference payload in history."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
@@ -548,9 +547,6 @@ class TestPayloadCodecWithExternalStorage:
             external_storage=StorageOptions(
                 drivers=[driver],
                 payload_size_threshold=50,
-                # Explicitly set external_converter without its own codec.
-                # DataConverter.payload_codec must NOT bleed through to stored bytes.
-                external_converter=StorageConverter(payload_codec=None),
             ),
         )
 
@@ -576,10 +572,10 @@ class TestPayloadCodecWithExternalStorage:
         assert driver._retrieve_calls == 1
 
     async def test_external_converter_codec_independent_from_dc_codec(self):
-        """When both DataConverter.payload_codec and
-        StorageOptions.external_converter.payload_codec are set, the reference
-        payload in history uses DataConverter.payload_codec and the bytes stored
-        by the driver use external_converter.payload_codec – independently."""
+        """When both DataConverter.payload_codec and StorageOptions.payload_codec
+        are set, the reference payload in history uses DataConverter.payload_codec
+        and the bytes stored by the driver use StorageOptions.payload_codec –
+        independently."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
         ext_codec = RecordingPayloadCodec("binary/ext-encoded")
@@ -589,7 +585,7 @@ class TestPayloadCodecWithExternalStorage:
             external_storage=StorageOptions(
                 drivers=[driver],
                 payload_size_threshold=50,
-                external_converter=StorageConverter(payload_codec=ext_codec),
+                payload_codec=ext_codec,
             ),
         )
 
