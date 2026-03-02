@@ -83,8 +83,8 @@ class ActivityAlreadyStartedError(FailureError):
     def __init__(
         self, activity_id: str, activity_type: str, *, run_id: str | None = None
     ) -> None:
-        """Initialize a workflow already started error."""
-        super().__init__("Workflow execution already started")
+        """Initialize a activity already started error."""
+        super().__init__("Activity execution already started")
         self.activity_id = activity_id
         self.activity_type = activity_type
         self.run_id = run_id
