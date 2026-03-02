@@ -847,6 +847,9 @@ async def test_id_conflict_policy_fail(client: Client, env: WorkflowEnvironment)
             id_conflict_policy=ActivityIDConflictPolicy.FAIL,
         )
     assert err.value.activity_id == activity_id
+    assert "Activity" in str(
+        err.value
+    ), f"Expected 'Activity' in error message, got: {err.value}"
 
 
 async def test_id_conflict_policy_use_existing(
