@@ -54,6 +54,7 @@ informal introduction to the features and their implementation.
       - [Data Conversion](#data-conversion)
         - [Pydantic Support](#pydantic-support)
         - [Custom Type Data Conversion](#custom-type-data-conversion)
+        - [External Payload Storage](#external-payload-storage)
     - [Workers](#workers)
     - [Workflows](#workflows)
       - [Definition](#definition)
@@ -309,8 +310,9 @@ other_ns_client = Client(**config)
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
 `temporalio.converter.DataConverter` can be set via the `data_converter` parameter of the `Client` constructor. Data
-converters are a combination of payload converters, payload codecs, and failure converters. Payload converters convert
-Python values to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption).
+converters are a combination of payload converters, external payload storage, payload codecs, and failure converters. Payload
+converters convert Python values to/from serialized bytes. External payload storage optionally stores and retrieves payloads
+to/from external storage services using drivers. Payload codecs convert bytes to bytes (e.g. for compression or encryption).
 Failure converters convert exceptions to/from serialized failures.
 
 The default data converter supports converting multiple types including:
@@ -454,6 +456,140 @@ my_data_converter = dataclasses.replace(
 ```
 
 Now `IPv4Address` can be used in type hints including collections, optionals, etc.
+
+##### External Payload Storage
+
+⚠️ **External payload storage support is currently at an experimental release stage.** ⚠️
+
+External payload storage allows large payloads to be offloaded to an external storage service (such as Amazon S3) rather than stored inline in workflow history. This is useful when workflows or activities work with data that would otherwise exceed Temporal's payload size limits.
+
+External payload storage is configured via the `external_storage` parameter on `DataConverter`, which accepts a `temporalio.extstore.StorageConfig` instance. Any driver used to store payloads must also be configured on the component that retrieves them — for example, if the client stores workflow inputs using a driver, the worker must include that driver in its `StorageConfig.drivers` list to retrieve them.
+
+The simplest setup uses a single storage driver:
+
+```python
+import dataclasses
+from temporalio.client import Client
+from temporalio.converter import DataConverter
+from temporalio.extstore import StorageConfig
+
+driver = MyDriver()
+
+client = await Client.connect(
+    "localhost:7233",
+    data_converter=dataclasses.replace(
+        DataConverter.default,
+        external_storage=StorageConfig(drivers=[driver]),
+    ),
+)
+```
+
+Some things to note about external payload storage:
+
+* Only payloads that meet or exceed `StorageConfig.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
+* External payload storage applies transparently to workflow inputs/outputs, activity inputs/outputs, signals, updates, queries, and failure details.
+* The `DataConverter`'s `payload_codec` (if configured) is applied to the *reference* payload stored in workflow history, not to the externally stored bytes. To encrypt or compress the bytes handed to a driver, use `StorageConfig.payload_codec`.
+* Setting `StorageConfig.payload_size_threshold` to `None` causes every payload to be considered for external payload storage regardless of size.
+
+###### Multiple Drivers and Driver Selection
+
+When multiple storage backends are needed, list all drivers in `StorageConfig.drivers` and provide a `driver_selector` to control which driver stores new payloads. Any driver in the list not chosen for storing is still available for retrieval, which is useful when migrating between storage backends.
+
+```python
+from temporalio.extstore import StorageConfig
+
+options = StorageConfig(
+    drivers=[hot_driver, cold_driver],
+    driver_selector=lambda context, payload: (
+        hot_driver if payload.ByteSize() < 5 * 1024 * 1024 else cold_driver
+    ),
+)
+```
+
+For stateful or class-based selection logic, implement a callable class. If it also implements `temporalio.converter.WithSerializationContext`, it will receive workflow or activity context (namespace, workflow ID, etc.) at serialization time, just like a driver or payload codec:
+
+```python
+from typing_extensions import Self
+import temporalio.converter
+import temporalio.extstore
+from temporalio.api.common.v1 import Payload
+
+class FeatureFlaggedDriverSelector(temporalio.converter.WithSerializationContext):
+    def __init__(self, driver: temporalio.extstore.StorageDriver, enabled: bool = False):
+        self._driver = driver
+        self._enabled = enabled
+
+    def __call__(
+        self, _context: temporalio.extstore.StorageDriverContext, _payload: Payload
+    ) -> temporalio.extstore.StorageDriver | None:
+        return self._driver if self._enabled else None
+
+    def with_context(self, context: temporalio.converter.SerializationContext) -> Self:
+        workflow_id = None
+        if isinstance(context, temporalio.converter.WorkflowSerializationContext) and context.workflow_id:
+            workflow_id = context.workflow_id
+        elif isinstance(context, temporalio.converter.ActivitySerializationContext) and context.workflow_id:
+            workflow_id = context.workflow_id
+
+        return FeatureFlaggedDriverSelector(
+            self._driver, FeatureFlaggedDriverSelector.feature_flag_is_on(workflow_id)
+        )
+
+    @staticmethod
+    def feature_flag_is_on(workflow_id: str | None) -> bool:
+        """Mock implementation of a feature flag based on a workflow ID."""
+        return workflow_id is not None and len(workflow_id) % 2 == 0
+```
+
+Some things to note about driver selection:
+
+* When no `driver_selector` is set, the first driver in `StorageConfig.drivers` is always used for storing.
+* Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
+* The driver returned by the selector must be registered in `StorageConfig.drivers`. If it is not, a `RuntimeError` is raised.
+
+###### Custom Drivers
+
+Implement `temporalio.extstore.StorageDriver` to integrate with an external storage system:
+
+```python
+from collections.abc import Sequence
+from temporalio.extstore import StorageDriver, StorageDriverClaim, StorageDriverContext
+from temporalio.api.common.v1 import Payload
+
+class MyDriver(StorageDriver):
+    def __init__(self, driver_name: str | None = None):
+        self._driver_name = driver_name or "my-org:driver:my-driver"
+
+    def name(self) -> str:
+        return self._driver_name
+
+    async def store(
+        self, context: StorageDriverContext, payloads: Sequence[Payload]
+    ) -> list[StorageDriverClaim]:
+        claims = []
+        for payload in payloads:
+            key = await my_storage.put(payload.SerializeToString())
+            claims.append(StorageDriverClaim(data={"key": key}))
+        return claims
+
+    async def retrieve(
+        self, context: StorageDriverContext, claims: Sequence[StorageDriverClaim]
+    ) -> list[Payload]:
+        payloads = []
+        for claim in claims:
+            data = await my_storage.get(claim.data["key"])
+            p = Payload()
+            p.ParseFromString(data)
+            payloads.append(p)
+        return payloads
+```
+
+Some things to note about implementing a custom driver:
+
+* `store` and `retrieve` must return lists of the same length as their respective input sequences.
+* `StorageDriver.name()` must return a string that is unique among all drivers in `StorageConfig.drivers`. This name is embedded in the reference payload stored in workflow history and used to look up the correct driver during retrieval — changing it after payloads have been stored will break retrieval.
+* `StorageDriver.type()` is automatically implemented to return the name of the class. This can be overridden in subclasses but must remain consistent across all instances of the subclass.
+* Implement `temporalio.converter.WithSerializationContext` on your driver to receive workflow or activity context (namespace, workflow ID, activity ID, etc.) at serialization time.
 
 ### Workers
 
