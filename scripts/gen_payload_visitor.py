@@ -1,7 +1,6 @@
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 from google.protobuf.descriptor import Descriptor, FieldDescriptor
 
@@ -21,50 +20,109 @@ def name_for(desc: Descriptor) -> str:
     return desc.full_name.replace(".", "_")
 
 
+# ---------------------------------------------------------------------------
+# Emitters for the "multi-unit" case: accumulate coroutines into `coros` list
+# and let the caller do a single asyncio.gather(*coros) at the end.
+# ---------------------------------------------------------------------------
+
+
 def emit_loop(
     field_name: str,
     iter_expr: str,
     child_method: str,
 ) -> str:
-    # Helper to emit a for-loop over a collection with optional headers guard
+    # Emit a coros.extend() over a collection with optional skip guard
     if field_name == "headers":
-        return f"""\
-        if not self.skip_headers:
-            for v in {iter_expr}:
-                await self._visit_{child_method}(fs, v)"""
+        return (
+            "        if not self.skip_headers:\n"
+            f"            coros.extend(self._visit_{child_method}(fs, v) for v in {iter_expr})"
+        )
     elif field_name == "search_attributes":
-        return f"""\
-        if not self.skip_search_attributes:
-            for v in {iter_expr}:
-                await self._visit_{child_method}(fs, v)"""
+        return (
+            "        if not self.skip_search_attributes:\n"
+            f"            coros.extend(self._visit_{child_method}(fs, v) for v in {iter_expr})"
+        )
     else:
-        return f"""\
-        for v in {iter_expr}:
-            await self._visit_{child_method}(fs, v)"""
+        return f"        coros.extend(self._visit_{child_method}(fs, v) for v in {iter_expr})"
 
 
 def emit_singular(
     field_name: str, access_expr: str, child_method: str, presence_word: str | None
 ) -> str:
-    # Helper to emit a singular field visit with presence check and optional headers guard
+    # Emit a coros.append() with optional HasField check and skip guard
     if presence_word:
         if field_name == "headers":
-            return f"""\
-        if not self.skip_headers:
-            {presence_word} o.HasField("{field_name}"):
-                await self._visit_{child_method}(fs, {access_expr})"""
+            return (
+                "        if not self.skip_headers:\n"
+                f'            {presence_word} o.HasField("{field_name}"):\n'
+                f"                coros.append(self._visit_{child_method}(fs, {access_expr}))"
+            )
         else:
-            return f"""\
-        {presence_word} o.HasField("{field_name}"):
-            await self._visit_{child_method}(fs, {access_expr})"""
+            return (
+                f'        {presence_word} o.HasField("{field_name}"):\n'
+                f"            coros.append(self._visit_{child_method}(fs, {access_expr}))"
+            )
     else:
         if field_name == "headers":
-            return f"""\
-        if not self.skip_headers:
-            await self._visit_{child_method}(fs, {access_expr})"""
+            return (
+                "        if not self.skip_headers:\n"
+                f"            coros.append(self._visit_{child_method}(fs, {access_expr}))"
+            )
         else:
-            return f"""\
-        await self._visit_{child_method}(fs, {access_expr})"""
+            return (
+                f"        coros.append(self._visit_{child_method}(fs, {access_expr}))"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Emitters for the "single-unit" case: emit a direct await (no list needed).
+# ---------------------------------------------------------------------------
+
+
+def emit_loop_direct(
+    field_name: str,
+    iter_expr: str,
+    child_method: str,
+) -> str:
+    # Emit a direct await asyncio.gather(*[...]) with optional skip guard
+    if field_name == "headers":
+        return (
+            "        if not self.skip_headers:\n"
+            f"            await asyncio.gather(*[self._visit_{child_method}(fs, v) for v in {iter_expr}])"
+        )
+    elif field_name == "search_attributes":
+        return (
+            "        if not self.skip_search_attributes:\n"
+            f"            await asyncio.gather(*[self._visit_{child_method}(fs, v) for v in {iter_expr}])"
+        )
+    else:
+        return f"        await asyncio.gather(*[self._visit_{child_method}(fs, v) for v in {iter_expr}])"
+
+
+def emit_singular_direct(
+    field_name: str, access_expr: str, child_method: str, presence_word: str | None
+) -> str:
+    # Emit a direct await self._visit_...() with optional HasField check and skip guard
+    if presence_word:
+        if field_name == "headers":
+            return (
+                "        if not self.skip_headers:\n"
+                f'            {presence_word} o.HasField("{field_name}"):\n'
+                f"                await self._visit_{child_method}(fs, {access_expr})"
+            )
+        else:
+            return (
+                f'        {presence_word} o.HasField("{field_name}"):\n'
+                f"            await self._visit_{child_method}(fs, {access_expr})"
+            )
+    else:
+        if field_name == "headers":
+            return (
+                "        if not self.skip_headers:\n"
+                f"            await self._visit_{child_method}(fs, {access_expr})"
+            )
+        else:
+            return f"        await self._visit_{child_method}(fs, {access_expr})"
 
 
 class VisitorGenerator:
@@ -85,15 +143,18 @@ class VisitorGenerator:
         header = """
 # This file is generated by gen_payload_visitor.py. Changes should be made there.
 import abc
+import asyncio
+from collections.abc import Coroutine
 from typing import Any, MutableSequence
 
 from temporalio.api.common.v1.message_pb2 import Payload
 
 
 class VisitorFunctions(abc.ABC):
-    \"\"\"Set of functions which can be called by the visitor. 
+    \"\"\"Set of functions which can be called by the visitor.
     Allows handling payloads as a sequence.
     \"\"\"
+
     @abc.abstractmethod
     async def visit_payload(self, payload: Payload) -> None:
         \"\"\"Called when encountering a single payload.\"\"\"
@@ -104,21 +165,57 @@ class VisitorFunctions(abc.ABC):
         \"\"\"Called when encountering multiple payloads together.\"\"\"
         raise NotImplementedError()
 
+
+class _BoundedVisitorFunctions(VisitorFunctions):
+    \"\"\"Wraps VisitorFunctions to cap concurrent payload visits via a semaphore.\"\"\"
+
+    def __init__(self, inner: VisitorFunctions, sem: asyncio.Semaphore) -> None:
+        self._inner = inner
+        self._sem = sem
+
+    async def visit_payload(self, payload: Payload) -> None:
+        async with self._sem:
+            await self._inner.visit_payload(payload)
+
+    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+        async with self._sem:
+            await self._inner.visit_payloads(payloads)
+
+
 class PayloadVisitor:
-    \"\"\"A visitor for payloads. 
+    \"\"\"A visitor for payloads.
     Applies a function to every payload in a tree of messages.
     \"\"\"
+
     def __init__(
-        self, *, skip_search_attributes: bool = False, skip_headers: bool = False
+        self,
+        *,
+        skip_search_attributes: bool = False,
+        skip_headers: bool = False,
+        concurrency_limit: int = 1,
     ):
-        \"\"\"Creates a new payload visitor.\"\"\"
+        \"\"\"Creates a new payload visitor.
+
+        Args:
+            skip_search_attributes: If True, search attributes are not visited.
+            skip_headers: If True, headers are not visited.
+            concurrency_limit: Maximum number of payload visits that may run
+                concurrently during a single call to visit(). Defaults to 1.
+                The semaphore is applied to each visit_payload / visit_payloads
+                call, so it limits I/O-level concurrency without risking
+                deadlock in the recursive traversal.
+        \"\"\"
+        if concurrency_limit < 1:
+            raise ValueError("concurrency_limit must be positive")
         self.skip_search_attributes = skip_search_attributes
         self.skip_headers = skip_headers
+        self._concurrency_limit = concurrency_limit
 
     async def visit(
         self, fs: VisitorFunctions, root: Any
     ) -> None:
         \"\"\"Visits the given root message with the given function.\"\"\"
+        fs = _BoundedVisitorFunctions(fs, asyncio.Semaphore(self._concurrency_limit))
         method_name = "_visit_" + root.DESCRIPTOR.full_name.replace(".", "_")
         method = getattr(self, method_name, None)
         if method is not None:
@@ -152,18 +249,16 @@ class PayloadVisitor:
     """,
         ]
 
-    def check_repeated(self, child_desc, field, iter_expr) -> str | None:
-        # Special case for repeated payloads, handle them directly
+    def _collect_repeated(
+        self, child_desc: Descriptor, field: FieldDescriptor, iter_expr: str
+    ) -> tuple | None:
+        """Collect emit item for a non-map repeated field. Returns tuple or None."""
         if child_desc.full_name == Payload.DESCRIPTOR.full_name:
-            return emit_singular(field.name, iter_expr, "payload_container", None)
+            return ("singular", field.name, iter_expr, "payload_container", None)
         else:
             child_needed = self.walk(child_desc)
             if child_needed:
-                return emit_loop(
-                    field.name,
-                    iter_expr,
-                    name_for(child_desc),
-                )
+                return ("loop", field.name, iter_expr, name_for(child_desc))
             else:
                 return None
 
@@ -177,11 +272,13 @@ class PayloadVisitor:
 
         has_payload = False
         self.in_progress.add(key)
-        lines: list[str] = [f"    async def _visit_{name_for(desc)}(self, fs, o):"]
-        # If this is the SearchAttributes message, allow skipping
-        if desc.full_name == SearchAttributes.DESCRIPTOR.full_name:
-            lines.append("        if self.skip_search_attributes:")
-            lines.append("            return")
+        is_search_attrs = desc.full_name == SearchAttributes.DESCRIPTOR.full_name
+
+        # Collect emit items before generating code.  Each item is one of:
+        #   ("loop",       field_name, iter_expr,   child_method)
+        #   ("singular",   field_name, access_expr, child_method, presence_word_or_None)
+        #   ("oneof_group",[(field_name, access_expr, child_method, if_word), ...])
+        emit_items: list = []
 
         # Group fields by oneof to generate if/elif chains
         oneof_fields: dict[int, list[FieldDescriptor]] = {}
@@ -217,8 +314,9 @@ class PayloadVisitor:
                         child_needed = self.walk(child_desc)
                         if child_needed:
                             has_payload = True
-                            lines.append(
-                                emit_loop(
+                            emit_items.append(
+                                (
+                                    "loop",
                                     field.name,
                                     f"o.{field.name}.values()",
                                     name_for(child_desc),
@@ -234,34 +332,39 @@ class PayloadVisitor:
                         child_needed = self.walk(child_desc)
                         if child_needed:
                             has_payload = True
-                            lines.append(
-                                emit_loop(
+                            emit_items.append(
+                                (
+                                    "loop",
                                     field.name,
                                     f"o.{field.name}.keys()",
                                     name_for(child_desc),
                                 )
                             )
                 else:
-                    child = self.check_repeated(
+                    item = self._collect_repeated(
                         field.message_type, field, f"o.{field.name}"
                     )
-                    if child is not None:
+                    if item is not None:
                         has_payload = True
-                        lines.append(child)
+                        emit_items.append(item)
             else:
                 child_desc = field.message_type
                 child_has_payload = self.walk(child_desc)
                 has_payload |= child_has_payload
                 if child_has_payload:
-                    lines.append(
-                        emit_singular(
-                            field.name, f"o.{field.name}", name_for(child_desc), "if"
+                    emit_items.append(
+                        (
+                            "singular",
+                            field.name,
+                            f"o.{field.name}",
+                            name_for(child_desc),
+                            "if",
                         )
                     )
 
         # Process oneof fields as if/elif chains
         for oneof_idx, fields in oneof_fields.items():
-            oneof_lines = []
+            group = []
             first = True
             for field in fields:
                 child_desc = field.message_type
@@ -270,16 +373,61 @@ class PayloadVisitor:
                 if child_has_payload:
                     if_word = "if" if first else "elif"
                     first = False
-                    line = emit_singular(
-                        field.name, f"o.{field.name}", name_for(child_desc), if_word
+                    group.append(
+                        (field.name, f"o.{field.name}", name_for(child_desc), if_word)
                     )
-                    oneof_lines.append(line)
-            if oneof_lines:
-                lines.extend(oneof_lines)
+            if group:
+                emit_items.append(("oneof_group", group))
 
         self.generated[key] = has_payload
         self.in_progress.discard(key)
+
         if has_payload:
+            lines: list[str] = [f"    async def _visit_{name_for(desc)}(self, fs, o):"]
+            if is_search_attrs:
+                lines.append("        if self.skip_search_attributes:")
+                lines.append("            return")
+
+            # Use coros accumulation only when there are multiple independent units;
+            # a single unit is emitted with a direct await (no list overhead).
+            use_coros = len(emit_items) > 1
+            if use_coros:
+                lines.append("        coros: list[Coroutine[Any, Any, None]] = []")
+
+            for item in emit_items:
+                if item[0] == "loop":
+                    _, field_name, iter_expr, child_method = item
+                    lines.append(
+                        emit_loop(field_name, iter_expr, child_method)
+                        if use_coros
+                        else emit_loop_direct(field_name, iter_expr, child_method)
+                    )
+                elif item[0] == "singular":
+                    _, field_name, access_expr, child_method, presence_word = item
+                    lines.append(
+                        emit_singular(
+                            field_name, access_expr, child_method, presence_word
+                        )
+                        if use_coros
+                        else emit_singular_direct(
+                            field_name, access_expr, child_method, presence_word
+                        )
+                    )
+                else:  # oneof_group
+                    for field_name, access_expr, child_method, presence_word in item[1]:
+                        lines.append(
+                            emit_singular(
+                                field_name, access_expr, child_method, presence_word
+                            )
+                            if use_coros
+                            else emit_singular_direct(
+                                field_name, access_expr, child_method, presence_word
+                            )
+                        )
+
+            if use_coros:
+                lines.append("        await asyncio.gather(*coros)")
+
             self.methods.append("\n".join(lines) + "\n")
         return has_payload
 
