@@ -981,8 +981,8 @@ wheels = [
 
 [[package]]
 name = "google-adk"
-version = "1.25.1"
-source = { git = "https://github.com/marcusmotill/adk-python-temporal.git?rev=motill%2Fdurable-support#5abb5194a179ef57fe3a34a8ea98a7c66dbb663c" }
+version = "1.26.0"
+source = { git = "https://github.com/google/adk-python.git?rev=main#175d6381c5e97ad865485427c6337324b55bb367" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "anyio" },
@@ -995,6 +995,7 @@ dependencies = [
     { name = "google-cloud-bigquery" },
     { name = "google-cloud-bigquery-storage" },
     { name = "google-cloud-bigtable" },
+    { name = "google-cloud-dataplex" },
     { name = "google-cloud-discoveryengine" },
     { name = "google-cloud-pubsub" },
     { name = "google-cloud-secret-manager" },
@@ -1233,6 +1234,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a6/03/ef0bc99d0e0faf4fdbe67ac445e18cdaa74824fd93cd069e7bb6548cb52d/google_cloud_core-2.5.0.tar.gz", hash = "sha256:7c1b7ef5c92311717bd05301aa1a91ffbc565673d3b0b4163a52d8413a186963", size = 36027, upload-time = "2025-10-29T23:17:39.513Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/89/20/bfa472e327c8edee00f04beecc80baeddd2ab33ee0e86fd7654da49d45e9/google_cloud_core-2.5.0-py3-none-any.whl", hash = "sha256:67d977b41ae6c7211ee830c7912e41003ea8194bff15ae7d72fd6f51e57acabc", size = 29469, upload-time = "2025-10-29T23:17:38.548Z" },
+]
+
+[[package]]
+name = "google-cloud-dataplex"
+version = "2.16.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "grpc-google-iam-v1" },
+    { name = "grpcio" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ac/64/38445469e85e20b6fbb0ad58d0466daa3bd779789729562c12b35cfc24c3/google_cloud_dataplex-2.16.0.tar.gz", hash = "sha256:f9086abb94ae1f35151b2df5b729cc6bbf9361354d5afd22e76515ec0a8e7fdc", size = 766385, upload-time = "2026-01-15T13:15:22.79Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/1a/9d0fc0188abcfe3c4e58db72972b100badb9899e34d94471223ac2037816/google_cloud_dataplex-2.16.0-py3-none-any.whl", hash = "sha256:173ce519395cd424c1ae22de4efb194767524fb5a2424194f091e63b34f4dfc1", size = 584533, upload-time = "2026-01-15T13:13:12.348Z" },
 ]
 
 [[package]]
@@ -4296,7 +4314,7 @@ provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents"]
 dev = [
     { name = "basedpyright", specifier = "==1.34.0" },
     { name = "cibuildwheel", specifier = ">=2.22.0,<3" },
-    { name = "google-adk", git = "https://github.com/marcusmotill/adk-python-temporal.git?rev=motill%2Fdurable-support" },
+    { name = "google-adk", git = "https://github.com/google/adk-python.git?rev=main" },
     { name = "googleapis-common-protos", specifier = "==1.70.0" },
     { name = "grpcio-tools", specifier = ">=1.48.2,<2" },
     { name = "httpx", specifier = ">=0.28.1" },
