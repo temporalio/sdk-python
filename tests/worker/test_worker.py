@@ -63,7 +63,7 @@ from tests.helpers import (
     new_worker,
 )
 from tests.helpers.fork import _ForkTestResult, _TestFork
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 def test_load_default_worker_binary_id():
@@ -468,7 +468,8 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         tuner=tuner,
         identity="myworker",
     ) as w:
-        await create_nexus_endpoint(w.task_queue, client)
+        endpoint_name = make_nexus_endpoint_name(w.task_queue)
+        await env.create_nexus_endpoint(endpoint_name, w.task_queue)
         wf1 = await client.start_workflow(
             CustomSlotSupplierWorkflow.run,
             id=f"custom-slot-supplier-{uuid.uuid4()}",

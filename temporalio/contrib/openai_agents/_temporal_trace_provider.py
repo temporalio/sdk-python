@@ -14,8 +14,8 @@ from agents.tracing.provider import (
 )
 from agents.tracing.spans import Span
 
+import temporalio.workflow
 from temporalio import workflow
-from temporalio.contrib.openai_agents._trace_interceptor import RunIdRandom
 from temporalio.workflow import ReadOnlyContextError
 
 
@@ -79,11 +79,13 @@ def activity_span(
 
 class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
     def __init__(
-        self, impl: SynchronousMultiTracingProcessor, auto_close_in_workflows: bool
+        self,
+        impl: SynchronousMultiTracingProcessor,
+        start_spans_in_replay: bool,
     ):
         super().__init__()
         self._impl = impl
-        self._auto_close_in_workflows = auto_close_in_workflows
+        self._emit_spans_in_replay = start_spans_in_replay
 
     def add_tracing_processor(self, tracing_processor: TracingProcessor):
         self._impl.add_tracing_processor(tracing_processor)
@@ -92,38 +94,33 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
         self._impl.set_processors(processors)
 
     def on_trace_start(self, trace: Trace) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
+        if not self._emit_spans_in_replay:
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
+                # In replay mode, don't report
+                return
 
         self._impl.on_trace_start(trace)
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            self._impl.on_trace_end(trace)
 
     def on_trace_end(self, trace: Trace) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            return
+        if not self._emit_spans_in_replay:
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
+                # In replay mode, don't report
+                return
 
         self._impl.on_trace_end(trace)
 
     def on_span_start(self, span: Span[Any]) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
-
+        if not self._emit_spans_in_replay:
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
+                # In replay mode, don't report
+                return
         self._impl.on_span_start(span)
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            self._impl.on_span_end(span)
 
     def on_span_end(self, span: Span[Any]) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            return
+        if not self._emit_spans_in_replay:
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
+                # In replay mode, don't report
+                return
 
         self._impl.on_span_end(span)
 
@@ -135,22 +132,33 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
 
 
 def _workflow_uuid() -> str:
-    random = cast(
-        RunIdRandom, getattr(workflow.instance(), "__temporal_openai_tracing_random")
-    )
-    return random.uuid4()
+    if (
+        getattr(
+            temporalio.workflow.instance(), "__temporal_openai_tracing_random", None
+        )
+        is None
+    ):
+        setattr(
+            temporalio.workflow.instance(),
+            "__temporal_openai_tracing_random",
+            temporalio.workflow.new_random(),
+        )
+    random = getattr(temporalio.workflow.instance(), "__temporal_openai_tracing_random")
+    return uuid.UUID(
+        bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
+    ).hex[:24]
 
 
 class TemporalTraceProvider(DefaultTraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
-    def __init__(self, auto_close_in_workflows: bool = False):
+    def __init__(self, start_spans_in_replay: bool = False):
         """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = cast(DefaultTraceProvider, get_trace_provider())
         self._multi_processor = _TemporalTracingProcessor(
             self._original_provider._multi_processor,
-            auto_close_in_workflows,
+            start_spans_in_replay,
         )
 
     def time_iso(self) -> str:

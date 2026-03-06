@@ -20,7 +20,6 @@ from temporalio import nexus, workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import (
-    create_nexus_endpoint,
     make_nexus_endpoint_name,
 )
 
@@ -127,7 +126,9 @@ async def test_nexus_worker_shutdown(env: WorkflowEnvironment):
     # Use separate task queues for caller and handler workers
     handler_task_queue = str(uuid.uuid4())
     caller_task_queue = str(uuid.uuid4())
-    await create_nexus_endpoint(handler_task_queue, env.client)
+    await env.create_nexus_endpoint(
+        make_nexus_endpoint_name(handler_task_queue), handler_task_queue
+    )
 
     operation_started = asyncio.Event()
 
@@ -180,7 +181,9 @@ async def test_nexus_worker_shutdown_graceful(env: WorkflowEnvironment):
     # Use separate task queues for caller and handler workers
     handler_task_queue = str(uuid.uuid4())
     caller_task_queue = str(uuid.uuid4())
-    await create_nexus_endpoint(handler_task_queue, env.client)
+    await env.create_nexus_endpoint(
+        make_nexus_endpoint_name(handler_task_queue), handler_task_queue
+    )
 
     operation_started = asyncio.Event()
 
@@ -234,7 +237,9 @@ async def test_sync_nexus_operation_worker_shutdown_graceful(env: WorkflowEnviro
     # Use separate task queues for caller and handler workers
     handler_task_queue = str(uuid.uuid4())
     caller_task_queue = str(uuid.uuid4())
-    await create_nexus_endpoint(handler_task_queue, env.client)
+    await env.create_nexus_endpoint(
+        make_nexus_endpoint_name(handler_task_queue), handler_task_queue
+    )
 
     sync_operation_started = threading.Event()
 
@@ -292,7 +297,9 @@ async def test_is_worker_shutdown(env: WorkflowEnvironment):
     # Use separate task queues for caller and handler workers
     handler_task_queue = str(uuid.uuid4())
     caller_task_queue = str(uuid.uuid4())
-    await create_nexus_endpoint(handler_task_queue, env.client)
+    await env.create_nexus_endpoint(
+        make_nexus_endpoint_name(handler_task_queue), handler_task_queue
+    )
 
     operation_started = asyncio.Event()
     handler = ShutdownTestServiceHandler(operation_started)

@@ -51,7 +51,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 @dataclass
@@ -1751,7 +1751,8 @@ async def test_nexus_payload_codec_operations_lack_context(
         workflows=[NexusOperationTestWorkflow],
         nexus_service_handlers=[NexusOperationTestServiceHandler()],
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
+        endpoint_name = make_nexus_endpoint_name(worker.task_queue)
+        await env.create_nexus_endpoint(endpoint_name, worker.task_queue)
         await client.execute_workflow(
             NexusOperationTestWorkflow.run,
             "workflow-data",

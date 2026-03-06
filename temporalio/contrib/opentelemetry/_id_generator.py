@@ -39,11 +39,35 @@ class TemporalIdGenerator(IdGenerator):
     inside a workflow execution, ensuring deterministic span and trace IDs
     across workflow replays. Falls back to standard random generation outside
     of workflows.
+
+    Can be seeded with OpenTelemetry span IDs from client context to maintain
+    proper span parenting across the client-workflow boundary.
     """
 
     def __init__(self, id_generator: IdGenerator):
         """Initialize a TemporalIdGenerator."""
         self._id_generator = id_generator
+        self.traces: list[int] = []
+        self.spans: list[int] = []
+
+    def seed_span_id(self, span_id: int) -> None:
+        """Seed the generator with a span ID to use as the first result.
+
+        This is typically used to maintain OpenTelemetry span parenting
+        when crossing the client-workflow boundary.
+
+        Args:
+            span_id: The span ID to use as the first generated span ID.
+        """
+        self.spans.append(span_id)
+
+    def seed_trace_id(self, trace_id: int) -> None:
+        """Seed the generator with a trace ID to use as the first result.
+
+        Args:
+            trace_id: The trace ID to use as the first generated trace ID.
+        """
+        self.traces.append(trace_id)
 
     def generate_span_id(self) -> int:
         """Generate a span ID using Temporal's deterministic random when in workflow.
@@ -51,6 +75,9 @@ class TemporalIdGenerator(IdGenerator):
         Returns:
             A 64-bit span ID.
         """
+        if len(self.spans) > 0:
+            return self.spans.pop()
+
         if workflow_random := _get_workflow_random():
             span_id = workflow_random.getrandbits(64)
             while span_id == INVALID_SPAN_ID:
@@ -64,6 +91,9 @@ class TemporalIdGenerator(IdGenerator):
         Returns:
             A 128-bit trace ID.
         """
+        if len(self.traces) > 0:
+            return self.traces.pop()
+
         if workflow_random := _get_workflow_random():
             trace_id = workflow_random.getrandbits(128)
             while trace_id == INVALID_TRACE_ID:

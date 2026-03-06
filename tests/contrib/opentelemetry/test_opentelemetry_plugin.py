@@ -25,7 +25,7 @@ from temporalio.testing import WorkflowEnvironment
 # Import the dump_spans function from the original opentelemetry test
 from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
 from tests.helpers import new_worker
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +272,9 @@ async def test_opentelemetry_comprehensive_tracing(
         max_cached_workflows=0,
     ) as worker:
         # Create Nexus endpoint for this task queue
-        await create_nexus_endpoint(worker.task_queue, new_client)
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(worker.task_queue), worker.task_queue
+        )
 
         with get_tracer(__name__).start_as_current_span("ComprehensiveTest") as span:
             span.set_attribute("test.type", "comprehensive")

@@ -856,6 +856,8 @@ class _Runtime(ABC):
         input: Any,
         output_type: type[OutputT] | None,
         schedule_to_close_timeout: timedelta | None,
+        schedule_to_start_timeout: timedelta | None,
+        start_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
@@ -5418,6 +5420,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5433,6 +5437,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5451,6 +5457,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5469,6 +5477,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5487,6 +5497,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5504,6 +5516,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5517,6 +5531,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5528,6 +5544,8 @@ class NexusClient(ABC, Generic[ServiceT]):
             input: The Nexus operation input.
             output_type: The Nexus operation output type.
             schedule_to_close_timeout: Timeout for the entire operation attempt.
+            schedule_to_start_timeout: Timeout for the operation to be started.
+            start_to_close_timeout: Timeout for async operations to complete after starting.
             headers: Headers to send with the Nexus HTTP request.
 
         Returns:
@@ -5548,6 +5566,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5563,6 +5583,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5581,6 +5603,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5599,6 +5623,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5617,6 +5643,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5635,6 +5663,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5648,6 +5678,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5659,6 +5691,8 @@ class NexusClient(ABC, Generic[ServiceT]):
             input: The Nexus operation input.
             output_type: The Nexus operation output type.
             schedule_to_close_timeout: Timeout for the entire operation attempt.
+            schedule_to_start_timeout: Timeout for the operation to be started.
+            start_to_close_timeout: Timeout for async operations to complete after starting.
             headers: Headers to send with the Nexus HTTP request.
 
         Returns:
@@ -5701,6 +5735,8 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5713,6 +5749,8 @@ class _NexusClient(NexusClient[ServiceT]):
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
                 cancellation_type=cancellation_type,
                 headers=headers,
                 summary=summary,
@@ -5726,6 +5764,8 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5735,6 +5775,8 @@ class _NexusClient(NexusClient[ServiceT]):
             input,
             output_type=output_type,
             schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
             cancellation_type=cancellation_type,
             headers=headers,
             summary=summary,
