@@ -63,7 +63,7 @@ class TemporalModel(BaseLlm):
             stream: Whether to stream the response (currently ignored).
 
         Yields:
-            LlmResponse: The responses from the model.
+            The responses from the model.
         """
         responses = await workflow.execute_activity(
             invoke_model,

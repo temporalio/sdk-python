@@ -105,7 +105,7 @@ jobs:
           TEMPORAL_TEST_PROTO3: 1
         run: |
           uv add --python 3.10 "protobuf<4"
-          uv sync --all-extras
+          uv sync --extra grpc 
           poe build-develop
           poe gen-protos
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
