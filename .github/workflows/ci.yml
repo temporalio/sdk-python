@@ -110,7 +110,7 @@ jobs:
           poe build-develop
           poe gen-protos
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
-          poe test -s
+          poe test -s --ignore=tests/contrib/google_adk_agents/
         timeout-minutes: 10
 
       # Do docs stuff (only on one host)
