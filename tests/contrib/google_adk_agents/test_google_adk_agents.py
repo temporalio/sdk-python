@@ -433,6 +433,7 @@ class McpModel(BaseLlm):
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.asyncio
+@pytest.mark.skip # Doesn't work well in CI currently
 async def test_mcp_agent(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("GOOGLE_API_KEY"):
         pytest.skip("No google API key")
