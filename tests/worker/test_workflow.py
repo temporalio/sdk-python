@@ -3435,17 +3435,22 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
 class CancelWorkflowSleepTaskWorkflow:
     """Like CancelSignalAndTimerFiredInSameTaskWorkflow but uses workflow.sleep."""
 
+    _ready = False
     timer_task: asyncio.Task[None]  # type: ignore[reportUninitializedInstanceVariable]
 
     @workflow.run
     async def run(self) -> str:
-        # Start a long workflow.sleep wrapped in a task
         self.timer_task = asyncio.create_task(workflow.sleep(60 * 60))
+        self._ready = True
         try:
             await self.timer_task
             return "timer_completed"
         except asyncio.CancelledError:
             return "timer_cancelled"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
 
     @workflow.signal
     def cancel_timer(self) -> None:
@@ -3453,49 +3458,38 @@ class CancelWorkflowSleepTaskWorkflow:
 
 
 async def test_workflow_sleep_task_cancellation(
-    client: Client, env: WorkflowEnvironment
+    client: Client,
 ):
-    """Cancelling a task wrapping workflow.sleep() should cancel the timer
-    and not raise InvalidStateError."""
-    if not env.supports_time_skipping:
-        pytest.skip("Need to skip time to validate this test")
+    async with new_worker(
+        client,
+        CancelWorkflowSleepTaskWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            CancelWorkflowSleepTaskWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
 
-    async with await WorkflowEnvironment.start_time_skipping() as env:
-        # Use max_cached_workflows=0 and restart worker so the signal and
-        # timer fire arrive in the same activation (mirrors the existing
-        # CancelSignalAndTimerFiredInSameTaskWorkflow test).
-        async with new_worker(
-            client,
-            CancelWorkflowSleepTaskWorkflow,
-            max_cached_workflows=0,
-        ) as worker:
-            task_queue = worker.task_queue
-            handle = await client.start_workflow(
-                CancelWorkflowSleepTaskWorkflow.run,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=task_queue,
-            )
-            # Wait so the worker starts the timer
-            await env.sleep(30 * 60)
+        async def ready() -> bool:
+            return await handle.query(CancelWorkflowSleepTaskWorkflow.ready)
 
-        # Listen to result in background so the auto-skipping works
-        result_task = asyncio.create_task(handle.result())
-
-        # Send signal to cancel the workflow.sleep task, then advance past timer
+        await assert_eq_eventually(True, ready)
         await handle.signal(CancelWorkflowSleepTaskWorkflow.cancel_timer)
-        await env.sleep(60 * 60)
+        result = await handle.result()
 
-        # Start worker again and wait for completion — previously this would
-        # log InvalidStateError when the timer callback fired on a cancelled future
-        async with new_worker(
-            env.client,
-            CancelWorkflowSleepTaskWorkflow,
-            task_queue=task_queue,
-            max_cached_workflows=0,
-        ):
-            result = await result_task
-
-        assert result == "timer_cancelled"
+    assert result == "timer_cancelled"
+    # Verify the Temporal timer was actually cancelled on the server
+    resp = await client.workflow_service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=handle.id),
+        )
+    )
+    timer_canceled = any(
+        e.event_type == EventType.EVENT_TYPE_TIMER_CANCELED
+        for e in resp.history.events
+    )
+    assert timer_canceled, "Expected TimerCanceled event in history"
 
 
 class MyCustomError(ApplicationError):
