@@ -3486,8 +3486,7 @@ async def test_workflow_sleep_task_cancellation(
         )
     )
     timer_canceled = any(
-        e.event_type == EventType.EVENT_TYPE_TIMER_CANCELED
-        for e in resp.history.events
+        e.event_type == EventType.EVENT_TYPE_TIMER_CANCELED for e in resp.history.events
     )
     assert timer_canceled, "Expected TimerCanceled event in history"
 
