@@ -257,6 +257,7 @@ async def test_single_agent(client: Client, use_local_model: bool):
             ],
             id=f"weather-agent-workflow-{uuid.uuid4()}",
             task_queue="adk-task-queue",
+            execution_timeout=timedelta(seconds=60),
         )
         result = await handle.result()
         print(f"Workflow result: {result}")
@@ -337,6 +338,7 @@ async def test_multi_agent(client: Client, use_local_model: bool):
             ],
             id=f"multi-agent-workflow-{uuid.uuid4()}",
             task_queue="adk-task-queue",
+            execution_timeout=timedelta(seconds=60),
         )
         result = await handle.result()
         print(f"Multi-Agent Workflow result: {result}")
@@ -478,6 +480,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
             ],
             id=f"mcp-agent-workflow-{uuid.uuid4()}",
             task_queue="adk-task-queue",
+            execution_timeout=timedelta(seconds=60),
         )
         result = await handle.result()
         print(f"MCP-Agent Workflow result: {result}")
@@ -521,6 +524,7 @@ async def test_single_agent_telemetry(client: Client):
             ],
             id=f"weather-agent-workflow-{uuid.uuid4()}",
             task_queue="adk-task-queue",
+            execution_timeout=timedelta(seconds=60),
         )
         result = await handle.result()
         print(f"Workflow result: {result}")
