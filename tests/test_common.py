@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from temporalio.api.common.v1 import Payload
+from temporalio.api.common.v1 import Payload, RetryPolicy as RetryPolicyProto
 from temporalio.common import (
     Priority,
     RawValue,
@@ -123,3 +123,26 @@ def test_cant_construct_bad_priority():
         Priority(priority_key=1.1)  # type: ignore
     with pytest.raises(ValueError):
         Priority(priority_key=-1)
+
+
+def test_retry_policy_from_proto_pickle():
+    """Test that RetryPolicy.from_proto() creates a picklable object when non_retryable_error_types is set."""
+    # Create a protobuf with non_retryable_error_types
+    proto = RetryPolicyProto()
+    proto.initial_interval.seconds = 1
+    proto.backoff_coefficient = 2.0
+    proto.maximum_attempts = 3
+    proto.non_retryable_error_types.extend(["SomeError", "AnotherError"])
+    
+    # Convert from proto
+    retry_policy = RetryPolicy.from_proto(proto)
+    
+    # This should not raise a PickleError
+    pickled = pickle.dumps(retry_policy)
+    unpickled = pickle.loads(pickled)
+    
+    # Verify the data is intact
+    assert unpickled.initial_interval == timedelta(seconds=1)
+    assert unpickled.backoff_coefficient == 2.0
+    assert unpickled.maximum_attempts == 3
+    assert unpickled.non_retryable_error_types == ["SomeError", "AnotherError"]
