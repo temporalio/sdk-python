@@ -104,8 +104,9 @@ jobs:
         env:
           TEMPORAL_TEST_PROTO3: 1
         run: |
+          uv remove google-adk --optional google-adk
           uv add --python 3.10 "protobuf<4"
-          uv sync --extra grpc 
+          uv sync --all extras
           poe build-develop
           poe gen-protos
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
