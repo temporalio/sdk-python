@@ -506,7 +506,7 @@ async def test_list_activities(client: Client, env: WorkflowEnvironment):
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
     )
-
+    await asyncio.sleep(1)
     executions = [
         e async for e in client.list_activities(f'ActivityId = "{activity_id}"')
     ]
