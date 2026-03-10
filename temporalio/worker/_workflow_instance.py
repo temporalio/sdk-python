@@ -1739,10 +1739,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         fut = self.create_future()
-        self._timer_impl(
+        timer_handle = self._timer_impl(
             duration,
             _TimerOptions(user_metadata=user_metadata),
-            lambda: fut.set_result(None),
+            lambda: fut.set_result(None) if not fut.done() else None,
+        )
+        fut.add_done_callback(
+            lambda f: timer_handle.cancel() if f.cancelled() else None
         )
         await fut
 
