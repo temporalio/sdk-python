@@ -150,6 +150,10 @@ class StorageConfig(WithSerializationContext):
     """Name-keyed index of :attr:`drivers`, built at construction time."""
 
     def __post_init__(self) -> None:
+        """Validate drivers and build the internal name-keyed driver map.
+
+        Raises :exc:`ValueError` if any two drivers share the same name.
+        """
         driver_map: dict[str, StorageDriver] = {}
         for driver in self.drivers:
             name = driver.name()
@@ -193,6 +197,7 @@ class StorageConfig(WithSerializationContext):
             driver_selector=driver_selector,
             payload_codec=payload_codec,
         )
+
 
 class StorageWarning(RuntimeWarning):
     """Warning for external storage issues.
