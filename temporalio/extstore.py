@@ -144,6 +144,23 @@ class StorageConfig(WithSerializationContext):
     payloads are stored as-is by the driver.
     """
 
+    _driver_map: dict[str, StorageDriver] = dataclasses.field(
+        init=False, repr=False, compare=False
+    )
+    """Name-keyed index of :attr:`drivers`, built at construction time."""
+
+    def __post_init__(self) -> None:
+        driver_map: dict[str, StorageDriver] = {}
+        for driver in self.drivers:
+            name = driver.name()
+            if name in driver_map:
+                raise ValueError(
+                    f"StorageConfig.drivers contains multiple drivers with name '{name}'. "
+                    "Each driver must have a unique name."
+                )
+            driver_map[name] = driver
+        object.__setattr__(self, "_driver_map", driver_map)
+
     def with_context(self, context: SerializationContext) -> Self:
         """Return a copy of these options with the serialization context applied.
 
@@ -170,12 +187,12 @@ class StorageConfig(WithSerializationContext):
             ]
         ):
             return self
-        cloned = dataclasses.replace(self)
-        object.__setattr__(cloned, "drivers", drivers)
-        object.__setattr__(cloned, "driver_selector", driver_selector)
-        object.__setattr__(cloned, "payload_codec", payload_codec)
-        return cloned
-
+        return dataclasses.replace(
+            self,
+            drivers=drivers,
+            driver_selector=driver_selector,
+            payload_codec=payload_codec,
+        )
 
 class StorageWarning(RuntimeWarning):
     """Warning for external storage issues.
@@ -204,18 +221,9 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
     ):
         self._options = options
         self._context = context
-        self._driver_map: dict[str, StorageDriver] = {}
-        if options is not None:
-            for driver in options.drivers:
-                name = driver.name()
-                if name in self._driver_map:
-                    warnings.warn(
-                        f"StorageConfig.drivers contains multiple drivers with name '{name}'. "
-                        "The first one will be used.",
-                        category=StorageWarning,
-                    )
-                else:
-                    self._driver_map[name] = driver
+        self._driver_map: dict[str, StorageDriver] = (
+            options._driver_map if options is not None else {}
+        )
 
     def _select_driver(
         self, context: StorageDriverContext, payload: Payload

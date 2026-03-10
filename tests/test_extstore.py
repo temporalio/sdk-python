@@ -1,6 +1,5 @@
 """Tests for external storage functionality."""
 
-import warnings
 from collections.abc import Sequence
 
 import pytest
@@ -22,7 +21,6 @@ from temporalio.extstore import (
     StorageDriver,
     StorageDriverClaim,
     StorageDriverContext,
-    StorageWarning,
     _StorageReference,
 )
 
@@ -677,41 +675,17 @@ class TestMultiDriver:
         with pytest.raises(RuntimeError):
             await converter.encode(["x" * 200])
 
-    async def test_duplicate_driver_names_warns_and_first_wins_for_retrieval(self):
-        """Registering two drivers with identical names emits StorageWarning.
-        The first-registered driver with that name is kept in the name→driver
-        map; subsequent duplicates are ignored.
-
-        Both store (positional via drivers[0]) and retrieval (name-based map)
-        therefore resolve to the same driver — no data is lost."""
+    def test_duplicate_driver_names_raises(self):
+        """Registering two drivers with identical names raises ValueError immediately
+        when constructing StorageConfig."""
         first = InMemoryTestDriver("dup-name")
         duplicate = InMemoryTestDriver("dup-name")
 
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            converter = DataConverter(
-                external_storage=StorageConfig(
-                    drivers=[first, duplicate],
-                    payload_size_threshold=50,
-                )
+        with pytest.raises(ValueError, match="dup-name"):
+            StorageConfig(
+                drivers=[first, duplicate],
+                payload_size_threshold=50,
             )
-
-        storage_warnings = [w for w in caught if issubclass(w.category, StorageWarning)]
-        assert len(storage_warnings) == 1
-        assert "dup-name" in str(storage_warnings[0].message)
-
-        # Store goes to first (drivers[0], positional).
-        large = "x" * 200
-        encoded = await converter.encode([large])
-        assert first._store_calls == 1
-        assert duplicate._store_calls == 0
-
-        # Retrieval resolves "dup-name" to first (first-registered wins).
-        # first has the data, so the round-trip succeeds.
-        decoded = await converter.decode(encoded, [str])
-        assert decoded[0] == large
-        assert first._retrieve_calls == 1
-        assert duplicate._retrieve_calls == 0
 
 
 if __name__ == "__main__":
