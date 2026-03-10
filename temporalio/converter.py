@@ -1381,7 +1381,7 @@ class DataConverter(WithSerializationContext):
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
-        self._reset_external_storage_middleware()
+        self._reset_storage_impl()
 
     async def encode(
         self, values: Sequence[Any]
@@ -1483,17 +1483,15 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)
         object.__setattr__(cloned, "external_storage", external_storage)
-        cloned._reset_external_storage_middleware(context)
+        cloned._reset_storage_impl(context)
         return cloned
 
-    def _reset_external_storage_middleware(
-        self, context: SerializationContext | None = None
-    ) -> None:
+    def _reset_storage_impl(self, context: SerializationContext | None = None) -> None:
         import temporalio.extstore  # lazy import to avoid circular dependency
 
         object.__setattr__(
             self,
-            "_external_storage_middleware",
+            "_storage_impl",
             temporalio.extstore._StorageImpl(self.external_storage, context),
         )
 
