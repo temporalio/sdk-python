@@ -7,6 +7,7 @@ import threading
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import IntEnum
 from typing import Any
 from urllib.request import urlopen
@@ -173,6 +174,11 @@ class HeaderTestService:
     cancellable_operation: nexusrpc.Operation[None, str]
 
 
+@nexusrpc.service
+class RequestDeadlineService:
+    cancellable_op: nexusrpc.Operation[None, str]
+
+
 # -----------------------------------------------------------------------------
 # Service implementation
 #
@@ -333,6 +339,46 @@ class HeaderTestServiceImpl:
     @operation_handler
     def cancellable_operation(self) -> OperationHandler[None, str]:
         return CancellableOperationHandler(self.cancel_headers_received)
+
+
+class CancellableDeadlineOperationHandler(OperationHandler[None, str]):
+    """Operation handler that captures request_deadline from start and cancel contexts."""
+
+    def __init__(
+        self,
+        start_deadlines_received: list[datetime | None],
+        cancel_deadlines_received: list[datetime | None],
+        cancel_received: asyncio.Event,
+    ) -> None:
+        self._start_deadlines_received = start_deadlines_received
+        self._cancel_deadlines_received = cancel_deadlines_received
+        self._cancel_received = cancel_received
+
+    async def start(
+        self, ctx: StartOperationContext, input: None
+    ) -> StartOperationResultAsync:
+        self._start_deadlines_received.append(ctx.request_deadline)
+        return StartOperationResultAsync("test-token")
+
+    async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+        self._cancel_deadlines_received.append(ctx.request_deadline)
+        self._cancel_received.set()
+
+
+@service_handler(service=RequestDeadlineService)
+class RequestDeadlineServiceImpl:
+    def __init__(self) -> None:
+        self.start_deadlines_received: list[datetime | None] = []
+        self.cancel_deadlines_received: list[datetime | None] = []
+        self.cancel_received = asyncio.Event()
+
+    @operation_handler
+    def cancellable_op(self) -> OperationHandler[None, str]:
+        return CancellableDeadlineOperationHandler(
+            self.start_deadlines_received,
+            self.cancel_deadlines_received,
+            self.cancel_received,
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -571,6 +617,30 @@ class CancelHeaderTestCallerWorkflow:
 
 
 @workflow.defn
+class CancelDeadlineCallerWorkflow:
+    """Workflow that starts a cancellable operation and then cancels it, for deadline testing."""
+
+    @workflow.run
+    async def run(self, task_queue: str) -> None:
+        nexus_client = workflow.create_nexus_client(
+            service=RequestDeadlineService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        op_handle = await nexus_client.start_operation(
+            RequestDeadlineService.cancellable_op,
+            None,
+            cancellation_type=workflow.NexusOperationCancellationType.WAIT_REQUESTED,
+        )
+        # Request cancellation - this sends a cancel operation to the handler
+        op_handle.cancel()
+
+        try:
+            await op_handle
+        except NexusOperationError:
+            pass
+
+
+@workflow.defn
 class WorkflowRunHeaderTestCallerWorkflow:
     """Workflow that calls a workflow_run_operation and verifies headers."""
 
@@ -593,8 +663,6 @@ class WorkflowRunHeaderTestCallerWorkflow:
 
 
 async def test_sync_operation_happy_path(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -631,8 +699,6 @@ async def test_sync_operation_happy_path(client: Client, env: WorkflowEnvironmen
 async def test_workflow_run_operation_happy_path(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -833,9 +899,6 @@ async def test_workflow_run_operation_headers(
     env: WorkflowEnvironment,
 ):
     """Test that headers are propagated to @workflow_run_operation handlers."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     test_headers = {"x-custom-workflow-run": "workflow-run-value"}
 
@@ -1317,9 +1380,6 @@ class ServiceInterfaceAndImplCallerWorkflow:
 async def test_service_interface_and_implementation_names(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     # Note that:
     # - The caller can specify the service & operation via a reference to either the
     #   interface or implementation class.
@@ -1448,9 +1508,6 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -1504,9 +1561,6 @@ async def test_nexus_operation_summary(
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = f"task-queue-{uuid.uuid4()}"
     async with Worker(
         client,
@@ -1799,9 +1853,6 @@ class OverloadTestCallerWorkflow:
 async def test_workflow_run_operation_overloads(
     client: Client, env: WorkflowEnvironment, op: str
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -1870,9 +1921,6 @@ class CustomMetricsWorkflow:
 
 
 async def test_workflow_caller_custom_metrics(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
     await env.create_nexus_endpoint(endpoint_name, task_queue)
@@ -1949,9 +1997,6 @@ async def test_workflow_caller_custom_metrics(client: Client, env: WorkflowEnvir
 async def test_workflow_caller_buffered_metrics(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     # Create runtime with metric buffer
     buffer = MetricBuffer(10000)
     runtime = Runtime(
@@ -2172,3 +2217,47 @@ class TestAsyncAndNonAsyncCancel:
             # Verify the workflow completed successfully
             result = await caller_wf_handle.result()
             assert result == "cancelled_successfully"
+
+
+async def test_request_deadline_is_accessible_in_operation(
+    client: Client,
+    env: WorkflowEnvironment,
+):
+    """Test that request_deadline is accessible in StartOperationContext."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    service_handler = RequestDeadlineServiceImpl()
+
+    async with Worker(
+        client,
+        nexus_service_handlers=[service_handler],
+        workflows=[CancelDeadlineCallerWorkflow],
+        task_queue=task_queue,
+    ):
+        endpoint_name = make_nexus_endpoint_name(task_queue)
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+        await client.execute_workflow(
+            CancelDeadlineCallerWorkflow.run,
+            task_queue,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+
+        assert len(service_handler.start_deadlines_received) == 1
+        deadline = service_handler.start_deadlines_received[0]
+        assert (
+            deadline is not None
+        ), "request_deadline should be set in StartOperationContext"
+        assert deadline.tzinfo is timezone.utc, "request_deadline should be in utc"
+
+        await asyncio.wait_for(service_handler.cancel_received.wait(), 1)
+
+        assert len(service_handler.cancel_deadlines_received) == 1
+        deadline = service_handler.cancel_deadlines_received[0]
+        assert (
+            deadline is not None
+        ), "request_deadline should be set in CancelOperationContext"
+        assert deadline.tzinfo is timezone.utc, "request_deadline should be in utc"
