@@ -166,35 +166,14 @@ class StorageConfig(WithSerializationContext):
         object.__setattr__(self, "_driver_map", driver_map)
 
     def with_context(self, context: SerializationContext) -> Self:
-        """Return a copy of these options with the serialization context applied.
-
-        Propagates *context* to any drivers, the driver selector, and the
-        payload codec that implement :class:`WithSerializationContext`.
-        If none of those fields changed, ``self`` is returned unchanged.
-        """
-        drivers = list(self.drivers)
-        for index, driver in enumerate(drivers):
-            if isinstance(driver, WithSerializationContext):
-                drivers[index] = driver.with_context(context)
-        driver_selector = self.driver_selector
-        if isinstance(driver_selector, WithSerializationContext):
-            driver_selector = driver_selector.with_context(context)
+        """Return a copy of these options with the serialization context applied."""
         payload_codec = self.payload_codec
         if isinstance(payload_codec, WithSerializationContext):
             payload_codec = payload_codec.with_context(context)
-        if all(
-            new is orig
-            for new, orig in [
-                (drivers, self.drivers),
-                (driver_selector, self.driver_selector),
-                (payload_codec, self.payload_codec),
-            ]
-        ):
+        if payload_codec == self.payload_codec:
             return self
         return dataclasses.replace(
             self,
-            drivers=drivers,
-            driver_selector=driver_selector,
             payload_codec=payload_codec,
         )
 
