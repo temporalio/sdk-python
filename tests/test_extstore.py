@@ -262,10 +262,10 @@ class NotFoundDriver(StorageDriver):
 
 
 class TestDriverError:
-    """Tests for RuntimeError raised when a driver violates its contract."""
+    """Tests for ValueError raised when a driver violates its contract."""
 
     async def test_encode_wrong_claim_count_raises_runtime_error(self):
-        """store() returning fewer claims than payloads must raise RuntimeError."""
+        """store() returning fewer claims than payloads must raise ValueError."""
 
         class _NoClaimsDriver(InMemoryTestDriver):
             async def store(
@@ -281,13 +281,13 @@ class TestDriverError:
             )
         )
         with pytest.raises(
-            RuntimeError,
+            ValueError,
             match=f"Driver '{driver.name()}' returned 0 claims, expected 1",
         ):
             await converter.encode(["x" * 200])
 
     async def test_decode_wrong_payload_count_raises_runtime_error(self):
-        """retrieve() returning fewer payloads than claims must raise RuntimeError."""
+        """retrieve() returning fewer payloads than claims must raise ValueError."""
         good_converter = DataConverter(
             external_storage=StorageConfig(
                 drivers=[InMemoryTestDriver()],
@@ -312,7 +312,7 @@ class TestDriverError:
             )
         )
         with pytest.raises(
-            RuntimeError,
+            ValueError,
             match=f"Driver '{driver.name()}' returned 0 payloads, expected 1",
         ):
             await bad_converter.decode(encoded, [str])
@@ -596,7 +596,7 @@ class TestMultiDriver:
 
     async def test_selector_returns_unregistered_driver_raises(self):
         """A selector that returns a Driver whose name is not present in
-        StorageConfig.drivers raises RuntimeError during encode."""
+        StorageConfig.drivers raises ValueError during encode."""
         registered = InMemoryTestDriver("registered")
 
         converter = DataConverter(
@@ -607,7 +607,7 @@ class TestMultiDriver:
             )
         )
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(ValueError):
             await converter.encode(["x" * 200])
 
     def test_duplicate_driver_names_raises(self):

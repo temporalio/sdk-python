@@ -537,7 +537,7 @@ Some things to note about driver selection:
 
 * When no `driver_selector` is set, the first driver in `StorageConfig.drivers` is always used for storing.
 * Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
-* The driver name returned by the selector must match a driver registered in `StorageConfig.drivers`. If it does not, a `RuntimeError` is raised.
+* The driver name returned by the selector must match a driver registered in `StorageConfig.drivers`. If it does not, an error is raised.
 
 ###### Custom Drivers
 

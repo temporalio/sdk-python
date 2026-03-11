@@ -221,14 +221,14 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
             return None
         driver = self._driver_map.get(driver_name)
         if driver is None:
-            raise RuntimeError(f"No driver found with name '{driver_name}'")
+            raise ValueError(f"No driver found with name '{driver_name}'")
         return driver
 
     def _get_driver_by_name(self, name: str) -> StorageDriver:
-        """Looks up a driver by name, raising :class:`RuntimeError` if not found."""
+        """Looks up a driver by name, raising :class:`ValueError` if not found."""
         driver = self._driver_map.get(name)
         if driver is None:
-            raise RuntimeError(f"No driver found with name '{name}'")
+            raise ValueError(f"No driver found with name '{name}'")
         return driver
 
     async def store_payload(self, payload: Payload) -> Payload:
@@ -478,7 +478,7 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         self, claims: Sequence[StorageDriverClaim], expected: int, driver: StorageDriver
     ) -> None:
         if len(claims) != expected:
-            raise RuntimeError(
+            raise ValueError(
                 f"Driver '{driver.name()}' returned {len(claims)} claims, expected {expected}",
             )
 
@@ -486,6 +486,6 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         self, payloads: Sequence[Payload], expected: int, driver: StorageDriver
     ) -> None:
         if len(payloads) != expected:
-            raise RuntimeError(
+            raise ValueError(
                 f"Driver '{driver.name()}' returned {len(payloads)} payloads, expected {expected}",
             )
