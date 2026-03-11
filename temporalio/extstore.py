@@ -120,9 +120,7 @@ class StorageConfig(WithSerializationContext):
     retrieval, so each driver must have a unique name.
     """
 
-    driver_selector: (
-        Callable[[StorageDriverContext, Payload], str | None] | None
-    ) = None
+    driver_selector: Callable[[StorageDriverContext, Payload], str | None] | None = None
     """Controls which driver stores a given payload. A callable of the form
     ``(StorageDriverContext, Payload) -> str | None`` that returns the name of
     the driver to use, or ``None`` to leave the payload stored inline.
@@ -212,7 +210,8 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         self, context: StorageDriverContext, payload: Payload
     ) -> StorageDriver | None:
         """Returns the driver to use for this payload, or None to pass through."""
-        assert self._options is not None
+        if not self._options:
+            return None
         selector = self._options.driver_selector
         if selector is None:
             return self._options.drivers[0] if self._options.drivers else None
@@ -262,7 +261,10 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
             driver_claim=claims[0],
         )
         reference_payload = self._claim_converter.to_payload(reference)
-        assert reference_payload is not None
+        if reference_payload is None:
+            raise ValueError(
+                f"Failed to serialize storage reference for driver '{driver.name()}'"
+            )
         reference_payload.external_payloads.add().size_bytes = (
             encoded_payload.ByteSize()
         )
@@ -342,7 +344,10 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
                     driver_claim=claim,
                 )
                 reference_payload = self._claim_converter.to_payload(reference)
-                assert reference_payload is not None
+                if reference_payload is None:
+                    raise ValueError(
+                        f"Failed to serialize storage reference for driver '{driver.name()}'"
+                    )
                 reference_payload.external_payloads.add().size_bytes = sizes[i]
                 results[indices[i]] = reference_payload
 
