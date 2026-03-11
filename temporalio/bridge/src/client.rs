@@ -89,12 +89,12 @@ pub fn connect_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: ClientConfig,
 ) -> PyResult<Bound<'a, PyAny>> {
-    let mut opts: ConnectionOptions = config.try_into()?;
-    opts.metrics_meter = runtime_ref
+    let metrics_meter = runtime_ref
         .runtime
         .core
         .telemetry()
         .get_temporal_metric_meter();
+    let opts = config.into_connection_options(metrics_meter)?;
     runtime_ref.runtime.assert_same_process("create client")?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
@@ -229,32 +229,34 @@ fn partition_headers(
     (ascii_headers, binary_headers)
 }
 
-impl TryFrom<ClientConfig> for ConnectionOptions {
-    type Error = PyErr;
-
-    fn try_from(opts: ClientConfig) -> PyResult<Self> {
-        let (ascii_headers, binary_headers) = partition_headers(opts.metadata);
+impl ClientConfig {
+    fn into_connection_options(
+        self,
+        metrics_meter: Option<temporalio_common::telemetry::metrics::TemporalMeter>,
+    ) -> PyResult<ConnectionOptions> {
+        let (ascii_headers, binary_headers) = partition_headers(self.metadata);
         let conn_opts = ConnectionOptions::new(
-            Url::parse(&opts.target_url)
+            Url::parse(&self.target_url)
                 .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
         )
-        .client_name(opts.client_name)
-        .client_version(opts.client_version)
-        .identity(opts.identity)
+        .client_name(self.client_name)
+        .client_version(self.client_version)
+        .identity(self.identity)
         .retry_options(
-            opts.retry_config
+            self.retry_config
                 .map_or(RetryOptions::default(), |c| c.into()),
         )
-        .keep_alive(opts.keep_alive_config.map(Into::into))
-        .maybe_http_connect_proxy(opts.http_connect_proxy_config.map(Into::into))
+        .keep_alive(self.keep_alive_config.map(Into::into))
+        .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
         .headers(ascii_headers)
         .binary_headers(binary_headers)
-        .maybe_api_key(opts.api_key)
-        .maybe_tls_options(if let Some(tls_config) = opts.tls_config {
+        .maybe_api_key(self.api_key)
+        .maybe_tls_options(if let Some(tls_config) = self.tls_config {
             Some(tls_config.try_into()?)
         } else {
             None
-        });
+        })
+        .maybe_metrics_meter(metrics_meter);
         Ok(conn_opts.build())
     }
 }
