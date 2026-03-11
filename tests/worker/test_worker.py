@@ -85,6 +85,16 @@ class NeverRunWorkflow:
         raise NotImplementedError
 
 
+@workflow.defn
+class TestClientUpdateWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            "capture_client_activity",
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
 @nexusrpc.handler.service_handler
 class NeverRunService:
     @nexusrpc.handler.sync_operation
@@ -1257,3 +1267,52 @@ class TestForkUseWorker(_TestFork):
             nexus_service_handlers=[],
         )
         self.run(mp_fork_ctx)
+
+
+async def test_activity_client_updates_when_worker_client_changes(client: Client):
+    """Test that activities get the updated client when worker.client is changed."""
+    # Create a second client (simulating a new client after cert rotation)
+    # Must use the same runtime
+    client2 = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        data_converter=client.data_converter,
+        runtime=client.service_client.config.runtime,
+    )
+
+    captured_clients: list[Client] = []
+
+    @activity.defn
+    async def capture_client_activity() -> None:
+        captured_clients.append(activity.client())
+
+    # Create worker with activities
+    worker = Worker(
+        client,
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        activities=[capture_client_activity],
+        workflows=[TestClientUpdateWorkflow],
+    )
+
+    async with worker:
+        # Execute activity with original client
+        await client.execute_workflow(
+            TestClientUpdateWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Update worker's client
+        worker.client = client2
+
+        # Execute activity again - should get the new client
+        await client2.execute_workflow(
+            TestClientUpdateWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Should have captured both clients
+    assert len(captured_clients) == 2
+    assert captured_clients[0] is client
+    assert captured_clients[1] is client2  # This will fail before the fix
