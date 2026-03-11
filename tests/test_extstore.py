@@ -192,9 +192,9 @@ class TestDataConverterExternalStorage:
 
         options = StorageConfig(
             drivers=[hot_driver, cold_driver],
-            driver_selector=lambda context, payload: hot_driver
+            driver_selector=lambda context, payload: "hot-storage"
             if payload.ByteSize() < 500
-            else cold_driver,
+            else "cold-storage",
             payload_size_threshold=100,
         )
         converter = DataConverter(external_storage=options)
@@ -545,8 +545,8 @@ class TestMultiDriver:
 
         # Route payloads that serialise to < 500 bytes to driver_a, larger ones
         # to driver_b.
-        def selector(_ctx: object, payload: Payload) -> InMemoryTestDriver:
-            return driver_a if payload.ByteSize() < 500 else driver_b
+        def selector(_ctx: object, payload: Payload) -> str:
+            return "driver-a" if payload.ByteSize() < 500 else "driver-b"
 
         converter = DataConverter(
             external_storage=StorageConfig(
@@ -598,12 +598,11 @@ class TestMultiDriver:
         """A selector that returns a Driver whose name is not present in
         StorageConfig.drivers raises RuntimeError during encode."""
         registered = InMemoryTestDriver("registered")
-        unregistered = InMemoryTestDriver("not-in-list")
 
         converter = DataConverter(
             external_storage=StorageConfig(
                 drivers=[registered],
-                driver_selector=lambda _ctx, _payload: unregistered,
+                driver_selector=lambda _ctx, _payload: "not-in-list",
                 payload_size_threshold=50,
             )
         )

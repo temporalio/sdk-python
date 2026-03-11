@@ -501,51 +501,43 @@ from temporalio.extstore import StorageConfig
 options = StorageConfig(
     drivers=[hot_driver, cold_driver],
     driver_selector=lambda context, payload: (
-        hot_driver if payload.ByteSize() < 5 * 1024 * 1024 else cold_driver
+        "hot-storage" if payload.ByteSize() < 5 * 1024 * 1024 else "cold-storage"
     ),
 )
 ```
 
-For stateful or class-based selection logic, implement a callable class. If it also implements `temporalio.converter.WithSerializationContext`, it will receive workflow or activity context (namespace, workflow ID, etc.) at serialization time, just like a driver or payload codec:
+For more complex selection logic, use a plain callable that reads from the `StorageDriverContext`:
 
 ```python
-from typing_extensions import Self
 import temporalio.converter
 import temporalio.extstore
 from temporalio.api.common.v1 import Payload
 
-class FeatureFlaggedDriverSelector(temporalio.converter.WithSerializationContext):
-    def __init__(self, driver: temporalio.extstore.StorageDriver, enabled: bool = False):
-        self._driver = driver
-        self._enabled = enabled
+def feature_flag_is_on(workflow_id: str | None) -> bool:
+    """Check whether external storage is enabled for this workflow via a feature flag service."""
+    return workflow_id is not None and len(workflow_id) % 2 == 0
 
-    def __call__(
-        self, _context: temporalio.extstore.StorageDriverContext, _payload: Payload
-    ) -> temporalio.extstore.StorageDriver | None:
-        return self._driver if self._enabled else None
+def feature_flag_selector(
+    context: temporalio.extstore.StorageDriverContext, _payload: Payload
+) -> str | None:
+    workflow_id = None
+    if isinstance(context.serialization_context, temporalio.converter.WorkflowSerializationContext):
+        workflow_id = context.serialization_context.workflow_id
+    elif isinstance(context.serialization_context, temporalio.converter.ActivitySerializationContext):
+        workflow_id = context.serialization_context.workflow_id
+    return "my-driver" if feature_flag_is_on(workflow_id) else None
 
-    def with_context(self, context: temporalio.converter.SerializationContext) -> Self:
-        workflow_id = None
-        if isinstance(context, temporalio.converter.WorkflowSerializationContext) and context.workflow_id:
-            workflow_id = context.workflow_id
-        elif isinstance(context, temporalio.converter.ActivitySerializationContext) and context.workflow_id:
-            workflow_id = context.workflow_id
-
-        return FeatureFlaggedDriverSelector(
-            self._driver, FeatureFlaggedDriverSelector.feature_flag_is_on(workflow_id)
-        )
-
-    @staticmethod
-    def feature_flag_is_on(workflow_id: str | None) -> bool:
-        """Mock implementation of a feature flag based on a workflow ID."""
-        return workflow_id is not None and len(workflow_id) % 2 == 0
+options = StorageConfig(
+    drivers=[my_driver],
+    driver_selector=feature_flag_selector,
+)
 ```
 
 Some things to note about driver selection:
 
 * When no `driver_selector` is set, the first driver in `StorageConfig.drivers` is always used for storing.
 * Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
-* The driver returned by the selector must be registered in `StorageConfig.drivers`. If it is not, a `RuntimeError` is raised.
+* The driver name returned by the selector must match a driver registered in `StorageConfig.drivers`. If it does not, a `RuntimeError` is raised.
 
 ###### Custom Drivers
 

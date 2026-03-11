@@ -121,15 +121,14 @@ class StorageConfig(WithSerializationContext):
     """
 
     driver_selector: (
-        Callable[[StorageDriverContext, Payload], StorageDriver | None] | None
+        Callable[[StorageDriverContext, Payload], str | None] | None
     ) = None
-    """Controls which driver stores a given payload. Accepts either a
-    :class:`DriverSelector` instance or a callable of the form
-    ``(DriverContext, Payload) -> Driver | None``.
+    """Controls which driver stores a given payload. A callable of the form
+    ``(StorageDriverContext, Payload) -> str | None`` that returns the name of
+    the driver to use, or ``None`` to leave the payload stored inline.
 
     When ``None``, the first driver in :attr:`drivers` is used for all store
-    operations. Returning ``None`` from the selector leaves the payload stored
-    inline rather than offloading it to external storage.
+    operations.
     """
 
     payload_size_threshold: int | None = 256 * 1024
@@ -217,14 +216,13 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         selector = self._options.driver_selector
         if selector is None:
             return self._options.drivers[0] if self._options.drivers else None
-        else:
-            driver = selector(context, payload)
-        if driver is None:
+        driver_name = selector(context, payload)
+        if driver_name is None:
             return None
-        registered = self._driver_map.get(driver.name())
-        if registered is None:
-            raise RuntimeError(f"No driver found with name '{driver.name()}'")
-        return registered
+        driver = self._driver_map.get(driver_name)
+        if driver is None:
+            raise RuntimeError(f"No driver found with name '{driver_name}'")
+        return driver
 
     def _get_driver_by_name(self, name: str) -> StorageDriver:
         """Looks up a driver by name, raising :class:`RuntimeError` if not found."""
