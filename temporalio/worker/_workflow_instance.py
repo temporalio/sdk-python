@@ -1649,7 +1649,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             mut_attrs.update(attributes)
             for k, vals in attributes.items():
                 # Add to command
-                v.search_attributes[k].CopyFrom(
+                v.search_attributes.indexed_fields[k].CopyFrom(
                     temporalio.converter.encode_search_attribute_values(vals)
                 )
 
@@ -1690,7 +1690,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Update typed and untyped keys, replacing typed as needed
             for update in attributes:
                 # Set on command (delete is a proper null)
-                v.search_attributes[update.key.name].CopyFrom(
+                v.search_attributes.indexed_fields[update.key.name].CopyFrom(
                     temporalio.converter.encode_typed_search_attribute_value(
                         update.key, update.value
                     )
@@ -3208,7 +3208,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 v.memo[k].CopyFrom(self._payload_converter.to_payloads([val])[0])
         if self._input.search_attributes:
             _encode_search_attributes(
-                self._input.search_attributes, v.search_attributes
+                self._input.search_attributes, v.search_attributes.indexed_fields
             )
         v.cancellation_type = cast(
             temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType,
@@ -3424,7 +3424,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
                 v.memo[k].CopyFrom(val)
         if self._input.search_attributes:
             _encode_search_attributes(
-                self._input.search_attributes, v.search_attributes
+                self._input.search_attributes, v.search_attributes.indexed_fields
             )
         if self._input.versioning_intent:
             v.versioning_intent = self._input.versioning_intent._to_proto()

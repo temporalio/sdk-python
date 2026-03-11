@@ -9,20 +9,18 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use temporalio_common::errors::PollError;
-use temporalio_common::errors::WorkflowErrorType;
 use temporalio_common::protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporalio_common::protos::coresdk::{
     nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
 };
 use temporalio_common::protos::temporal::api::history::v1::History;
 use temporalio_common::protos::temporal::api::worker::v1::PluginInfo;
-use temporalio_common::worker::{
-    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
-    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
-};
-use temporalio_common::Worker;
 use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
+use temporalio_sdk_core::{
+    PollError, SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext,
+    SlotReleaseContext, SlotReservationContext, SlotSupplier as SlotSupplierTrait,
+    SlotSupplierPermit, WorkflowErrorType,
+};
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::error;
@@ -78,31 +76,29 @@ pub struct PollerBehaviorAutoscaling {
     pub initial: usize,
 }
 
-/// Recreates [temporalio_common::worker::PollerBehavior]
+/// Recreates [temporalio_sdk_core::PollerBehavior]
 #[derive(FromPyObject)]
 pub enum PollerBehavior {
     SimpleMaximum(PollerBehaviorSimpleMaximum),
     Autoscaling(PollerBehaviorAutoscaling),
 }
 
-impl From<PollerBehavior> for temporalio_common::worker::PollerBehavior {
+impl From<PollerBehavior> for temporalio_sdk_core::PollerBehavior {
     fn from(value: PollerBehavior) -> Self {
         match value {
             PollerBehavior::SimpleMaximum(simple) => {
-                temporalio_common::worker::PollerBehavior::SimpleMaximum(simple.simple_maximum)
+                temporalio_sdk_core::PollerBehavior::SimpleMaximum(simple.simple_maximum)
             }
-            PollerBehavior::Autoscaling(auto) => {
-                temporalio_common::worker::PollerBehavior::Autoscaling {
-                    minimum: auto.minimum,
-                    maximum: auto.maximum,
-                    initial: auto.initial,
-                }
-            }
+            PollerBehavior::Autoscaling(auto) => temporalio_sdk_core::PollerBehavior::Autoscaling {
+                minimum: auto.minimum,
+                maximum: auto.maximum,
+                initial: auto.initial,
+            },
         }
     }
 }
 
-/// Recreates [temporalio_common::worker::WorkerVersioningStrategy]
+/// Recreates [temporalio_sdk_core::WorkerVersioningStrategy]
 #[derive(FromPyObject)]
 pub enum WorkerVersioningStrategy {
     None(WorkerVersioningNone),
@@ -482,7 +478,7 @@ pub struct ResourceBasedTunerConfig {
 macro_rules! enter_sync {
     ($runtime:expr) => {
         if let Some(subscriber) = $runtime.core.telemetry().trace_subscriber() {
-            temporalio_sdk_core::telemetry::set_trace_subscriber_for_current_thread(subscriber);
+            temporalio_common::telemetry::set_trace_subscriber_for_current_thread(subscriber);
         }
         let _guard = $runtime.core.tokio_handle().enter();
     };
@@ -500,7 +496,7 @@ pub fn new_worker(
     let worker = temporalio_sdk_core::init_worker(
         &runtime_ref.runtime.core,
         config,
-        client.retry_client.clone().into_inner(),
+        client.connection.clone(),
     )
     .context("Failed creating worker")?;
     Ok(WorkerRef {
@@ -682,7 +678,7 @@ impl WorkerRef {
         self.worker
             .as_ref()
             .expect("missing worker")
-            .replace_client(client.retry_client.clone().into_inner())
+            .replace_client(client.connection.clone())
             .map_err(|err| PyValueError::new_err(format!("Failed replacing client: {err}")))
     }
 
@@ -876,15 +872,13 @@ fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
 
 fn convert_versioning_strategy(
     strategy: WorkerVersioningStrategy,
-) -> temporalio_common::worker::WorkerVersioningStrategy {
+) -> temporalio_sdk_core::WorkerVersioningStrategy {
     match strategy {
-        WorkerVersioningStrategy::None(vn) => {
-            temporalio_common::worker::WorkerVersioningStrategy::None {
-                build_id: vn.build_id_no_versioning,
-            }
-        }
+        WorkerVersioningStrategy::None(vn) => temporalio_sdk_core::WorkerVersioningStrategy::None {
+            build_id: vn.build_id_no_versioning,
+        },
         WorkerVersioningStrategy::DeploymentBased(options) => {
-            temporalio_common::worker::WorkerVersioningStrategy::WorkerDeploymentBased(
+            temporalio_sdk_core::WorkerVersioningStrategy::WorkerDeploymentBased(
                 temporalio_common::worker::WorkerDeploymentOptions {
                     version: temporalio_common::worker::WorkerDeploymentVersion {
                         deployment_name: options.version.deployment_name,
@@ -901,7 +895,7 @@ fn convert_versioning_strategy(
             )
         }
         WorkerVersioningStrategy::LegacyBuildIdBased(lb) => {
-            temporalio_common::worker::WorkerVersioningStrategy::LegacyBuildIdBased {
+            temporalio_sdk_core::WorkerVersioningStrategy::LegacyBuildIdBased {
                 build_id: lb.build_id_with_versioning,
             }
         }
