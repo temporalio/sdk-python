@@ -506,7 +506,7 @@ options = ExternalStorage(
 )
 ```
 
-For more complex selection logic, use a plain callable that reads from the `StorageDriverContext`:
+For more complex selection logic, use a plain callable that reads from the `StorageDriverStoreContext`:
 
 ```python
 import temporalio.converter
@@ -517,7 +517,7 @@ def feature_flag_is_on(workflow_id: str | None) -> bool:
     return workflow_id is not None and len(workflow_id) % 2 == 0
 
 def feature_flag_selector(
-    context: temporalio.converter.StorageDriverContext, _payload: Payload
+    context: temporalio.converter.StorageDriverStoreContext, _payload: Payload
 ) -> str | None:
     workflow_id = None
     if isinstance(context.serialization_context, temporalio.converter.WorkflowSerializationContext):
@@ -544,7 +544,7 @@ Implement `temporalio.converter.StorageDriver` to integrate with an external sto
 
 ```python
 from collections.abc import Sequence
-from temporalio.converter import StorageDriver, StorageDriverClaim, StorageDriverContext
+from temporalio.converter import StorageDriver, StorageDriverClaim, StorageDriverRetrieveContext, StorageDriverStoreContext
 from temporalio.api.common.v1 import Payload
 
 class MyDriver(StorageDriver):
@@ -555,7 +555,7 @@ class MyDriver(StorageDriver):
         return self._driver_name
 
     async def store(
-        self, context: StorageDriverContext, payloads: Sequence[Payload]
+        self, context: StorageDriverStoreContext, payloads: Sequence[Payload]
     ) -> list[StorageDriverClaim]:
         claims = []
         for payload in payloads:
@@ -564,7 +564,7 @@ class MyDriver(StorageDriver):
         return claims
 
     async def retrieve(
-        self, context: StorageDriverContext, claims: Sequence[StorageDriverClaim]
+        self, context: StorageDriverRetrieveContext, claims: Sequence[StorageDriverClaim]
     ) -> list[Payload]:
         payloads = []
         for claim in claims:

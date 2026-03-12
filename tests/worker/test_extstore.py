@@ -15,7 +15,8 @@ from temporalio.common import RetryPolicy
 from temporalio.converter import (
     ExternalStorage,
     StorageDriverClaim,
-    StorageDriverContext,
+    StorageDriverRetrieveContext,
+    StorageDriverStoreContext,
     StorageWarning,
 )
 from temporalio.exceptions import ActivityError, ApplicationError
@@ -84,7 +85,7 @@ class BadTestDriver(InMemoryTestDriver):
 
     async def store(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverStoreContext,
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
         if self._no_store:
@@ -93,7 +94,7 @@ class BadTestDriver(InMemoryTestDriver):
 
     async def retrieve(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverRetrieveContext,
         claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
         if self._no_retrieve:

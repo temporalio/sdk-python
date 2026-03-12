@@ -20,7 +20,8 @@ from temporalio.converter import (
     ExternalStorage,
     StorageDriver,
     StorageDriverClaim,
-    StorageDriverContext,
+    StorageDriverRetrieveContext,
+    StorageDriverStoreContext,
 )
 from temporalio.converter._extstore import _StorageReference
 
@@ -42,7 +43,7 @@ class InMemoryTestDriver(StorageDriver):
 
     async def store(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverStoreContext,
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
         self._store_calls += 1
@@ -58,7 +59,7 @@ class InMemoryTestDriver(StorageDriver):
 
     async def retrieve(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverRetrieveContext,
         claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
         self._retrieve_calls += 1
@@ -95,7 +96,7 @@ class WorkflowIdFeatureFlagDriverSelector(WithSerializationContext):
         self._enabled = enabled
 
     def __call__(
-        self, _context: StorageDriverContext, _payload: Payload
+        self, _context: StorageDriverStoreContext, _payload: Payload
     ) -> StorageDriver | None:
         return self._driver if self._enabled else None
 
@@ -242,7 +243,7 @@ class NotFoundDriver(StorageDriver):
 
     async def store(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverStoreContext,
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
         entries = [
@@ -254,7 +255,7 @@ class NotFoundDriver(StorageDriver):
 
     async def retrieve(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverRetrieveContext,
         claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
         assert len(claims) > 0, "NotFoundDriver expected claims to be provided"
@@ -269,7 +270,7 @@ class TestDriverError:
 
         class _NoClaimsDriver(InMemoryTestDriver):
             async def store(
-                self, context: StorageDriverContext, payloads: Sequence[Payload]
+                self, context: StorageDriverStoreContext, payloads: Sequence[Payload]
             ) -> list[StorageDriverClaim]:
                 return []
 
@@ -299,7 +300,7 @@ class TestDriverError:
         class _NoPayloadsDriver(InMemoryTestDriver):
             async def retrieve(
                 self,
-                context: StorageDriverContext,
+                context: StorageDriverRetrieveContext,
                 claims: Sequence[StorageDriverClaim],
             ) -> list[Payload]:
                 return []

@@ -33,16 +33,25 @@ class StorageDriverClaim:
 
 
 @dataclass(frozen=True)
-class StorageDriverContext:
-    """Context passed to :class:`StorageDriver` and :class:`DriverSelector` calls.
+class StorageDriverStoreContext:
+    """Context passed to :meth:`StorageDriver.store` and ``driver_selector`` calls.
 
     .. warning::
            This API is experimental.
     """
 
     serialization_context: SerializationContext | None = None
-    """The serialization context active when this driver operation was initiated,
+    """The serialization context active when this store operation was initiated,
     or ``None`` if no context has been set.
+    """
+
+
+@dataclass(frozen=True)
+class StorageDriverRetrieveContext:
+    """Context passed to :meth:`StorageDriver.retrieve` calls.
+
+    .. warning::
+           This API is experimental.
     """
 
 
@@ -75,7 +84,7 @@ class StorageDriver(ABC):
     @abstractmethod
     async def store(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverStoreContext,
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
         """Stores payloads in external storage and returns a :class:`StorageDriverClaim`
@@ -86,7 +95,7 @@ class StorageDriver(ABC):
     @abstractmethod
     async def retrieve(
         self,
-        context: StorageDriverContext,
+        context: StorageDriverRetrieveContext,
         claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
         """Retrieves payloads from external storage for the given :class:`StorageDriverClaim`
@@ -134,9 +143,9 @@ class ExternalStorage(WithSerializationContext):
     retrieval, so each driver must have a unique name.
     """
 
-    driver_selector: Callable[[StorageDriverContext, Payload], str | None] | None = None
+    driver_selector: Callable[[StorageDriverStoreContext, Payload], str | None] | None = None
     """Controls which driver stores a given payload. A callable of the form
-    ``(StorageDriverContext, Payload) -> str | None`` that returns the name of
+    ``(StorageDriverStoreContext, Payload) -> str | None`` that returns the name of
     the driver to use, or ``None`` to leave the payload stored inline.
 
     When ``None``, the first driver in :attr:`drivers` is used for all store
@@ -199,7 +208,7 @@ class ExternalStorage(WithSerializationContext):
         return result
 
     def _select_driver(
-        self, context: StorageDriverContext, payload: Payload
+        self, context: StorageDriverStoreContext, payload: Payload
     ) -> StorageDriver | None:
         """Returns the driver to use for this payload, or None to pass through."""
         if (
@@ -226,7 +235,7 @@ class ExternalStorage(WithSerializationContext):
         return driver
 
     async def store_payload(self, payload: Payload) -> Payload:
-        context = StorageDriverContext(serialization_context=self._context)
+        context = StorageDriverStoreContext(serialization_context=self._context)
 
         driver = self._select_driver(context, payload)
         if driver is None:
@@ -267,7 +276,7 @@ class ExternalStorage(WithSerializationContext):
             return [await self.store_payload(payloads[0])]
 
         results = list(payloads)
-        context = StorageDriverContext(serialization_context=self._context)
+        context = StorageDriverStoreContext(serialization_context=self._context)
 
         to_store: list[tuple[int, Payload, StorageDriver]] = []
         for index, payload in enumerate(payloads):
@@ -329,7 +338,7 @@ class ExternalStorage(WithSerializationContext):
             return payload
 
         driver = self._get_driver_by_name(reference.driver_name)
-        context = StorageDriverContext(serialization_context=self._context)
+        context = StorageDriverRetrieveContext()
 
         stored_payloads = await driver.retrieve(context, [reference.driver_claim])
 
@@ -369,7 +378,7 @@ class ExternalStorage(WithSerializationContext):
         if not driver_claims:
             return results
 
-        context = StorageDriverContext(serialization_context=self._context)
+        context = StorageDriverRetrieveContext()
         stored_by_index: dict[int, Payload] = {}
 
         driver_claim_list = list(driver_claims.items())

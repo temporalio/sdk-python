@@ -1690,7 +1690,8 @@ from temporalio.converter._extstore import (  # noqa: E402
     StorageDriverClaim as StorageDriverClaim,
 )
 from temporalio.converter._extstore import (  # noqa: E402
-    StorageDriverContext as StorageDriverContext,
+    StorageDriverRetrieveContext as StorageDriverRetrieveContext,
+    StorageDriverStoreContext as StorageDriverStoreContext,
 )
 from temporalio.converter._extstore import (  # noqa: E402
     StorageWarning as StorageWarning,
