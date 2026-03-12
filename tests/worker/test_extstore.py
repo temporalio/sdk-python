@@ -12,13 +12,13 @@ from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.converter import (
     ExternalStorage,
     StorageDriverClaim,
     StorageDriverContext,
     StorageWarning,
 )
+from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
 from temporalio.worker import Replayer
 from tests.helpers import assert_task_fail_eventually, new_worker
@@ -328,7 +328,7 @@ async def test_replay_extstore_history_fails_without_extstore(
     # Replay without external storage — the reference payload cannot be decoded.
     # The middleware emits a StorageWarning when it encounters a reference payload
     # with no driver configured.
-    with pytest.warns(StorageWarning, match="External storage is not configured"):
+    with pytest.warns(StorageWarning, match="TMPRL1105"):
         result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
             history, raise_on_replay_failure=False
         )
@@ -414,7 +414,7 @@ async def test_replay_extstore_activity_result_fails_without_extstore(
     # Replay without external storage.  The workflow input decodes fine, but
     # when the ActivityTaskCompleted result is delivered back to the workflow
     # coroutine it cannot be decoded.
-    with pytest.warns(StorageWarning, match="External storage is not configured"):
+    with pytest.warns(StorageWarning, match="TMPRL1105"):
         result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
             history, raise_on_replay_failure=False
         )
