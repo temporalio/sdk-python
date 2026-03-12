@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -172,8 +171,13 @@ class ExternalStorage(WithSerializationContext):
     def __post_init__(self) -> None:
         """Validate drivers and build the internal name-keyed driver map.
 
-        Raises :exc:`ValueError` if any two drivers share the same name.
+        Raises :exc:`ValueError` if no drivers are provided or if any two drivers
+        share the same name.
         """
+        if not self.drivers:
+            raise ValueError(
+                "ExternalStorage.drivers must contain at least one driver."
+            )
         driver_map: dict[str, StorageDriver] = {}
         for driver in self.drivers:
             name = driver.name()
@@ -325,14 +329,6 @@ class ExternalStorage(WithSerializationContext):
         return results
 
     async def retrieve_payload(self, payload: Payload) -> Payload:
-        if len(self.drivers) == 0:
-            if len(payload.external_payloads) > 0:
-                warnings.warn(
-                    "ExternalStorage.drivers is empty, but detected external storage references.",
-                    category=StorageWarning,
-                )
-            return payload
-
         if len(payload.external_payloads) == 0:
             return payload
 
@@ -362,14 +358,6 @@ class ExternalStorage(WithSerializationContext):
         payloads: Sequence[Payload],
     ) -> list[Payload]:
         results = list(payloads)
-
-        if len(self.drivers) == 0:
-            if any(len(p.external_payloads) > 0 for p in payloads):
-                warnings.warn(
-                    "ExternalStorage.drivers is empty, but detected external storage references.",
-                    category=StorageWarning,
-                )
-            return results
 
         if len(payloads) == 1:
             return [await self.retrieve_payload(payloads[0])]
