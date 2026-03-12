@@ -71,6 +71,38 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         conversation_id: str | None,
         prompt: ResponsePromptParam | None,
     ) -> ModelResponse:
+        activity_input, summary = self._prepare_activity_input(
+            system_instructions=system_instructions,
+            input=input,
+            model_settings=model_settings,
+            tools=tools,
+            output_schema=output_schema,
+            handoffs=handoffs,
+            tracing=tracing,
+            previous_response_id=previous_response_id,
+            conversation_id=conversation_id,
+            prompt=prompt,
+        )
+
+        return await self._execute_activity(
+            ModelActivity.invoke_model_activity,
+            activity_input,
+            summary,
+        )
+
+    def _prepare_activity_input(
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        tracing: ModelTracing,
+        previous_response_id: str | None,
+        conversation_id: str | None,
+        prompt: ResponsePromptParam | None,
+    ) -> tuple[ActivityModelInput, str | None]:
         def make_tool_info(tool: Tool) -> ToolInput:
             if isinstance(
                 tool,
@@ -154,9 +186,17 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         else:
             summary = None
 
+        return activity_input, summary
+
+    async def _execute_activity(
+        self,
+        activity_method: Any,
+        activity_input: ActivityModelInput,
+        summary: str | None,
+    ) -> Any:
         if self.model_params.use_local_activity:
             return await workflow.execute_local_activity_method(
-                ModelActivity.invoke_model_activity,
+                activity_method,
                 activity_input,
                 summary=summary,
                 schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
@@ -167,7 +207,7 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
             )
         else:
             return await workflow.execute_activity_method(
-                ModelActivity.invoke_model_activity,
+                activity_method,
                 activity_input,
                 summary=summary,
                 task_queue=self.model_params.task_queue,
@@ -181,7 +221,7 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
                 priority=self.model_params.priority,
             )
 
-    def stream_response(
+    async def stream_response(
         self,
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
@@ -195,4 +235,25 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         conversation_id: str | None,
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
-        raise NotImplementedError("Temporal model doesn't support streams yet")
+        activity_input, summary = self._prepare_activity_input(
+            system_instructions=system_instructions,
+            input=input,
+            model_settings=model_settings,
+            tools=tools,
+            output_schema=output_schema,
+            handoffs=handoffs,
+            tracing=tracing,
+            previous_response_id=previous_response_id,
+            conversation_id=conversation_id,
+            prompt=prompt,
+        )
+
+        events = await self._execute_activity(
+            ModelActivity.batch_stream_model,
+            activity_input,
+            summary,
+        )
+
+        # Convert the list of events into an async iterator
+        for event in events:
+            yield event
