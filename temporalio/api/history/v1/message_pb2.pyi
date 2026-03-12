@@ -805,7 +805,6 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
     REQUEST_ID_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_REASONS_FIELD_NUMBER: builtins.int
-    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     BUILD_ID_REDIRECT_COUNTER_FIELD_NUMBER: builtins.int
@@ -832,11 +831,6 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
         """The reason(s) that suggest_continue_as_new is true, if it is.
         Unset if suggest_continue_as_new is false.
         """
-    target_worker_deployment_version_changed: builtins.bool
-    """True if Workflow's Target Worker Deployment Version is different from its Pinned Version and
-    the workflow is Pinned.
-    Experimental.
-    """
     history_size_bytes: builtins.int
     """Total history size in bytes, which the workflow might use to decide when to
     continue-as-new regardless of the suggestion. Note that history event count is
@@ -863,7 +857,6 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
             temporalio.api.enums.v1.workflow_pb2.SuggestContinueAsNewReason.ValueType
         ]
         | None = ...,
-        target_worker_deployment_version_changed: builtins.bool = ...,
         history_size_bytes: builtins.int = ...,
         worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
@@ -889,8 +882,6 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
             b"suggest_continue_as_new",
             "suggest_continue_as_new_reasons",
             b"suggest_continue_as_new_reasons",
-            "target_worker_deployment_version_changed",
-            b"target_worker_deployment_version_changed",
             "worker_version",
             b"worker_version",
         ],

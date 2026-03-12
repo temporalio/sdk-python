@@ -557,6 +557,12 @@ class _SuggestContinueAsNewReasonEnumTypeWrapper(
         _SuggestContinueAsNewReason.ValueType
     )  # 3
     """Workflow's count of completed plus in-flight updates is too large."""
+    SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED: (
+        _SuggestContinueAsNewReason.ValueType
+    )  # 4
+    """Workflow's Target Worker Deployment Version is different from its
+    Current Version and the workflow is versioned.
+    """
 
 class SuggestContinueAsNewReason(
     _SuggestContinueAsNewReason, metaclass=_SuggestContinueAsNewReasonEnumTypeWrapper
@@ -576,4 +582,10 @@ SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES: (
     SuggestContinueAsNewReason.ValueType
 )  # 3
 """Workflow's count of completed plus in-flight updates is too large."""
+SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED: (
+    SuggestContinueAsNewReason.ValueType
+)  # 4
+"""Workflow's Target Worker Deployment Version is different from its
+Current Version and the workflow is versioned.
+"""
 global___SuggestContinueAsNewReason = SuggestContinueAsNewReason

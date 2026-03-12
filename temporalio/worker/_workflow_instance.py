@@ -251,9 +251,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_history_length = 0
         self._current_history_size = 0
         self._continue_as_new_suggested = False
-        self._suggested_continue_as_new_reasons: Sequence[
-            temporalio.api.enums.v1.SuggestContinueAsNewReason.ValueType
-        ] = []
         self._target_worker_deployment_version_changed = False
         # Lazily loaded
         self._untyped_converted_memo: MutableMapping[str, Any] | None = None
@@ -409,7 +406,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_history_length = act.history_length
         self._current_history_size = act.history_size_bytes
         self._continue_as_new_suggested = act.continue_as_new_suggested
-        self._suggested_continue_as_new_reasons = act.suggest_continue_as_new_reasons
         self._target_worker_deployment_version_changed = (
             act.target_worker_deployment_version_changed
         )
@@ -1237,14 +1233,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def workflow_is_continue_as_new_suggested(self) -> bool:
         return self._continue_as_new_suggested
-
-    def workflow_get_suggested_continue_as_new_reasons(
-        self,
-    ) -> Sequence[temporalio.workflow.SuggestContinueAsNewReason]:
-        return [
-            temporalio.workflow.SuggestContinueAsNewReason(r)
-            for r in self._suggested_continue_as_new_reasons
-        ]
 
     def workflow_is_target_worker_deployment_version_changed(self) -> bool:
         return self._target_worker_deployment_version_changed

@@ -279,9 +279,7 @@ class HistoryInfo:
     history_length: int
     history_size: int
     continue_as_new_suggested: bool
-    continue_as_new_suggested_reasons: Sequence[
-        temporalio.workflow.SuggestContinueAsNewReason
-    ]
+    target_deployment_version_changed: bool
 
 
 @workflow.defn
@@ -303,7 +301,7 @@ class HistoryInfoWorkflow:
             history_length=workflow.info().get_current_history_length(),
             history_size=workflow.info().get_current_history_size(),
             continue_as_new_suggested=workflow.info().is_continue_as_new_suggested(),
-            continue_as_new_suggested_reasons=workflow.info().get_suggested_continue_as_new_reasons(),
+            target_deployment_version_changed=workflow.info().is_target_worker_deployment_version_changed(),
         )
 
 
@@ -340,8 +338,8 @@ async def test_workflow_history_info(
         assert new_info.continue_as_new_suggested
 
 
-# Test that CAN suggested reasons/suggestion are persistent across WFTs
-async def test_workflow_continue_as_new_reasons_persistent(
+# Test that upgrade suggestion is persistent across WFTs
+async def test_workflow_upgrade_suggestion_persistent(
     client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
 ):
     if env.supports_time_skipping:
@@ -366,24 +364,14 @@ async def test_workflow_continue_as_new_reasons_persistent(
         # Get wf info
         info = await handle.query(HistoryInfoWorkflow.get_history_info)
         # Assert CAN expectations
-        assert info.continue_as_new_suggested
-        assert len(info.continue_as_new_suggested_reasons) == 1
-        assert (
-            info.continue_as_new_suggested_reasons[0]
-            == temporalio.workflow.SuggestContinueAsNewReason.TOO_MANY_HISTORY_EVENTS
-        )
+        assert info.target_deployment_version_changed
+
         # Send another signal to create a new WFT
         await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
         # Get fresh info
         info = await handle.query(HistoryInfoWorkflow.get_history_info)
         # Expect CAN to still be suggested
-        assert info.continue_as_new_suggested
-        # Expected reasons to still be populated
-        assert len(info.continue_as_new_suggested_reasons) == 1
-        assert (
-            info.continue_as_new_suggested_reasons[0]
-            == temporalio.workflow.SuggestContinueAsNewReason.TOO_MANY_HISTORY_EVENTS
-        )
+        assert info.target_deployment_version_changed
 
 
 @workflow.defn

@@ -603,12 +603,6 @@ class Info:
         """
         return _Runtime.current().workflow_is_continue_as_new_suggested()
 
-    def get_suggested_continue_as_new_reasons(
-        self,
-    ) -> Sequence[SuggestContinueAsNewReason]:
-        """Get reason(s) why continue as new is suggested"""
-        return _Runtime.current().workflow_get_suggested_continue_as_new_reasons()
-
     def is_target_worker_deployment_version_changed(self) -> bool:
         """Check whether the target worker deployment version has changed.
 
@@ -753,9 +747,6 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_continue_as_new_suggested(self) -> bool: ...
-
-    @abstractmethod
-    def workflow_get_suggested_continue_as_new_reasons(self) -> Sequence[Any]: ...
 
     @abstractmethod
     def workflow_is_target_worker_deployment_version_changed(self) -> bool: ...
@@ -5408,30 +5399,6 @@ class ContinueAsNewVersioningBehavior(IntEnum):
     behavior, the base version of the new run will be the Target Version as described above, but the
     effective version will be whatever is specified by the Versioning Override until the override is removed.
     """
-
-
-class SuggestContinueAsNewReason(IntEnum):
-    """SuggestContinueAsNewReason specifies a reason why continue as new is true."""
-
-    UNSPECIFIED = int(
-        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
-    )
-    """Continue as new is suggested but the reason is unknown"""
-
-    HISTORY_SIZE_TOO_LARGE = int(
-        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
-    )
-    """Workflow History size is getting too large."""
-
-    TOO_MANY_HISTORY_EVENTS = int(
-        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
-    )
-    """Workflow History event count is getting too large."""
-
-    TOO_MANY_UPDATES = int(
-        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
-    )
-    """Workflow's count of completed plus in-flight updates is too large."""
 
 
 ServiceT = TypeVar("ServiceT")
