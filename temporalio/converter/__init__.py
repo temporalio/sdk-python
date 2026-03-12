@@ -1536,7 +1536,7 @@ class DataConverter(WithSerializationContext):
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
         if self.external_storage is not None:
-            payload = await self.external_storage.store_payload(payload)
+            payload = await self.external_storage._store_payload(payload)
         if self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
         self._validate_payload_limits([payload])
@@ -1544,7 +1544,7 @@ class DataConverter(WithSerializationContext):
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
         if self.external_storage is not None:
-            await self.external_storage.store_payloads(payloads)
+            await self.external_storage._store_payloads(payloads)
         if self.payload_codec:
             await self.payload_codec.encode_wrapper(payloads)
         self._validate_payload_limits(payloads.payloads)
@@ -1553,7 +1553,7 @@ class DataConverter(WithSerializationContext):
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         result = (
-            await self.external_storage.store_payload_sequence(payloads)
+            await self.external_storage._store_payload_sequence(payloads)
             if self.external_storage is not None
             else list(payloads)
         )
@@ -1568,7 +1568,7 @@ class DataConverter(WithSerializationContext):
         if self.payload_codec:
             payload = (await self.payload_codec.decode([payload]))[0]
         if self.external_storage is not None:
-            payload = await self.external_storage.retrieve_payload(payload)
+            payload = await self.external_storage._retrieve_payload(payload)
         elif len(payload.external_payloads) > 0:
             warnings.warn(
                 "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
@@ -1580,7 +1580,7 @@ class DataConverter(WithSerializationContext):
         if self.payload_codec:
             await self.payload_codec.decode_wrapper(payloads)
         if self.external_storage is not None:
-            await self.external_storage.retrieve_payloads(payloads)
+            await self.external_storage._retrieve_payloads(payloads)
         elif any(len(p.external_payloads) > 0 for p in payloads.payloads):
             warnings.warn(
                 "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
@@ -1594,7 +1594,7 @@ class DataConverter(WithSerializationContext):
         if self.payload_codec:
             result = await self.payload_codec.decode(result)
         if self.external_storage is not None:
-            result = await self.external_storage.retrieve_payload_sequence(result)
+            result = await self.external_storage._retrieve_payload_sequence(result)
         elif any(len(p.external_payloads) > 0 for p in result):
             warnings.warn(
                 "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
@@ -1691,6 +1691,8 @@ from temporalio.converter._extstore import (  # noqa: E402
 )
 from temporalio.converter._extstore import (  # noqa: E402
     StorageDriverRetrieveContext as StorageDriverRetrieveContext,
+)
+from temporalio.converter._extstore import (
     StorageDriverStoreContext as StorageDriverStoreContext,
 )
 from temporalio.converter._extstore import (  # noqa: E402

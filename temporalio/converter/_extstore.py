@@ -143,7 +143,9 @@ class ExternalStorage(WithSerializationContext):
     retrieval, so each driver must have a unique name.
     """
 
-    driver_selector: Callable[[StorageDriverStoreContext, Payload], str | None] | None = None
+    driver_selector: (
+        Callable[[StorageDriverStoreContext, Payload], str | None] | None
+    ) = None
     """Controls which driver stores a given payload. A callable of the form
     ``(StorageDriverStoreContext, Payload) -> str | None`` that returns the name of
     the driver to use, or ``None`` to leave the payload stored inline.
@@ -234,7 +236,7 @@ class ExternalStorage(WithSerializationContext):
             raise ValueError(f"No driver found with name '{name}'")
         return driver
 
-    async def store_payload(self, payload: Payload) -> Payload:
+    async def _store_payload(self, payload: Payload) -> Payload:
         context = StorageDriverStoreContext(serialization_context=self._context)
 
         driver = self._select_driver(context, payload)
@@ -263,17 +265,17 @@ class ExternalStorage(WithSerializationContext):
         )
         return reference_payload
 
-    async def store_payloads(self, payloads: Payloads):
-        stored_payloads = await self.store_payload_sequence(payloads.payloads)
+    async def _store_payloads(self, payloads: Payloads):
+        stored_payloads = await self._store_payload_sequence(payloads.payloads)
         for i, payload in enumerate(stored_payloads):
             payloads.payloads[i].CopyFrom(payload)
 
-    async def store_payload_sequence(
+    async def _store_payload_sequence(
         self,
         payloads: Sequence[Payload],
     ) -> list[Payload]:
         if len(payloads) == 1:
-            return [await self.store_payload(payloads[0])]
+            return [await self._store_payload(payloads[0])]
 
         results = list(payloads)
         context = StorageDriverStoreContext(serialization_context=self._context)
@@ -329,7 +331,7 @@ class ExternalStorage(WithSerializationContext):
 
         return results
 
-    async def retrieve_payload(self, payload: Payload) -> Payload:
+    async def _retrieve_payload(self, payload: Payload) -> Payload:
         if len(payload.external_payloads) == 0:
             return payload
 
@@ -349,19 +351,19 @@ class ExternalStorage(WithSerializationContext):
 
         return stored_payloads[0]
 
-    async def retrieve_payloads(self, payloads: Payloads):
-        stored_payloads = await self.retrieve_payload_sequence(payloads.payloads)
+    async def _retrieve_payloads(self, payloads: Payloads):
+        stored_payloads = await self._retrieve_payload_sequence(payloads.payloads)
         for i, payload in enumerate(stored_payloads):
             payloads.payloads[i].CopyFrom(payload)
 
-    async def retrieve_payload_sequence(
+    async def _retrieve_payload_sequence(
         self,
         payloads: Sequence[Payload],
     ) -> list[Payload]:
         results = list(payloads)
 
         if len(payloads) == 1:
-            return [await self.retrieve_payload(payloads[0])]
+            return [await self._retrieve_payload(payloads[0])]
 
         driver_claims: dict[StorageDriver, list[tuple[int, StorageDriverClaim]]] = {}
         for index, payload in enumerate(payloads):
