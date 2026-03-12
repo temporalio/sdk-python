@@ -34,7 +34,7 @@ class WorkerDeploymentOptions(google.protobuf.message.Message):
     BUILD_ID_FIELD_NUMBER: builtins.int
     WORKER_VERSIONING_MODE_FIELD_NUMBER: builtins.int
     deployment_name: builtins.str
-    """Required. Worker Deployment name."""
+    """Required when `worker_versioning_mode==VERSIONED`."""
     build_id: builtins.str
     """The Build ID of the worker. Required when `worker_versioning_mode==VERSIONED`, in which case,
     the worker will be part of a Deployment Version.

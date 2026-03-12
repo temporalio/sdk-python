@@ -536,6 +536,251 @@ SQLite storage is not suited to a distributed environment.
 | :--------------- | :-------: |
 | OpenAI platform  |    Yes    |
 
+## OpenTelemetry Integration
+
+This integration provides seamless export of OpenAI agent telemetry to OpenTelemetry (OTEL) endpoints for observability and monitoring. The integration automatically handles workflow replay semantics, ensuring spans are only exported when workflows actually complete.
+
+### Quick Start
+
+To enable OTEL telemetry export, you need to set up a global `ReplaySafeTracerProvider` and enable the integration in the `OpenAIAgentsPlugin`:
+
+```python
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+from temporalio.contrib.opentelemetry import create_tracer_provider
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry import trace
+
+# Configure your OTEL exporters
+exporters = [
+    OTLPSpanExporter(endpoint="http://localhost:4317"),
+    # Add multiple exporters for different endpoints as needed
+]
+
+# Set up the global tracer provider
+tracer_provider = create_tracer_provider(exporters=exporters)
+trace.set_tracer_provider(tracer_provider)
+
+# For production applications
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[
+        OpenAIAgentsPlugin(
+            use_otel_instrumentation=True,  # Enable OTEL integration
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            )
+        ),
+    ],
+)
+
+# For testing
+from temporalio.contrib.openai_agents.testing import AgentEnvironment
+
+async with AgentEnvironment(
+    model=my_test_model,
+    use_otel_instrumentation=True  # Enable OTEL integration for tests
+) as env:
+    client = env.applied_on_client(base_client)
+```
+
+### Features
+
+- **Multiple Exporters**: Send telemetry to multiple OTEL endpoints simultaneously via the global tracer provider
+- **Replay-Safe**: Spans are only exported when workflows actually complete, not during replays
+- **Deterministic IDs**: Consistent span IDs across workflow replays for reliable correlation
+- **Automatic Setup**: No manual instrumentation required - just enable the flag and set up the global tracer provider
+- **Graceful Degradation**: Works seamlessly whether OTEL dependencies are installed or not
+
+### Dependencies
+
+OTEL integration requires additional dependencies:
+
+```bash
+pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+Choose the appropriate OTEL exporter for your monitoring system:
+
+```bash
+# For OTLP (works with most OTEL collectors and monitoring systems)
+pip install opentelemetry-exporter-otlp
+
+# For Console output (development/debugging)
+pip install opentelemetry-exporter-console
+
+# Other exporters available for specific systems
+pip install opentelemetry-exporter-<your-system>
+```
+
+### Example: Multiple Exporters
+
+```python
+from temporalio.contrib.opentelemetry import create_tracer_provider
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.console import ConsoleSpanExporter
+from opentelemetry import trace
+
+exporters = [
+    # Production monitoring system
+    OTLPSpanExporter(
+        endpoint="https://your-monitoring-system:4317",
+        headers={"api-key": "your-api-key"}
+    ),
+    
+    # Secondary monitoring endpoint
+    OTLPSpanExporter(endpoint="https://backup-collector:4317"),
+    
+    # Development debugging
+    ConsoleSpanExporter(),
+]
+
+# Set up global tracer provider with multiple exporters
+tracer_provider = create_tracer_provider(exporters=exporters)
+trace.set_tracer_provider(tracer_provider)
+
+plugin = OpenAIAgentsPlugin(use_otel_instrumentation=True)
+```
+
+### Error Handling
+
+If you enable OTEL instrumentation but the required dependencies are not installed, you'll receive a clear error message:
+
+```
+ImportError: OTEL dependencies not available. Install with: pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+If you enable OTEL instrumentation but don't have a proper global tracer provider set up, you'll get:
+
+```
+ValueError: Global tracer provider must a ReplaySafeTracerProvider. Use temporalio.contrib.opentelemtry.create_trace_provider to create one.
+```
+
+### Direct OpenTelemetry API Calls in Workflows
+
+When using direct OpenTelemetry API calls within workflows (e.g., `opentelemetry.trace.get_tracer(__name__).start_as_current_span()`), you need to ensure proper context bridging and sandbox configuration.
+
+#### Sandbox Configuration
+
+Workflows run in a sandbox that restricts module access. To use direct OTEL API calls, you must explicitly allow OpenTelemetry passthrough:
+
+```python
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+# Configure worker with OpenTelemetry passthrough
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+#### Context Bridging Pattern
+
+Direct OTEL spans must be created within an active OpenAI Agents SDK span to ensure proper parenting:
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Start an SDK span first to establish OTEL context bridge
+        with custom_span("Workflow coordination"):
+            # Now direct OTEL spans will be properly parented
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            with tracer.start_as_current_span("Custom workflow span"):
+                # Your workflow logic here
+                result = await self.do_work()
+                return result
+```
+
+#### Why This Pattern is Required
+
+- **OpenInference instrumentation** bridges OpenAI Agents SDK spans to OpenTelemetry context
+- **Direct OTEL API calls** without an active SDK span become root spans with no parent
+- **SDK spans** (`custom_span()`) establish the context bridge that allows subsequent direct OTEL spans to inherit proper trace parenting
+
+#### Complete Example
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+@workflow.defn
+class TracedWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Establish OTEL context with SDK span
+        with custom_span("Main workflow"):
+            # Create direct OTEL spans for fine-grained tracing
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            
+            with tracer.start_as_current_span("Data processing"):
+                data = await self.process_data()
+                
+            with tracer.start_as_current_span("Business logic"):
+                result = await self.execute_business_logic(data)
+                
+            return result
+
+# Worker configuration
+worker = Worker(
+    client,
+    task_queue="traced-workflows",
+    workflows=[TracedWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+This ensures your direct OTEL spans are properly parented within the trace hierarchy initiated by your client SDK traces.
+
+### Client-Side Trace Initialization
+
+You can also start an Agents SDK trace on the client side before executing a workflow. This is useful when you want the entire workflow execution to be part of a larger trace context:
+
+```python
+from agents import trace, custom_span
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+
+# Set up the plugin with OTEL integration
+plugin = OpenAIAgentsPlugin(use_otel_instrumentation=True)
+
+# Client setup
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[plugin]
+)
+
+# Start a trace on the client side
+with plugin.tracing_context():
+    with trace("Customer support workflow"):
+        with custom_span("Workflow execution"):
+            # Execute workflow within the trace context
+            result = await client.execute_workflow(
+                CustomerSupportAgent.run,
+                "Help me with my order",
+                id="customer-support-123",
+                task_queue="my-task-queue",
+            )
+            print(f"Result: {result}")
+```
+
+The `plugin.tracing_context()` is required when starting traces outside of a worker context. This ensures proper instrumentation setup and trace propagation into the workflow execution.
+
+If OTEL instrumentation is not enabled, the integration works normally without any OTEL setup.
+
 ### Voice
 
 | Mode                     | Supported |

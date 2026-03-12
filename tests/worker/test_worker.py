@@ -64,7 +64,7 @@ from tests.helpers import (
     new_worker,
 )
 from tests.helpers.fork import _ForkTestResult, _TestFork
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 def test_load_default_worker_binary_id():
@@ -84,6 +84,16 @@ class NeverRunWorkflow:
     @workflow.run
     async def run(self) -> None:
         raise NotImplementedError
+
+
+@workflow.defn
+class TestClientUpdateWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            "capture_client_activity",
+            start_to_close_timeout=timedelta(seconds=10),
+        )
 
 
 @nexusrpc.handler.service_handler
@@ -469,7 +479,8 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         tuner=tuner,
         identity="myworker",
     ) as w:
-        await create_nexus_endpoint(w.task_queue, client)
+        endpoint_name = make_nexus_endpoint_name(w.task_queue)
+        await env.create_nexus_endpoint(endpoint_name, w.task_queue)
         wf1 = await client.start_workflow(
             CustomSlotSupplierWorkflow.run,
             id=f"custom-slot-supplier-{uuid.uuid4()}",
@@ -1305,6 +1316,55 @@ class TestForkUseWorker(_TestFork):
             nexus_service_handlers=[],
         )
         self.run(mp_fork_ctx)
+
+
+async def test_activity_client_updates_when_worker_client_changes(client: Client):
+    """Test that activities get the updated client when worker.client is changed."""
+    # Create a second client (simulating a new client after cert rotation)
+    # Must use the same runtime
+    client2 = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        data_converter=client.data_converter,
+        runtime=client.service_client.config.runtime,
+    )
+
+    captured_clients: list[Client] = []
+
+    @activity.defn
+    async def capture_client_activity() -> None:
+        captured_clients.append(activity.client())
+
+    # Create worker with activities
+    worker = Worker(
+        client,
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        activities=[capture_client_activity],
+        workflows=[TestClientUpdateWorkflow],
+    )
+
+    async with worker:
+        # Execute activity with original client
+        await client.execute_workflow(
+            TestClientUpdateWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Update worker's client
+        worker.client = client2
+
+        # Execute activity again - should get the new client
+        await client2.execute_workflow(
+            TestClientUpdateWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Should have captured both clients
+    assert len(captured_clients) == 2
+    assert captured_clients[0] is client
+    assert captured_clients[1] is client2  # This will fail before the fix
 
 
 @workflow.defn(

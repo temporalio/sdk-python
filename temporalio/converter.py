@@ -55,6 +55,8 @@ from types import UnionType
 
 logger = getLogger(__name__)
 
+_TEMPORAL_FAILURE_PROTO_TYPE = "temporal.api.failure.v1.Failure"
+
 
 class SerializationContext(ABC):
     """Base serialization context.
@@ -82,51 +84,64 @@ class SerializationContext(ABC):
 
 
 @dataclass(frozen=True)
-class BaseWorkflowSerializationContext(SerializationContext):
-    """Base serialization context shared by workflow and activity serialization contexts."""
-
-    namespace: str
-    workflow_id: str
-
-
-@dataclass(frozen=True)
-class WorkflowSerializationContext(BaseWorkflowSerializationContext):
+class WorkflowSerializationContext(SerializationContext):
     """Serialization context for workflows.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: The namespace the workflow is running in.
-        workflow_id: The ID of the workflow. Note that this is the ID of the workflow of which the
-            payload being operated on is an input or output. Note also that when creating/describing
-            schedules, this may be the workflow ID prefix as configured, not the final workflow ID
-            when the workflow is created by the schedule.
     """
 
-    pass
+    namespace: str
+    """The namespace the workflow is running in."""
+
+    workflow_id: str
+    """The ID of the workflow.
+    
+    Note that this is the ID of the workflow of which the payload being operated on is an input or
+    output. Note also that when creating/describing schedules, this may be the workflow ID prefix
+    as configured, not the final workflow ID when the workflow is created by the schedule.
+    """
 
 
 @dataclass(frozen=True)
-class ActivitySerializationContext(BaseWorkflowSerializationContext):
+class ActivitySerializationContext(SerializationContext):
     """Serialization context for activities.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: Workflow/activity namespace.
-        workflow_id: Workflow ID. Note, when creating/describing schedules,
-            this may be the workflow ID prefix as configured, not the final workflow ID when the
-            workflow is created by the schedule.
-        workflow_type: Workflow Type.
-        activity_type: Activity Type.
-        activity_task_queue: Activity task queue.
-        is_local: Whether the activity is a local activity.
     """
 
-    workflow_type: str
-    activity_type: str
-    activity_task_queue: str
+    namespace: str
+    """Workflow/activity namespace."""
+
+    activity_id: str | None
+    """Activity ID. Optional if this is an activity started from a workflow."""
+
+    activity_type: str | None
+    """Activity type.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
+
+    activity_task_queue: str | None
+    """Activity task queue.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
+
+    workflow_id: str | None
+    """Workflow ID. Only set if this is an activity started from a workflow.
+    
+    Note, when creating/describing schedules, this may be the workflow ID prefix as
+    configured, not the final workflow ID when the workflow is created by the schedule."""
+
+    workflow_type: str | None
+    """Workflow type if this is an activity started from a workflow."""
+
     is_local: bool
+    """Whether the activity is a local activity started from a workflow."""
 
 
 class WithSerializationContext(ABC):
@@ -917,7 +932,10 @@ class DefaultFailureConverter(FailureConverter):
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
-                str(exception), type=exception.__class__.__name__
+                str(exception),
+                type="PayloadSizeError"
+                if isinstance(exception, _PayloadSizeError)
+                else exception.__class__.__name__,
             )
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__
@@ -1023,7 +1041,6 @@ class DefaultFailureConverter(FailureConverter):
             failure.child_workflow_execution_failure_info.retry_state = (
                 temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
             )
-        # TODO(nexus-preview): missing test coverage
         elif isinstance(error, temporalio.exceptions.NexusOperationError):
             failure.nexus_operation_execution_failure_info.SetInParent()
             failure.nexus_operation_execution_failure_info.scheduled_event_id = (
@@ -1042,20 +1059,72 @@ class DefaultFailureConverter(FailureConverter):
         payload_converter: PayloadConverter,
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
-        failure.message = str(error)
-        if error.__traceback__:
-            failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
-        if error.__cause__:
-            self.to_failure(error.__cause__, payload_converter, failure.cause)
-        failure.nexus_handler_failure_info.SetInParent()
-        failure.nexus_handler_failure_info.type = error.type.name
-        failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
-            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-            if error.retryable_override is True
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-            if error.retryable_override is False
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        if error.original_failure:
+            self._nexus_failure_to_temporal_failure(
+                error.original_failure, True, failure
+            )
+        else:
+            failure.message = error.message
+            if stack_trace := error.stack_trace:
+                failure.stack_trace = stack_trace
+            elif tb := error.__traceback__:
+                failure.stack_trace = "\n".join(traceback.format_tb(tb))
+            if error.__cause__:
+                self.to_failure(error.__cause__, payload_converter, failure.cause)
+            failure.nexus_handler_failure_info.SetInParent()
+            failure.nexus_handler_failure_info.type = error.type.name
+            failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
+                temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+                if error.retryable_override is True
+                else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+                if error.retryable_override is False
+                else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+            )
+
+    def _temporal_failure_to_nexus_failure(
+        self, failure: temporalio.api.failure.v1.Failure
+    ) -> nexusrpc.Failure:
+        message, failure.message = failure.message, ""
+        stack_trace, failure.stack_trace = failure.stack_trace, ""
+        failure_dict = google.protobuf.json_format.MessageToDict(failure)
+        failure.message = message
+        failure.stack_trace = stack_trace
+        return nexusrpc.Failure(
+            message=message,
+            stack_trace=stack_trace,
+            metadata={
+                "type": _TEMPORAL_FAILURE_PROTO_TYPE,
+            },
+            details=failure_dict,
         )
+
+    def _nexus_failure_to_temporal_failure(
+        self,
+        failure: nexusrpc.Failure,
+        retryable: bool,
+        temporal_failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        if (
+            failure.metadata
+            and failure.metadata.get("type") == _TEMPORAL_FAILURE_PROTO_TYPE
+        ):
+            google.protobuf.json_format.ParseDict(failure.details, temporal_failure)
+        else:
+            temporal_failure.application_failure_info.SetInParent()
+            temporal_failure.application_failure_info.type = "NexusFailure"
+            temporal_failure.application_failure_info.non_retryable = not retryable
+            temporal_failure.application_failure_info.details.SetInParent()
+            temporal_failure.application_failure_info.details.payloads.append(
+                temporalio.api.common.v1.Payload(
+                    metadata={"encoding": b"json/plain"},
+                    data=json.dumps(
+                        dataclasses.replace(failure, message=""), separators=(",", ":")
+                    ).encode("utf-8"),
+                )
+            )
+
+        temporal_failure.message = failure.message
+        temporal_failure.stack_trace = failure.stack_trace or ""
 
     def from_failure(
         self,
@@ -1085,111 +1154,128 @@ class DefaultFailureConverter(FailureConverter):
                 pass
 
         err: temporalio.exceptions.FailureError | nexusrpc.HandlerError
-        if failure.HasField("application_failure_info"):
-            app_info = failure.application_failure_info
-            err = temporalio.exceptions.ApplicationError(
-                failure.message or "Application error",
-                *payload_converter.from_payloads_wrapper(app_info.details),
-                type=app_info.type or None,
-                non_retryable=app_info.non_retryable,
-                next_retry_delay=app_info.next_retry_delay.ToTimedelta(),
-                category=temporalio.exceptions.ApplicationErrorCategory(
-                    int(app_info.category)
-                ),
-            )
-        elif failure.HasField("timeout_failure_info"):
-            timeout_info = failure.timeout_failure_info
-            err = temporalio.exceptions.TimeoutError(
-                failure.message or "Timeout",
-                type=temporalio.exceptions.TimeoutType(int(timeout_info.timeout_type))
-                if timeout_info.timeout_type
-                else None,
-                last_heartbeat_details=payload_converter.from_payloads_wrapper(
-                    timeout_info.last_heartbeat_details
-                ),
-            )
-        elif failure.HasField("canceled_failure_info"):
-            cancel_info = failure.canceled_failure_info
-            err = temporalio.exceptions.CancelledError(
-                failure.message or "Cancelled",
-                *payload_converter.from_payloads_wrapper(cancel_info.details),
-            )
-        elif failure.HasField("terminated_failure_info"):
-            err = temporalio.exceptions.TerminatedError(failure.message or "Terminated")
-        elif failure.HasField("server_failure_info"):
-            server_info = failure.server_failure_info
-            err = temporalio.exceptions.ServerError(
-                failure.message or "Server error",
-                non_retryable=server_info.non_retryable,
-            )
-        elif failure.HasField("activity_failure_info"):
-            act_info = failure.activity_failure_info
-            err = temporalio.exceptions.ActivityError(
-                failure.message or "Activity error",
-                scheduled_event_id=act_info.scheduled_event_id,
-                started_event_id=act_info.started_event_id,
-                identity=act_info.identity,
-                activity_type=act_info.activity_type.name,
-                activity_id=act_info.activity_id,
-                retry_state=temporalio.exceptions.RetryState(int(act_info.retry_state))
-                if act_info.retry_state
-                else None,
-            )
-        elif failure.HasField("child_workflow_execution_failure_info"):
-            child_info = failure.child_workflow_execution_failure_info
-            err = temporalio.exceptions.ChildWorkflowError(
-                failure.message or "Child workflow error",
-                namespace=child_info.namespace,
-                workflow_id=child_info.workflow_execution.workflow_id,
-                run_id=child_info.workflow_execution.run_id,
-                workflow_type=child_info.workflow_type.name,
-                initiated_event_id=child_info.initiated_event_id,
-                started_event_id=child_info.started_event_id,
-                retry_state=temporalio.exceptions.RetryState(
-                    int(child_info.retry_state)
+        match failure.WhichOneof("failure_info"):
+            case "application_failure_info":
+                app_info = failure.application_failure_info
+                err = temporalio.exceptions.ApplicationError(
+                    failure.message or "Application error",
+                    *payload_converter.from_payloads_wrapper(app_info.details),
+                    type=app_info.type or None,
+                    non_retryable=app_info.non_retryable,
+                    next_retry_delay=app_info.next_retry_delay.ToTimedelta(),
+                    category=temporalio.exceptions.ApplicationErrorCategory(
+                        int(app_info.category)
+                    ),
                 )
-                if child_info.retry_state
-                else None,
-            )
-        elif failure.HasField("nexus_handler_failure_info"):
-            nexus_handler_failure_info = failure.nexus_handler_failure_info
-            try:
-                _type = nexusrpc.HandlerErrorType[nexus_handler_failure_info.type]
-            except KeyError:
-                logger.warning(
-                    f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
+
+            case "timeout_failure_info":
+                timeout_info = failure.timeout_failure_info
+                err = temporalio.exceptions.TimeoutError(
+                    failure.message or "Timeout",
+                    type=temporalio.exceptions.TimeoutType(
+                        int(timeout_info.timeout_type)
+                    )
+                    if timeout_info.timeout_type
+                    else None,
+                    last_heartbeat_details=payload_converter.from_payloads_wrapper(
+                        timeout_info.last_heartbeat_details
+                    ),
                 )
-                _type = nexusrpc.HandlerErrorType.INTERNAL
-            retryable_override = (
-                True
-                if (
-                    nexus_handler_failure_info.retry_behavior
-                    == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+
+            case "canceled_failure_info":
+                cancel_info = failure.canceled_failure_info
+                err = temporalio.exceptions.CancelledError(
+                    failure.message or "Cancelled",
+                    *payload_converter.from_payloads_wrapper(cancel_info.details),
                 )
-                else False
-                if (
-                    nexus_handler_failure_info.retry_behavior
-                    == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+            case "terminated_failure_info":
+                err = temporalio.exceptions.TerminatedError(
+                    failure.message or "Terminated"
                 )
-                else None
-            )
-            err = nexusrpc.HandlerError(
-                failure.message or "Nexus handler error",
-                type=_type,
-                retryable_override=retryable_override,
-            )
-        elif failure.HasField("nexus_operation_execution_failure_info"):
-            nexus_op_failure_info = failure.nexus_operation_execution_failure_info
-            err = temporalio.exceptions.NexusOperationError(
-                failure.message or "Nexus operation error",
-                scheduled_event_id=nexus_op_failure_info.scheduled_event_id,
-                endpoint=nexus_op_failure_info.endpoint,
-                service=nexus_op_failure_info.service,
-                operation=nexus_op_failure_info.operation,
-                operation_token=nexus_op_failure_info.operation_token,
-            )
-        else:
-            err = temporalio.exceptions.FailureError(failure.message or "Failure error")
+
+            case "server_failure_info":
+                server_info = failure.server_failure_info
+                err = temporalio.exceptions.ServerError(
+                    failure.message or "Server error",
+                    non_retryable=server_info.non_retryable,
+                )
+
+            case "activity_failure_info":
+                act_info = failure.activity_failure_info
+                err = temporalio.exceptions.ActivityError(
+                    failure.message or "Activity error",
+                    scheduled_event_id=act_info.scheduled_event_id,
+                    started_event_id=act_info.started_event_id,
+                    identity=act_info.identity,
+                    activity_type=act_info.activity_type.name,
+                    activity_id=act_info.activity_id,
+                    retry_state=temporalio.exceptions.RetryState(
+                        int(act_info.retry_state)
+                    )
+                    if act_info.retry_state
+                    else None,
+                )
+
+            case "child_workflow_execution_failure_info":
+                child_info = failure.child_workflow_execution_failure_info
+                err = temporalio.exceptions.ChildWorkflowError(
+                    failure.message or "Child workflow error",
+                    namespace=child_info.namespace,
+                    workflow_id=child_info.workflow_execution.workflow_id,
+                    run_id=child_info.workflow_execution.run_id,
+                    workflow_type=child_info.workflow_type.name,
+                    initiated_event_id=child_info.initiated_event_id,
+                    started_event_id=child_info.started_event_id,
+                    retry_state=temporalio.exceptions.RetryState(
+                        int(child_info.retry_state)
+                    )
+                    if child_info.retry_state
+                    else None,
+                )
+
+            case "nexus_handler_failure_info":
+                nexus_handler_failure_info = failure.nexus_handler_failure_info
+                try:
+                    _type = nexusrpc.HandlerErrorType[nexus_handler_failure_info.type]
+                except KeyError:
+                    logger.warning(
+                        f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
+                    )
+                    _type = nexusrpc.HandlerErrorType.INTERNAL
+
+                retryable_override: bool | None
+                match nexus_handler_failure_info.retry_behavior:
+                    case temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE:
+                        retryable_override = True
+                    case temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE:
+                        retryable_override = False
+                    case _:
+                        retryable_override = None
+
+                err = nexusrpc.HandlerError(
+                    failure.message or "Nexus handler error",
+                    type=_type,
+                    retryable_override=retryable_override,
+                    stack_trace=failure.stack_trace if failure.stack_trace else None,
+                    original_failure=self._temporal_failure_to_nexus_failure(failure),
+                )
+
+            case "nexus_operation_execution_failure_info":
+                nexus_op_failure_info = failure.nexus_operation_execution_failure_info
+                err = temporalio.exceptions.NexusOperationError(
+                    failure.message or "Nexus operation error",
+                    scheduled_event_id=nexus_op_failure_info.scheduled_event_id,
+                    endpoint=nexus_op_failure_info.endpoint,
+                    service=nexus_op_failure_info.service,
+                    operation=nexus_op_failure_info.operation,
+                    operation_token=nexus_op_failure_info.operation_token,
+                )
+
+            case "reset_workflow_failure_info" | None:
+                err = temporalio.exceptions.FailureError(
+                    failure.message or "Failure error",
+                )
+
         if isinstance(err, temporalio.exceptions.FailureError):
             err._failure = failure
         if failure.HasField("cause"):
@@ -1205,6 +1291,46 @@ class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
     def __init__(self) -> None:
         """Create a default failure converter with encoded attributes."""
         super().__init__(encode_common_attributes=True)
+
+
+@dataclass(frozen=True)
+class PayloadLimitsConfig:
+    """Configuration for when payload sizes exceed limits."""
+
+    memo_size_warning: int = 2 * 1024
+    """The limit (in bytes) at which a memo size warning is logged."""
+
+    payload_size_warning: int = 512 * 1024
+    """The limit (in bytes) at which a payload size warning is logged."""
+
+
+class PayloadSizeWarning(RuntimeWarning):
+    """The size of payloads is above the warning limit."""
+
+
+class _PayloadSizeError(temporalio.exceptions.TemporalError):
+    """Error raised when payloads size exceeds payload size limits."""
+
+    def __init__(self, message: str):
+        """Initialize a payloads size error."""
+        super().__init__(message)
+        self._message = message
+
+    @property
+    def message(self) -> str:
+        """Message."""
+        return self._message
+
+
+@dataclass(frozen=True)
+class _ServerPayloadErrorLimits:
+    """Error limits for payloads as described by the Temporal server."""
+
+    memo_size_error: int
+    """The limit (in bytes) at which a memo size error is raised."""
+
+    payload_size_error: int
+    """The limit (in bytes) at which a payload size error is raised."""
 
 
 @dataclass(frozen=True)
@@ -1230,8 +1356,14 @@ class DataConverter(WithSerializationContext):
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""
 
+    payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
+    """Settings for payload size limits."""
+
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
+
+    _payload_error_limits: _ServerPayloadErrorLimits | None = None
+    """Server-reported limits for payloads."""
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
@@ -1334,6 +1466,11 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "failure_converter", failure_converter)
         return cloned
 
+    def _with_payload_error_limits(
+        self, limits: _ServerPayloadErrorLimits | None
+    ) -> DataConverter:
+        return dataclasses.replace(self, _payload_error_limits=limits)
+
     async def _decode_memo(
         self,
         source: temporalio.api.common.v1.Memo,
@@ -1372,30 +1509,38 @@ class DataConverter(WithSerializationContext):
             if not isinstance(v, temporalio.api.common.v1.Payload):
                 payload = (await self.encode([v]))[0]
             memo.fields[k].CopyFrom(payload)
+        # Memos have their field payloads validated all together in one unit
+        DataConverter._validate_limits(
+            list(memo.fields.values()),
+            self._payload_error_limits.memo_size_error
+            if self._payload_error_limits
+            else None,
+            "[TMPRL1103] Attempted to upload memo with size that exceeded the error limit.",
+            self.payload_limits.memo_size_warning,
+            "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit.",
+        )
 
     async def _encode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
         if self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
+        self._validate_payload_limits([payload])
         return payload
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
         if self.payload_codec:
             await self.payload_codec.encode_wrapper(payloads)
+        self._validate_payload_limits(payloads.payloads)
 
     async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        if not self.payload_codec:
-            return list(payloads)
-        return await self.payload_codec.encode(payloads)
-
-    # Temporary shortcircuit detection while the _encode_* methods may no-op if
-    # a payload codec is not configured. Remove once those paths have more to them.
-    @property
-    def _encode_payload_has_effect(self) -> bool:
-        return self.payload_codec is not None
+        encoded_payloads = list(payloads)
+        if self.payload_codec:
+            encoded_payloads = await self.payload_codec.encode(encoded_payloads)
+        self._validate_payload_limits(encoded_payloads)
+        return encoded_payloads
 
     async def _decode_payload(
         self, payload: temporalio.api.common.v1.Payload
@@ -1451,6 +1596,42 @@ class DataConverter(WithSerializationContext):
             await cb(failure.reset_workflow_failure_info.last_heartbeat_details)
         if failure.HasField("cause"):
             await DataConverter._apply_to_failure_payloads(failure.cause, cb)
+
+    def _validate_payload_limits(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+    ):
+        DataConverter._validate_limits(
+            payloads,
+            self._payload_error_limits.payload_size_error
+            if self._payload_error_limits
+            else None,
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit.",
+            self.payload_limits.payload_size_warning,
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit.",
+        )
+
+    @staticmethod
+    def _validate_limits(
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+        error_limit: int | None,
+        error_message: str,
+        warning_limit: int,
+        warning_message: str,
+    ):
+        total_size = sum(payload.ByteSize() for payload in payloads)
+
+        if error_limit and error_limit > 0 and total_size > error_limit:
+            raise _PayloadSizeError(
+                f"{error_message} Size: {total_size} bytes, Limit: {error_limit} bytes"
+            )
+
+        if warning_limit > 0 and total_size > warning_limit:
+            # TODO: Use a context aware logger to log extra information about workflow/activity/etc
+            warnings.warn(
+                f"{warning_message} Size: {total_size} bytes, Limit: {warning_limit} bytes",
+                PayloadSizeWarning,
+            )
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (

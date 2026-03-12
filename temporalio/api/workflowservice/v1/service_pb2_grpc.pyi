@@ -87,7 +87,8 @@ class WorkflowServiceStub:
     Upon failure, it returns `MultiOperationExecutionFailure` where the status code
     equals the status code of the *first* operation that failed to be started.
 
-    NOTE: Experimental API.
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: To be exposed over HTTP in the future. --)
     """
     GetWorkflowExecutionHistory: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
@@ -499,6 +500,11 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
     ]
     """List all schedules in a namespace."""
+    CountSchedules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
+    ]
+    """CountSchedules is a visibility API to count schedules in a specific namespace."""
     UpdateWorkerBuildIdCompatibility: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
@@ -1103,7 +1109,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Upon failure, it returns `MultiOperationExecutionFailure` where the status code
         equals the status code of the *first* operation that failed to be started.
 
-        NOTE: Experimental API.
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: To be exposed over HTTP in the future. --)
         """
     @abc.abstractmethod
     def GetWorkflowExecutionHistory(
@@ -1605,6 +1612,13 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse:
         """List all schedules in a namespace."""
+    @abc.abstractmethod
+    def CountSchedules(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse:
+        """CountSchedules is a visibility API to count schedules in a specific namespace."""
     @abc.abstractmethod
     def UpdateWorkerBuildIdCompatibility(
         self,

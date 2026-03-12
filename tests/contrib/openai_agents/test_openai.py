@@ -102,7 +102,7 @@ from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
 from tests.helpers import assert_eventually, new_worker
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 def hello_mock_model():
@@ -489,7 +489,9 @@ async def test_nexus_tool_workflow(
             NexusToolsWorkflow,
             nexus_service_handlers=[WeatherServiceHandler()],
         ) as worker:
-            await create_nexus_endpoint(worker.task_queue, client)
+            await env.create_nexus_endpoint(
+                make_nexus_endpoint_name(worker.task_queue), worker.task_queue
+            )
 
             workflow_handle = await client.start_workflow(
                 NexusToolsWorkflow.run,

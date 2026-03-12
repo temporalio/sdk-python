@@ -754,6 +754,9 @@ class _Runtime(ABC):
     def workflow_is_replaying_history_events(self) -> bool: ...
 
     @abstractmethod
+    def workflow_is_read_only(self) -> bool: ...
+
+    @abstractmethod
     def workflow_memo(self) -> Mapping[str, Any]: ...
 
     @abstractmethod
@@ -865,6 +868,8 @@ class _Runtime(ABC):
         input: Any,
         output_type: type[OutputT] | None,
         schedule_to_close_timeout: timedelta | None,
+        schedule_to_start_timeout: timedelta | None,
+        start_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
@@ -913,6 +918,14 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_last_failure(self) -> BaseException | None: ...
+
+    @abstractmethod
+    def workflow_random_seed(self) -> int: ...
+
+    @abstractmethod
+    def workflow_register_random_seed_callback(
+        self, callback: Callable[[int], None]
+    ) -> None: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -1166,6 +1179,51 @@ def random() -> Random:
         The deterministically-seeded pseudo-random number generator.
     """
     return _Runtime.current().workflow_random()
+
+
+def random_seed() -> int:
+    """Get the current random seed value from core.
+
+    This returns the seed value currently being used by the workflow's
+    deterministic random number generator.
+
+    Returns:
+        The current random seed as an integer.
+    """
+    return _Runtime.current().workflow_random_seed()
+
+
+def register_random_seed_callback(callback: Callable[[int], None]) -> None:
+    """Register a callback to be notified when the random seed changes.
+
+    The callback will be invoked whenever the workflow receives a new random
+    seed from the core. This is useful for maintaining external random number
+    generators that need to stay in sync with the workflow's randomness.
+
+    Args:
+        callback: Function to be called with the new seed value when it changes.
+    """
+    return _Runtime.current().workflow_register_random_seed_callback(callback)
+
+
+def new_random() -> Random:
+    """Create a Random instance that automatically reseeds when the workflow seed changes.
+
+    This creates a new Random instance that is initially seeded with the current
+    workflow seed, and automatically registers a callback to reseed itself
+    whenever the workflow receives a new seed from core.
+
+    Returns:
+        A Random instance that stays synchronized with the workflow's randomness.
+    """
+    current_seed = random_seed()
+    auto_random = Random(current_seed)
+
+    def reseed_callback(new_seed: int) -> None:
+        auto_random.seed(new_seed)
+
+    register_random_seed_callback(reseed_callback)
+    return auto_random
 
 
 def time() -> float:
@@ -1474,6 +1532,18 @@ class unsafe:
             True if replaying history events, False otherwise.
         """
         return _Runtime.current().workflow_is_replaying_history_events()
+
+    @staticmethod
+    def is_read_only() -> bool:
+        """Whether the workflow is currently in read-only mode.
+
+        Read-only mode occurs during queries and update validators where
+        side effects are not allowed.
+
+        Returns:
+            True if the workflow is in read-only mode, False otherwise.
+        """
+        return _Runtime.current().workflow_is_read_only()
 
     @staticmethod
     def is_sandbox_unrestricted() -> bool:
@@ -5350,11 +5420,6 @@ class SuggestContinueAsNewReason(IntEnum):
     )
     """Workflow's count of completed plus in-flight updates is too large."""
 
-    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED = int(
-        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED
-    )
-    """Workflow's Target Worker Deployment Version is different from its current Version and the workflow is versioned."""
-
 
 ServiceT = TypeVar("ServiceT")
 
@@ -5426,6 +5491,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5441,6 +5508,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5459,6 +5528,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5477,6 +5548,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5495,6 +5568,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5512,6 +5587,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5525,6 +5602,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5536,6 +5615,8 @@ class NexusClient(ABC, Generic[ServiceT]):
             input: The Nexus operation input.
             output_type: The Nexus operation output type.
             schedule_to_close_timeout: Timeout for the entire operation attempt.
+            schedule_to_start_timeout: Timeout for the operation to be started.
+            start_to_close_timeout: Timeout for async operations to complete after starting.
             headers: Headers to send with the Nexus HTTP request.
 
         Returns:
@@ -5556,6 +5637,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5571,6 +5654,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5589,6 +5674,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5607,6 +5694,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5625,6 +5714,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5643,6 +5734,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5656,6 +5749,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5667,6 +5762,8 @@ class NexusClient(ABC, Generic[ServiceT]):
             input: The Nexus operation input.
             output_type: The Nexus operation output type.
             schedule_to_close_timeout: Timeout for the entire operation attempt.
+            schedule_to_start_timeout: Timeout for the operation to be started.
+            start_to_close_timeout: Timeout for async operations to complete after starting.
             headers: Headers to send with the Nexus HTTP request.
 
         Returns:
@@ -5709,6 +5806,8 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5721,6 +5820,8 @@ class _NexusClient(NexusClient[ServiceT]):
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
                 cancellation_type=cancellation_type,
                 headers=headers,
                 summary=summary,
@@ -5734,6 +5835,8 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5743,6 +5846,8 @@ class _NexusClient(NexusClient[ServiceT]):
             input,
             output_type=output_type,
             schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
             cancellation_type=cancellation_type,
             headers=headers,
             summary=summary,

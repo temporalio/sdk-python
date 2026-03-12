@@ -15,6 +15,8 @@ from typing import (
 import google.protobuf.empty_pb2
 from typing_extensions import Self
 
+import temporalio.api.nexus.v1
+import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
 import temporalio.bridge.testing
 import temporalio.client
@@ -400,6 +402,48 @@ class WorkflowEnvironment:
     def supports_time_skipping(self) -> bool:
         """Whether this environment supports time skipping."""
         return False
+
+    async def create_nexus_endpoint(
+        self, endpoint_name: str, task_queue: str
+    ) -> temporalio.api.nexus.v1.Endpoint:
+        """Create a Nexus endpoint with the given name and task queue.
+
+        Args:
+            endpoint_name: The name of the Nexus endpoint to create.
+            task_queue: The task queue to associate with the endpoint.
+
+        Returns:
+            The created Nexus endpoint.
+        """
+        response = await self._client.operator_service.create_nexus_endpoint(
+            temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
+                spec=temporalio.api.nexus.v1.EndpointSpec(
+                    name=endpoint_name,
+                    target=temporalio.api.nexus.v1.EndpointTarget(
+                        worker=temporalio.api.nexus.v1.EndpointTarget.Worker(
+                            namespace=self._client.namespace,
+                            task_queue=task_queue,
+                        )
+                    ),
+                )
+            )
+        )
+        return response.endpoint
+
+    async def delete_nexus_endpoint(
+        self, endpoint: temporalio.api.nexus.v1.Endpoint
+    ) -> None:
+        """Delete a Nexus endpoint.
+
+        Args:
+            endpoint: The Nexus endpoint to delete.
+        """
+        await self._client.operator_service.delete_nexus_endpoint(
+            temporalio.api.operatorservice.v1.DeleteNexusEndpointRequest(
+                id=endpoint.id,
+                version=endpoint.version,
+            )
+        )
 
     @contextmanager
     def auto_time_skipping_disabled(self) -> Iterator[None]:

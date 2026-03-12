@@ -275,6 +275,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._object: Any = None
         self._is_replaying: bool = False
         self._random = random.Random(det.randomness_seed)
+        self._current_seed = det.randomness_seed
+        self._seed_callbacks: list[Callable[[int], None]] = []
         self._read_only = False
         self._in_query_or_validator = False
 
@@ -795,6 +797,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             workflow_id=self._info.workflow_id,
             workflow_type=self._info.workflow_type,
             activity_type=handle._input.activity,
+            activity_id=handle._input.activity_id,
             activity_task_queue=(
                 handle._input.task_queue or self._info.task_queue
                 if isinstance(handle._input, StartActivityInput)
@@ -1079,6 +1082,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self, job: temporalio.bridge.proto.workflow_activation.UpdateRandomSeed
     ) -> None:
         self._random.seed(job.randomness_seed)
+        self._current_seed = job.randomness_seed
+        # Notify all registered callbacks
+        for callback in self._seed_callbacks:
+            try:
+                callback(job.randomness_seed)
+            except Exception:
+                # Ignore callback errors to avoid disrupting workflow execution
+                pass
 
     def _make_workflow_input(
         self, init_job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow
@@ -1236,6 +1247,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def workflow_is_replaying_history_events(self) -> bool:
         return self._is_replaying and not self._in_query_or_validator
+
+    def workflow_is_read_only(self) -> bool:
+        return self._read_only
 
     def workflow_memo(self) -> Mapping[str, Any]:
         if self._untyped_converted_memo is None:
@@ -1597,6 +1611,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         input: Any,
         output_type: type[OutputT] | None,
         schedule_to_close_timeout: timedelta | None,
+        schedule_to_start_timeout: timedelta | None,
+        start_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
@@ -1610,6 +1626,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
                 cancellation_type=cancellation_type,
                 headers=headers,
                 summary=summary,
@@ -1646,7 +1664,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             mut_attrs.update(attributes)
             for k, vals in attributes.items():
                 # Add to command
-                v.search_attributes[k].CopyFrom(
+                v.search_attributes.indexed_fields[k].CopyFrom(
                     temporalio.converter.encode_search_attribute_values(vals)
                 )
 
@@ -1687,7 +1705,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Update typed and untyped keys, replacing typed as needed
             for update in attributes:
                 # Set on command (delete is a proper null)
-                v.search_attributes[update.key.name].CopyFrom(
+                v.search_attributes.indexed_fields[update.key.name].CopyFrom(
                     temporalio.converter.encode_typed_search_attribute_value(
                         update.key, update.value
                     )
@@ -1736,10 +1754,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         fut = self.create_future()
-        self._timer_impl(
+        timer_handle = self._timer_impl(
             duration,
             _TimerOptions(user_metadata=user_metadata),
-            lambda: fut.set_result(None),
+            lambda: fut.set_result(None) if not fut.done() else None,
+        )
+        fut.add_done_callback(
+            lambda f: timer_handle.cancel() if f.cancelled() else None
         )
         await fut
 
@@ -1822,6 +1843,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
 
         return None
+
+    def workflow_random_seed(self) -> int:
+        return self._current_seed
+
+    def workflow_register_random_seed_callback(
+        self, callback: Callable[[int], None]
+    ) -> None:
+        self._seed_callbacks.append(callback)
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
@@ -2145,6 +2174,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 workflow_id=self._info.workflow_id,
                 workflow_type=self._info.workflow_type,
                 activity_type=activity_handle._input.activity,
+                activity_id=activity_handle._input.activity_id,
                 activity_task_queue=(
                     activity_handle._input.task_queue
                     if isinstance(activity_handle._input, StartActivityInput)
@@ -2311,7 +2341,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         except Exception:
             logger.exception(
-                f"Failed deserializing signal input for {job.signal_name}, dropping the signal"
+                f"Failed deserializing signal input for {job.signal_name}"
+                f" on workflow {self._info.workflow_type} with ID {self._info.workflow_id}"
+                f" and run ID {self._info.run_id}, dropping the signal",
+                extra={"temporal_workflow": self._info._logger_details()},
             )
             return
         input = HandleSignalInput(
@@ -2940,6 +2973,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 workflow_id=self._instance._info.workflow_id,
                 workflow_type=self._instance._info.workflow_type,
                 activity_type=self._input.activity,
+                activity_id=self._input.activity_id,
                 activity_task_queue=(
                     self._input.task_queue or self._instance._info.task_queue
                     if isinstance(self._input, StartActivityInput)
@@ -3189,7 +3223,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 v.memo[k].CopyFrom(self._payload_converter.to_payloads([val])[0])
         if self._input.search_attributes:
             _encode_search_attributes(
-                self._input.search_attributes, v.search_attributes
+                self._input.search_attributes, v.search_attributes.indexed_fields
             )
         v.cancellation_type = cast(
             temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType,
@@ -3328,6 +3362,12 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout
             )
+        if self._input.schedule_to_start_timeout is not None:
+            v.schedule_to_start_timeout.FromTimedelta(
+                self._input.schedule_to_start_timeout
+            )
+        if self._input.start_to_close_timeout is not None:
+            v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         v.cancellation_type = cast(
             temporalio.bridge.proto.nexus.NexusOperationCancellationType.ValueType,
             int(self._input.cancellation_type),
@@ -3399,7 +3439,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
                 v.memo[k].CopyFrom(val)
         if self._input.search_attributes:
             _encode_search_attributes(
-                self._input.search_attributes, v.search_attributes
+                self._input.search_attributes, v.search_attributes.indexed_fields
             )
         if self._input.versioning_intent:
             v.versioning_intent = self._input.versioning_intent._to_proto()

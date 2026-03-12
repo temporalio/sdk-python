@@ -69,7 +69,7 @@ class RetryPolicy:
             if proto.HasField("maximum_interval")
             else None,
             maximum_attempts=proto.maximum_attempts,
-            non_retryable_error_types=proto.non_retryable_error_types
+            non_retryable_error_types=list(proto.non_retryable_error_types)
             if proto.non_retryable_error_types
             else None,
         )
@@ -145,6 +145,49 @@ class WorkflowIDConflictPolicy(IntEnum):
     )
     TERMINATE_EXISTING = int(
         temporalio.api.enums.v1.WorkflowIdConflictPolicy.WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING
+    )
+
+
+class ActivityIDReusePolicy(IntEnum):
+    """How already-closed activity IDs are handled on start.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityIdReusePolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_UNSPECIFIED
+    )
+    ALLOW_DUPLICATE = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE
+    )
+    ALLOW_DUPLICATE_FAILED_ONLY = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
+    )
+    REJECT_DUPLICATE = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_REJECT_DUPLICATE
+    )
+
+
+class ActivityIDConflictPolicy(IntEnum):
+    """How already-running activity IDs are handled on start.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityIdConflictPolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_UNSPECIFIED
+    )
+    FAIL = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_FAIL
+    )
+    USE_EXISTING = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING
     )
 
 
@@ -335,19 +378,22 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
 
     @staticmethod
     def _from_metadata_type(name: str, metadata_type: str) -> SearchAttributeKey | None:
-        if metadata_type == "Text":
+        # The type metadata is usually in PascalCase (e.g. "KeywordList")
+        # but in rare cases may be in SCREAMING_SNAKE_CASE (e.g.
+        # "INDEXED_VALUE_TYPE_KEYWORD_LIST").
+        if metadata_type in ("Text", "INDEXED_VALUE_TYPE_TEXT"):
             return SearchAttributeKey.for_text(name)
-        elif metadata_type == "Keyword":
+        elif metadata_type in ("Keyword", "INDEXED_VALUE_TYPE_KEYWORD"):
             return SearchAttributeKey.for_keyword(name)
-        elif metadata_type == "Int":
+        elif metadata_type in ("Int", "INDEXED_VALUE_TYPE_INT"):
             return SearchAttributeKey.for_int(name)
-        elif metadata_type == "Double":
+        elif metadata_type in ("Double", "INDEXED_VALUE_TYPE_DOUBLE"):
             return SearchAttributeKey.for_float(name)
-        elif metadata_type == "Bool":
+        elif metadata_type in ("Bool", "INDEXED_VALUE_TYPE_BOOL"):
             return SearchAttributeKey.for_bool(name)
-        elif metadata_type == "Datetime":
+        elif metadata_type in ("Datetime", "INDEXED_VALUE_TYPE_DATETIME"):
             return SearchAttributeKey.for_datetime(name)
-        elif metadata_type == "KeywordList":
+        elif metadata_type in ("KeywordList", "INDEXED_VALUE_TYPE_KEYWORD_LIST"):
             return SearchAttributeKey.for_keyword_list(name)
         return None
 

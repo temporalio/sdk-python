@@ -355,14 +355,15 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         info = temporalio.activity.info()
+        attributes: dict[str, str] = {"temporalActivityID": info.activity_id}
+        if info.workflow_id:
+            attributes["temporalWorkflowID"] = info.workflow_id
+        if info.workflow_run_id:
+            attributes["temporalRunID"] = info.workflow_run_id
         with self.root._start_as_current_span(
             f"RunActivity:{info.activity_type}",
             context=self.root._context_from_headers(input.headers),
-            attributes={
-                "temporalWorkflowID": info.workflow_id,
-                "temporalRunID": info.workflow_run_id,
-                "temporalActivityID": info.activity_id,
-            },
+            attributes=attributes,
             kind=opentelemetry.trace.SpanKind.SERVER,
         ):
             return await super().execute_activity(input)
@@ -826,43 +827,3 @@ def _carrier_to_nexus_headers(
         else:
             out[k] = v
     return out
-
-
-class workflow:
-    """Contains static methods that are safe to call from within a workflow.
-
-    .. warning::
-        Using any other ``opentelemetry`` API could cause non-determinism.
-    """
-
-    def __init__(self) -> None:  # noqa: D107
-        raise NotImplementedError
-
-    @staticmethod
-    def completed_span(
-        name: str,
-        *,
-        attributes: opentelemetry.util.types.Attributes = None,
-        exception: Exception | None = None,
-    ) -> None:
-        """Create and end an OpenTelemetry span.
-
-        Note, this will only create and record when the workflow is not
-        replaying and if there is a current span (meaning the client started a
-        span and this interceptor is configured on the worker and the span is on
-        the context).
-
-        There is currently no way to create a long-running span or to create a
-        span that actually spans other code.
-
-        Args:
-            name: Name of the span.
-            attributes: Attributes to set on the span if any. Workflow ID and
-                run ID are automatically added.
-            exception: Optional exception to record on the span.
-        """
-        interceptor = TracingWorkflowInboundInterceptor._from_context()
-        if interceptor:
-            interceptor._completed_span(
-                name, additional_attributes=attributes, exception=exception
-            )

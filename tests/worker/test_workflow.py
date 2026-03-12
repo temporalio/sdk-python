@@ -729,21 +729,36 @@ class BadSignalParamWorkflow:
 
 
 async def test_workflow_bad_signal_param(client: Client):
-    async with new_worker(client, BadSignalParamWorkflow) as worker:
-        handle = await client.start_workflow(
-            BadSignalParamWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
+    with LogCapturer().logs_captured(
+        temporalio.worker._workflow_instance.logger
+    ) as capturer:
+        async with new_worker(client, BadSignalParamWorkflow) as worker:
+            handle = await client.start_workflow(
+                BadSignalParamWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            # Send 4 signals, first and third are bad
+            await handle.signal("some_signal", "bad")
+            await handle.signal("some_signal", BadSignalParam(some_str="good"))
+            await handle.signal("some_signal", 123)
+            await handle.signal("some_signal", BadSignalParam(some_str="finish"))
+            assert [
+                BadSignalParam(some_str="good"),
+                BadSignalParam(some_str="finish"),
+            ] == await handle.result()
+
+        # Check that the log message includes workflow context
+        record = capturer.find_log("Failed deserializing signal input")
+        assert record is not None
+        assert "some_signal" in record.message
+        assert "BadSignalParamWorkflow" in record.message
+        assert handle.id in record.message
+        assert hasattr(record, "temporal_workflow")
+        assert (
+            getattr(record, "temporal_workflow")["workflow_type"]
+            == "BadSignalParamWorkflow"
         )
-        # Send 4 signals, first and third are bad
-        await handle.signal("some_signal", "bad")
-        await handle.signal("some_signal", BadSignalParam(some_str="good"))
-        await handle.signal("some_signal", 123)
-        await handle.signal("some_signal", BadSignalParam(some_str="finish"))
-        assert [
-            BadSignalParam(some_str="good"),
-            BadSignalParam(some_str="finish"),
-        ] == await handle.result()
 
 
 @workflow.defn
@@ -3464,6 +3479,66 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire
             await result_task
+
+
+@workflow.defn
+class CancelWorkflowSleepTaskWorkflow:
+    """Like CancelSignalAndTimerFiredInSameTaskWorkflow but uses workflow.sleep."""
+
+    _ready = False
+    timer_task: asyncio.Task[None]  # type: ignore[reportUninitializedInstanceVariable]
+
+    @workflow.run
+    async def run(self) -> str:
+        self.timer_task = asyncio.create_task(workflow.sleep(60 * 60))
+        self._ready = True
+        try:
+            await self.timer_task
+            return "timer_completed"
+        except asyncio.CancelledError:
+            return "timer_cancelled"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.signal
+    def cancel_timer(self) -> None:
+        self.timer_task.cancel()
+
+
+async def test_workflow_sleep_task_cancellation(
+    client: Client,
+):
+    async with new_worker(
+        client,
+        CancelWorkflowSleepTaskWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            CancelWorkflowSleepTaskWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def ready() -> bool:
+            return await handle.query(CancelWorkflowSleepTaskWorkflow.ready)
+
+        await assert_eq_eventually(True, ready)
+        await handle.signal(CancelWorkflowSleepTaskWorkflow.cancel_timer)
+        result = await handle.result()
+
+    assert result == "timer_cancelled"
+    # Verify the Temporal timer was actually cancelled on the server
+    resp = await client.workflow_service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=handle.id),
+        )
+    )
+    timer_canceled = any(
+        e.event_type == EventType.EVENT_TYPE_TIMER_CANCELED for e in resp.history.events
+    )
+    assert timer_canceled, "Expected TimerCanceled event in history"
 
 
 class MyCustomError(ApplicationError):
@@ -8535,3 +8610,120 @@ async def test_disable_logger_sandbox(
                     run_timeout=timedelta(seconds=1),
                     retry_policy=RetryPolicy(maximum_attempts=1),
                 )
+
+
+@workflow.defn
+class RandomSeedTestWorkflow:
+    def __init__(self) -> None:
+        self.seed_changes: list[int] = []
+        self.continue_signal_received = False
+        self._ready = False
+
+    @workflow.run
+    async def run(self) -> dict[str, Any]:
+        # Get the initial seed
+        initial_seed = workflow.random_seed()
+
+        # Register callback to track seed changes
+        workflow.register_random_seed_callback(self._on_seed_change)
+
+        # Create a new random instance that auto-reseeds
+        auto_random = workflow.new_random()
+
+        # Generate random values before waiting
+        auto_value1 = auto_random.randint(1, 1000000)
+
+        # Do an activity to give a reset point
+        await workflow.execute_activity(
+            say_hello,
+            "Hi",
+            schedule_to_close_timeout=timedelta(seconds=5),
+        )
+
+        self._ready = True
+
+        # Wait for signal to continue - this allows for workflow reset
+        await workflow.wait_condition(lambda: self.continue_signal_received)
+
+        # Generate more random values after reset might have occurred
+        auto_value2 = auto_random.randint(1, 1000000)
+
+        # Get final seed
+        final_seed = workflow.random_seed()
+
+        return {
+            "initial_seed": initial_seed,
+            "final_seed": final_seed,
+            "seed_changes": self.seed_changes.copy(),
+            "auto_values": [auto_value1, auto_value2],
+        }
+
+    def _on_seed_change(self, new_seed: int) -> None:
+        self.seed_changes.append(new_seed)
+
+    @workflow.signal
+    def continue_workflow(self) -> None:
+        self.continue_signal_received = True
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+
+async def test_random_seed_functionality(
+    client: Client, worker: Worker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support reset")
+    async with new_worker(
+        client, RandomSeedTestWorkflow, activities=[say_hello], max_cached_workflows=0
+    ) as worker:
+        workflow_id = f"test-random-seed-{uuid.uuid4()}"
+        handle = await client.start_workflow(
+            RandomSeedTestWorkflow.run,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+        # Let workflow generate some random values
+        # Wait for workflow to be ready
+        async def ready() -> bool:
+            return await handle.query(RandomSeedTestWorkflow.ready)
+
+        await assert_eq_eventually(True, ready)
+
+        # Reset workflow using raw gRPC call to trigger seed change
+        from temporalio.api.common.v1.message_pb2 import WorkflowExecution
+        from temporalio.api.enums.v1.reset_pb2 import ResetReapplyType
+        from temporalio.api.workflowservice.v1 import ResetWorkflowExecutionRequest
+
+        await client.workflow_service.reset_workflow_execution(
+            ResetWorkflowExecutionRequest(
+                namespace=client.namespace,
+                workflow_execution=WorkflowExecution(
+                    workflow_id=handle.id,
+                    run_id="",
+                ),
+                reason="Test seed change",
+                reset_reapply_type=ResetReapplyType.RESET_REAPPLY_TYPE_UNSPECIFIED,
+                request_id=str(uuid.uuid4()),
+                workflow_task_finish_event_id=9,  # Reset to after activity completion
+            )
+        )
+
+        # Get handle to the reset workflow using the new run ID
+        reset_handle = client.get_workflow_handle(
+            workflow_id,
+        )
+
+        # Continue the workflow
+        await reset_handle.signal(RandomSeedTestWorkflow.continue_workflow)
+
+        result = await reset_handle.result()
+
+        # Verify basic functionality
+        assert isinstance(result["initial_seed"], int)
+        assert isinstance(result["final_seed"], int)
+        assert isinstance(result["seed_changes"], list)
+        assert len(result["auto_values"]) == 2
+        assert len(result["seed_changes"]) == 1
