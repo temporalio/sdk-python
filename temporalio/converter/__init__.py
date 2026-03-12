@@ -21,7 +21,6 @@ from enum import IntEnum
 from itertools import zip_longest
 from logging import getLogger
 from typing import (
-    TYPE_CHECKING,
     Any,
     ClassVar,
     Literal,
@@ -44,9 +43,6 @@ import temporalio.api.failure.v1
 import temporalio.common
 import temporalio.exceptions
 import temporalio.types
-
-if TYPE_CHECKING:
-    import temporalio.extstore  # avoid circular import at runtime
 
 if sys.version_info < (3, 11):
     # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
@@ -1363,7 +1359,7 @@ class DataConverter(WithSerializationContext):
     payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
     """Settings for payload size limits."""
 
-    external_storage: temporalio.extstore.StorageConfig | None = None
+    external_storage: extstore.StorageConfig | None = None
     """Options for external storage. If None, external storage is disabled.
     
     .. warning::
@@ -1373,7 +1369,7 @@ class DataConverter(WithSerializationContext):
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
-    _storage_impl: temporalio.extstore._StorageImpl = dataclasses.field(init=False)
+    _storage_impl: extstore._StorageImpl = dataclasses.field(init=False)
 
     _payload_error_limits: _ServerPayloadErrorLimits | None = None
     """Server-reported limits for payloads."""
@@ -1487,12 +1483,10 @@ class DataConverter(WithSerializationContext):
         return cloned
 
     def _reset_storage_impl(self, context: SerializationContext | None = None) -> None:
-        import temporalio.extstore  # lazy import to avoid circular dependency
-
         object.__setattr__(
             self,
             "_storage_impl",
-            temporalio.extstore._StorageImpl(self.external_storage, context),
+            extstore._StorageImpl(self.external_storage, context),
         )
 
     def _with_payload_error_limits(
@@ -1669,6 +1663,24 @@ DefaultPayloadConverter.default_encoding_payload_converters = (
     JSONProtoPayloadConverter(),
     BinaryProtoPayloadConverter(),
     JSONPlainPayloadConverter(),  # JSON Plain needs to remain in last because it throws on unknown types
+)
+
+# Imported here to break the circular dependency
+from temporalio.converter import _extstore as extstore  # noqa: E402
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageConfig as StorageConfig,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageDriver as StorageDriver,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageDriverClaim as StorageDriverClaim,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageDriverContext as StorageDriverContext,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageWarning as StorageWarning,
 )
 
 DataConverter.default = DataConverter()

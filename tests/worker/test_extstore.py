@@ -13,7 +13,7 @@ from temporalio.api.common.v1 import Payload
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
-from temporalio.extstore import (
+from temporalio.converter import (
     StorageConfig,
     StorageDriverClaim,
     StorageDriverContext,

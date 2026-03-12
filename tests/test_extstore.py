@@ -16,13 +16,13 @@ from temporalio.converter import (
     WorkflowSerializationContext,
 )
 from temporalio.exceptions import ApplicationError
-from temporalio.extstore import (
+from temporalio.converter import (
     StorageConfig,
     StorageDriver,
     StorageDriverClaim,
     StorageDriverContext,
-    _StorageReference,
 )
+from temporalio.converter._extstore import _StorageReference
 
 
 class InMemoryTestDriver(StorageDriver):
