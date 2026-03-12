@@ -14,7 +14,7 @@ from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.converter import (
-    StorageConfig,
+    ExternalStorage,
     StorageDriverClaim,
     StorageDriverContext,
     StorageWarning,
@@ -119,7 +119,7 @@ async def test_extstore_activity_input_no_retrieve(
         namespace=env.client.namespace,
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=1024,
             ),
@@ -160,7 +160,7 @@ async def test_extstore_activity_result_no_store(
         namespace=env.client.namespace,
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=1024,
             ),
@@ -203,7 +203,7 @@ async def test_extstore_worker_missing_driver(
         namespace=env.client.namespace,
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=1024,
             ),
@@ -244,7 +244,7 @@ async def test_extstore_payload_not_found_fails_workflow(
         namespace=env.client.namespace,
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[BadTestDriver(raise_payload_not_found=True)],
                 payload_size_threshold=1024,
             ),
@@ -288,7 +288,7 @@ async def _run_extstore_workflow_and_fetch_history(
         namespace=env.client.namespace,
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=512,
             ),
@@ -357,7 +357,7 @@ async def test_replay_extstore_history_succeeds_with_correct_extstore(
         workflows=[ExtStoreWorkflow],
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=512,
             ),
@@ -382,7 +382,7 @@ async def test_replay_extstore_history_fails_with_empty_driver(
         workflows=[ExtStoreWorkflow],
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[InMemoryTestDriver()],
                 payload_size_threshold=512,
             ),

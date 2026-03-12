@@ -463,7 +463,7 @@ Now `IPv4Address` can be used in type hints including collections, optionals, et
 
 External payload storage allows large payloads to be offloaded to an external storage service (such as Amazon S3) rather than stored inline in workflow history. This is useful when workflows or activities work with data that would otherwise exceed Temporal's payload size limits.
 
-External payload storage is configured via the `external_storage` parameter on `DataConverter`, which accepts a `temporalio.extstore.StorageConfig` instance. Any driver used to store payloads must also be configured on the component that retrieves them — for example, if the client stores workflow inputs using a driver, the worker must include that driver in its `StorageConfig.drivers` list to retrieve them.
+External payload storage is configured via the `external_storage` parameter on `DataConverter`, which accepts a `temporalio.converter.ExternalStorage` instance. Any driver used to store payloads must also be configured on the component that retrieves them — for example, if the client stores workflow inputs using a driver, the worker must include that driver in its `ExternalStorage.drivers` list to retrieve them.
 
 The simplest setup uses a single storage driver:
 
@@ -471,7 +471,7 @@ The simplest setup uses a single storage driver:
 import dataclasses
 from temporalio.client import Client
 from temporalio.converter import DataConverter
-from temporalio.extstore import StorageConfig
+from temporalio.converter import ExternalStorage
 
 driver = MyDriver()
 
@@ -479,26 +479,26 @@ client = await Client.connect(
     "localhost:7233",
     data_converter=dataclasses.replace(
         DataConverter.default,
-        external_storage=StorageConfig(drivers=[driver]),
+        external_storage=ExternalStorage(drivers=[driver]),
     ),
 )
 ```
 
 Some things to note about external payload storage:
 
-* Only payloads that meet or exceed `StorageConfig.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
+* Only payloads that meet or exceed `ExternalStorage.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
 * External payload storage applies transparently to workflow inputs/outputs, activity inputs/outputs, signals, updates, queries, and failure details.
-* The `DataConverter`'s `payload_codec` (if configured) is applied to the *reference* payload stored in workflow history, not to the externally stored bytes. To encrypt or compress the bytes handed to a driver, use `StorageConfig.payload_codec`.
-* Setting `StorageConfig.payload_size_threshold` to `None` causes every payload to be considered for external payload storage regardless of size.
+* The `DataConverter`'s `payload_codec` (if configured) is applied to the *reference* payload stored in workflow history, not to the externally stored bytes. To encrypt or compress the bytes handed to a driver, use `ExternalStorage.payload_codec`.
+* Setting `ExternalStorage.payload_size_threshold` to `None` causes every payload to be considered for external payload storage regardless of size.
 
 ###### Multiple Drivers and Driver Selection
 
-When multiple storage backends are needed, list all drivers in `StorageConfig.drivers` and provide a `driver_selector` to control which driver stores new payloads. Any driver in the list not chosen for storing is still available for retrieval, which is useful when migrating between storage backends.
+When multiple storage backends are needed, list all drivers in `ExternalStorage.drivers` and provide a `driver_selector` to control which driver stores new payloads. Any driver in the list not chosen for storing is still available for retrieval, which is useful when migrating between storage backends.
 
 ```python
-from temporalio.extstore import StorageConfig
+from temporalio.converter import ExternalStorage
 
-options = StorageConfig(
+options = ExternalStorage(
     drivers=[hot_driver, cold_driver],
     driver_selector=lambda context, payload: (
         "hot-storage" if payload.ByteSize() < 5 * 1024 * 1024 else "cold-storage"
@@ -510,7 +510,6 @@ For more complex selection logic, use a plain callable that reads from the `Stor
 
 ```python
 import temporalio.converter
-import temporalio.extstore
 from temporalio.api.common.v1 import Payload
 
 def feature_flag_is_on(workflow_id: str | None) -> bool:
@@ -518,7 +517,7 @@ def feature_flag_is_on(workflow_id: str | None) -> bool:
     return workflow_id is not None and len(workflow_id) % 2 == 0
 
 def feature_flag_selector(
-    context: temporalio.extstore.StorageDriverContext, _payload: Payload
+    context: temporalio.converter.StorageDriverContext, _payload: Payload
 ) -> str | None:
     workflow_id = None
     if isinstance(context.serialization_context, temporalio.converter.WorkflowSerializationContext):
@@ -527,7 +526,7 @@ def feature_flag_selector(
         workflow_id = context.serialization_context.workflow_id
     return "my-driver" if feature_flag_is_on(workflow_id) else None
 
-options = StorageConfig(
+options = ExternalStorage(
     drivers=[my_driver],
     driver_selector=feature_flag_selector,
 )
@@ -535,17 +534,17 @@ options = StorageConfig(
 
 Some things to note about driver selection:
 
-* When no `driver_selector` is set, the first driver in `StorageConfig.drivers` is always used for storing.
+* When no `driver_selector` is set, the first driver in `ExternalStorage.drivers` is always used for storing.
 * Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
-* The driver name returned by the selector must match a driver registered in `StorageConfig.drivers`. If it does not, an error is raised.
+* The driver name returned by the selector must match a driver registered in `ExternalStorage.drivers`. If it does not, an error is raised.
 
 ###### Custom Drivers
 
-Implement `temporalio.extstore.StorageDriver` to integrate with an external storage system:
+Implement `temporalio.converter.StorageDriver` to integrate with an external storage system:
 
 ```python
 from collections.abc import Sequence
-from temporalio.extstore import StorageDriver, StorageDriverClaim, StorageDriverContext
+from temporalio.converter import StorageDriver, StorageDriverClaim, StorageDriverContext
 from temporalio.api.common.v1 import Payload
 
 class MyDriver(StorageDriver):
@@ -579,7 +578,7 @@ class MyDriver(StorageDriver):
 Some things to note about implementing a custom driver:
 
 * `store` and `retrieve` must return lists of the same length as their respective input sequences.
-* `StorageDriver.name()` must return a string that is unique among all drivers in `StorageConfig.drivers`. This name is embedded in the reference payload stored in workflow history and used to look up the correct driver during retrieval — changing it after payloads have been stored will break retrieval.
+* `StorageDriver.name()` must return a string that is unique among all drivers in `ExternalStorage.drivers`. This name is embedded in the reference payload stored in workflow history and used to look up the correct driver during retrieval — changing it after payloads have been stored will break retrieval.
 * `StorageDriver.type()` is automatically implemented to return the name of the class. This can be overridden in subclasses but must remain consistent across all instances of the subclass.
 * Implement `temporalio.converter.WithSerializationContext` on your driver to receive workflow or activity context (namespace, workflow ID, activity ID, etc.) at serialization time.
 

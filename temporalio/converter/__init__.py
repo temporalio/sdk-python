@@ -1359,7 +1359,7 @@ class DataConverter(WithSerializationContext):
     payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
     """Settings for payload size limits."""
 
-    external_storage: extstore.StorageConfig | None = None
+    external_storage: extstore.ExternalStorage | None = None
     """Options for external storage. If None, external storage is disabled.
     
     .. warning::
@@ -1668,7 +1668,7 @@ DefaultPayloadConverter.default_encoding_payload_converters = (
 # Imported here to break the circular dependency
 from temporalio.converter import _extstore as extstore  # noqa: E402
 from temporalio.converter._extstore import (  # noqa: E402
-    StorageConfig as StorageConfig,
+    ExternalStorage as ExternalStorage,
 )
 from temporalio.converter._extstore import (  # noqa: E402
     StorageDriver as StorageDriver,

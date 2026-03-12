@@ -17,7 +17,7 @@ from temporalio.converter import (
 )
 from temporalio.exceptions import ApplicationError
 from temporalio.converter import (
-    StorageConfig,
+    ExternalStorage,
     StorageDriver,
     StorageDriverClaim,
     StorageDriverContext,
@@ -130,7 +130,7 @@ class TestDataConverterExternalStorage:
 
         # Configure with 100-byte threshold
         converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=100,
             )
@@ -159,7 +159,7 @@ class TestDataConverterExternalStorage:
     async def test_extstore_reference_structure(self):
         """Test that external storage creates proper reference structure."""
         converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[InMemoryTestDriver("test-driver")],
                 payload_size_threshold=50,
             )
@@ -190,7 +190,7 @@ class TestDataConverterExternalStorage:
         hot_driver = InMemoryTestDriver("hot-storage")
         cold_driver = InMemoryTestDriver("cold-storage")
 
-        options = StorageConfig(
+        options = ExternalStorage(
             drivers=[hot_driver, cold_driver],
             driver_selector=lambda context, payload: "hot-storage"
             if payload.ByteSize() < 500
@@ -275,7 +275,7 @@ class TestDriverError:
 
         driver = _NoClaimsDriver()
         converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=10,
             )
@@ -289,7 +289,7 @@ class TestDriverError:
     async def test_decode_wrong_payload_count_raises_runtime_error(self):
         """retrieve() returning fewer payloads than claims must raise ValueError."""
         good_converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[InMemoryTestDriver()],
                 payload_size_threshold=10,
             )
@@ -306,7 +306,7 @@ class TestDriverError:
 
         driver = _NoPayloadsDriver()
         bad_converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=10,
             )
@@ -362,7 +362,7 @@ class TestPayloadCodecWithExternalStorage:
 
         converter = DataConverter(
             payload_codec=dc_codec,
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=50,
             ),
@@ -390,7 +390,7 @@ class TestPayloadCodecWithExternalStorage:
         assert driver._retrieve_calls == 1
 
     async def test_external_converter_without_codec_does_not_encode_stored_bytes(self):
-        """When DataConverter.payload_codec is set but StorageConfig.payload_codec
+        """When DataConverter.payload_codec is set but ExternalStorage.payload_codec
         is None, stored bytes are NOT encoded – even though
         DataConverter.payload_codec is active for the reference payload in history."""
         driver = InMemoryTestDriver()
@@ -398,7 +398,7 @@ class TestPayloadCodecWithExternalStorage:
 
         converter = DataConverter(
             payload_codec=dc_codec,
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=50,
             ),
@@ -426,9 +426,9 @@ class TestPayloadCodecWithExternalStorage:
         assert driver._retrieve_calls == 1
 
     async def test_external_converter_codec_independent_from_dc_codec(self):
-        """When both DataConverter.payload_codec and StorageConfig.payload_codec
+        """When both DataConverter.payload_codec and ExternalStorage.payload_codec
         are set, the reference payload in history uses DataConverter.payload_codec
-        and the bytes stored by the driver use StorageConfig.payload_codec –
+        and the bytes stored by the driver use ExternalStorage.payload_codec –
         independently."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
@@ -436,7 +436,7 @@ class TestPayloadCodecWithExternalStorage:
 
         converter = DataConverter(
             payload_codec=dc_codec,
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 payload_size_threshold=50,
                 payload_codec=ext_codec,
@@ -472,7 +472,7 @@ class TestPayloadCodecWithExternalStorage:
 
 
 class TestMultiDriver:
-    """Tests for StorageConfig with multiple drivers."""
+    """Tests for ExternalStorage with multiple drivers."""
 
     async def test_no_selector_uses_first_driver_for_store(self):
         """Without a driver_selector the first driver in the list handles all
@@ -481,7 +481,7 @@ class TestMultiDriver:
         second = InMemoryTestDriver("driver-second")
 
         converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[first, second],
                 payload_size_threshold=50,
             )
@@ -514,7 +514,7 @@ class TestMultiDriver:
 
         # Store with driver-b as the sole driver.
         store_converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver_b],
                 payload_size_threshold=50,
             )
@@ -525,7 +525,7 @@ class TestMultiDriver:
         # Retrieve with driver-a listed first, driver-b second.
         # The "driver-b" name in the reference must route to driver-b.
         retrieve_converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver_a, driver_b],
                 payload_size_threshold=50,
             )
@@ -549,7 +549,7 @@ class TestMultiDriver:
             return "driver-a" if payload.ByteSize() < 500 else "driver-b"
 
         converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver_a, driver_b],
                 driver_selector=selector,
                 payload_size_threshold=50,
@@ -577,7 +577,7 @@ class TestMultiDriver:
         driver = InMemoryTestDriver("driver-a")
 
         converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[driver],
                 driver_selector=lambda _ctx, _payload: None,
                 payload_size_threshold=50,
@@ -596,11 +596,11 @@ class TestMultiDriver:
 
     async def test_selector_returns_unregistered_driver_raises(self):
         """A selector that returns a Driver whose name is not present in
-        StorageConfig.drivers raises ValueError during encode."""
+        ExternalStorage.drivers raises ValueError during encode."""
         registered = InMemoryTestDriver("registered")
 
         converter = DataConverter(
-            external_storage=StorageConfig(
+            external_storage=ExternalStorage(
                 drivers=[registered],
                 driver_selector=lambda _ctx, _payload: "not-in-list",
                 payload_size_threshold=50,
@@ -612,12 +612,12 @@ class TestMultiDriver:
 
     def test_duplicate_driver_names_raises(self):
         """Registering two drivers with identical names raises ValueError immediately
-        when constructing StorageConfig."""
+        when constructing ExternalStorage."""
         first = InMemoryTestDriver("dup-name")
         duplicate = InMemoryTestDriver("dup-name")
 
         with pytest.raises(ValueError, match="dup-name"):
-            StorageConfig(
+            ExternalStorage(
                 drivers=[first, duplicate],
                 payload_size_threshold=50,
             )

@@ -57,7 +57,7 @@ class StorageDriver(ABC):
     def name(self) -> str:
         """Returns the name of this driver instance. A driver may allow its name
         to be parameterized at construction time so that multiple instances of
-        the same driver class can coexist in :attr:`StorageConfig.drivers` with
+        the same driver class can coexist in :attr:`ExternalStorage.drivers` with
         distinct names.
         """
         raise NotImplementedError
@@ -101,7 +101,7 @@ class StorageDriver(ABC):
 
 
 @dataclass(frozen=True)
-class StorageConfig(WithSerializationContext):
+class ExternalStorage(WithSerializationContext):
     """Configuration for external storage behavior.
 
     .. warning::
@@ -156,7 +156,7 @@ class StorageConfig(WithSerializationContext):
             name = driver.name()
             if name in driver_map:
                 raise ValueError(
-                    f"StorageConfig.drivers contains multiple drivers with name '{name}'. "
+                    f"ExternalStorage.drivers contains multiple drivers with name '{name}'. "
                     "Each driver must have a unique name."
                 )
             driver_map[name] = driver
@@ -197,7 +197,7 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
 
     def __init__(
         self,
-        options: StorageConfig | None,
+        options: ExternalStorage | None,
         context: SerializationContext | None = None,
     ):
         self._options = options
@@ -368,7 +368,7 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
                     )
                 elif len(self._options.drivers) == 0:
                     warnings.warn(
-                        "StorageConfig.drivers is empty, but detected external storage references.",
+                        "ExternalStorage.drivers is empty, but detected external storage references.",
                         category=StorageWarning,
                     )
             return payload
@@ -414,7 +414,7 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
                     )
                 elif len(self._options.drivers) == 0:
                     warnings.warn(
-                        "StorageConfig.drivers is empty, but detected external storage references.",
+                        "ExternalStorage.drivers is empty, but detected external storage references.",
                         category=StorageWarning,
                     )
             return results
