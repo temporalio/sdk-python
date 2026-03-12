@@ -410,7 +410,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_history_size = act.history_size_bytes
         self._continue_as_new_suggested = act.continue_as_new_suggested
         self._suggested_continue_as_new_reasons = act.suggest_continue_as_new_reasons
-        self._target_worker_deployment_version_changed = act.target_worker_deployment_version_changed
+        self._target_worker_deployment_version_changed = (
+            act.target_worker_deployment_version_changed
+        )
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
         self._current_thread_id = threading.get_ident()

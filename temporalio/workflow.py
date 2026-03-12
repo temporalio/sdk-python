@@ -613,7 +613,7 @@ class Info:
         """Check whether the target worker deployment version has changed.
 
         Note: Upgrade-on-Continue-as-New is currently experimental.
-        
+
         Returns:
             True if the target worker deployment version has changed.
         """
