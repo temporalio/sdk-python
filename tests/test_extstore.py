@@ -9,21 +9,19 @@ from temporalio.api.common.v1 import Payload
 from temporalio.converter import (
     ActivitySerializationContext,
     DataConverter,
+    ExternalStorage,
     JSONPlainPayloadConverter,
     PayloadCodec,
     SerializationContext,
-    WithSerializationContext,
-    WorkflowSerializationContext,
-)
-from temporalio.exceptions import ApplicationError
-from temporalio.converter import (
-    ExternalStorage,
     StorageDriver,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
+    WithSerializationContext,
+    WorkflowSerializationContext,
 )
 from temporalio.converter._extstore import _StorageReference
+from temporalio.exceptions import ApplicationError
 
 
 class InMemoryTestDriver(StorageDriver):

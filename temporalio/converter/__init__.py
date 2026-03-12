@@ -1692,7 +1692,7 @@ from temporalio.converter._extstore import (  # noqa: E402
 from temporalio.converter._extstore import (  # noqa: E402
     StorageDriverRetrieveContext as StorageDriverRetrieveContext,
 )
-from temporalio.converter._extstore import (
+from temporalio.converter._extstore import (  # noqa: E402
     StorageDriverStoreContext as StorageDriverStoreContext,
 )
 from temporalio.converter._extstore import (  # noqa: E402
