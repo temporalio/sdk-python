@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any, ClassVar, TypeVar
 
 from typing_extensions import Self
 
@@ -18,6 +18,22 @@ from temporalio.converter import (
     SerializationContext,
     WithSerializationContext,
 )
+
+_T = TypeVar("_T")
+
+
+async def _gather_cancel_on_error(
+    coros: Sequence[Coroutine[Any, Any, _T]],
+) -> list[_T]:
+    """Run coroutines concurrently; cancel all remaining tasks if any one fails."""
+    tasks = [asyncio.create_task(c) for c in coros]
+    try:
+        return await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
 
 
 @dataclass(frozen=True)
@@ -303,11 +319,11 @@ class ExternalStorage(WithSerializationContext):
 
         driver_group_list = list(driver_groups.items())
 
-        all_claims = await asyncio.gather(
-            *(
+        all_claims = await _gather_cancel_on_error(
+            [
                 driver.store(context, [p for _, p in indexed_payloads])
                 for driver, indexed_payloads in driver_group_list
-            )
+            ]
         )
 
         for (driver, indexed_payloads), claims in zip(driver_group_list, all_claims):
@@ -385,11 +401,11 @@ class ExternalStorage(WithSerializationContext):
 
         driver_claim_list = list(driver_claims.items())
 
-        all_stored = await asyncio.gather(
-            *(
+        all_stored = await _gather_cancel_on_error(
+            [
                 driver.retrieve(context, [claim for _, claim in indexed_claims])
                 for driver, indexed_claims in driver_claim_list
-            )
+            ]
         )
 
         for (driver, indexed_claims), stored_payloads in zip(

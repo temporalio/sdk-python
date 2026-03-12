@@ -1,5 +1,6 @@
 """Tests for external storage functionality."""
 
+import asyncio
 from collections.abc import Sequence
 
 import pytest
@@ -315,6 +316,102 @@ class TestDriverError:
             match=f"Driver '{driver.name()}' returned 0 payloads, expected 1",
         ):
             await bad_converter.decode(encoded, [str])
+
+    async def test_store_cancels_in_flight_driver_on_error(self):
+        """When one driver raises during concurrent store, other in-flight drivers are cancelled."""
+        store_cancelled = asyncio.Event()
+
+        class _SleepingStoreDriver(InMemoryTestDriver):
+            def __init__(self):
+                super().__init__("sleeping")
+
+            async def store(
+                self,
+                context: StorageDriverStoreContext,
+                payloads: Sequence[Payload],
+            ) -> list[StorageDriverClaim]:
+                try:
+                    await asyncio.sleep(float("inf"))
+                except asyncio.CancelledError:
+                    store_cancelled.set()
+                    raise
+                return []  # unreachable
+
+        class _FailingStoreDriver(InMemoryTestDriver):
+            def __init__(self):
+                super().__init__("failing")
+
+            async def store(
+                self,
+                context: StorageDriverStoreContext,
+                payloads: Sequence[Payload],
+            ) -> list[StorageDriverClaim]:
+                raise RuntimeError("driver store failure")
+
+        drivers = [_SleepingStoreDriver(), _FailingStoreDriver()]
+        names = iter(["sleeping", "failing"])
+        converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=drivers,
+                driver_selector=lambda ctx, p: next(names),
+                payload_size_threshold=None,
+            )
+        )
+
+        with pytest.raises(RuntimeError, match="driver store failure"):
+            await converter.encode(["payload_a", "payload_b"])
+
+        assert store_cancelled.is_set()
+
+    async def test_retrieve_cancels_in_flight_driver_on_error(self):
+        """When one driver raises during concurrent retrieve, other in-flight drivers are cancelled."""
+        retrieve_cancelled = asyncio.Event()
+
+        class _SleepingRetrieveDriver(InMemoryTestDriver):
+            def __init__(self):
+                super().__init__("sleeping")
+
+            async def retrieve(
+                self,
+                context: StorageDriverRetrieveContext,
+                claims: Sequence[StorageDriverClaim],
+            ) -> list[Payload]:
+                try:
+                    await asyncio.sleep(float("inf"))
+                except asyncio.CancelledError:
+                    retrieve_cancelled.set()
+                    raise
+                return []  # unreachable
+
+        class _FailingRetrieveDriver(InMemoryTestDriver):
+            def __init__(self):
+                super().__init__("failing")
+
+            async def retrieve(
+                self,
+                context: StorageDriverRetrieveContext,
+                claims: Sequence[StorageDriverClaim],
+            ) -> list[Payload]:
+                raise RuntimeError("driver retrieve failure")
+
+        drivers: list[StorageDriver] = [
+            _SleepingRetrieveDriver(),
+            _FailingRetrieveDriver(),
+        ]
+        names = iter(["sleeping", "failing"])
+        converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=drivers,
+                driver_selector=lambda ctx, p: next(names),
+                payload_size_threshold=None,
+            )
+        )
+        encoded = await converter.encode(["payload_a", "payload_b"])
+
+        with pytest.raises(RuntimeError, match="driver retrieve failure"):
+            await converter.decode(encoded, [str, str])
+
+        assert retrieve_cancelled.is_set()
 
 
 class RecordingPayloadCodec(PayloadCodec):
