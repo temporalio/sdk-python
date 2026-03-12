@@ -279,7 +279,6 @@ class HistoryInfo:
     history_length: int
     history_size: int
     continue_as_new_suggested: bool
-    target_deployment_version_changed: bool
 
 
 @workflow.defn
@@ -301,7 +300,6 @@ class HistoryInfoWorkflow:
             history_length=workflow.info().get_current_history_length(),
             history_size=workflow.info().get_current_history_size(),
             continue_as_new_suggested=workflow.info().is_continue_as_new_suggested(),
-            target_deployment_version_changed=workflow.info().is_target_worker_deployment_version_changed(),
         )
 
 
@@ -336,42 +334,6 @@ async def test_workflow_history_info(
         assert new_info.history_length > continue_as_new_suggest_history_count
         assert new_info.history_size > orig_info.history_size
         assert new_info.continue_as_new_suggested
-
-
-# Test that upgrade suggestion is persistent across WFTs
-async def test_workflow_upgrade_suggestion_persistent(
-    client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
-):
-    if env.supports_time_skipping:
-        pytest.skip("Java test server does not support should continue as new")
-    async with new_worker(client, HistoryInfoWorkflow) as worker:
-        handle = await client.start_workflow(
-            HistoryInfoWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-        await handle.query(HistoryInfoWorkflow.get_history_info)
-
-        # Send a lot of events (trigger CAN suggestion for too many history events)
-        await handle.signal(
-            HistoryInfoWorkflow.bunch_of_events, continue_as_new_suggest_history_count
-        )
-        # Send one more event to trigger the WFT update. We have to do this
-        # because just a query will have a stale representation of history
-        # counts, but signal forces a new WFT.
-        await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
-        # Get wf info
-        info = await handle.query(HistoryInfoWorkflow.get_history_info)
-        # Assert CAN expectations
-        assert info.target_deployment_version_changed
-
-        # Send another signal to create a new WFT
-        await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
-        # Get fresh info
-        info = await handle.query(HistoryInfoWorkflow.get_history_info)
-        # Expect CAN to still be suggested
-        assert info.target_deployment_version_changed
 
 
 @workflow.defn
