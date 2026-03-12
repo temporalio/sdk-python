@@ -202,6 +202,11 @@ class ExternalStorage(WithSerializationContext):
         self, context: StorageDriverContext, payload: Payload
     ) -> StorageDriver | None:
         """Returns the driver to use for this payload, or None to pass through."""
+        if (
+            self.payload_size_threshold is not None
+            and payload.ByteSize() < self.payload_size_threshold
+        ):
+            return None
         selector = self.driver_selector
         if selector is None:
             return self.drivers[0] if self.drivers else None
@@ -221,13 +226,6 @@ class ExternalStorage(WithSerializationContext):
         return driver
 
     async def store_payload(self, payload: Payload) -> Payload:
-        size_bytes = payload.ByteSize()
-        if (
-            self.payload_size_threshold is not None
-            and size_bytes < self.payload_size_threshold
-        ):
-            return payload
-
         context = StorageDriverContext(serialization_context=self._context)
 
         driver = self._select_driver(context, payload)
@@ -273,12 +271,6 @@ class ExternalStorage(WithSerializationContext):
 
         to_store: list[tuple[int, Payload, StorageDriver]] = []
         for index, payload in enumerate(payloads):
-            size_bytes = payload.ByteSize()
-            if (
-                self.payload_size_threshold is not None
-                and size_bytes < self.payload_size_threshold
-            ):
-                continue
             driver = self._select_driver(context, payload)
             if driver is None:
                 continue
