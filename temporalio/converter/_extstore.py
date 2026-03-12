@@ -8,6 +8,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import ClassVar
 
 from typing_extensions import Self
 
@@ -100,6 +101,20 @@ class StorageDriver(ABC):
         raise NotImplementedError
 
 
+class StorageWarning(RuntimeWarning):
+    """Warning for external storage issues.
+
+    .. warning::
+           This API is experimental.
+    """
+
+
+@dataclass(frozen=True)
+class _StorageReference:
+    driver_name: str
+    driver_claim: StorageDriverClaim
+
+
 @dataclass(frozen=True)
 class ExternalStorage(WithSerializationContext):
     """Configuration for external storage behavior.
@@ -146,6 +161,14 @@ class ExternalStorage(WithSerializationContext):
     )
     """Name-keyed index of :attr:`drivers`, built at construction time."""
 
+    _context: SerializationContext | None = dataclasses.field(
+        init=False, default=None, repr=False, compare=False
+    )
+
+    _claim_converter: ClassVar[JSONPlainPayloadConverter] = JSONPlainPayloadConverter(
+        encoding="json/external-storage-reference"
+    )
+
     def __post_init__(self) -> None:
         """Validate drivers and build the internal name-keyed driver map.
 
@@ -167,54 +190,17 @@ class ExternalStorage(WithSerializationContext):
         payload_codec = self.payload_codec
         if isinstance(payload_codec, WithSerializationContext):
             payload_codec = payload_codec.with_context(context)
-        if payload_codec == self.payload_codec:
-            return self
-        return dataclasses.replace(
-            self,
-            payload_codec=payload_codec,
-        )
-
-
-class StorageWarning(RuntimeWarning):
-    """Warning for external storage issues.
-
-    .. warning::
-           This API is experimental.
-    """
-
-
-@dataclass(frozen=True)
-class _StorageReference:
-    driver_name: str
-    driver_claim: StorageDriverClaim
-
-
-class _StorageImpl:  # type:ignore[reportUnusedClass]
-    # Claim payload encoding is fixed and independent of any user configuration.
-    _claim_converter: JSONPlainPayloadConverter = JSONPlainPayloadConverter(
-        encoding="json/external-storage-reference"
-    )
-
-    def __init__(
-        self,
-        options: ExternalStorage | None,
-        context: SerializationContext | None = None,
-    ):
-        self._options = options
-        self._context = context
-        self._driver_map: dict[str, StorageDriver] = (
-            options._driver_map if options is not None else {}
-        )
+        result = dataclasses.replace(self, payload_codec=payload_codec)
+        object.__setattr__(result, "_context", context)
+        return result
 
     def _select_driver(
         self, context: StorageDriverContext, payload: Payload
     ) -> StorageDriver | None:
         """Returns the driver to use for this payload, or None to pass through."""
-        if not self._options:
-            return None
-        selector = self._options.driver_selector
+        selector = self.driver_selector
         if selector is None:
-            return self._options.drivers[0] if self._options.drivers else None
+            return self.drivers[0] if self.drivers else None
         driver_name = selector(context, payload)
         if driver_name is None:
             return None
@@ -231,13 +217,10 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         return driver
 
     async def store_payload(self, payload: Payload) -> Payload:
-        if self._options is None:
-            return payload
-
         size_bytes = payload.ByteSize()
         if (
-            self._options.payload_size_threshold is not None
-            and size_bytes < self._options.payload_size_threshold
+            self.payload_size_threshold is not None
+            and size_bytes < self.payload_size_threshold
         ):
             return payload
 
@@ -247,10 +230,9 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         if driver is None:
             return payload
 
-        # Optionally encode the payload before externally storing it
         encoded_payload = payload
-        if self._options.payload_codec:
-            encoded_payload = (await self._options.payload_codec.encode([payload]))[0]
+        if self.payload_codec:
+            encoded_payload = (await self.payload_codec.encode([payload]))[0]
 
         claims = await driver.store(context, [encoded_payload])
 
@@ -279,23 +261,18 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         self,
         payloads: Sequence[Payload],
     ) -> list[Payload]:
-        if self._options is None:
-            return list(payloads)
-
         if len(payloads) == 1:
             return [await self.store_payload(payloads[0])]
 
         results = list(payloads)
         context = StorageDriverContext(serialization_context=self._context)
 
-        # First pass: determine which payloads to store and which driver to use for each.
-        # Provide unencoded payloads to give maximal context information to the selector.
         to_store: list[tuple[int, Payload, StorageDriver]] = []
         for index, payload in enumerate(payloads):
             size_bytes = payload.ByteSize()
             if (
-                self._options.payload_size_threshold is not None
-                and size_bytes < self._options.payload_size_threshold
+                self.payload_size_threshold is not None
+                and size_bytes < self.payload_size_threshold
             ):
                 continue
             driver = self._select_driver(context, payload)
@@ -306,23 +283,17 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         if not to_store:
             return results
 
-        # Optionally encode all payloads destined for external storage
         payloads_to_encode = [payload for _, payload, _ in to_store]
         encoded_payloads = payloads_to_encode
-        if self._options.payload_codec:
-            encoded_payloads = await self._options.payload_codec.encode(
-                payloads_to_encode
-            )
+        if self.payload_codec:
+            encoded_payloads = await self.payload_codec.encode(payloads_to_encode)
 
-        # Group encoded payloads by driver for batched store calls
-        # driver -> [(original_index, encoded_payload)]
         driver_groups: dict[StorageDriver, list[tuple[int, Payload]]] = {}
         for i, (orig_index, _, driver) in enumerate(to_store):
             driver_groups.setdefault(driver, []).append(
                 (orig_index, encoded_payloads[i])
             )
 
-        # Store all driver groups concurrently then build reference payloads
         driver_group_list = list(driver_groups.items())
 
         all_claims = await asyncio.gather(
@@ -353,24 +324,13 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
 
         return results
 
-    async def retrieve_payload(
-        self,
-        payload: Payload,
-    ) -> Payload:
-        if self._options is None or len(self._options.drivers) == 0:
-            # External storage was not configured (correctly). Warn if there are any external payloads
-            # since that is likely to cause downstream error when decoding or deserializing.
+    async def retrieve_payload(self, payload: Payload) -> Payload:
+        if len(self.drivers) == 0:
             if len(payload.external_payloads) > 0:
-                if not self._options:
-                    warnings.warn(
-                        "External storage is not configured, but detected external storage references.",
-                        category=StorageWarning,
-                    )
-                elif len(self._options.drivers) == 0:
-                    warnings.warn(
-                        "ExternalStorage.drivers is empty, but detected external storage references.",
-                        category=StorageWarning,
-                    )
+                warnings.warn(
+                    "ExternalStorage.drivers is empty, but detected external storage references.",
+                    category=StorageWarning,
+                )
             return payload
 
         if len(payload.external_payloads) == 0:
@@ -387,8 +347,8 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
 
-        if self._options.payload_codec:
-            stored_payloads = await self._options.payload_codec.decode(stored_payloads)
+        if self.payload_codec:
+            stored_payloads = await self.payload_codec.decode(stored_payloads)
 
         return stored_payloads[0]
 
@@ -403,27 +363,17 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
     ) -> list[Payload]:
         results = list(payloads)
 
-        if self._options is None or len(self._options.drivers) == 0:
-            # External storage was not configured, but warn if there are any external payloads
-            # since that is likely to cause downstream error when decoding or deserializing.
+        if len(self.drivers) == 0:
             if any(len(p.external_payloads) > 0 for p in payloads):
-                if not self._options:
-                    warnings.warn(
-                        "External storage is not configured, but detected external storage references.",
-                        category=StorageWarning,
-                    )
-                elif len(self._options.drivers) == 0:
-                    warnings.warn(
-                        "ExternalStorage.drivers is empty, but detected external storage references.",
-                        category=StorageWarning,
-                    )
+                warnings.warn(
+                    "ExternalStorage.drivers is empty, but detected external storage references.",
+                    category=StorageWarning,
+                )
             return results
 
         if len(payloads) == 1:
             return [await self.retrieve_payload(payloads[0])]
 
-        # Group claims by driver for batched retrieve calls
-        # driver -> [(original_index, claim)]
         driver_claims: dict[StorageDriver, list[tuple[int, StorageDriverClaim]]] = {}
         for index, payload in enumerate(payloads):
             if len(payload.external_payloads) == 0:
@@ -442,7 +392,6 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
         context = StorageDriverContext(serialization_context=self._context)
         stored_by_index: dict[int, Payload] = {}
 
-        # Retrieve from all drivers concurrently
         driver_claim_list = list(driver_claims.items())
 
         all_stored = await asyncio.gather(
@@ -466,13 +415,12 @@ class _StorageImpl:  # type:ignore[reportUnusedClass]
             for idx, stored_payload in zip(indices, stored_payloads):
                 stored_by_index[idx] = stored_payload
 
-        # Decode all retrieved payloads together if a codec is configured
         retrieve_indices = sorted(stored_by_index.keys())
         stored_list = [stored_by_index[idx] for idx in retrieve_indices]
 
         decoded_payloads = stored_list
-        if self._options.payload_codec:
-            decoded_payloads = await self._options.payload_codec.decode(stored_list)
+        if self.payload_codec:
+            decoded_payloads = await self.payload_codec.decode(stored_list)
 
         for i, retrieved_payload in enumerate(decoded_payloads):
             results[retrieve_indices[i]] = retrieved_payload
