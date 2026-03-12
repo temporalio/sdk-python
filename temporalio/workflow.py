@@ -609,6 +609,16 @@ class Info:
         """Get reason(s) why continue as new is suggested"""
         return _Runtime.current().workflow_get_suggested_continue_as_new_reasons()
 
+    def is_target_worker_deployment_version_changed(self) -> bool:
+        """Check whether the target worker deployment version has changed.
+
+        Note: Upgrade-on-Continue-as-New is currently experimental.
+        
+        Returns:
+            True if the target worker deployment version has changed.
+        """
+        return _Runtime.current().workflow_is_target_worker_deployment_version_changed()
+
 
 @dataclass(frozen=True)
 class ParentInfo:
@@ -746,6 +756,9 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_get_suggested_continue_as_new_reasons(self) -> Sequence[Any]: ...
+
+    @abstractmethod
+    def workflow_is_target_worker_deployment_version_changed(self) -> bool: ...
 
     @abstractmethod
     def workflow_is_replaying(self) -> bool: ...

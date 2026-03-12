@@ -1377,21 +1377,16 @@ class ContinueAsNewWithVersionUpgradeV1:
         if attempt > 0:
             return "v1.0"
 
-        # Loop waiting for CAN suggestion with version change reason
+        # Loop waiting for CAN suggestion with version changed
         while True:
             # Trigger a WFT when timer expires, thereby refreshing the continue-as-new-suggested flag
             await asyncio.sleep(0.01)
             info = workflow.info()
-            if info.is_continue_as_new_suggested():
-                for reason in info.get_suggested_continue_as_new_reasons():
-                    if (
-                        reason
-                        == workflow.SuggestContinueAsNewReason.TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED
-                    ):
-                        workflow.continue_as_new(
-                            arg=attempt + 1,
-                            initial_versioning_behavior=workflow.ContinueAsNewVersioningBehavior.AUTO_UPGRADE,
-                        )
+            if info.is_target_worker_deployment_version_changed():
+                workflow.continue_as_new(
+                    arg=attempt + 1,
+                    initial_versioning_behavior=workflow.ContinueAsNewVersioningBehavior.AUTO_UPGRADE,
+                )
 
 
 @workflow.defn(
