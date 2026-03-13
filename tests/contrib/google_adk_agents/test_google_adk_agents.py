@@ -322,7 +322,7 @@ async def test_multi_agent(client: Client, use_local_model: bool):
     # Run Worker with the ADK plugin
     async with Worker(
         client,
-        task_queue="adk-task-queue",
+        task_queue="adk-task-queue-multi-agent",
         workflows=[MultiAgentWorkflow],
         max_cached_workflows=0,
     ):
@@ -337,7 +337,7 @@ async def test_multi_agent(client: Client, use_local_model: bool):
                 "research_model" if use_local_model else "gemini-2.5-pro",
             ],
             id=f"multi-agent-workflow-{uuid.uuid4()}",
-            task_queue="adk-task-queue",
+            task_queue="adk-task-queue-multi-agent",
             execution_timeout=timedelta(seconds=60),
         )
         result = await handle.result()
@@ -465,7 +465,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
     # Run Worker with the ADK plugin
     async with Worker(
         client,
-        task_queue="adk-task-queue",
+        task_queue="adk-task-queue-mcp",
         workflows=[McpAgent],
         max_cached_workflows=0,
     ):
@@ -480,7 +480,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
                 "mcp_model" if use_local_model else "gemini-2.5-pro",
             ],
             id=f"mcp-agent-workflow-{uuid.uuid4()}",
-            task_queue="adk-task-queue",
+            task_queue="adk-task-queue-mcp",
             execution_timeout=timedelta(seconds=60),
         )
         result = await handle.result()
@@ -507,7 +507,7 @@ async def test_single_agent_telemetry(client: Client):
     # Run Worker with the ADK plugin
     async with Worker(
         client,
-        task_queue="adk-task-queue",
+        task_queue="adk-task-queue-telemetry",
         activities=[
             get_weather,
         ],
@@ -523,8 +523,8 @@ async def test_single_agent_telemetry(client: Client):
                 "What is the weather in New York?",
                 "weather_model",
             ],
-            id=f"weather-agent-workflow-{uuid.uuid4()}",
-            task_queue="adk-task-queue",
+            id=f"weather-agent-telemetry-workflow-{uuid.uuid4()}",
+            task_queue="adk-task-queue-telemetry",
             execution_timeout=timedelta(seconds=60),
         )
         result = await handle.result()
