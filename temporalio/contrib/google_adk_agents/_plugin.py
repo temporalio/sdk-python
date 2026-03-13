@@ -24,7 +24,7 @@ def setup_deterministic_runtime():
     """Configures ADK runtime for Temporal determinism.
 
     .. warning::
-        This class is experimental and may change in future versions.
+        This function is experimental and may change in future versions.
         Use with caution in production environments.
 
     This should be called at the start of a Temporal Workflow before any ADK components

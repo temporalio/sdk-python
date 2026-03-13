@@ -10,7 +10,7 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
     """Decorator/Wrapper to wrap a Temporal Activity as an ADK Tool.
 
     .. warning::
-        This class is experimental and may change in future versions.
+        This function is experimental and may change in future versions.
         Use with caution in production environments.
 
     This ensures the activity's signature is preserved for ADK's tool schema generation
