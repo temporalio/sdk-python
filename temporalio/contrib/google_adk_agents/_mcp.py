@@ -82,6 +82,10 @@ class _CallToolArguments:
 class TemporalMcpToolSetProvider:
     """Provider for creating Temporal-aware MCP toolsets.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
+
     Manages the creation of toolset activities and handles tool execution
     within Temporal workflows.
     """
@@ -197,6 +201,10 @@ class _TemporalTool(BaseTool):
 
 class TemporalMcpToolSet(BaseToolset):
     """Temporal-aware MCP toolset implementation.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
 
     Executes MCP tools as Temporal activities, providing proper isolation
     and execution guarantees within workflows.
