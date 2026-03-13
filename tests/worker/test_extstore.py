@@ -33,6 +33,62 @@ class ExtStoreActivityInput:
     pass
 
 
+# ---------------------------------------------------------------------------
+# Chained-activity scenario
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ProcessDataInput:
+    """Input for the first activity: generate a large result."""
+
+    size: int
+
+
+@dataclass(frozen=True)
+class SummarizeInput:
+    """Input for the second activity: receives the large result from the first."""
+
+    data: str
+
+
+@activity.defn
+async def process_data(input: ProcessDataInput) -> str:
+    """Produces a large string result that will be stored externally."""
+    return "x" * input.size
+
+
+@activity.defn
+async def summarize(input: SummarizeInput) -> str:
+    """Receives the large result and returns a short summary."""
+    return f"received {len(input.data)} bytes"
+
+
+@workflow.defn
+class ChainedExtStoreWorkflow:
+    """Workflow that passes a large activity result directly into a second activity.
+
+    This mirrors a common customer pattern: activity A produces a large payload
+    (e.g. a fetched document or ML inference result) which is too big to store
+    inline in workflow history, and is then consumed by activity B.  External
+    storage should transparently offload the payload between the two steps
+    without any special handling in the workflow code.
+    """
+
+    @workflow.run
+    async def run(self, payload_size: int) -> str:
+        large_result = await workflow.execute_activity(
+            process_data,
+            ProcessDataInput(size=payload_size),
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        return await workflow.execute_activity(
+            summarize,
+            SummarizeInput(data=large_result),
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+
+
 @activity.defn
 async def ext_store_activity(
     input: ExtStoreActivityInput,
@@ -426,3 +482,53 @@ async def test_replay_extstore_activity_result_fails_without_extstore(
     # The message is the full activation-completion failure string; the
     # "Failed decoding arguments" text from _convert_payloads is embedded in it.
     assert "Failed decoding arguments" in result.replay_failure.args[0]
+
+
+async def test_extstore_chained_activities(
+    env: WorkflowEnvironment,
+) -> None:
+    """Large activity output is transparently offloaded and passed to a second activity.
+
+    This is a representative customer scenario: activity A returns a payload that
+    exceeds the size threshold (e.g. a fetched document), external storage offloads
+    it so it never bloats workflow history, and activity B receives it as its input
+    without any special handling in the workflow code.
+    """
+    driver = InMemoryTestDriver()
+
+    client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=1024,  # 1 KB threshold
+            ),
+        ),
+    )
+
+    # process_data returns 10 KB — well above the 1 KB threshold.
+    payload_size = 10_000
+
+    async with new_worker(
+        client,
+        ChainedExtStoreWorkflow,
+        activities=[process_data, summarize],
+    ) as worker:
+        result = await client.execute_workflow(
+            ChainedExtStoreWorkflow.run,
+            payload_size,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+
+    # The second activity received the full payload and summarized it correctly.
+    assert result == f"received {payload_size} bytes"
+
+    # External storage was actually used: the large activity result and its
+    # re-use as the second activity's input should have triggered at least two
+    # round-trips (one store on completion, one retrieve on the next WFT).
+    assert driver._store_calls == 2
+    assert driver._retrieve_calls == 2
