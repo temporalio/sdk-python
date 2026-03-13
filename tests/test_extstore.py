@@ -706,6 +706,53 @@ class TestMultiDriver:
         with pytest.raises(ValueError):
             await converter.encode(["x" * 200])
 
+    async def test_selector_dispatches_drivers_concurrently(self):
+        started_a = asyncio.Event()
+        started_b = asyncio.Event()
+
+        class BarrierDriver(InMemoryTestDriver):
+            def __init__(
+                self, name: str, my_event: asyncio.Event, their_event: asyncio.Event
+            ):
+                super().__init__(name)
+                self._my_event = my_event
+                self._their_event = their_event
+
+            async def store(
+                self,
+                context: StorageDriverStoreContext,
+                payloads: Sequence[Payload],
+            ) -> list[StorageDriverClaim]:
+                self._my_event.set()
+                await asyncio.wait_for(self._their_event.wait(), timeout=2.0)
+                return await super().store(context, payloads)
+
+        driver_a = BarrierDriver("driver-a", started_a, started_b)
+        driver_b = BarrierDriver("driver-b", started_b, started_a)
+
+        def selector(_ctx: object, payload: Payload) -> str:
+            return "driver-a" if payload.ByteSize() < 500 else "driver-b"
+
+        converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=[driver_a, driver_b],
+                driver_selector=selector,
+                payload_size_threshold=None,
+            )
+        )
+
+        small_ext = "a" * 100  # routes to driver-a
+        large_ext = "b" * 1000  # routes to driver-b
+
+        # This will deadlock (and timeout) if the two store() calls are not
+        # dispatched concurrently.
+        encoded = await asyncio.wait_for(
+            converter.encode([small_ext, large_ext]), timeout=5.0
+        )
+
+        decoded = await converter.decode(encoded, [str, str])
+        assert decoded == [small_ext, large_ext]
+
     def test_duplicate_driver_names_raises(self):
         """Registering two drivers with identical names raises ValueError immediately
         when constructing ExternalStorage."""
