@@ -1794,9 +1794,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_details = details
 
     def workflow_is_failure_exception(self, err: BaseException) -> bool:
-        # An exception is a failure instead of a task fail if it's already a
-        # failure error or if it is a timeout error or if it is an instance of
-        # any of the failure types in the worker or workflow-level setting
+        # An exception causes the workflow to fail (rather than the task) if it
+        # is already a failure error, a timeout error, or an instance of any of the
+        # failure exception types configured at the worker or workflow level.
         wf_failure_exception_types = self._defn.failure_exception_types
         if self._dynamic_failure_exception_types is not None:
             wf_failure_exception_types = self._dynamic_failure_exception_types

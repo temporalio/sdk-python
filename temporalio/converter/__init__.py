@@ -1359,6 +1359,13 @@ class DataConverter(WithSerializationContext):
     payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
     """Settings for payload size limits."""
 
+    external_storage: extstore.ExternalStorage | None = None
+    """Options for external storage. If None, external storage is disabled.
+    
+    .. warning::
+           This API is experimental.
+    """
+
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
@@ -1445,18 +1452,22 @@ class DataConverter(WithSerializationContext):
         payload_converter = self.payload_converter
         payload_codec = self.payload_codec
         failure_converter = self.failure_converter
+        external_storage = self.external_storage
         if isinstance(payload_converter, WithSerializationContext):
             payload_converter = payload_converter.with_context(context)
         if isinstance(payload_codec, WithSerializationContext):
             payload_codec = payload_codec.with_context(context)
         if isinstance(failure_converter, WithSerializationContext):
             failure_converter = failure_converter.with_context(context)
+        if isinstance(external_storage, WithSerializationContext):
+            external_storage = external_storage.with_context(context)
         if all(
             new is orig
             for new, orig in [
                 (payload_converter, self.payload_converter),
                 (payload_codec, self.payload_codec),
                 (failure_converter, self.failure_converter),
+                (external_storage, self.external_storage),
             ]
         ):
             return self
@@ -1464,6 +1475,7 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "payload_converter", payload_converter)
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)
+        object.__setattr__(cloned, "external_storage", external_storage)
         return cloned
 
     def _with_payload_error_limits(
@@ -1523,12 +1535,16 @@ class DataConverter(WithSerializationContext):
     async def _encode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
+        if self.external_storage is not None:
+            payload = await self.external_storage._store_payload(payload)
         if self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
         self._validate_payload_limits([payload])
         return payload
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
+        if self.external_storage is not None:
+            await self.external_storage._store_payloads(payloads)
         if self.payload_codec:
             await self.payload_codec.encode_wrapper(payloads)
         self._validate_payload_limits(payloads.payloads)
@@ -1536,35 +1552,55 @@ class DataConverter(WithSerializationContext):
     async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        encoded_payloads = list(payloads)
+        result = (
+            await self.external_storage._store_payload_sequence(payloads)
+            if self.external_storage is not None
+            else list(payloads)
+        )
         if self.payload_codec:
-            encoded_payloads = await self.payload_codec.encode(encoded_payloads)
-        self._validate_payload_limits(encoded_payloads)
-        return encoded_payloads
+            result = await self.payload_codec.encode(result)
+        self._validate_payload_limits(result)
+        return result
 
     async def _decode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
         if self.payload_codec:
             payload = (await self.payload_codec.decode([payload]))[0]
+        if self.external_storage is not None:
+            payload = await self.external_storage._retrieve_payload(payload)
+        elif len(payload.external_payloads) > 0:
+            warnings.warn(
+                "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
+                category=extstore.StorageWarning,
+            )
         return payload
 
     async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
         if self.payload_codec:
             await self.payload_codec.decode_wrapper(payloads)
+        if self.external_storage is not None:
+            await self.external_storage._retrieve_payloads(payloads)
+        elif any(len(p.external_payloads) > 0 for p in payloads.payloads):
+            warnings.warn(
+                "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
+                category=extstore.StorageWarning,
+            )
 
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        if not self.payload_codec:
-            return list(payloads)
-        return await self.payload_codec.decode(payloads)
-
-    # Temporary shortcircuit detection while the _decode_* methods may no-op if
-    # a payload codec is not configured. Remove once those paths have more to them.
-    @property
-    def _decode_payload_has_effect(self) -> bool:
-        return self.payload_codec is not None
+        result = list(payloads)
+        if self.payload_codec:
+            result = await self.payload_codec.decode(result)
+        if self.external_storage is not None:
+            result = await self.external_storage._retrieve_payload_sequence(result)
+        elif any(len(p.external_payloads) > 0 for p in result):
+            warnings.warn(
+                "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
+                category=extstore.StorageWarning,
+            )
+        return result
 
     @staticmethod
     async def _apply_to_failure_payloads(
@@ -1640,6 +1676,27 @@ DefaultPayloadConverter.default_encoding_payload_converters = (
     JSONProtoPayloadConverter(),
     BinaryProtoPayloadConverter(),
     JSONPlainPayloadConverter(),  # JSON Plain needs to remain in last because it throws on unknown types
+)
+
+# Imported here to break the circular dependency
+from temporalio.converter import _extstore as extstore  # noqa: E402
+from temporalio.converter._extstore import (  # noqa: E402
+    ExternalStorage as ExternalStorage,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageDriver as StorageDriver,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageDriverClaim as StorageDriverClaim,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageDriverRetrieveContext as StorageDriverRetrieveContext,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageDriverStoreContext as StorageDriverStoreContext,
+)
+from temporalio.converter._extstore import (  # noqa: E402
+    StorageWarning as StorageWarning,
 )
 
 DataConverter.default = DataConverter()

@@ -625,7 +625,7 @@ class _ActivityWorker:
             else None,
         )
 
-        if self._encode_headers and data_converter._decode_payload_has_effect:
+        if self._encode_headers:
             for payload in start.header_fields.values():
                 payload.CopyFrom(await data_converter._decode_payload(payload))
 
