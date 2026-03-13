@@ -410,6 +410,16 @@ class Worker:
             raise ValueError(
                 "deployment_config cannot be used with build_id or use_worker_versioning"
             )
+        _deployment_config = config.get("deployment_config")
+        if (
+            _deployment_config is not None
+            and not _deployment_config.use_worker_versioning
+            and _deployment_config.default_versioning_behavior
+            != VersioningBehavior.UNSPECIFIED
+        ):
+            raise ValueError(
+                "default_versioning_behavior must be UNSPECIFIED when use_worker_versioning is False"
+            )
 
         # Prepend applicable client interceptors to the given ones
         client_config = config["client"].config(active_config=True)  # type: ignore[reportTypedDictNotRequiredAccess]

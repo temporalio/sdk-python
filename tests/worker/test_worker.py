@@ -1008,6 +1008,63 @@ async def test_workflows_can_use_default_versioning_behavior(
         )
 
 
+async def test_worker_deployment_config_without_versioning(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    build_id = "my-custom-build-id-1.0"
+    deployment_name = f"deployment-no-versioning-{uuid.uuid4()}"
+
+    async with new_worker(
+        client,
+        NoVersioningAnnotationWorkflow,
+        deployment_config=WorkerDeploymentConfig(
+            version=WorkerDeploymentVersion(
+                deployment_name=deployment_name, build_id=build_id
+            ),
+            use_worker_versioning=False,
+        ),
+    ) as worker:
+        handle = await client.start_workflow(
+            NoVersioningAnnotationWorkflow.run,
+            id=f"no-versioning-build-id-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "whee"
+
+        history = await handle.fetch_history()
+        assert any(
+            event.workflow_task_completed_event_attributes
+            and event.workflow_task_completed_event_attributes.worker_version
+            and event.workflow_task_completed_event_attributes.worker_version.build_id
+            == build_id
+            for event in history.events
+        ), "Expected build ID to appear in workflow history"
+
+
+async def test_deployment_config_rejects_versioning_behavior_without_versioning(
+    client: Client,
+):
+    with pytest.raises(
+        ValueError, match="default_versioning_behavior must be UNSPECIFIED"
+    ):
+        Worker(
+            client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            workflows=[NoVersioningAnnotationWorkflow],
+            deployment_config=WorkerDeploymentConfig(
+                version=WorkerDeploymentVersion(
+                    deployment_name="whatever", build_id="1.0"
+                ),
+                use_worker_versioning=False,
+                default_versioning_behavior=VersioningBehavior.AUTO_UPGRADE,
+            ),
+        )
+
+
 async def test_workflows_can_use_versioning_override(
     client: Client, env: WorkflowEnvironment
 ):
