@@ -678,6 +678,14 @@ class Worker:
         self._bridge_worker.replace_client(bridge_client._bridge_client)
         self._config["client"] = value
 
+        # Update the activity worker's client reference if activities are configured
+        if self._activity_worker:
+            self._activity_worker._client = value
+
+        # Update the nexus worker's client reference if nexus services are configured
+        if self._nexus_worker:
+            self._nexus_worker._client = value
+
     @property
     def is_running(self) -> bool:
         """Whether the worker is running.
