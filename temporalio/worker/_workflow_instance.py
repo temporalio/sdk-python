@@ -251,6 +251,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_history_length = 0
         self._current_history_size = 0
         self._continue_as_new_suggested = False
+        self._target_worker_deployment_version_changed = False
         # Lazily loaded
         self._untyped_converted_memo: MutableMapping[str, Any] | None = None
         # Handles which are ready to run on the next event loop iteration
@@ -405,6 +406,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_history_length = act.history_length
         self._current_history_size = act.history_size_bytes
         self._continue_as_new_suggested = act.continue_as_new_suggested
+        self._target_worker_deployment_version_changed = (
+            act.target_worker_deployment_version_changed
+        )
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
         self._current_thread_id = threading.get_ident()
@@ -1131,6 +1135,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
         ),
         versioning_intent: temporalio.workflow.VersioningIntent | None,
+        initial_versioning_behavior: temporalio.workflow.ContinueAsNewVersioningBehavior
+        | None,
     ) -> NoReturn:
         self._assert_not_read_only("continue as new")
         # Use definition if callable
@@ -1158,6 +1164,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 headers={},
                 arg_types=arg_types,
                 versioning_intent=versioning_intent,
+                initial_versioning_behavior=initial_versioning_behavior,
             )
         )
 
@@ -1226,6 +1233,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def workflow_is_continue_as_new_suggested(self) -> bool:
         return self._continue_as_new_suggested
+
+    def workflow_is_target_worker_deployment_version_changed(self) -> bool:
+        return self._target_worker_deployment_version_changed
 
     def workflow_is_replaying(self) -> bool:
         return self._is_replaying
@@ -3428,6 +3438,11 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             )
         if self._input.versioning_intent:
             v.versioning_intent = self._input.versioning_intent._to_proto()
+        if self._input.initial_versioning_behavior:
+            v.initial_versioning_behavior = cast(
+                "temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.ValueType",
+                int(self._input.initial_versioning_behavior),
+            )
 
 
 def _encode_search_attributes(
