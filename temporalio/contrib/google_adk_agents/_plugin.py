@@ -53,8 +53,8 @@ class TemporalAdkPlugin(SimplePlugin):
     """A Temporal Worker Plugin configured for ADK.
 
     This plugin configures:
-    1. Pydantic Payload Converter (required for ADK objects).
-    2. Sandbox Passthrough for google.adk and google.genai modules.
+    - Pydantic Payload Converter (required for ADK objects).
+    - Sandbox Passthrough for google.adk and google.genai modules.
     """
 
     def __init__(
