@@ -116,11 +116,6 @@ class StorageDriver(ABC):
     ) -> list[Payload]:
         """Retrieves payloads from external storage for the given :class:`StorageDriverClaim`
         list. The returned list must be the same length as ``claims``.
-
-        Raise :class:`PayloadNotFoundError` when a retrieval attempt confirms
-        that a payload is absent from storage. This signals an unrecoverable
-        condition that will fail the workflow rather than retrying the workflow
-        task.
         """
         raise NotImplementedError
 
@@ -155,7 +150,7 @@ class ExternalStorage(WithSerializationContext):
     used for all store operations. Additional drivers may be included solely to
     support retrieval — for example, to download payloads that remote callers
     uploaded to an external storage system that is not your primary store
-    driver. Drivers in this list are looked up by :meth:`Driver.name` during
+    driver. Drivers in this list are looked up by :meth:`StorageDriver.name` during
     retrieval, so each driver must have a unique name.
     """
 
