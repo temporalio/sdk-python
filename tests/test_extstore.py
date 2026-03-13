@@ -192,9 +192,9 @@ class TestDataConverterExternalStorage:
 
         options = ExternalStorage(
             drivers=[hot_driver, cold_driver],
-            driver_selector=lambda context, payload: "hot-storage"
+            driver_selector=lambda context, payload: hot_driver
             if payload.ByteSize() < 500
-            else "cold-storage",
+            else cold_driver,
             payload_size_threshold=100,
         )
         converter = DataConverter(external_storage=options)
@@ -349,11 +349,11 @@ class TestDriverError:
                 raise RuntimeError("driver store failure")
 
         drivers = [_SleepingStoreDriver(), _FailingStoreDriver()]
-        names = iter(["sleeping", "failing"])
+        drivers_iter = iter(drivers)
         converter = DataConverter(
             external_storage=ExternalStorage(
                 drivers=drivers,
-                driver_selector=lambda ctx, p: next(names),
+                driver_selector=lambda ctx, p: next(drivers_iter),
                 payload_size_threshold=None,
             )
         )
@@ -398,11 +398,11 @@ class TestDriverError:
             _SleepingRetrieveDriver(),
             _FailingRetrieveDriver(),
         ]
-        names = iter(["sleeping", "failing"])
+        drivers_iter = iter(drivers)
         converter = DataConverter(
             external_storage=ExternalStorage(
                 drivers=drivers,
-                driver_selector=lambda ctx, p: next(names),
+                driver_selector=lambda ctx, p: next(drivers_iter),
                 payload_size_threshold=None,
             )
         )
@@ -641,8 +641,8 @@ class TestMultiDriver:
 
         # Route payloads that serialise to < 500 bytes to driver_a, larger ones
         # to driver_b.
-        def selector(_ctx: object, payload: Payload) -> str:
-            return "driver-a" if payload.ByteSize() < 500 else "driver-b"
+        def selector(_ctx: object, payload: Payload) -> StorageDriver:
+            return driver_a if payload.ByteSize() < 500 else driver_b
 
         converter = DataConverter(
             external_storage=ExternalStorage(
@@ -691,14 +691,15 @@ class TestMultiDriver:
         assert driver._retrieve_calls == 0
 
     async def test_selector_returns_unregistered_driver_raises(self):
-        """A selector that returns a Driver whose name is not present in
+        """A selector that returns a driver instance not present in
         ExternalStorage.drivers raises ValueError during encode."""
         registered = InMemoryTestDriver("registered")
+        unregistered = InMemoryTestDriver("unregistered")
 
         converter = DataConverter(
             external_storage=ExternalStorage(
                 drivers=[registered],
-                driver_selector=lambda _ctx, _payload: "not-in-list",
+                driver_selector=lambda _ctx, _payload: unregistered,
                 payload_size_threshold=50,
             )
         )
@@ -730,8 +731,8 @@ class TestMultiDriver:
         driver_a = BarrierDriver("driver-a", started_a, started_b)
         driver_b = BarrierDriver("driver-b", started_b, started_a)
 
-        def selector(_ctx: object, payload: Payload) -> str:
-            return "driver-a" if payload.ByteSize() < 500 else "driver-b"
+        def selector(_ctx: object, payload: Payload) -> StorageDriver:
+            return driver_a if payload.ByteSize() < 500 else driver_b
 
         converter = DataConverter(
             external_storage=ExternalStorage(

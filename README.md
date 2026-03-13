@@ -503,7 +503,7 @@ from temporalio.converter import ExternalStorage
 options = ExternalStorage(
     drivers=[hot_driver, cold_driver],
     driver_selector=lambda context, payload: (
-        "hot-storage" if payload.ByteSize() < 5 * 1024 * 1024 else "cold-storage"
+        hot_driver if payload.ByteSize() < 5 * 1024 * 1024 else cold_driver
     ),
 )
 ```
@@ -520,13 +520,13 @@ def feature_flag_is_on(workflow_id: str | None) -> bool:
 
 def feature_flag_selector(
     context: temporalio.converter.StorageDriverStoreContext, _payload: Payload
-) -> str | None:
+) -> temporalio.converter.StorageDriver | None:
     workflow_id = None
     if isinstance(context.serialization_context, temporalio.converter.WorkflowSerializationContext):
         workflow_id = context.serialization_context.workflow_id
     elif isinstance(context.serialization_context, temporalio.converter.ActivitySerializationContext):
         workflow_id = context.serialization_context.workflow_id
-    return "my-driver" if feature_flag_is_on(workflow_id) else None
+    return my_driver if feature_flag_is_on(workflow_id) else None
 
 options = ExternalStorage(
     drivers=[my_driver],
@@ -538,7 +538,7 @@ Some things to note about driver selection:
 
 * When no `driver_selector` is set, the first driver in `ExternalStorage.drivers` is always used for storing.
 * Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
-* The driver name returned by the selector must match a driver registered in `ExternalStorage.drivers`. If it does not, an error is raised.
+* The driver instance returned by the selector must be one of the instances registered in `ExternalStorage.drivers`. If it is not, an error is raised.
 
 ###### Custom Drivers
 

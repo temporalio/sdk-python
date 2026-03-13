@@ -155,11 +155,12 @@ class ExternalStorage(WithSerializationContext):
     """
 
     driver_selector: (
-        Callable[[StorageDriverStoreContext, Payload], str | None] | None
+        Callable[[StorageDriverStoreContext, Payload], StorageDriver | None] | None
     ) = None
     """Controls which driver stores a given payload. A callable of the form
-    ``(StorageDriverStoreContext, Payload) -> str | None`` that returns the name of
-    the driver to use, or ``None`` to leave the payload stored inline.
+    ``(StorageDriverStoreContext, Payload) -> StorageDriver | None`` that returns the
+    driver instance to use, or ``None`` to leave the payload stored inline.
+    The returned driver must be one of the instances registered in :attr:`drivers`.
 
     When ``None``, the first driver in :attr:`drivers` is used for all store
     operations.
@@ -180,7 +181,7 @@ class ExternalStorage(WithSerializationContext):
     _driver_map: dict[str, StorageDriver] = dataclasses.field(
         init=False, repr=False, compare=False
     )
-    """Name-keyed index of :attr:`drivers`, built at construction time."""
+    """Name-keyed index of :attr:`drivers`, built at construction time. Used for retrieval lookups."""
 
     _context: SerializationContext | None = dataclasses.field(
         init=False, default=None, repr=False, compare=False
@@ -232,12 +233,14 @@ class ExternalStorage(WithSerializationContext):
         selector = self.driver_selector
         if selector is None:
             return self.drivers[0] if self.drivers else None
-        driver_name = selector(context, payload)
-        if driver_name is None:
-            return None
-        driver = self._driver_map.get(driver_name)
+        driver = selector(context, payload)
         if driver is None:
-            raise ValueError(f"No driver found with name '{driver_name}'")
+            return None
+        registered = self._driver_map.get(driver.name())
+        if registered is not driver:
+            raise ValueError(
+                f"Driver '{driver.name()}' returned by driver_selector is not registered in ExternalStorage.drivers"
+            )
         return driver
 
     def _get_driver_by_name(self, name: str) -> StorageDriver:
