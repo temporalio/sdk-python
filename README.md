@@ -54,7 +54,9 @@ informal introduction to the features and their implementation.
       - [Data Conversion](#data-conversion)
         - [Pydantic Support](#pydantic-support)
         - [Custom Type Data Conversion](#custom-type-data-conversion)
-        - [External Payload Storage](#external-payload-storage)
+        - [External Storage](#external-storage)
+          - [Driver Selection](#driver-selection)
+          - [Custom Drivers](#custom-drivers)
     - [Workers](#workers)
     - [Workflows](#workflows)
       - [Definition](#definition)
@@ -310,7 +312,7 @@ other_ns_client = Client(**config)
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
 `temporalio.converter.DataConverter` can be set via the `data_converter` parameter of the `Client` constructor. Data
-converters are a combination of payload converters, external payload storage, payload codecs, and failure converters. Payload
+converters are a combination of payload converters, external storage, payload codecs, and failure converters. Payload
 converters convert Python values to/from serialized bytes. External payload storage optionally stores and retrieves payloads
 to/from external storage services using drivers. Payload codecs convert bytes to bytes (e.g. for compression or encryption).
 Failure converters convert exceptions to/from serialized failures.
@@ -457,13 +459,13 @@ my_data_converter = dataclasses.replace(
 
 Now `IPv4Address` can be used in type hints including collections, optionals, etc.
 
-##### External Payload Storage
+##### External Storage
 
-⚠️ **External payload storage support is currently at an experimental release stage.** ⚠️
+⚠️ **External storage support is currently at an experimental release stage.** ⚠️
 
-External payload storage allows large payloads to be offloaded to an external storage service (such as Amazon S3) rather than stored inline in workflow history. This is useful when workflows or activities work with data that would otherwise exceed Temporal's payload size limits.
+External storage allows large payloads to be offloaded to an external storage service (such as Amazon S3) rather than stored inline in workflow history. This is useful when workflows or activities work with data that would otherwise exceed Temporal's payload size limits.
 
-External payload storage is configured via the `external_storage` parameter on `DataConverter`, which accepts a `temporalio.converter.ExternalStorage` instance. Any driver used to store payloads must also be configured on the component that retrieves them — for example, if the client stores workflow inputs using a driver, the worker must include that driver in its `ExternalStorage.drivers` list to retrieve them.
+External storage is configured via the `external_storage` parameter on `DataConverter`, which accepts a `temporalio.converter.ExternalStorage` instance. Any driver used to store payloads must also be configured on the component that retrieves them — for example, if the client stores workflow inputs using a driver, the worker must include that driver in its `ExternalStorage.drivers` list to retrieve them.
 
 The simplest setup uses a single storage driver:
 
@@ -484,14 +486,14 @@ client = await Client.connect(
 )
 ```
 
-Some things to note about external payload storage:
+Some things to note about external storage:
 
 * Only payloads that meet or exceed `ExternalStorage.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
 * External payload storage applies transparently to workflow inputs/outputs, activity inputs/outputs, signals, updates, queries, and failure details.
 * The `DataConverter`'s `payload_codec` (if configured) is applied to the *reference* payload stored in workflow history, not to the externally stored bytes. To encrypt or compress the bytes handed to a driver, use `ExternalStorage.payload_codec`.
-* Setting `ExternalStorage.payload_size_threshold` to `None` causes every payload to be considered for external payload storage regardless of size.
+* Setting `ExternalStorage.payload_size_threshold` to `None` causes every payload to be considered for external storage regardless of size.
 
-###### Multiple Drivers and Driver Selection
+###### Driver Selection
 
 When multiple storage backends are needed, list all drivers in `ExternalStorage.drivers` and provide a `driver_selector` to control which driver stores new payloads. Any driver in the list not chosen for storing is still available for retrieval, which is useful when migrating between storage backends.
 
