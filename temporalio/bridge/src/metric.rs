@@ -5,7 +5,9 @@ use std::{collections::HashMap, sync::Arc};
 use pyo3::prelude::*;
 use pyo3::{exceptions::PyTypeError, types::PyDict};
 use temporalio_common::telemetry::metrics::{
-    self, BufferInstrumentRef, CustomMetricAttributes, MetricEvent, NewAttributes,
+    self,
+    core::{BufferInstrumentRef, CustomMetricAttributes, MetricEvent},
+    NewAttributes,
 };
 
 use crate::runtime;
@@ -61,7 +63,7 @@ pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeter
         .get_metric_meter()
         .map(|meter| {
             let default_attributes = MetricAttributesRef {
-                attrs: meter.inner.new_attributes(meter.default_attribs.clone()),
+                attrs: meter.get_default_attributes().clone(),
             };
             MetricMeterRef {
                 meter,
@@ -81,7 +83,6 @@ impl MetricMeterRef {
         MetricCounterRef {
             counter: self
                 .meter
-                .inner
                 .counter(build_metric_parameters(name, description, unit)),
         }
     }
@@ -95,7 +96,6 @@ impl MetricMeterRef {
         MetricHistogramRef {
             histogram: self
                 .meter
-                .inner
                 .histogram(build_metric_parameters(name, description, unit)),
         }
     }
@@ -107,11 +107,9 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramFloatRef {
         MetricHistogramFloatRef {
-            histogram: self.meter.inner.histogram_f64(build_metric_parameters(
-                name,
-                description,
-                unit,
-            )),
+            histogram: self
+                .meter
+                .histogram_f64(build_metric_parameters(name, description, unit)),
         }
     }
 
@@ -122,7 +120,7 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramDurationRef {
         MetricHistogramDurationRef {
-            histogram: self.meter.inner.histogram_duration(build_metric_parameters(
+            histogram: self.meter.histogram_duration(build_metric_parameters(
                 name,
                 description,
                 unit,
@@ -139,7 +137,6 @@ impl MetricMeterRef {
         MetricGaugeRef {
             gauge: self
                 .meter
-                .inner
                 .gauge(build_metric_parameters(name, description, unit)),
         }
     }
@@ -153,7 +150,6 @@ impl MetricMeterRef {
         MetricGaugeFloatRef {
             gauge: self
                 .meter
-                .inner
                 .gauge_f64(build_metric_parameters(name, description, unit)),
         }
     }
@@ -222,7 +218,7 @@ impl MetricAttributesRef {
         meter: &MetricMeterRef,
         new_attrs: HashMap<String, PyObject>,
     ) -> PyResult<Self> {
-        let attrs = meter.meter.inner.extend_attributes(
+        let attrs = meter.meter.extend_attributes(
             self.attrs.clone(),
             NewAttributes {
                 attributes: new_attrs
@@ -332,7 +328,7 @@ fn convert_metric_event(
                         description: Some(params.description)
                             .filter(|s| !s.is_empty())
                             .map(|s| s.to_string()),
-                        unit: if matches!(kind, metrics::MetricKind::HistogramDuration)
+                        unit: if matches!(kind, metrics::core::MetricKind::HistogramDuration)
                             && params.unit == "duration"
                         {
                             if durations_as_seconds {
@@ -346,11 +342,12 @@ fn convert_metric_event(
                             Some(params.unit.to_string())
                         },
                         kind: match kind {
-                            metrics::MetricKind::Counter => 0,
-                            metrics::MetricKind::Gauge | metrics::MetricKind::GaugeF64 => 1,
-                            metrics::MetricKind::Histogram
-                            | metrics::MetricKind::HistogramF64
-                            | metrics::MetricKind::HistogramDuration => 2,
+                            metrics::core::MetricKind::Counter => 0,
+                            metrics::core::MetricKind::Gauge
+                            | metrics::core::MetricKind::GaugeF64 => 1,
+                            metrics::core::MetricKind::Histogram
+                            | metrics::core::MetricKind::HistogramF64
+                            | metrics::core::MetricKind::HistogramDuration => 2,
                         },
                     },
                 )
@@ -405,16 +402,16 @@ fn convert_metric_event(
         } => Some(BufferedMetricUpdate {
             metric: instrument.get().clone().0.clone_ref(py),
             value: match update {
-                metrics::MetricUpdateVal::Duration(v) if durations_as_seconds => {
+                metrics::core::MetricUpdateVal::Duration(v) if durations_as_seconds => {
                     BufferedMetricUpdateValue::F64(v.as_secs_f64())
                 }
-                metrics::MetricUpdateVal::Duration(v) => {
+                metrics::core::MetricUpdateVal::Duration(v) => {
                     BufferedMetricUpdateValue::U128(v.as_millis())
                 }
-                metrics::MetricUpdateVal::Delta(v) => BufferedMetricUpdateValue::U64(v),
-                metrics::MetricUpdateVal::DeltaF64(v) => BufferedMetricUpdateValue::F64(v),
-                metrics::MetricUpdateVal::Value(v) => BufferedMetricUpdateValue::U64(v),
-                metrics::MetricUpdateVal::ValueF64(v) => BufferedMetricUpdateValue::F64(v),
+                metrics::core::MetricUpdateVal::Delta(v) => BufferedMetricUpdateValue::U64(v),
+                metrics::core::MetricUpdateVal::DeltaF64(v) => BufferedMetricUpdateValue::F64(v),
+                metrics::core::MetricUpdateVal::Value(v) => BufferedMetricUpdateValue::U64(v),
+                metrics::core::MetricUpdateVal::ValueF64(v) => BufferedMetricUpdateValue::F64(v),
             },
             attributes: attributes
                 .get()

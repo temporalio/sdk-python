@@ -635,7 +635,8 @@ class WorkflowServiceServicer(object):
         Upon failure, it returns `MultiOperationExecutionFailure` where the status code
         equals the status code of the *first* operation that failed to be started.
 
-        NOTE: Experimental API.
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: To be exposed over HTTP in the future. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
