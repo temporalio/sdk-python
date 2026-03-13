@@ -9,6 +9,10 @@ from temporalio import workflow
 def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
     """Decorator/Wrapper to wrap a Temporal Activity as an ADK Tool.
 
+    .. warning::
+        This function is experimental and may change in future versions.
+        Use with caution in production environments.
+
     This ensures the activity's signature is preserved for ADK's tool schema generation
     while marking it as a tool that executes via 'workflow.execute_activity'.
     """

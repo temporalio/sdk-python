@@ -23,6 +23,10 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 def setup_deterministic_runtime():
     """Configures ADK runtime for Temporal determinism.
 
+    .. warning::
+        This function is experimental and may change in future versions.
+        Use with caution in production environments.
+
     This should be called at the start of a Temporal Workflow before any ADK components
     (like SessionService) are used, if they rely on runtime.get_time() or runtime.new_uuid().
     """
@@ -51,6 +55,10 @@ def setup_deterministic_runtime():
 
 class GoogleAdkPlugin(SimplePlugin):
     """A Temporal Worker Plugin configured for ADK.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
 
     This plugin configures:
     - Pydantic Payload Converter (required for ADK objects).
