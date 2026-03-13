@@ -981,8 +981,8 @@ wheels = [
 
 [[package]]
 name = "google-adk"
-version = "1.26.0"
-source = { git = "https://github.com/google/adk-python.git?rev=main#175d6381c5e97ad865485427c6337324b55bb367" }
+version = "1.27.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "anyio" },
@@ -1029,6 +1029,10 @@ dependencies = [
     { name = "uvicorn" },
     { name = "watchdog" },
     { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bd/c4/0e41560662706b28895438b707dde4c3a86892e97cc2cf2bc4e029a4fb13/google_adk-1.27.0.tar.gz", hash = "sha256:281c1c2617d02645993972cd42cbe898265010ce80cb41e1d3381f78f362097c", size = 2297667, upload-time = "2026-03-12T22:50:15.968Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/42/0cfb8d7f29bf1665e04d09852868fa93ce269ba8ecca19576f6bc7274188/google_adk-1.27.0-py3-none-any.whl", hash = "sha256:a800684760e299270bbb6836ea4648b5cbf0efdc681dfee4c8d0ca939630f4e5", size = 2688747, upload-time = "2026-03-12T22:50:14.241Z" },
 ]
 
 [[package]]
@@ -4324,7 +4328,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "google-adk", marker = "extra == 'google-adk'", git = "https://github.com/google/adk-python.git?rev=main" },
+    { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=1.27.0,<2" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
     { name = "nexus-rpc", specifier = "==1.4.0" },

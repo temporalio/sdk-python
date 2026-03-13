@@ -9,11 +9,11 @@ from temporalio.contrib.google_adk_agents._mcp import (
 )
 from temporalio.contrib.google_adk_agents._model import TemporalModel
 from temporalio.contrib.google_adk_agents._plugin import (
-    TemporalAdkPlugin,
+    GoogleAdkPlugin,
 )
 
 __all__ = [
-    "TemporalAdkPlugin",
+    "GoogleAdkPlugin",
     "TemporalMcpToolSet",
     "TemporalMcpToolSetProvider",
     "TemporalModel",

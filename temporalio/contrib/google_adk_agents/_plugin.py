@@ -49,7 +49,7 @@ def setup_deterministic_runtime():
         print(f"Warning: Failed to set deterministic runtime providers: {e}")
 
 
-class TemporalAdkPlugin(SimplePlugin):
+class GoogleAdkPlugin(SimplePlugin):
     """A Temporal Worker Plugin configured for ADK.
 
     This plugin configures:
@@ -92,7 +92,7 @@ class TemporalAdkPlugin(SimplePlugin):
                 new_activities.extend(toolset_provider._get_activities())
 
         super().__init__(
-            name="google_adk_plugin",
+            name="google.AdkPlugin",
             data_converter=self._configure_data_converter,
             activities=new_activities,
             run_context=lambda: run_context(),

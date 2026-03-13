@@ -45,7 +45,7 @@ import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import (
-    TemporalAdkPlugin,
+    GoogleAdkPlugin,
     TemporalMcpToolSet,
     TemporalMcpToolSetProvider,
     TemporalModel,
@@ -232,7 +232,7 @@ async def test_single_agent(client: Client, use_local_model: bool):
         pytest.skip("No google API key")
 
     new_config = client.config()
-    new_config["plugins"] = [TemporalAdkPlugin()]
+    new_config["plugins"] = [GoogleAdkPlugin()]
     client = Client(**new_config)
 
     # Run Worker with the ADK plugin
@@ -316,7 +316,7 @@ async def test_multi_agent(client: Client, use_local_model: bool):
         pytest.skip("No google API key")
 
     new_config = client.config()
-    new_config["plugins"] = [TemporalAdkPlugin()]
+    new_config["plugins"] = [GoogleAdkPlugin()]
     client = Client(**new_config)
 
     # Run Worker with the ADK plugin
@@ -440,7 +440,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
 
     new_config = client.config()
     new_config["plugins"] = [
-        TemporalAdkPlugin(
+        GoogleAdkPlugin(
             toolset_providers=[
                 TemporalMcpToolSetProvider(
                     "test_set",
@@ -499,7 +499,7 @@ async def test_single_agent_telemetry(client: Client):
 
     new_config = client.config()
     new_config["plugins"] = [
-        TemporalAdkPlugin(),
+        GoogleAdkPlugin(),
         OpenTelemetryPlugin(add_temporal_spans=True),
     ]
     client = Client(**new_config)
