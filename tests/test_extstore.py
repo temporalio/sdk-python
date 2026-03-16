@@ -4,22 +4,17 @@ import asyncio
 from collections.abc import Sequence
 
 import pytest
-from typing_extensions import Self
 
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import (
-    ActivitySerializationContext,
     DataConverter,
     ExternalStorage,
     JSONPlainPayloadConverter,
     PayloadCodec,
-    SerializationContext,
     StorageDriver,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
-    WithSerializationContext,
-    WorkflowSerializationContext,
 )
 from temporalio.converter._extstore import _StorageReference
 from temporalio.exceptions import ApplicationError
@@ -76,49 +71,6 @@ class InMemoryTestDriver(StorageDriver):
             return payload
 
         return [parse_claim(claim) for claim in claims]
-
-
-class WorkflowIdFeatureFlagDriverSelector(WithSerializationContext):
-    """Example selector that conditionally stores based on workflow ID feature flag.
-
-    This example shows how a callable can implement WithSerializationContext if it
-    needs to precompute data from the serialization context instead of doing it on
-    every payload selection call.
-
-    The feature flag in this example is a simple check on the workflow ID length, but in
-    a real implementation this could be a call to a feature flag service or a lookup in a
-    configuration store.
-    """
-
-    def __init__(self, driver: StorageDriver, enabled: bool = False):
-        self._driver = driver
-        self._enabled = enabled
-
-    def __call__(
-        self, _context: StorageDriverStoreContext, _payload: Payload
-    ) -> StorageDriver | None:
-        return self._driver if self._enabled else None
-
-    def with_context(self, context: SerializationContext) -> Self:
-        workflow_id = None
-        if isinstance(context, ActivitySerializationContext) and context.workflow_id:
-            workflow_id = context.workflow_id
-        if isinstance(context, WorkflowSerializationContext) and context.workflow_id:
-            workflow_id = context.workflow_id
-
-        # Create new instance with updated enabled flag and propagate context to inner driver
-        driver = self._driver
-        if isinstance(driver, WithSerializationContext):
-            driver = driver.with_context(context)
-
-        return type(self)(
-            driver, WorkflowIdFeatureFlagDriverSelector.feature_flag_is_on(workflow_id)
-        )
-
-    @staticmethod
-    def feature_flag_is_on(workflow_id: str | None) -> bool:
-        """Mock implementation of a feature flag based on a workflow ID."""
-        return workflow_id is not None and len(workflow_id) % 2 == 0
 
 
 class TestDataConverterExternalStorage:
