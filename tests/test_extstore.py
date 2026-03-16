@@ -402,9 +402,10 @@ class RecordingPayloadCodec(PayloadCodec):
 class TestPayloadCodecWithExternalStorage:
     """Tests for interaction between DataConverter.payload_codec and external storage."""
 
-    async def test_dc_payload_codec_encodes_reference_payload(self):
-        """DataConverter.payload_codec encodes the reference payload in workflow
-        history but does NOT encode the bytes handed to the driver for storage."""
+    async def test_dc_payload_codec_encodes_stored_bytes(self):
+        """DataConverter.payload_codec encodes the bytes handed to the driver
+        for storage. The reference payload written to workflow history is NOT
+        encoded by the DataConverter codec."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
 
@@ -421,15 +422,14 @@ class TestPayloadCodecWithExternalStorage:
         assert len(encoded) == 1
         assert driver._store_calls == 1
 
-        # The reference payload written to history must carry the dc_codec label.
+        # The reference payload written to history must NOT carry the dc_codec label.
         assert dc_codec.encoded_count == 1
-        assert encoded[0].metadata.get("encoding") == b"binary/dc-encoded"
+        assert encoded[0].metadata.get("encoding") != b"binary/dc-encoded"
 
-        # The bytes given to the driver must NOT carry the dc_codec label.
+        # The bytes given to the driver must carry the dc_codec label.
         stored_payload = Payload()
         stored_payload.ParseFromString(next(iter(driver._storage.values())))
-        assert stored_payload.metadata.get("encoding") != b"binary/dc-encoded"
-        assert stored_payload.metadata.get("encoding") == b"json/plain"
+        assert stored_payload.metadata.get("encoding") == b"binary/dc-encoded"
 
         # Round-trip must recover the original value.
         decoded = await converter.decode(encoded, [str])
@@ -437,10 +437,11 @@ class TestPayloadCodecWithExternalStorage:
         assert dc_codec.decoded_count == 1
         assert driver._retrieve_calls == 1
 
-    async def test_external_converter_without_codec_does_not_encode_stored_bytes(self):
+    async def test_dc_payload_codec_does_not_encode_reference_payload(self):
         """When DataConverter.payload_codec is set but ExternalStorage.payload_codec
-        is None, stored bytes are NOT encoded – even though
-        DataConverter.payload_codec is active for the reference payload in history."""
+        is None, the reference payload stored in workflow history is NOT encoded
+        by DataConverter.payload_codec – encoding is applied to the stored bytes
+        instead."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
 
@@ -457,15 +458,14 @@ class TestPayloadCodecWithExternalStorage:
         assert len(encoded) == 1
         assert driver._store_calls == 1
 
-        # Reference payload in history is still encoded by DataConverter.payload_codec.
+        # Reference payload in history is NOT encoded by DataConverter.payload_codec.
         assert dc_codec.encoded_count == 1
-        assert encoded[0].metadata.get("encoding") == b"binary/dc-encoded"
+        assert encoded[0].metadata.get("encoding") != b"binary/dc-encoded"
 
-        # Stored bytes are NOT encoded.
+        # Stored bytes ARE encoded by DataConverter.payload_codec.
         stored_payload = Payload()
         stored_payload.ParseFromString(next(iter(driver._storage.values())))
-        assert stored_payload.metadata.get("encoding") != b"binary/dc-encoded"
-        assert stored_payload.metadata.get("encoding") == b"json/plain"
+        assert stored_payload.metadata.get("encoding") == b"binary/dc-encoded"
 
         # Round-trip.
         decoded = await converter.decode(encoded, [str])
@@ -475,9 +475,10 @@ class TestPayloadCodecWithExternalStorage:
 
     async def test_external_converter_codec_independent_from_dc_codec(self):
         """When both DataConverter.payload_codec and ExternalStorage.payload_codec
-        are set, the reference payload in history uses DataConverter.payload_codec
-        and the bytes stored by the driver use ExternalStorage.payload_codec –
-        independently."""
+        are set, DataConverter.payload_codec encodes the payload first, then
+        ExternalStorage.payload_codec applies a second encoding layer before the
+        driver stores the bytes. The reference payload in history carries neither
+        codec's label."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
         ext_codec = RecordingPayloadCodec("binary/ext-encoded")
@@ -500,16 +501,14 @@ class TestPayloadCodecWithExternalStorage:
         assert dc_codec.encoded_count == 1
         assert ext_codec.encoded_count == 1
 
-        # Reference payload carries dc_codec's label.
-        assert encoded[0].metadata.get("encoding") == b"binary/dc-encoded"
+        # Reference payload in history carries neither codec's label.
+        assert encoded[0].metadata.get("encoding") != b"binary/dc-encoded"
+        assert encoded[0].metadata.get("encoding") != b"binary/ext-encoded"
 
-        # Stored bytes carry ext_codec's label – different from the reference.
+        # Stored bytes carry ext_codec's label (the outermost encoding layer).
         stored_payload = Payload()
         stored_payload.ParseFromString(next(iter(driver._storage.values())))
         assert stored_payload.metadata.get("encoding") == b"binary/ext-encoded"
-        assert stored_payload.metadata.get("encoding") != encoded[0].metadata.get(
-            "encoding"
-        )
 
         # Round-trip must recover the original value using both codecs.
         decoded = await converter.decode(encoded, [str])

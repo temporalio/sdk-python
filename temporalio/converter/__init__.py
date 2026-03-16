@@ -1535,71 +1535,69 @@ class DataConverter(WithSerializationContext):
     async def _encode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
-        if self.external_storage is not None:
-            payload = await self.external_storage._store_payload(payload)
         if self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
+        if self.external_storage:
+            payload = await self.external_storage._store_payload(payload)
         self._validate_payload_limits([payload])
         return payload
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
-        if self.external_storage is not None:
-            await self.external_storage._store_payloads(payloads)
         if self.payload_codec:
             await self.payload_codec.encode_wrapper(payloads)
+        if self.external_storage:
+            await self.external_storage._store_payloads(payloads)
         self._validate_payload_limits(payloads.payloads)
 
     async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        result = (
-            await self.external_storage._store_payload_sequence(payloads)
-            if self.external_storage is not None
-            else list(payloads)
-        )
+        result = list(payloads)
         if self.payload_codec:
             result = await self.payload_codec.encode(result)
+        if self.external_storage:
+            result = await self.external_storage._store_payload_sequence(result)
         self._validate_payload_limits(result)
         return result
 
     async def _decode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
-        if self.payload_codec:
-            payload = (await self.payload_codec.decode([payload]))[0]
-        if self.external_storage is not None:
+        if self.external_storage:
             payload = await self.external_storage._retrieve_payload(payload)
         elif len(payload.external_payloads) > 0:
             warnings.warn(
                 "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
                 category=extstore.StorageWarning,
             )
+        if self.payload_codec:
+            payload = (await self.payload_codec.decode([payload]))[0]
         return payload
 
     async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
-        if self.payload_codec:
-            await self.payload_codec.decode_wrapper(payloads)
-        if self.external_storage is not None:
+        if self.external_storage:
             await self.external_storage._retrieve_payloads(payloads)
         elif any(len(p.external_payloads) > 0 for p in payloads.payloads):
             warnings.warn(
                 "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
                 category=extstore.StorageWarning,
             )
+        if self.payload_codec:
+            await self.payload_codec.decode_wrapper(payloads)
 
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         result = list(payloads)
-        if self.payload_codec:
-            result = await self.payload_codec.decode(result)
-        if self.external_storage is not None:
+        if self.external_storage:
             result = await self.external_storage._retrieve_payload_sequence(result)
         elif any(len(p.external_payloads) > 0 for p in result):
             warnings.warn(
                 "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
                 category=extstore.StorageWarning,
             )
+        if self.payload_codec:
+            result = await self.payload_codec.decode(result)
         return result
 
     @staticmethod
