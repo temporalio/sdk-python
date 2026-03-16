@@ -1,4 +1,6 @@
-"""External payload storage support for offloading payloads to external storage systems."""
+"""External payload storage support for offloading payloads to external storage
+systems.
+"""
 
 from __future__ import annotations
 
@@ -38,14 +40,17 @@ async def _gather_cancel_on_error(
 
 @dataclass(frozen=True)
 class StorageDriverClaim:
-    """Claim for an externally stored payload.
+    """A driver-defined reference to an externally-stored payload that can be used to
+    retrieve it.
 
     .. warning::
-           This API is experimental.
+        This API is experimental.
     """
 
     data: Mapping[str, str]
-    """Driver-defined data for identifying and retrieving an externally stored payload."""
+    """Driver-defined data for identifying and retrieving an externally stored
+    payload.
+    """
 
 
 @dataclass(frozen=True)
@@ -53,7 +58,7 @@ class StorageDriverStoreContext:
     """Context passed to :meth:`StorageDriver.store` and ``driver_selector`` calls.
 
     .. warning::
-           This API is experimental.
+        This API is experimental.
     """
 
     serialization_context: SerializationContext | None = None
@@ -67,7 +72,7 @@ class StorageDriverRetrieveContext:
     """Context passed to :meth:`StorageDriver.retrieve` calls.
 
     .. warning::
-           This API is experimental.
+        This API is experimental.
     """
 
 
@@ -75,7 +80,7 @@ class StorageDriver(ABC):
     """Base driver for storing and retrieve payloads from external storage systems.
 
     .. warning::
-           This API is experimental.
+        This API is experimental.
     """
 
     @abstractmethod
@@ -103,8 +108,9 @@ class StorageDriver(ABC):
         context: StorageDriverStoreContext,
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
-        """Stores payloads in external storage and returns a :class:`StorageDriverClaim`
-        for each one. The returned list must be the same length as ``payloads``.
+        """Stores payloads in external storage and returns a
+        :class:`StorageDriverClaim` for each one. The returned list must be the
+        same length as ``payloads``.
         """
         raise NotImplementedError
 
@@ -114,8 +120,9 @@ class StorageDriver(ABC):
         context: StorageDriverRetrieveContext,
         claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
-        """Retrieves payloads from external storage for the given :class:`StorageDriverClaim`
-        list. The returned list must be the same length as ``claims``.
+        """Retrieves payloads from external storage for the given
+        :class:`StorageDriverClaim` list. The returned list must be the same
+        length as ``claims``.
         """
         raise NotImplementedError
 
@@ -124,7 +131,7 @@ class StorageWarning(RuntimeWarning):
     """Warning for external storage issues.
 
     .. warning::
-           This API is experimental.
+        This API is experimental.
     """
 
 
@@ -139,7 +146,7 @@ class ExternalStorage(WithSerializationContext):
     """Configuration for external storage behavior.
 
     .. warning::
-           This API is experimental.
+        This API is experimental.
     """
 
     drivers: Sequence[StorageDriver]
@@ -147,18 +154,15 @@ class ExternalStorage(WithSerializationContext):
     driver must be provided.
 
     When no :attr:`driver_selector` is set, the first driver in this list is
-    used for all store operations. Additional drivers may be included solely to
-    support retrieval — for example, to download payloads that remote callers
-    uploaded to an external storage system that is not your primary store
-    driver. Drivers in this list are looked up by :meth:`StorageDriver.name` during
-    retrieval, so each driver must have a unique name.
+    used for all store operations. Drivers in this list are looked up by
+    :meth:`StorageDriver.name` during retrieval, so each driver must have a
+    unique name.
     """
 
     driver_selector: (
         Callable[[StorageDriverStoreContext, Payload], StorageDriver | None] | None
     ) = None
-    """Controls which driver stores a given payload. A callable of the form
-    ``(StorageDriverStoreContext, Payload) -> StorageDriver | None`` that returns the
+    """Controls which driver stores a given payload. A callable that returns the
     driver instance to use, or ``None`` to leave the payload stored inline.
     The returned driver must be one of the instances registered in :attr:`drivers`.
 
@@ -181,7 +185,9 @@ class ExternalStorage(WithSerializationContext):
     _driver_map: dict[str, StorageDriver] = dataclasses.field(
         init=False, repr=False, compare=False
     )
-    """Name-keyed index of :attr:`drivers`, built at construction time. Used for retrieval lookups."""
+    """Name-keyed index of :attr:`drivers`, built at construction time. Used
+    for retrieval lookups.
+    """
 
     _context: SerializationContext | None = dataclasses.field(
         init=False, default=None, repr=False, compare=False

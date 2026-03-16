@@ -465,9 +465,9 @@ Now `IPv4Address` can be used in type hints including collections, optionals, et
 
 External storage allows large payloads to be offloaded to an external storage service (such as Amazon S3) rather than stored inline in workflow history. This is useful when workflows or activities work with data that would otherwise exceed Temporal's payload size limits.
 
-External storage is configured via the `external_storage` parameter on `DataConverter`, which accepts a `temporalio.converter.ExternalStorage` instance. Any driver used to store payloads must also be configured on the component that retrieves them — for example, if the client stores workflow inputs using a driver, the worker must include that driver in its `ExternalStorage.drivers` list to retrieve them.
+External storage is configured via the `external_storage` parameter on `DataConverter`.  It should be configured on the `Client` both for clients of your workflow as well as on the worker -- anywhere large payloads may be uploaded or downloaded.
 
-The simplest setup uses a single storage driver:
+A `StorageDriver` handles uploading and downloading payloads. Temporal provides built-in drivers for common storage solutions, or you may customize one. Here's an example using our provided `InMemoryTestDriver`.
 
 ```python
 import dataclasses
@@ -475,7 +475,7 @@ from temporalio.client import Client
 from temporalio.converter import DataConverter
 from temporalio.converter import ExternalStorage
 
-driver = MyDriver()
+driver = InMemoryTestDriver()
 
 client = await Client.connect(
     "localhost:7233",
@@ -489,7 +489,7 @@ client = await Client.connect(
 Some things to note about external storage:
 
 * Only payloads that meet or exceed `ExternalStorage.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
-* External payload storage applies transparently to workflow inputs/outputs, activity inputs/outputs, signals, updates, queries, and failure details.
+* External storage applies transparently to all payloads, whether they are workflow inputs/outputs, activity inputs/outputs, signal inputs, query outputs, update inputs/outputs, or failure details.
 * The `DataConverter`'s `payload_codec` (if configured) is applied to the *reference* payload stored in workflow history, not to the externally stored bytes. To encrypt or compress the bytes handed to a driver, use `ExternalStorage.payload_codec`.
 * Setting `ExternalStorage.payload_size_threshold` to `None` causes every payload to be considered for external storage regardless of size.
 
@@ -579,7 +579,6 @@ class MyDriver(StorageDriver):
 
 Some things to note about implementing a custom driver:
 
-* `store` and `retrieve` must return lists of the same length as their respective input sequences.
 * `StorageDriver.name()` must return a string that is unique among all drivers in `ExternalStorage.drivers`. This name is embedded in the reference payload stored in workflow history and used to look up the correct driver during retrieval — changing it after payloads have been stored will break retrieval.
 * `StorageDriver.type()` is automatically implemented to return the name of the class. This can be overridden in subclasses but must remain consistent across all instances of the subclass.
 * Implement `temporalio.converter.WithSerializationContext` on your driver to receive workflow or activity context (namespace, workflow ID, activity ID, etc.) at serialization time.
