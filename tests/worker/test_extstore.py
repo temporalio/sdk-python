@@ -167,8 +167,9 @@ class BadTestDriver(InMemoryTestDriver):
 async def test_extstore_activity_input_no_retrieve(
     env: WorkflowEnvironment,
 ):
-    """Using a small threshold, validate that activity result size over
-    the threshold causes driver to be invoked."""
+    """When the driver's retrieve returns no payloads for an externalized
+    activity input, the activity fails and the workflow terminates with a
+    WorkflowFailureError wrapping an ActivityError."""
     driver = BadTestDriver(no_retrieve=True)
 
     client = await Client.connect(
@@ -208,8 +209,9 @@ async def test_extstore_activity_input_no_retrieve(
 async def test_extstore_activity_result_no_store(
     env: WorkflowEnvironment,
 ):
-    """Using a small threshold, validate that activity result size over
-    the threshold causes driver to be invoked."""
+    """When the driver's store returns no claims for an activity result that
+    exceeds the size threshold, the activity fails to complete and the workflow
+    terminates with a WorkflowFailureError wrapping an ActivityError."""
     driver = BadTestDriver(no_store=True)
 
     client = await Client.connect(
