@@ -48,7 +48,7 @@ class StorageDriverClaim:
         This API is experimental.
     """
 
-    data: Mapping[str, str]
+    claim_data: Mapping[str, str]
     """Driver-defined data for identifying and retrieving an externally stored
     payload.
     """

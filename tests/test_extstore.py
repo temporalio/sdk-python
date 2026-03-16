@@ -49,7 +49,7 @@ class InMemoryTestDriver(StorageDriver):
         ]
         self._storage.update(entries)
 
-        return [StorageDriverClaim(data={"key": key}) for key, _ in entries]
+        return [StorageDriverClaim(claim_data={"key": key}) for key, _ in entries]
 
     async def retrieve(
         self,
@@ -61,7 +61,7 @@ class InMemoryTestDriver(StorageDriver):
         def parse_claim(
             claim: StorageDriverClaim,
         ) -> Payload:
-            key = claim.data["key"]
+            key = claim.claim_data["key"]
             if key not in self._storage:
                 raise ApplicationError(
                     f"Payload not found for key '{key}'", non_retryable=True
@@ -135,7 +135,7 @@ class TestDataConverterExternalStorage:
         assert isinstance(reference, _StorageReference)
         assert "test-driver" == reference.driver_name
         assert isinstance(reference.driver_claim, StorageDriverClaim)
-        assert "key" in reference.driver_claim.data
+        assert "key" in reference.driver_claim.claim_data
 
     async def test_extstore_composite_conditional(self):
         """Test using multiple drivers based on size."""
