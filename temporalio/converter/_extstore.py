@@ -16,7 +16,6 @@ from typing_extensions import Self
 from temporalio.api.common.v1 import Payload, Payloads
 from temporalio.converter import (
     JSONPlainPayloadConverter,
-    PayloadCodec,
     SerializationContext,
     WithSerializationContext,
 )
@@ -176,12 +175,6 @@ class ExternalStorage(WithSerializationContext):
     external storage regardless of size.
     """
 
-    payload_codec: PayloadCodec | None = None
-    """Optional codec applied to payloads before they are handed to a
-    :class:`StorageDriver` for storage, and after they are retrieved. When ``None``,
-    payloads are stored as-is by the driver.
-    """
-
     _driver_map: dict[str, StorageDriver] = dataclasses.field(
         init=False, repr=False, compare=False
     )
@@ -220,10 +213,7 @@ class ExternalStorage(WithSerializationContext):
 
     def with_context(self, context: SerializationContext) -> Self:
         """Return a copy of these options with the serialization context applied."""
-        payload_codec = self.payload_codec
-        if isinstance(payload_codec, WithSerializationContext):
-            payload_codec = payload_codec.with_context(context)
-        result = dataclasses.replace(self, payload_codec=payload_codec)
+        result = dataclasses.replace(self)
         object.__setattr__(result, "_context", context)
         return result
 
@@ -263,11 +253,7 @@ class ExternalStorage(WithSerializationContext):
         if driver is None:
             return payload
 
-        encoded_payload = payload
-        if self.payload_codec:
-            encoded_payload = (await self.payload_codec.encode([payload]))[0]
-
-        claims = await driver.store(context, [encoded_payload])
+        claims = await driver.store(context, [payload])
 
         self._validate_claim_length(claims, expected=1, driver=driver)
 
@@ -280,9 +266,7 @@ class ExternalStorage(WithSerializationContext):
             raise ValueError(
                 f"Failed to serialize storage reference for driver '{driver.name()}'"
             )
-        reference_payload.external_payloads.add().size_bytes = (
-            encoded_payload.ByteSize()
-        )
+        reference_payload.external_payloads.add().size_bytes = payload.ByteSize()
         return reference_payload
 
     async def _store_payloads(self, payloads: Payloads):
@@ -310,16 +294,9 @@ class ExternalStorage(WithSerializationContext):
         if not to_store:
             return results
 
-        payloads_to_encode = [payload for _, payload, _ in to_store]
-        encoded_payloads = payloads_to_encode
-        if self.payload_codec:
-            encoded_payloads = await self.payload_codec.encode(payloads_to_encode)
-
         driver_groups: dict[StorageDriver, list[tuple[int, Payload]]] = {}
-        for i, (orig_index, _, driver) in enumerate(to_store):
-            driver_groups.setdefault(driver, []).append(
-                (orig_index, encoded_payloads[i])
-            )
+        for orig_index, payload, driver in to_store:
+            driver_groups.setdefault(driver, []).append((orig_index, payload))
 
         driver_group_list = list(driver_groups.items())
 
@@ -365,9 +342,6 @@ class ExternalStorage(WithSerializationContext):
         stored_payloads = await driver.retrieve(context, [reference.driver_claim])
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
-
-        if self.payload_codec:
-            stored_payloads = await self.payload_codec.decode(stored_payloads)
 
         return stored_payloads[0]
 
@@ -429,11 +403,7 @@ class ExternalStorage(WithSerializationContext):
         retrieve_indices = sorted(stored_by_index.keys())
         stored_list = [stored_by_index[idx] for idx in retrieve_indices]
 
-        decoded_payloads = stored_list
-        if self.payload_codec:
-            decoded_payloads = await self.payload_codec.decode(stored_list)
-
-        for i, retrieved_payload in enumerate(decoded_payloads):
+        for i, retrieved_payload in enumerate(stored_list):
             results[retrieve_indices[i]] = retrieved_payload
 
         return results
