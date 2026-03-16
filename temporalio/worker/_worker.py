@@ -29,7 +29,7 @@ from temporalio.common import (
     VersioningBehavior,
     WorkerDeploymentVersion,
 )
-from temporalio.converter import _ServerPayloadErrorLimits
+from temporalio.converter._payload_limits import _ServerPayloadErrorLimits
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
