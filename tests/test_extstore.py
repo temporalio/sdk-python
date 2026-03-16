@@ -455,15 +455,16 @@ class TestPayloadCodecWithExternalStorage:
 class TestMultiDriver:
     """Tests for ExternalStorage with multiple drivers."""
 
-    async def test_no_selector_uses_first_driver_for_store(self):
-        """Without a driver_selector the first driver in the list handles all
-        store operations.  Additional drivers are never called for store."""
+    async def test_selector_always_first_driver_handles_all_stores(self):
+        """A selector that always picks the first driver routes all store
+        operations there. The second driver is never called for store."""
         first = InMemoryTestDriver("driver-first")
         second = InMemoryTestDriver("driver-second")
 
         converter = DataConverter(
             external_storage=ExternalStorage(
                 drivers=[first, second],
+                driver_selector=lambda _ctx, _p: first,
                 payload_size_threshold=50,
             )
         )
@@ -508,6 +509,7 @@ class TestMultiDriver:
         retrieve_converter = DataConverter(
             external_storage=ExternalStorage(
                 drivers=[driver_a, driver_b],
+                driver_selector=lambda _ctx, _p: driver_a,
                 payload_size_threshold=50,
             )
         )
@@ -639,6 +641,21 @@ class TestMultiDriver:
         decoded = await converter.decode(encoded, [str, str])
         assert decoded == [small_ext, large_ext]
 
+    def test_multiple_drivers_without_selector_raises(self):
+        """Registering more than one driver without a driver_selector raises
+        ValueError immediately when constructing ExternalStorage."""
+        first = InMemoryTestDriver("driver-a")
+        second = InMemoryTestDriver("driver-b")
+
+        with pytest.raises(
+            ValueError,
+            match=r"^ExternalStorage\.driver_selector must be specified if multiple drivers are registered\.$",
+        ):
+            ExternalStorage(
+                drivers=[first, second],
+                payload_size_threshold=50,
+            )
+
     def test_duplicate_driver_names_raises(self):
         """Registering two drivers with identical names raises ValueError immediately
         when constructing ExternalStorage."""
@@ -651,6 +668,7 @@ class TestMultiDriver:
         ):
             ExternalStorage(
                 drivers=[first, duplicate],
+                driver_selector=lambda _ctx, _p: first,
                 payload_size_threshold=50,
             )
 

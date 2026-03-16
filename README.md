@@ -536,7 +536,7 @@ options = ExternalStorage(
 
 Some things to note about driver selection:
 
-* When no `driver_selector` is set, the first driver in `ExternalStorage.drivers` is always used for storing.
+* A `driver_selector` is required when more than one driver is registered. With a single driver, `driver_selector` may be omitted and that driver is used for all store operations.
 * Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
 * The driver instance returned by the selector must be one of the instances registered in `ExternalStorage.drivers`. If it is not, an error is raised.
 

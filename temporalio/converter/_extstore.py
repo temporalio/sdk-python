@@ -86,17 +86,18 @@ class StorageDriver(ABC):
 
     @abstractmethod
     def name(self) -> str:
-        """Returns the name of this driver instance. A driver may allow its name
-        to be parameterized at construction time so that multiple instances of
-        the same driver class can coexist in :attr:`ExternalStorage.drivers` with
-        distinct names.
+        """Returns the name of this driver instance. A driver may allow
+        its name to be parameterized at construction time so that multiple
+        instances of the same driver class can coexist in
+        :attr:`ExternalStorage.drivers` with distinct names.
         """
         raise NotImplementedError
 
     def type(self) -> str:
-        """Returns the type of the storage driver. This string should be the same
-        across all instantiations of the same driver class. This allows the equivalent
-        driver implementation in different languages to be named the same.
+        """Returns the type of the storage driver. This string should be
+        the same across all instantiations of the same driver class. This
+        allows the equivalent driver implementation in different languages
+        to be named the same.
 
         Defaults to the class name. Subclasses may override this to return a
         stable, language-agnostic identifier.
@@ -152,12 +153,11 @@ class ExternalStorage(WithSerializationContext):
 
     drivers: Sequence[StorageDriver]
     """Drivers available for storing and retrieving payloads. At least one
-    driver must be provided.
+    driver must be provided. If more than one driver is registered,
+    :attr:`driver_selector` must also be set.
 
-    When no :attr:`driver_selector` is set, the first driver in this list is
-    used for all store operations. Drivers in this list are looked up by
-    :meth:`StorageDriver.name` during retrieval, so each driver must have a
-    unique name.
+    Drivers in this list are looked up by :meth:`StorageDriver.name` during
+    retrieval, so each driver must have a unique name.
     """
 
     driver_selector: (
@@ -165,10 +165,11 @@ class ExternalStorage(WithSerializationContext):
     ) = None
     """Controls which driver stores a given payload. A callable that returns the
     driver instance to use, or ``None`` to leave the payload stored inline.
-    The returned driver must be one of the instances registered in :attr:`drivers`.
+    The returned driver must be one of the instances registered in
+    :attr:`drivers`.
 
-    When ``None``, the first driver in :attr:`drivers` is used for all store
-    operations.
+    Required when more than one driver is registered. When ``None`` and only
+    one driver is registered, that driver is used for all store operations.
     """
 
     payload_size_threshold: int | None = 256 * 1024
@@ -195,12 +196,17 @@ class ExternalStorage(WithSerializationContext):
     def __post_init__(self) -> None:
         """Validate drivers and build the internal name-keyed driver map.
 
-        Raises :exc:`ValueError` if no drivers are provided or if any two drivers
-        share the same name.
+        Raises :exc:`ValueError` if no drivers are provided, if more than one
+        driver is registered without a :attr:`driver_selector`, or if any two
+        drivers share the same name.
         """
         if not self.drivers:
             raise ValueError(
                 "ExternalStorage.drivers must contain at least one driver."
+            )
+        if len(self.drivers) > 1 and self.driver_selector is None:
+            raise ValueError(
+                "ExternalStorage.driver_selector must be specified if multiple drivers are registered."
             )
         driver_map: dict[str, StorageDriver] = {}
         for driver in self.drivers:
