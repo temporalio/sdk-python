@@ -29,7 +29,7 @@ from temporalio.common import (
     VersioningBehavior,
     WorkerDeploymentVersion,
 )
-from temporalio.converter import _ServerPayloadErrorLimits
+from temporalio.converter._payload_limits import _ServerPayloadErrorLimits
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -415,6 +415,16 @@ class Worker:
             raise ValueError(
                 "deployment_config cannot be used with build_id or use_worker_versioning"
             )
+        _deployment_config = config.get("deployment_config")
+        if (
+            _deployment_config is not None
+            and not _deployment_config.use_worker_versioning
+            and _deployment_config.default_versioning_behavior
+            != VersioningBehavior.UNSPECIFIED
+        ):
+            raise ValueError(
+                "default_versioning_behavior must be UNSPECIFIED when use_worker_versioning is False"
+            )
         max_concurrent_payload_conversions = config.get(
             "max_concurrent_payload_conversions",
             _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
@@ -689,6 +699,14 @@ class Worker:
         assert bridge_client._bridge_client
         self._bridge_worker.replace_client(bridge_client._bridge_client)
         self._config["client"] = value
+
+        # Update the activity worker's client reference if activities are configured
+        if self._activity_worker:
+            self._activity_worker._client = value
+
+        # Update the nexus worker's client reference if nexus services are configured
+        if self._nexus_worker:
+            self._nexus_worker._client = value
 
     @property
     def is_running(self) -> bool:

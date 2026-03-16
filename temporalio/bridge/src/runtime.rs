@@ -9,15 +9,14 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
-use temporalio_common::telemetry::metrics::{CoreMeter, MetricCallBufferer};
+use temporalio_common::telemetry::metrics::core::MetricCallBufferer;
+use temporalio_common::telemetry::metrics::CoreMeter;
 use temporalio_common::telemetry::{
-    CoreLog, Logger, MetricTemporality, OtelCollectorOptions, OtlpProtocol,
-    PrometheusExporterOptions, TelemetryOptions,
+    build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLog, CoreLogStreamConsumer,
+    Logger, MetricTemporality, OtelCollectorOptions, OtlpProtocol, PrometheusExporterOptions,
+    TelemetryOptions,
 };
-use temporalio_sdk_core::telemetry::{
-    build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
-    MetricsCallBuffer,
-};
+use temporalio_sdk_core::telemetry::MetricsCallBuffer;
 use temporalio_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;

@@ -414,10 +414,11 @@ class PayloadVisitor:
                 self._visit_temporal_api_common_v1_Payload(fs, v)
                 for v in o.headers.values()
             )
-        if not self.skip_search_attributes:
-            coros.extend(
-                self._visit_temporal_api_common_v1_Payload(fs, v)
-                for v in o.search_attributes.values()
+        if o.HasField("search_attributes"):
+            coros.append(
+                self._visit_temporal_api_common_v1_SearchAttributes(
+                    fs, o.search_attributes
+                )
             )
         await asyncio.gather(*coros)
 
@@ -432,10 +433,11 @@ class PayloadVisitor:
         coros.extend(
             self._visit_temporal_api_common_v1_Payload(fs, v) for v in o.memo.values()
         )
-        if not self.skip_search_attributes:
-            coros.extend(
-                self._visit_temporal_api_common_v1_Payload(fs, v)
-                for v in o.search_attributes.values()
+        if o.HasField("search_attributes"):
+            coros.append(
+                self._visit_temporal_api_common_v1_SearchAttributes(
+                    fs, o.search_attributes
+                )
             )
         await asyncio.gather(*coros)
 
@@ -464,12 +466,9 @@ class PayloadVisitor:
     async def _visit_coresdk_workflow_commands_UpsertWorkflowSearchAttributes(
         self, fs, o
     ):
-        if not self.skip_search_attributes:
-            await asyncio.gather(
-                *[
-                    self._visit_temporal_api_common_v1_Payload(fs, v)
-                    for v in o.search_attributes.values()
-                ]
+        if o.HasField("search_attributes"):
+            await self._visit_temporal_api_common_v1_SearchAttributes(
+                fs, o.search_attributes
             )
 
     async def _visit_coresdk_workflow_commands_ModifyWorkflowProperties(self, fs, o):

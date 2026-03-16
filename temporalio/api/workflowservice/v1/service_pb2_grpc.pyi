@@ -87,7 +87,8 @@ class WorkflowServiceStub:
     Upon failure, it returns `MultiOperationExecutionFailure` where the status code
     equals the status code of the *first* operation that failed to be started.
 
-    NOTE: Experimental API.
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: To be exposed over HTTP in the future. --)
     """
     GetWorkflowExecutionHistory: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
@@ -1108,7 +1109,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Upon failure, it returns `MultiOperationExecutionFailure` where the status code
         equals the status code of the *first* operation that failed to be started.
 
-        NOTE: Experimental API.
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: To be exposed over HTTP in the future. --)
         """
     @abc.abstractmethod
     def GetWorkflowExecutionHistory(

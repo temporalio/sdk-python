@@ -98,7 +98,6 @@ def env_type(request: pytest.FixtureRequest) -> str:
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
-        http_port = 7243
         env = await WorkflowEnvironment.start_local(
             dev_server_extra_args=[
                 "--dynamic-config-value",
@@ -125,13 +124,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "history.enableChasm=true",
                 "--dynamic-config-value",
                 "history.enableTransitionHistory=true",
-                "--http-port",
-                str(http_port),
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
-        # TODO(nexus-preview): expose this in a more principled way
-        env._http_port = http_port  # type: ignore
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
     else:

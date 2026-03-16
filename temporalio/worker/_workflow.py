@@ -21,6 +21,7 @@ import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._payload_limits
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
@@ -170,7 +171,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
     async def run(
         self,
-        payload_error_limits: temporalio.converter._ServerPayloadErrorLimits | None,
+        payload_error_limits: temporalio.converter._payload_limits._ServerPayloadErrorLimits
+        | None,
     ) -> None:
         self._data_converter = self._data_converter._with_payload_error_limits(
             payload_error_limits
@@ -387,7 +389,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     encode_headers=self._encode_headers,
                     concurrency_limit=self._max_concurrent_payload_conversions,
                 )
-            except temporalio.converter._PayloadSizeError as err:
+            except temporalio.converter._payload_limits._PayloadSizeError as err:
                 logger.warning(err.message)
                 completion.failed.Clear()
                 await data_converter.encode_failure(err, completion.failed.failure)
