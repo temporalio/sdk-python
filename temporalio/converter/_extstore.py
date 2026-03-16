@@ -14,13 +14,15 @@ from typing import Any, ClassVar, TypeVar
 from typing_extensions import Self
 
 from temporalio.api.common.v1 import Payload, Payloads
-from temporalio.converter import (
-    JSONPlainPayloadConverter,
+from temporalio.converter._payload_converter import JSONPlainPayloadConverter
+from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
 )
 
 _T = TypeVar("_T")
+
+_REFERENCE_ENCODING = b"json/external-storage-reference"
 
 
 async def _gather_cancel_on_error(
@@ -187,7 +189,7 @@ class ExternalStorage(WithSerializationContext):
     )
 
     _claim_converter: ClassVar[JSONPlainPayloadConverter] = JSONPlainPayloadConverter(
-        encoding="json/external-storage-reference"
+        encoding=_REFERENCE_ENCODING.decode()
     )
 
     def __post_init__(self) -> None:

@@ -32,6 +32,7 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._payload_limits
 import temporalio.exceptions
 
 from ._interceptor import (
@@ -128,7 +129,8 @@ class _ActivityWorker:
 
     async def run(
         self,
-        payload_error_limits: temporalio.converter._ServerPayloadErrorLimits | None,
+        payload_error_limits: temporalio.converter._payload_limits._ServerPayloadErrorLimits
+        | None,
     ) -> None:
         """Continually poll for activity tasks and dispatch to handlers."""
         self._data_converter = self._data_converter._with_payload_error_limits(
@@ -403,7 +405,7 @@ class _ActivityWorker:
                         )
                     elif isinstance(
                         err,
-                        temporalio.converter._PayloadSizeError,
+                        temporalio.converter._payload_limits._PayloadSizeError,
                     ):
                         temporalio.activity.logger.warning(
                             err.message,
@@ -444,7 +446,9 @@ class _ActivityWorker:
                         if isinstance(err, concurrent.futures.BrokenExecutor):
                             self._fail_worker_exception_queue.put_nowait(err)
                 # Handle PayloadSizeError from attempting to encode failure information
-                except temporalio.converter._PayloadSizeError as inner_err:
+                except (
+                    temporalio.converter._payload_limits._PayloadSizeError
+                ) as inner_err:
                     temporalio.activity.logger.exception(inner_err.message)
                     completion.result.Clear()
                     await data_converter.encode_failure(
