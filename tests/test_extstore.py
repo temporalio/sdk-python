@@ -182,37 +182,6 @@ class TestDataConverterExternalStorage:
         assert cold_driver._retrieve_calls == 1
 
 
-class NotFoundDriver(StorageDriver):
-    """Driver that stores normally but raises non-retryable ApplicationError on retrieve."""
-
-    def __init__(self, driver_name: str = "not-found-driver"):
-        self._driver_name = driver_name
-        self._storage: dict[str, bytes] = {}
-
-    def name(self) -> str:
-        return self._driver_name
-
-    async def store(
-        self,
-        context: StorageDriverStoreContext,
-        payloads: Sequence[Payload],
-    ) -> list[StorageDriverClaim]:
-        entries = [
-            (f"payload-{i}", payload.SerializeToString())
-            for i, payload in enumerate(payloads)
-        ]
-        self._storage.update(entries)
-        return [StorageDriverClaim(data={"key": key}) for key, _ in entries]
-
-    async def retrieve(
-        self,
-        context: StorageDriverRetrieveContext,
-        claims: Sequence[StorageDriverClaim],
-    ) -> list[Payload]:
-        assert len(claims) > 0, "NotFoundDriver expected claims to be provided"
-        raise ApplicationError("Payload not found.", non_retryable=True)
-
-
 class TestDriverError:
     """Tests for ValueError raised when a driver violates its contract."""
 
@@ -298,7 +267,9 @@ class TestDriverError:
                 context: StorageDriverStoreContext,
                 payloads: Sequence[Payload],
             ) -> list[StorageDriverClaim]:
-                raise RuntimeError("driver store failure")
+                raise ValueError(
+                    "failed to store payloads because remote service is unavailable"
+                )
 
         drivers = [_SleepingStoreDriver(), _FailingStoreDriver()]
         drivers_iter = iter(drivers)
@@ -310,7 +281,10 @@ class TestDriverError:
             )
         )
 
-        with pytest.raises(RuntimeError, match="driver store failure"):
+        with pytest.raises(
+            ValueError,
+            match="^failed to store payloads because remote service is unavailable$",
+        ):
             await converter.encode(["payload_a", "payload_b"])
 
         assert store_cancelled.is_set()
@@ -344,7 +318,9 @@ class TestDriverError:
                 context: StorageDriverRetrieveContext,
                 claims: Sequence[StorageDriverClaim],
             ) -> list[Payload]:
-                raise RuntimeError("driver retrieve failure")
+                raise ValueError(
+                    "failed to retrieve a payload because the object key does not exist"
+                )
 
         drivers: list[StorageDriver] = [
             _SleepingRetrieveDriver(),
@@ -360,7 +336,10 @@ class TestDriverError:
         )
         encoded = await converter.encode(["payload_a", "payload_b"])
 
-        with pytest.raises(RuntimeError, match="driver retrieve failure"):
+        with pytest.raises(
+            ValueError,
+            match="^failed to retrieve a payload because the object key does not exist$",
+        ):
             await converter.decode(encoded, [str, str])
 
         assert retrieve_cancelled.is_set()
@@ -666,7 +645,10 @@ class TestMultiDriver:
         first = InMemoryTestDriver("dup-name")
         duplicate = InMemoryTestDriver("dup-name")
 
-        with pytest.raises(ValueError, match="dup-name"):
+        with pytest.raises(
+            ValueError,
+            match=r"^ExternalStorage\.drivers contains multiple drivers with name 'dup-name'\. Each driver must have a unique name\.$",
+        ):
             ExternalStorage(
                 drivers=[first, duplicate],
                 payload_size_threshold=50,

@@ -157,8 +157,8 @@ class BadTestDriver(InMemoryTestDriver):
             return []
         if self._raise_payload_not_found:
             raise ApplicationError(
-                "Payload not found",
-                type="PayloadNotFoundError",
+                "Payload not found because the bucket does not exist.",
+                type="BucketNotFoundError",
                 non_retryable=True,
             )
         return await super().retrieve(context, claims)
@@ -204,6 +204,8 @@ async def test_extstore_activity_input_no_retrieve(
             await handle.result()
 
         assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, ApplicationError)
+        assert err.value.cause.cause.message == "Failed decoding arguments"
 
 
 async def test_extstore_activity_result_no_store(
@@ -246,6 +248,12 @@ async def test_extstore_activity_result_no_store(
             await handle.result()
 
         assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, ApplicationError)
+        assert (
+            err.value.cause.cause.message
+            == "Driver 'bad-driver' returned 0 claims, expected 1"
+        )
+        assert err.value.cause.cause.type == "ValueError"
 
 
 async def test_extstore_worker_missing_driver(
@@ -330,7 +338,11 @@ async def test_extstore_payload_not_found_fails_workflow(
             await handle.result()
 
         assert isinstance(exc_info.value.cause, ApplicationError)
-        assert exc_info.value.cause.type == "PayloadNotFoundError"
+        assert (
+            exc_info.value.cause.message
+            == "Payload not found because the bucket does not exist."
+        )
+        assert exc_info.value.cause.type == "BucketNotFoundError"
         assert exc_info.value.cause.non_retryable is True
 
 
@@ -387,7 +399,10 @@ async def test_replay_extstore_history_fails_without_extstore(
     # Replay without external storage — the reference payload cannot be decoded.
     # The middleware emits a StorageWarning when it encounters a reference payload
     # with no driver configured.
-    with pytest.warns(StorageWarning, match="TMPRL1105"):
+    with pytest.warns(
+        StorageWarning,
+        match=r"^\[TMPRL1105\] Detected externally stored payload\(s\) but external storage is not configured\.$",
+    ):
         result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
             history, raise_on_replay_failure=False
         )
@@ -473,7 +488,10 @@ async def test_replay_extstore_activity_result_fails_without_extstore(
     # Replay without external storage.  The workflow input decodes fine, but
     # when the ActivityTaskCompleted result is delivered back to the workflow
     # coroutine it cannot be decoded.
-    with pytest.warns(StorageWarning, match="TMPRL1105"):
+    with pytest.warns(
+        StorageWarning,
+        match=r"^\[TMPRL1105\] Detected externally stored payload\(s\) but external storage is not configured\.$",
+    ):
         result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
             history, raise_on_replay_failure=False
         )
