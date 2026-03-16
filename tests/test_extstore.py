@@ -473,7 +473,6 @@ class TestPayloadCodecWithExternalStorage:
         assert driver._retrieve_calls == 1
 
 
-
 class TestMultiDriver:
     """Tests for ExternalStorage with multiple drivers."""
 
