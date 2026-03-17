@@ -13,12 +13,15 @@ from temporalio.testing import WorkflowEnvironment
 from tests.contrib.langsmith.conftest import dump_runs
 from tests.contrib.langsmith.test_integration import (
     ComprehensiveWorkflow,
+    NexusService,
+    SimpleNexusWorkflow,
     TraceableActivityWorkflow,
     _make_client_and_collector,
     nested_traceable_activity,
     traceable_activity,
 )
 from tests.helpers import new_worker
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 class TestPluginConstruction:
@@ -60,8 +63,14 @@ class TestPluginIntegration:
                 temporal_client,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
+                SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
+                nexus_service_handlers=[NexusService()],
             ) as worker:
+                await env.create_nexus_endpoint(
+                    make_nexus_endpoint_name(worker.task_queue),
+                    worker.task_queue,
+                )
                 handle = await temporal_client.start_workflow(
                     ComprehensiveWorkflow.run,
                     id=f"plugin-comprehensive-{uuid.uuid4()}",
@@ -100,6 +109,13 @@ class TestPluginIntegration:
             "          StartActivity:traceable_activity",
             "            RunActivity:traceable_activity",
             "              inner_llm_call",
+            "      StartNexusOperation:NexusService/run_operation",
+            "        RunStartNexusOperationHandler:NexusService/run_operation",
+            "          StartWorkflow:SimpleNexusWorkflow",
+            "            RunWorkflow:SimpleNexusWorkflow",
+            "              StartActivity:traceable_activity",
+            "                RunActivity:traceable_activity",
+            "                  inner_llm_call",
             "  QueryWorkflow:my_query",
             "    HandleQuery:my_query",
             "  SignalWorkflow:my_signal",

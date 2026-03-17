@@ -7,16 +7,18 @@ from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock
 
+import nexusrpc.handler
 import pytest
 from langsmith import traceable, tracing_context
 
-from temporalio import activity, common, workflow
+from temporalio import activity, common, nexus, workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.langsmith import LangSmithPlugin
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.langsmith.conftest import InMemoryRunCollector, dump_runs
 from tests.helpers import new_worker
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 # ---------------------------------------------------------------------------
 # Shared @traceable functions and activities
@@ -61,6 +63,29 @@ class TraceableActivityWorkflow:
         return await workflow.execute_activity(
             traceable_activity,
             start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+@workflow.defn
+class SimpleNexusWorkflow:
+    @workflow.run
+    async def run(self, input: str) -> str:
+        return await workflow.execute_activity(
+            traceable_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+@nexusrpc.handler.service_handler
+class NexusService:
+    @nexus.workflow_run_operation
+    async def run_operation(
+        self, ctx: nexus.WorkflowRunOperationContext, input: str
+    ) -> nexus.WorkflowHandle[str]:
+        return await ctx.start_workflow(
+            SimpleNexusWorkflow.run,
+            input,
+            id=f"nexus-wf-{ctx.request_id}",
         )
 
 
@@ -113,7 +138,17 @@ class ComprehensiveWorkflow:
             TraceableActivityWorkflow.run,
             id=f"child-{workflow.info().workflow_id}",
         )
-        # 4. Wait for signal
+        # 4. Nexus operation
+        nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=NexusService,
+        )
+        nexus_handle = await nexus_client.start_operation(
+            operation=NexusService.run_operation,
+            input="test-input",
+        )
+        await nexus_handle
+        # 5. Wait for signal
         await workflow.wait_condition(lambda: self._signal_received)
         # 5. Wait for update to complete
         await workflow.wait_condition(lambda: self._complete)
@@ -449,8 +484,14 @@ class TestComprehensiveTracing:
                 temporal_client,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
+                SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
+                nexus_service_handlers=[NexusService()],
             ) as worker:
+                await env.create_nexus_endpoint(
+                    make_nexus_endpoint_name(worker.task_queue),
+                    worker.task_queue,
+                )
                 handle = await temporal_client.start_workflow(
                     ComprehensiveWorkflow.run,
                     id=f"comprehensive-{uuid.uuid4()}",
@@ -489,6 +530,13 @@ class TestComprehensiveTracing:
             "          StartActivity:traceable_activity",
             "            RunActivity:traceable_activity",
             "              inner_llm_call",
+            "      StartNexusOperation:NexusService/run_operation",
+            "        RunStartNexusOperationHandler:NexusService/run_operation",
+            "          StartWorkflow:SimpleNexusWorkflow",
+            "            RunWorkflow:SimpleNexusWorkflow",
+            "              StartActivity:traceable_activity",
+            "                RunActivity:traceable_activity",
+            "                  inner_llm_call",
             "  QueryWorkflow:my_query",
             "    HandleQuery:my_query",
             "  SignalWorkflow:my_signal",
@@ -517,8 +565,14 @@ class TestComprehensiveTracing:
                 temporal_client,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
+                SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
+                nexus_service_handlers=[NexusService()],
             ) as worker:
+                await env.create_nexus_endpoint(
+                    make_nexus_endpoint_name(worker.task_queue),
+                    worker.task_queue,
+                )
                 handle = await temporal_client.start_workflow(
                     ComprehensiveWorkflow.run,
                     id=f"comprehensive-no-runs-{uuid.uuid4()}",
@@ -546,6 +600,7 @@ class TestComprehensiveTracing:
             "    inner_llm_call",
             "  outer_chain",
             "    inner_llm_call",
+            "  inner_llm_call",
             "  inner_llm_call",
         ]
         assert hierarchy == expected, (
