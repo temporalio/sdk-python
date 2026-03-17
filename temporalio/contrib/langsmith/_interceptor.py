@@ -135,20 +135,25 @@ class ReplaySafeRunTree:
     """
 
     def __init__(self, run_tree: Any) -> None:
+        """Initialize with the underlying RunTree to wrap."""
         self._run = run_tree
 
     def to_headers(self) -> dict[str, str]:
+        """Delegate header serialization to the underlying RunTree."""
         return self._run.to_headers()
 
     @property
     def ls_client(self) -> Any:
+        """Get the LangSmith client from the underlying RunTree."""
         return self._run.ls_client
 
     @ls_client.setter
     def ls_client(self, value: Any) -> None:
+        """Set the LangSmith client on the underlying RunTree."""
         self._run.ls_client = value
 
     def post(self) -> None:
+        """Post the run to LangSmith, skipping during replay."""
         if _is_replaying():
             return
         if temporalio.workflow.in_workflow():
@@ -158,11 +163,13 @@ class ReplaySafeRunTree:
             self._run.post()
 
     def end(self, **kwargs: Any) -> None:
+        """End the run, skipping during replay."""
         if _is_replaying():
             return
         self._run.end(**kwargs)
 
     def patch(self) -> None:
+        """Patch the run to LangSmith, skipping during replay."""
         if _is_replaying():
             return
         if temporalio.workflow.in_workflow():
@@ -267,6 +274,7 @@ class LangSmithInterceptor(
         default_metadata: dict[str, Any] | None = None,
         default_tags: list[str] | None = None,
     ) -> None:
+        """Initialize the LangSmith interceptor with tracing configuration."""
         # Import langsmith.Client lazily to avoid hard dependency at import time
         if client is None:
             import langsmith
@@ -304,16 +312,19 @@ class LangSmithInterceptor(
     def intercept_client(
         self, next: temporalio.client.OutboundInterceptor
     ) -> temporalio.client.OutboundInterceptor:
+        """Create a client outbound interceptor for LangSmith tracing."""
         return _LangSmithClientOutboundInterceptor(next, self)
 
     def intercept_activity(
         self, next: temporalio.worker.ActivityInboundInterceptor
     ) -> temporalio.worker.ActivityInboundInterceptor:
+        """Create an activity inbound interceptor for LangSmith tracing."""
         return _LangSmithActivityInboundInterceptor(next, self)
 
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
     ) -> type[_LangSmithWorkflowInboundInterceptor]:
+        """Return the workflow interceptor class with config bound."""
         config = self
 
         class InterceptorWithConfig(_LangSmithWorkflowInboundInterceptor):
@@ -324,6 +335,7 @@ class LangSmithInterceptor(
     def intercept_nexus_operation(
         self, next: temporalio.worker.NexusOperationInboundInterceptor
     ) -> temporalio.worker.NexusOperationInboundInterceptor:
+        """Create a Nexus operation inbound interceptor for LangSmith tracing."""
         return _LangSmithNexusOperationInboundInterceptor(next, self)
 
 

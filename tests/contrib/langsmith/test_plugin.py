@@ -37,6 +37,7 @@ class TestPluginConstruction:
             metadata={"env": "prod"},
             tags=["v1"],
         )
+        assert plugin.interceptors is not None
         assert len(plugin.interceptors) > 0
         interceptor = plugin.interceptors[0]
         assert isinstance(interceptor, LangSmithInterceptor)

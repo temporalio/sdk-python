@@ -227,6 +227,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
+                assert run is not None
                 assert run._run is mock_run
                 raise RuntimeError("boom")
         # run.end should have been called with error containing "boom"
@@ -252,6 +253,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
+                assert run is not None
                 assert run._run is mock_run
                 raise ApplicationError(
                     "benign",
@@ -279,6 +281,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
+                assert run is not None
                 assert run._run is mock_run
                 raise ApplicationError("bad", non_retryable=True)
         mock_run.end.assert_called()
@@ -300,6 +303,7 @@ class TestErrorHandling:
             "TestRun",
             add_temporal_runs=True,
         ) as run:
+            assert run is not None
             assert run._run is mock_run
         mock_run.end.assert_called_once()
         end_kwargs = mock_run.end.call_args.kwargs
@@ -324,6 +328,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
+                assert run is not None
                 assert run._run is mock_run
                 raise asyncio.CancelledError()
         # run.end should NOT have been called with error=
