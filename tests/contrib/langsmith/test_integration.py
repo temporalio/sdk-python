@@ -69,7 +69,7 @@ class TraceableActivityWorkflow:
 @workflow.defn
 class SimpleNexusWorkflow:
     @workflow.run
-    async def run(self, input: str) -> str:
+    async def run(self, _input: str) -> str:
         return await workflow.execute_activity(
             traceable_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -155,7 +155,7 @@ class ComprehensiveWorkflow:
         return "comprehensive-done"
 
     @workflow.signal
-    def my_signal(self, value: str) -> None:
+    def my_signal(self, _value: str) -> None:
         self._signal_received = True
 
     @workflow.query
@@ -262,6 +262,7 @@ class TestBasicTracing:
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
         """StartWorkflow → RunWorkflow → StartActivity → RunActivity hierarchy."""
+        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -315,6 +316,7 @@ class TestReplay:
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
         """With max_cached_workflows=0 (forcing replay), no duplicate runs appear."""
+        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -356,6 +358,7 @@ class TestErrorTracing:
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
         """A failing activity run is marked with an error."""
+        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -390,9 +393,12 @@ class TestErrorTracing:
         assert activity_runs[0].error == "ApplicationError: activity-failed"
 
     async def test_workflow_failure_marked(
-        self, client: Client, env: WorkflowEnvironment
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A failing workflow run is marked with an error."""
+        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -422,9 +428,12 @@ class TestErrorTracing:
         assert wf_runs[0].error == "ApplicationError: workflow-failed"
 
     async def test_benign_error_not_marked(
-        self, client: Client, env: WorkflowEnvironment
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A benign ApplicationError does NOT mark the run as errored."""
+        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(

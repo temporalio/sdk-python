@@ -145,7 +145,7 @@ class TestReplaySafety:
     @patch(_PATCH_IS_REPLAYING, return_value=True)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
     def test_replay_noop_post_end_patch(
-        self, mock_in_wf: Any, mock_replaying: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, _mock_replaying: Any, MockRunTree: Any
     ) -> None:
         """During replay, RunTree is created but post/end/patch are no-ops."""
         mock_run = _make_mock_run()
@@ -169,7 +169,7 @@ class TestReplaySafety:
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
     def test_create_trace_when_not_replaying(
-        self, mock_in_wf: Any, mock_replaying: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, _mock_replaying: Any, MockRunTree: Any
     ) -> None:
         """When not replaying (but in workflow), _maybe_run creates a ReplaySafeRunTree."""
         mock_run = _make_mock_run()
@@ -188,7 +188,7 @@ class TestReplaySafety:
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     def test_create_trace_outside_workflow(
-        self, mock_in_wf: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, MockRunTree: Any
     ) -> None:
         """Outside workflow (client/activity), RunTree IS created."""
         mock_run = _make_mock_run()
@@ -215,7 +215,7 @@ class TestErrorHandling:
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     def test_exception_marks_run_errored(
-        self, mock_in_wf: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, MockRunTree: Any
     ) -> None:
         """RuntimeError marks the run as errored and re-raises."""
         mock_run = _make_mock_run()
@@ -239,7 +239,7 @@ class TestErrorHandling:
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     def test_benign_application_error_not_marked(
-        self, mock_in_wf: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, MockRunTree: Any
     ) -> None:
         """Benign ApplicationError does not mark the run as errored."""
         from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
@@ -267,7 +267,7 @@ class TestErrorHandling:
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     def test_non_benign_application_error_marked(
-        self, mock_in_wf: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, MockRunTree: Any
     ) -> None:
         """Non-benign ApplicationError marks the run as errored."""
         from temporalio.exceptions import ApplicationError
@@ -292,7 +292,7 @@ class TestErrorHandling:
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     def test_success_completes_normally(
-        self, mock_in_wf: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, MockRunTree: Any
     ) -> None:
         """On success, run.end(outputs={"status": "ok"}) and run.patch() are called."""
         mock_run = _make_mock_run()
@@ -313,7 +313,7 @@ class TestErrorHandling:
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     def test_cancelled_error_propagates_without_marking_run(
-        self, mock_in_wf: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, MockRunTree: Any
     ) -> None:
         """CancelledError (BaseException) propagates without marking run as errored.
 
@@ -559,7 +559,7 @@ class TestActivityInboundInterceptor:
         mock_info_fn.return_value = _mock_activity_info()
         mock_run = _make_mock_run()
         MockRunTree.return_value = mock_run
-        interceptor, mock_next = self._make_activity_interceptor()
+        interceptor, _mock_next = self._make_activity_interceptor()
 
         mock_input = MagicMock()
         mock_input.headers = {}  # No LangSmith header
@@ -617,8 +617,8 @@ class TestWorkflowInboundInterceptor:
     async def test_execute_workflow(
         self,
         mock_wf_info: Any,
-        mock_in_wf: Any,
-        mock_replaying: Any,
+        _mock_in_wf: Any,
+        _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
     ) -> None:
@@ -671,8 +671,8 @@ class TestWorkflowInboundInterceptor:
     async def test_handler_creates_trace(
         self,
         mock_wf_info: Any,
-        mock_in_wf: Any,
-        mock_replaying: Any,
+        _mock_in_wf: Any,
+        _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
         method: str,
@@ -803,8 +803,8 @@ class TestWorkflowOutboundInterceptor:
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
     async def test_creates_trace_and_injects_headers(
         self,
-        mock_in_wf: Any,
-        mock_replaying: Any,
+        _mock_in_wf: Any,
+        _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
         method: str,
@@ -834,10 +834,10 @@ class TestWorkflowOutboundInterceptor:
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
     def test_continue_as_new(
-        self, mock_in_wf: Any, mock_replaying: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, _mock_replaying: Any, MockRunTree: Any
     ) -> None:
         """continue_as_new does NOT create a new trace, but injects context from current run."""
-        outbound, mock_next, inbound = self._make_outbound_interceptor()
+        outbound, mock_next, _inbound = self._make_outbound_interceptor()
 
         mock_input = MagicMock()
         mock_input.headers = {}
@@ -857,8 +857,8 @@ class TestWorkflowOutboundInterceptor:
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
     async def test_start_nexus_operation(
         self,
-        mock_in_wf: Any,
-        mock_replaying: Any,
+        _mock_in_wf: Any,
+        _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
     ) -> None:
@@ -978,7 +978,7 @@ class TestLazyClientPrevention:
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     @patch(_PATCH_RUNTREE)
     def test_runtree_always_receives_ls_client(
-        self, MockRunTree: Any, mock_in_wf: Any
+        self, MockRunTree: Any, _mock_in_wf: Any
     ) -> None:
         """Every RunTree() created by _maybe_run receives ls_client= (pre-created client)."""
         mock_client = MagicMock()
@@ -1008,7 +1008,7 @@ class TestAddTemporalRunsToggle:
 
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
-    def test_false_skips_traces(self, mock_in_wf: Any, MockRunTree: Any) -> None:
+    def test_false_skips_traces(self, _mock_in_wf: Any, MockRunTree: Any) -> None:
         """With add_temporal_runs=False, _maybe_run yields None (no run created).
 
         Callers are responsible for propagating context even when the run is None.
@@ -1035,10 +1035,10 @@ class TestAddTemporalRunsToggle:
         self,
         mock_act_info: Any,
         mock_wf_info: Any,
-        mock_in_wf: Any,
-        mock_replaying: Any,
+        _mock_in_wf: Any,
+        _mock_replaying: Any,
         MockRunTree: Any,
-        mock_sandbox: Any,
+        _mock_sandbox: Any,
         mock_tracing_ctx: Any,
     ) -> None:
         """With add_temporal_runs=False, no runs are created but context still propagates.

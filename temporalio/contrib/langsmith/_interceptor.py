@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from typing import Any, ClassVar, Iterator, Mapping, NoReturn
+from typing import Any, ClassVar, NoReturn
 
 from langsmith import tracing_context
 from langsmith.run_helpers import get_current_run_tree
