@@ -15,10 +15,8 @@ from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.langsmith import LangSmithPlugin
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
-
 from tests.contrib.langsmith.conftest import InMemoryRunCollector, dump_runs
 from tests.helpers import new_worker
-
 
 # ---------------------------------------------------------------------------
 # Shared @traceable functions and activities

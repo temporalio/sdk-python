@@ -6,14 +6,15 @@ import json
 from contextlib import contextmanager
 from typing import Any, Iterator, Mapping, NoReturn
 
+from langsmith import tracing_context
+from langsmith.run_helpers import get_current_run_tree
+from langsmith.run_trees import RunTree
+
 import temporalio.activity
 import temporalio.client
 import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
-from langsmith import tracing_context
-from langsmith.run_helpers import get_current_run_tree
-from langsmith.run_trees import RunTree
 from temporalio.api.common.v1 import Payload
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
@@ -45,6 +46,12 @@ def _inject_context(
         **headers,
         HEADER_KEY: _payload_converter.to_payloads([ls_headers])[0],
     }
+
+
+def _get_current_run_safe() -> ReplaySafeRunTree | None:
+    """Get the current ambient LangSmith run tree, wrapped for replay safety."""
+    raw = get_current_run_tree()
+    return ReplaySafeRunTree(raw) if raw is not None else None
 
 
 def _inject_current_context(
@@ -207,9 +214,7 @@ def _maybe_run(
 
     # If no explicit parent, inherit from ambient @traceable context
     if parent is None:
-        raw = get_current_run_tree()
-        if raw is not None:
-            parent = ReplaySafeRunTree(raw)
+        parent = _get_current_run_safe()
 
     kwargs: dict[str, Any] = dict(
         name=name,
