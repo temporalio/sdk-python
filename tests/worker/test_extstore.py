@@ -3,10 +3,12 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+from unittest import mock
 
 import pytest
 
 import temporalio
+import temporalio.bridge.worker
 import temporalio.converter
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
@@ -557,8 +559,16 @@ async def test_extstore_chained_activities(
 async def test_worker_storage_drivers_populated_from_client(
     env: WorkflowEnvironment,
 ):
-    """Worker._storage_drivers is populated from the client's ExternalStorage."""
-    driver = InMemoryTestDriver()
+    """Worker._storage_drivers is populated from the client's ExternalStorage and
+    passed to the bridge config as a set of driver type strings."""
+
+    class DifferentTestDriver(InMemoryTestDriver):
+        def __init__(self, driver_name: str):
+            super().__init__(driver_name=driver_name)
+
+    driver1 = InMemoryTestDriver(driver_name="driver1")
+    driver2 = InMemoryTestDriver(driver_name="driver2")
+    driver3 = DifferentTestDriver(driver_name="driver3")
 
     client = await Client.connect(
         env.client.service_client.config.target_host,
@@ -566,16 +576,30 @@ async def test_worker_storage_drivers_populated_from_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
-                drivers=[driver],
+                drivers=[driver1, driver2, driver3],
+                driver_selector=lambda _context, _payload: driver1,
                 payload_size_threshold=None,
             ),
         ),
     )
 
-    async with new_worker(
-        client, ExtStoreWorkflow, activities=[ext_store_activity]
-    ) as worker:
-        assert worker._storage_drivers == [driver]
+    captured_config: list[temporalio.bridge.worker.WorkerConfig] = []
+    original_create = temporalio.bridge.worker.Worker.create
+
+    def capture_config(bridge_client, config):
+        captured_config.append(config)
+        return original_create(bridge_client, config)
+
+    with mock.patch.object(
+        temporalio.bridge.worker.Worker, "create", side_effect=capture_config
+    ):
+        async with new_worker(
+            client, ExtStoreWorkflow, activities=[ext_store_activity]
+        ) as worker:
+            assert worker._storage_drivers == [driver1, driver2, driver3]
+
+    assert len(captured_config) == 1
+    assert captured_config[0].storage_drivers == {driver1.type(), driver3.type()}
 
 
 async def test_worker_storage_drivers_empty_without_external_storage(

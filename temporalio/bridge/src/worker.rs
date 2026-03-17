@@ -62,7 +62,7 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
     plugins: Vec<String>,
-    storage_drivers: Vec<String>,
+    storage_drivers: HashSet<String>,
 }
 
 #[derive(FromPyObject)]

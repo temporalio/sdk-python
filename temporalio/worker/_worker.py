@@ -582,9 +582,7 @@ class Worker:
             )
 
         deduped_plugin_names = list({plugin.name() for plugin in self._plugins})
-        deduped_storage_driver_types = list(
-            {driver.type() for driver in self._storage_drivers}
-        )
+        deduped_storage_driver_types = {driver.type() for driver in self._storage_drivers}
 
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker

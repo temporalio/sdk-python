@@ -56,7 +56,7 @@ class WorkerConfig:
     nondeterminism_as_workflow_fail_for_types: set[str]
     nexus_task_poller_behavior: PollerBehavior
     plugins: Sequence[str]
-    storage_drivers: Sequence[str]
+    storage_drivers: set[str]
 
 
 @dataclass
