@@ -259,10 +259,11 @@ def _make_client_and_collector(
 
 class TestBasicTracing:
     async def test_workflow_activity_trace_hierarchy(
-        self, client: Client, env: WorkflowEnvironment
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """StartWorkflow → RunWorkflow → StartActivity → RunActivity hierarchy."""
-        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -313,10 +314,11 @@ class TestBasicTracing:
 
 class TestReplay:
     async def test_no_duplicate_traces_on_replay(
-        self, client: Client, env: WorkflowEnvironment
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """With max_cached_workflows=0 (forcing replay), no duplicate runs appear."""
-        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -355,10 +357,11 @@ class TestReplay:
 
 class TestErrorTracing:
     async def test_activity_failure_marked(
-        self, client: Client, env: WorkflowEnvironment
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A failing activity run is marked with an error."""
-        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -398,7 +401,6 @@ class TestErrorTracing:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A failing workflow run is marked with an error."""
-        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
@@ -433,7 +435,6 @@ class TestErrorTracing:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A benign ApplicationError does NOT mark the run as errored."""
-        _ = env
         temporal_client, collector, _ = _make_client_and_collector(client)
 
         async with new_worker(
