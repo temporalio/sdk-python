@@ -12,6 +12,7 @@ from temporalio.api.common.v1 import Payload
 from temporalio.contrib.langsmith import LangSmithInterceptor
 from temporalio.contrib.langsmith._interceptor import (
     HEADER_KEY,
+    ReplaySafeRunTree,
     _extract_context,
     _inject_context,
     _maybe_run,
@@ -107,8 +108,9 @@ class TestContextPropagation:
         MockRunTree.from_headers.return_value = mock_extracted
 
         extracted = _extract_context(result)
-        # extracted should be reconstructed from headers
-        assert extracted is mock_extracted
+        # extracted should be a ReplaySafeRunTree wrapping the reconstructed run
+        assert isinstance(extracted, ReplaySafeRunTree)
+        assert extracted._run is mock_extracted
         MockRunTree.from_headers.assert_called_once()
 
     def test_extract_missing_header(self) -> None:
@@ -142,28 +144,10 @@ class TestReplaySafety:
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=True)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
-    def test_skip_trace_during_replay(
+    def test_replay_noop_post_end_patch(
         self, mock_in_wf: Any, mock_replaying: Any, MockRunTree: Any
     ) -> None:
-        """During replay, _maybe_run yields None — no RunTree created."""
-        mock_client = MagicMock()
-        with _maybe_run(
-            mock_client,
-            "TestRun",
-            add_temporal_runs=True,
-            in_workflow=True,
-        ) as run:
-            assert run is None
-        # RunTree should never be instantiated during replay
-        MockRunTree.assert_not_called()
-
-    @patch(_PATCH_RUNTREE)
-    @patch(_PATCH_IS_REPLAYING, return_value=False)
-    @patch(_PATCH_IN_WORKFLOW, return_value=True)
-    def test_create_trace_when_not_replaying(
-        self, mock_in_wf: Any, mock_replaying: Any, MockRunTree: Any
-    ) -> None:
-        """When not replaying (but in workflow), _maybe_run creates a RunTree."""
+        """During replay, RunTree is created but post/end/patch are no-ops."""
         mock_run = _make_mock_run()
         MockRunTree.return_value = mock_run
         mock_client = MagicMock()
@@ -171,9 +155,33 @@ class TestReplaySafety:
             mock_client,
             "TestRun",
             add_temporal_runs=True,
-            in_workflow=True,
         ) as run:
-            assert run is mock_run
+            assert isinstance(run, ReplaySafeRunTree)
+            assert run._run is mock_run
+        # RunTree IS created (wrapped in ReplaySafeRunTree)
+        MockRunTree.assert_called_once()
+        # But post/end/patch are no-ops during replay
+        mock_run.post.assert_not_called()
+        mock_run.end.assert_not_called()
+        mock_run.patch.assert_not_called()
+
+    @patch(_PATCH_RUNTREE)
+    @patch(_PATCH_IS_REPLAYING, return_value=False)
+    @patch(_PATCH_IN_WORKFLOW, return_value=True)
+    def test_create_trace_when_not_replaying(
+        self, mock_in_wf: Any, mock_replaying: Any, MockRunTree: Any
+    ) -> None:
+        """When not replaying (but in workflow), _maybe_run creates a ReplaySafeRunTree."""
+        mock_run = _make_mock_run()
+        MockRunTree.return_value = mock_run
+        mock_client = MagicMock()
+        with _maybe_run(
+            mock_client,
+            "TestRun",
+            add_temporal_runs=True,
+        ) as run:
+            assert isinstance(run, ReplaySafeRunTree)
+            assert run._run is mock_run
         MockRunTree.assert_called_once()
         assert MockRunTree.call_args.kwargs["name"] == "TestRun"
 
@@ -182,7 +190,7 @@ class TestReplaySafety:
     def test_create_trace_outside_workflow(
         self, mock_in_wf: Any, MockRunTree: Any
     ) -> None:
-        """Outside workflow (client/activity), RunTree IS created. No is_replaying check."""
+        """Outside workflow (client/activity), RunTree IS created."""
         mock_run = _make_mock_run()
         MockRunTree.return_value = mock_run
         mock_client = MagicMock()
@@ -190,9 +198,9 @@ class TestReplaySafety:
             mock_client,
             "TestRun",
             add_temporal_runs=True,
-            in_workflow=False,
         ) as run:
-            assert run is mock_run
+            assert isinstance(run, ReplaySafeRunTree)
+            assert run._run is mock_run
         MockRunTree.assert_called_once()
 
 
@@ -219,7 +227,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
-                assert run is mock_run
+                assert run._run is mock_run
                 raise RuntimeError("boom")
         # run.end should have been called with error containing "boom"
         mock_run.end.assert_called()
@@ -244,7 +252,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
-                assert run is mock_run
+                assert run._run is mock_run
                 raise ApplicationError(
                     "benign",
                     category=ApplicationErrorCategory.BENIGN,
@@ -271,7 +279,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
-                assert run is mock_run
+                assert run._run is mock_run
                 raise ApplicationError("bad", non_retryable=True)
         mock_run.end.assert_called()
         end_kwargs = mock_run.end.call_args.kwargs
@@ -292,7 +300,7 @@ class TestErrorHandling:
             "TestRun",
             add_temporal_runs=True,
         ) as run:
-            assert run is mock_run
+            assert run._run is mock_run
         mock_run.end.assert_called_once()
         end_kwargs = mock_run.end.call_args.kwargs
         assert end_kwargs.get("outputs") == {"status": "ok"}
@@ -316,7 +324,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
             ) as run:
-                assert run is mock_run
+                assert run._run is mock_run
                 raise asyncio.CancelledError()
         # run.end should NOT have been called with error=
         end_calls = mock_run.end.call_args_list

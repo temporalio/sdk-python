@@ -75,7 +75,7 @@ def _extract_context(
     if not header:
         return None
     ls_headers = _payload_converter.from_payloads([header])[0]
-    return RunTree.from_headers(ls_headers)
+    return ReplaySafeRunTree(RunTree.from_headers(ls_headers))
 
 
 def _inject_nexus_context(
@@ -98,7 +98,7 @@ def _extract_nexus_context(
     if not raw:
         return None
     ls_headers = json.loads(raw)
-    return RunTree.from_headers(ls_headers)
+    return ReplaySafeRunTree(RunTree.from_headers(ls_headers))
 
 
 # ---------------------------------------------------------------------------
@@ -115,24 +115,54 @@ def _is_replaying() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Sandbox-safe post/patch helpers
+# ReplaySafeRunTree wrapper
 # ---------------------------------------------------------------------------
 
 
-def _safe_post(run_tree: Any, in_workflow: bool) -> None:
-    if in_workflow:
-        with temporalio.workflow.unsafe.sandbox_unrestricted():
-            run_tree.post()
-    else:
-        run_tree.post()
+class ReplaySafeRunTree:
+    """Wraps a RunTree to handle replay skipping and sandbox safety transparently.
 
+    During replay, ``post()``, ``end()``, and ``patch()`` become no-ops.
+    Inside a workflow sandbox, ``post()`` and ``patch()`` are wrapped in
+    ``sandbox_unrestricted()``.
+    """
 
-def _safe_patch(run_tree: Any, in_workflow: bool) -> None:
-    if in_workflow:
-        with temporalio.workflow.unsafe.sandbox_unrestricted():
-            run_tree.patch()
-    else:
-        run_tree.patch()
+    def __init__(self, run_tree: Any) -> None:
+        self._run = run_tree
+
+    def to_headers(self) -> dict[str, str]:
+        return self._run.to_headers()
+
+    @property
+    def ls_client(self) -> Any:
+        return self._run.ls_client
+
+    @ls_client.setter
+    def ls_client(self, value: Any) -> None:
+        self._run.ls_client = value
+
+    def post(self) -> None:
+        if _is_replaying():
+            return
+        if temporalio.workflow.in_workflow():
+            with temporalio.workflow.unsafe.sandbox_unrestricted():
+                self._run.post()
+        else:
+            self._run.post()
+
+    def end(self, **kwargs: Any) -> None:
+        if _is_replaying():
+            return
+        self._run.end(**kwargs)
+
+    def patch(self) -> None:
+        if _is_replaying():
+            return
+        if temporalio.workflow.in_workflow():
+            with temporalio.workflow.unsafe.sandbox_unrestricted():
+                self._run.patch()
+        else:
+            self._run.patch()
 
 
 # ---------------------------------------------------------------------------
@@ -160,30 +190,26 @@ def _maybe_run(
     tags: list[str] | None = None,
     parent: Any | None = None,
     project_name: str | None = None,
-    in_workflow: bool = False,
 ) -> Iterator[Any | None]:
-    """Create a LangSmith run, handling errors and replay.
+    """Create a LangSmith run, handling errors.
 
-    - If replaying, yields None (skip tracing entirely).
     - If add_temporal_runs is False, yields None (no run created).
       Context propagation is handled unconditionally by callers.
-    - When a run IS created, sets it as ambient context via
-      ``tracing_context(parent=run_tree)`` so ``get_current_run_tree()``
+    - When a run IS created, wraps it in :class:`ReplaySafeRunTree` for
+      replay and sandbox safety, then sets it as ambient context via
+      ``tracing_context(parent=raw_run)`` so ``get_current_run_tree()``
       returns it and ``_inject_current_context()`` can inject it.
     - On exception: marks run as errored (unless benign ApplicationError), re-raises.
-    - If in_workflow is True, wraps post()/patch() in sandbox_unrestricted().
     """
-    if _is_replaying():
-        yield None
-        return
-
     if not add_temporal_runs:
         yield None
         return
 
     # If no explicit parent, inherit from ambient @traceable context
     if parent is None:
-        parent = get_current_run_tree()
+        raw = get_current_run_tree()
+        if raw is not None:
+            parent = ReplaySafeRunTree(raw)
 
     kwargs: dict[str, Any] = dict(
         name=name,
@@ -194,24 +220,25 @@ def _maybe_run(
     if project_name is not None:
         kwargs["project_name"] = project_name
     if parent is not None:
-        kwargs["parent_run"] = parent
+        kwargs["parent_run"] = parent._run
     if metadata:
         kwargs["extra"] = {"metadata": metadata}
     if tags:
         kwargs["tags"] = tags
-    run_tree = RunTree(**kwargs)
-    _safe_post(run_tree, in_workflow)
+    raw_run = RunTree(**kwargs)
+    run_tree = ReplaySafeRunTree(raw_run)
+    run_tree.post()
     try:
-        with tracing_context(parent=run_tree, client=client):
+        with tracing_context(parent=raw_run, client=client):
             yield run_tree
     except Exception as exc:
         if not _is_benign_error(exc):
             run_tree.end(error=f"{type(exc).__name__}: {exc}")
-            _safe_patch(run_tree, in_workflow)
+            run_tree.patch()
         raise
     else:
         run_tree.end(outputs={"status": "ok"})
-        _safe_patch(run_tree, in_workflow)
+        run_tree.patch()
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +272,29 @@ class LangSmithInterceptor(
         self._add_temporal_runs = add_temporal_runs
         self._default_metadata = default_metadata or {}
         self._default_tags = default_tags or []
+
+    @contextmanager
+    def maybe_run(
+        self,
+        name: str,
+        *,
+        run_type: str = "chain",
+        parent: Any | None = None,
+        extra_metadata: dict[str, Any] | None = None,
+    ) -> Iterator[Any | None]:
+        """Create a LangSmith run with this interceptor's config already applied."""
+        metadata = {**self._default_metadata, **(extra_metadata or {})}
+        with _maybe_run(
+            self._client,
+            name,
+            add_temporal_runs=self._add_temporal_runs,
+            run_type=run_type,
+            metadata=metadata,
+            tags=list(self._default_tags),
+            parent=parent,
+            project_name=self._project_name,
+        ) as run:
+            yield run
 
     def intercept_client(
         self, next: temporalio.client.OutboundInterceptor
@@ -288,65 +338,35 @@ class _LangSmithClientOutboundInterceptor(temporalio.client.OutboundInterceptor)
         super().__init__(next)
         self._config = config
 
+    @contextmanager
+    def _traced_call(self, name: str, input: Any) -> Iterator[None]:
+        """Wrap a client call with a LangSmith run and inject context into headers."""
+        with self._config.maybe_run(name):
+            input.headers = _inject_current_context(input.headers)
+            yield
+
     async def start_workflow(self, input: Any) -> Any:
         prefix = (
             "SignalWithStartWorkflow" if input.start_signal else "StartWorkflow"
         )
-        with _maybe_run(
-            self._config._client,
-            f"{prefix}:{input.workflow}",
-            add_temporal_runs=self._config._add_temporal_runs,
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
-            project_name=self._config._project_name,
-        ):
-            input.headers = _inject_current_context(input.headers)
+        with self._traced_call(f"{prefix}:{input.workflow}", input):
             return await super().start_workflow(input)
 
     async def query_workflow(self, input: Any) -> Any:
-        with _maybe_run(
-            self._config._client,
-            f"QueryWorkflow:{input.query}",
-            add_temporal_runs=self._config._add_temporal_runs,
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
-            project_name=self._config._project_name,
-        ):
-            input.headers = _inject_current_context(input.headers)
+        with self._traced_call(f"QueryWorkflow:{input.query}", input):
             return await super().query_workflow(input)
 
     async def signal_workflow(self, input: Any) -> None:
-        with _maybe_run(
-            self._config._client,
-            f"SignalWorkflow:{input.signal}",
-            add_temporal_runs=self._config._add_temporal_runs,
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
-            project_name=self._config._project_name,
-        ):
-            input.headers = _inject_current_context(input.headers)
+        with self._traced_call(f"SignalWorkflow:{input.signal}", input):
             return await super().signal_workflow(input)
 
     async def start_workflow_update(self, input: Any) -> Any:
-        with _maybe_run(
-            self._config._client,
-            f"StartWorkflowUpdate:{input.update}",
-            add_temporal_runs=self._config._add_temporal_runs,
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
-            project_name=self._config._project_name,
-        ):
-            input.headers = _inject_current_context(input.headers)
+        with self._traced_call(f"StartWorkflowUpdate:{input.update}", input):
             return await super().start_workflow_update(input)
 
     async def start_update_with_start_workflow(self, input: Any) -> Any:
-        with _maybe_run(
-            self._config._client,
+        with self._config.maybe_run(
             f"StartUpdateWithStartWorkflow:{input.start_workflow_input.workflow}",
-            add_temporal_runs=self._config._add_temporal_runs,
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
-            project_name=self._config._project_name,
         ):
             input.start_workflow_input.headers = _inject_current_context(
                 input.start_workflow_input.headers
@@ -378,15 +398,14 @@ class _LangSmithActivityInboundInterceptor(
     async def execute_activity(self, input: Any) -> Any:
         parent = _extract_context(input.headers)
         info = temporalio.activity.info()
-        metadata = {
-            **self._config._default_metadata,
+        extra_metadata = {
             "temporalWorkflowID": info.workflow_id or "",
             "temporalRunID": info.workflow_run_id or "",
             "temporalActivityID": info.activity_id,
         }
         # Unconditionally set tracing context so @traceable functions inside
         # activities can use the plugin's LangSmith client and inherit parent.
-        # When add_temporal_runs=True: _maybe_run overrides with the RunActivity run.
+        # When add_temporal_runs=True: maybe_run overrides with the RunActivity run.
         # When add_temporal_runs=False: parent (if any) remains active for @traceable,
         # and the client is available even without a parent.
         # Override the parent's ls_client so @traceable children (via create_child)
@@ -400,15 +419,11 @@ class _LangSmithActivityInboundInterceptor(
         if parent:
             ctx_kwargs["parent"] = parent
         with tracing_context(**ctx_kwargs):
-            with _maybe_run(
-                self._config._client,
+            with self._config.maybe_run(
                 f"RunActivity:{info.activity_type}",
-                add_temporal_runs=self._config._add_temporal_runs,
                 run_type="tool",
-                metadata=metadata,
-                tags=list(self._config._default_tags),
                 parent=parent,
-                project_name=self._config._project_name,
+                extra_metadata=extra_metadata,
             ):
                 return await super().execute_activity(input)
 
@@ -433,28 +448,22 @@ class _LangSmithWorkflowInboundInterceptor(
 
     @contextmanager
     def _workflow_maybe_run(
-        self, name: str, parent: Any | None = None
+        self, name: str, headers: Mapping[str, Payload] | None = None
     ) -> Iterator[Any | None]:
         """Workflow-specific run creation with metadata.
 
-        Stores the run (or parent fallback) as ``_current_run`` so the outbound
-        interceptor can propagate context even when ``add_temporal_runs=False``.
+        Extracts parent from headers (if provided) and stores the run (or parent
+        fallback) as ``_current_run`` so the outbound interceptor can propagate
+        context even when ``add_temporal_runs=False``.
         """
+        parent = _extract_context(headers) if headers else None
         info = temporalio.workflow.info()
-        metadata = {
-            **self._config._default_metadata,
+        extra_metadata = {
             "temporalWorkflowID": info.workflow_id,
             "temporalRunID": info.run_id,
         }
-        with _maybe_run(
-            self._config._client,
-            name,
-            add_temporal_runs=self._config._add_temporal_runs,
-            metadata=metadata,
-            tags=list(self._config._default_tags),
-            parent=parent,
-            project_name=self._config._project_name,
-            in_workflow=True,
+        with self._config.maybe_run(
+            name, parent=parent, extra_metadata=extra_metadata
         ) as run:
             self._current_run = run or parent
             try:
@@ -463,39 +472,25 @@ class _LangSmithWorkflowInboundInterceptor(
                 self._current_run = None
 
     async def execute_workflow(self, input: Any) -> Any:
-        parent = _extract_context(input.headers)
         with self._workflow_maybe_run(
-            f"RunWorkflow:{temporalio.workflow.info().workflow_type}",
-            parent=parent,
+            f"RunWorkflow:{temporalio.workflow.info().workflow_type}", input.headers
         ):
             return await super().execute_workflow(input)
 
     async def handle_signal(self, input: Any) -> None:
-        parent = _extract_context(input.headers)
-        with self._workflow_maybe_run(
-            f"HandleSignal:{input.signal}", parent=parent
-        ):
+        with self._workflow_maybe_run(f"HandleSignal:{input.signal}", input.headers):
             return await super().handle_signal(input)
 
     async def handle_query(self, input: Any) -> Any:
-        parent = _extract_context(input.headers)
-        with self._workflow_maybe_run(
-            f"HandleQuery:{input.query}", parent=parent
-        ):
+        with self._workflow_maybe_run(f"HandleQuery:{input.query}", input.headers):
             return await super().handle_query(input)
 
     def handle_update_validator(self, input: Any) -> None:
-        parent = _extract_context(input.headers)
-        with self._workflow_maybe_run(
-            f"ValidateUpdate:{input.update}", parent=parent
-        ):
+        with self._workflow_maybe_run(f"ValidateUpdate:{input.update}", input.headers):
             return super().handle_update_validator(input)
 
     async def handle_update_handler(self, input: Any) -> Any:
-        parent = _extract_context(input.headers)
-        with self._workflow_maybe_run(
-            f"HandleUpdate:{input.update}", parent=parent
-        ):
+        with self._workflow_maybe_run(f"HandleUpdate:{input.update}", input.headers):
             return await super().handle_update_handler(input)
 
 
@@ -520,59 +515,34 @@ class _LangSmithWorkflowOutboundInterceptor(
         self._inbound = inbound
 
     @contextmanager
-    def _workflow_maybe_run(self, name: str) -> Iterator[Any | None]:
-        """Outbound workflow run creation, parented under inbound's current run."""
-        with _maybe_run(
-            self._config._client,
-            name,
-            add_temporal_runs=self._config._add_temporal_runs,
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
-            parent=self._inbound._current_run,
-            project_name=self._config._project_name,
-            in_workflow=True,
+    def _traced_outbound(self, name: str, input: Any) -> Iterator[Any | None]:
+        """Outbound workflow run creation with context injection into input.headers."""
+        with self._config.maybe_run(
+            name, parent=self._inbound._current_run
         ) as run:
+            context_source = run or self._inbound._current_run
+            if context_source:
+                input.headers = _inject_context(input.headers, context_source)
             yield run
 
     def start_activity(self, input: Any) -> Any:
-        with self._workflow_maybe_run(f"StartActivity:{input.activity}") as run:
-            context_source = run or self._inbound._current_run
-            if context_source:
-                input.headers = _inject_context(input.headers, context_source)
+        with self._traced_outbound(f"StartActivity:{input.activity}", input):
             return super().start_activity(input)
 
     def start_local_activity(self, input: Any) -> Any:
-        with self._workflow_maybe_run(f"StartActivity:{input.activity}") as run:
-            context_source = run or self._inbound._current_run
-            if context_source:
-                input.headers = _inject_context(input.headers, context_source)
+        with self._traced_outbound(f"StartActivity:{input.activity}", input):
             return super().start_local_activity(input)
 
     async def start_child_workflow(self, input: Any) -> Any:
-        with self._workflow_maybe_run(
-            f"StartChildWorkflow:{input.workflow}"
-        ) as run:
-            context_source = run or self._inbound._current_run
-            if context_source:
-                input.headers = _inject_context(input.headers, context_source)
+        with self._traced_outbound(f"StartChildWorkflow:{input.workflow}", input):
             return await super().start_child_workflow(input)
 
     async def signal_child_workflow(self, input: Any) -> None:
-        with self._workflow_maybe_run(
-            f"SignalChildWorkflow:{input.signal}"
-        ) as run:
-            context_source = run or self._inbound._current_run
-            if context_source:
-                input.headers = _inject_context(input.headers, context_source)
+        with self._traced_outbound(f"SignalChildWorkflow:{input.signal}", input):
             return await super().signal_child_workflow(input)
 
     async def signal_external_workflow(self, input: Any) -> None:
-        with self._workflow_maybe_run(
-            f"SignalExternalWorkflow:{input.signal}"
-        ) as run:
-            context_source = run or self._inbound._current_run
-            if context_source:
-                input.headers = _inject_context(input.headers, context_source)
+        with self._traced_outbound(f"SignalExternalWorkflow:{input.signal}", input):
             return await super().signal_external_workflow(input)
 
     def continue_as_new(self, input: Any) -> NoReturn:
@@ -583,8 +553,9 @@ class _LangSmithWorkflowOutboundInterceptor(
         super().continue_as_new(input)
 
     async def start_nexus_operation(self, input: Any) -> Any:
-        with self._workflow_maybe_run(
-            f"StartNexusOperation:{input.service}/{input.operation_name}"
+        with self._config.maybe_run(
+            f"StartNexusOperation:{input.service}/{input.operation_name}",
+            parent=self._inbound._current_run,
         ) as run:
             context_source = run or self._inbound._current_run
             if context_source:
@@ -614,28 +585,18 @@ class _LangSmithNexusOperationInboundInterceptor(
 
     async def execute_nexus_operation_start(self, input: Any) -> Any:
         parent = _extract_nexus_context(input.ctx.headers)
-        with _maybe_run(
-            self._config._client,
+        with self._config.maybe_run(
             f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
-            add_temporal_runs=self._config._add_temporal_runs,
             run_type="tool",
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
             parent=parent,
-            project_name=self._config._project_name,
         ):
             return await self.next.execute_nexus_operation_start(input)
 
     async def execute_nexus_operation_cancel(self, input: Any) -> Any:
         parent = _extract_nexus_context(input.ctx.headers)
-        with _maybe_run(
-            self._config._client,
+        with self._config.maybe_run(
             f"RunCancelNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
-            add_temporal_runs=self._config._add_temporal_runs,
             run_type="tool",
-            metadata={**self._config._default_metadata},
-            tags=list(self._config._default_tags),
             parent=parent,
-            project_name=self._config._project_name,
         ):
             return await self.next.execute_nexus_operation_cancel(input)
