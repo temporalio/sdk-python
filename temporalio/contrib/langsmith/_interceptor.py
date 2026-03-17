@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
-from typing import Any, Iterator, Mapping, NoReturn
+from typing import Any, ClassVar, Iterator, Mapping, NoReturn
 
 from langsmith import tracing_context
 from langsmith.run_helpers import get_current_run_tree
@@ -275,6 +275,7 @@ class LangSmithInterceptor(
         default_tags: list[str] | None = None,
     ) -> None:
         """Initialize the LangSmith interceptor with tracing configuration."""
+        super().__init__()
         # Import langsmith.Client lazily to avoid hard dependency at import time
         if client is None:
             import langsmith
@@ -453,7 +454,7 @@ class _LangSmithWorkflowInboundInterceptor(
 ):
     """Instruments workflow execution with LangSmith runs."""
 
-    _config: LangSmithInterceptor
+    _config: ClassVar[LangSmithInterceptor]
     _current_run: Any | None = None
 
     def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
