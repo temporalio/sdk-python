@@ -552,3 +552,37 @@ async def test_extstore_chained_activities(
     # round-trips (one store on completion, one retrieve on the next WFT).
     assert driver._store_calls == 2
     assert driver._retrieve_calls == 2
+
+
+async def test_worker_storage_drivers_populated_from_client(
+    env: WorkflowEnvironment,
+):
+    """Worker._storage_drivers is populated from the client's ExternalStorage."""
+    driver = InMemoryTestDriver()
+
+    client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=None,
+            ),
+        ),
+    )
+
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        assert worker._storage_drivers == [driver]
+
+
+async def test_worker_storage_drivers_empty_without_external_storage(
+    env: WorkflowEnvironment,
+):
+    """Worker._storage_drivers is empty when the client has no ExternalStorage."""
+    async with new_worker(
+        env.client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        assert worker._storage_drivers == []
