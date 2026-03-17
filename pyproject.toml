@@ -69,6 +69,7 @@ dev = [
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
   "moto[s3,server]>=5",
+  "langsmith>=0.7.17",
 ]
 
 [tool.poe.tasks]

@@ -1,0 +1,74 @@
+"""LangSmith plugin for Temporal SDK."""
+
+from __future__ import annotations
+
+import dataclasses
+from typing import Any
+
+from temporalio.contrib.langsmith._interceptor import LangSmithInterceptor
+from temporalio.plugin import SimplePlugin
+from temporalio.worker import WorkflowRunner
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+
+class LangSmithPlugin(SimplePlugin):
+    """LangSmith tracing plugin for Temporal SDK.
+
+    Provides automatic LangSmith run creation for workflows, activities,
+    and other Temporal operations with context propagation.
+    """
+
+    def __init__(
+        self,
+        *,
+        client: Any | None = None,
+        project_name: str | None = None,
+        add_temporal_runs: bool = True,
+        metadata: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+    ) -> None:
+        """Initialize the LangSmith plugin.
+
+        Args:
+            client: A langsmith.Client instance. If None, one will be created
+                lazily (using LANGSMITH_API_KEY env var).
+            project_name: LangSmith project name for traces.
+            add_temporal_runs: Whether to create LangSmith runs for Temporal
+                operations. Defaults to True.
+            metadata: Default metadata to attach to all runs.
+            tags: Default tags to attach to all runs.
+        """
+        interceptor = LangSmithInterceptor(
+            client=client,
+            project_name=project_name,
+            add_temporal_runs=add_temporal_runs,
+            default_metadata=metadata,
+            default_tags=tags,
+        )
+        interceptors = [interceptor]
+
+        def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
+            if not runner:
+                raise ValueError("No WorkflowRunner provided to the LangSmith plugin.")
+            if isinstance(runner, SandboxedWorkflowRunner):
+                return dataclasses.replace(
+                    runner,
+                    restrictions=runner.restrictions.with_passthrough_modules(
+                        "langsmith"
+                    ),
+                )
+            return runner
+
+        super().__init__(
+            "LangSmithPlugin",
+            interceptors=interceptors,
+            workflow_runner=workflow_runner,
+        )
+
+    async def shutdown(self) -> None:
+        """Flush the LangSmith client to drain pending runs."""
+        if not self.interceptors:
+            return
+        interceptor = self.interceptors[0]
+        if isinstance(interceptor, LangSmithInterceptor) and interceptor._client is not None:
+            interceptor._client.flush()
