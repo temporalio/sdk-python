@@ -49,9 +49,11 @@ class TemporalModel(BaseLlm):
         """
         super().__init__(model=model_name)
         self._model_name = model_name
-        self._activity_options = activity_options or ActivityConfig(
+        self._activity_options = ActivityConfig(
             start_to_close_timeout=timedelta(seconds=60)
         )
+        if activity_options:
+            self._activity_options.update(activity_options)
 
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False

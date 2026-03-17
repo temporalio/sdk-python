@@ -52,6 +52,7 @@ from temporalio.contrib.google_adk_agents import (
 )
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.worker import Worker
+from temporalio.workflow import ActivityConfig
 from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
 
 logger = logging.getLogger(__name__)
@@ -128,21 +129,21 @@ class MultiAgentWorkflow:
         # Sub-agent: Researcher
         researcher = LlmAgent(
             name="researcher",
-            model=TemporalModel(model_name),
+            model=TemporalModel(model_name, activity_options=ActivityConfig(summary="Researcher Agent")),
             instruction="You are a researcher. Find information about the topic.",
         )
 
         # Sub-agent: Writer
         writer = LlmAgent(
             name="writer",
-            model=TemporalModel(model_name),
+            model=TemporalModel(model_name, activity_options=ActivityConfig(summary="Writer Agent")),
             instruction="You are a poet. Write a haiku based on the research.",
         )
 
         # Root Agent: Coordinator
         coordinator = LlmAgent(
             name="coordinator",
-            model=TemporalModel(model_name),
+            model=TemporalModel(model_name, activity_options=ActivityConfig(start_to_close_timeout=timedelta(seconds=30), summary="Coordinator Agent")),
             instruction="You are a coordinator. Delegate to researcher then writer.",
             sub_agents=[researcher, writer],
         )
