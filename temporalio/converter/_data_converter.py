@@ -14,6 +14,11 @@ from typing_extensions import Self
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
 import temporalio.common
+from temporalio.converter._extstore import (
+    _REFERENCE_ENCODING,
+    ExternalStorage,
+    StorageWarning,
+)
 from temporalio.converter._failure_converter import (
     FailureConverter,
 )
@@ -71,6 +76,13 @@ class DataConverter(WithSerializationContext):
 
     payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
     """Settings for payload size limits."""
+
+    external_storage: ExternalStorage | None = None
+    """Options for external storage. If None, external storage is disabled.
+        
+    .. warning::
+        This API is experimental.
+    """
 
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
@@ -158,18 +170,22 @@ class DataConverter(WithSerializationContext):
         payload_converter = self.payload_converter
         payload_codec = self.payload_codec
         failure_converter = self.failure_converter
+        external_storage = self.external_storage
         if isinstance(payload_converter, WithSerializationContext):
             payload_converter = payload_converter.with_context(context)
         if isinstance(payload_codec, WithSerializationContext):
             payload_codec = payload_codec.with_context(context)
         if isinstance(failure_converter, WithSerializationContext):
             failure_converter = failure_converter.with_context(context)
+        if isinstance(external_storage, WithSerializationContext):
+            external_storage = external_storage.with_context(context)
         if all(
             new is orig
             for new, orig in [
                 (payload_converter, self.payload_converter),
                 (payload_codec, self.payload_codec),
                 (failure_converter, self.failure_converter),
+                (external_storage, self.external_storage),
             ]
         ):
             return self
@@ -177,6 +193,7 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "payload_converter", payload_converter)
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)
+        object.__setattr__(cloned, "external_storage", external_storage)
         return cloned
 
     def _with_payload_error_limits(
@@ -238,12 +255,16 @@ class DataConverter(WithSerializationContext):
     ) -> temporalio.api.common.v1.Payload:
         if self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
+        if self.external_storage:
+            payload = await self.external_storage._store_payload(payload)
         self._validate_payload_limits([payload])
         return payload
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
         if self.payload_codec:
             await self.payload_codec.encode_wrapper(payloads)
+        if self.external_storage:
+            await self.external_storage._store_payloads(payloads)
         self._validate_payload_limits(payloads.payloads)
 
     async def _encode_payload_sequence(
@@ -252,32 +273,63 @@ class DataConverter(WithSerializationContext):
         encoded_payloads = list(payloads)
         if self.payload_codec:
             encoded_payloads = await self.payload_codec.encode(encoded_payloads)
+        if self.external_storage:
+            encoded_payloads = await self.external_storage._store_payload_sequence(
+                encoded_payloads
+            )
         self._validate_payload_limits(encoded_payloads)
         return encoded_payloads
 
     async def _decode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
+        if self.external_storage:
+            payload = await self.external_storage._retrieve_payload(payload)
         if self.payload_codec:
             payload = (await self.payload_codec.decode([payload]))[0]
         return payload
 
     async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
+        if self.external_storage:
+            await self.external_storage._retrieve_payloads(payloads)
+        else:
+            if any(
+                p.metadata.get("encoding") == _REFERENCE_ENCODING
+                for p in payloads.payloads
+            ):
+                warnings.warn(
+                    "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
+                    StorageWarning,
+                )
         if self.payload_codec:
             await self.payload_codec.decode_wrapper(payloads)
 
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        if not self.payload_codec:
-            return list(payloads)
-        return await self.payload_codec.decode(payloads)
+        decoded_payloads = list(payloads)
+        if self.external_storage:
+            decoded_payloads = await self.external_storage._retrieve_payload_sequence(
+                decoded_payloads
+            )
+        else:
+            if any(
+                p.metadata.get("encoding") == _REFERENCE_ENCODING
+                for p in decoded_payloads
+            ):
+                warnings.warn(
+                    "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
+                    StorageWarning,
+                )
+        if self.payload_codec:
+            decoded_payloads = await self.payload_codec.decode(decoded_payloads)
+        return decoded_payloads
 
     # Temporary shortcircuit detection while the _decode_* methods may no-op if
     # a payload codec is not configured. Remove once those paths have more to them.
     @property
     def _decode_payload_has_effect(self) -> bool:
-        return self.payload_codec is not None
+        return self.payload_codec is not None or self.external_storage is not None
 
     def _validate_payload_limits(
         self,
