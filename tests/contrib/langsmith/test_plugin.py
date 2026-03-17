@@ -47,7 +47,6 @@ class TestPluginConstruction:
         assert interceptor._default_tags == ["v1"]
 
 
-
 class TestPluginIntegration:
     """End-to-end test using LangSmithPlugin as a Temporal client plugin."""
 
@@ -81,9 +80,7 @@ class TestPluginIntegration:
                 # Signal
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 # Update (completes the workflow)
-                await handle.execute_update(
-                    ComprehensiveWorkflow.my_update, "finish"
-                )
+                await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 return await handle.result()
 
         with tracing_context(client=mock_ls_client, enabled=True):
@@ -124,6 +121,6 @@ class TestPluginIntegration:
             "    ValidateUpdate:my_update",
             "    HandleUpdate:my_update",
         ]
-        assert hierarchy == expected, (
-            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
-        )
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"

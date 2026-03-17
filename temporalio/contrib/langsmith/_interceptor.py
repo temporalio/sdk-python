@@ -351,9 +351,7 @@ class _LangSmithClientOutboundInterceptor(temporalio.client.OutboundInterceptor)
             yield
 
     async def start_workflow(self, input: Any) -> Any:
-        prefix = (
-            "SignalWithStartWorkflow" if input.start_signal else "StartWorkflow"
-        )
+        prefix = "SignalWithStartWorkflow" if input.start_signal else "StartWorkflow"
         with self._traced_call(f"{prefix}:{input.workflow}", input):
             return await super().start_workflow(input)
 
@@ -522,9 +520,7 @@ class _LangSmithWorkflowOutboundInterceptor(
     @contextmanager
     def _traced_outbound(self, name: str, input: Any) -> Iterator[Any | None]:
         """Outbound workflow run creation with context injection into input.headers."""
-        with self._config.maybe_run(
-            name, parent=self._inbound._current_run
-        ) as run:
+        with self._config.maybe_run(name, parent=self._inbound._current_run) as run:
             context_source = run or self._inbound._current_run
             if context_source:
                 input.headers = _inject_context(input.headers, context_source)

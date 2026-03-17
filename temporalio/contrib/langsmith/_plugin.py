@@ -70,5 +70,8 @@ class LangSmithPlugin(SimplePlugin):
         if not self.interceptors:
             return
         interceptor = self.interceptors[0]
-        if isinstance(interceptor, LangSmithInterceptor) and interceptor._client is not None:
+        if (
+            isinstance(interceptor, LangSmithInterceptor)
+            and interceptor._client is not None
+        ):
             interceptor._client.flush()

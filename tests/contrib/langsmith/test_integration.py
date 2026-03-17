@@ -283,27 +283,26 @@ class TestBasicTracing:
             "    StartActivity:simple_activity",
             "      RunActivity:simple_activity",
         ]
-        assert hierarchy == expected, (
-            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
-        )
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
 
         # Verify run_type: RunActivity is "tool", others are "chain"
         for run in collector.runs:
             if run.name == "RunActivity:simple_activity":
-                assert run.run_type == "tool", (
-                    f"Expected RunActivity run_type='tool', got '{run.run_type}'"
-                )
+                assert (
+                    run.run_type == "tool"
+                ), f"Expected RunActivity run_type='tool', got '{run.run_type}'"
             else:
-                assert run.run_type == "chain", (
-                    f"Expected {run.name} run_type='chain', got '{run.run_type}'"
-                )
+                assert (
+                    run.run_type == "chain"
+                ), f"Expected {run.name} run_type='chain', got '{run.run_type}'"
 
         # Verify successful runs have outputs == {"status": "ok"}
         for run in collector.runs:
-            assert run.outputs == {"status": "ok"}, (
-                f"Expected {run.name} outputs={{'status': 'ok'}}, got {run.outputs}"
-            )
-
+            assert run.outputs == {
+                "status": "ok"
+            }, f"Expected {run.name} outputs={{'status': 'ok'}}, got {run.outputs}"
 
 
 # ---------------------------------------------------------------------------
@@ -380,9 +379,9 @@ class TestErrorTracing:
             "    StartActivity:failing_activity",
             "      RunActivity:failing_activity",
         ]
-        assert hierarchy == expected, (
-            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
-        )
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
         # Verify the RunActivity run has an error
         activity_runs = [
             r for r in collector.runs if r.name == "RunActivity:failing_activity"
@@ -414,13 +413,11 @@ class TestErrorTracing:
             "StartWorkflow:FailingWorkflow",
             "  RunWorkflow:FailingWorkflow",
         ]
-        assert hierarchy == expected, (
-            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
-        )
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
         # Verify the RunWorkflow run has an error
-        wf_runs = [
-            r for r in collector.runs if r.name == "RunWorkflow:FailingWorkflow"
-        ]
+        wf_runs = [r for r in collector.runs if r.name == "RunWorkflow:FailingWorkflow"]
         assert len(wf_runs) == 1
         assert wf_runs[0].error == "ApplicationError: workflow-failed"
 
@@ -451,14 +448,12 @@ class TestErrorTracing:
             "    StartActivity:benign_failing_activity",
             "      RunActivity:benign_failing_activity",
         ]
-        assert hierarchy == expected, (
-            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
-        )
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
         # The RunActivity run for benign error should NOT have error set
         activity_runs = [
-            r
-            for r in collector.runs
-            if r.name == "RunActivity:benign_failing_activity"
+            r for r in collector.runs if r.name == "RunActivity:benign_failing_activity"
         ]
         assert len(activity_runs) == 1
         assert activity_runs[0].error is None
@@ -502,9 +497,7 @@ class TestComprehensiveTracing:
                 # Signal
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 # Update (completes the workflow)
-                await handle.execute_update(
-                    ComprehensiveWorkflow.my_update, "finish"
-                )
+                await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 return await handle.result()
 
         with tracing_context(client=mock_ls_client, enabled=True):
@@ -545,9 +538,9 @@ class TestComprehensiveTracing:
             "    ValidateUpdate:my_update",
             "    HandleUpdate:my_update",
         ]
-        assert hierarchy == expected, (
-            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
-        )
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
 
     async def test_comprehensive_without_temporal_runs(
         self, client: Client, env: WorkflowEnvironment
@@ -583,9 +576,7 @@ class TestComprehensiveTracing:
                 # Signal
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 # Update (completes the workflow)
-                await handle.execute_update(
-                    ComprehensiveWorkflow.my_update, "finish"
-                )
+                await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 return await handle.result()
 
         with tracing_context(client=mock_ls_client, enabled=True):
@@ -603,6 +594,6 @@ class TestComprehensiveTracing:
             "  inner_llm_call",
             "  inner_llm_call",
         ]
-        assert hierarchy == expected, (
-            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
-        )
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"

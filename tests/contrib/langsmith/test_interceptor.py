@@ -344,7 +344,9 @@ class TestClientOutboundInterceptor:
         self, *, add_temporal_runs: bool = True
     ) -> tuple[Any, MagicMock]:
         """Create a client outbound interceptor with a mock next."""
-        config = LangSmithInterceptor(client=MagicMock(), add_temporal_runs=add_temporal_runs)
+        config = LangSmithInterceptor(
+            client=MagicMock(), add_temporal_runs=add_temporal_runs
+        )
         mock_next = MagicMock()
         mock_next.start_workflow = AsyncMock()
         mock_next.query_workflow = AsyncMock()
@@ -357,18 +359,34 @@ class TestClientOutboundInterceptor:
     @pytest.mark.parametrize(
         "method,input_attrs,expected_name",
         [
-            ("start_workflow", {"workflow": "MyWorkflow", "start_signal": None}, "StartWorkflow:MyWorkflow"),
-            ("start_workflow", {"workflow": "MyWorkflow", "start_signal": "my_signal"}, "SignalWithStartWorkflow:MyWorkflow"),
+            (
+                "start_workflow",
+                {"workflow": "MyWorkflow", "start_signal": None},
+                "StartWorkflow:MyWorkflow",
+            ),
+            (
+                "start_workflow",
+                {"workflow": "MyWorkflow", "start_signal": "my_signal"},
+                "SignalWithStartWorkflow:MyWorkflow",
+            ),
             ("query_workflow", {"query": "get_status"}, "QueryWorkflow:get_status"),
             ("signal_workflow", {"signal": "my_signal"}, "SignalWorkflow:my_signal"),
-            ("start_workflow_update", {"update": "my_update"}, "StartWorkflowUpdate:my_update"),
+            (
+                "start_workflow_update",
+                {"update": "my_update"},
+                "StartWorkflowUpdate:my_update",
+            ),
         ],
         ids=["start_workflow", "signal_with_start", "query", "signal", "update"],
     )
     @pytest.mark.asyncio
     @patch(_PATCH_RUNTREE)
     async def test_creates_trace_and_injects_headers(
-        self, MockRunTree: Any, method: str, input_attrs: dict[str, Any], expected_name: str
+        self,
+        MockRunTree: Any,
+        method: str,
+        input_attrs: dict[str, Any],
+        expected_name: str,
     ) -> None:
         """Each client method creates the correct trace and injects headers."""
         mock_run = _make_mock_run()
@@ -404,8 +422,7 @@ class TestClientOutboundInterceptor:
             await interceptor.start_update_with_start_workflow(mock_input)
 
         assert (
-            _get_runtree_name(MockRunTree)
-            == "StartUpdateWithStartWorkflow:MyWorkflow"
+            _get_runtree_name(MockRunTree) == "StartUpdateWithStartWorkflow:MyWorkflow"
         )
         assert HEADER_KEY in mock_input.start_workflow_input.headers
         assert HEADER_KEY in mock_input.update_workflow_input.headers
@@ -423,9 +440,7 @@ class TestClientOutboundInterceptor:
         _inject_current_context() is called unconditionally, but
         get_current_run_tree() returns None so headers are unchanged.
         """
-        interceptor, mock_next = self._make_client_interceptor(
-            add_temporal_runs=False
-        )
+        interceptor, mock_next = self._make_client_interceptor(add_temporal_runs=False)
         mock_input = MagicMock()
         mock_input.workflow = "MyWorkflow"
         mock_input.start_signal = None
@@ -455,9 +470,7 @@ class TestClientOutboundInterceptor:
         gets propagated through Temporal headers.
         """
         mock_ambient_run = _make_mock_run()
-        interceptor, mock_next = self._make_client_interceptor(
-            add_temporal_runs=False
-        )
+        interceptor, mock_next = self._make_client_interceptor(add_temporal_runs=False)
         mock_input = MagicMock()
         mock_input.workflow = "MyWorkflow"
         mock_input.start_signal = None
@@ -484,7 +497,9 @@ class TestActivityInboundInterceptor:
     def _make_activity_interceptor(
         self, *, add_temporal_runs: bool = True
     ) -> tuple[Any, MagicMock]:
-        config = LangSmithInterceptor(client=MagicMock(), add_temporal_runs=add_temporal_runs)
+        config = LangSmithInterceptor(
+            client=MagicMock(), add_temporal_runs=add_temporal_runs
+        )
         mock_next = MagicMock()
         mock_next.execute_activity = AsyncMock(return_value="activity_result")
         interceptor = config.intercept_activity(mock_next)
@@ -564,7 +579,9 @@ class TestWorkflowInboundInterceptor:
         self, *, add_temporal_runs: bool = True
     ) -> tuple[Any, MagicMock]:
         """Create workflow inbound interceptor and a mock next."""
-        config = LangSmithInterceptor(client=MagicMock(), add_temporal_runs=add_temporal_runs)
+        config = LangSmithInterceptor(
+            client=MagicMock(), add_temporal_runs=add_temporal_runs
+        )
         mock_next = MagicMock()
         mock_next.execute_workflow = AsyncMock(return_value="wf_result")
         mock_next.handle_signal = AsyncMock()
@@ -630,7 +647,12 @@ class TestWorkflowInboundInterceptor:
         [
             ("handle_signal", "signal", "my_signal", "HandleSignal:my_signal"),
             ("handle_query", "query", "get_status", "HandleQuery:get_status"),
-            ("handle_update_validator", "update", "my_update", "ValidateUpdate:my_update"),
+            (
+                "handle_update_validator",
+                "update",
+                "my_update",
+                "ValidateUpdate:my_update",
+            ),
             ("handle_update_handler", "update", "my_update", "HandleUpdate:my_update"),
         ],
         ids=["signal", "query", "validator", "update_handler"],
@@ -687,7 +709,9 @@ class TestWorkflowOutboundInterceptor:
 
         Returns (outbound_interceptor, mock_next, inbound_interceptor).
         """
-        config = LangSmithInterceptor(client=MagicMock(), add_temporal_runs=add_temporal_runs)
+        config = LangSmithInterceptor(
+            client=MagicMock(), add_temporal_runs=add_temporal_runs
+        )
 
         # Create mock next for inbound
         mock_inbound_next = MagicMock()
@@ -734,12 +758,38 @@ class TestWorkflowOutboundInterceptor:
         "method,input_attr,input_val,expected_name",
         [
             ("start_activity", "activity", "do_thing", "StartActivity:do_thing"),
-            ("start_local_activity", "activity", "local_thing", "StartActivity:local_thing"),
-            ("start_child_workflow", "workflow", "ChildWorkflow", "StartChildWorkflow:ChildWorkflow"),
-            ("signal_child_workflow", "signal", "child_signal", "SignalChildWorkflow:child_signal"),
-            ("signal_external_workflow", "signal", "ext_signal", "SignalExternalWorkflow:ext_signal"),
+            (
+                "start_local_activity",
+                "activity",
+                "local_thing",
+                "StartActivity:local_thing",
+            ),
+            (
+                "start_child_workflow",
+                "workflow",
+                "ChildWorkflow",
+                "StartChildWorkflow:ChildWorkflow",
+            ),
+            (
+                "signal_child_workflow",
+                "signal",
+                "child_signal",
+                "SignalChildWorkflow:child_signal",
+            ),
+            (
+                "signal_external_workflow",
+                "signal",
+                "ext_signal",
+                "SignalExternalWorkflow:ext_signal",
+            ),
         ],
-        ids=["activity", "local_activity", "child_workflow", "signal_child", "signal_external"],
+        ids=[
+            "activity",
+            "local_activity",
+            "child_workflow",
+            "signal_child",
+            "signal_external",
+        ],
     )
     @pytest.mark.asyncio
     @patch(_PATCH_SANDBOX)
@@ -837,7 +887,9 @@ class TestNexusInboundInterceptor:
     def _make_nexus_interceptor(
         self, *, add_temporal_runs: bool = True
     ) -> tuple[Any, MagicMock]:
-        config = LangSmithInterceptor(client=MagicMock(), add_temporal_runs=add_temporal_runs)
+        config = LangSmithInterceptor(
+            client=MagicMock(), add_temporal_runs=add_temporal_runs
+        )
         mock_next = MagicMock()
         mock_next.execute_nexus_operation_start = AsyncMock()
         mock_next.execute_nexus_operation_cancel = AsyncMock()
@@ -1044,9 +1096,7 @@ class TestAddTemporalRunsToggle:
         mock_act_input = MagicMock()
         mock_extracted_parent = _make_mock_run()
 
-        with patch(
-            f"{_MOD}._extract_context", return_value=mock_extracted_parent
-        ):
+        with patch(f"{_MOD}._extract_context", return_value=mock_extracted_parent):
             await act_interceptor.execute_activity(mock_act_input)
 
         # No RunTree should be created (add_temporal_runs=False)
