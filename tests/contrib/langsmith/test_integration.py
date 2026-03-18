@@ -264,7 +264,9 @@ class TestBasicTracing:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """StartWorkflow → RunWorkflow → StartActivity → RunActivity hierarchy."""
-        temporal_client, collector, _ = _make_client_and_collector(client)
+        temporal_client, collector, _ = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
 
         async with new_worker(
             temporal_client,
@@ -319,7 +321,9 @@ class TestReplay:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """With max_cached_workflows=0 (forcing replay), no duplicate runs appear."""
-        temporal_client, collector, _ = _make_client_and_collector(client)
+        temporal_client, collector, _ = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
 
         async with new_worker(
             temporal_client,
@@ -362,7 +366,9 @@ class TestErrorTracing:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A failing activity run is marked with an error."""
-        temporal_client, collector, _ = _make_client_and_collector(client)
+        temporal_client, collector, _ = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
 
         async with new_worker(
             temporal_client,
@@ -401,7 +407,9 @@ class TestErrorTracing:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A failing workflow run is marked with an error."""
-        temporal_client, collector, _ = _make_client_and_collector(client)
+        temporal_client, collector, _ = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
 
         async with new_worker(
             temporal_client,
@@ -435,7 +443,9 @@ class TestErrorTracing:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """A benign ApplicationError does NOT mark the run as errored."""
-        temporal_client, collector, _ = _make_client_and_collector(client)
+        temporal_client, collector, _ = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
 
         async with new_worker(
             temporal_client,
@@ -481,7 +491,9 @@ class TestComprehensiveTracing:
         """Full workflow exercising activity, local activity, child workflow,
         signal, query, and update — all nested under an ambient @traceable.
         """
-        temporal_client, collector, mock_ls_client = _make_client_and_collector(client)
+        temporal_client, collector, mock_ls_client = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
 
         @traceable(name="user_pipeline")
         async def user_pipeline() -> str:

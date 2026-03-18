@@ -55,7 +55,9 @@ class TestPluginIntegration:
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
         """Plugin wired to a real Temporal worker produces the full trace hierarchy."""
-        temporal_client, collector, mock_ls_client = _make_client_and_collector(client)
+        temporal_client, collector, mock_ls_client = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
 
         @traceable(name="user_pipeline")
         async def user_pipeline() -> str:

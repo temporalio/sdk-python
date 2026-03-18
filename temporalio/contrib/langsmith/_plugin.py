@@ -23,7 +23,7 @@ class LangSmithPlugin(SimplePlugin):
         *,
         client: Any | None = None,
         project_name: str | None = None,
-        add_temporal_runs: bool = True,
+        add_temporal_runs: bool = False,
         metadata: dict[str, Any] | None = None,
         tags: list[str] | None = None,
     ) -> None:
@@ -34,7 +34,7 @@ class LangSmithPlugin(SimplePlugin):
                 lazily (using LANGSMITH_API_KEY env var).
             project_name: LangSmith project name for traces.
             add_temporal_runs: Whether to create LangSmith runs for Temporal
-                operations. Defaults to True.
+                operations. Defaults to False.
             metadata: Default metadata to attach to all runs.
             tags: Default tags to attach to all runs.
         """
@@ -60,7 +60,7 @@ class LangSmithPlugin(SimplePlugin):
             return runner
 
         super().__init__(
-            "LangSmithPlugin",
+            "langchain.LangSmithPlugin",
             interceptors=interceptors,
             workflow_runner=workflow_runner,
         )

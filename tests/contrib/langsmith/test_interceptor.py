@@ -114,7 +114,7 @@ class TestContextPropagation:
         MockRunTree.from_headers.assert_called_once()
 
     def test_extract_missing_header(self) -> None:
-        """When the _langsmith-context header is absent, returns None."""
+        """When the _temporal-langsmith-context header is absent, returns None."""
         headers: dict[str, Payload] = {}
         result = _extract_context(headers)
         assert result is None

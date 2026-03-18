@@ -23,7 +23,7 @@ from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 # Constants
 # ---------------------------------------------------------------------------
 
-HEADER_KEY = "_langsmith-context"
+HEADER_KEY = "_temporal-langsmith-context"
 
 # ---------------------------------------------------------------------------
 # Context helpers
@@ -271,7 +271,7 @@ class LangSmithInterceptor(
         *,
         client: Any | None = None,
         project_name: str | None = None,
-        add_temporal_runs: bool = True,
+        add_temporal_runs: bool = False,
         default_metadata: dict[str, Any] | None = None,
         default_tags: list[str] | None = None,
     ) -> None:
