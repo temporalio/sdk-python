@@ -30,6 +30,7 @@ opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.3,<0.7", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=1.27.0,<2"]
+activity-cache = ["fsspec>=2024.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"
