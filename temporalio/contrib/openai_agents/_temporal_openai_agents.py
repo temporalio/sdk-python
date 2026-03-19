@@ -164,9 +164,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 but should not be disabled on all workers, or agents will not be able to progress.
             add_temporal_spans: Whether to add temporal spans to traces
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
-                .. warning::
-                    use_otel_instrumentation is experimental and may change in future versions.
-                    Use with caution in production environments.
+            .. warning::
+                use_otel_instrumentation is experimental and may change in future versions.
+                Use with caution in production environments.
 
         """
         if model_params is None:
