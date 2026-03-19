@@ -506,6 +506,7 @@ async def test_list_activities(client: Client, env: WorkflowEnvironment):
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
     )
+
     async def check_executions():
         executions = [
             e async for e in client.list_activities(f'ActivityId = "{activity_id}"')
@@ -516,7 +517,9 @@ async def test_list_activities(client: Client, env: WorkflowEnvironment):
         assert execution.activity_type == "increment"
         assert execution.task_queue == task_queue
         assert execution.status == ActivityExecutionStatus.RUNNING
-        assert execution.state_transition_count is None  # Not set until activity completes
+        assert (
+            execution.state_transition_count is None
+        )  # Not set until activity completes
 
     await assert_eventually(check_executions)
 
