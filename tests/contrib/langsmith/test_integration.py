@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -12,11 +13,16 @@ import pytest
 from langsmith import traceable, tracing_context
 
 from temporalio import activity, common, nexus, workflow
-from temporalio.client import Client, WorkflowFailureError
+from temporalio.client import Client, WorkflowFailureError, WorkflowQueryFailedError
 from temporalio.contrib.langsmith import LangSmithPlugin
 from temporalio.exceptions import ApplicationError
+from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
-from tests.contrib.langsmith.conftest import InMemoryRunCollector, dump_runs
+from tests.contrib.langsmith.conftest import (
+    InMemoryRunCollector,
+    dump_runs,
+    make_mock_ls_client,
+)
 from tests.helpers import new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 
@@ -119,26 +125,29 @@ class SimpleWorkflow:
 class ComprehensiveWorkflow:
     def __init__(self) -> None:
         self._signal_received = False
+        self._waiting_for_signal = False
         self._complete = False
 
     @workflow.run
     async def run(self) -> str:
-        # 1. Regular activity
+        # Regular activity
         await workflow.execute_activity(
             nested_traceable_activity,
             start_to_close_timeout=timedelta(seconds=10),
         )
-        # 2. Local activity
+        # Local activity
         await workflow.execute_local_activity(
             nested_traceable_activity,
             start_to_close_timeout=timedelta(seconds=10),
         )
-        # 3. Child workflow
+        # Direct @traceable call
+        await _outer_chain("from-workflow")
+        # Child workflow
         await workflow.execute_child_workflow(
             TraceableActivityWorkflow.run,
             id=f"child-{workflow.info().workflow_id}",
         )
-        # 4. Nexus operation
+        # Nexus operation
         nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=NexusService,
@@ -148,9 +157,15 @@ class ComprehensiveWorkflow:
             input="test-input",
         )
         await nexus_handle
-        # 5. Wait for signal
+        # Wait for signal
+        self._waiting_for_signal = True
         await workflow.wait_condition(lambda: self._signal_received)
-        # 5. Wait for update to complete
+        # Post-signal activity (verifies context survives signal wait)
+        await workflow.execute_activity(
+            nested_traceable_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+        # Wait for update to complete
         await workflow.wait_condition(lambda: self._complete)
         return "comprehensive-done"
 
@@ -161,6 +176,10 @@ class ComprehensiveWorkflow:
     @workflow.query
     def my_query(self) -> bool:
         return self._signal_received
+
+    @workflow.query
+    def is_waiting_for_signal(self) -> bool:
+        return self._waiting_for_signal
 
     @workflow.update
     def my_update(self, value: str) -> str:
@@ -233,11 +252,7 @@ def _make_plugin_and_collector(
 ) -> tuple[LangSmithPlugin, InMemoryRunCollector, MagicMock]:
     """Create a LangSmithPlugin wired to an InMemoryRunCollector via mock client."""
     collector = InMemoryRunCollector()
-    mock_ls_client = MagicMock()
-    mock_ls_client.create_run.side_effect = collector.record_create
-    mock_ls_client.update_run.side_effect = collector.record_update
-    mock_ls_client.session = MagicMock()
-    mock_ls_client.tracing_queue = MagicMock()
+    mock_ls_client = make_mock_ls_client(collector)
     plugin = LangSmithPlugin(client=mock_ls_client, **kwargs)
     return plugin, collector, mock_ls_client
 
@@ -250,6 +265,37 @@ def _make_client_and_collector(
     config = client.config()
     config["plugins"] = [plugin]
     return Client(**config), collector, mock_ls_client
+
+
+def _make_temporal_client(
+    client: Client, mock_ls_client: MagicMock, **kwargs: Any
+) -> Client:
+    """Create a Temporal Client with a fresh LangSmith plugin."""
+    plugin = LangSmithPlugin(client=mock_ls_client, **kwargs)
+    config = client.config()
+    config["plugins"] = [plugin]
+    return Client(**config)
+
+
+async def _poll_query(
+    handle: Any,
+    query: Any,
+    *,
+    expected: Any = True,
+    timeout_secs: float = 10.0,
+    interval_secs: float = 0.2,
+) -> bool:
+    """Poll a workflow query until it returns the expected value or times out."""
+    deadline = asyncio.get_event_loop().time() + timeout_secs
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            result = await handle.query(query)
+            if result == expected:
+                return True
+        except (WorkflowQueryFailedError, RPCError):
+            pass  # Query not yet available (workflow hasn't started)
+        await asyncio.sleep(interval_secs)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +318,7 @@ class TestBasicTracing:
             temporal_client,
             SimpleWorkflow,
             activities=[simple_activity],
+            max_cached_workflows=0,
         ) as worker:
             result = await temporal_client.start_workflow(
                 SimpleWorkflow.run,
@@ -375,6 +422,7 @@ class TestErrorTracing:
             ActivityFailureWorkflow,
             activities=[failing_activity],
             workflow_failure_exception_types=[ApplicationError],
+            max_cached_workflows=0,
         ) as worker:
             handle = await temporal_client.start_workflow(
                 ActivityFailureWorkflow.run,
@@ -415,6 +463,7 @@ class TestErrorTracing:
             temporal_client,
             FailingWorkflow,
             workflow_failure_exception_types=[ApplicationError],
+            max_cached_workflows=0,
         ) as worker:
             handle = await temporal_client.start_workflow(
                 FailingWorkflow.run,
@@ -452,6 +501,7 @@ class TestErrorTracing:
             BenignErrorWorkflow,
             activities=[benign_failing_activity],
             workflow_failure_exception_types=[ApplicationError],
+            max_cached_workflows=0,
         ) as worker:
             handle = await temporal_client.start_workflow(
                 BenignErrorWorkflow.run,
@@ -488,41 +538,74 @@ class TestComprehensiveTracing:
     async def test_comprehensive_with_temporal_runs(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
-        """Full workflow exercising activity, local activity, child workflow,
-        signal, query, and update — all nested under an ambient @traceable.
+        """Full trace hierarchy with worker restart mid-workflow.
+
+        Starts workflow on first worker, kills it at signal wait point,
+        then starts fresh worker+plugin to signal and complete the workflow.
+        Verifies combined hierarchy from both worker lifetimes in one assertion.
         """
-        temporal_client, collector, mock_ls_client = _make_client_and_collector(
-            client, add_temporal_runs=True
-        )
+        if env.supports_time_skipping:
+            pytest.skip("Time-skipping server doesn't persist headers.")
+
+        task_queue = f"comprehensive-{uuid.uuid4()}"
+        workflow_id = f"comprehensive-{uuid.uuid4()}"
+        collector = InMemoryRunCollector()
+        mock_ls = make_mock_ls_client(collector)
 
         @traceable(name="user_pipeline")
         async def user_pipeline() -> str:
+            # Phase 1: Start workflow, run until signal wait
+            temporal_client_1 = _make_temporal_client(
+                client, mock_ls, add_temporal_runs=True
+            )
             async with new_worker(
-                temporal_client,
+                temporal_client_1,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
                 SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
+                task_queue=task_queue,
+                max_cached_workflows=0,
             ) as worker:
                 await env.create_nexus_endpoint(
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                handle = await temporal_client.start_workflow(
+                handle = await temporal_client_1.start_workflow(
                     ComprehensiveWorkflow.run,
-                    id=f"comprehensive-{uuid.uuid4()}",
+                    id=workflow_id,
                     task_queue=worker.task_queue,
                 )
-                # Query
+                # Poll via raw client to avoid creating trace runs
+                raw_handle = client.get_workflow_handle(workflow_id)
+                assert await _poll_query(
+                    raw_handle,
+                    ComprehensiveWorkflow.is_waiting_for_signal,
+                    expected=True,
+                ), "Workflow never reached signal wait point"
+
+            # Phase 2: Fresh worker+plugin, signal to resume, complete
+            temporal_client_2 = _make_temporal_client(
+                client, mock_ls, add_temporal_runs=True
+            )
+            async with new_worker(
+                temporal_client_2,
+                ComprehensiveWorkflow,
+                TraceableActivityWorkflow,
+                SimpleNexusWorkflow,
+                activities=[nested_traceable_activity, traceable_activity],
+                nexus_service_handlers=[NexusService()],
+                task_queue=task_queue,
+                max_cached_workflows=0,
+            ):
+                handle = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle.query(ComprehensiveWorkflow.my_query)
-                # Signal
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
-                # Update (completes the workflow)
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 return await handle.result()
 
-        with tracing_context(client=mock_ls_client, enabled=True):
+        with tracing_context(client=mock_ls, enabled=True):
             result = await user_pipeline()
 
         assert result == "comprehensive-done"
@@ -540,6 +623,8 @@ class TestComprehensiveTracing:
             "        RunActivity:nested_traceable_activity",
             "          outer_chain",
             "            inner_llm_call",
+            "      outer_chain",
+            "        inner_llm_call",
             "      StartChildWorkflow:TraceableActivityWorkflow",
             "        RunWorkflow:TraceableActivityWorkflow",
             "          StartActivity:traceable_activity",
@@ -552,6 +637,10 @@ class TestComprehensiveTracing:
             "              StartActivity:traceable_activity",
             "                RunActivity:traceable_activity",
             "                  inner_llm_call",
+            "      StartActivity:nested_traceable_activity",
+            "        RunActivity:nested_traceable_activity",
+            "          outer_chain",
+            "            inner_llm_call",
             "  QueryWorkflow:my_query",
             "    HandleQuery:my_query",
             "  SignalWorkflow:my_signal",
@@ -567,41 +656,71 @@ class TestComprehensiveTracing:
     async def test_comprehensive_without_temporal_runs(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
-        """With add_temporal_runs=False, only @traceable runs appear,
-        all nested under the ambient user_pipeline.
+        """Same comprehensive workflow with add_temporal_runs=False and worker restart.
+
+        Only @traceable runs appear. Context propagation via headers still works.
         """
-        temporal_client, collector, mock_ls_client = _make_client_and_collector(
-            client, add_temporal_runs=False
-        )
+        if env.supports_time_skipping:
+            pytest.skip("Time-skipping server doesn't persist headers.")
+
+        task_queue = f"comprehensive-no-runs-{uuid.uuid4()}"
+        workflow_id = f"comprehensive-no-runs-{uuid.uuid4()}"
+        collector = InMemoryRunCollector()
+        mock_ls = make_mock_ls_client(collector)
 
         @traceable(name="user_pipeline")
         async def user_pipeline() -> str:
+            # Phase 1: Start workflow, run until signal wait
+            temporal_client_1 = _make_temporal_client(
+                client, mock_ls, add_temporal_runs=False
+            )
             async with new_worker(
-                temporal_client,
+                temporal_client_1,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
                 SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
+                task_queue=task_queue,
+                max_cached_workflows=0,
             ) as worker:
                 await env.create_nexus_endpoint(
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                handle = await temporal_client.start_workflow(
+                handle = await temporal_client_1.start_workflow(
                     ComprehensiveWorkflow.run,
-                    id=f"comprehensive-no-runs-{uuid.uuid4()}",
+                    id=workflow_id,
                     task_queue=worker.task_queue,
                 )
-                # Query
-                await handle.query(ComprehensiveWorkflow.my_query)
-                # Signal
+                # Poll via raw client to avoid creating trace runs
+                raw_handle = client.get_workflow_handle(workflow_id)
+                assert await _poll_query(
+                    raw_handle,
+                    ComprehensiveWorkflow.is_waiting_for_signal,
+                    expected=True,
+                ), "Workflow never reached signal wait point"
+
+            # Phase 2: Fresh worker+plugin, signal to resume, complete
+            temporal_client_2 = _make_temporal_client(
+                client, mock_ls, add_temporal_runs=False
+            )
+            async with new_worker(
+                temporal_client_2,
+                ComprehensiveWorkflow,
+                TraceableActivityWorkflow,
+                SimpleNexusWorkflow,
+                activities=[nested_traceable_activity, traceable_activity],
+                nexus_service_handlers=[NexusService()],
+                task_queue=task_queue,
+                max_cached_workflows=0,
+            ):
+                handle = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
-                # Update (completes the workflow)
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 return await handle.result()
 
-        with tracing_context(client=mock_ls_client, enabled=True):
+        with tracing_context(client=mock_ls, enabled=True):
             result = await user_pipeline()
 
         assert result == "comprehensive-done"
@@ -613,8 +732,12 @@ class TestComprehensiveTracing:
             "    inner_llm_call",
             "  outer_chain",
             "    inner_llm_call",
+            "  outer_chain",
+            "    inner_llm_call",
             "  inner_llm_call",
             "  inner_llm_call",
+            "  outer_chain",
+            "    inner_llm_call",
         ]
         assert (
             hierarchy == expected

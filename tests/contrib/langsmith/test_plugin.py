@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from unittest.mock import MagicMock
 
+import pytest
 from langsmith import traceable, tracing_context
 
 from temporalio.client import Client
@@ -17,6 +18,7 @@ from tests.contrib.langsmith.test_integration import (
     SimpleNexusWorkflow,
     TraceableActivityWorkflow,
     _make_client_and_collector,
+    _poll_query,
     nested_traceable_activity,
     traceable_activity,
 )
@@ -55,6 +57,9 @@ class TestPluginIntegration:
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
         """Plugin wired to a real Temporal worker produces the full trace hierarchy."""
+        if env.supports_time_skipping:
+            pytest.skip("Time-skipping server doesn't persist headers.")
+
         temporal_client, collector, mock_ls_client = _make_client_and_collector(
             client, add_temporal_runs=True
         )
@@ -68,21 +73,27 @@ class TestPluginIntegration:
                 SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
+                max_cached_workflows=0,
             ) as worker:
                 await env.create_nexus_endpoint(
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
+                workflow_id = f"plugin-comprehensive-{uuid.uuid4()}"
                 handle = await temporal_client.start_workflow(
                     ComprehensiveWorkflow.run,
-                    id=f"plugin-comprehensive-{uuid.uuid4()}",
+                    id=workflow_id,
                     task_queue=worker.task_queue,
                 )
-                # Query
+                # Poll via raw client to avoid creating trace runs
+                raw_handle = client.get_workflow_handle(workflow_id)
+                assert await _poll_query(
+                    raw_handle,
+                    ComprehensiveWorkflow.is_waiting_for_signal,
+                    expected=True,
+                ), "Workflow never reached signal wait point"
                 await handle.query(ComprehensiveWorkflow.my_query)
-                # Signal
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
-                # Update (completes the workflow)
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 return await handle.result()
 
@@ -104,6 +115,8 @@ class TestPluginIntegration:
             "        RunActivity:nested_traceable_activity",
             "          outer_chain",
             "            inner_llm_call",
+            "      outer_chain",
+            "        inner_llm_call",
             "      StartChildWorkflow:TraceableActivityWorkflow",
             "        RunWorkflow:TraceableActivityWorkflow",
             "          StartActivity:traceable_activity",
@@ -116,6 +129,10 @@ class TestPluginIntegration:
             "              StartActivity:traceable_activity",
             "                RunActivity:traceable_activity",
             "                  inner_llm_call",
+            "      StartActivity:nested_traceable_activity",
+            "        RunActivity:nested_traceable_activity",
+            "          outer_chain",
+            "            inner_llm_call",
             "  QueryWorkflow:my_query",
             "    HandleQuery:my_query",
             "  SignalWorkflow:my_signal",

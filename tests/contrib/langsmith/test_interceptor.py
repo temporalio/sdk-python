@@ -541,10 +541,12 @@ class TestActivityInboundInterceptor:
         assert metadata["temporalWorkflowID"] == "wf-123"
         assert metadata["temporalRunID"] == "run-456"
         assert metadata["temporalActivityID"] == "act-789"
-        # Verify tracing_context sets parent
+        # Verify tracing_context sets parent (wrapped in ReplaySafeRunTree)
         mock_tracing_ctx.assert_called()
         ctx_kwargs = mock_tracing_ctx.call_args.kwargs
-        assert ctx_kwargs.get("parent") is mock_run
+        parent = ctx_kwargs.get("parent")
+        assert isinstance(parent, ReplaySafeRunTree)
+        assert parent._run is mock_run
         # Verify super() called and result passed through
         mock_next.execute_activity.assert_called_once()
         assert result == "activity_result"

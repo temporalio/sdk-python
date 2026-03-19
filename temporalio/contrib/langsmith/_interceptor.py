@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import random
+import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any, ClassVar, NoReturn
@@ -39,7 +41,7 @@ def _inject_context(
     """Inject LangSmith context into Temporal payload headers.
 
     Serializes the run's trace context (trace ID, parent run ID, dotted order)
-    into a Temporal header under ``_langsmith-context``, enabling parent-child
+    into a Temporal header under ``_temporal-langsmith-context``, enabling parent-child
     trace nesting across process boundaries (client → worker, workflow → activity).
     """
     ls_headers = run_tree.to_headers()
@@ -49,10 +51,9 @@ def _inject_context(
     }
 
 
-def _get_current_run_safe() -> ReplaySafeRunTree | None:
-    """Get the current ambient LangSmith run tree, wrapped for replay safety."""
-    raw = get_current_run_tree()
-    return ReplaySafeRunTree(raw) if raw is not None else None
+def _get_current_run_safe() -> RunTree | None:
+    """Get the current ambient LangSmith run tree."""
+    return get_current_run_tree()
 
 
 def _inject_current_context(
@@ -76,14 +77,16 @@ def _extract_context(
     """Extract LangSmith context from Temporal payload headers.
 
     Reconstructs a :class:`RunTree` from the ``_langsmith-context`` header on
-    the receiving side, so inbound interceptors can establish a parent-child
-    relationship with the sender's run. Returns ``None`` if no header is present.
+    the receiving side, wrapped in a :class:`ReplaySafeRunTree` so inbound
+    interceptors can establish a parent-child relationship with the sender's
+    run. Returns ``None`` if no header is present.
     """
     header = headers.get(HEADER_KEY)
     if not header:
         return None
     ls_headers = _payload_converter.from_payloads([header])[0]
-    return ReplaySafeRunTree(RunTree.from_headers(ls_headers))
+    run = RunTree.from_headers(ls_headers)
+    return ReplaySafeRunTree(run) if run else None
 
 
 def _inject_nexus_context(
@@ -106,7 +109,58 @@ def _extract_nexus_context(
     if not raw:
         return None
     ls_headers = json.loads(raw)
-    return ReplaySafeRunTree(RunTree.from_headers(ls_headers))
+    run = RunTree.from_headers(ls_headers)
+    return ReplaySafeRunTree(run) if run else None
+
+
+# ---------------------------------------------------------------------------
+# Sandbox safety: patch @traceable's aio_to_thread
+# ---------------------------------------------------------------------------
+
+_aio_to_thread_patched = False
+
+
+def _patch_aio_to_thread() -> None:
+    """Patch langsmith's ``aio_to_thread`` to run synchronously in workflows.
+
+    The ``@traceable`` decorator uses ``aio_to_thread()`` →
+    ``loop.run_in_executor()`` for run setup/teardown.  The Temporal workflow
+    sandbox blocks ``run_in_executor``.  This patch runs those functions
+    synchronously (they are CPU-bound, no I/O) when inside a workflow.
+    """
+    global _aio_to_thread_patched  # noqa: PLW0603
+    if _aio_to_thread_patched:
+        return
+
+    import langsmith._internal._aiter as _aiter
+
+    _original = _aiter.aio_to_thread
+
+    import contextvars
+
+    async def _safe_aio_to_thread(
+        func: Any,
+        /,
+        *args: Any,
+        __ctx: contextvars.Context | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        if not temporalio.workflow.in_workflow():
+            return await _original(func, *args, __ctx=__ctx, **kwargs)
+        with temporalio.workflow.unsafe.sandbox_unrestricted():
+            # During replay, disable tracing so @traceable calls don't
+            # produce duplicate traces for code that already ran.
+            # Run func directly in the current context (no ctx.run) so
+            # that context var changes (e.g. _PARENT_RUN_TREE set by
+            # @traceable's _setup_run) propagate to the caller.
+            # This is safe because workflows are single-threaded.
+            if _is_replaying():
+                with tracing_context(enabled=False):
+                    return func(*args, **kwargs)
+            return func(*args, **kwargs)
+
+    _aiter.aio_to_thread = _safe_aio_to_thread  # type: ignore[assignment]
+    _aio_to_thread_patched = True
 
 
 # ---------------------------------------------------------------------------
@@ -122,62 +176,100 @@ def _is_replaying() -> bool:
     )
 
 
+def _get_workflow_random() -> random.Random | None:
+    """Get a deterministic random generator for the current workflow.
+
+    Follows the OTel pattern: creates a workflow-safe random generator once
+    via ``workflow.new_random()`` and stores it on the workflow instance so
+    subsequent calls return the same generator.  The generator is seeded from
+    the workflow's deterministic seed, so it produces identical UUIDs across
+    replays and eviction/restart cycles.
+
+    Returns ``None`` outside a workflow, in read-only (query) contexts, or
+    when workflow APIs are mocked (unit tests).
+    """
+    try:
+        if not temporalio.workflow.in_workflow():
+            return None
+        if temporalio.workflow.unsafe.is_read_only():
+            return None
+        inst = temporalio.workflow.instance()
+        rng = getattr(inst, "__temporal_langsmith_random", None)
+        if rng is None:
+            rng = temporalio.workflow.new_random()
+            setattr(inst, "__temporal_langsmith_random", rng)
+        return rng
+    except Exception:
+        return None
+
+
+def _uuid_from_random(rng: random.Random) -> uuid.UUID:
+    """Generate a deterministic UUID4 from a workflow-bound random generator."""
+    return uuid.UUID(int=rng.getrandbits(128), version=4)
+
+
 # ---------------------------------------------------------------------------
 # ReplaySafeRunTree wrapper
 # ---------------------------------------------------------------------------
 
 
-class ReplaySafeRunTree:
-    """Wraps a RunTree to handle replay skipping and sandbox safety transparently.
+class ReplaySafeRunTree(RunTree):
+    """Wrapper around a :class:`RunTree` with replay-safe ``post``, ``end``, and ``patch``.
+
+    Inherits from :class:`RunTree` so ``isinstance`` checks pass, but does
+    **not** call ``super().__init__()``—the wrapped ``_run`` is the real
+    RunTree.  Attribute access is delegated via ``__getattr__``/``__setattr__``.
 
     During replay, ``post()``, ``end()``, and ``patch()`` become no-ops.
-    Inside a workflow sandbox, ``post()`` and ``patch()`` are wrapped in
+    Inside a workflow sandbox, these methods are wrapped in
     ``sandbox_unrestricted()``.
     """
 
-    def __init__(self, run_tree: Any) -> None:
-        """Initialize with the underlying RunTree to wrap."""
-        self._run = run_tree
+    def __init__(self, run_tree: RunTree) -> None:  # pyright: ignore[reportMissingSuperCall]
+        """Wrap an existing RunTree with replay-safe overrides."""
+        object.__setattr__(self, "_run", run_tree)
 
-    def to_headers(self) -> dict[str, str]:
-        """Delegate header serialization to the underlying RunTree."""
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the wrapped RunTree."""
+        return getattr(self._run, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Delegate attribute setting to the wrapped RunTree."""
+        setattr(self._run, name, value)
+
+    def to_headers(self) -> dict[str, Any]:
+        """Delegate to the wrapped RunTree's to_headers."""
         return self._run.to_headers()
 
-    @property
-    def ls_client(self) -> Any:
-        """Get the LangSmith client from the underlying RunTree."""
-        return self._run.ls_client
-
-    @ls_client.setter
-    def ls_client(self, value: Any) -> None:
-        """Set the LangSmith client on the underlying RunTree."""
-        self._run.ls_client = value
-
-    def post(self) -> None:
+    def post(self, exclude_child_runs: bool = True) -> None:
         """Post the run to LangSmith, skipping during replay."""
         if _is_replaying():
             return
         if temporalio.workflow.in_workflow():
             with temporalio.workflow.unsafe.sandbox_unrestricted():
-                self._run.post()
+                self._run.post(exclude_child_runs=exclude_child_runs)
         else:
-            self._run.post()
+            self._run.post(exclude_child_runs=exclude_child_runs)
 
     def end(self, **kwargs: Any) -> None:
         """End the run, skipping during replay."""
         if _is_replaying():
             return
-        self._run.end(**kwargs)
+        if temporalio.workflow.in_workflow():
+            with temporalio.workflow.unsafe.sandbox_unrestricted():
+                self._run.end(**kwargs)
+        else:
+            self._run.end(**kwargs)
 
-    def patch(self) -> None:
+    def patch(self, *, exclude_inputs: bool = False) -> None:
         """Patch the run to LangSmith, skipping during replay."""
         if _is_replaying():
             return
         if temporalio.workflow.in_workflow():
             with temporalio.workflow.unsafe.sandbox_unrestricted():
-                self._run.patch()
+                self._run.patch(exclude_inputs=exclude_inputs)
         else:
-            self._run.patch()
+            self._run.patch(exclude_inputs=exclude_inputs)
 
 
 # ---------------------------------------------------------------------------
@@ -210,11 +302,22 @@ def _maybe_run(
 
     - If add_temporal_runs is False, yields None (no run created).
       Context propagation is handled unconditionally by callers.
-    - When a run IS created, wraps it in :class:`ReplaySafeRunTree` for
+    - When a run IS created, uses :class:`ReplaySafeRunTree` for
       replay and sandbox safety, then sets it as ambient context via
-      ``tracing_context(parent=raw_run)`` so ``get_current_run_tree()``
+      ``tracing_context(parent=run_tree)`` so ``get_current_run_tree()``
       returns it and ``_inject_current_context()`` can inject it.
     - On exception: marks run as errored (unless benign ApplicationError), re-raises.
+
+    Args:
+        client: LangSmith client instance.
+        name: Display name for the run.
+        add_temporal_runs: Whether to create Temporal-level trace runs.
+        run_type: LangSmith run type (default ``"chain"``).
+        inputs: Input data to record on the run.
+        metadata: Extra metadata to attach to the run.
+        tags: Tags to attach to the run.
+        parent: Parent run for nesting.
+        project_name: LangSmith project name override.
     """
     if not add_temporal_runs:
         yield None
@@ -230,19 +333,36 @@ def _maybe_run(
         inputs=inputs or {},
         ls_client=client,
     )
+    # Deterministic IDs and start times in workflow context so that runs
+    # survive eviction/replay with max_cached_workflows=0.  Uses a
+    # workflow-bound random generator (following the OTel pattern) to
+    # produce identical UUIDs across replays and worker restarts.
+    rng = _get_workflow_random()
+    if rng is not None:
+        kwargs["id"] = _uuid_from_random(rng)
+        kwargs["start_time"] = temporalio.workflow.now()
+    elif temporalio.workflow.in_workflow():
+        # Read-only context (e.g. query handler) — use workflow.uuid4()
+        try:
+            kwargs["id"] = temporalio.workflow.uuid4()
+            kwargs["start_time"] = temporalio.workflow.now()
+        except Exception:
+            pass  # Not in a real workflow context (e.g., unit test mock)
     if project_name is not None:
         kwargs["project_name"] = project_name
     if parent is not None:
-        kwargs["parent_run"] = parent._run
+        # Unwrap ReplaySafeRunTree so RunTree gets the real parent
+        kwargs["parent_run"] = (
+            parent._run if isinstance(parent, ReplaySafeRunTree) else parent
+        )
     if metadata:
         kwargs["extra"] = {"metadata": metadata}
     if tags:
         kwargs["tags"] = tags
-    raw_run = RunTree(**kwargs)
-    run_tree = ReplaySafeRunTree(raw_run)
+    run_tree = ReplaySafeRunTree(RunTree(**kwargs))
     run_tree.post()
     try:
-        with tracing_context(parent=raw_run, client=client):
+        with tracing_context(parent=run_tree, client=client):
             yield run_tree
     except Exception as exc:
         if not _is_benign_error(exc):
@@ -327,6 +447,7 @@ class LangSmithInterceptor(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
     ) -> type[_LangSmithWorkflowInboundInterceptor]:
         """Return the workflow interceptor class with config bound."""
+        _patch_aio_to_thread()
         config = self
 
         class InterceptorWithConfig(_LangSmithWorkflowInboundInterceptor):
@@ -418,7 +539,7 @@ class _LangSmithActivityInboundInterceptor(
         extra_metadata = {
             "temporalWorkflowID": info.workflow_id or "",
             "temporalRunID": info.workflow_run_id or "",
-            "temporalActivityID": info.activity_id,
+            "temporalActivityID": info.activity_id or "",
         }
         # Unconditionally set tracing context so @traceable functions inside
         # activities can use the plugin's LangSmith client and inherit parent.
@@ -465,49 +586,95 @@ class _LangSmithWorkflowInboundInterceptor(
 
     @contextmanager
     def _workflow_maybe_run(
-        self, name: str, headers: Mapping[str, Payload] | None = None
+        self,
+        name: str,
+        headers: Mapping[str, Payload] | None = None,
+        *,
+        is_handler: bool = False,
     ) -> Iterator[Any | None]:
         """Workflow-specific run creation with metadata.
 
         Extracts parent from headers (if provided) and stores the run (or parent
         fallback) as ``_current_run`` so the outbound interceptor can propagate
         context even when ``add_temporal_runs=False``.
+
+        Always sets up ``tracing_context`` so ``@traceable`` functions called
+        from workflow code can discover the parent and LangSmith client,
+        independent of the ``add_temporal_runs`` toggle.
+
+        When ``is_handler`` is True and no LangSmith context is found in
+        headers, skips trace creation if a workflow run is already active
+        (``_current_run`` is set). This suppresses orphan traces from
+        uninstrumented client operations (e.g. query polling) while still
+        allowing handler traces when invoked with propagated context.
         """
         parent = _extract_context(headers) if headers else None
+        if parent is not None:
+            parent.ls_client = self._config._client
+        # Handler from an uninstrumented client during workflow execution:
+        # no LangSmith headers but _current_run is set. Skip trace creation
+        # to avoid orphan/duplicate handler traces (e.g. query polling).
+        if is_handler and parent is None and self._current_run is not None:
+            yield None
+            return
         info = temporalio.workflow.info()
         extra_metadata = {
             "temporalWorkflowID": info.workflow_id,
             "temporalRunID": info.run_id,
         }
-        with self._config.maybe_run(
-            name, parent=parent, extra_metadata=extra_metadata
-        ) as run:
-            self._current_run = run or parent
-            try:
-                yield run
-            finally:
-                self._current_run = None
+        # Set up tracing context for @traceable functions inside the workflow.
+        # When add_temporal_runs=True, _maybe_run overrides with the
+        # RunWorkflow run as parent.  When False, this outer context ensures
+        # @traceable still sees the propagated parent from headers.
+        ctx_kwargs: dict[str, Any] = {
+            "client": self._config._client,
+            "enabled": True,
+        }
+        if parent:
+            ctx_kwargs["parent"] = parent
+        with tracing_context(**ctx_kwargs):
+            with self._config.maybe_run(
+                name,
+                parent=parent,
+                extra_metadata=extra_metadata,
+            ) as run:
+                prev_run = self._current_run
+                self._current_run = run or parent
+                try:
+                    yield run
+                finally:
+                    self._current_run = prev_run
 
     async def execute_workflow(self, input: Any) -> Any:
+        wf_type = temporalio.workflow.info().workflow_type
         with self._workflow_maybe_run(
-            f"RunWorkflow:{temporalio.workflow.info().workflow_type}", input.headers
+            f"RunWorkflow:{wf_type}",
+            input.headers,
         ):
             return await super().execute_workflow(input)
 
     async def handle_signal(self, input: Any) -> None:
-        with self._workflow_maybe_run(f"HandleSignal:{input.signal}", input.headers):
+        with self._workflow_maybe_run(
+            f"HandleSignal:{input.signal}", input.headers, is_handler=True
+        ):
             return await super().handle_signal(input)
 
     async def handle_query(self, input: Any) -> Any:
-        with self._workflow_maybe_run(f"HandleQuery:{input.query}", input.headers):
+        with self._workflow_maybe_run(
+            f"HandleQuery:{input.query}", input.headers, is_handler=True
+        ):
             return await super().handle_query(input)
 
     def handle_update_validator(self, input: Any) -> None:
-        with self._workflow_maybe_run(f"ValidateUpdate:{input.update}", input.headers):
+        with self._workflow_maybe_run(
+            f"ValidateUpdate:{input.update}", input.headers, is_handler=True
+        ):
             return super().handle_update_validator(input)
 
     async def handle_update_handler(self, input: Any) -> Any:
-        with self._workflow_maybe_run(f"HandleUpdate:{input.update}", input.headers):
+        with self._workflow_maybe_run(
+            f"HandleUpdate:{input.update}", input.headers, is_handler=True
+        ):
             return await super().handle_update_handler(input)
 
 

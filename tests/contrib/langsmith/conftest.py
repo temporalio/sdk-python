@@ -1,12 +1,10 @@
-"""Shared test fixtures for LangSmith plugin tests."""
+"""Shared test helpers for LangSmith plugin tests."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
-
-import pytest
 
 
 @dataclass
@@ -91,27 +89,11 @@ def dump_runs(collector: InMemoryRunCollector) -> list[str]:
     return result
 
 
-@pytest.fixture
-def collector() -> InMemoryRunCollector:
-    return InMemoryRunCollector()
-
-
-@pytest.fixture
-def mock_ls_client(collector: InMemoryRunCollector) -> MagicMock:
-    """A mock langsmith.Client that records create_run / update_run calls."""
+def make_mock_ls_client(collector: InMemoryRunCollector) -> MagicMock:
+    """Create a mock langsmith.Client wired to a collector."""
     client = MagicMock()
     client.create_run.side_effect = collector.record_create
     client.update_run.side_effect = collector.record_update
-    # Stub session property (needed by RunTree internals)
     client.session = MagicMock()
     client.tracing_queue = MagicMock()
     return client
-
-
-@pytest.fixture
-def langsmith_plugin(mock_ls_client: MagicMock, collector: InMemoryRunCollector):
-    """Return (plugin, collector) wired to a mock client."""
-    from temporalio.contrib.langsmith import LangSmithPlugin
-
-    plugin = LangSmithPlugin(client=mock_ls_client)
-    return plugin, collector
