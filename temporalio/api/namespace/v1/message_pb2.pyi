@@ -55,6 +55,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         REPORTED_PROBLEMS_SEARCH_ATTRIBUTE_FIELD_NUMBER: builtins.int
         WORKFLOW_PAUSE_FIELD_NUMBER: builtins.int
         STANDALONE_ACTIVITIES_FIELD_NUMBER: builtins.int
+        WORKER_POLL_COMPLETE_ON_SHUTDOWN_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -69,6 +70,13 @@ class NamespaceInfo(google.protobuf.message.Message):
         """True if the namespace supports pausing workflows"""
         standalone_activities: builtins.bool
         """True if the namespace supports standalone activities"""
+        worker_poll_complete_on_shutdown: builtins.bool
+        """True if the namespace supports server-side completion of outstanding worker polls on shutdown.
+        When enabled, the server will complete polls for workers that send WorkerInstanceKey in their
+        poll requests and call ShutdownWorker with the same WorkerInstanceKey. The poll will return
+        an empty response. When this flag is true, workers should allow polls to return gracefully
+        rather than terminating any open polls on shutdown.
+        """
         def __init__(
             self,
             *,
@@ -79,6 +87,7 @@ class NamespaceInfo(google.protobuf.message.Message):
             reported_problems_search_attribute: builtins.bool = ...,
             workflow_pause: builtins.bool = ...,
             standalone_activities: builtins.bool = ...,
+            worker_poll_complete_on_shutdown: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -95,6 +104,8 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"sync_update",
                 "worker_heartbeats",
                 b"worker_heartbeats",
+                "worker_poll_complete_on_shutdown",
+                b"worker_poll_complete_on_shutdown",
                 "workflow_pause",
                 b"workflow_pause",
             ],

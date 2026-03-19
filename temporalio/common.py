@@ -69,7 +69,7 @@ class RetryPolicy:
             if proto.HasField("maximum_interval")
             else None,
             maximum_attempts=proto.maximum_attempts,
-            non_retryable_error_types=proto.non_retryable_error_types
+            non_retryable_error_types=list(proto.non_retryable_error_types)
             if proto.non_retryable_error_types
             else None,
         )

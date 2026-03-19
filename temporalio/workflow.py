@@ -50,6 +50,8 @@ from typing_extensions import (
 )
 
 import temporalio.api.common.v1
+import temporalio.api.enums
+import temporalio.api.enums.v1
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
 import temporalio.bridge.proto.nexus
@@ -601,6 +603,16 @@ class Info:
         """
         return _Runtime.current().workflow_is_continue_as_new_suggested()
 
+    def is_target_worker_deployment_version_changed(self) -> bool:
+        """Check whether the target worker deployment version has changed.
+
+        Note: Upgrade-on-Continue-as-New is currently experimental.
+
+        Returns:
+            True if the target worker deployment version has changed.
+        """
+        return _Runtime.current().workflow_is_target_worker_deployment_version_changed()
+
 
 @dataclass(frozen=True)
 class ParentInfo:
@@ -690,6 +702,7 @@ class _Runtime(ABC):
             temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
         ),
         versioning_intent: VersioningIntent | None,
+        initial_versioning_behavior: ContinueAsNewVersioningBehavior | None,
     ) -> NoReturn: ...
 
     @abstractmethod
@@ -734,6 +747,9 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_continue_as_new_suggested(self) -> bool: ...
+
+    @abstractmethod
+    def workflow_is_target_worker_deployment_version_changed(self) -> bool: ...
 
     @abstractmethod
     def workflow_is_replaying(self) -> bool: ...
@@ -4800,6 +4816,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4818,6 +4835,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4837,6 +4855,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4856,6 +4875,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4875,6 +4895,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4893,6 +4914,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
 
@@ -4934,6 +4956,7 @@ def continue_as_new(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        initial_versioning_behavior=initial_versioning_behavior,
     )
 
 
@@ -5348,6 +5371,34 @@ class VersioningIntent(Enum):
         elif self == VersioningIntent.DEFAULT:
             return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
+
+
+class ContinueAsNewVersioningBehavior(IntEnum):
+    """Experimental. Optionally decide the versioning behavior that the first task of the new run should use.
+    For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
+    of the previous run.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+    )
+    """An initial versioning behavior is not set, follow the existing continue-as-new inheritance semantics.
+    See https://docs.temporal.io/worker-versioning#inheritance-semantics for more detail.
+    """
+
+    AUTO_UPGRADE = int(
+        temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    )
+    """Start the new run with AutoUpgrade behavior. Use the Target Version of the workflow's task queue at
+    start-time, as AutoUpgrade workflows do. After the first workflow task completes, use whatever
+    Versioning Behavior the workflow is annotated with in the workflow code.
+    
+    Note that if the previous workflow had a Pinned override, that override will be inherited by the
+    new workflow run regardless of the ContinueAsNewVersioningBehavior specified in the continue-as-new
+    command. If a Pinned override is inherited by the new run, and the new run starts with AutoUpgrade
+    behavior, the base version of the new run will be the Target Version as described above, but the
+    effective version will be whatever is specified by the Versioning Override until the override is removed.
+    """
 
 
 ServiceT = TypeVar("ServiceT")

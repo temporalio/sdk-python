@@ -21,7 +21,7 @@ import temporalio.common
 import temporalio.nexus
 import temporalio.nexus._util
 import temporalio.workflow
-from temporalio.workflow import VersioningIntent
+from temporalio.workflow import ContinueAsNewVersioningBehavior, VersioningIntent
 
 
 class Interceptor:
@@ -172,6 +172,7 @@ class ContinueAsNewInput:
     )
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: VersioningIntent | None
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None
     # The types may be absent
     arg_types: list[type] | None
 

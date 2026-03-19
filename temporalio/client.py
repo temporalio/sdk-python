@@ -54,6 +54,7 @@ import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._search_attributes
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.nexus._operation_context
@@ -4433,7 +4434,9 @@ class ActivityExecutionCountAggregationGroup:
         return ActivityExecutionCountAggregationGroup(
             count=raw.count,
             group_values=[
-                temporalio.converter._decode_search_attribute_value(v)
+                temporalio.converter._search_attributes._decode_search_attribute_value(
+                    v
+                )
                 for v in raw.group_values
             ],
         )
@@ -5127,7 +5130,9 @@ class WorkflowExecutionCountAggregationGroup:
         return WorkflowExecutionCountAggregationGroup(
             count=raw.count,
             group_values=[
-                temporalio.converter._decode_search_attribute_value(v)
+                temporalio.converter._search_attributes._decode_search_attribute_value(
+                    v
+                )
                 for v in raw.group_values
             ],
         )

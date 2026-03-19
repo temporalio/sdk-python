@@ -303,10 +303,9 @@ async def decode_activation(
     decode_headers: bool,
 ) -> None:
     """Decode all payloads in the activation."""
-    if data_converter._decode_payload_has_effect:
-        await CommandAwarePayloadVisitor(
-            skip_search_attributes=True, skip_headers=not decode_headers
-        ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+    await CommandAwarePayloadVisitor(
+        skip_search_attributes=True, skip_headers=not decode_headers
+    ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
 
 
 async def encode_completion(

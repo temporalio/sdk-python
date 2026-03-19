@@ -238,9 +238,6 @@ async def test_cancellation_type(
     env: WorkflowEnvironment,
     cancellation_type_name: str,
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     cancellation_type = workflow.NexusOperationCancellationType[cancellation_type_name]
     global test_context
     test_context = TestContext(

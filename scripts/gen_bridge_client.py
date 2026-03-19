@@ -174,8 +174,8 @@ fn call_${service_name}<'p>(
     call: RpcCall,
   ) -> PyResult<Bound<'p, PyAny>> {
     self.runtime.assert_same_process("use client")?;
-    use temporalio_client::${descriptor_name};
-    let mut retry_client = self.retry_client.clone();
+    use temporalio_client::grpc::${descriptor_name};
+    let mut connection = self.connection.clone();
     self.runtime.future_into_py(py, async move {
         let bytes = match call.rpc.as_str() {
 $match_arms
@@ -203,26 +203,31 @@ $match_arms
         if not method.client_streaming and not method.server_streaming
     ]
 
+    service_method = pascal_to_snake(sanitized_service_name)
     match_arms = [
-        generate_rust_match_arm(sanitized_service_name, method)
+        generate_rust_match_arm(sanitized_service_name, service_method, method)
         for method in sorted(methods, key=lambda m: m.name)
     ]
 
     return call_template.substitute(
-        service_name=pascal_to_snake(sanitized_service_name),
+        service_name=service_method,
         descriptor_name=sanitized_service_name,
         match_arms="\n".join(match_arms),
     )
 
 
-def generate_rust_match_arm(trait_name: str, method: MethodDescriptor) -> str:
+def generate_rust_match_arm(
+    trait_name: str, service_method: str, method: MethodDescriptor
+) -> str:
     match_template = Template("""\
-          "$method_name" => { 
-            rpc_call!(retry_client, call, $trait_name, $method_name)
+          "$method_name" => {
+            rpc_call!(connection, call, $trait_name, $service_method, $method_name)
           }""")
 
     return match_template.substitute(
-        method_name=pascal_to_snake(method.name), trait_name=trait_name
+        method_name=pascal_to_snake(method.name),
+        trait_name=trait_name,
+        service_method=service_method,
     )
 
 

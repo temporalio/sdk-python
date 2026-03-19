@@ -41,11 +41,11 @@ from temporalio.converter import (
     JSONPlainPayloadConverter,
     JSONTypeConverter,
     PayloadCodec,
-    _JSONTypeConverterUnhandled,
     decode_search_attributes,
     encode_search_attribute_values,
     value_to_type,
 )
+from temporalio.converter._payload_converter import _JSONTypeConverterUnhandled
 from temporalio.exceptions import (
     ApplicationError,
     FailureError,

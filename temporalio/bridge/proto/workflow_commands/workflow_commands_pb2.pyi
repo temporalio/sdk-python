@@ -931,28 +931,6 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
-    class SearchAttributesEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
-        ) -> None: ...
-        def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
-        ) -> builtins.bool: ...
-        def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
-        ) -> None: ...
-
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     ARGUMENTS_FIELD_NUMBER: builtins.int
@@ -1002,9 +980,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
     @property
     def search_attributes(
         self,
-    ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, temporalio.api.common.v1.message_pb2.Payload
-    ]:
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
         """If set, the new workflow will have these search attributes. If unset, re-uses the current
         workflow's search attributes.
         """
@@ -1043,9 +1019,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
             builtins.str, temporalio.api.common.v1.message_pb2.Payload
         ]
         | None = ...,
-        search_attributes: collections.abc.Mapping[
-            builtins.str, temporalio.api.common.v1.message_pb2.Payload
-        ]
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
@@ -1056,6 +1030,8 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "retry_policy",
             b"retry_policy",
+            "search_attributes",
+            b"search_attributes",
             "workflow_run_timeout",
             b"workflow_run_timeout",
             "workflow_task_timeout",
@@ -1185,28 +1161,6 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
-    class SearchAttributesEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
-        ) -> None: ...
-        def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
-        ) -> builtins.bool: ...
-        def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
-        ) -> None: ...
-
     SEQ_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
     WORKFLOW_ID_FIELD_NUMBER: builtins.int
@@ -1275,9 +1229,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
     @property
     def search_attributes(
         self,
-    ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, temporalio.api.common.v1.message_pb2.Payload
-    ]:
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
         """Search attributes"""
     cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType
     """Defines behaviour of the underlying workflow when child workflow cancellation has been requested."""
@@ -1313,9 +1265,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             builtins.str, temporalio.api.common.v1.message_pb2.Payload
         ]
         | None = ...,
-        search_attributes: collections.abc.Mapping[
-            builtins.str, temporalio.api.common.v1.message_pb2.Payload
-        ]
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
@@ -1328,6 +1278,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             b"priority",
             "retry_policy",
             b"retry_policy",
+            "search_attributes",
+            b"search_attributes",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -1588,46 +1540,26 @@ global___CancelSignalWorkflow = CancelSignalWorkflow
 class UpsertWorkflowSearchAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    class SearchAttributesEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.str
-        @property
-        def value(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.str = ...,
-            value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
-        ) -> None: ...
-        def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
-        ) -> builtins.bool: ...
-        def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
-        ) -> None: ...
-
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     @property
     def search_attributes(
         self,
-    ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, temporalio.api.common.v1.message_pb2.Payload
-    ]:
-        """SearchAttributes fields - equivalent to indexed_fields on api. Key = search index, Value =
-        value?
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
+        """SearchAttributes to upsert. The indexed_fields map will be merged with existing search
+        attributes, with these values taking precedence.
         """
     def __init__(
         self,
         *,
-        search_attributes: collections.abc.Mapping[
-            builtins.str, temporalio.api.common.v1.message_pb2.Payload
-        ]
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "search_attributes", b"search_attributes"
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
