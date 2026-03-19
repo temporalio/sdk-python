@@ -28,7 +28,7 @@ from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually
+from tests.helpers import assert_eq_eventually, assert_eventually
 
 
 @activity.defn
@@ -506,17 +506,19 @@ async def test_list_activities(client: Client, env: WorkflowEnvironment):
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
     )
-    await asyncio.sleep(1)
-    executions = [
-        e async for e in client.list_activities(f'ActivityId = "{activity_id}"')
-    ]
-    assert len(executions) == 1
-    execution = executions[0]
-    assert execution.activity_id == activity_id
-    assert execution.activity_type == "increment"
-    assert execution.task_queue == task_queue
-    assert execution.status == ActivityExecutionStatus.RUNNING
-    assert execution.state_transition_count is None  # Not set until activity completes
+    async def check_executions():
+        executions = [
+            e async for e in client.list_activities(f'ActivityId = "{activity_id}"')
+        ]
+        assert len(executions) == 1
+        execution = executions[0]
+        assert execution.activity_id == activity_id
+        assert execution.activity_type == "increment"
+        assert execution.task_queue == task_queue
+        assert execution.status == ActivityExecutionStatus.RUNNING
+        assert execution.state_transition_count is None  # Not set until activity completes
+
+    await assert_eventually(check_executions)
 
 
 async def test_count_activities(client: Client, env: WorkflowEnvironment):
