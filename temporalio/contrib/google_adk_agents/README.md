@@ -71,13 +71,14 @@ Model calls are intercepted and executed as Temporal activities with configurabl
 **Agent (Workflow) Side:**
 ```python
 from temporalio.contrib.google_adk_agents import TemporalModel
+from temporalio.workflow import ActivityConfig
 from google.adk import Agent
 
 
 # Add to agent
 agent = Agent(
     name="test_agent",
-    model=TemporalModel("gemini-2.5-pro"), 
+    model=TemporalModel("gemini-2.5-pro", activity_config=ActivityConfig(summary="Researcher Agent")), 
 )
 ```
 
