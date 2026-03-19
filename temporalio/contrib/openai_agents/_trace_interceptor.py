@@ -65,10 +65,6 @@ class OpenAIAgentsContextPropagationInterceptor(
 ):
     """Interceptor that propagates OpenAI agent tracing context through Temporal workflows and activities.
 
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
-
     This interceptor enables tracing of OpenAI agent operations across Temporal workflows
     and activities. It propagates trace context through workflow and activity boundaries,
     allowing for end-to-end tracing of agent operations.
