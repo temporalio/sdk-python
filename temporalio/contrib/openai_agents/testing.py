@@ -199,8 +199,7 @@ class AgentEnvironment:
             register_activities: Whether to register activities during worker execution.
             add_temporal_spans: Whether to add temporal spans to traces
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
-            .. warning::
-                use_otel_instrumentation is experimental and may change in future versions.
+                Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
                 Use with caution in production environments.
         """
         self._model_params = model_params
