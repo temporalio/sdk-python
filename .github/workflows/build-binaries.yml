@@ -4,8 +4,6 @@ on:
     branches:
       - main
       - "releases/*"
-      - build-binaries-install-whl
-
 permissions:
   contents: read
 
@@ -69,9 +67,9 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             bindir=Scripts
           fi
-          ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil 'openai-agents>=0.2.3,<=0.2.9' 'googleapis-common-protos==1.70.0'
+          ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic
           ./.venv/$bindir/pip install --prefer-binary ../dist/*.whl
-          ./.venv/$bindir/python -m pytest -s -k test_workflow_hello
+          ./.venv/$bindir/python -m pytest -s tests/worker/test_workflow.py -k test_workflow_hello
 
       # Upload dist
       - uses: actions/upload-artifact@v4

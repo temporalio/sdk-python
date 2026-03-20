@@ -1514,8 +1514,6 @@ code](https://github.com/temporalio/samples-python/blob/main/context_propagation
 
 ### Nexus
 
-⚠️  **Nexus support is currently at an experimental release stage. Backwards-incompatible changes are anticipated until a stable release is announced.** ⚠️
-
 [Nexus](https://github.com/nexus-rpc/) is a synchronous RPC protocol. Arbitrary duration operations that can respond
 asynchronously are modeled on top of a set of pre-defined synchronous RPCs.
 

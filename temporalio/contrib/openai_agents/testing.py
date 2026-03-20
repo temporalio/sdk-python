@@ -39,19 +39,11 @@ __all__ = [
 
 
 class ResponseBuilders:
-    """Builders for creating model responses for testing.
-
-    .. warning::
-        This API is experimental and may change in the future.
-    """
+    """Builders for creating model responses for testing."""
 
     @staticmethod
     def model_response(output: TResponseOutputItem) -> ModelResponse:
-        """Create a ModelResponse with the given output.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ModelResponse with the given output."""
         return ModelResponse(
             output=[output],
             usage=Usage(),
@@ -60,11 +52,7 @@ class ResponseBuilders:
 
     @staticmethod
     def response_output_message(text: str) -> ResponseOutputMessage:
-        """Create a ResponseOutputMessage with text content.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ResponseOutputMessage with text content."""
         return ResponseOutputMessage(
             id="",
             content=[
@@ -81,11 +69,7 @@ class ResponseBuilders:
 
     @staticmethod
     def tool_call(arguments: str, name: str) -> ModelResponse:
-        """Create a ModelResponse with a function tool call.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ModelResponse with a function tool call."""
         return ResponseBuilders.model_response(
             ResponseFunctionToolCall(
                 arguments=arguments,
@@ -99,57 +83,33 @@ class ResponseBuilders:
 
     @staticmethod
     def output_message(text: str) -> ModelResponse:
-        """Create a ModelResponse with an output message.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ModelResponse with an output message."""
         return ResponseBuilders.model_response(
             ResponseBuilders.response_output_message(text)
         )
 
 
 class TestModelProvider(ModelProvider):
-    """Test model provider which simply returns the given module.
-
-    .. warning::
-        This API is experimental and may change in the future.
-    """
+    """Test model provider which simply returns the given module."""
 
     __test__ = False
 
     def __init__(self, model: Model):
-        """Initialize a test model provider with a model.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Initialize a test model provider with a model."""
         self._model = model
 
     def get_model(self, model_name: str | None) -> Model:
-        """Get a model from the model provider.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Get a model from the model provider."""
         return self._model
 
 
 class TestModel(Model):
-    """Test model for use mocking model responses.
-
-    .. warning::
-        This API is experimental and may change in the future.
-    """
+    """Test model for use mocking model responses."""
 
     __test__ = False
 
     def __init__(self, fn: Callable[[], ModelResponse]) -> None:
-        """Initialize a test model with a callable.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Initialize a test model with a callable."""
         self.fn = fn
 
     async def get_response(
@@ -182,11 +142,7 @@ class TestModel(Model):
 
     @staticmethod
     def returning_responses(responses: list[ModelResponse]) -> "TestModel":
-        """Create a mock model which sequentially returns responses from a list.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a mock model which sequentially returns responses from a list."""
         i = iter(responses)
         return TestModel(lambda: next(i))
 
@@ -196,9 +152,6 @@ class AgentEnvironment:
 
     This async context manager provides a convenient way to set up testing environments
     for OpenAI agents with mocked model calls and Temporal integration.
-
-    .. warning::
-        This API is experimental and may change in the future.
 
     Example:
         >>> from temporalio.contrib.openai_agents.testing import AgentEnvironment, TestModelProvider, ResponseBuilders
@@ -246,9 +199,8 @@ class AgentEnvironment:
             register_activities: Whether to register activities during worker execution.
             add_temporal_spans: Whether to add temporal spans to traces
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
-
-        .. warning::
-           This API is experimental and may change in the future.
+                Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
+                Use with caution in production environments.
         """
         self._model_params = model_params
         self._model_provider = None
@@ -289,9 +241,6 @@ class AgentEnvironment:
 
         Returns:
             A new Client instance with the OpenAI agents plugin applied.
-
-        .. warning::
-           This API is experimental and may change in the future.
         """
         if self._plugin is None:
             raise RuntimeError(
@@ -305,11 +254,7 @@ class AgentEnvironment:
 
     @property
     def openai_agents_plugin(self) -> OpenAIAgentsPlugin:
-        """Get the underlying OpenAI agents plugin.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Get the underlying OpenAI agents plugin."""
         if self._plugin is None:
             raise RuntimeError(
                 "AgentEnvironment must be entered before accessing plugin"

@@ -44,33 +44,10 @@ if typing.TYPE_CHECKING:
 
 
 @contextmanager
-def set_open_ai_agent_temporal_overrides(
+def _set_open_ai_agent_temporal_overrides(
     model_params: ModelActivityParameters,
     start_spans_in_replay: bool = False,
 ):
-    """Configure Temporal-specific overrides for OpenAI agents.
-
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments. Future versions may wrap the worker directly
-        instead of requiring this context manager.
-
-    This context manager sets up the necessary Temporal-specific runners and trace providers
-    for running OpenAI agents within Temporal workflows. It should be called in the main
-    entry point of your application before initializing the Temporal client and worker.
-
-    The context manager handles:
-    1. Setting up a Temporal-specific runner for OpenAI agents
-    2. Configuring a Temporal-aware trace provider
-    3. Restoring previous settings when the context exits
-
-    Args:
-        model_params: Configuration parameters for Temporal activity execution of model calls.
-        start_spans_in_replay: If set to true, start spans even during replay. Primarily used for otel integration.
-
-    Returns:
-        A context manager that yields the configured TemporalTraceProvider.
-    """
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
     provider = TemporalTraceProvider(
@@ -111,10 +88,6 @@ def _data_converter(converter: DataConverter | None) -> DataConverter:
 class OpenAIAgentsPlugin(SimplePlugin):
     """Temporal plugin for integrating OpenAI agents with Temporal workflows.
 
-    .. warning::
-        This class is experimental and may change in future versions.
-        Use with caution in production environments.
-
     This plugin provides seamless integration between the OpenAI Agents SDK and
     Temporal workflows. It automatically configures the necessary interceptors,
     activities, and data converters to enable OpenAI agents to run within
@@ -126,16 +99,6 @@ class OpenAIAgentsPlugin(SimplePlugin):
     3. Registers model execution activities
     4. Automatically registers MCP server activities and manages their lifecycles
     5. Manages the OpenAI agent runtime overrides during worker execution
-
-    Args:
-        model_params: Configuration parameters for Temporal activity execution
-            of model calls. If None, default parameters will be used.
-        model_provider: Optional model provider for custom model implementations.
-            Useful for testing or custom model integrations.
-        mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
-            The plugin will wrap each server in a TemporalMCPServer if needed and
-            manage their connection lifecycles tied to the worker lifetime. This is
-            the recommended way to use MCP servers with Temporal workflows.
 
     Example:
         >>> from temporalio.client import Client
@@ -201,6 +164,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 but should not be disabled on all workers, or agents will not be able to progress.
             add_temporal_spans: Whether to add temporal spans to traces
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
+                Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
+                Use with caution in production environments.
+
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -280,7 +246,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
             with self.tracing_context():
-                with set_open_ai_agent_temporal_overrides(
+                with _set_open_ai_agent_temporal_overrides(
                     model_params, start_spans_in_replay=use_otel_instrumentation
                 ):
                     yield
