@@ -1,8 +1,5 @@
 """Temporal Nexus support
 
-.. warning::
-    Nexus APIs are experimental and unstable.
-
 See https://github.com/temporalio/sdk-python/tree/main#nexus
 """
 

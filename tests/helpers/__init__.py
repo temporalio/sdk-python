@@ -71,6 +71,7 @@ async def assert_eventually(
     *,
     timeout: timedelta = timedelta(seconds=10),
     interval: timedelta = timedelta(milliseconds=200),
+    retry_on_rpc_cancelled: bool = True,
 ) -> T:
     start_sec = time.monotonic()
     while True:
@@ -79,6 +80,11 @@ async def assert_eventually(
             return res
         except AssertionError:
             if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
+                raise
+        except RPCError as e:
+            if retry_on_rpc_cancelled and e.status == RPCStatusCode.CANCELLED:
+                continue
+            else:
                 raise
         await asyncio.sleep(interval.total_seconds())
 

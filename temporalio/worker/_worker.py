@@ -157,9 +157,6 @@ class Worker:
                 may be async functions or non-async functions.
             nexus_service_handlers: Instances of Nexus service handler classes
                 decorated with :py:func:`@nexusrpc.handler.service_handler<nexusrpc.handler.service_handler>`.
-
-                .. warning::
-                    This parameter is experimental and unstable.
             workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
@@ -182,9 +179,6 @@ class Worker:
             nexus_task_executor: Executor to use for non-async
                 Nexus operations. This is required if any operation start methods
                 are non-``async def``.
-
-                .. warning::
-                    This parameter is experimental and unstable.
             workflow_runner: Runner for workflows.
             unsandboxed_workflow_runner: Runner for workflows that opt-out of
                 sandboxing.

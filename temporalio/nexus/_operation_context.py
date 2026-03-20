@@ -76,9 +76,6 @@ _temporal_nexus_backing_workflow_start_context: ContextVar[bool] = ContextVar(
 class Info:
     """Information about the running Nexus operation.
 
-    .. warning::
-        This API is experimental and unstable.
-
     Retrieved inside a Nexus operation handler via :py:func:`info`.
     """
 
@@ -277,11 +274,7 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
 
 
 class WorkflowRunOperationContext(StartOperationContext):
-    """Context received by a workflow run operation.
-
-    .. warning::
-        This API is experimental and unstable.
-    """
+    """Context received by a workflow run operation."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the workflow run operation context."""
@@ -541,11 +534,7 @@ class WorkflowRunOperationContext(StartOperationContext):
 
 @dataclass(frozen=True)
 class NexusCallback:
-    """Nexus callback to attach to events such as workflow completion.
-
-    .. warning::
-        This API is experimental and unstable.
-    """
+    """Nexus callback to attach to events such as workflow completion."""
 
     url: str
     """Callback URL."""
