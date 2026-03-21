@@ -8,6 +8,7 @@ from unittest import mock
 import pytest
 
 import temporalio
+import temporalio.bridge.client
 import temporalio.bridge.worker
 import temporalio.converter
 from temporalio import activity, workflow
@@ -586,7 +587,10 @@ async def test_worker_storage_drivers_populated_from_client(
     captured_config: list[temporalio.bridge.worker.WorkerConfig] = []
     original_create = temporalio.bridge.worker.Worker.create
 
-    def capture_config(bridge_client, config):
+    def capture_config(
+        bridge_client: temporalio.bridge.client.Client,
+        config: temporalio.bridge.worker.WorkerConfig,
+    ):
         captured_config.append(config)
         return original_create(bridge_client, config)
 

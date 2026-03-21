@@ -271,9 +271,9 @@ class Replayer:
             )
             external_storage = data_converter.external_storage
             storage_driver_types = (
-                list({driver.type() for driver in external_storage.drivers})
+                {driver.type() for driver in external_storage.drivers}
                 if external_storage
-                else []
+                else set()
             )
 
             # Create bridge worker
