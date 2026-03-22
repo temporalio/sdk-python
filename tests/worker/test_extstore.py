@@ -568,7 +568,9 @@ def _tmprl1104_records(capturer: LogCapturer) -> list[logging.LogRecord]:
     return capturer.find_all(lambda r: r.getMessage().startswith("[TMPRL1104]"))
 
 
-async def _expected_payload_size(converter: temporalio.converter.DataConverter, value: object) -> int:
+async def _expected_payload_size(
+    converter: temporalio.converter.DataConverter, value: object
+) -> int:
     """Encode a value and return the protobuf ByteSize of the resulting payload."""
     payloads = converter.payload_converter.to_payloads([value])
     return payloads[0].ByteSize()
@@ -586,9 +588,7 @@ class SimpleWorkflow:
 async def test_tmprl1104_no_extstore(env: WorkflowEnvironment) -> None:
     """Without external storage, TMPRL1104 logs contain duration but no
     download/upload metrics."""
-    with LogCapturer().logs_captured(
-        _workflow_logger, level=logging.DEBUG
-    ) as capturer:
+    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
         async with new_worker(env.client, SimpleWorkflow) as worker:
             await env.client.execute_workflow(
                 SimpleWorkflow.run,
@@ -599,7 +599,9 @@ async def test_tmprl1104_no_extstore(env: WorkflowEnvironment) -> None:
     records = _tmprl1104_records(capturer)
     assert len(records) == 1
     record = records[0]
-    assert record.getMessage().startswith("[TMPRL1104] Workflow task duration information (")
+    assert record.getMessage().startswith(
+        "[TMPRL1104] Workflow task duration information ("
+    )
     assert hasattr(record, "workflow_task_duration")
     assert hasattr(record, "event_id")
     # No external storage — download/upload fields must be absent
@@ -636,9 +638,7 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
     )
     expected_input_size = await _expected_payload_size(data_converter, wf_input)
 
-    with LogCapturer().logs_captured(
-        _workflow_logger, level=logging.DEBUG
-    ) as capturer:
+    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
         async with new_worker(
             client, ExtStoreWorkflow, activities=[ext_store_activity]
         ) as worker:
@@ -653,14 +653,22 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
     assert len(records) == 2
 
     # WFT 1: retrieves the externalized workflow input
-    assert records[0].getMessage().startswith("[TMPRL1104] Workflow task duration information (")
+    assert (
+        records[0]
+        .getMessage()
+        .startswith("[TMPRL1104] Workflow task duration information (")
+    )
     assert records[0].payload_download_count == 1  # type: ignore[attr-defined]
     assert records[0].payload_download_size == expected_input_size  # type: ignore[attr-defined]
     assert records[0].payload_download_duration > timedelta(0)  # type: ignore[attr-defined]
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: activity result is small — no external storage
-    assert records[1].getMessage().startswith("[TMPRL1104] Workflow task duration information (")
+    assert (
+        records[1]
+        .getMessage()
+        .startswith("[TMPRL1104] Workflow task duration information (")
+    )
     assert not hasattr(records[1], "payload_download_count")
     assert not hasattr(records[1], "payload_upload_count")
 
@@ -685,9 +693,7 @@ async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
     wf_output = "wo" * 1024  # 2048 bytes → stored externally
     expected_output_size = await _expected_payload_size(data_converter, wf_output)
 
-    with LogCapturer().logs_captured(
-        _workflow_logger, level=logging.DEBUG
-    ) as capturer:
+    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
         async with new_worker(
             client, ExtStoreWorkflow, activities=[ext_store_activity]
         ) as worker:
@@ -707,12 +713,20 @@ async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
     assert len(records) == 2
 
     # WFT 1: small input — no external storage
-    assert records[0].getMessage().startswith("[TMPRL1104] Workflow task duration information (")
+    assert (
+        records[0]
+        .getMessage()
+        .startswith("[TMPRL1104] Workflow task duration information (")
+    )
     assert not hasattr(records[0], "payload_download_count")
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: workflow returns large result → uploaded
-    assert records[1].getMessage().startswith("[TMPRL1104] Workflow task duration information (")
+    assert (
+        records[1]
+        .getMessage()
+        .startswith("[TMPRL1104] Workflow task duration information (")
+    )
     assert not hasattr(records[1], "payload_download_count")
     assert records[1].payload_upload_count == 1  # type: ignore[attr-defined]
     assert records[1].payload_upload_size == expected_output_size  # type: ignore[attr-defined]
@@ -748,9 +762,7 @@ async def test_tmprl1104_with_extstore_download_and_upload(
     wf_output = "wo" * 1024
     expected_output_size = await _expected_payload_size(data_converter, wf_output)
 
-    with LogCapturer().logs_captured(
-        _workflow_logger, level=logging.DEBUG
-    ) as capturer:
+    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
         async with new_worker(
             client, ExtStoreWorkflow, activities=[ext_store_activity]
         ) as worker:
@@ -765,14 +777,22 @@ async def test_tmprl1104_with_extstore_download_and_upload(
     assert len(records) == 2
 
     # WFT 1: retrieves externalized workflow input
-    assert records[0].getMessage().startswith("[TMPRL1104] Workflow task duration information (")
+    assert (
+        records[0]
+        .getMessage()
+        .startswith("[TMPRL1104] Workflow task duration information (")
+    )
     assert records[0].payload_download_count == 1  # type: ignore[attr-defined]
     assert records[0].payload_download_size == expected_input_size  # type: ignore[attr-defined]
     assert records[0].payload_download_duration > timedelta(0)  # type: ignore[attr-defined]
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: uploads externalized workflow result
-    assert records[1].getMessage().startswith("[TMPRL1104] Workflow task duration information (")
+    assert (
+        records[1]
+        .getMessage()
+        .startswith("[TMPRL1104] Workflow task duration information (")
+    )
     assert not hasattr(records[1], "payload_download_count")
     assert records[1].payload_upload_count == 1  # type: ignore[attr-defined]
     assert records[1].payload_upload_size == expected_output_size  # type: ignore[attr-defined]

@@ -422,9 +422,7 @@ class LogCapturer:
         self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
 
     @contextmanager
-    def logs_captured(
-        self, *loggers: logging.Logger, level: int = logging.INFO
-    ):
+    def logs_captured(self, *loggers: logging.Logger, level: int = logging.INFO):
         handler = logging.handlers.QueueHandler(self.log_queue)
 
         prev_levels = [l.level for l in loggers]
