@@ -9,23 +9,33 @@ import pytest_asyncio
 
 from temporalio.api.cloud.cloudservice.v1 import GetNamespaceRequest
 from temporalio.client import Client, CloudOperationsClient
+from temporalio.service import TLSConfig
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import SharedStateManager
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
-# Skip entire module if cloud env vars are missing
+# Skip entire module unless explicitly enabled
 pytestmark = pytest.mark.skipif(
-    "TEMPORAL_CLIENT_CLOUD_API_KEY" not in os.environ,
-    reason="No cloud API key",
+    "TEMPORAL_IS_CLOUD_TESTS" not in os.environ,
+    reason="Cloud tests not enabled",
 )
 
 
 @pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
 async def env() -> AsyncGenerator[WorkflowEnvironment, None]:
+    tls_config: bool | TLSConfig = True
+    client_cert = os.environ.get("TEMPORAL_CLIENT_CERT")
+    client_key = os.environ.get("TEMPORAL_CLIENT_KEY")
+    if client_cert and client_key:
+        tls_config = TLSConfig(
+            client_cert=client_cert.encode(),
+            client_private_key=client_key.encode(),
+        )
     client = await Client.connect(
         os.environ["TEMPORAL_CLIENT_CLOUD_TARGET"],
         namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"],
-        api_key=os.environ["TEMPORAL_CLIENT_CLOUD_API_KEY"],
+        api_key=os.environ.get("TEMPORAL_CLIENT_CLOUD_API_KEY"),
+        tls=tls_config,
     )
     env = WorkflowEnvironment.from_client(client)
     yield env

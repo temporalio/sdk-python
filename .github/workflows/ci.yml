@@ -188,10 +188,13 @@ jobs:
       - run: poe test -s tests/test_cloud.py --junit-xml=junit-xml/cloud.xml
         timeout-minutes: 10
         env:
+          TEMPORAL_IS_CLOUD_TESTS: true
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
           TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
           TEMPORAL_CLIENT_CLOUD_TARGET: sdk-ci.a2dd6.tmprl.cloud:7233
+          TEMPORAL_CLIENT_CERT: ${{ secrets.TEMPORAL_CLIENT_CERT }}
+          TEMPORAL_CLIENT_KEY: ${{ secrets.TEMPORAL_CLIENT_KEY }}
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@v4
         if: always()

@@ -1479,7 +1479,6 @@ async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
     assert reachability.build_id_reachability["1.1"].task_queue_reachability[tq] == []
 
 
-
 @workflow.defn
 class LastCompletionResultWorkflow:
     @workflow.run
