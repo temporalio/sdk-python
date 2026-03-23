@@ -435,6 +435,17 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
 
         # Log workflow task duration with external storage metrics
+        self._log_workflow_task_duration(
+            act, task_start_time, download_metrics, upload_metrics
+        )
+
+    @staticmethod
+    def _log_workflow_task_duration(
+        act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+        task_start_time: float,
+        download_metrics: temporalio.converter._extstore.StorageOperationMetrics,
+        upload_metrics: temporalio.converter._extstore.StorageOperationMetrics,
+    ) -> None:
         task_duration = timedelta(seconds=time.monotonic() - task_start_time)
 
         def _fmt_duration(td: timedelta) -> str:
