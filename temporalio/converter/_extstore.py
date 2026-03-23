@@ -503,4 +503,6 @@ class ExternalStorage(WithSerializationContext):
     def _record_metrics(count: int, size: int, start_time: float):
         metrics = _current_storage_metrics.get()
         if metrics is not None:
-            metrics.record_batch(count, size, timedelta(time.monotonic() - start_time))
+            metrics.record_batch(
+                count, size, timedelta(seconds=time.monotonic() - start_time)
+            )
