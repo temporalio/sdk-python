@@ -325,8 +325,7 @@ class OpenTelemetryConfig:
         headers: Optional headers to include with each export request.
             Useful for authentication tokens or routing metadata.
         metric_periodicity: How often metrics are exported to the collector.
-            Defaults to the OpenTelemetry SDK default (typically 60s) when
-            ``None``.
+            Defaults to 1s (set by sdk-core) when ``None``.
         metric_temporality: Whether metrics are exported as cumulative
             or delta values. Defaults to ``CUMULATIVE``.
         durations_as_seconds: If ``True``, export duration metrics as
