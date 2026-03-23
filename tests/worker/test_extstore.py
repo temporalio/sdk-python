@@ -4,10 +4,13 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+from unittest import mock
 
 import pytest
 
 import temporalio
+import temporalio.bridge.client
+import temporalio.bridge.worker
 import temporalio.converter
 import temporalio.worker._workflow
 from temporalio import activity, workflow
@@ -554,6 +557,65 @@ async def test_extstore_chained_activities(
     # round-trips (one store on completion, one retrieve on the next WFT).
     assert driver._store_calls == 2
     assert driver._retrieve_calls == 2
+
+
+async def test_worker_storage_drivers_populated_from_client(
+    env: WorkflowEnvironment,
+):
+    """Worker._storage_drivers is populated from the client's ExternalStorage and
+    passed to the bridge config as a set of driver type strings."""
+
+    class DifferentTestDriver(InMemoryTestDriver):
+        def __init__(self, driver_name: str):
+            super().__init__(driver_name=driver_name)
+
+    driver1 = InMemoryTestDriver(driver_name="driver1")
+    driver2 = InMemoryTestDriver(driver_name="driver2")
+    driver3 = DifferentTestDriver(driver_name="driver3")
+
+    client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=ExternalStorage(
+                drivers=[driver1, driver2, driver3],
+                driver_selector=lambda _context, _payload: driver1,
+                payload_size_threshold=None,
+            ),
+        ),
+    )
+
+    captured_config: list[temporalio.bridge.worker.WorkerConfig] = []
+    original_create = temporalio.bridge.worker.Worker.create
+
+    def capture_config(
+        bridge_client: temporalio.bridge.client.Client,
+        config: temporalio.bridge.worker.WorkerConfig,
+    ):
+        captured_config.append(config)
+        return original_create(bridge_client, config)
+
+    with mock.patch.object(
+        temporalio.bridge.worker.Worker, "create", side_effect=capture_config
+    ):
+        async with new_worker(
+            client, ExtStoreWorkflow, activities=[ext_store_activity]
+        ) as worker:
+            assert worker._storage_drivers == [driver1, driver2, driver3]
+
+    assert len(captured_config) == 1
+    assert captured_config[0].storage_drivers == {driver1.type(), driver3.type()}
+
+
+async def test_worker_storage_drivers_empty_without_external_storage(
+    env: WorkflowEnvironment,
+):
+    """Worker._storage_drivers is empty when the client has no ExternalStorage."""
+    async with new_worker(
+        env.client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        assert worker._storage_drivers == []
 
 
 # ---------------------------------------------------------------------------

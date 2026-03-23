@@ -233,6 +233,10 @@ class Replayer:
             runtime = (
                 self._config.get("runtime") or temporalio.runtime.Runtime.default()
             )
+            data_converter = (
+                self._config.get("data_converter")
+                or temporalio.converter.DataConverter.default
+            )
             workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: bridge_worker,
                 namespace=self._config.get("namespace", "ReplayNamespace"),
@@ -246,8 +250,7 @@ class Replayer:
                     "unsandboxed_workflow_runner"
                 )
                 or UnsandboxedWorkflowRunner(),
-                data_converter=self._config.get("data_converter")
-                or temporalio.converter.DataConverter.default,
+                data_converter=data_converter,
                 interceptors=self._config.get("interceptors", []),
                 workflow_failure_exception_types=self._config.get(
                     "workflow_failure_exception_types", []
@@ -266,6 +269,13 @@ class Replayer:
                 )
                 != HeaderCodecBehavior.NO_CODEC,
             )
+            external_storage = data_converter.external_storage
+            storage_driver_types = (
+                {driver.type() for driver in external_storage.drivers}
+                if external_storage
+                else set()
+            )
+
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
                 runtime._core_runtime,
@@ -322,6 +332,7 @@ class Replayer:
                         1
                     ),
                     plugins=[plugin.name() for plugin in self.plugins],
+                    storage_drivers=storage_driver_types,
                 ),
             )
             bridge_worker_scope = bridge_worker
