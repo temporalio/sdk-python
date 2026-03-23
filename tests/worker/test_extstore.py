@@ -658,9 +658,9 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
         .getMessage()
         .startswith("[TMPRL1104] Workflow task duration information (")
     )
-    assert records[0].payload_download_count == 1  # type: ignore[attr-defined]
-    assert records[0].payload_download_size == expected_input_size  # type: ignore[attr-defined]
-    assert records[0].payload_download_duration > timedelta(0)  # type: ignore[attr-defined]
+    assert getattr(records[0], "payload_download_count") == 1
+    assert getattr(records[0], "payload_download_size") == expected_input_size
+    assert getattr(records[0], "payload_download_duration") > timedelta(0)
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: activity result is small — no external storage
@@ -728,9 +728,9 @@ async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
         .startswith("[TMPRL1104] Workflow task duration information (")
     )
     assert not hasattr(records[1], "payload_download_count")
-    assert records[1].payload_upload_count == 1  # type: ignore[attr-defined]
-    assert records[1].payload_upload_size == expected_output_size  # type: ignore[attr-defined]
-    assert records[1].payload_upload_duration > timedelta(0)  # type: ignore[attr-defined]
+    assert getattr(records[1], "payload_upload_count") == 1
+    assert getattr(records[1], "payload_upload_size") == expected_output_size
+    assert getattr(records[1], "payload_upload_duration") > timedelta(0)
 
 
 async def test_tmprl1104_with_extstore_download_and_upload(
@@ -782,9 +782,9 @@ async def test_tmprl1104_with_extstore_download_and_upload(
         .getMessage()
         .startswith("[TMPRL1104] Workflow task duration information (")
     )
-    assert records[0].payload_download_count == 1  # type: ignore[attr-defined]
-    assert records[0].payload_download_size == expected_input_size  # type: ignore[attr-defined]
-    assert records[0].payload_download_duration > timedelta(0)  # type: ignore[attr-defined]
+    assert getattr(records[0], "payload_download_count") == 1
+    assert getattr(records[0], "payload_download_size") == expected_input_size
+    assert getattr(records[0], "payload_download_duration") > timedelta(0)
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: uploads externalized workflow result
@@ -794,6 +794,6 @@ async def test_tmprl1104_with_extstore_download_and_upload(
         .startswith("[TMPRL1104] Workflow task duration information (")
     )
     assert not hasattr(records[1], "payload_download_count")
-    assert records[1].payload_upload_count == 1  # type: ignore[attr-defined]
-    assert records[1].payload_upload_size == expected_output_size  # type: ignore[attr-defined]
-    assert records[1].payload_upload_duration > timedelta(0)  # type: ignore[attr-defined]
+    assert getattr(records[1], "payload_upload_count") == 1
+    assert getattr(records[1], "payload_upload_size") == expected_output_size
+    assert getattr(records[1], "payload_upload_duration") > timedelta(0)
