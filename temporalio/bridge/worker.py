@@ -309,13 +309,10 @@ async def decode_activation(
         Metrics from any external storage retrieval operations that occurred.
     """
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
-    token = temporalio.converter._extstore._current_storage_metrics.set(metrics)
-    try:
+    with metrics.track():
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True, skip_headers=not decode_headers
         ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
-    finally:
-        temporalio.converter._extstore._current_storage_metrics.reset(token)
     return metrics
 
 
@@ -330,11 +327,8 @@ async def encode_completion(
         Metrics from any external storage store operations that occurred.
     """
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
-    token = temporalio.converter._extstore._current_storage_metrics.set(metrics)
-    try:
+    with metrics.track():
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True, skip_headers=not encode_headers
         ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
-    finally:
-        temporalio.converter._extstore._current_storage_metrics.reset(token)
     return metrics

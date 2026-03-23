@@ -5,11 +5,12 @@ systems.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import contextvars
 import dataclasses
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Generator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, ClassVar, TypeVar
@@ -46,6 +47,15 @@ class StorageOperationMetrics:
         self.payload_count += count
         self.total_size += size
         self.total_duration += duration
+
+    @contextlib.contextmanager
+    def track(self) -> Generator[Self, None, None]:
+        """Set this instance as the current metrics context and reset on exit."""
+        token = _current_storage_metrics.set(self)
+        try:
+            yield self
+        finally:
+            _current_storage_metrics.reset(token)
 
 
 _current_storage_metrics: contextvars.ContextVar[StorageOperationMetrics | None] = (
