@@ -20,6 +20,7 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
+import temporalio.converter._extstore
 from temporalio.api.common.v1.message_pb2 import Payload
 from temporalio.bridge._visitor import VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
@@ -302,19 +303,33 @@ async def decode_activation(
     activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
-) -> None:
-    """Decode all payloads in the activation."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+) -> temporalio.converter._extstore.StorageOperationMetrics:
+    """Decode all payloads in the activation.
+
+    Returns:
+        Metrics from any external storage retrieval operations that occurred.
+    """
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
+    with metrics.track():
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True, skip_headers=not decode_headers
+        ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+    return metrics
 
 
 async def encode_completion(
     completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     data_converter: temporalio.converter.DataConverter,
     encode_headers: bool,
-) -> None:
-    """Encode all payloads in the completion."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
+) -> temporalio.converter._extstore.StorageOperationMetrics:
+    """Encode all payloads in the completion.
+
+    Returns:
+        Metrics from any external storage store operations that occurred.
+    """
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
+    with metrics.track():
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True, skip_headers=not encode_headers
+        ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
+    return metrics
