@@ -51,10 +51,6 @@ def activity_as_tool(
 ) -> Tool:
     """Convert a single Temporal activity function to an OpenAI agent tool.
 
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
-
     This function takes a Temporal activity function and converts it into an
     OpenAI agent tool that can be used by the agent to execute the activity
     during workflow execution. The tool will automatically handle the conversion
@@ -171,10 +167,6 @@ def nexus_operation_as_tool(
 ) -> Tool:
     """Convert a Nexus operation into an OpenAI agent tool.
 
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
-
     This function takes a Nexus operation and converts it into an
     OpenAI agent tool that can be used by the agent to execute the operation
     during workflow execution. The tool will automatically handle the conversion
@@ -257,10 +249,6 @@ def stateless_mcp_server(
 ) -> "MCPServer":
     """A stateless MCP server implementation for Temporal workflows.
 
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
-
     This uses a TemporalMCPServer of the same name registered with the OpenAIAgents plugin to implement
     durable MCP operations statelessly.
 
@@ -291,10 +279,6 @@ def stateful_mcp_server(
     factory_argument: Any | None = None,
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
-
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
 
     This wraps an MCP server to maintain a persistent connection throughout
     the workflow execution. It creates a dedicated worker that stays connected to
@@ -327,10 +311,6 @@ def stateful_mcp_server(
 class ToolSerializationError(TemporalError):
     """Error that occurs when a tool output could not be serialized.
 
-    .. warning::
-        This exception is experimental and may change in future versions.
-        Use with caution in production environments.
-
     This exception is raised when a tool (created from an activity or Nexus operation)
     returns a value that cannot be properly serialized for use by the OpenAI agent.
     All tool outputs must be convertible to strings for the agent to process them.
@@ -351,9 +331,4 @@ class ToolSerializationError(TemporalError):
 
 
 class AgentsWorkflowError(TemporalError):
-    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow or update.
-
-    .. warning::
-        This exception is experimental and may change in future versions.
-        Use with caution in production environments.
-    """
+    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow or update."""

@@ -4656,11 +4656,7 @@ async def execute_child_workflow(
 
 
 class NexusOperationHandle(Generic[OutputT]):
-    """Handle for interacting with a Nexus operation.
-
-    .. warning::
-        This API is experimental and unstable.
-    """
+    """Handle for interacting with a Nexus operation."""
 
     # TODO(nexus-preview): should attempts to instantiate directly throw?
 
@@ -5444,9 +5440,6 @@ class NexusOperationCancellationType(IntEnum):
 class NexusClient(ABC, Generic[ServiceT]):
     """A client for invoking Nexus operations.
 
-    .. warning::
-        This API is experimental and unstable.
-
     Example::
 
         nexus_client = workflow.create_nexus_client(
@@ -5857,9 +5850,6 @@ def create_nexus_client(
     endpoint: str,
 ) -> NexusClient[ServiceT]:
     """Create a Nexus client.
-
-    .. warning::
-        This API is experimental and unstable.
 
     Args:
         service: The Nexus service.

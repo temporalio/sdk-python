@@ -49,6 +49,9 @@ class InMemoryTestDriver(StorageDriver):
         ]
         self._storage.update(entries)
 
+        # Small delay to ensure measurable duration even on low-resolution timers.
+        await asyncio.sleep(0.02)
+
         return [StorageDriverClaim(claim_data={"key": key}) for key, _ in entries]
 
     async def retrieve(
@@ -69,6 +72,9 @@ class InMemoryTestDriver(StorageDriver):
             payload = Payload()
             payload.ParseFromString(self._storage[key])
             return payload
+
+        # Small delay to ensure measurable duration even on low-resolution timers.
+        await asyncio.sleep(0.02)
 
         return [parse_claim(claim) for claim in claims]
 

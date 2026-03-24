@@ -9938,8 +9938,8 @@ class ListWorkersRequest(google.protobuf.message.Message):
     page_size: builtins.int
     next_page_token: builtins.bytes
     query: builtins.str
-    """`query` in ListWorkers is used to filter workers based on worker status info.
-    The following worker status attributes are expected are supported as part of the query:
+    """`query` in ListWorkers is used to filter workers based on worker attributes.
+    Supported attributes:
     * WorkerInstanceKey
     * WorkerIdentity
     * HostName
@@ -9949,9 +9949,7 @@ class ListWorkersRequest(google.protobuf.message.Message):
     * SdkName
     * SdkVersion
     * StartTime
-    * LastHeartbeatTime
     * Status
-    Currently metrics are not supported as a part of ListWorkers query.
     """
     def __init__(
         self,
@@ -9981,13 +9979,24 @@ class ListWorkersResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     WORKERS_INFO_FIELD_NUMBER: builtins.int
+    WORKERS_FIELD_NUMBER: builtins.int
     NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
     @property
     def workers_info(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.worker.v1.message_pb2.WorkerInfo
-    ]: ...
+    ]:
+        """Deprecated: Use workers instead. This field returns full WorkerInfo which
+        includes expensive runtime metrics. We will stop populating this field in the future.
+        """
+    @property
+    def workers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.worker.v1.message_pb2.WorkerListInfo
+    ]:
+        """Limited worker information."""
     next_page_token: builtins.bytes
     """Next page token"""
     def __init__(
@@ -9997,12 +10006,21 @@ class ListWorkersResponse(google.protobuf.message.Message):
             temporalio.api.worker.v1.message_pb2.WorkerInfo
         ]
         | None = ...,
+        workers: collections.abc.Iterable[
+            temporalio.api.worker.v1.message_pb2.WorkerListInfo
+        ]
+        | None = ...,
         next_page_token: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "next_page_token", b"next_page_token", "workers_info", b"workers_info"
+            "next_page_token",
+            b"next_page_token",
+            "workers",
+            b"workers",
+            "workers_info",
+            b"workers_info",
         ],
     ) -> None: ...
 

@@ -20,6 +20,7 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
+import temporalio.converter._extstore
 from temporalio.api.common.v1.message_pb2 import Payload
 from temporalio.bridge._visitor import VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
@@ -56,6 +57,7 @@ class WorkerConfig:
     nondeterminism_as_workflow_fail_for_types: set[str]
     nexus_task_poller_behavior: PollerBehavior
     plugins: Sequence[str]
+    storage_drivers: set[str]
 
 
 @dataclass
@@ -302,13 +304,20 @@ async def decode_activation(
     data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
     concurrency_limit: int,
-) -> None:
-    """Decode all payloads in the activation."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True,
-        skip_headers=not decode_headers,
-        concurrency_limit=concurrency_limit,
-    ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+) -> temporalio.converter._extstore.StorageOperationMetrics:
+    """Decode all payloads in the activation.
+
+    Returns:
+        Metrics from any external storage retrieval operations that occurred.
+    """
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
+    with metrics.track():
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True,
+            skip_headers=not decode_headers,
+            concurrency_limit=concurrency_limit,
+        ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+    return metrics
 
 
 async def encode_completion(
@@ -316,10 +325,17 @@ async def encode_completion(
     data_converter: temporalio.converter.DataConverter,
     encode_headers: bool,
     concurrency_limit: int,
-) -> None:
-    """Encode all payloads in the completion."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True,
-        skip_headers=not encode_headers,
-        concurrency_limit=concurrency_limit,
-    ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
+) -> temporalio.converter._extstore.StorageOperationMetrics:
+    """Encode all payloads in the completion.
+
+    Returns:
+        Metrics from any external storage store operations that occurred.
+    """
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
+    with metrics.track():
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True,
+            skip_headers=not encode_headers,
+            concurrency_limit=concurrency_limit,
+        ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
+    return metrics

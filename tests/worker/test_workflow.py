@@ -7725,38 +7725,38 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
 async def heartbeat_activity(
     catch_err: bool = True,
 ) -> temporalio.activity.ActivityCancellationDetails | None:
-    while True:
-        try:
+    try:
+        while True:
             activity.heartbeat()
             # If we have heartbeat details, we are on the second attempt, we have retried due to pause/unpause.
             if activity.info().heartbeat_details:
                 return activity.cancellation_details()
             await asyncio.sleep(0.1)
-        except (CancelledError, asyncio.CancelledError) as err:
-            if not catch_err:
-                raise err
-            return activity.cancellation_details()
-        finally:
-            activity.heartbeat("finally-complete")
+    except (CancelledError, asyncio.CancelledError) as err:
+        if not catch_err:
+            raise err
+        return activity.cancellation_details()
+    finally:
+        activity.heartbeat("finally-complete")
 
 
 @activity.defn
 def sync_heartbeat_activity(
     catch_err: bool = True,
 ) -> temporalio.activity.ActivityCancellationDetails | None:
-    while True:
-        try:
+    try:
+        while True:
             activity.heartbeat()
             # If we have heartbeat details, we are on the second attempt, we have retried due to pause/unpause.
             if activity.info().heartbeat_details:
                 return activity.cancellation_details()
             time.sleep(0.1)
-        except (CancelledError, asyncio.CancelledError) as err:
-            if not catch_err:
-                raise err
-            return activity.cancellation_details()
-        finally:
-            activity.heartbeat("finally-complete")
+    except (CancelledError, asyncio.CancelledError) as err:
+        if not catch_err:
+            raise err
+        return activity.cancellation_details()
+    finally:
+        activity.heartbeat("finally-complete")
 
 
 @workflow.defn
@@ -7769,6 +7769,7 @@ class ActivityHeartbeatWorkflow:
         result.append(
             await workflow.execute_activity(
                 sync_heartbeat_activity,
+                True,
                 activity_id=activity_id,
                 start_to_close_timeout=timedelta(seconds=10),
                 heartbeat_timeout=timedelta(seconds=2),
@@ -7778,6 +7779,7 @@ class ActivityHeartbeatWorkflow:
         result.append(
             await workflow.execute_activity(
                 heartbeat_activity,
+                True,
                 activity_id=f"{activity_id}-2",
                 start_to_close_timeout=timedelta(seconds=10),
                 heartbeat_timeout=timedelta(seconds=2),
@@ -8348,6 +8350,7 @@ async def test_previous_run_failure(client: Client):
             task_queue=worker.task_queue,
             retry_policy=RetryPolicy(
                 initial_interval=timedelta(milliseconds=10),
+                maximum_attempts=2,
             ),
         )
         result = await handle.result()

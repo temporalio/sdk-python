@@ -18,9 +18,6 @@ if TYPE_CHECKING:
 class WorkflowHandle(Generic[OutputT]):
     """A handle to a workflow that is backing a Nexus operation.
 
-    .. warning::
-        This API is experimental and unstable.
-
     Do not instantiate this directly. Use
     :py:func:`temporalio.nexus.WorkflowRunOperationContext.start_workflow` to create a
     handle.
