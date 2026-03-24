@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 # Set to true to log all activations and completions
 LOG_PROTOS = False
 
-_DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY: int = 1
+_DEFAULT_WORKFLOW_TASK_PAYLOAD_CONCURRENCY: int = 1
 
 
 class _WorkflowWorker:  # type:ignore[reportUnusedClass]
@@ -76,7 +76,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
         encode_headers: bool,
-        max_concurrent_payload_conversions: int,
+        max_workflow_task_payload_concurrency: int,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -115,7 +115,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
         self._encode_headers = encode_headers
-        self._max_concurrent_payload_conversions = max_concurrent_payload_conversions
+        self._max_workflow_task_payload_concurrency = max_workflow_task_payload_concurrency
         self._throw_after_activation: Exception | None = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
@@ -303,7 +303,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 act,
                 data_converter,
                 decode_headers=self._encode_headers,
-                concurrency_limit=self._max_concurrent_payload_conversions,
+                concurrency_limit=self._max_workflow_task_payload_concurrency,
             )
             if not workflow:
                 assert init_job
@@ -415,7 +415,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     completion,
                     data_converter,
                     encode_headers=self._encode_headers,
-                    concurrency_limit=self._max_concurrent_payload_conversions,
+                    concurrency_limit=self._max_workflow_task_payload_concurrency,
                 )
             except temporalio.converter._payload_limits._PayloadSizeError as err:
                 logger.warning(err.message)

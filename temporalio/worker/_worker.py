@@ -36,7 +36,7 @@ from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
 from ._plugin import Plugin
 from ._tuning import WorkerTuner
-from ._workflow import _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY, _WorkflowWorker
+from ._workflow import _DEFAULT_WORKFLOW_TASK_PAYLOAD_CONCURRENCY, _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
@@ -142,7 +142,7 @@ class Worker:
             maximum=5
         ),
         disable_payload_error_limit: bool = False,
-        max_concurrent_payload_conversions: int = _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
+        max_workflow_task_payload_concurrency: int = _DEFAULT_WORKFLOW_TASK_PAYLOAD_CONCURRENCY,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -317,9 +317,10 @@ class Worker:
                 and cause a task failure if the size limit is exceeded. The default is False.
                 See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
                 details.
-            max_concurrent_payload_conversions: Maximum number of payload
-                encode/decode calls that may run concurrently within a single
-                workflow activation. Defaults to 1.
+            max_workflow_task_payload_concurrency: Maximum number of payload
+                operations (codec encode/decode, external storage I/O, etc.)
+                that may run concurrently within a single workflow task
+                activation. Defaults to 1. WARNING: This setting is experimental.
 
         """
         config = WorkerConfig(
@@ -365,7 +366,7 @@ class Worker:
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
             disable_payload_error_limit=disable_payload_error_limit,
-            max_concurrent_payload_conversions=max_concurrent_payload_conversions,
+            max_workflow_task_payload_concurrency=max_workflow_task_payload_concurrency,
         )
 
         plugins_from_client = cast(
@@ -419,12 +420,12 @@ class Worker:
             raise ValueError(
                 "default_versioning_behavior must be UNSPECIFIED when use_worker_versioning is False"
             )
-        max_concurrent_payload_conversions = config.get(
-            "max_concurrent_payload_conversions",
-            _DEFAULT_PAYLOAD_CONVERSION_CONCURRENCY,
+        max_workflow_task_payload_concurrency = config.get(
+            "max_workflow_task_payload_concurrency",
+            _DEFAULT_WORKFLOW_TASK_PAYLOAD_CONCURRENCY,
         )
-        if max_concurrent_payload_conversions < 1:
-            raise ValueError("max_concurrent_payload_conversions must be positive")
+        if max_workflow_task_payload_concurrency < 1:
+            raise ValueError("max_workflow_task_payload_concurrency must be positive")
 
         # Prepend applicable client interceptors to the given ones
         client_config = config["client"].config(active_config=True)  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -529,7 +530,7 @@ class Worker:
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
-                max_concurrent_payload_conversions=max_concurrent_payload_conversions,
+                max_workflow_task_payload_concurrency=max_workflow_task_payload_concurrency,
             )
 
         tuner = config.get("tuner")
@@ -976,7 +977,7 @@ class WorkerConfig(TypedDict, total=False):
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
     disable_payload_error_limit: bool
-    max_concurrent_payload_conversions: int
+    max_workflow_task_payload_concurrency: int
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(
