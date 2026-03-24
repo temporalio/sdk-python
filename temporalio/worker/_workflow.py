@@ -384,14 +384,17 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         # Encode completion
         if workflow:
+            workflow_context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._namespace,
+                workflow_id=workflow.workflow_id,
+            )
             data_converter = _CommandAwareDataConverter.create(
                 instance=workflow.instance,
                 context_free_dc=self._data_converter,
-                workflow_context_dc=data_converter,
-                workflow_context=temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._namespace,
-                    workflow_id=workflow.workflow_id,
+                workflow_context_dc=self._data_converter.with_context(
+                    workflow_context
                 ),
+                workflow_context=workflow_context,
             )
 
         upload_metrics = temporalio.converter._extstore.StorageOperationMetrics()
