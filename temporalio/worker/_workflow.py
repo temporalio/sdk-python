@@ -115,7 +115,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
         self._encode_headers = encode_headers
-        self._max_workflow_task_payload_concurrency = max_workflow_task_payload_concurrency
+        self._max_workflow_task_payload_concurrency = (
+            max_workflow_task_payload_concurrency
+        )
         self._throw_after_activation: Exception | None = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
