@@ -344,6 +344,7 @@ class TestBasicTracing:
             "  RunWorkflow:SimpleWorkflow",
             "    StartActivity:simple_activity",
             "      RunActivity:simple_activity",
+            "        simple_activity",
         ]
         assert (
             hierarchy == expected
@@ -362,9 +363,10 @@ class TestBasicTracing:
 
         # Verify successful runs have outputs == {"status": "ok"}
         for run in collector.runs:
-            assert run.outputs == {
-                "status": "ok"
-            }, f"Expected {run.name} outputs={{'status': 'ok'}}, got {run.outputs}"
+            if ":" in run.name:  # Interceptor runs use "Type:Name" format
+                assert run.outputs == {
+                    "status": "ok"
+                }, f"Expected {run.name} outputs={{'status': 'ok'}}, got {run.outputs}"
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +406,8 @@ class TestReplay:
             "  RunWorkflow:TraceableActivityWorkflow",
             "    StartActivity:traceable_activity",
             "      RunActivity:traceable_activity",
-            "        inner_llm_call",
+            "        traceable_activity",
+            "          inner_llm_call",
         ]
         assert hierarchy == expected, (
             f"Hierarchy mismatch (possible replay duplicates).\n"
@@ -449,6 +452,7 @@ class TestErrorTracing:
             "  RunWorkflow:ActivityFailureWorkflow",
             "    StartActivity:failing_activity",
             "      RunActivity:failing_activity",
+            "        failing_activity",
         ]
         assert (
             hierarchy == expected
@@ -528,6 +532,7 @@ class TestErrorTracing:
             "  RunWorkflow:BenignErrorWorkflow",
             "    StartActivity:benign_failing_activity",
             "      RunActivity:benign_failing_activity",
+            "        benign_failing_activity",
         ]
         assert (
             hierarchy == expected
@@ -628,30 +633,35 @@ class TestComprehensiveTracing:
             "    RunWorkflow:ComprehensiveWorkflow",
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
-            "          outer_chain",
-            "            inner_llm_call",
+            "          nested_traceable_activity",
+            "            outer_chain",
+            "              inner_llm_call",
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
-            "          outer_chain",
-            "            inner_llm_call",
+            "          nested_traceable_activity",
+            "            outer_chain",
+            "              inner_llm_call",
             "      outer_chain",
             "        inner_llm_call",
             "      StartChildWorkflow:TraceableActivityWorkflow",
             "        RunWorkflow:TraceableActivityWorkflow",
             "          StartActivity:traceable_activity",
             "            RunActivity:traceable_activity",
-            "              inner_llm_call",
+            "              traceable_activity",
+            "                inner_llm_call",
             "      StartNexusOperation:NexusService/run_operation",
             "        RunStartNexusOperationHandler:NexusService/run_operation",
             "          StartWorkflow:SimpleNexusWorkflow",
             "            RunWorkflow:SimpleNexusWorkflow",
             "              StartActivity:traceable_activity",
             "                RunActivity:traceable_activity",
-            "                  inner_llm_call",
+            "                  traceable_activity",
+            "                    inner_llm_call",
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
-            "          outer_chain",
-            "            inner_llm_call",
+            "          nested_traceable_activity",
+            "            outer_chain",
+            "              inner_llm_call",
             "  QueryWorkflow:my_query",
             "    HandleQuery:my_query",
             "  SignalWorkflow:my_signal",
@@ -739,16 +749,21 @@ class TestComprehensiveTracing:
         hierarchy = dump_runs(collector)
         expected = [
             "user_pipeline",
+            "  nested_traceable_activity",
+            "    outer_chain",
+            "      inner_llm_call",
+            "  nested_traceable_activity",
+            "    outer_chain",
+            "      inner_llm_call",
             "  outer_chain",
             "    inner_llm_call",
-            "  outer_chain",
+            "  traceable_activity",
             "    inner_llm_call",
-            "  outer_chain",
+            "  traceable_activity",
             "    inner_llm_call",
-            "  inner_llm_call",
-            "  inner_llm_call",
-            "  outer_chain",
-            "    inner_llm_call",
+            "  nested_traceable_activity",
+            "    outer_chain",
+            "      inner_llm_call",
         ]
         assert (
             hierarchy == expected
@@ -853,10 +868,9 @@ class TestBackgroundIOIntegration:
             "  sync_inner_llm_call",
             "async_calls_sync",
             "  sync_inner_llm_call",
-            # Activity @traceable: no LangSmith context propagated (bridge is
-            # workflow-internal only), so activity traces are independent roots.
-            "outer_chain",
-            "  inner_llm_call",
+            "nested_traceable_activity",
+            "  outer_chain",
+            "    inner_llm_call",
         ]
         assert (
             hierarchy == expected
@@ -947,8 +961,9 @@ class TestBackgroundIOIntegration:
             "      sync_inner_llm_call",
             "    StartActivity:nested_traceable_activity",
             "      RunActivity:nested_traceable_activity",
-            "        outer_chain",
-            "          inner_llm_call",
+            "        nested_traceable_activity",
+            "          outer_chain",
+            "            inner_llm_call",
         ]
         assert (
             hierarchy == expected
