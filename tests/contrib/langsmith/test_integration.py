@@ -860,7 +860,7 @@ class TestBackgroundIOIntegration:
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
         """Bridge children inherit project_name (session_name) from plugin config."""
-        temporal_client, collector, mock_ls_client = _make_client_and_collector(
+        temporal_client, _collector, mock_ls_client = _make_client_and_collector(
             client, add_temporal_runs=False, project_name="my-ls-project"
         )
 

@@ -204,7 +204,7 @@ class TestExecutorBackedPostPatch:
         calling_thread = threading.current_thread()
         post_thread: list[threading.Thread] = []
 
-        def record_thread(*args: Any, **kwargs: Any) -> None:
+        def record_thread(*_args: Any, **_kwargs: Any) -> None:
             post_thread.append(threading.current_thread())
 
         mock_run.post.side_effect = record_thread
@@ -520,10 +520,10 @@ class TestPostTimingDelayedExecution:
         mock_run = _make_mock_run()
         call_order: list[str] = []
 
-        def record_post(*args: Any, **kwargs: Any) -> None:
+        def record_post(*_args: Any, **_kwargs: Any) -> None:
             call_order.append("post")
 
-        def record_patch(*args: Any, **kwargs: Any) -> None:
+        def record_patch(*_args: Any, **_kwargs: Any) -> None:
             call_order.append("patch")
 
         mock_run.post.side_effect = record_post
@@ -564,7 +564,7 @@ class TestPostTimingDelayedExecution:
         executor.submit(blocking_task)
 
         # Record what fields post() sees when it finally runs
-        def capturing_post(*args: Any, **kwargs: Any) -> None:
+        def capturing_post(*_args: Any, **_kwargs: Any) -> None:
             post_saw_outputs.append(getattr(mock_run, "outputs", None))
             post_saw_end_time.append(getattr(mock_run, "end_time", None))
 
@@ -670,7 +670,7 @@ class TestAioToThreadErrorGate:
             # The patched aio_to_thread should raise when a plain RunTree is
             # created (no _ReplaySafeRunTree or _ContextBridgeRunTree parent).
             # This simulates _setup_run creating a root RunTree.
-            def _mock_setup_run(*args: Any, **kwargs: Any) -> RunTree:
+            def _mock_setup_run(*_args: Any, **_kwargs: Any) -> RunTree:
                 return RunTree(name="test", run_type="chain")
 
             with pytest.raises(RuntimeError, match="Use the LangSmith plugin"):
