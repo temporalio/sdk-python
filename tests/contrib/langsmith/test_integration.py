@@ -742,3 +742,203 @@ class TestComprehensiveTracing:
         assert (
             hierarchy == expected
         ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+
+
+# ---------------------------------------------------------------------------
+# TestBackgroundIOIntegration — _ContextBridgeRunTree + sync @traceable
+# ---------------------------------------------------------------------------
+
+
+@traceable(name="sync_inner_llm_call")
+def _sync_inner_llm_call(prompt: str) -> str:
+    """Sync @traceable simulating an LLM call."""
+    return f"sync-response to: {prompt}"
+
+
+@traceable(name="sync_outer_chain")
+def _sync_outer_chain(prompt: str) -> str:
+    """Sync @traceable that calls another sync @traceable."""
+    return _sync_inner_llm_call(prompt)
+
+
+@traceable(name="async_calls_sync")
+async def _async_calls_sync(prompt: str) -> str:
+    """Async @traceable that calls a sync @traceable — the interesting mixed case."""
+    return _sync_inner_llm_call(prompt)
+
+
+@workflow.defn
+class BridgeTraceableWorkflow:
+    """Workflow exercising _ContextBridgeRunTree with async, sync, and mixed @traceable.
+
+    Covers three code paths through create_child:
+    - async→async nesting
+    - sync→sync nesting (sync @traceable entry to bridge)
+    - async→sync nesting (cross-boundary case)
+    """
+
+    @workflow.run
+    async def run(self) -> str:
+        r1 = await _outer_chain("async")
+        r2 = _sync_outer_chain("sync")
+        r3 = await _async_calls_sync("mixed")
+        # Activity with nested @traceable
+        await workflow.execute_activity(
+            nested_traceable_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+        return f"{r1}|{r2}|{r3}"
+
+
+class TestBackgroundIOIntegration:
+    """Integration tests for workflows using add_temporal_runs=False without external context.
+
+    Exercises the _ContextBridgeRunTree path with sync, async, and mixed @traceable
+    nesting. Verifies root-run creation, correct nesting hierarchy, and replay safety.
+    """
+
+    async def test_bridge_traceable_no_external_context(
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
+    ) -> None:
+        """Exercises _ContextBridgeRunTree: add_temporal_runs=False, no external context.
+
+        Uses a workflow with async→async, sync→sync, and async→sync @traceable
+        nesting, plus an activity with nested @traceable. Verifies:
+        - Each top-level @traceable becomes a root run (bridge creates root children)
+        - Nested @traceable calls nest correctly under their parent
+        - Activity @traceable also produces correct hierarchy
+        - No phantom bridge run appears in collected runs
+        - No duplicate run IDs after replay (max_cached_workflows=0)
+        """
+        temporal_client, collector, _ = _make_client_and_collector(
+            client, add_temporal_runs=False
+        )
+
+        async with new_worker(
+            temporal_client,
+            BridgeTraceableWorkflow,
+            activities=[nested_traceable_activity],
+            max_cached_workflows=0,
+        ) as worker:
+            handle = await temporal_client.start_workflow(
+                BridgeTraceableWorkflow.run,
+                id=f"bridge-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            result = await handle.result()
+
+        assert "|" in result
+
+        hierarchy = dump_runs(collector)
+        expected = [
+            "outer_chain",
+            "  inner_llm_call",
+            "sync_outer_chain",
+            "  sync_inner_llm_call",
+            "async_calls_sync",
+            "  sync_inner_llm_call",
+            # Activity @traceable: no LangSmith context propagated (bridge is
+            # workflow-internal only), so activity traces are independent roots.
+            "outer_chain",
+            "  inner_llm_call",
+        ]
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+
+        # Verify no duplicate run IDs (replay safety with max_cached_workflows=0)
+        run_ids = [r.id for r in collector.runs]
+        assert len(run_ids) == len(
+            set(run_ids)
+        ), f"Duplicate run IDs found (replay issue): {run_ids}"
+
+    async def test_bridge_passes_project_name_to_children(
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
+    ) -> None:
+        """Bridge children inherit project_name (session_name) from plugin config."""
+        temporal_client, collector, mock_ls_client = _make_client_and_collector(
+            client, add_temporal_runs=False, project_name="my-ls-project"
+        )
+
+        async with new_worker(
+            temporal_client,
+            BridgeTraceableWorkflow,
+            activities=[nested_traceable_activity],
+            max_cached_workflows=0,
+        ) as worker:
+            handle = await temporal_client.start_workflow(
+                BridgeTraceableWorkflow.run,
+                id=f"bridge-proj-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle.result()
+
+        # Verify create_run calls include session_name from project_name
+        for call in mock_ls_client.create_run.call_args_list:
+            session = call.kwargs.get("session_name")
+            assert session == "my-ls-project", (
+                f"Expected session_name='my-ls-project', got {session!r} "
+                f"in create_run call: {call.kwargs.get('name')}"
+            )
+
+    async def test_mixed_sync_async_traceable_with_temporal_runs(
+        self,
+        client: Client,
+        env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
+    ) -> None:
+        """Exercises _ReplaySafeRunTree.create_child with mixed sync/async @traceable.
+
+        With add_temporal_runs=True, the interceptor creates a real
+        _ReplaySafeRunTree as parent. This test verifies create_child
+        propagation works at every level regardless of sync/async, with
+        correct parent-child hierarchy and no duplicate run IDs after replay.
+        """
+        temporal_client, collector, _ = _make_client_and_collector(
+            client, add_temporal_runs=True
+        )
+
+        async with new_worker(
+            temporal_client,
+            BridgeTraceableWorkflow,
+            activities=[nested_traceable_activity],
+            max_cached_workflows=0,
+        ) as worker:
+            handle = await temporal_client.start_workflow(
+                BridgeTraceableWorkflow.run,
+                id=f"mixed-temporal-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            result = await handle.result()
+
+        assert "|" in result
+
+        hierarchy = dump_runs(collector)
+        # With add_temporal_runs=True, Temporal operations get their own runs.
+        # @traceable calls nest under the RunWorkflow run.
+        expected = [
+            "StartWorkflow:BridgeTraceableWorkflow",
+            "  RunWorkflow:BridgeTraceableWorkflow",
+            "    outer_chain",
+            "      inner_llm_call",
+            "    sync_outer_chain",
+            "      sync_inner_llm_call",
+            "    async_calls_sync",
+            "      sync_inner_llm_call",
+            "    StartActivity:nested_traceable_activity",
+            "      RunActivity:nested_traceable_activity",
+            "        outer_chain",
+            "          inner_llm_call",
+        ]
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+
+        # Verify no duplicate run IDs (replay safety with max_cached_workflows=0)
+        run_ids = [r.id for r in collector.runs]
+        assert len(run_ids) == len(
+            set(run_ids)
+        ), f"Duplicate run IDs found (replay issue): {run_ids}"

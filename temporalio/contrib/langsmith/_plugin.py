@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from temporalio.contrib.langsmith._interceptor import LangSmithInterceptor
@@ -59,19 +61,18 @@ class LangSmithPlugin(SimplePlugin):
                 )
             return runner
 
+        @asynccontextmanager
+        async def run_context() -> AsyncIterator[None]:
+            try:
+                yield
+            finally:
+                interceptor._executor.shutdown(wait=True)
+                if interceptor._client is not None:
+                    interceptor._client.flush()
+
         super().__init__(
             "langchain.LangSmithPlugin",
             interceptors=interceptors,
             workflow_runner=workflow_runner,
+            run_context=run_context,
         )
-
-    async def shutdown(self) -> None:
-        """Flush the LangSmith client to drain pending runs."""
-        if not self.interceptors:
-            return
-        interceptor = self.interceptors[0]
-        if (
-            isinstance(interceptor, LangSmithInterceptor)
-            and interceptor._client is not None
-        ):
-            interceptor._client.flush()

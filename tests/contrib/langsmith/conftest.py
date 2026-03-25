@@ -76,15 +76,16 @@ def dump_runs(collector: InMemoryRunCollector) -> list[str]:
             result.append("  " * depth + child.name)
             _walk(child.id, depth + 1)
 
-    # Roots: runs whose parent_run_id is None or not in our set
+    # Strict: reject dangling parent references
     known_ids = {r.id for r in runs}
-    root_parents = {
-        r.parent_run_id
-        for r in runs
-        if r.parent_run_id is None or r.parent_run_id not in known_ids
-    }
-    for rp in sorted(root_parents, key=lambda x: (x is not None, x)):
-        _walk(rp, 0)
+    for r in runs:
+        if r.parent_run_id is not None and r.parent_run_id not in known_ids:
+            raise AssertionError(
+                f"Run {r.name!r} (id={r.id}) has parent_run_id={r.parent_run_id} "
+                f"which is not in the collected runs — dangling parent reference"
+            )
+    # Only walk true roots (parent_run_id is None)
+    _walk(None, 0)
 
     return result
 
