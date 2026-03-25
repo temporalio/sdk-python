@@ -18,6 +18,7 @@ import pytest
 from langsmith.run_trees import RunTree
 
 from temporalio.contrib.langsmith._interceptor import (
+    _ContextBridgeRunTree,
     _ReplaySafeRunTree,
     _uuid_from_random,
 )
@@ -380,7 +381,7 @@ class TestReplaySuppression:
 class TestContextBridgeRunTree:
     """Tests for _ContextBridgeRunTree subclass."""
 
-    def _make_bridge(self, **kwargs: Any) -> Any:
+    def _make_bridge(self, **kwargs: Any) -> _ContextBridgeRunTree:
         """Create a _ContextBridgeRunTree for testing."""
         from temporalio.contrib.langsmith._interceptor import _ContextBridgeRunTree
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock
@@ -13,7 +14,12 @@ import pytest
 from langsmith import traceable, tracing_context
 
 from temporalio import activity, common, nexus, workflow
-from temporalio.client import Client, WorkflowFailureError, WorkflowQueryFailedError
+from temporalio.client import (
+    Client,
+    WorkflowFailureError,
+    WorkflowHandle,
+    WorkflowQueryFailedError,
+)
 from temporalio.contrib.langsmith import LangSmithPlugin
 from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError
@@ -278,8 +284,8 @@ def _make_temporal_client(
 
 
 async def _poll_query(
-    handle: Any,
-    query: Any,
+    handle: WorkflowHandle[Any, Any],
+    query: Callable[..., Any],
     *,
     expected: Any = True,
     timeout_secs: float = 10.0,
@@ -829,7 +835,7 @@ class TestBackgroundIOIntegration:
             )
             result = await handle.result()
 
-        assert "|" in result
+        assert result == "response to: async|sync-response to: sync|sync-response to: mixed"
 
         hierarchy = dump_runs(collector)
         expected = [
@@ -914,7 +920,7 @@ class TestBackgroundIOIntegration:
             )
             result = await handle.result()
 
-        assert "|" in result
+        assert result == "response to: async|sync-response to: sync|sync-response to: mixed"
 
         hierarchy = dump_runs(collector)
         # With add_temporal_runs=True, Temporal operations get their own runs.

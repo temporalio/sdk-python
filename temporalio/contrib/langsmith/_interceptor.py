@@ -64,11 +64,6 @@ def _inject_context(
     }
 
 
-def _get_current_run_safe() -> RunTree | None:
-    """Get the current ambient LangSmith run tree."""
-    return get_current_run_tree()
-
-
 def _inject_current_context(
     headers: Mapping[str, Payload],
 ) -> Mapping[str, Payload]:
@@ -477,7 +472,7 @@ def _maybe_run(
 
     # If no explicit parent, inherit from ambient @traceable context
     if parent is None:
-        parent = _get_current_run_safe()
+        parent = get_current_run_tree()
 
     kwargs: dict[str, Any] = dict(
         name=name,
@@ -899,19 +894,19 @@ class _LangSmithWorkflowOutboundInterceptor(
 
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
-    ) -> temporalio.workflow.ActivityHandle:
+    ) -> temporalio.workflow.ActivityHandle[Any]:
         with self._traced_outbound(f"StartActivity:{input.activity}", input):
             return super().start_activity(input)
 
     def start_local_activity(
         self, input: temporalio.worker.StartLocalActivityInput
-    ) -> temporalio.workflow.ActivityHandle:
+    ) -> temporalio.workflow.ActivityHandle[Any]:
         with self._traced_outbound(f"StartActivity:{input.activity}", input):
             return super().start_local_activity(input)
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
-    ) -> temporalio.workflow.ChildWorkflowHandle:
+    ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         with self._traced_outbound(f"StartChildWorkflow:{input.workflow}", input):
             return await super().start_child_workflow(input)
 
