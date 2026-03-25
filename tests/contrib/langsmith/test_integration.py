@@ -49,6 +49,7 @@ async def _outer_chain(prompt: str) -> str:
     return await _inner_llm_call(prompt)
 
 
+@traceable
 @activity.defn
 async def traceable_activity() -> str:
     """Activity that calls a @traceable function."""
@@ -56,6 +57,7 @@ async def traceable_activity() -> str:
     return result
 
 
+@traceable
 @activity.defn
 async def nested_traceable_activity() -> str:
     """Activity with two levels of @traceable nesting."""
@@ -106,6 +108,7 @@ class NexusService:
 # ---------------------------------------------------------------------------
 
 
+@traceable
 @activity.defn
 async def simple_activity() -> str:
     return "activity-done"
@@ -203,11 +206,13 @@ class ComprehensiveWorkflow:
 # ---------------------------------------------------------------------------
 
 
+@traceable
 @activity.defn
 async def failing_activity() -> str:
     raise ApplicationError("activity-failed", non_retryable=True)
 
 
+@traceable
 @activity.defn
 async def benign_failing_activity() -> str:
     from temporalio.exceptions import ApplicationErrorCategory
@@ -835,7 +840,10 @@ class TestBackgroundIOIntegration:
             )
             result = await handle.result()
 
-        assert result == "response to: async|sync-response to: sync|sync-response to: mixed"
+        assert (
+            result
+            == "response to: async|sync-response to: sync|sync-response to: mixed"
+        )
 
         hierarchy = dump_runs(collector)
         expected = [
@@ -920,7 +928,10 @@ class TestBackgroundIOIntegration:
             )
             result = await handle.result()
 
-        assert result == "response to: async|sync-response to: sync|sync-response to: mixed"
+        assert (
+            result
+            == "response to: async|sync-response to: sync|sync-response to: mixed"
+        )
 
         hierarchy = dump_runs(collector)
         # With add_temporal_runs=True, Temporal operations get their own runs.
