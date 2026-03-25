@@ -6,14 +6,16 @@ import json
 import logging
 import random
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
-from typing import Any, ClassVar, NoReturn
+from typing import Any, ClassVar, NoReturn, Protocol
 
+import langsmith
+import nexusrpc.handler
 from langsmith import tracing_context
 from langsmith.run_helpers import get_current_run_tree
-from langsmith.run_trees import RunTree
+from langsmith.run_trees import RunTree, WriteReplica
 
 import temporalio.activity
 import temporalio.client
@@ -41,9 +43,13 @@ HEADER_KEY = "_temporal-langsmith-context"
 _payload_converter = temporalio.converter.PayloadConverter.default
 
 
+class _InputWithHeaders(Protocol):
+    headers: Mapping[str, Payload]
+
+
 def _inject_context(
     headers: Mapping[str, Payload],
-    run_tree: Any,
+    run_tree: RunTree,
 ) -> dict[str, Payload]:
     """Inject LangSmith context into Temporal payload headers.
 
@@ -81,7 +87,7 @@ def _inject_current_context(
 def _extract_context(
     headers: Mapping[str, Payload],
     executor: ThreadPoolExecutor,
-) -> Any | None:
+) -> _ReplaySafeRunTree | None:
     """Extract LangSmith context from Temporal payload headers.
 
     Reconstructs a :class:`RunTree` from the ``_temporal-langsmith-context`` header on
@@ -98,8 +104,8 @@ def _extract_context(
 
 
 def _inject_nexus_context(
-    headers: dict[str, str],
-    run_tree: Any,
+    headers: Mapping[str, str],
+    run_tree: RunTree,
 ) -> dict[str, str]:
     """Inject LangSmith context into Nexus string headers."""
     ls_headers = run_tree.to_headers()
@@ -110,9 +116,9 @@ def _inject_nexus_context(
 
 
 def _extract_nexus_context(
-    headers: dict[str, str],
+    headers: Mapping[str, str],
     executor: ThreadPoolExecutor,
-) -> Any | None:
+) -> _ReplaySafeRunTree | None:
     """Extract LangSmith context from Nexus string headers."""
     raw = headers.get(HEADER_KEY)
     if not raw:
@@ -153,7 +159,7 @@ def _patch_aio_to_thread() -> None:
     import contextvars
 
     async def _safe_aio_to_thread(
-        func: Any,
+        func: Callable[..., Any],
         /,
         *args: Any,
         __ctx: contextvars.Context | None = None,
@@ -269,7 +275,7 @@ class _ReplaySafeRunTree(RunTree):
         """Delegate attribute setting to the wrapped RunTree."""
         setattr(self._run, name, value)
 
-    def to_headers(self) -> dict[str, Any]:
+    def to_headers(self) -> dict[str, str]:
         """Delegate to the wrapped RunTree's to_headers."""
         return self._run.to_headers()
 
@@ -293,7 +299,9 @@ class _ReplaySafeRunTree(RunTree):
         child_run = self._run.create_child(*args, **kwargs)
         return _ReplaySafeRunTree(child_run, executor=self._executor)
 
-    def _submit_or_fallback(self, fn: Any, *args: Any, **kwargs: Any) -> None:
+    def _submit_or_fallback(
+        self, fn: Callable[..., object], *args: Any, **kwargs: Any
+    ) -> None:
         """Submit work to executor, falling back to synchronous after shutdown."""
 
         def _log_future_exception(future: Future[None]) -> None:
@@ -356,10 +364,10 @@ class _ContextBridgeRunTree(_ReplaySafeRunTree):
     def __init__(  # pyright: ignore[reportMissingSuperCall]
         self,
         *,
-        ls_client: Any,
+        ls_client: langsmith.Client,
         executor: ThreadPoolExecutor,
         session_name: str | None = None,
-        replicas: list[Any] | None = None,
+        replicas: Sequence[WriteReplica] | None = None,
     ) -> None:
         """Create a context bridge with the given LangSmith client."""
         # Create a minimal RunTree for the bridge — it will never be posted
@@ -429,7 +437,7 @@ def _is_benign_error(exc: Exception) -> bool:
 
 @contextmanager
 def _maybe_run(
-    client: Any,
+    client: langsmith.Client,
     name: str,
     *,
     add_temporal_runs: bool,
@@ -437,10 +445,10 @@ def _maybe_run(
     inputs: dict[str, Any] | None = None,
     metadata: dict[str, Any] | None = None,
     tags: list[str] | None = None,
-    parent: Any | None = None,
+    parent: RunTree | None = None,
     project_name: str | None = None,
     executor: ThreadPoolExecutor,
-) -> Iterator[Any | None]:
+) -> Iterator[_ReplaySafeRunTree | None]:
     """Create a LangSmith run, handling errors.
 
     - If add_temporal_runs is False, yields None (no run created).
@@ -537,7 +545,7 @@ class LangSmithInterceptor(
     def __init__(
         self,
         *,
-        client: Any | None = None,
+        client: langsmith.Client | None = None,
         project_name: str | None = None,
         add_temporal_runs: bool = False,
         default_metadata: dict[str, Any] | None = None,
@@ -563,9 +571,9 @@ class LangSmithInterceptor(
         name: str,
         *,
         run_type: str = "chain",
-        parent: Any | None = None,
+        parent: RunTree | None = None,
         extra_metadata: dict[str, Any] | None = None,
-    ) -> Iterator[Any | None]:
+    ) -> Iterator[_ReplaySafeRunTree | None]:
         """Create a LangSmith run with this interceptor's config already applied."""
         metadata = {**self._default_metadata, **(extra_metadata or {})}
         with _maybe_run(
@@ -629,30 +637,38 @@ class _LangSmithClientOutboundInterceptor(temporalio.client.OutboundInterceptor)
         self._config = config
 
     @contextmanager
-    def _traced_call(self, name: str, input: Any) -> Iterator[None]:
+    def _traced_call(self, name: str, input: _InputWithHeaders) -> Iterator[None]:
         """Wrap a client call with a LangSmith run and inject context into headers."""
         with self._config.maybe_run(name):
             input.headers = _inject_current_context(input.headers)
             yield
 
-    async def start_workflow(self, input: Any) -> Any:
+    async def start_workflow(
+        self, input: temporalio.client.StartWorkflowInput
+    ) -> temporalio.client.WorkflowHandle[Any, Any]:
         prefix = "SignalWithStartWorkflow" if input.start_signal else "StartWorkflow"
         with self._traced_call(f"{prefix}:{input.workflow}", input):
             return await super().start_workflow(input)
 
-    async def query_workflow(self, input: Any) -> Any:
+    async def query_workflow(self, input: temporalio.client.QueryWorkflowInput) -> Any:
         with self._traced_call(f"QueryWorkflow:{input.query}", input):
             return await super().query_workflow(input)
 
-    async def signal_workflow(self, input: Any) -> None:
+    async def signal_workflow(
+        self, input: temporalio.client.SignalWorkflowInput
+    ) -> None:
         with self._traced_call(f"SignalWorkflow:{input.signal}", input):
             return await super().signal_workflow(input)
 
-    async def start_workflow_update(self, input: Any) -> Any:
+    async def start_workflow_update(
+        self, input: temporalio.client.StartWorkflowUpdateInput
+    ) -> temporalio.client.WorkflowUpdateHandle[Any]:
         with self._traced_call(f"StartWorkflowUpdate:{input.update}", input):
             return await super().start_workflow_update(input)
 
-    async def start_update_with_start_workflow(self, input: Any) -> Any:
+    async def start_update_with_start_workflow(
+        self, input: temporalio.client.StartWorkflowUpdateWithStartInput
+    ) -> temporalio.client.WorkflowUpdateHandle[Any]:
         with self._config.maybe_run(
             f"StartUpdateWithStartWorkflow:{input.start_workflow_input.workflow}",
         ):
@@ -683,7 +699,9 @@ class _LangSmithActivityInboundInterceptor(
         super().__init__(next)
         self._config = config
 
-    async def execute_activity(self, input: Any) -> Any:
+    async def execute_activity(
+        self, input: temporalio.worker.ExecuteActivityInput
+    ) -> Any:
         parent = _extract_context(input.headers, self._config._executor)
         info = temporalio.activity.info()
         extra_metadata = {
@@ -729,7 +747,7 @@ class _LangSmithWorkflowInboundInterceptor(
     """Instruments workflow execution with LangSmith runs."""
 
     _config: ClassVar[LangSmithInterceptor]
-    _current_run: Any | None = None
+    _current_run: _ReplaySafeRunTree | None = None
 
     def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
         super().init(
@@ -743,7 +761,7 @@ class _LangSmithWorkflowInboundInterceptor(
         headers: Mapping[str, Payload] | None = None,
         *,
         is_handler: bool = False,
-    ) -> Iterator[Any | None]:
+    ) -> Iterator[_ReplaySafeRunTree | None]:
         """Workflow-specific run creation with metadata.
 
         Extracts parent from headers (if provided) and stores the run (or parent
@@ -809,7 +827,9 @@ class _LangSmithWorkflowInboundInterceptor(
                 finally:
                     self._current_run = prev_run
 
-    async def execute_workflow(self, input: Any) -> Any:
+    async def execute_workflow(
+        self, input: temporalio.worker.ExecuteWorkflowInput
+    ) -> Any:
         wf_type = temporalio.workflow.info().workflow_type
         with self._workflow_maybe_run(
             f"RunWorkflow:{wf_type}",
@@ -817,25 +837,29 @@ class _LangSmithWorkflowInboundInterceptor(
         ):
             return await super().execute_workflow(input)
 
-    async def handle_signal(self, input: Any) -> None:
+    async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
         with self._workflow_maybe_run(
             f"HandleSignal:{input.signal}", input.headers, is_handler=True
         ):
             return await super().handle_signal(input)
 
-    async def handle_query(self, input: Any) -> Any:
+    async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
         with self._workflow_maybe_run(
             f"HandleQuery:{input.query}", input.headers, is_handler=True
         ):
             return await super().handle_query(input)
 
-    def handle_update_validator(self, input: Any) -> None:
+    def handle_update_validator(
+        self, input: temporalio.worker.HandleUpdateInput
+    ) -> None:
         with self._workflow_maybe_run(
             f"ValidateUpdate:{input.update}", input.headers, is_handler=True
         ):
             return super().handle_update_validator(input)
 
-    async def handle_update_handler(self, input: Any) -> Any:
+    async def handle_update_handler(
+        self, input: temporalio.worker.HandleUpdateInput
+    ) -> Any:
         with self._workflow_maybe_run(
             f"HandleUpdate:{input.update}", input.headers, is_handler=True
         ):
@@ -863,7 +887,9 @@ class _LangSmithWorkflowOutboundInterceptor(
         self._inbound = inbound
 
     @contextmanager
-    def _traced_outbound(self, name: str, input: Any) -> Iterator[Any | None]:
+    def _traced_outbound(
+        self, name: str, input: _InputWithHeaders
+    ) -> Iterator[_ReplaySafeRunTree | None]:
         """Outbound workflow run creation with context injection into input.headers."""
         with self._config.maybe_run(name, parent=self._inbound._current_run) as run:
             context_source = run or self._inbound._current_run
@@ -871,34 +897,46 @@ class _LangSmithWorkflowOutboundInterceptor(
                 input.headers = _inject_context(input.headers, context_source)
             yield run
 
-    def start_activity(self, input: Any) -> Any:
+    def start_activity(
+        self, input: temporalio.worker.StartActivityInput
+    ) -> temporalio.workflow.ActivityHandle:
         with self._traced_outbound(f"StartActivity:{input.activity}", input):
             return super().start_activity(input)
 
-    def start_local_activity(self, input: Any) -> Any:
+    def start_local_activity(
+        self, input: temporalio.worker.StartLocalActivityInput
+    ) -> temporalio.workflow.ActivityHandle:
         with self._traced_outbound(f"StartActivity:{input.activity}", input):
             return super().start_local_activity(input)
 
-    async def start_child_workflow(self, input: Any) -> Any:
+    async def start_child_workflow(
+        self, input: temporalio.worker.StartChildWorkflowInput
+    ) -> temporalio.workflow.ChildWorkflowHandle:
         with self._traced_outbound(f"StartChildWorkflow:{input.workflow}", input):
             return await super().start_child_workflow(input)
 
-    async def signal_child_workflow(self, input: Any) -> None:
+    async def signal_child_workflow(
+        self, input: temporalio.worker.SignalChildWorkflowInput
+    ) -> None:
         with self._traced_outbound(f"SignalChildWorkflow:{input.signal}", input):
             return await super().signal_child_workflow(input)
 
-    async def signal_external_workflow(self, input: Any) -> None:
+    async def signal_external_workflow(
+        self, input: temporalio.worker.SignalExternalWorkflowInput
+    ) -> None:
         with self._traced_outbound(f"SignalExternalWorkflow:{input.signal}", input):
             return await super().signal_external_workflow(input)
 
-    def continue_as_new(self, input: Any) -> NoReturn:
+    def continue_as_new(self, input: temporalio.worker.ContinueAsNewInput) -> NoReturn:
         # No trace created, but inject context from inbound's current run
         current_run = getattr(self._inbound, "_current_run", None)
         if current_run:
             input.headers = _inject_context(input.headers, current_run)
         super().continue_as_new(input)
 
-    async def start_nexus_operation(self, input: Any) -> Any:
+    async def start_nexus_operation(
+        self, input: temporalio.worker.StartNexusOperationInput[Any, Any]
+    ) -> temporalio.workflow.NexusOperationHandle[Any]:
         with self._config.maybe_run(
             f"StartNexusOperation:{input.service}/{input.operation_name}",
             parent=self._inbound._current_run,
@@ -929,7 +967,12 @@ class _LangSmithNexusOperationInboundInterceptor(
         super().__init__(next)
         self._config = config
 
-    async def execute_nexus_operation_start(self, input: Any) -> Any:
+    async def execute_nexus_operation_start(
+        self, input: temporalio.worker.ExecuteNexusOperationStartInput
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
         parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
         with self._config.maybe_run(
             f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
@@ -938,7 +981,9 @@ class _LangSmithNexusOperationInboundInterceptor(
         ):
             return await self.next.execute_nexus_operation_start(input)
 
-    async def execute_nexus_operation_cancel(self, input: Any) -> Any:
+    async def execute_nexus_operation_cancel(
+        self, input: temporalio.worker.ExecuteNexusOperationCancelInput
+    ) -> None:
         parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
         with self._config.maybe_run(
             f"RunCancelNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",

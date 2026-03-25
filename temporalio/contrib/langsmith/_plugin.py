@@ -7,6 +7,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import langsmith
+
 from temporalio.contrib.langsmith._interceptor import LangSmithInterceptor
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
@@ -23,7 +25,7 @@ class LangSmithPlugin(SimplePlugin):
     def __init__(
         self,
         *,
-        client: Any | None = None,
+        client: langsmith.Client | None = None,
         project_name: str | None = None,
         add_temporal_runs: bool = False,
         metadata: dict[str, Any] | None = None,
@@ -67,8 +69,7 @@ class LangSmithPlugin(SimplePlugin):
                 yield
             finally:
                 interceptor._executor.shutdown(wait=True)
-                if interceptor._client is not None:
-                    interceptor._client.flush()
+                interceptor._client.flush()
 
         super().__init__(
             "langchain.LangSmithPlugin",
