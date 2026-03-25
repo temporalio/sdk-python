@@ -1,5 +1,3 @@
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-
 # OpenAI Agents SDK Integration for Temporal
 
 We welcome questions and feedback in the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
