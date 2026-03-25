@@ -303,6 +303,7 @@ async def decode_activation(
     activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
+    concurrency_limit: int,
 ) -> temporalio.converter._extstore.StorageOperationMetrics:
     """Decode all payloads in the activation.
 
@@ -312,7 +313,9 @@ async def decode_activation(
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
         await CommandAwarePayloadVisitor(
-            skip_search_attributes=True, skip_headers=not decode_headers
+            skip_search_attributes=True,
+            skip_headers=not decode_headers,
+            concurrency_limit=concurrency_limit,
         ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
     return metrics
 
@@ -321,6 +324,7 @@ async def encode_completion(
     completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     data_converter: temporalio.converter.DataConverter,
     encode_headers: bool,
+    concurrency_limit: int,
 ) -> temporalio.converter._extstore.StorageOperationMetrics:
     """Encode all payloads in the completion.
 
@@ -330,6 +334,8 @@ async def encode_completion(
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
         await CommandAwarePayloadVisitor(
-            skip_search_attributes=True, skip_headers=not encode_headers
+            skip_search_attributes=True,
+            skip_headers=not encode_headers,
+            concurrency_limit=concurrency_limit,
         ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
     return metrics
