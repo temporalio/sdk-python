@@ -268,7 +268,7 @@ class Replayer:
                     "header_codec_behavior", HeaderCodecBehavior.NO_CODEC
                 )
                 != HeaderCodecBehavior.NO_CODEC,
-                max_workflow_task_payload_concurrency=1,
+                max_workflow_task_external_storage_concurrency=1,
             )
             external_storage = data_converter.external_storage
             storage_driver_types = (

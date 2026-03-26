@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 # Set to true to log all activations and completions
 LOG_PROTOS = False
 
-_DEFAULT_WORKFLOW_TASK_PAYLOAD_CONCURRENCY: int = 1
+_DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY: int = 10
 
 
 class _WorkflowWorker:  # type:ignore[reportUnusedClass]
@@ -76,7 +76,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
         encode_headers: bool,
-        max_workflow_task_payload_concurrency: int,
+        max_workflow_task_external_storage_concurrency: int,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -115,8 +115,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
         self._encode_headers = encode_headers
-        self._max_workflow_task_payload_concurrency = (
-            max_workflow_task_payload_concurrency
+        self._max_workflow_task_external_storage_concurrency = (
+            max_workflow_task_external_storage_concurrency
         )
         self._throw_after_activation: Exception | None = None
 
@@ -300,7 +300,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 act,
                 data_converter,
                 decode_headers=self._encode_headers,
-                concurrency_limit=self._max_workflow_task_payload_concurrency,
+                storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
             )
             if not workflow:
                 assert init_job
@@ -409,7 +409,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     completion,
                     data_converter,
                     encode_headers=self._encode_headers,
-                    concurrency_limit=self._max_workflow_task_payload_concurrency,
+                    storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
                 )
             except temporalio.converter._payload_limits._PayloadSizeError as err:
                 logger.warning(err.message)
@@ -892,6 +892,18 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         return await self._get_current_dc()._encode_payload_sequence(payloads)
+
+    async def _external_store_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return await self._get_current_dc()._external_store_payload_sequence(payloads)
+
+    async def _external_retrieve_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return await self._get_current_dc()._external_retrieve_payload_sequence(
+            payloads
+        )
 
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]

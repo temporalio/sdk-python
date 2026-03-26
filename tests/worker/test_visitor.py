@@ -303,7 +303,9 @@ async def test_bridge_encoding():
         payload_codec=SimpleCodec(),
     )
 
-    await temporalio.bridge.worker.encode_completion(comp, data_converter, True, 1)
+    await temporalio.bridge.worker.encode_completion(
+        comp, data_converter, True, storage_concurrency_limit=1
+    )
 
     cmd = comp.successful.commands[0]
     sa = cmd.schedule_activity
