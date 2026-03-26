@@ -910,6 +910,12 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
     ) -> list[temporalio.api.common.v1.Payload]:
         return await self._get_current_dc()._decode_payload_sequence(payloads)
 
+    def _validate_payload_limits(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+    ) -> None:
+        self._get_current_dc()._validate_payload_limits(payloads)
+
 
 class _InterruptDeadlockError(BaseException):
     pass
