@@ -681,3 +681,26 @@ class TestMultiDriver:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+async def test_transform_outbound_payload_encode_false_still_stores_and_validates():
+    """Headers with encode=False should still go through external storage and validation."""
+    driver = InMemoryTestDriver()
+    dc = DataConverter(
+        payload_codec=RecordingPayloadCodec("test-codec"),
+        external_storage=ExternalStorage(
+            drivers=[driver],
+            payload_size_threshold=0,
+        ),
+    )
+
+    payload = Payload(data=b"x" * 100)
+
+    # With encode=True, codec should encode and external storage should store
+    result_encode = await dc._transform_outbound_payload(payload, encode=True)
+    assert driver._store_calls == 1
+
+    # With encode=False, codec should NOT encode but external storage should still store
+    driver._store_calls = 0
+    result_no_encode = await dc._transform_outbound_payload(payload, encode=False)
+    assert driver._store_calls == 1
