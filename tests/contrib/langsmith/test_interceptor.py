@@ -726,9 +726,9 @@ class TestWorkflowOutboundInterceptor:
     def _make_outbound_interceptor(
         self, *, add_temporal_runs: bool = True
     ) -> tuple[Any, MagicMock, Any]:
-        """Create outbound interceptor with mock next and inbound reference.
+        """Create outbound interceptor with mock next and ambient run.
 
-        Returns (outbound_interceptor, mock_next, inbound_interceptor).
+        Returns (outbound_interceptor, mock_next, mock_current_run).
         """
         config = LangSmithInterceptor(
             client=MagicMock(), add_temporal_runs=add_temporal_runs
@@ -765,15 +765,12 @@ class TestWorkflowOutboundInterceptor:
             _LangSmithWorkflowOutboundInterceptor,
         )
 
-        outbound = _LangSmithWorkflowOutboundInterceptor(
-            mock_outbound_next, config, inbound
-        )
+        outbound = _LangSmithWorkflowOutboundInterceptor(mock_outbound_next, config)
 
-        # Set a current run on the inbound to simulate active workflow execution
+        # Simulate active workflow execution via ambient context
         mock_current_run = _make_mock_run()
-        inbound._current_run = mock_current_run
 
-        return outbound, mock_outbound_next, inbound
+        return outbound, mock_outbound_next, mock_current_run
 
     @pytest.mark.parametrize(
         "method,input_attr,input_val,expected_name",
@@ -831,15 +828,16 @@ class TestWorkflowOutboundInterceptor:
         """Each outbound method creates the correct trace and injects headers."""
         mock_run = _make_mock_run()
         MockRunTree.return_value = mock_run
-        outbound, mock_next, _ = self._make_outbound_interceptor()
+        outbound, mock_next, mock_current_run = self._make_outbound_interceptor()
 
         mock_input = MagicMock()
         setattr(mock_input, input_attr, input_val)
         mock_input.headers = {}
 
-        result = getattr(outbound, method)(mock_input)
-        if asyncio.iscoroutine(result):
-            await result
+        with patch(_PATCH_GET_CURRENT_RUN, return_value=mock_current_run):
+            result = getattr(outbound, method)(mock_input)
+            if asyncio.iscoroutine(result):
+                await result
 
         assert _get_runtree_name(MockRunTree) == expected_name
         assert HEADER_KEY in mock_input.headers
@@ -852,17 +850,18 @@ class TestWorkflowOutboundInterceptor:
     def test_continue_as_new(
         self, _mock_in_wf: Any, _mock_replaying: Any, MockRunTree: Any
     ) -> None:
-        """continue_as_new does NOT create a new trace, but injects context from current run."""
-        outbound, mock_next, _inbound = self._make_outbound_interceptor()
+        """continue_as_new does NOT create a new trace, but injects context from ambient run."""
+        outbound, mock_next, mock_current_run = self._make_outbound_interceptor()
 
         mock_input = MagicMock()
         mock_input.headers = {}
 
-        outbound.continue_as_new(mock_input)
+        with patch(_PATCH_GET_CURRENT_RUN, return_value=mock_current_run):
+            outbound.continue_as_new(mock_input)
 
         # No new RunTree should be created for continue_as_new
         MockRunTree.assert_not_called()
-        # But headers SHOULD be modified (context from inbound's _current_run)
+        # But headers SHOULD be modified (context from ambient run)
         assert HEADER_KEY in mock_input.headers
         mock_next.continue_as_new.assert_called_once()
 
@@ -881,14 +880,15 @@ class TestWorkflowOutboundInterceptor:
         """start_nexus_operation creates a trace named StartNexusOperation:{service}/{operation}."""
         mock_run = _make_mock_run()
         MockRunTree.return_value = mock_run
-        outbound, mock_next, _ = self._make_outbound_interceptor()
+        outbound, mock_next, mock_current_run = self._make_outbound_interceptor()
 
         mock_input = MagicMock()
         mock_input.service = "MyService"
         mock_input.operation_name = "do_op"
         mock_input.headers = {}
 
-        await outbound.start_nexus_operation(mock_input)
+        with patch(_PATCH_GET_CURRENT_RUN, return_value=mock_current_run):
+            await outbound.start_nexus_operation(mock_input)
 
         assert _get_runtree_name(MockRunTree) == "StartNexusOperation:MyService/do_op"
         # Nexus uses string headers, so context injection uses _inject_nexus_context
@@ -1063,8 +1063,8 @@ class TestAddTemporalRunsToggle:
     ) -> None:
         """With add_temporal_runs=False, no runs are created but context still propagates.
 
-        1. Workflow outbound: injects the inbound's _current_run (parent fallback)
-           into headers even though no StartActivity run is created.
+        1. Workflow outbound: injects the ambient run's context into headers even
+           though no StartActivity run is created.
         2. Activity inbound: sets tracing_context(parent=extracted_parent)
            unconditionally (before _maybe_run), so @traceable code nests correctly
            even without a RunActivity run.
@@ -1090,19 +1090,17 @@ class TestAddTemporalRunsToggle:
         mock_outbound_next = MagicMock()
         mock_outbound_next.start_activity = MagicMock()
         inbound.init(mock_outbound_next)
-        outbound = _LangSmithWorkflowOutboundInterceptor(
-            mock_outbound_next, config, inbound
-        )
+        outbound = _LangSmithWorkflowOutboundInterceptor(mock_outbound_next, config)
 
-        # Simulate an inbound parent context (as if extracted from headers)
+        # Simulate an ambient parent context (as if from active workflow execution)
         mock_parent = _make_mock_run()
-        inbound._current_run = mock_parent
 
         mock_input = MagicMock()
         mock_input.activity = "do_thing"
         mock_input.headers = {}
 
-        outbound.start_activity(mock_input)
+        with patch(_PATCH_GET_CURRENT_RUN, return_value=mock_parent):
+            outbound.start_activity(mock_input)
 
         # No RunTree should be created (add_temporal_runs=False)
         MockRunTree.assert_not_called()

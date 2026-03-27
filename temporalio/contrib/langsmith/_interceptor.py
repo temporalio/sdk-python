@@ -123,6 +123,18 @@ def _extract_nexus_context(
     return _ReplaySafeRunTree(run, executor=executor) if run else None
 
 
+def _get_current_run_for_propagation() -> RunTree | None:
+    """Get the current ambient run for context propagation.
+
+    Filters out _ContextBridgeRunTree, which is internal scaffolding
+    that should never be serialized into headers or used as parent runs.
+    """
+    run = get_current_run_tree()
+    if isinstance(run, _ContextBridgeRunTree):
+        return None
+    return run
+
+
 # ---------------------------------------------------------------------------
 # Sandbox safety: patch @traceable's aio_to_thread
 # ---------------------------------------------------------------------------
@@ -742,46 +754,26 @@ class _LangSmithWorkflowInboundInterceptor(
     """Instruments workflow execution with LangSmith runs."""
 
     _config: ClassVar[LangSmithInterceptor]
-    _current_run: _ReplaySafeRunTree | None = None
 
     def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
-        super().init(
-            _LangSmithWorkflowOutboundInterceptor(outbound, self._config, self)
-        )
+        super().init(_LangSmithWorkflowOutboundInterceptor(outbound, self._config))
 
     @contextmanager
     def _workflow_maybe_run(
         self,
         name: str,
         headers: Mapping[str, Payload] | None = None,
-        *,
-        is_handler: bool = False,
     ) -> Iterator[_ReplaySafeRunTree | None]:
         """Workflow-specific run creation with metadata.
 
-        Extracts parent from headers (if provided) and stores the run (or parent
-        fallback) as ``_current_run`` so the outbound interceptor can propagate
-        context even when ``add_temporal_runs=False``.
-
-        Always sets up ``tracing_context`` so ``@traceable`` functions called
-        from workflow code can discover the parent and LangSmith client,
-        independent of the ``add_temporal_runs`` toggle.
-
-        When ``is_handler`` is True and no LangSmith context is found in
-        headers, skips trace creation if a workflow run is already active
-        (``_current_run`` is set). This suppresses orphan traces from
-        uninstrumented client operations (e.g. query polling) while still
-        allowing handler traces when invoked with propagated context.
+        Extracts parent from headers (if provided) and sets up
+        ``tracing_context`` so ``@traceable`` functions called from workflow
+        code can discover the parent and LangSmith client, independent of the
+        ``add_temporal_runs`` toggle.
         """
         parent = _extract_context(headers, self._config._executor) if headers else None
         if parent is not None:
             parent.ls_client = self._config._client
-        # Handler from an uninstrumented client during workflow execution:
-        # no LangSmith headers but _current_run is set. Skip trace creation
-        # to avoid orphan/duplicate handler traces (e.g. query polling).
-        if is_handler and parent is None and self._current_run is not None:
-            yield None
-            return
         info = temporalio.workflow.info()
         extra_metadata = {
             "temporalWorkflowID": info.workflow_id,
@@ -815,12 +807,7 @@ class _LangSmithWorkflowInboundInterceptor(
                 parent=parent,
                 extra_metadata=extra_metadata,
             ) as run:
-                prev_run = self._current_run
-                self._current_run = run or parent
-                try:
-                    yield run
-                finally:
-                    self._current_run = prev_run
+                yield run
 
     async def execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
@@ -833,31 +820,23 @@ class _LangSmithWorkflowInboundInterceptor(
             return await super().execute_workflow(input)
 
     async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
-        with self._workflow_maybe_run(
-            f"HandleSignal:{input.signal}", input.headers, is_handler=True
-        ):
+        with self._workflow_maybe_run(f"HandleSignal:{input.signal}", input.headers):
             return await super().handle_signal(input)
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
-        with self._workflow_maybe_run(
-            f"HandleQuery:{input.query}", input.headers, is_handler=True
-        ):
+        with self._workflow_maybe_run(f"HandleQuery:{input.query}", input.headers):
             return await super().handle_query(input)
 
     def handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
     ) -> None:
-        with self._workflow_maybe_run(
-            f"ValidateUpdate:{input.update}", input.headers, is_handler=True
-        ):
+        with self._workflow_maybe_run(f"ValidateUpdate:{input.update}", input.headers):
             return super().handle_update_validator(input)
 
     async def handle_update_handler(
         self, input: temporalio.worker.HandleUpdateInput
     ) -> Any:
-        with self._workflow_maybe_run(
-            f"HandleUpdate:{input.update}", input.headers, is_handler=True
-        ):
+        with self._workflow_maybe_run(f"HandleUpdate:{input.update}", input.headers):
             return await super().handle_update_handler(input)
 
 
@@ -875,19 +854,22 @@ class _LangSmithWorkflowOutboundInterceptor(
         self,
         next: temporalio.worker.WorkflowOutboundInterceptor,
         config: LangSmithInterceptor,
-        inbound: _LangSmithWorkflowInboundInterceptor,
     ) -> None:
         super().__init__(next)
         self._config = config
-        self._inbound = inbound
 
     @contextmanager
     def _traced_outbound(
         self, name: str, input: _InputWithHeaders
     ) -> Iterator[_ReplaySafeRunTree | None]:
-        """Outbound workflow run creation with context injection into input.headers."""
-        with self._config.maybe_run(name, parent=self._inbound._current_run) as run:
-            context_source = run or self._inbound._current_run
+        """Outbound workflow run creation with context injection into input.headers.
+
+        Uses ambient context (``get_current_run_tree()``) instead of a cached
+        snapshot, so ``@traceable`` step functions that wrap outbound calls
+        correctly parent the outbound run under themselves.
+        """
+        with self._config.maybe_run(name) as run:
+            context_source = run or _get_current_run_for_propagation()
             if context_source:
                 input.headers = _inject_context(input.headers, context_source)
             yield run
@@ -923,8 +905,8 @@ class _LangSmithWorkflowOutboundInterceptor(
             return await super().signal_external_workflow(input)
 
     def continue_as_new(self, input: temporalio.worker.ContinueAsNewInput) -> NoReturn:
-        # No trace created, but inject context from inbound's current run
-        current_run = getattr(self._inbound, "_current_run", None)
+        # No trace created, but inject context from ambient run
+        current_run = _get_current_run_for_propagation()
         if current_run:
             input.headers = _inject_context(input.headers, current_run)
         super().continue_as_new(input)
@@ -934,9 +916,8 @@ class _LangSmithWorkflowOutboundInterceptor(
     ) -> temporalio.workflow.NexusOperationHandle[Any]:
         with self._config.maybe_run(
             f"StartNexusOperation:{input.service}/{input.operation_name}",
-            parent=self._inbound._current_run,
         ) as run:
-            context_source = run or self._inbound._current_run
+            context_source = run or _get_current_run_for_propagation()
             if context_source:
                 input.headers = _inject_nexus_context(
                     input.headers or {}, context_source
@@ -969,20 +950,42 @@ class _LangSmithNexusOperationInboundInterceptor(
         | nexusrpc.handler.StartOperationResultAsync
     ):
         parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
-        with self._config.maybe_run(
-            f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
-            run_type="tool",
-            parent=parent,
-        ):
-            return await self.next.execute_nexus_operation_start(input)
+        if parent is not None and hasattr(parent, "ls_client"):
+            parent.ls_client = self._config._client
+        ctx_kwargs: dict[str, Any] = {
+            "client": self._config._client,
+            "enabled": True,
+        }
+        if self._config._project_name:
+            ctx_kwargs["project_name"] = self._config._project_name
+        if parent:
+            ctx_kwargs["parent"] = parent
+        with tracing_context(**ctx_kwargs):
+            with self._config.maybe_run(
+                f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
+                run_type="tool",
+                parent=parent,
+            ):
+                return await self.next.execute_nexus_operation_start(input)
 
     async def execute_nexus_operation_cancel(
         self, input: temporalio.worker.ExecuteNexusOperationCancelInput
     ) -> None:
         parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
-        with self._config.maybe_run(
-            f"RunCancelNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
-            run_type="tool",
-            parent=parent,
-        ):
-            return await self.next.execute_nexus_operation_cancel(input)
+        if parent is not None and hasattr(parent, "ls_client"):
+            parent.ls_client = self._config._client
+        ctx_kwargs: dict[str, Any] = {
+            "client": self._config._client,
+            "enabled": True,
+        }
+        if self._config._project_name:
+            ctx_kwargs["project_name"] = self._config._project_name
+        if parent:
+            ctx_kwargs["parent"] = parent
+        with tracing_context(**ctx_kwargs):
+            with self._config.maybe_run(
+                f"RunCancelNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
+                run_type="tool",
+                parent=parent,
+            ):
+                return await self.next.execute_nexus_operation_cancel(input)

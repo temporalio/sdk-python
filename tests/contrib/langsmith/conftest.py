@@ -58,23 +58,17 @@ class InMemoryRunCollector:
         self._by_id.clear()
 
 
-def dump_runs(collector: InMemoryRunCollector) -> list[str]:
-    """Reconstruct parent-child hierarchy from collected runs.
+def dump_traces(collector: InMemoryRunCollector) -> list[list[str]]:
+    """Reconstruct parent-child hierarchy grouped by root trace.
 
-    Returns a list of indented strings, e.g.:
-        ["StartWorkflow:MyWf", "  RunWorkflow:MyWf", "    StartActivity:do_thing"]
+    Returns a list of traces, where each trace is a list of indented
+    strings (same format as dump_runs). Each trace starts from a
+    different root run.
     """
     runs = collector.runs
     children: dict[str | None, list[_RunRecord]] = {}
     for r in runs:
         children.setdefault(r.parent_run_id, []).append(r)
-
-    result: list[str] = []
-
-    def _walk(parent_id: str | None, depth: int) -> None:
-        for child in children.get(parent_id, []):
-            result.append("  " * depth + child.name)
-            _walk(child.id, depth + 1)
 
     # Strict: reject dangling parent references
     known_ids = {r.id for r in runs}
@@ -84,10 +78,26 @@ def dump_runs(collector: InMemoryRunCollector) -> list[str]:
                 f"Run {r.name!r} (id={r.id}) has parent_run_id={r.parent_run_id} "
                 f"which is not in the collected runs — dangling parent reference"
             )
-    # Only walk true roots (parent_run_id is None)
-    _walk(None, 0)
 
-    return result
+    traces: list[list[str]] = []
+    for root in children.get(None, []):
+        trace: list[str] = []
+
+        def _walk(parent_id: str | None, depth: int) -> None:
+            for child in children.get(parent_id, []):
+                trace.append("  " * depth + child.name)
+                _walk(child.id, depth + 1)
+
+        trace.append(root.name)
+        _walk(root.id, 1)
+        traces.append(trace)
+
+    return traces
+
+
+def dump_runs(collector: InMemoryRunCollector) -> list[str]:
+    """Flat list of all runs across all traces."""
+    return [run for trace in dump_traces(collector) for run in trace]
 
 
 def make_mock_ls_client(collector: InMemoryRunCollector) -> MagicMock:

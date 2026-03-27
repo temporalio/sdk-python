@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from langsmith import traceable, tracing_context
 
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowHandle
 from temporalio.contrib.langsmith import LangSmithInterceptor, LangSmithPlugin
 from temporalio.testing import WorkflowEnvironment
-from tests.contrib.langsmith.conftest import dump_runs
+from tests.contrib.langsmith.conftest import dump_traces
 from tests.contrib.langsmith.test_integration import (
     ComprehensiveWorkflow,
     NexusService,
@@ -56,7 +57,11 @@ class TestPluginIntegration:
     async def test_comprehensive_plugin_trace_hierarchy(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
-        """Plugin wired to a real Temporal worker produces the full trace hierarchy."""
+        """Plugin wired to a real Temporal worker produces the full trace hierarchy.
+
+        user_pipeline only wraps start_workflow, so poll/query/signal/update
+        traces are naturally separate root traces.
+        """
         if env.supports_time_skipping:
             pytest.skip("Time-skipping server doesn't persist headers.")
 
@@ -64,8 +69,20 @@ class TestPluginIntegration:
             client, add_temporal_runs=True
         )
 
+        task_queue = f"plugin-comprehensive-{uuid.uuid4()}"
+        workflow_id = f"plugin-comprehensive-{uuid.uuid4()}"
+
         @traceable(name="user_pipeline")
-        async def user_pipeline() -> str:
+        async def user_pipeline() -> WorkflowHandle[Any, Any]:
+            return await temporal_client.start_workflow(
+                ComprehensiveWorkflow.run,
+                id=workflow_id,
+                task_queue=task_queue,
+            )
+
+        with tracing_context(client=mock_ls_client, enabled=True):
+            handle = await user_pipeline()
+
             async with new_worker(
                 temporal_client,
                 ComprehensiveWorkflow,
@@ -73,70 +90,60 @@ class TestPluginIntegration:
                 SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
+                task_queue=task_queue,
                 max_cached_workflows=0,
             ) as worker:
                 await env.create_nexus_endpoint(
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                workflow_id = f"plugin-comprehensive-{uuid.uuid4()}"
-                handle = await temporal_client.start_workflow(
-                    ComprehensiveWorkflow.run,
-                    id=workflow_id,
-                    task_queue=worker.task_queue,
-                )
-                # Poll via raw client to avoid creating trace runs
-                raw_handle = client.get_workflow_handle(workflow_id)
                 assert await _poll_query(
-                    raw_handle,
+                    handle,
                     ComprehensiveWorkflow.is_waiting_for_signal,
                     expected=True,
                 ), "Workflow never reached signal wait point"
                 await handle.query(ComprehensiveWorkflow.my_query)
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
-                return await handle.result()
-
-        with tracing_context(client=mock_ls_client, enabled=True):
-            result = await user_pipeline()
+                result = await handle.result()
 
         assert result == "comprehensive-done"
 
-        hierarchy = dump_runs(collector)
-        expected = [
+        traces = dump_traces(collector)
+
+        # user_pipeline trace: StartWorkflow + full workflow execution tree
+        workflow_traces = [t for t in traces if t[0] == "user_pipeline"]
+        assert len(workflow_traces) == 1
+        assert workflow_traces[0] == [
             "user_pipeline",
             "  StartWorkflow:ComprehensiveWorkflow",
             "    RunWorkflow:ComprehensiveWorkflow",
-            # Direct activity
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
             "          nested_traceable_activity",
             "            outer_chain",
             "              inner_llm_call",
-            # @traceable step wrapping activity
+            # step-wrapped activity
             "      step_with_activity",
             "        StartActivity:nested_traceable_activity",
             "          RunActivity:nested_traceable_activity",
             "            nested_traceable_activity",
             "              outer_chain",
             "                inner_llm_call",
-            # Direct local activity
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
             "          nested_traceable_activity",
             "            outer_chain",
             "              inner_llm_call",
-            # Direct @traceable
             "      outer_chain",
             "        inner_llm_call",
-            # Direct child workflow
             "      StartChildWorkflow:TraceableActivityWorkflow",
             "        RunWorkflow:TraceableActivityWorkflow",
             "          StartActivity:traceable_activity",
             "            RunActivity:traceable_activity",
             "              traceable_activity",
             "                inner_llm_call",
-            # @traceable step wrapping child workflow
+            # step-wrapped child workflow
             "      step_with_child_workflow",
             "        StartChildWorkflow:TraceableActivityWorkflow",
             "          RunWorkflow:TraceableActivityWorkflow",
@@ -144,7 +151,6 @@ class TestPluginIntegration:
             "              RunActivity:traceable_activity",
             "                traceable_activity",
             "                  inner_llm_call",
-            # Direct nexus operation
             "      StartNexusOperation:NexusService/run_operation",
             "        RunStartNexusOperationHandler:NexusService/run_operation",
             "          StartWorkflow:SimpleNexusWorkflow",
@@ -153,7 +159,7 @@ class TestPluginIntegration:
             "                RunActivity:traceable_activity",
             "                  traceable_activity",
             "                    inner_llm_call",
-            # @traceable step wrapping nexus operation
+            # step-wrapped nexus operation
             "      step_with_nexus",
             "        StartNexusOperation:NexusService/run_operation",
             "          RunStartNexusOperationHandler:NexusService/run_operation",
@@ -163,20 +169,43 @@ class TestPluginIntegration:
             "                  RunActivity:traceable_activity",
             "                    traceable_activity",
             "                      inner_llm_call",
-            # Post-signal activity
+            # post-signal
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
             "          nested_traceable_activity",
             "            outer_chain",
             "              inner_llm_call",
-            "  QueryWorkflow:my_query",
-            "    HandleQuery:my_query",
-            "  SignalWorkflow:my_signal",
-            "    HandleSignal:my_signal",
-            "  StartWorkflowUpdate:my_update",
-            "    ValidateUpdate:my_update",
-            "    HandleUpdate:my_update",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+
+        # poll_query trace (separate root, variable number of iterations)
+        poll_traces = [t for t in traces if t[0] == "poll_query"]
+        assert len(poll_traces) == 1
+        poll = poll_traces[0]
+        assert poll[0] == "poll_query"
+        poll_children = poll[1:]
+        for i in range(0, len(poll_children), 2):
+            assert poll_children[i] == "  QueryWorkflow:is_waiting_for_signal"
+            assert poll_children[i + 1] == "    HandleQuery:is_waiting_for_signal"
+
+        # Each remaining operation is its own root trace
+        query_traces = [t for t in traces if t[0] == "QueryWorkflow:my_query"]
+        assert len(query_traces) == 1
+        assert query_traces[0] == [
+            "QueryWorkflow:my_query",
+            "  HandleQuery:my_query",
+        ]
+
+        signal_traces = [t for t in traces if t[0] == "SignalWorkflow:my_signal"]
+        assert len(signal_traces) == 1
+        assert signal_traces[0] == [
+            "SignalWorkflow:my_signal",
+            "  HandleSignal:my_signal",
+        ]
+
+        update_traces = [t for t in traces if t[0] == "StartWorkflowUpdate:my_update"]
+        assert len(update_traces) == 1
+        assert update_traces[0] == [
+            "StartWorkflowUpdate:my_update",
+            "  ValidateUpdate:my_update",
+            "  HandleUpdate:my_update",
+        ]
