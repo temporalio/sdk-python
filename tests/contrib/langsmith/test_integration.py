@@ -130,6 +130,38 @@ class SimpleWorkflow:
 # ---------------------------------------------------------------------------
 
 
+@traceable(name="step_with_activity")
+async def _step_with_activity() -> str:
+    """A @traceable step that wraps an activity call."""
+    return await workflow.execute_activity(
+        nested_traceable_activity,
+        start_to_close_timeout=timedelta(seconds=10),
+    )
+
+
+@traceable(name="step_with_child_workflow")
+async def _step_with_child_workflow() -> str:
+    """A @traceable step that wraps a child workflow call."""
+    return await workflow.execute_child_workflow(
+        TraceableActivityWorkflow.run,
+        id=f"step-child-{workflow.info().workflow_id}",
+    )
+
+
+@traceable(name="step_with_nexus")
+async def _step_with_nexus() -> str:
+    """A @traceable step that wraps a nexus operation."""
+    nexus_client = workflow.create_nexus_client(
+        endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+        service=NexusService,
+    )
+    nexus_handle = await nexus_client.start_operation(
+        operation=NexusService.run_operation,
+        input="test-input",
+    )
+    return await nexus_handle
+
+
 @workflow.defn
 class ComprehensiveWorkflow:
     def __init__(self) -> None:
@@ -139,24 +171,28 @@ class ComprehensiveWorkflow:
 
     @workflow.run
     async def run(self) -> str:
-        # Regular activity
+        # Direct activity
         await workflow.execute_activity(
             nested_traceable_activity,
             start_to_close_timeout=timedelta(seconds=10),
         )
-        # Local activity
+        # @traceable step wrapping activity (tests outbound nesting)
+        await _step_with_activity()
+        # Direct local activity
         await workflow.execute_local_activity(
             nested_traceable_activity,
             start_to_close_timeout=timedelta(seconds=10),
         )
-        # Direct @traceable call
+        # Direct @traceable call (no outbound)
         await _outer_chain("from-workflow")
-        # Child workflow
+        # Direct child workflow
         await workflow.execute_child_workflow(
             TraceableActivityWorkflow.run,
             id=f"child-{workflow.info().workflow_id}",
         )
-        # Nexus operation
+        # @traceable step wrapping child workflow (tests outbound nesting)
+        await _step_with_child_workflow()
+        # Direct nexus operation
         nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=NexusService,
@@ -166,6 +202,8 @@ class ComprehensiveWorkflow:
             input="test-input",
         )
         await nexus_handle
+        # @traceable step wrapping nexus operation (tests outbound nesting)
+        await _step_with_nexus()
         # Wait for signal
         self._waiting_for_signal = True
         await workflow.wait_condition(lambda: self._signal_received)
@@ -631,24 +669,44 @@ class TestComprehensiveTracing:
             "user_pipeline",
             "  StartWorkflow:ComprehensiveWorkflow",
             "    RunWorkflow:ComprehensiveWorkflow",
+            # Direct activity
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
             "          nested_traceable_activity",
             "            outer_chain",
             "              inner_llm_call",
+            # @traceable step wrapping activity
+            "      step_with_activity",
+            "        StartActivity:nested_traceable_activity",
+            "          RunActivity:nested_traceable_activity",
+            "            nested_traceable_activity",
+            "              outer_chain",
+            "                inner_llm_call",
+            # Direct local activity
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
             "          nested_traceable_activity",
             "            outer_chain",
             "              inner_llm_call",
+            # Direct @traceable
             "      outer_chain",
             "        inner_llm_call",
+            # Direct child workflow
             "      StartChildWorkflow:TraceableActivityWorkflow",
             "        RunWorkflow:TraceableActivityWorkflow",
             "          StartActivity:traceable_activity",
             "            RunActivity:traceable_activity",
             "              traceable_activity",
             "                inner_llm_call",
+            # @traceable step wrapping child workflow
+            "      step_with_child_workflow",
+            "        StartChildWorkflow:TraceableActivityWorkflow",
+            "          RunWorkflow:TraceableActivityWorkflow",
+            "            StartActivity:traceable_activity",
+            "              RunActivity:traceable_activity",
+            "                traceable_activity",
+            "                  inner_llm_call",
+            # Direct nexus operation
             "      StartNexusOperation:NexusService/run_operation",
             "        RunStartNexusOperationHandler:NexusService/run_operation",
             "          StartWorkflow:SimpleNexusWorkflow",
@@ -657,6 +715,17 @@ class TestComprehensiveTracing:
             "                RunActivity:traceable_activity",
             "                  traceable_activity",
             "                    inner_llm_call",
+            # @traceable step wrapping nexus operation
+            "      step_with_nexus",
+            "        StartNexusOperation:NexusService/run_operation",
+            "          RunStartNexusOperationHandler:NexusService/run_operation",
+            "            StartWorkflow:SimpleNexusWorkflow",
+            "              RunWorkflow:SimpleNexusWorkflow",
+            "                StartActivity:traceable_activity",
+            "                  RunActivity:traceable_activity",
+            "                    traceable_activity",
+            "                      inner_llm_call",
+            # Post-signal activity
             "      StartActivity:nested_traceable_activity",
             "        RunActivity:nested_traceable_activity",
             "          nested_traceable_activity",
@@ -749,18 +818,37 @@ class TestComprehensiveTracing:
         hierarchy = dump_runs(collector)
         expected = [
             "user_pipeline",
+            # Direct activity
             "  nested_traceable_activity",
             "    outer_chain",
             "      inner_llm_call",
+            # @traceable step wrapping activity
+            "  step_with_activity",
+            "    nested_traceable_activity",
+            "      outer_chain",
+            "        inner_llm_call",
+            # Direct local activity
             "  nested_traceable_activity",
             "    outer_chain",
             "      inner_llm_call",
+            # Direct @traceable
             "  outer_chain",
             "    inner_llm_call",
+            # Direct child workflow (activity @traceable propagated via headers)
             "  traceable_activity",
             "    inner_llm_call",
+            # @traceable step wrapping child workflow
+            "  step_with_child_workflow",
+            "    traceable_activity",
+            "      inner_llm_call",
+            # Direct nexus operation (activity @traceable propagated via headers)
             "  traceable_activity",
             "    inner_llm_call",
+            # @traceable step wrapping nexus operation
+            "  step_with_nexus",
+            "    traceable_activity",
+            "      inner_llm_call",
+            # Post-signal activity
             "  nested_traceable_activity",
             "    outer_chain",
             "      inner_llm_call",
@@ -974,3 +1062,113 @@ class TestBackgroundIOIntegration:
         assert len(run_ids) == len(
             set(run_ids)
         ), f"Duplicate run IDs found (replay issue): {run_ids}"
+
+
+# --- Nexus service for Bug 2 test (direct @traceable in handler) ---
+
+
+@traceable(name="nexus_direct_traceable")
+async def _nexus_direct_traceable(input: str) -> str:
+    """A @traceable function called directly from a nexus handler."""
+    return await _inner_llm_call(input)
+
+
+@nexusrpc.handler.service_handler
+class DirectTraceableNexusService:
+    """Nexus service that calls @traceable directly (not via activity)."""
+
+    @nexusrpc.handler.sync_operation
+    async def direct_traceable_op(
+        self,
+        ctx: nexusrpc.handler.StartOperationContext,  # type:ignore[reportUnusedParameter]
+        input: str,
+    ) -> str:
+        return await _nexus_direct_traceable(input)
+
+
+@workflow.defn
+class NexusDirectTraceableWorkflow:
+    """Workflow that calls a nexus operation whose handler uses @traceable directly."""
+
+    @workflow.run
+    async def run(self) -> str:
+        nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=DirectTraceableNexusService,
+        )
+        return await nexus_client.execute_operation(
+            operation=DirectTraceableNexusService.direct_traceable_op,
+            input="nexus-input",
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestNexusInboundTracing — Bug 2: missing tracing_context in nexus handler
+# ---------------------------------------------------------------------------
+
+
+class TestNexusInboundTracing:
+    """Tests that @traceable calls inside nexus handlers work without temporal runs.
+
+    Bug 2: The nexus inbound interceptor doesn't set up tracing_context()
+    when add_temporal_runs=False, so @traceable functions inside the handler
+    have no LangSmith client and no parent — their runs aren't collected.
+    """
+
+    async def test_nexus_direct_traceable_without_temporal_runs(
+        self,
+        client: Client,
+        env: WorkflowEnvironment,
+    ) -> None:
+        """Test F: @traceable in nexus handler works with add_temporal_runs=False.
+
+        The worker must be started OUTSIDE tracing_context so that nexus handler
+        tasks inherit a clean contextvars state. Only the client call gets
+        tracing_context — the interceptor's tracing_context setup (or lack
+        thereof) is the only thing that should provide context to the handler.
+        """
+        if env.supports_time_skipping:
+            pytest.skip("Time-skipping server doesn't persist headers.")
+
+        task_queue = f"nexus-direct-{uuid.uuid4()}"
+        collector = InMemoryRunCollector()
+        mock_ls = make_mock_ls_client(collector)
+        temporal_client = _make_temporal_client(
+            client, mock_ls, add_temporal_runs=False
+        )
+
+        # Worker starts OUTSIDE tracing_context — nexus handler tasks get clean context
+        async with new_worker(
+            temporal_client,
+            NexusDirectTraceableWorkflow,
+            nexus_service_handlers=[DirectTraceableNexusService()],
+            task_queue=task_queue,
+            max_cached_workflows=0,
+        ) as worker:
+            await env.create_nexus_endpoint(
+                make_nexus_endpoint_name(worker.task_queue),
+                worker.task_queue,
+            )
+            # Only the client call gets tracing context, not the worker
+            with tracing_context(client=mock_ls, enabled=True):
+                handle = await temporal_client.start_workflow(
+                    NexusDirectTraceableWorkflow.run,
+                    id=f"nexus-direct-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                result = await handle.result()
+
+        assert result == "response to: nexus-input"
+
+        hierarchy = dump_runs(collector)
+        # @traceable runs from inside the nexus handler should be collected
+        # and nested under user_pipeline via context propagation.
+        # Without the fix, the nexus handler has no tracing_context so
+        # @traceable runs won't be collected — hierarchy will be empty.
+        expected = [
+            "nexus_direct_traceable",
+            "  inner_llm_call",
+        ]
+        assert (
+            hierarchy == expected
+        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
