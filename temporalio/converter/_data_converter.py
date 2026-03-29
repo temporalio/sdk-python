@@ -254,9 +254,12 @@ class DataConverter(WithSerializationContext):
         )
 
     async def _transform_outbound_payload(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        *,
+        encode: bool = True,
     ) -> temporalio.api.common.v1.Payload:
-        if self.payload_codec:
+        if encode and self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
         if self.external_storage:
             payload = await self.external_storage._store_payload(payload)
@@ -273,11 +276,14 @@ class DataConverter(WithSerializationContext):
         self._validate_payload_limits(payloads.payloads)
 
     async def _transform_inbound_payload(
-        self, payload: temporalio.api.common.v1.Payload
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        *,
+        decode: bool = True,
     ) -> temporalio.api.common.v1.Payload:
         if self.external_storage:
             payload = await self.external_storage._retrieve_payload(payload)
-        if self.payload_codec:
+        if decode and self.payload_codec:
             payload = (await self.payload_codec.decode([payload]))[0]
         return payload
 

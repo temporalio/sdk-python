@@ -629,11 +629,14 @@ class _ActivityWorker:
             else None,
         )
 
-        if self._encode_headers:
-            for payload in start.header_fields.values():
-                payload.CopyFrom(
-                    await data_converter._transform_inbound_payload(payload)
+        # Always retrieve headers from external storage regardless of
+        # encode_headers — external storage is orthogonal to codec encoding.
+        for payload in start.header_fields.values():
+            payload.CopyFrom(
+                await data_converter._transform_inbound_payload(
+                    payload, decode=self._encode_headers
                 )
+            )
 
         running_activity.info = info
         input = ExecuteActivityInput(

@@ -312,9 +312,11 @@ async def decode_activation(
     """
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
+        # Always retrieve headers from external storage regardless of
+        # decode_headers — external storage is orthogonal to codec encoding.
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True,
-            skip_headers=not decode_headers,
+            skip_headers=False,
             concurrency_limit=storage_concurrency_limit,
         ).visit(
             _Visitor(data_converter._external_retrieve_payload_sequence), activation
@@ -353,9 +355,11 @@ async def encode_completion(
 
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
+        # Always store and validate headers regardless of encode_headers —
+        # external storage is orthogonal to codec encoding.
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True,
-            skip_headers=not encode_headers,
+            skip_headers=False,
             concurrency_limit=storage_concurrency_limit,
         ).visit(_Visitor(_store_and_validate), completion)
 

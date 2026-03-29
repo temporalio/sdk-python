@@ -9183,9 +9183,14 @@ async def _apply_headers(
 ) -> None:
     if source is None:
         return
-    if encode_headers:
-        for payload in source.values():
-            payload.CopyFrom(await data_converter._transform_outbound_payload(payload))
+    # Always run headers through external storage and validation, but only
+    # codec-encode when encode_headers is True.
+    for payload in source.values():
+        payload.CopyFrom(
+            await data_converter._transform_outbound_payload(
+                payload, encode=encode_headers
+            )
+        )
     temporalio.common._apply_headers(source, dest)
 
 
