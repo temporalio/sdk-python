@@ -1,7 +1,7 @@
 """Unit tests for _ReplaySafeRunTree and _ContextBridgeRunTree.
 
 Covers create_child propagation, executor-backed post/patch,
-replay suppression, post-shutdown fallback, and aio_to_thread error gate.
+replay suppression, and post-shutdown fallback.
 """
 
 from __future__ import annotations
@@ -633,54 +633,6 @@ class TestPostShutdownFallback:
         tree.patch()
 
         mock_run.patch.assert_called_once()
-
-
-# ===================================================================
-# TestAioToThreadErrorGate
-# ===================================================================
-
-
-class TestAioToThreadErrorGate:
-    """Tests for aio_to_thread error gate when plugin is not configured."""
-
-    @pytest.mark.asyncio
-    @patch(_PATCH_IN_WORKFLOW, return_value=True)
-    @patch(_PATCH_IS_REPLAYING, return_value=False)
-    async def test_error_gate_raises_without_plugin(
-        self, _mock_replaying: Any, _mock_in_wf: Any
-    ) -> None:
-        """Async @traceable in workflow without plugin raises a clear error.
-
-        When _setup_run creates a plain RunTree (no _ReplaySafeRunTree parent),
-        the aio_to_thread patch should detect this and raise an error telling
-        the user to configure the LangSmith plugin.
-        """
-        import langsmith._internal._aiter as _aiter
-
-        import temporalio.contrib.langsmith._interceptor as _mod
-        from temporalio.contrib.langsmith._interceptor import _patch_aio_to_thread
-
-        # Save original state and restore after test to avoid global mutation
-        original_aio_to_thread = _aiter.aio_to_thread
-        original_patched_flag = _mod._aio_to_thread_patched
-        try:
-            # Reset the flag so _patch_aio_to_thread applies fresh
-            _mod._aio_to_thread_patched = False
-            _patch_aio_to_thread()
-
-            # The patched aio_to_thread should raise when a plain RunTree is
-            # created (no _ReplaySafeRunTree or _ContextBridgeRunTree parent).
-            # This simulates _setup_run creating a root RunTree.
-            def _mock_setup_run(*_args: Any, **_kwargs: Any) -> RunTree:
-                return RunTree(name="test", run_type="chain")
-
-            with pytest.raises(RuntimeError, match="Use the LangSmith plugin"):
-                # The error gate should fire when _setup_run returns a plain RunTree
-                # This test validates the error gate exists and fires
-                await _aiter.aio_to_thread(_mock_setup_run)
-        finally:
-            _aiter.aio_to_thread = original_aio_to_thread  # type: ignore[assignment]
-            _mod._aio_to_thread_patched = original_patched_flag
 
 
 # ===================================================================

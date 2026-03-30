@@ -157,10 +157,6 @@ def _patch_aio_to_thread() -> None:
     sandbox blocks ``run_in_executor``.  This patch runs those functions
     synchronously (they are CPU-bound, no I/O) when inside a workflow.
 
-    Also serves as an error gate: if ``_setup_run`` creates a plain ``RunTree``
-    (no ``_ReplaySafeRunTree`` or ``_ContextBridgeRunTree`` parent), the
-    ``post()`` call would block. The patch detects this and raises a clear
-    error telling the user to configure the LangSmith plugin.
     """
     global _aio_to_thread_patched  # noqa: PLW0603
     if _aio_to_thread_patched:
@@ -191,18 +187,7 @@ def _patch_aio_to_thread() -> None:
             # and patch() are no-ops during replay, which handles I/O
             # suppression. _setup_run must run normally during replay to
             # maintain parent-child linkage across the replay boundary.
-            result = func(*args, **kwargs)
-            # Error gate: if _setup_run created a plain RunTree (no
-            # _ReplaySafeRunTree parent found), post() would block on
-            # compressed_traces.lock. Detect this and raise a clear error.
-            if isinstance(result, RunTree) and not isinstance(
-                result, _ReplaySafeRunTree
-            ):
-                raise RuntimeError(
-                    "Use the LangSmith plugin to enable @langsmith.traceable "
-                    "in Temporal workflows."
-                )
-            return result
+            return func(*args, **kwargs)
 
     _aiter.aio_to_thread = _safe_aio_to_thread  # type: ignore[assignment]
     _aio_to_thread_patched = True
