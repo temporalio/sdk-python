@@ -92,7 +92,7 @@ def _extract_context(
 ) -> _ReplaySafeRunTree | None:
     """Extract LangSmith context from Temporal payload headers.
 
-    Reconstructs a :class:`RunTree` from the ``_temporal-langsmith-context`` header on
+    Reconstructs a ``RunTree`` from the ``_temporal-langsmith-context`` header on
     the receiving side, wrapped in a :class:`_ReplaySafeRunTree` so inbound
     interceptors can establish a parent-child relationship with the sender's
     run. Returns ``None`` if no header is present.
@@ -244,9 +244,9 @@ def _uuid_from_random(rng: random.Random) -> uuid.UUID:
 
 
 class _ReplaySafeRunTree(RunTree):
-    """Wrapper around a :class:`RunTree` with replay-safe ``post``, ``end``, and ``patch``.
+    """Wrapper around a ``RunTree`` with replay-safe ``post``, ``end``, and ``patch``.
 
-    Inherits from :class:`RunTree` so ``isinstance`` checks pass, but does
+    Inherits from ``RunTree`` so ``isinstance`` checks pass, but does
     **not** call ``super().__init__()``—the wrapped ``_run`` is the real
     RunTree.  Attribute access is delegated via ``__getattr__``/``__setattr__``.
 

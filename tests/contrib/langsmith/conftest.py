@@ -31,8 +31,11 @@ class InMemoryRunCollector:
         self._by_id: dict[str, _RunRecord] = {}
 
     def record_create(self, **kwargs: Any) -> None:
+        run_id = str(kwargs.get("id", kwargs.get("run_id", "")))
+        if run_id in self._by_id:
+            return
         rec = _RunRecord(
-            id=str(kwargs.get("id", kwargs.get("run_id", ""))),
+            id=run_id,
             parent_run_id=(
                 str(kwargs["parent_run_id"]) if kwargs.get("parent_run_id") else None
             ),
