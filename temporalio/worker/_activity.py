@@ -631,7 +631,9 @@ class _ActivityWorker:
 
         if self._encode_headers:
             for payload in start.header_fields.values():
-                payload.CopyFrom(await data_converter._decode_payload(payload))
+                payload.CopyFrom(
+                    await data_converter._transform_inbound_payload(payload)
+                )
 
         running_activity.info = info
         input = ExecuteActivityInput(
