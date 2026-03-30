@@ -1190,3 +1190,93 @@ class TestNexusInboundTracing:
         assert (
             hierarchy == expected
         ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+
+
+# ---------------------------------------------------------------------------
+# TestBuiltinQueryFiltering
+# ---------------------------------------------------------------------------
+
+
+@workflow.defn
+class QueryFilteringWorkflow:
+    """Workflow with a user query and a signal to complete."""
+
+    def __init__(self) -> None:
+        self._complete = False
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self._complete)
+        return "done"
+
+    @workflow.signal
+    def complete(self) -> None:
+        self._complete = True
+
+    @workflow.query
+    def my_query(self) -> str:
+        return "query-result"
+
+
+class TestBuiltinQueryFiltering:
+    """Verifies __temporal_ prefixed queries are not traced."""
+
+    async def test_temporal_prefixed_query_not_traced(
+        self,
+        client: Client,
+    ) -> None:
+        """__temporal_workflow_metadata query should not produce a trace,
+        but user-defined queries should still be traced.
+
+        Uses add_temporal_runs=False on the query client to suppress
+        client-side QueryWorkflow traces, isolating the test to
+        worker-side HandleQuery traces only.
+        """
+
+        task_queue = f"query-filter-{uuid.uuid4()}"
+        collector = InMemoryRunCollector()
+        mock_ls = make_mock_ls_client(collector)
+
+        # Worker client: add_temporal_runs=True so HandleQuery traces are created
+        worker_client = _make_temporal_client(client, mock_ls, add_temporal_runs=True)
+        # Query client: add_temporal_runs=False to suppress client-side traces
+        query_client = _make_temporal_client(client, mock_ls, add_temporal_runs=False)
+
+        async with new_worker(
+            worker_client,
+            QueryFilteringWorkflow,
+            task_queue=task_queue,
+            max_cached_workflows=0,
+        ) as worker:
+            handle = await query_client.start_workflow(
+                QueryFilteringWorkflow.run,
+                id=f"query-filter-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            # Wait for workflow to start by polling the user query
+            assert await _poll_query(
+                handle,
+                QueryFilteringWorkflow.my_query,
+                expected="query-result",
+            ), "Workflow never started"
+
+            collector.clear()
+
+            # Built-in queries — should NOT be traced
+            await handle.query("__temporal_workflow_metadata")
+            await handle.query("__stack_trace")
+            await handle.query("__enhanced_stack_trace")
+
+            # User query — should be traced
+            await handle.query(QueryFilteringWorkflow.my_query)
+
+            await handle.signal(QueryFilteringWorkflow.complete)
+            assert await handle.result() == "done"
+
+        # Built-in queries should be absent; only user query and signal remain.
+        traces = dump_traces(collector)
+        assert traces == [
+            ["HandleQuery:my_query"],
+            ["HandleSignal:complete"],
+        ], f"Unexpected traces: {traces}"

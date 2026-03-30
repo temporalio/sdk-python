@@ -36,6 +36,13 @@ logger = logging.getLogger(__name__)
 
 HEADER_KEY = "_temporal-langsmith-context"
 
+_BUILTIN_QUERIES: frozenset[str] = frozenset(
+    {
+        "__stack_trace",
+        "__enhanced_stack_trace",
+    }
+)
+
 # ---------------------------------------------------------------------------
 # Context helpers
 # ---------------------------------------------------------------------------
@@ -824,6 +831,8 @@ class _LangSmithWorkflowInboundInterceptor(
             return await super().handle_signal(input)
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
+        if input.query.startswith("__temporal") or input.query in _BUILTIN_QUERIES:
+            return await super().handle_query(input)
         with self._workflow_maybe_run(f"HandleQuery:{input.query}", input.headers):
             return await super().handle_query(input)
 
