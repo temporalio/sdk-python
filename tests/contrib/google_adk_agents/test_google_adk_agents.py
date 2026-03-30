@@ -18,7 +18,7 @@ import logging
 import os
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator
 from datetime import timedelta
 
 import pytest
@@ -417,7 +417,9 @@ class McpModel(TestModel):
                     parts=[
                         Part(
                             function_call=FunctionCall(
-                                args={"path": os.path.dirname(os.path.abspath(__file__))},
+                                args={
+                                    "path": os.path.dirname(os.path.abspath(__file__))
+                                },
                                 name="list_directory",
                             )
                         )
@@ -667,6 +669,7 @@ async def test_mcp_toolset_outside_workflow_no_local_toolset():
     """Test that TemporalMcpToolSet raises ValueError outside a workflow with no local_toolset."""
     toolset = TemporalMcpToolSet("test_set_no_local")
     with pytest.raises(
-        ValueError, match="No local toolset available when executing outside a workflow."
+        ValueError,
+        match="No local toolset available when executing outside a workflow.",
     ):
         await toolset.get_tools()
