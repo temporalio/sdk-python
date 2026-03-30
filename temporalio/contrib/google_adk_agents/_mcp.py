@@ -90,7 +90,9 @@ class TemporalMcpToolSetProvider:
     within Temporal workflows.
     """
 
-    def __init__(self, name: str, toolset_factory: Callable[[Any | None], McpToolset]):
+    def __init__(
+        self, name: str, toolset_factory: Callable[[Any | None], McpToolset]
+    ) -> None:
         """Initializes the toolset provider.
 
         Args:
@@ -215,6 +217,7 @@ class TemporalMcpToolSet(BaseToolset):
         name: str,
         config: ActivityConfig | None = None,
         factory_argument: Any | None = None,
+        local_toolset: McpToolset | None = None,
     ):
         """Initializes the Temporal MCP toolset.
 
@@ -222,6 +225,7 @@ class TemporalMcpToolSet(BaseToolset):
             name: Name of the toolset (used for activity naming).
             config: Optional activity configuration.
             factory_argument: Optional argument passed to toolset factory.
+            local_toolset: Optional temporal toolset for local execution when running outside a durable workflow.
         """
         super().__init__()
         self._name = name
@@ -229,6 +233,7 @@ class TemporalMcpToolSet(BaseToolset):
         self._config = config or ActivityConfig(
             start_to_close_timeout=timedelta(minutes=1)
         )
+        self._local_toolset = local_toolset
 
     async def get_tools(
         self, readonly_context: ReadonlyContext | None = None
@@ -241,6 +246,14 @@ class TemporalMcpToolSet(BaseToolset):
         Returns:
             List of available tools wrapped as Temporal activities.
         """
+        # If executed outside a workflow, like when doing local adk runs, use the mcp server directly
+        if not workflow.in_workflow():
+            if self._local_toolset is None:
+                raise ValueError(
+                    "No local toolset available when executing outside a workflow."
+                )
+            return await self._local_toolset.get_tools(readonly_context)
+
         tool_results: list[_ToolResult] = await workflow.execute_activity(
             self._name + "-list-tools",
             _GetToolsArguments(self._factory_argument),

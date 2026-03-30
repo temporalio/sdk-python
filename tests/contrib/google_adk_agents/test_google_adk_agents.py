@@ -408,38 +408,33 @@ class McpAgent:
         return last_event.content.parts[0].text
 
 
-class McpModel(BaseLlm):
-    responses: list[LlmResponse] = [
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[
-                    Part(
-                        function_call=FunctionCall(
-                            args={"path": os.path.dirname(os.path.abspath(__file__))},
-                            name="list_directory",
+class McpModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                args={"path": os.path.dirname(os.path.abspath(__file__))},
+                                name="list_directory",
+                            )
                         )
-                    )
-                ],
-            )
-        ),
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[Part(text="Some files.")],
-            )
-        ),
-    ]
-    response_iter: Iterator[LlmResponse] = iter(responses)
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[Part(text="Some files.")],
+                )
+            ),
+        ]
 
     @classmethod
     def supported_models(cls) -> list[str]:
         return ["mcp_model"]
-
-    async def generate_content_async(
-        self, llm_request: LlmRequest, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        yield next(self.response_iter)
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
@@ -567,3 +562,111 @@ async def test_single_agent_telemetry(client: Client):
 async def test_unsetting_timeout():
     model = TemporalModel("", ActivityConfig(start_to_close_timeout=None))
     assert model._activity_config.get("start_to_close_timeout", None) is None
+
+
+@pytest.mark.asyncio
+async def test_agent_outside_workflow():
+    """Test that an agent using TemporalModel and activity_tool works outside a Temporal workflow."""
+    LLMRegistry.register(WeatherModel)
+
+    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+        get_weather, start_to_close_timeout=timedelta(seconds=60)
+    )
+
+    agent = Agent(
+        name="test_agent",
+        model=TemporalModel("weather_model"),
+        tools=[weather_tool],
+    )
+
+    runner = InMemoryRunner(
+        agent=agent,
+        app_name="test_app_local",
+    )
+
+    session = await runner.session_service.create_session(
+        app_name="test_app_local", user_id="test"
+    )
+
+    last_event = None
+    async with Aclosing(
+        runner.run_async(
+            user_id="test",
+            session_id=session.id,
+            new_message=types.Content(
+                role="user", parts=[types.Part(text="What is the weather in New York?")]
+            ),
+        )
+    ) as agen:
+        async for event in agen:
+            last_event = event
+
+    assert last_event is not None
+    assert last_event.content is not None
+    assert last_event.content.parts is not None
+    assert last_event.content.parts[0].text == "warm and sunny"
+
+
+@pytest.mark.asyncio
+async def test_mcp_agent_outside_workflow():
+    """Test that an agent using TemporalMcpToolSet works outside a Temporal workflow."""
+    LLMRegistry.register(McpModel)
+
+    local_toolset = McpToolset(
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="npx",
+                args=[
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            ),
+        ),
+    )
+
+    agent = Agent(
+        name="test_agent",
+        model=TemporalModel("mcp_model"),
+        tools=[TemporalMcpToolSet("test_set_local", local_toolset=local_toolset)],
+    )
+
+    session_service = InMemorySessionService()
+    session = await session_service.create_session(
+        app_name="test_app_local", user_id="test"
+    )
+
+    runner = Runner(
+        agent=agent,
+        app_name="test_app_local",
+        session_service=session_service,
+    )
+
+    last_event = None
+    async with Aclosing(
+        runner.run_async(
+            user_id="test",
+            session_id=session.id,
+            new_message=types.Content(
+                role="user",
+                parts=[types.Part(text="What files are in the current directory?")],
+            ),
+        )
+    ) as agen:
+        async for event in agen:
+            last_event = event
+
+    assert last_event is not None
+    assert last_event.content is not None
+    assert last_event.content.parts is not None
+    assert last_event.content.parts[0].text == "Some files."
+
+
+@pytest.mark.asyncio
+async def test_mcp_toolset_outside_workflow_no_local_toolset():
+    """Test that TemporalMcpToolSet raises ValueError outside a workflow with no local_toolset."""
+    toolset = TemporalMcpToolSet("test_set_no_local")
+    with pytest.raises(
+        ValueError, match="No local toolset available when executing outside a workflow."
+    ):
+        await toolset.get_tools()
