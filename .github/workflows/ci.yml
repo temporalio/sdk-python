@@ -36,7 +36,7 @@ jobs:
           - os: ubuntu-arm
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
-            runsOn: macos-15-intel
+            runsOn: macos-26-intel
           - os: macos-arm
             runsOn: macos-latest
     runs-on: ${{ matrix.runsOn || matrix.os }}
