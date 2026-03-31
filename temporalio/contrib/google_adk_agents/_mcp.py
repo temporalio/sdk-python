@@ -250,7 +250,7 @@ class TemporalMcpToolSet(BaseToolset):
         if not workflow.in_workflow():
             if self._local_toolset is None:
                 raise ValueError(
-                    "No local toolset available when executing outside a workflow."
+                    "Attempted to execute an MCP tool declared with TemporalMcpToolSet outside of a Workflow. Either use McpToolSet or pass a copy of your MCP toolset into local_toolset."
                 )
             return await self._local_toolset.get_tools(readonly_context)
 

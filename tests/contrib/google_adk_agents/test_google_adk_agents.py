@@ -64,6 +64,19 @@ async def get_weather(city: str) -> str:  #  type: ignore[reportUnusedParameter]
     return "Warm and sunny. 17 degrees."
 
 
+def weather_agent(model_name: str) -> Agent:
+    # Wraps 'get_weather' activity as a Tool
+    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+        get_weather, start_to_close_timeout=timedelta(seconds=60)
+    )
+
+    return Agent(
+        name="test_agent",
+        model=TemporalModel(model_name),
+        tools=[weather_tool],
+    )
+
+
 @workflow.defn
 class WeatherAgent:
     @workflow.run
@@ -73,17 +86,7 @@ class WeatherAgent:
         # 1. Define Agent using Temporal Helpers
         # Note: AgentPlugin in the Runner automatically handles Runtime setup
         # and Model Activity interception. We use standard ADK models now.
-
-        # Wraps 'get_weather' activity as a Tool
-        weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
-            get_weather, start_to_close_timeout=timedelta(seconds=60)
-        )
-
-        agent = Agent(
-            name="test_agent",
-            model=TemporalModel(model_name),
-            tools=[weather_tool],
-        )
+        agent = weather_agent(model_name)
 
         # 2. Create runner
         runner = InMemoryRunner(
@@ -357,6 +360,27 @@ async def test_multi_agent(client: Client, use_local_model: bool):
             assert result == "haiku"
 
 
+def mcp_agent(model_name: str) -> Agent:
+    local_toolset = McpToolset(
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="npx",
+                args=[
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            ),
+        ),
+    )
+    return Agent(
+        name="test_agent",
+        # instruction="Always use your tools to answer questions.",
+        model=TemporalModel(model_name),
+        tools=[TemporalMcpToolSet("test_set", local_toolset=local_toolset)],
+    )
+
+
 @workflow.defn
 class McpAgent:
     @workflow.run
@@ -364,14 +388,7 @@ class McpAgent:
         logger.info("Workflow started.")
 
         # 1. Define Agent using Temporal Helpers
-        # Note: AgentPlugin in the Runner automatically handles Runtime setup
-        # and Model Activity interception. We use standard ADK models now.
-        agent = Agent(
-            name="test_agent",
-            # instruction="Always use your tools to answer questions.",
-            model=TemporalModel(model_name),
-            tools=[TemporalMcpToolSet("test_set")],
-        )
+        agent = mcp_agent(model_name)
 
         # 2. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
         session_service = InMemorySessionService()
@@ -571,15 +588,7 @@ async def test_agent_outside_workflow():
     """Test that an agent using TemporalModel and activity_tool works outside a Temporal workflow."""
     LLMRegistry.register(WeatherModel)
 
-    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
-        get_weather, start_to_close_timeout=timedelta(seconds=60)
-    )
-
-    agent = Agent(
-        name="test_agent",
-        model=TemporalModel("weather_model"),
-        tools=[weather_tool],
-    )
+    agent = weather_agent("weather_model")
 
     runner = InMemoryRunner(
         agent=agent,
@@ -671,6 +680,6 @@ async def test_mcp_toolset_outside_workflow_no_local_toolset():
     toolset = TemporalMcpToolSet("test_set_no_local")
     with pytest.raises(
         ValueError,
-        match="No local toolset available when executing outside a workflow.",
+        match="Attempted to execute an MCP tool",
     ):
         await toolset.get_tools()
