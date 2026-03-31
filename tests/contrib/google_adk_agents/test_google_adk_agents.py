@@ -20,6 +20,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from datetime import timedelta
+from typing import Any
 
 import pytest
 from google.adk import Agent, Runner
@@ -360,8 +361,8 @@ async def test_multi_agent(client: Client, use_local_model: bool):
             assert result == "haiku"
 
 
-def mcp_agent(model_name: str) -> Agent:
-    local_toolset = McpToolset(
+def example_toolset(_: Any | None) -> McpToolset:
+    return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
                 command="npx",
@@ -373,11 +374,14 @@ def mcp_agent(model_name: str) -> Agent:
             ),
         ),
     )
+
+
+def mcp_agent(model_name: str) -> Agent:
     return Agent(
         name="test_agent",
         # instruction="Always use your tools to answer questions.",
         model=TemporalModel(model_name),
-        tools=[TemporalMcpToolSet("test_set", local_toolset=local_toolset)],
+        tools=[TemporalMcpToolSet("test_set", local_toolset=example_toolset)],
     )
 
 
@@ -469,18 +473,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
             toolset_providers=[
                 TemporalMcpToolSetProvider(
                     "test_set",
-                    lambda _: McpToolset(
-                        connection_params=StdioConnectionParams(
-                            server_params=StdioServerParameters(
-                                command="npx",
-                                args=[
-                                    "-y",
-                                    "@modelcontextprotocol/server-filesystem",
-                                    os.path.dirname(os.path.abspath(__file__)),
-                                ],
-                            ),
-                        ),
-                    ),
+                    example_toolset,
                 )
             ],
         )
@@ -624,24 +617,7 @@ async def test_mcp_agent_outside_workflow():
     """Test that an agent using TemporalMcpToolSet works outside a Temporal workflow."""
     LLMRegistry.register(McpModel)
 
-    local_toolset = McpToolset(
-        connection_params=StdioConnectionParams(
-            server_params=StdioServerParameters(
-                command="npx",
-                args=[
-                    "-y",
-                    "@modelcontextprotocol/server-filesystem",
-                    os.path.dirname(os.path.abspath(__file__)),
-                ],
-            ),
-        ),
-    )
-
-    agent = Agent(
-        name="test_agent",
-        model=TemporalModel("mcp_model"),
-        tools=[TemporalMcpToolSet("test_set_local", local_toolset=local_toolset)],
-    )
+    agent = mcp_agent("mcp_model")
 
     session_service = InMemorySessionService()
     session = await session_service.create_session(

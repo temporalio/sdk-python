@@ -217,7 +217,7 @@ class TemporalMcpToolSet(BaseToolset):
         name: str,
         config: ActivityConfig | None = None,
         factory_argument: Any | None = None,
-        local_toolset: McpToolset | None = None,
+        local_toolset: Callable[[Any | None], McpToolset] | None = None,
     ):
         """Initializes the Temporal MCP toolset.
 
@@ -225,7 +225,7 @@ class TemporalMcpToolSet(BaseToolset):
             name: Name of the toolset (used for activity naming).
             config: Optional activity configuration.
             factory_argument: Optional argument passed to toolset factory.
-            local_toolset: Optional temporal toolset for local execution when running outside a durable workflow.
+            local_toolset: Optional factory for a temporal toolset for local execution when running outside a durable workflow.
         """
         super().__init__()
         self._name = name
@@ -250,9 +250,9 @@ class TemporalMcpToolSet(BaseToolset):
         if not workflow.in_workflow():
             if self._local_toolset is None:
                 raise ValueError(
-                    "Attempted to execute an MCP tool declared with TemporalMcpToolSet outside of a Workflow. Either use McpToolSet or pass a copy of your MCP toolset into local_toolset."
+                    "Attempted to execute an MCP tool declared with TemporalMcpToolSet outside of a Workflow. Either use McpToolSet or pass a copy of your MCP toolset provider into local_toolset."
                 )
-            return await self._local_toolset.get_tools(readonly_context)
+            return await self._local_toolset(None).get_tools(readonly_context)
 
         tool_results: list[_ToolResult] = await workflow.execute_activity(
             self._name + "-list-tools",
