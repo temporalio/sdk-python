@@ -111,6 +111,8 @@ class DataConverter(WithSerializationContext):
         """
         payloads = self.payload_converter.to_payloads(values)
         payloads = await self._encode_payload_sequence(payloads)
+        payloads = await self._external_store_payload_sequence(payloads)
+        self._validate_payload_limits(payloads)
         return payloads
 
     async def decode(
@@ -128,6 +130,7 @@ class DataConverter(WithSerializationContext):
         Returns:
             Decoded and converted values.
         """
+        payloads = await self._external_retrieve_payload_sequence(payloads)
         payloads = await self._decode_payload_sequence(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)
 
@@ -156,13 +159,13 @@ class DataConverter(WithSerializationContext):
     ) -> None:
         """Convert and encode failure."""
         self.failure_converter.to_failure(exception, self.payload_converter, failure)
-        await _apply_to_failure_payloads(failure, self._encode_payloads)
+        await _apply_to_failure_payloads(failure, self._transform_outbound_payloads)
 
     async def decode_failure(
         self, failure: temporalio.api.failure.v1.Failure
     ) -> BaseException:
         """Decode and convert failure."""
-        await _apply_to_failure_payloads(failure, self._decode_payloads)
+        await _apply_to_failure_payloads(failure, self._transform_inbound_payloads)
         return self.failure_converter.from_failure(failure, self.payload_converter)
 
     def with_context(self, context: SerializationContext) -> Self:
@@ -250,7 +253,7 @@ class DataConverter(WithSerializationContext):
             "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit.",
         )
 
-    async def _encode_payload(
+    async def _transform_outbound_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
         if self.payload_codec:
@@ -260,27 +263,16 @@ class DataConverter(WithSerializationContext):
         self._validate_payload_limits([payload])
         return payload
 
-    async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
+    async def _transform_outbound_payloads(
+        self, payloads: temporalio.api.common.v1.Payloads
+    ):
         if self.payload_codec:
             await self.payload_codec.encode_wrapper(payloads)
         if self.external_storage:
             await self.external_storage._store_payloads(payloads)
         self._validate_payload_limits(payloads.payloads)
 
-    async def _encode_payload_sequence(
-        self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> list[temporalio.api.common.v1.Payload]:
-        encoded_payloads = list(payloads)
-        if self.payload_codec:
-            encoded_payloads = await self.payload_codec.encode(encoded_payloads)
-        if self.external_storage:
-            encoded_payloads = await self.external_storage._store_payload_sequence(
-                encoded_payloads
-            )
-        self._validate_payload_limits(encoded_payloads)
-        return encoded_payloads
-
-    async def _decode_payload(
+    async def _transform_inbound_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
         if self.external_storage:
@@ -289,7 +281,9 @@ class DataConverter(WithSerializationContext):
             payload = (await self.payload_codec.decode([payload]))[0]
         return payload
 
-    async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
+    async def _transform_inbound_payloads(
+        self, payloads: temporalio.api.common.v1.Payloads
+    ):
         if self.external_storage:
             await self.external_storage._retrieve_payloads(payloads)
         else:
@@ -304,23 +298,51 @@ class DataConverter(WithSerializationContext):
         if self.payload_codec:
             await self.payload_codec.decode_wrapper(payloads)
 
-    async def _decode_payload_sequence(
+    async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        decoded_payloads = list(payloads)
+        """Codec encode only."""
+        encoded_payloads = list(payloads)
+        if self.payload_codec:
+            encoded_payloads = await self.payload_codec.encode(encoded_payloads)
+        return encoded_payloads
+
+    async def _external_store_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """External storage store, then validate payload limits."""
+        stored_payloads = list(payloads)
         if self.external_storage:
-            decoded_payloads = await self.external_storage._retrieve_payload_sequence(
-                decoded_payloads
+            stored_payloads = await self.external_storage._store_payload_sequence(
+                stored_payloads
+            )
+        return stored_payloads
+
+    async def _external_retrieve_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """External storage retrieve only."""
+        retrieved_payloads = list(payloads)
+        if self.external_storage:
+            retrieved_payloads = await self.external_storage._retrieve_payload_sequence(
+                retrieved_payloads
             )
         else:
             if any(
                 p.metadata.get("encoding") == _REFERENCE_ENCODING
-                for p in decoded_payloads
+                for p in retrieved_payloads
             ):
                 warnings.warn(
                     "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
                     StorageWarning,
                 )
+        return retrieved_payloads
+
+    async def _decode_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """Codec decode only."""
+        decoded_payloads = list(payloads)
         if self.payload_codec:
             decoded_payloads = await self.payload_codec.decode(decoded_payloads)
         return decoded_payloads

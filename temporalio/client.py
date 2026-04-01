@@ -9185,7 +9185,7 @@ async def _apply_headers(
         return
     if encode_headers:
         for payload in source.values():
-            payload.CopyFrom(await data_converter._encode_payload(payload))
+            payload.CopyFrom(await data_converter._transform_outbound_payload(payload))
     temporalio.common._apply_headers(source, dest)
 
 
