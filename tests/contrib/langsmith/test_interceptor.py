@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -28,6 +29,7 @@ _MOD = "temporalio.contrib.langsmith._interceptor"
 _PATCH_RUNTREE = f"{_MOD}.RunTree"
 _PATCH_IN_WORKFLOW = f"{_MOD}.temporalio.workflow.in_workflow"
 _PATCH_IS_REPLAYING = f"{_MOD}.temporalio.workflow.unsafe.is_replaying_history_events"
+_PATCH_WF_NOW = f"{_MOD}.temporalio.workflow.now"
 _PATCH_WF_INFO = f"{_MOD}.temporalio.workflow.info"
 _PATCH_SANDBOX = f"{_MOD}.temporalio.workflow.unsafe.sandbox_unrestricted"
 _PATCH_TRACING_CTX = f"{_MOD}.tracing_context"
@@ -162,9 +164,8 @@ class TestReplaySafety:
             "TestRun",
             add_temporal_runs=True,
             executor=_make_executor(),
-        ) as run:
-            assert isinstance(run, _ReplaySafeRunTree)
-            assert run._run is mock_run
+        ):
+            pass
         # RunTree IS created (wrapped in _ReplaySafeRunTree)
         MockRunTree.assert_called_once()
         # But post/end/patch are no-ops during replay
@@ -172,11 +173,12 @@ class TestReplaySafety:
         mock_run.end.assert_not_called()
         mock_run.patch.assert_not_called()
 
+    @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
     def test_create_trace_when_not_replaying(
-        self, _mock_in_wf: Any, _mock_replaying: Any, MockRunTree: Any
+        self, _mock_in_wf: Any, _mock_replaying: Any, MockRunTree: Any, _mock_now: Any
     ) -> None:
         """When not replaying (but in workflow), _maybe_run creates a _ReplaySafeRunTree."""
         mock_run = _make_mock_run()
@@ -187,9 +189,8 @@ class TestReplaySafety:
             "TestRun",
             add_temporal_runs=True,
             executor=_make_executor(),
-        ) as run:
-            assert isinstance(run, _ReplaySafeRunTree)
-            assert run._run is mock_run
+        ):
+            pass
         MockRunTree.assert_called_once()
         assert MockRunTree.call_args.kwargs["name"] == "TestRun"
 
@@ -207,9 +208,8 @@ class TestReplaySafety:
             "TestRun",
             add_temporal_runs=True,
             executor=_make_executor(),
-        ) as run:
-            assert isinstance(run, _ReplaySafeRunTree)
-            assert run._run is mock_run
+        ):
+            pass
         MockRunTree.assert_called_once()
 
 
@@ -236,9 +236,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
                 executor=_make_executor(),
-            ) as run:
-                assert run is not None
-                assert run._run is mock_run
+            ):
                 raise RuntimeError("boom")
         # run.end should have been called with error containing "boom"
         mock_run.end.assert_called()
@@ -263,9 +261,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
                 executor=_make_executor(),
-            ) as run:
-                assert run is not None
-                assert run._run is mock_run
+            ):
                 raise ApplicationError(
                     "benign",
                     category=ApplicationErrorCategory.BENIGN,
@@ -292,9 +288,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
                 executor=_make_executor(),
-            ) as run:
-                assert run is not None
-                assert run._run is mock_run
+            ):
                 raise ApplicationError("bad", non_retryable=True)
         mock_run.end.assert_called()
         end_kwargs = mock_run.end.call_args.kwargs
@@ -315,9 +309,8 @@ class TestErrorHandling:
             "TestRun",
             add_temporal_runs=True,
             executor=_make_executor(),
-        ) as run:
-            assert run is not None
-            assert run._run is mock_run
+        ):
+            pass
         mock_run.end.assert_called_once()
         end_kwargs = mock_run.end.call_args.kwargs
         assert end_kwargs.get("outputs") == {"status": "ok"}
@@ -341,9 +334,7 @@ class TestErrorHandling:
                 "TestRun",
                 add_temporal_runs=True,
                 executor=_make_executor(),
-            ) as run:
-                assert run is not None
-                assert run._run is mock_run
+            ):
                 raise asyncio.CancelledError()
         # run.end should NOT have been called with error=
         end_calls = mock_run.end.call_args_list
@@ -457,7 +448,7 @@ class TestClientOutboundInterceptor:
         and no headers are injected.
 
         _inject_current_context() is called unconditionally, but
-        get_current_run_tree() returns None so headers are unchanged.
+        _get_current_run_for_propagation() returns None so headers are unchanged.
         """
         interceptor, mock_next = self._make_client_interceptor(add_temporal_runs=False)
         mock_input = MagicMock()
@@ -625,6 +616,7 @@ class TestWorkflowInboundInterceptor:
         return wf_interceptor, mock_next
 
     @pytest.mark.asyncio
+    @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
     @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
@@ -637,6 +629,7 @@ class TestWorkflowInboundInterceptor:
         _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
+        _mock_now: Any,
     ) -> None:
         """execute_workflow creates a run named RunWorkflow:{workflow_type}."""
         mock_wf_info.return_value = _mock_workflow_info(workflow_type="MyWorkflow")
@@ -679,6 +672,7 @@ class TestWorkflowInboundInterceptor:
         ids=["signal", "query", "validator", "update_handler"],
     )
     @pytest.mark.asyncio
+    @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
     @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
@@ -691,6 +685,7 @@ class TestWorkflowInboundInterceptor:
         _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
+        _mock_now: Any,
         method: str,
         input_attr: str,
         input_val: str,
@@ -810,6 +805,7 @@ class TestWorkflowOutboundInterceptor:
         ],
     )
     @pytest.mark.asyncio
+    @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
     @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
@@ -820,6 +816,7 @@ class TestWorkflowOutboundInterceptor:
         _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
+        _mock_now: Any,
         method: str,
         input_attr: str,
         input_val: str,
@@ -866,6 +863,7 @@ class TestWorkflowOutboundInterceptor:
         mock_next.continue_as_new.assert_called_once()
 
     @pytest.mark.asyncio
+    @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
     @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
@@ -876,6 +874,7 @@ class TestWorkflowOutboundInterceptor:
         _mock_replaying: Any,
         MockRunTree: Any,
         mock_sandbox: Any,
+        _mock_now: Any,
     ) -> None:
         """start_nexus_operation creates a trace named StartNexusOperation:{service}/{operation}."""
         mock_run = _make_mock_run()

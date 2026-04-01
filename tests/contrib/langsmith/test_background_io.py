@@ -356,10 +356,11 @@ class TestReplaySuppression:
 
         mock_run.end.assert_not_called()
 
+    @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
     def test_end_delegates_during_normal_execution(
-        self, _mock_in_wf: Any, _mock_replaying: Any
+        self, _mock_in_wf: Any, _mock_replaying: Any, _mock_now: Any
     ) -> None:
         """end() delegates to self._run.end() during normal (non-replay) execution."""
         executor = _make_executor()
@@ -368,9 +369,11 @@ class TestReplaySuppression:
 
         tree.end(outputs={"result": "done"}, error="some error")
 
-        mock_run.end.assert_called_once_with(
-            outputs={"result": "done"}, error="some error"
-        )
+        mock_run.end.assert_called_once()
+        call_kwargs = mock_run.end.call_args.kwargs
+        assert call_kwargs["outputs"] == {"result": "done"}
+        assert call_kwargs["error"] == "some error"
+        assert "end_time" in call_kwargs
 
 
 # ===================================================================
