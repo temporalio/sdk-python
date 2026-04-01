@@ -14,7 +14,7 @@ use temporalio_common::protos::coresdk::{
     nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
 };
 use temporalio_common::protos::temporal::api::history::v1::History;
-use temporalio_common::protos::temporal::api::worker::v1::PluginInfo;
+use temporalio_common::protos::temporal::api::worker::v1::{PluginInfo, StorageDriverInfo};
 use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporalio_sdk_core::{
     PollError, SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext,
@@ -62,6 +62,7 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
     plugins: Vec<String>,
+    storage_drivers: HashSet<String>,
 }
 
 #[derive(FromPyObject)]
@@ -761,6 +762,12 @@ fn convert_worker_config(
                     version: String::new(),
                 })
                 .collect(),
+        )
+        .storage_drivers(
+            conf.storage_drivers
+                .into_iter()
+                .map(|r#type| StorageDriverInfo { r#type })
+                .collect::<HashSet<_>>(),
         )
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))

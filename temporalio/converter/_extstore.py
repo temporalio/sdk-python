@@ -5,10 +5,14 @@ systems.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import contextvars
 import dataclasses
+import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Generator, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, ClassVar, TypeVar
 
 from typing_extensions import Self
@@ -23,6 +27,40 @@ from temporalio.converter._serialization_context import (
 _T = TypeVar("_T")
 
 _REFERENCE_ENCODING = b"json/external-storage-reference"
+
+
+@dataclass
+class StorageOperationMetrics:
+    """Accumulates metrics from external storage operations."""
+
+    payload_count: int = 0
+    """Number of payloads stored or retrieved externally."""
+
+    total_size: int = 0
+    """Total size in bytes of externally stored/retrieved payloads."""
+
+    total_duration: timedelta = dataclasses.field(default_factory=timedelta)
+    """Wall-clock time spent on external storage operations."""
+
+    def record_batch(self, count: int, size: int, duration: timedelta) -> None:
+        """Record metrics from a batch of storage operations."""
+        self.payload_count += count
+        self.total_size += size
+        self.total_duration += duration
+
+    @contextlib.contextmanager
+    def track(self) -> Generator[Self, None, None]:
+        """Set this instance as the current metrics context and reset on exit."""
+        token = _current_storage_metrics.set(self)
+        try:
+            yield self
+        finally:
+            _current_storage_metrics.reset(token)
+
+
+_current_storage_metrics: contextvars.ContextVar[StorageOperationMetrics | None] = (
+    contextvars.ContextVar("_current_storage_metrics", default=None)
+)
 
 
 async def _gather_cancel_on_error(
@@ -255,6 +293,7 @@ class ExternalStorage(WithSerializationContext):
         return driver
 
     async def _store_payload(self, payload: Payload) -> Payload:
+        start_time = time.monotonic()
         context = StorageDriverStoreContext(serialization_context=self._context)
 
         driver = self._select_driver(context, payload)
@@ -265,6 +304,7 @@ class ExternalStorage(WithSerializationContext):
 
         self._validate_claim_length(claims, expected=1, driver=driver)
 
+        external_size = payload.ByteSize()
         reference = _StorageReference(
             driver_name=driver.name(),
             driver_claim=claims[0],
@@ -274,7 +314,10 @@ class ExternalStorage(WithSerializationContext):
             raise ValueError(
                 f"Failed to serialize storage reference for driver '{driver.name()}'"
             )
-        reference_payload.external_payloads.add().size_bytes = payload.ByteSize()
+        reference_payload.external_payloads.add().size_bytes = external_size
+
+        ExternalStorage._record_metrics(1, external_size, start_time)
+
         return reference_payload
 
     async def _store_payloads(self, payloads: Payloads):
@@ -288,6 +331,8 @@ class ExternalStorage(WithSerializationContext):
     ) -> list[Payload]:
         if len(payloads) == 1:
             return [await self._store_payload(payloads[0])]
+
+        start_time = time.monotonic()
 
         results = list(payloads)
         context = StorageDriverStoreContext(serialization_context=self._context)
@@ -315,6 +360,8 @@ class ExternalStorage(WithSerializationContext):
             ]
         )
 
+        external_count = 0
+        external_size = 0
         for (driver, indexed_payloads), claims in zip(driver_group_list, all_claims):
             indices = [idx for idx, _ in indexed_payloads]
             sizes = [p.ByteSize() for _, p in indexed_payloads]
@@ -333,12 +380,19 @@ class ExternalStorage(WithSerializationContext):
                     )
                 reference_payload.external_payloads.add().size_bytes = sizes[i]
                 results[indices[i]] = reference_payload
+                external_size += sizes[i]
+
+            external_count += len(claims)
+
+        ExternalStorage._record_metrics(external_count, external_size, start_time)
 
         return results
 
     async def _retrieve_payload(self, payload: Payload) -> Payload:
         if len(payload.external_payloads) == 0:
             return payload
+
+        start_time = time.monotonic()
 
         reference = self._claim_converter.from_payload(payload, _StorageReference)
         if not isinstance(reference, _StorageReference):
@@ -351,7 +405,11 @@ class ExternalStorage(WithSerializationContext):
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
 
-        return stored_payloads[0]
+        stored_payload = stored_payloads[0]
+
+        ExternalStorage._record_metrics(1, stored_payload.ByteSize(), start_time)
+
+        return stored_payload
 
     async def _retrieve_payloads(self, payloads: Payloads):
         stored_payloads = await self._retrieve_payload_sequence(payloads.payloads)
@@ -362,10 +420,12 @@ class ExternalStorage(WithSerializationContext):
         self,
         payloads: Sequence[Payload],
     ) -> list[Payload]:
-        results = list(payloads)
-
         if len(payloads) == 1:
             return [await self._retrieve_payload(payloads[0])]
+
+        start_time = time.monotonic()
+
+        results = list(payloads)
 
         driver_claims: dict[StorageDriver, list[tuple[int, StorageDriverClaim]]] = {}
         for index, payload in enumerate(payloads):
@@ -394,6 +454,8 @@ class ExternalStorage(WithSerializationContext):
             ]
         )
 
+        external_count = 0
+        external_size = 0
         for (driver, indexed_claims), stored_payloads in zip(
             driver_claim_list, all_stored
         ):
@@ -407,12 +469,17 @@ class ExternalStorage(WithSerializationContext):
 
             for idx, stored_payload in zip(indices, stored_payloads):
                 stored_by_index[idx] = stored_payload
+                external_size += stored_payload.ByteSize()
+
+            external_count += len(stored_payloads)
 
         retrieve_indices = sorted(stored_by_index.keys())
         stored_list = [stored_by_index[idx] for idx in retrieve_indices]
 
         for i, retrieved_payload in enumerate(stored_list):
             results[retrieve_indices[i]] = retrieved_payload
+
+        ExternalStorage._record_metrics(external_count, external_size, start_time)
 
         return results
 
@@ -430,4 +497,12 @@ class ExternalStorage(WithSerializationContext):
         if len(payloads) != expected:
             raise ValueError(
                 f"Driver '{driver.name()}' returned {len(payloads)} payloads, expected {expected}",
+            )
+
+    @staticmethod
+    def _record_metrics(count: int, size: int, start_time: float):
+        metrics = _current_storage_metrics.get()
+        if metrics is not None:
+            metrics.record_batch(
+                count, size, timedelta(seconds=time.monotonic() - start_time)
             )

@@ -26,7 +26,6 @@ jobs:
           - os: ubuntu-latest
             python: "3.14"
             docsTarget: true
-            cloudTestTarget: true
             openaiTestTarget: true
             clippyLinter: true
           - os: ubuntu-latest
@@ -73,14 +72,6 @@ jobs:
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
         timeout-minutes: 10
-      # Check cloud if proper target and not on fork
-      - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--cloud.xml
-        timeout-minutes: 10
-        env:
-          TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
-          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
-          TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
       - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
         run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
         timeout-minutes: 10
@@ -166,6 +157,49 @@ jobs:
         if: always()
         with:
           name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--latest-deps--time-skipping
+          path: junit-xml
+          retention-days: 14
+
+  # Run tests against Temporal Cloud (skipped on forks)
+  cloud-test:
+    if: ${{ github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python' }}
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: temporalio/bridge -> target
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: arduino/setup-protoc@v3
+        with:
+          # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
+          version: "23.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv tool install poethepoet
+      - run: uv sync --all-extras
+      - run: poe build-develop
+      - run: poe test -s tests/test_cloud.py --junit-xml=junit-xml/cloud.xml
+        timeout-minutes: 10
+        env:
+          TEMPORAL_IS_CLOUD_TESTS: true
+          TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
+          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
+          TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
+          TEMPORAL_CLIENT_CLOUD_TARGET: sdk-ci.a2dd6.tmprl.cloud:7233
+          TEMPORAL_CLIENT_CERT: ${{ secrets.TEMPORAL_CLIENT_CERT }}
+          TEMPORAL_CLIENT_KEY: ${{ secrets.TEMPORAL_CLIENT_KEY }}
+      - name: "Upload junit-xml artifacts"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--cloud
           path: junit-xml
           retention-days: 14
 

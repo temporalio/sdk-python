@@ -576,3 +576,34 @@ async def test_otel_tracing_workflow_failure(
     assert (
         actual_hierarchy == expected_hierarchy
     ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+
+
+def test_replay_safe_span_delegates_extra_attributes():
+    """Test that _ReplaySafeSpan delegates attribute access to the underlying span.
+
+    Concrete span implementations (e.g. opentelemetry.sdk.trace.Span) expose
+    attributes beyond the Span ABC such as .attributes, .name, .kind, and
+    .resource. _ReplaySafeSpan must forward these so that instrumentation
+    libraries that rely on them work correctly.
+    """
+    from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
+
+    from temporalio.contrib.opentelemetry._tracer_provider import _ReplaySafeSpan
+
+    provider = SdkTracerProvider()
+    tracer = provider.get_tracer("test")
+    inner_span = tracer.start_span("test-span")
+
+    wrapper = _ReplaySafeSpan(inner_span)
+
+    # These properties exist on the SDK span but not on the Span ABC
+    assert wrapper.name == "test-span"
+    assert wrapper.kind is not None
+    assert wrapper.resource is not None
+    assert wrapper.attributes is not None or wrapper.attributes == {}
+
+    # Verify that AttributeError is still raised for truly missing attributes
+    with pytest.raises(AttributeError):
+        _ = wrapper.nonexistent_attribute_xyz
+
+    inner_span.end()
