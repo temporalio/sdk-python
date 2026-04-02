@@ -157,6 +157,39 @@ worker = Worker(
 )
 ```
 
+### Local ADK Runs
+
+The same agent definitions can also be exercised outside Temporal with
+`adk run` or `adk web`.
+
+- `TemporalModel` and `activity_tool(...)` work in local ADK runs without
+  additional configuration.
+- If the agent uses `TemporalMcpToolSet`, provide
+  `not_in_workflow_toolset=...` so the agent can fall back to the underlying
+  `McpToolset` when it is not running inside `workflow.in_workflow()`.
+
+Example:
+
+```python
+agent = Agent(
+    name="test_agent",
+    model=TemporalModel("gemini-2.5-pro"),
+    tools=[
+        TemporalMcpToolSet(
+            "my-tools",
+            not_in_workflow_toolset=lambda _: McpToolset(
+                connection_params=StdioConnectionParams(
+                    server_params=StdioServerParameters(
+                        command="npx",
+                        args=["-y", "@modelcontextprotocol/server-filesystem", "."],
+                    ),
+                ),
+            ),
+        )
+    ],
+)
+```
+
 ## Integration Points
 
 This integration provides comprehensive support for running Google ADK Agents within Temporal workflows while maintaining:
