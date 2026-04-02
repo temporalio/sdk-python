@@ -846,6 +846,8 @@ class Worker:
             if worker and task.done() and task.exception():
                 tasks[worker] = asyncio.create_task(worker.drain_poll_queue())
 
+        print("Exception tasks replaced")
+
         # Notify shutdown occurring
         if self._activity_worker:
             self._activity_worker.notify_shutdown()
@@ -854,8 +856,13 @@ class Worker:
         if self._nexus_worker:
             self._nexus_worker.notify_shutdown()
 
+        print("Workers notified")
+
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks.values())
+
+        print("Tasks drained: ", tasks)
+
         # Sometimes both workers throw an exception and since we only take the
         # first, Python may complain with "Task exception was never retrieved"
         # if we don't get the others. Therefore we call cancel on each task
@@ -863,11 +870,16 @@ class Worker:
         for task in tasks.values():
             task.cancel()
 
+        print("Tasks cancelled")
+
         # Let all activity / nexus operations completions finish. We cannot guarantee that
         # because poll shutdown completed (which means activities/operations completed)
         # that they got flushed to the server.
         if self._activity_worker:
             await self._activity_worker.wait_all_completed()
+
+        print("Activitiy worker waited")
+
         if self._nexus_worker:
             await self._nexus_worker.wait_all_completed()
 
