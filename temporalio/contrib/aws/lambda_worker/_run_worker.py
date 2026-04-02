@@ -251,9 +251,8 @@ async def _invocation_handler(
         ).total_seconds()
         if work_time_secs > 0:
             try:
-                async with asyncio.timeout(work_time_secs):
-                    await worker.run()
-            except TimeoutError:
+                await asyncio.wait_for(worker.run(), timeout=work_time_secs)
+            except asyncio.TimeoutError:
                 pass
     else:
         # No deadline - run until cancelled.
