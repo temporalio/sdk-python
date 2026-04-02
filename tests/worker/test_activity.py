@@ -169,6 +169,7 @@ async def test_client_not_available_in_sync_activities(
     assert saw_error
 
 
+@pytest.mark.timeout(120)
 async def test_activity_info(
     client: Client,
     worker: ExternalWorker,
