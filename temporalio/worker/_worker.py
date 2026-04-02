@@ -836,6 +836,8 @@ class Worker:
             f"Beginning worker shutdown, will wait {graceful_timeout} before cancelling activities"
         )
 
+        print("Initiate bridge worker shutdown")
+
         # Initiate core worker shutdown
         self._bridge_worker.initiate_shutdown()
 
@@ -868,6 +870,8 @@ class Worker:
             await self._activity_worker.wait_all_completed()
         if self._nexus_worker:
             await self._nexus_worker.wait_all_completed()
+
+        print("Finalize bridge worker shutdown")
 
         # Do final shutdown
         try:
