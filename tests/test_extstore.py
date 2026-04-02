@@ -283,7 +283,7 @@ class TestDriverError:
             external_storage=ExternalStorage(
                 drivers=drivers,
                 driver_selector=lambda ctx, p: next(drivers_iter),
-                payload_size_threshold=None,
+                payload_size_threshold=0,
             )
         )
 
@@ -337,7 +337,7 @@ class TestDriverError:
             external_storage=ExternalStorage(
                 drivers=drivers,
                 driver_selector=lambda ctx, p: next(drivers_iter),
-                payload_size_threshold=None,
+                payload_size_threshold=0,
             )
         )
         encoded = await converter.encode(["payload_a", "payload_b"])
@@ -631,7 +631,7 @@ class TestMultiDriver:
             external_storage=ExternalStorage(
                 drivers=[driver_a, driver_b],
                 driver_selector=selector,
-                payload_size_threshold=None,
+                payload_size_threshold=0,
             )
         )
 
@@ -676,6 +676,21 @@ class TestMultiDriver:
                 drivers=[first, duplicate],
                 driver_selector=lambda _ctx, _p: first,
                 payload_size_threshold=50,
+            )
+
+    @pytest.mark.parametrize("threshold", [-1, -1000])
+    def test_negative_payload_size_threshold_raises(self, threshold: int):
+        """A negative payload_size_threshold raises ValueError immediately
+        when constructing ExternalStorage."""
+        driver = InMemoryTestDriver()
+
+        with pytest.raises(
+            ValueError,
+            match=r"^ExternalStorage\.payload_size_threshold must be greater than or equal to zero\.$",
+        ):
+            ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=threshold,
             )
 
 

@@ -1972,7 +1972,7 @@ async def test_child_workflow_external_storage_with_context(client: Client):
         DataConverter.default,
         external_storage=ExternalStorage(
             drivers=[driver],
-            payload_size_threshold=None,
+            payload_size_threshold=0,
         ),
     )
     client = Client(**config)

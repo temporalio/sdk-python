@@ -321,9 +321,12 @@ class Worker:
                 See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
                 details.
             max_workflow_task_external_storage_concurrency: Maximum number of
-                external storage I/O operations (store/retrieve) that may run
+                external storage payload operations (store/retrieve) that may run
                 concurrently within a single workflow task activation.
-                Defaults to 10. WARNING: This setting is experimental.
+                Defaults to 3. Adjust this value based on your workload's needs.
+                Please report any issues you encounter with this setting or if you
+                feel the default should be changed.
+                WARNING: This setting is experimental.
 
         """
         config = WorkerConfig(
