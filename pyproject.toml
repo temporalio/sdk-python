@@ -30,6 +30,13 @@ opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.3,<0.7", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=1.27.0,<2"]
+lambda-worker-otel = [
+  "opentelemetry-api>=1.11.1,<2",
+  "opentelemetry-sdk>=1.11.1,<2",
+  "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
+  "opentelemetry-semantic-conventions>=0.40b0,<1",
+  "opentelemetry-sdk-extension-aws>=2.0.0,<3",
+]
 aioboto3 = [
   "aioboto3>=10.4.0",
   "types-aioboto3[s3]>=10.4.0",
@@ -69,6 +76,9 @@ dev = [
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
   "moto[s3,server]>=5",
+  "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
+  "opentelemetry-semantic-conventions>=0.40b0,<1",
+  "opentelemetry-sdk-extension-aws>=2.0.0,<3",
 ]
 
 [tool.poe.tasks]
