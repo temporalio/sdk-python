@@ -381,11 +381,7 @@ def mcp_agent(model_name: str) -> Agent:
         name="test_agent",
         # instruction="Always use your tools to answer questions.",
         model=TemporalModel(model_name),
-        tools=[
-            TemporalMcpToolSet(
-                "test_set", not_in_workflow_toolset=example_toolset
-            )
-        ],
+        tools=[TemporalMcpToolSet("test_set", not_in_workflow_toolset=example_toolset)],
     )
 
 

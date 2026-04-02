@@ -260,9 +260,7 @@ class TemporalMcpToolSet(BaseToolset):
                     "McpToolSet directly or pass a factory that returns the "
                     "underlying McpToolset for non-workflow execution."
                 )
-            return await self._not_in_workflow_toolset(None).get_tools(
-                readonly_context
-            )
+            return await self._not_in_workflow_toolset(None).get_tools(readonly_context)
 
         tool_results: list[_ToolResult] = await workflow.execute_activity(
             self._name + "-list-tools",
