@@ -47,7 +47,13 @@ logger = logging.getLogger(__name__)
 # Set to true to log all activations and completions
 LOG_PROTOS = False
 
-_DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY: int = 10
+# Value was chosen abitrarily as a small number that allows some concurrency and prevents
+# large numbers of concurrent external storage operations causing resource contention.
+# This default limit is per workflow task activation and does not limit the total number
+# of concurrent external storage operations across all workflow task activations.
+# Advise customers to adjust based on their workload needs and to report issues with the
+# value if problems are encountered. This setting is experimental.
+_DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY: int = 3
 
 
 class _WorkflowWorker:  # type:ignore[reportUnusedClass]
