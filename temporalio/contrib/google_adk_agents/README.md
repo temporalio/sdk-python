@@ -118,35 +118,43 @@ from temporalio.worker import Worker
 from temporalio.contrib.google_adk_agents import (
     GoogleAdkPlugin,
     TemporalMcpToolSetProvider,
-    TemporalMcpToolSet
+    TemporalMcpToolSet,
 )
 
-# Create toolset provider
-provider = TemporalMcpToolSetProvider("my-tools",
-                                      lambda _: McpToolset(
-                                          connection_params=StdioConnectionParams(
-                                              server_params=StdioServerParameters(
-                                                  command="npx",
-                                                  args=[
-                                                      "-y",
-                                                      "@modelcontextprotocol/server-filesystem",
-                                                      os.path.dirname(os.path.abspath(__file__)),
-                                                  ],
-                                              ),
-                                          ),
-                                      ))
+# Share one MCP toolset factory between the plugin and the agent.
+toolset_factory = lambda _: McpToolset(
+    connection_params=StdioConnectionParams(
+        server_params=StdioServerParameters(
+            command="npx",
+            args=[
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                os.path.dirname(os.path.abspath(__file__)),
+            ],
+        ),
+    ),
+)
 
 # Use in agent workflow
 agent = Agent(
     name="test_agent",
     model="gemini-2.5-pro",
-    tools=[TemporalMcpToolSet("my-tools")]
+    tools=[
+        TemporalMcpToolSet(
+            "my-tools",
+            not_in_workflow_toolset=toolset_factory,
+        )
+    ],
 )
 
 client = await Client.connect(
     "localhost:7233",
     plugins=[
-        GoogleAdkPlugin(toolset_providers=[provider]),
+        GoogleAdkPlugin(
+            toolset_providers=[
+                TemporalMcpToolSetProvider("my-tools", toolset_factory),
+            ],
+        ),
     ],
 )
 
