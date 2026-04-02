@@ -381,7 +381,11 @@ def mcp_agent(model_name: str) -> Agent:
         name="test_agent",
         # instruction="Always use your tools to answer questions.",
         model=TemporalModel(model_name),
-        tools=[TemporalMcpToolSet("test_set", local_toolset=example_toolset)],
+        tools=[
+            TemporalMcpToolSet(
+                "test_set", not_in_workflow_toolset=example_toolset
+            )
+        ],
     )
 
 
@@ -651,11 +655,11 @@ async def test_mcp_agent_outside_workflow():
 
 
 @pytest.mark.asyncio
-async def test_mcp_toolset_outside_workflow_no_local_toolset():
-    """Test that TemporalMcpToolSet raises ValueError outside a workflow with no local_toolset."""
+async def test_mcp_toolset_outside_workflow_no_not_in_workflow_toolset():
+    """Test that TemporalMcpToolSet raises ValueError outside a workflow with no not_in_workflow_toolset."""
     toolset = TemporalMcpToolSet("test_set_no_local")
     with pytest.raises(
         ValueError,
-        match="Attempted to execute an MCP tool",
+        match="not_in_workflow_toolset",
     ):
         await toolset.get_tools()
