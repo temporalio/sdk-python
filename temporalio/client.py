@@ -2963,6 +2963,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             ):
+                print("Getting history event:", event)
                 if event.HasField("workflow_execution_completed_event_attributes"):
                     complete_attr = event.workflow_execution_completed_event_attributes
                     # Follow execution

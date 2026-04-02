@@ -194,6 +194,7 @@ async def test_activity_info(
         nonlocal info
         info = activity.info()
 
+    print("Executing workflow")
     result = await _execute_workflow_with_activity(
         client,
         worker,
@@ -201,6 +202,7 @@ async def test_activity_info(
         start_to_close_timeout_ms=4000,
         shared_state_manager=shared_state_manager,
     )
+    print("Executed workflow")
 
     assert info
     assert info.activity_id  # type:ignore[reportUnreachable]
@@ -1621,12 +1623,14 @@ async def _execute_workflow_with_activity(
                 task_queue=worker.task_queue,
                 result_type=result_type_override,
             )
+            print("Constructing activity result")
             return _ActivityResult(
                 act_task_queue=worker_config["task_queue"],
                 result=await handle.result(),
                 handle=handle,
             )
         finally:
+            print("On complete.")
             if on_complete:
                 on_complete()
 

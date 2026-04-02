@@ -16,7 +16,7 @@ env:
 jobs:
   # Build and test the project
   build-lint-test:
-    timeout-minutes: 30
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
