@@ -210,8 +210,10 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 for t in asyncio.all_tasks()
                 if getattr(t, "__temporal_task_tag", None) is task_tag
             ]
+            print("Waiting for tasks to finish: ", our_tasks)
             if our_tasks:
                 await asyncio.wait(our_tasks)
+            print("Waited for tasks to finish: ", our_tasks)
             # Shutdown the thread pool executor if we created it
             if not self._workflow_task_executor_user_provided:
                 self._workflow_task_executor.shutdown()
