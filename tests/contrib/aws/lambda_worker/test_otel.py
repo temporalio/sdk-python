@@ -20,6 +20,7 @@ from temporalio.contrib.aws.lambda_worker.otel import (
     apply_tracing,
     build_metrics_telemetry_config,
 )
+from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.runtime import OpenTelemetryConfig, TelemetryConfig
 
 
@@ -40,13 +41,15 @@ class TestApplyTracing:
 
     def test_appends_to_existing_interceptors(self) -> None:
         config = LambdaWorkerConfig()
-        sentinel = object()
-        config.client_connect_config["interceptors"] = [sentinel]
+        # Use a TracingInterceptor as the existing interceptor.
+        existing_provider, _ = _make_tracer_provider()
+        existing = TracingInterceptor(tracer=existing_provider.get_tracer("existing"))
+        config.client_connect_config["interceptors"] = [existing]
         tracer_provider, _ = _make_tracer_provider()
         apply_tracing(config, tracer_provider)
         interceptors = config.client_connect_config["interceptors"]
         assert len(interceptors) == 2
-        assert interceptors[0] is sentinel
+        assert interceptors[0] is existing
 
     def test_registers_flush_shutdown_hook(self) -> None:
         config = LambdaWorkerConfig()

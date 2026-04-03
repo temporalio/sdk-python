@@ -40,14 +40,10 @@ key in ``worker_config`` is pre-populated from the ``TEMPORAL_TASK_QUEUE`` envir
 set.
 """
 
-from temporalio.contrib.aws.lambda_worker._configure import (
-    LambdaClientConnectConfig,
-    LambdaWorkerConfig,
-)
+from temporalio.contrib.aws.lambda_worker._configure import LambdaWorkerConfig
 from temporalio.contrib.aws.lambda_worker._run_worker import run_worker
 
 __all__ = [
-    "LambdaClientConnectConfig",
     "LambdaWorkerConfig",
     "run_worker",
 ]

@@ -4,27 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
 
-import temporalio.runtime
-from temporalio.envconfig import ClientConnectConfig
+from temporalio.client import ClientConnectConfig
 from temporalio.worker import WorkerConfig
-
-
-class LambdaClientConnectConfig(ClientConnectConfig, total=False):
-    """Keyword arguments for :py:meth:`temporalio.client.Client.connect`.
-
-    Extends :py:class:`~temporalio.envconfig.ClientConnectConfig` with additional keys that may be
-    set by the Lambda worker or its OTel helpers.
-    """
-
-    identity: str
-    runtime: temporalio.runtime.Runtime
-    interceptors: Sequence[Any]
-    plugins: Sequence[Any]
 
 
 @dataclass
@@ -60,8 +45,8 @@ class LambdaWorkerConfig:
             per-process resources.
     """
 
-    client_connect_config: LambdaClientConnectConfig = field(
-        default_factory=LambdaClientConnectConfig
+    client_connect_config: ClientConnectConfig = field(
+        default_factory=ClientConnectConfig
     )
     worker_config: WorkerConfig = field(default_factory=WorkerConfig)
     shutdown_deadline_buffer: timedelta = field(

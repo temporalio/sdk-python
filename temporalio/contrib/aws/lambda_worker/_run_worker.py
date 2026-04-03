@@ -11,9 +11,9 @@ from typing import Any
 
 import temporalio.client
 import temporalio.worker
+from temporalio.client import ClientConnectConfig
 from temporalio.common import WorkerDeploymentVersion
 from temporalio.contrib.aws.lambda_worker._configure import (
-    LambdaClientConnectConfig,
     LambdaWorkerConfig,
     _run_shutdown_hooks,
 )
@@ -133,7 +133,7 @@ def _run_worker_internal(
     # Load client config from envconfig / TOML.
     load_config = deps.load_config or (lambda: _default_load_config(deps.getenv))
     profile = load_config()
-    connect_config: LambdaClientConnectConfig = {**profile.to_client_connect_config()}
+    connect_config: ClientConnectConfig = {**profile.to_client_connect_config()}
 
     # Build worker config with Lambda defaults.
     worker_config: WorkerConfig = {}
@@ -225,9 +225,7 @@ async def _invocation_handler(
             )
 
     # Build per-invocation connect kwargs with identity from Lambda context.
-    invocation_connect_kwargs: LambdaClientConnectConfig = {
-        **config.client_connect_config
-    }
+    invocation_connect_kwargs: ClientConnectConfig = {**config.client_connect_config}
     if "identity" not in invocation_connect_kwargs:
         ctx_info = extract_lambda_ctx(lambda_context)
         if ctx_info is not None:

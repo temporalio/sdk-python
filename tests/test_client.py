@@ -1552,6 +1552,21 @@ class TestForkCreateClient(_TestFork):
         self.run(mp_fork_ctx)
 
 
+def test_client_connect_config_matches_connect_params():
+    """ClientConnectConfig TypedDict keys must match Client.connect kwargs."""
+    import inspect
+
+    from temporalio.client import Client, ClientConnectConfig
+
+    connect_params = set(inspect.signature(Client.connect).parameters.keys()) - {"cls"}
+    config_keys = set(ClientConnectConfig.__annotations__.keys())
+    assert config_keys == connect_params, (
+        f"ClientConnectConfig is out of sync with Client.connect. "
+        f"Missing from config: {connect_params - config_keys}. "
+        f"Extra in config: {config_keys - connect_params}."
+    )
+
+
 class TestForkUseClient(_TestFork):
     async def coro(self):
         await self._client.start_workflow(

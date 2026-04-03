@@ -2805,6 +2805,29 @@ class Client:
         )
 
 
+class ClientConnectConfig(TypedDict, total=False):
+    """TypedDict of keyword arguments for :py:meth:`Client.connect`."""
+
+    target_host: str
+    namespace: str
+    api_key: str | None
+    data_converter: temporalio.converter.DataConverter
+    plugins: Sequence[Plugin]
+    interceptors: Sequence[Interceptor]
+    default_workflow_query_reject_condition: (
+        temporalio.common.QueryRejectCondition | None
+    )
+    tls: bool | TLSConfig | None
+    retry_config: RetryConfig | None
+    keep_alive_config: KeepAliveConfig | None
+    rpc_metadata: Mapping[str, str | bytes]
+    identity: str | None
+    lazy: bool
+    runtime: temporalio.runtime.Runtime | None
+    http_connect_proxy_config: HttpConnectProxyConfig | None
+    header_codec_behavior: HeaderCodecBehavior
+
+
 class ClientConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
