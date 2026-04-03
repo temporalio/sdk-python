@@ -597,45 +597,42 @@ class TestPostTimingDelayedExecution:
 
 
 # ===================================================================
-# TestPostShutdownFallback
+# TestPostShutdownRaises
 # ===================================================================
 
 
-class TestPostShutdownFallback:
-    """Tests for post-shutdown executor fallback to synchronous execution."""
+class TestPostShutdownRaises:
+    """Tests that post/patch raise after executor shutdown."""
 
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
-    def test_post_falls_back_to_sync_after_shutdown(
+    def test_post_raises_after_shutdown(
         self, _mock_in_wf: Any, _mock_replaying: Any
     ) -> None:
-        """After executor.shutdown(), post() falls back to synchronous execution."""
+        """After executor.shutdown(), post() raises RuntimeError."""
         executor = _make_executor()
         executor.shutdown(wait=True)
 
         mock_run = _make_mock_run()
         tree = _ReplaySafeRunTree(mock_run, executor=executor)
 
-        # Should not raise RuntimeError, should fall back to sync
-        tree.post()
-
-        mock_run.post.assert_called_once()
+        with pytest.raises(RuntimeError):
+            tree.post()
 
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
-    def test_patch_falls_back_to_sync_after_shutdown(
+    def test_patch_raises_after_shutdown(
         self, _mock_in_wf: Any, _mock_replaying: Any
     ) -> None:
-        """After executor.shutdown(), patch() falls back to synchronous execution."""
+        """After executor.shutdown(), patch() raises RuntimeError."""
         executor = _make_executor()
         executor.shutdown(wait=True)
 
         mock_run = _make_mock_run()
         tree = _ReplaySafeRunTree(mock_run, executor=executor)
 
-        tree.patch()
-
-        mock_run.patch.assert_called_once()
+        with pytest.raises(RuntimeError):
+            tree.patch()
 
 
 # ===================================================================

@@ -294,22 +294,16 @@ class _ReplaySafeRunTree(RunTree):
         child_run = self._run.create_child(*args, **kwargs)
         return _ReplaySafeRunTree(child_run, executor=self._executor)
 
-    def _submit_or_fallback(
-        self, fn: Callable[..., object], *args: Any, **kwargs: Any
-    ) -> None:
-        """Submit work to executor, falling back to synchronous after shutdown."""
+    def _submit(self, fn: Callable[..., object], *args: Any, **kwargs: Any) -> None:
+        """Submit work to the background executor."""
 
         def _log_future_exception(future: Future[None]) -> None:
             exc = future.exception()
             if exc is not None:
                 logger.error("LangSmith background I/O error: %s", exc)
 
-        try:
-            future = self._executor.submit(fn, *args, **kwargs)
-            future.add_done_callback(_log_future_exception)
-        except RuntimeError:
-            # Executor shut down — fall back to synchronous execution
-            fn(*args, **kwargs)
+        future = self._executor.submit(fn, *args, **kwargs)
+        future.add_done_callback(_log_future_exception)
 
     def post(self, exclude_child_runs: bool = True) -> None:
         """Post the run to LangSmith, skipping during replay."""
@@ -317,9 +311,7 @@ class _ReplaySafeRunTree(RunTree):
             if _is_replaying():
                 return
             with temporalio.workflow.unsafe.sandbox_unrestricted():
-                self._submit_or_fallback(
-                    self._run.post, exclude_child_runs=exclude_child_runs
-                )
+                self._submit(self._run.post, exclude_child_runs=exclude_child_runs)
         else:
             self._run.post(exclude_child_runs=exclude_child_runs)
 
@@ -342,7 +334,7 @@ class _ReplaySafeRunTree(RunTree):
             if _is_replaying():
                 return
             with temporalio.workflow.unsafe.sandbox_unrestricted():
-                self._submit_or_fallback(self._run.patch, exclude_inputs=exclude_inputs)
+                self._submit(self._run.patch, exclude_inputs=exclude_inputs)
         else:
             self._run.patch(exclude_inputs=exclude_inputs)
 
