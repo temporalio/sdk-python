@@ -18,7 +18,7 @@ DEFAULT_MAX_CONCURRENT_LOCAL_ACTIVITIES: int = 2
 DEFAULT_MAX_CONCURRENT_NEXUS_TASKS: int = 5
 DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT: timedelta = timedelta(seconds=5)
 DEFAULT_SHUTDOWN_HOOK_BUFFER: timedelta = timedelta(seconds=2)
-DEFAULT_MAX_CACHED_WORKFLOWS: int = 100
+DEFAULT_MAX_CACHED_WORKFLOWS: int = 30
 
 DEFAULT_WORKFLOW_TASK_POLLER_BEHAVIOR = PollerBehaviorSimpleMaximum(maximum=2)
 DEFAULT_ACTIVITY_TASK_POLLER_BEHAVIOR = PollerBehaviorSimpleMaximum(maximum=1)
@@ -68,7 +68,7 @@ def build_lambda_identity(request_id: str, function_arn: str) -> str:
 
 def lambda_default_config_file_path(
     getenv: Callable[[str], str] = os.environ.get,  # type: ignore[assignment]
-) -> str:
+) -> Path:
     """Return the config file path for a Lambda environment.
 
     Resolution order:
@@ -79,6 +79,6 @@ def lambda_default_config_file_path(
     """
     config_file = getenv(ENV_CONFIG_FILE)
     if config_file:
-        return config_file
+        return Path(config_file)
     root = getenv(ENV_LAMBDA_TASK_ROOT) or "."
-    return str(Path(root) / DEFAULT_CONFIG_FILE)
+    return Path(root) / DEFAULT_CONFIG_FILE

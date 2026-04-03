@@ -1,5 +1,3 @@
-"""Core run_worker implementation for Lambda."""
-
 from __future__ import annotations
 
 import asyncio
@@ -67,23 +65,21 @@ def _default_extract_lambda_ctx(
 def run_worker(
     version: WorkerDeploymentVersion,
     configure: Callable[[LambdaWorkerConfig], None],
-) -> Callable[[Any, Any], Awaitable[None]]:
+) -> Callable[[Any, Any], None]:
     """Create a Temporal worker Lambda handler.
 
-    Calls the *configure* callback to collect workflow/activity registrations
-    and option overrides, then returns an async Lambda handler function. On
-    each invocation the handler connects to the Temporal server, starts a
-    worker with Lambda-tuned defaults, polls for tasks until the invocation
+    Calls the *configure* callback to collect workflow/activity registrations and option overrides,
+    then returns a Lambda handler function. On each invocation the handler connects to the Temporal
+    server, starts a worker with Lambda-tuned defaults, polls for tasks until the invocation
     deadline approaches, and then gracefully shuts down.
 
-    The *version* parameter identifies this worker's deployment version.
-    ``run_worker`` always enables Worker Deployment Versioning
-    (``use_worker_versioning=True``). To provide a default versioning behavior
-    for workflows that do not specify one at registration time, set
+    The *version* parameter identifies this worker's deployment version. ``run_worker`` always
+    enables Worker Deployment Versioning (``use_worker_versioning=True``). To provide a default
+    versioning behavior for workflows that do not specify one at registration time, set
     ``deployment_config`` in ``worker_config`` in the configure callback.
 
-    The returned handler has the signature ``async handler(event, context)``
-    and should be set as your Lambda function's handler entry point.
+    The returned handler has the signature ``handler(event, context)`` and should be set as your
+    Lambda function's handler entry point.
 
     Args:
         version: The worker deployment version. Required.
@@ -92,7 +88,7 @@ def run_worker(
             activities, and options on it.
 
     Returns:
-        An async Lambda handler function.
+        A Lambda handler function.
 
     Example::
 
@@ -127,7 +123,7 @@ def _run_worker_internal(
     version: WorkerDeploymentVersion,
     configure: Callable[[LambdaWorkerConfig], None],
     deps: _WorkerDeps,
-) -> Callable[[Any, Any], Awaitable[None]]:
+) -> Callable[[Any, Any], None]:
     """Core logic with injected dependencies for testability."""
     if not version.deployment_name or not version.build_id:
         raise ValueError(
@@ -180,12 +176,14 @@ def _run_worker_internal(
 
     extract_lambda_ctx = deps.extract_lambda_ctx or _default_extract_lambda_ctx
 
-    async def _handler(_event: Any, lambda_context: Any) -> None:
-        await _invocation_handler(
-            lambda_context=lambda_context,
-            config=config,
-            deps=deps,
-            extract_lambda_ctx=extract_lambda_ctx,
+    def _handler(_event: Any, lambda_context: Any) -> None:
+        asyncio.run(
+            _invocation_handler(
+                lambda_context=lambda_context,
+                config=config,
+                deps=deps,
+                extract_lambda_ctx=extract_lambda_ctx,
+            )
         )
 
     return _handler
@@ -210,9 +208,10 @@ async def _invocation_handler(
         work_time = remaining - shutdown_buffer
         if work_time <= timedelta(seconds=1):
             raise RuntimeError(
-                f"Lambda timeout leaves almost no time for work "
-                f"(work_time={work_time}, shutdown_buffer={shutdown_buffer}); "
-                f"increase the function timeout or decrease the shutdown "
+                f"Lambda timeout is too short: {remaining.total_seconds():.1f}s "
+                f"remaining but {shutdown_buffer.total_seconds():.1f}s is "
+                f"reserved for shutdown, leaving no time for work. "
+                f"Increase the function timeout or decrease the shutdown "
                 f"deadline buffer"
             )
         elif work_time < timedelta(seconds=5):

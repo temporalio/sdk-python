@@ -17,8 +17,8 @@ from temporalio.worker import WorkerConfig
 class LambdaClientConnectConfig(ClientConnectConfig, total=False):
     """Keyword arguments for :py:meth:`temporalio.client.Client.connect`.
 
-    Extends :py:class:`~temporalio.envconfig.ClientConnectConfig` with
-    additional keys that may be set by the Lambda worker or its OTel helpers.
+    Extends :py:class:`~temporalio.envconfig.ClientConnectConfig` with additional keys that may be
+    set by the Lambda worker or its OTel helpers.
     """
 
     identity: str
@@ -31,13 +31,12 @@ class LambdaClientConnectConfig(ClientConnectConfig, total=False):
 class LambdaWorkerConfig:
     """Passed to the configure callback of :py:func:`run_worker`.
 
-    Fields are pre-populated with Lambda-appropriate defaults before the
-    configure callback is invoked; the callback may read and override any of
-    them.
+    Fields are pre-populated with Lambda-appropriate defaults before the configure callback is
+    invoked; the callback may read and override any of them.
 
-    Use ``worker_config`` to set task queue, register workflows/activities, and
-    tune worker options. The ``task_queue`` key is pre-populated from the
-    ``TEMPORAL_TASK_QUEUE`` environment variable if set.
+    Use ``worker_config`` to set task queue, register workflows/activities, and tune worker options.
+    The ``task_queue`` key is pre-populated from the ``TEMPORAL_TASK_QUEUE`` environment variable if
+    set.
 
     Attributes:
         client_connect_config: Keyword arguments that will be passed to

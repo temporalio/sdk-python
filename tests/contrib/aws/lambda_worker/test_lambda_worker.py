@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -185,21 +186,21 @@ class TestDefaults:
         env = {"TEMPORAL_CONFIG_FILE": "/custom/path.toml"}
         assert (
             lambda_default_config_file_path(env.get)  # type: ignore[arg-type]
-            == "/custom/path.toml"
+            == Path("/custom/path.toml")
         )
 
     def test_lambda_default_config_file_path_lambda_root(self) -> None:
         env = {"LAMBDA_TASK_ROOT": "/var/task"}
         assert (
             lambda_default_config_file_path(env.get)  # type: ignore[arg-type]
-            == "/var/task/temporal.toml"
+            == Path("/var/task/temporal.toml")
         )
 
     def test_lambda_default_config_file_path_cwd(self) -> None:
         env: dict[str, str] = {}
         assert (
             lambda_default_config_file_path(env.get)  # type: ignore[arg-type]
-            == "temporal.toml"
+            == Path("temporal.toml")
         )
 
 
@@ -260,15 +261,14 @@ class TestRunWorkerInternal:
         handler = _run_worker_internal(TEST_VERSION, lambda config: None, deps)
         assert callable(handler)
 
-    @pytest.mark.asyncio
-    async def test_success(self) -> None:
+    def test_success(self) -> None:
         deps = _make_test_deps()
 
         def configure(config: LambdaWorkerConfig) -> None:
             config.worker_config["workflows"] = [type("FakeWf", (), {})]
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
 
     def test_configure_callback_error(self) -> None:
         deps = _make_test_deps()
@@ -294,8 +294,7 @@ class TestRunWorkerInternal:
                 deps,
             )
 
-    @pytest.mark.asyncio
-    async def test_user_overrides_applied(self) -> None:
+    def test_user_overrides_applied(self) -> None:
         connect_capture: list[dict[str, Any]] = []
         worker_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(
@@ -309,17 +308,16 @@ class TestRunWorkerInternal:
             config.worker_config["max_concurrent_activities"] = 99
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
 
         assert connect_capture[0]["namespace"] == "custom-ns"
         assert worker_capture[0]["max_concurrent_activities"] == 99
 
-    @pytest.mark.asyncio
-    async def test_lambda_defaults_applied(self) -> None:
+    def test_lambda_defaults_applied(self) -> None:
         worker_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(worker_kwargs_capture=worker_capture)
         handler = _run_worker_internal(TEST_VERSION, lambda config: None, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
 
         kwargs = worker_capture[0]
         assert kwargs["max_concurrent_activities"] == DEFAULT_MAX_CONCURRENT_ACTIVITIES
@@ -332,12 +330,11 @@ class TestRunWorkerInternal:
         assert dc.use_worker_versioning is True
         assert dc.version == TEST_VERSION
 
-    @pytest.mark.asyncio
-    async def test_identity_from_lambda_context(self) -> None:
+    def test_identity_from_lambda_context(self) -> None:
         connect_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(connect_kwargs_capture=connect_capture)
         handler = _run_worker_internal(TEST_VERSION, lambda config: None, deps)
-        await handler(
+        handler(
             {},
             _make_lambda_context(
                 request_id="req-abc-123",
@@ -350,8 +347,7 @@ class TestRunWorkerInternal:
             == "req-abc-123@arn:aws:lambda:us-east-1:123456:function:my-func"
         )
 
-    @pytest.mark.asyncio
-    async def test_identity_user_override_wins(self) -> None:
+    def test_identity_user_override_wins(self) -> None:
         connect_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(connect_kwargs_capture=connect_capture)
 
@@ -359,20 +355,18 @@ class TestRunWorkerInternal:
             config.client_connect_config["identity"] = "my-custom-identity"
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
         assert connect_capture[0]["identity"] == "my-custom-identity"
 
-    @pytest.mark.asyncio
-    async def test_identity_no_lambda_context(self) -> None:
+    def test_identity_no_lambda_context(self) -> None:
         connect_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(connect_kwargs_capture=connect_capture)
         deps.extract_lambda_ctx = lambda ctx: None
         handler = _run_worker_internal(TEST_VERSION, lambda config: None, deps)
-        await handler({}, MagicMock(spec=[]))
+        handler({}, MagicMock(spec=[]))
         assert "identity" not in connect_capture[0]
 
-    @pytest.mark.asyncio
-    async def test_shutdown_hooks_called(self) -> None:
+    def test_shutdown_hooks_called(self) -> None:
         deps = _make_test_deps()
         shutdown_called = False
 
@@ -384,11 +378,10 @@ class TestRunWorkerInternal:
             config.shutdown_hooks.append(hook)
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
         assert shutdown_called
 
-    @pytest.mark.asyncio
-    async def test_shutdown_hooks_called_per_invocation(self) -> None:
+    def test_shutdown_hooks_called_per_invocation(self) -> None:
         deps = _make_test_deps()
         shutdown_count = 0
 
@@ -400,13 +393,12 @@ class TestRunWorkerInternal:
             config.shutdown_hooks.append(hook)
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
-        await handler({}, _make_lambda_context())
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
         assert shutdown_count == 3
 
-    @pytest.mark.asyncio
-    async def test_shutdown_hooks_multiple_funcs_order(self) -> None:
+    def test_shutdown_hooks_multiple_funcs_order(self) -> None:
         deps = _make_test_deps()
         order: list[str] = []
 
@@ -415,11 +407,10 @@ class TestRunWorkerInternal:
             config.shutdown_hooks.append(lambda: order.append("second"))
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
         assert order == ["first", "second"]
 
-    @pytest.mark.asyncio
-    async def test_shutdown_hooks_error_continues(self) -> None:
+    def test_shutdown_hooks_error_continues(self) -> None:
         deps = _make_test_deps()
         second_called = False
 
@@ -435,22 +426,20 @@ class TestRunWorkerInternal:
             config.shutdown_hooks.append(second)
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
         assert second_called
 
-    @pytest.mark.asyncio
-    async def test_tight_deadline_raises_error(self) -> None:
+    def test_tight_deadline_raises_error(self) -> None:
         deps = _make_test_deps()
 
         def configure(config: LambdaWorkerConfig) -> None:
             config.shutdown_deadline_buffer = timedelta(milliseconds=1500)
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        with pytest.raises(RuntimeError, match="almost no time for work"):
-            await handler({}, _make_lambda_context(remaining_ms=2000))
+        with pytest.raises(RuntimeError, match="Lambda timeout is too short"):
+            handler({}, _make_lambda_context(remaining_ms=2000))
 
-    @pytest.mark.asyncio
-    async def test_tight_deadline_logs_warning(self) -> None:
+    def test_tight_deadline_logs_warning(self) -> None:
         deps = _make_test_deps()
 
         def configure(config: LambdaWorkerConfig) -> None:
@@ -460,12 +449,11 @@ class TestRunWorkerInternal:
         with patch(
             "temporalio.contrib.aws.lambda_worker._run_worker.logger"
         ) as mock_logger:
-            await handler({}, _make_lambda_context(remaining_ms=2000))
+            handler({}, _make_lambda_context(remaining_ms=2000))
             mock_logger.warning.assert_called_once()
             assert "less than 5s" in mock_logger.warning.call_args[0][0]
 
-    @pytest.mark.asyncio
-    async def test_per_invocation_lifecycle(self) -> None:
+    def test_per_invocation_lifecycle(self) -> None:
         """Each invocation creates its own client and worker."""
         connect_count = 0
         deps = _make_test_deps()
@@ -479,13 +467,12 @@ class TestRunWorkerInternal:
         deps.connect = counting_connect
 
         handler = _run_worker_internal(TEST_VERSION, lambda config: None, deps)
-        await handler({}, _make_lambda_context())
-        await handler({}, _make_lambda_context())
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
         assert connect_count == 3
 
-    @pytest.mark.asyncio
-    async def test_task_queue_from_config(self) -> None:
+    def test_task_queue_from_config(self) -> None:
         worker_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(worker_kwargs_capture=worker_capture)
         deps.getenv = lambda _: None  # type: ignore[assignment]
@@ -494,7 +481,7 @@ class TestRunWorkerInternal:
             config.worker_config["task_queue"] = "explicit-queue"
 
         handler = _run_worker_internal(TEST_VERSION, configure, deps)
-        await handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
         assert worker_capture[0]["task_queue"] == "explicit-queue"
 
     def test_task_queue_pre_populated_from_env(self) -> None:
@@ -525,12 +512,11 @@ class TestRunWorkerInternal:
         assert dc.use_worker_versioning is True
         assert dc.version == TEST_VERSION
 
-    @pytest.mark.asyncio
-    async def test_no_deadline_runs_until_complete(self) -> None:
+    def test_no_deadline_runs_until_complete(self) -> None:
         """When no deadline is available, worker runs until it completes."""
         deps = _make_test_deps()
         handler = _run_worker_internal(TEST_VERSION, lambda config: None, deps)
         ctx = MagicMock(spec=["aws_request_id", "invoked_function_arn"])
         ctx.aws_request_id = "req-123"
         ctx.invoked_function_arn = "arn:aws:lambda:us-east-1:123:function:f"
-        await handler({}, ctx)
+        handler({}, ctx)
