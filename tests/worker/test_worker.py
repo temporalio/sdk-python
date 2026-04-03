@@ -35,7 +35,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
 )
-from temporalio.service import RPCError
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ActivitySlotInfo,
@@ -1192,14 +1192,40 @@ async def wait_until_worker_deployment_visible(
 async def set_current_deployment_version(
     client: Client, conflict_token: bytes, version: WorkerDeploymentVersion
 ) -> SetWorkerDeploymentCurrentVersionResponse:
-    return await client.workflow_service.set_worker_deployment_current_version(
-        SetWorkerDeploymentCurrentVersionRequest(
-            namespace=client.namespace,
-            deployment_name=version.deployment_name,
-            version=version.to_canonical_string(),
-            conflict_token=conflict_token,
-        )
-    )
+    async def mk_call() -> SetWorkerDeploymentCurrentVersionResponse:
+        nonlocal conflict_token
+        try:
+            return await client.workflow_service.set_worker_deployment_current_version(
+                SetWorkerDeploymentCurrentVersionRequest(
+                    namespace=client.namespace,
+                    deployment_name=version.deployment_name,
+                    version=version.to_canonical_string(),
+                    conflict_token=conflict_token,
+                )
+            )
+        except RPCError as err:
+            if err.status != RPCStatusCode.CANCELLED:
+                raise
+            describe_resp = await client.workflow_service.describe_worker_deployment(
+                DescribeWorkerDeploymentRequest(
+                    namespace=client.namespace,
+                    deployment_name=version.deployment_name,
+                )
+            )
+            current_version = (
+                describe_resp.worker_deployment_info.routing_config.current_deployment_version
+            )
+            if (
+                current_version.deployment_name == version.deployment_name
+                and current_version.build_id == version.build_id
+            ):
+                return SetWorkerDeploymentCurrentVersionResponse(
+                    conflict_token=describe_resp.conflict_token
+                )
+            conflict_token = describe_resp.conflict_token
+            assert False
+
+    return await assert_eventually(mk_call, retry_on_rpc_cancelled=False)
 
 
 async def set_ramping_version(
