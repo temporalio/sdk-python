@@ -633,11 +633,23 @@ class _LangSmithClientOutboundInterceptor(temporalio.client.OutboundInterceptor)
             input.headers = _inject_current_context(input.headers)
             yield
 
+    @contextmanager
+    def _traced_start(self, name: str, input: _InputWithHeaders) -> Iterator[None]:
+        """Wrap a start operation, injecting ambient parent context before creating the run.
+
+        Unlike ``_traced_call``, this injects headers *before* ``maybe_run``
+        so the downstream ``RunFoo`` becomes a sibling of ``StartFoo`` rather
+        than a child.
+        """
+        input.headers = _inject_current_context(input.headers)
+        with self._config.maybe_run(name):
+            yield
+
     async def start_workflow(
         self, input: temporalio.client.StartWorkflowInput
     ) -> temporalio.client.WorkflowHandle[Any, Any]:
         prefix = "SignalWithStartWorkflow" if input.start_signal else "StartWorkflow"
-        with self._traced_call(f"{prefix}:{input.workflow}", input):
+        with self._traced_start(f"{prefix}:{input.workflow}", input):
             return await super().start_workflow(input)
 
     async def query_workflow(self, input: temporalio.client.QueryWorkflowInput) -> Any:
@@ -659,15 +671,15 @@ class _LangSmithClientOutboundInterceptor(temporalio.client.OutboundInterceptor)
     async def start_update_with_start_workflow(
         self, input: temporalio.client.StartWorkflowUpdateWithStartInput
     ) -> temporalio.client.WorkflowUpdateHandle[Any]:
+        input.start_workflow_input.headers = _inject_current_context(
+            input.start_workflow_input.headers
+        )
+        input.update_workflow_input.headers = _inject_current_context(
+            input.update_workflow_input.headers
+        )
         with self._config.maybe_run(
             f"StartUpdateWithStartWorkflow:{input.start_workflow_input.workflow}",
         ):
-            input.start_workflow_input.headers = _inject_current_context(
-                input.start_workflow_input.headers
-            )
-            input.update_workflow_input.headers = _inject_current_context(
-                input.update_workflow_input.headers
-            )
             return await super().start_update_with_start_workflow(input)
 
 
@@ -845,8 +857,8 @@ class _LangSmithWorkflowOutboundInterceptor(
         Uses ambient context so ``@traceable`` step functions that wrap
         outbound calls correctly parent the outbound run under themselves.
         """
+        context_source = _get_current_run_for_propagation()
         with self._config.maybe_run(name):
-            context_source = _get_current_run_for_propagation()
             if context_source:
                 input.headers = _inject_context(input.headers, context_source)
             yield None
@@ -891,10 +903,10 @@ class _LangSmithWorkflowOutboundInterceptor(
     async def start_nexus_operation(
         self, input: temporalio.worker.StartNexusOperationInput[Any, Any]
     ) -> temporalio.workflow.NexusOperationHandle[Any]:
+        context_source = _get_current_run_for_propagation()
         with self._config.maybe_run(
             f"StartNexusOperation:{input.service}/{input.operation_name}",
         ):
-            context_source = _get_current_run_for_propagation()
             if context_source:
                 input.headers = _inject_nexus_context(
                     input.headers or {}, context_source
