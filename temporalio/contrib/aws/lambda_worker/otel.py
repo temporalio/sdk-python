@@ -1,6 +1,6 @@
 """OpenTelemetry helpers for Temporal workers running inside AWS Lambda.
 
-Use :py:func:`apply_defaults` inside a :py:func:`~lambda_worker.run_worker` configure callback for a
+Use :py:func:`apply_defaults` inside a :py:func:`run_worker` configure callback for a
 batteries-included setup that creates an OTel collector exporter and tracing interceptor, suitable
 for use with the AWS Distro for OpenTelemetry (ADOT) Lambda layer.
 
@@ -72,9 +72,9 @@ def apply_defaults(
 ) -> None:
     """Configure OTel metrics and tracing with AWS Lambda defaults.
 
-    Sets up Core SDK metrics export via a :py:class:`~temporalio.runtime.Runtime` with an
-    :py:class:`~temporalio.runtime.OpenTelemetryConfig` pointing at the OTLP collector, and adds a
-    :py:class:`~temporalio.contrib.opentelemetry.TracingInterceptor` for distributed tracing.
+    Sets up Core SDK metrics export via a :py:class:`temporalio.runtime.Runtime` with an
+    :py:class:`temporalio.runtime.OpenTelemetryConfig` pointing at the OTLP collector, and adds a
+    :py:class:`temporalio.contrib.opentelemetry.TracingInterceptor` for distributed tracing.
 
     The collector endpoint defaults to ``http://localhost:4317``, which is the endpoint expected by
     the ADOT collector Lambda layer.
@@ -139,12 +139,12 @@ def build_metrics_telemetry_config(
     service_name: str = "",
     metric_periodicity: timedelta | None = None,
 ) -> TelemetryConfig:
-    """Build a :py:class:`~temporalio.runtime.TelemetryConfig` for OTel metrics.
+    """Build a :py:class:`temporalio.runtime.TelemetryConfig` for OTel metrics.
 
-    Returns a ``TelemetryConfig`` with :py:class:`~temporalio.runtime.OpenTelemetryConfig` metrics
+    Returns a ``TelemetryConfig`` with :py:class:`temporalio.runtime.OpenTelemetryConfig` metrics
     pointed at the given OTLP collector endpoint. Use this when you need to compose metrics config
     with other telemetry settings (e.g. custom logging) into your own
-    :py:class:`~temporalio.runtime.Runtime`.
+    :py:class:`temporalio.runtime.Runtime`.
 
     Core SDK metrics are exported on the ``metric_periodicity`` interval by the runtime's internal
     thread. There is no explicit flush API; set ``metric_periodicity`` short enough to ensure at
@@ -171,7 +171,7 @@ def build_metrics_telemetry_config(
 
     Returns:
         A ``TelemetryConfig`` ready to pass to
-        :py:class:`~temporalio.runtime.Runtime`.
+        :py:class:`temporalio.runtime.Runtime`.
     """
     if not endpoint:
         endpoint = "http://localhost:4317"
@@ -197,7 +197,7 @@ def apply_tracing(
 ) -> None:
     """Configure only OTel tracing (no metrics) on the Lambda worker config.
 
-    Adds a :py:class:`~temporalio.contrib.opentelemetry.TracingInterceptor` to
+    Adds a :py:class:`temporalio.contrib.opentelemetry.TracingInterceptor` to
     ``config.client_connect_config["interceptors"]`` and registers a ``ForceFlush`` shutdown hook
     for the provider.
 

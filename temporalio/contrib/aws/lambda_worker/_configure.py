@@ -29,7 +29,7 @@ class LambdaWorkerConfig:
             config file / environment variables via envconfig, with Lambda
             defaults applied.
         worker_config: Keyword arguments that will be passed to the
-            :py:class:`~temporalio.worker.Worker` constructor (the ``client``
+            :py:class:`temporalio.worker.Worker` constructor (the ``client``
             key is managed internally). Pre-populated with Lambda-appropriate
             defaults (low concurrency, eager activities disabled) and
             ``task_queue`` from ``TEMPORAL_TASK_QUEUE`` if set.
