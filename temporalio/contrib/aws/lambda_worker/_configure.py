@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-import sys
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
 
 from temporalio.client import ClientConnectConfig
 from temporalio.worker import WorkerConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,7 +69,4 @@ async def _run_shutdown_hooks(  # type:ignore[reportUnusedFunction]
             if asyncio.iscoroutine(result):
                 await result
         except Exception as e:
-            print(
-                f"lambda_worker: shutdown hook error: {e}",
-                file=sys.stderr,
-            )
+            logger.error(f"shutdown hook error: {e}")

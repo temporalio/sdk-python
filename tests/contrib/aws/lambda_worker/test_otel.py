@@ -6,9 +6,6 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from temporalio.contrib.aws.lambda_worker._configure import (
     LambdaWorkerConfig,
@@ -20,48 +17,37 @@ from temporalio.contrib.aws.lambda_worker.otel import (
     apply_tracing,
     build_metrics_telemetry_config,
 )
-from temporalio.contrib.opentelemetry import TracingInterceptor
+from temporalio.contrib.opentelemetry import OpenTelemetryPlugin
 from temporalio.runtime import OpenTelemetryConfig, TelemetryConfig
 
 
-def _make_tracer_provider() -> tuple[TracerProvider, InMemorySpanExporter]:
-    span_exporter = InMemorySpanExporter()
-    tracer_provider = TracerProvider()
-    tracer_provider.add_span_processor(SimpleSpanProcessor(span_exporter))
-    return tracer_provider, span_exporter
-
-
 class TestApplyTracing:
-    def test_adds_interceptor(self) -> None:
+    def test_adds_plugin(self) -> None:
         config = LambdaWorkerConfig()
-        tracer_provider, _ = _make_tracer_provider()
-        apply_tracing(config, tracer_provider)
-        interceptors = config.client_connect_config.get("interceptors", [])
-        assert len(interceptors) == 1
+        apply_tracing(config)
+        plugins = config.worker_config.get("plugins", [])
+        assert len(plugins) == 1
+        assert isinstance(plugins[0], OpenTelemetryPlugin)
 
-    def test_appends_to_existing_interceptors(self) -> None:
+    def test_appends_to_existing_plugins(self) -> None:
         config = LambdaWorkerConfig()
-        # Use a TracingInterceptor as the existing interceptor.
-        existing_provider, _ = _make_tracer_provider()
-        existing = TracingInterceptor(tracer=existing_provider.get_tracer("existing"))
-        config.client_connect_config["interceptors"] = [existing]
-        tracer_provider, _ = _make_tracer_provider()
-        apply_tracing(config, tracer_provider)
-        interceptors = config.client_connect_config["interceptors"]
-        assert len(interceptors) == 2
-        assert interceptors[0] is existing
+        existing = OpenTelemetryPlugin()
+        config.worker_config["plugins"] = [existing]
+        apply_tracing(config)
+        plugins = config.worker_config["plugins"]
+        assert len(plugins) == 2
+        assert plugins[0] is existing
 
     def test_registers_flush_shutdown_hook(self) -> None:
         config = LambdaWorkerConfig()
-        tracer_provider, _ = _make_tracer_provider()
-        apply_tracing(config, tracer_provider)
+        apply_tracing(config)
         assert len(config.shutdown_hooks) == 1
 
     @pytest.mark.asyncio
     async def test_shutdown_hook_flushes(self) -> None:
         config = LambdaWorkerConfig()
-        tracer_provider, _ = _make_tracer_provider()
-        apply_tracing(config, tracer_provider)
+        apply_tracing(config)
+        # Should not raise even with the default noop global provider.
         await _run_shutdown_hooks(config)
 
 
@@ -95,7 +81,6 @@ class TestBuildMetricsTelemetryConfig:
         import dataclasses
 
         tc = build_metrics_telemetry_config(endpoint="http://localhost:4317")
-        # Replace logging config to demonstrate composability.
         custom_tc = dataclasses.replace(tc, logging=None)
         assert custom_tc.logging is None
         assert isinstance(custom_tc.metrics, OpenTelemetryConfig)
@@ -106,10 +91,26 @@ class TestApplyDefaults:
         config = LambdaWorkerConfig()
         apply_defaults(config, OtelOptions(collector_endpoint="http://localhost:4317"))
 
+        # Metrics: runtime should be set.
         assert "runtime" in config.client_connect_config
-        interceptors = config.client_connect_config.get("interceptors", [])
-        assert len(interceptors) == 1
+        # Tracing: plugin should be added.
+        plugins = config.worker_config.get("plugins", [])
+        assert len(plugins) == 1
+        assert isinstance(plugins[0], OpenTelemetryPlugin)
+        # Shutdown hook for tracer flush.
         assert len(config.shutdown_hooks) == 1
+
+    def test_sets_global_tracer_provider(self) -> None:
+        from opentelemetry.trace import get_tracer_provider
+
+        from temporalio.contrib.opentelemetry._tracer_provider import (
+            ReplaySafeTracerProvider,
+        )
+
+        config = LambdaWorkerConfig()
+        apply_defaults(config)
+        provider = get_tracer_provider()
+        assert isinstance(provider, ReplaySafeTracerProvider)
 
     def test_service_name_from_options(self) -> None:
         config = LambdaWorkerConfig()

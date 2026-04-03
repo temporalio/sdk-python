@@ -1,7 +1,7 @@
 """OpenTelemetry helpers for Temporal workers running inside AWS Lambda.
 
 Use :py:func:`apply_defaults` inside a :py:func:`run_worker` configure callback for a
-batteries-included setup that creates an OTel collector exporter and tracing interceptor, suitable
+batteries-included setup that creates an OTel collector exporter and tracing plugin, suitable
 for use with the AWS Distro for OpenTelemetry (ADOT) Lambda layer.
 
 Use :py:func:`apply_tracing` or :py:func:`build_metrics_telemetry_config` individually if you only
@@ -10,17 +10,21 @@ need one.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import timedelta
 
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.attributes.service_attributes import SERVICE_NAME
+from opentelemetry.trace import get_tracer_provider, set_tracer_provider
 
 from temporalio.contrib.aws.lambda_worker._configure import LambdaWorkerConfig
+from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -73,14 +77,20 @@ def apply_defaults(
     """Configure OTel metrics and tracing with AWS Lambda defaults.
 
     Sets up Core SDK metrics export via a :py:class:`temporalio.runtime.Runtime` with an
-    :py:class:`temporalio.runtime.OpenTelemetryConfig` pointing at the OTLP collector, and adds a
-    :py:class:`temporalio.contrib.opentelemetry.TracingInterceptor` for distributed tracing.
+    :py:class:`temporalio.runtime.OpenTelemetryConfig` pointing at the OTLP collector, and adds the
+    :py:class:`temporalio.contrib.opentelemetry.OpenTelemetryPlugin` for distributed tracing with
+    workflow sandbox passthrough.
+
+    Creates a replay-safe ``TracerProvider`` (with X-Ray ID generator and OTLP gRPC exporter if
+    available) and sets it as the global OpenTelemetry tracer provider. The
+    :py:class:`temporalio.contrib.opentelemetry.OpenTelemetryPlugin` uses the global provider, so
+    it must be set before the worker starts.
 
     The collector endpoint defaults to ``http://localhost:4317``, which is the endpoint expected by
     the ADOT collector Lambda layer.
 
-    Registers a per-invocation ``ForceFlush`` shutdown hook for the ``TracerProvider`` so pending
-    traces are exported before each Lambda invocation completes.
+    Registers a per-invocation ``ForceFlush`` shutdown hook for the global ``TracerProvider`` so
+    pending traces are exported before each Lambda invocation completes.
 
     Metrics are exported on the ``metric_periodicity`` interval by the runtime's internal thread.
     There is no explicit flush API for these metrics; set ``metric_periodicity`` short enough to
@@ -112,11 +122,16 @@ def apply_defaults(
             AwsXRayIdGenerator,
         )
 
-        tracer_provider = TracerProvider(
+        tracer_provider = create_tracer_provider(
             resource=resource, id_generator=AwsXRayIdGenerator()
         )
     except ImportError:
-        tracer_provider = TracerProvider(resource=resource)
+        logger.warning(
+            "opentelemetry-sdk-extension-aws is not installed; "
+            "X-Ray trace ID generation is disabled. "
+            "Install the 'lambda-worker-otel' extra for full ADOT support."
+        )
+        tracer_provider = create_tracer_provider(resource=resource)
 
     # Use OTLP gRPC exporter if available, otherwise skip trace export.
     try:
@@ -128,9 +143,16 @@ def apply_defaults(
             BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
         )
     except ImportError:
-        pass
+        logger.warning(
+            "opentelemetry-exporter-otlp-proto-grpc is not installed; "
+            "traces will not be exported to the OTLP collector. "
+            "Install the 'lambda-worker-otel' extra for full ADOT support."
+        )
 
-    apply_tracing(config, tracer_provider)
+    # Set as global so the OpenTelemetryPlugin picks it up.
+    set_tracer_provider(tracer_provider)
+
+    apply_tracing(config)
 
 
 def build_metrics_telemetry_config(
@@ -191,28 +213,29 @@ def build_metrics_telemetry_config(
     )
 
 
-def apply_tracing(
-    config: LambdaWorkerConfig,
-    tracer_provider: TracerProvider,
-) -> None:
+def apply_tracing(config: LambdaWorkerConfig) -> None:
     """Configure only OTel tracing (no metrics) on the Lambda worker config.
 
-    Adds a :py:class:`temporalio.contrib.opentelemetry.TracingInterceptor` to
-    ``config.client_connect_config["interceptors"]`` and registers a ``ForceFlush`` shutdown hook
-    for the provider.
+    Adds an :py:class:`temporalio.contrib.opentelemetry.OpenTelemetryPlugin` to
+    ``config.worker_config["plugins"]``. The plugin uses the global
+    ``TracerProvider`` set via ``opentelemetry.trace.set_tracer_provider``.
+    Ensure your provider is set globally before the worker starts.
+
+    Also registers a ``ForceFlush`` shutdown hook that flushes the global
+    ``TracerProvider`` (if it supports ``force_flush``).
 
     Args:
         config: The :py:class:`LambdaWorkerConfig` to configure.
-        tracer_provider: The ``TracerProvider`` to use for tracing.
     """
-    from temporalio.contrib.opentelemetry import TracingInterceptor
-
-    interceptor = TracingInterceptor(tracer=tracer_provider.get_tracer("temporal-sdk"))
-    interceptors = list(config.client_connect_config.get("interceptors", []))
-    interceptors.append(interceptor)
-    config.client_connect_config["interceptors"] = interceptors
+    plugin = OpenTelemetryPlugin()
+    plugins = list(config.worker_config.get("plugins", []))
+    plugins.append(plugin)
+    config.worker_config["plugins"] = plugins
 
     async def _flush() -> None:
-        tracer_provider.force_flush()
+        provider = get_tracer_provider()
+        flush = getattr(provider, "force_flush", None)
+        if flush is not None:
+            flush()
 
     config.shutdown_hooks.append(_flush)

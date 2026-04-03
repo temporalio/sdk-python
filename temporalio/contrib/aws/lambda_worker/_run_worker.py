@@ -115,7 +115,7 @@ def run_worker(
     try:
         return _run_worker_internal(version, configure, deps)
     except Exception as e:
-        print(f"lambda_worker: fatal: {e}", file=sys.stderr)
+        logger.error(f"fatal error running lambda worker: {e}")
         sys.exit(1)
 
 
