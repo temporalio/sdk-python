@@ -1,4 +1,4 @@
-"""Unit tests for _ReplaySafeRunTree and _ContextBridgeRunTree.
+"""Unit tests for _ReplaySafeRunTree and _RootReplaySafeRunTreeFactory.
 
 Covers create_child propagation, executor-backed post/patch,
 replay suppression, and post-shutdown fallback.
@@ -18,8 +18,8 @@ import pytest
 from langsmith.run_trees import RunTree
 
 from temporalio.contrib.langsmith._interceptor import (
-    _ContextBridgeRunTree,
     _ReplaySafeRunTree,
+    _RootReplaySafeRunTreeFactory,
     _uuid_from_random,
 )
 
@@ -377,42 +377,42 @@ class TestReplaySuppression:
 
 
 # ===================================================================
-# TestContextBridgeRunTree
+# TestRootReplaySafeRunTreeFactory
 # ===================================================================
 
 
-class TestContextBridgeRunTree:
-    """Tests for _ContextBridgeRunTree subclass."""
+class TestRootReplaySafeRunTreeFactory:
+    """Tests for _RootReplaySafeRunTreeFactory subclass."""
 
-    def _make_bridge(self, **kwargs: Any) -> _ContextBridgeRunTree:
-        """Create a _ContextBridgeRunTree for testing."""
-        from temporalio.contrib.langsmith._interceptor import _ContextBridgeRunTree
+    def _make_factory(self, **kwargs: Any) -> _RootReplaySafeRunTreeFactory:
+        """Create a _RootReplaySafeRunTreeFactory for testing."""
+        from temporalio.contrib.langsmith._interceptor import (
+            _RootReplaySafeRunTreeFactory,
+        )
 
         executor = kwargs.pop("executor", _make_executor())
         mock_client = kwargs.pop("ls_client", MagicMock())
-        return _ContextBridgeRunTree(
-            ls_client=mock_client,
-            executor=executor,
-            **kwargs,
+        return _RootReplaySafeRunTreeFactory(
+            ls_client=mock_client, executor=executor, **kwargs
         )
 
     def test_post_raises_runtime_error(self) -> None:
-        """Bridge's post() raises RuntimeError — bridge must never be posted."""
-        bridge = self._make_bridge()
+        """Factory's post() raises RuntimeError — factory must never be posted."""
+        factory = self._make_factory()
         with pytest.raises(RuntimeError, match="must never be posted"):
-            bridge.post()
+            factory.post()
 
     def test_patch_raises_runtime_error(self) -> None:
-        """Bridge's patch() raises RuntimeError — bridge must never be patched."""
-        bridge = self._make_bridge()
+        """Factory's patch() raises RuntimeError — factory must never be patched."""
+        factory = self._make_factory()
         with pytest.raises(RuntimeError, match="must never be patched"):
-            bridge.patch()
+            factory.patch()
 
     def test_end_raises_runtime_error(self) -> None:
-        """Bridge's end() raises RuntimeError — bridge must never be ended."""
-        bridge = self._make_bridge()
+        """Factory's end() raises RuntimeError — factory must never be ended."""
+        factory = self._make_factory()
         with pytest.raises(RuntimeError, match="must never be ended"):
-            bridge.end(outputs={"status": "ok"})
+            factory.end(outputs={"status": "ok"})
 
     @patch(_PATCH_GET_WF_RANDOM)
     @patch(_PATCH_WF_NOW)
@@ -423,7 +423,7 @@ class TestContextBridgeRunTree:
         mock_now: Any,
         mock_get_random: Any,
     ) -> None:
-        """Bridge's create_child creates a root _ReplaySafeRunTree (no parent_run_id)."""
+        """Factory's create_child creates a root _ReplaySafeRunTree (no parent_run_id)."""
         import random as stdlib_random
 
         mock_get_random.return_value = stdlib_random.Random(42)
@@ -431,20 +431,20 @@ class TestContextBridgeRunTree:
 
         executor = _make_executor()
         mock_client = MagicMock()
-        bridge = self._make_bridge(ls_client=mock_client, executor=executor)
+        factory = self._make_factory(ls_client=mock_client, executor=executor)
 
-        child = bridge.create_child(name="traceable-fn", run_type="chain")
+        child = factory.create_child(name="traceable-fn", run_type="chain")
 
         assert isinstance(child, _ReplaySafeRunTree)
         # Child should be a root run — no parent_run_id
         assert child._run.parent_run_id is None
 
     def test_create_child_inherits_client_session_and_replicas(self) -> None:
-        """Bridge's children inherit ls_client, session_name, replicas."""
+        """Factory's children inherit ls_client, session_name, replicas."""
         executor = _make_executor()
         mock_client = MagicMock()
         mock_replicas = [MagicMock(), MagicMock()]
-        bridge = self._make_bridge(
+        factory = self._make_factory(
             ls_client=mock_client,
             executor=executor,
             session_name="my-project",
@@ -452,37 +452,37 @@ class TestContextBridgeRunTree:
         )
 
         with patch(_PATCH_IN_WORKFLOW, return_value=False):
-            child = bridge.create_child(name="traceable-fn", run_type="chain")
+            child = factory.create_child(name="traceable-fn", run_type="chain")
 
         assert isinstance(child, _ReplaySafeRunTree)
-        # Child should have the bridge's ls_client, session_name, and replicas
+        # Child should have the factory's ls_client, session_name, and replicas
         assert child.ls_client is mock_client
         assert child.session_name == "my-project"
         assert child.replicas is mock_replicas
 
     def test_create_child_propagates_executor(self) -> None:
-        """Bridge propagates executor to children."""
+        """Factory propagates executor to children."""
         executor = _make_executor()
-        bridge = self._make_bridge(executor=executor)
+        factory = self._make_factory(executor=executor)
 
         with patch(_PATCH_IN_WORKFLOW, return_value=False):
-            child = bridge.create_child(name="traceable-fn", run_type="chain")
+            child = factory.create_child(name="traceable-fn", run_type="chain")
 
         assert isinstance(child, _ReplaySafeRunTree)
         assert child._executor is executor
 
     def test_create_child_maps_run_id_to_id(self) -> None:
-        """Bridge's create_child maps run_id kwarg to id on the resulting RunTree.
+        """Factory's create_child maps run_id kwarg to id on the resulting RunTree.
 
         The run_id kwarg is mapped to id, matching LangSmith's
         RunTree.create_child convention (run_trees.py:545).
         """
         executor = _make_executor()
-        bridge = self._make_bridge(executor=executor)
+        factory = self._make_factory(executor=executor)
         explicit_id = uuid.uuid4()
 
         with patch(_PATCH_IN_WORKFLOW, return_value=False):
-            child = bridge.create_child(
+            child = factory.create_child(
                 name="traceable-fn", run_type="chain", run_id=explicit_id
             )
 
@@ -490,16 +490,16 @@ class TestContextBridgeRunTree:
         # The underlying RunTree should have id set to the passed run_id
         assert child._run.id == explicit_id
 
-    def test_bridge_not_in_collected_runs(self) -> None:
-        """Bridge's post/patch/end raise RuntimeError — bridge is never traced."""
-        bridge = self._make_bridge()
+    def test_factory_not_in_collected_runs(self) -> None:
+        """Factory's post/patch/end raise RuntimeError — factory is never traced."""
+        factory = self._make_factory()
 
         with pytest.raises(RuntimeError):
-            bridge.post()
+            factory.post()
         with pytest.raises(RuntimeError):
-            bridge.patch()
+            factory.patch()
         with pytest.raises(RuntimeError):
-            bridge.end()
+            factory.end()
 
 
 # ===================================================================

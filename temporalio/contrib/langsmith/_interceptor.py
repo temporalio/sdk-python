@@ -133,11 +133,12 @@ def _extract_nexus_context(
 def _get_current_run_for_propagation() -> RunTree | None:
     """Get the current ambient run for context propagation.
 
-    Filters out _ContextBridgeRunTree, which is internal scaffolding
-    that should never be serialized into headers or used as parent runs.
+    Filters out ``_RootReplaySafeRunTreeFactory``, which is internal
+    scaffolding that should never be serialized into headers or used as
+    parent runs.
     """
     run = get_current_run_tree()
-    if isinstance(run, _ContextBridgeRunTree):
+    if isinstance(run, _RootReplaySafeRunTreeFactory):
         return None
     return run
 
@@ -337,18 +338,26 @@ class _ReplaySafeRunTree(RunTree):
             self._run.patch(exclude_inputs=exclude_inputs)
 
 
-class _ContextBridgeRunTree(_ReplaySafeRunTree):
-    """Invisible parent placeholder for ``add_temporal_runs=False`` without propagated context.
+class _RootReplaySafeRunTreeFactory(_ReplaySafeRunTree):
+    """Factory that produces independent root ``_ReplaySafeRunTree`` instances with no parent link.
 
     When ``add_temporal_runs=False`` and no parent was propagated via headers,
-    ``@traceable`` functions still need a parent context to create
-    ``_ReplaySafeRunTree`` children.  This placeholder provides that context
-    without appearing in LangSmith — its children become root runs.
+    ``@traceable`` functions still need *something* in the LangSmith
+    ``tracing_context`` to call ``create_child()`` on — otherwise they
+    cannot create ``_ReplaySafeRunTree`` children at all and instead default to
+    creating generic ``RunTree``s, which are not replay safe. This class fills
+    that role: it sits in the context as the nominal parent so
+    ``@traceable`` has a ``create_child()`` target.
 
-    Never posted, patched, or ended — no trace of it exists in LangSmith.
-    ``create_child()`` creates root ``_ReplaySafeRunTree`` objects (no
-    ``parent_run_id``) so that ``@traceable`` calls appear as independent
-    root runs.
+    However, ``create_child()`` deliberately creates fresh ``RunTree``
+    instances with **no** ``parent_run_id``.  This means every child appears
+    as an independent root run in LangSmith rather than being nested under
+    a phantom parent that was never meant to be visible.
+
+    ``post()``, ``patch()``, and ``end()`` all raise ``RuntimeError``
+    because this object is purely internal scaffolding — it must never
+    appear in LangSmith.  If any of these methods are called, it indicates
+    a programming error.
     """
 
     def __init__(  # pyright: ignore[reportMissingSuperCall]
@@ -359,38 +368,38 @@ class _ContextBridgeRunTree(_ReplaySafeRunTree):
         session_name: str | None = None,
         replicas: Sequence[WriteReplica] | None = None,
     ) -> None:
-        """Create a context bridge with the given LangSmith client."""
-        # Create a minimal RunTree for the bridge — it will never be posted
-        bridge_run = RunTree(
-            name="__bridge__",
+        """Create a root factory with the given LangSmith client."""
+        # Create a minimal RunTree for the factory — it will never be posted
+        factory_run = RunTree(
+            name="__root_factory__",
             run_type="chain",
             ls_client=ls_client,
         )
         if session_name is not None:
-            bridge_run.session_name = session_name
+            factory_run.session_name = session_name
         if replicas is not None:
-            bridge_run.replicas = replicas
-        object.__setattr__(self, "_run", bridge_run)
+            factory_run.replicas = replicas
+        object.__setattr__(self, "_run", factory_run)
         object.__setattr__(self, "_executor", executor)
 
     def post(self, exclude_child_runs: bool = True) -> NoReturn:
-        """Bridge must never be posted."""
-        raise RuntimeError("ContextBridgeRunTree must never be posted")
+        """Factory must never be posted."""
+        raise RuntimeError("_RootReplaySafeRunTreeFactory must never be posted")
 
     def patch(self, *, exclude_inputs: bool = False) -> NoReturn:
-        """Bridge must never be patched."""
-        raise RuntimeError("ContextBridgeRunTree must never be patched")
+        """Factory must never be patched."""
+        raise RuntimeError("_RootReplaySafeRunTreeFactory must never be patched")
 
     def end(self, **kwargs: Any) -> NoReturn:
-        """Bridge must never be ended."""
-        raise RuntimeError("ContextBridgeRunTree must never be ended")
+        """Factory must never be ended."""
+        raise RuntimeError("_RootReplaySafeRunTreeFactory must never be ended")
 
     def create_child(self, *args: Any, **kwargs: Any) -> _ReplaySafeRunTree:
         """Create a root _ReplaySafeRunTree (no parent_run_id).
 
         Creates a fresh ``RunTree(...)`` directly (bypassing
         ``self._run.create_child``) so children are independent root runs
-        with no link back to the bridge.
+        with no link back to the factory.
         """
         self._inject_deterministic_ids(kwargs)
 
@@ -399,7 +408,7 @@ class _ContextBridgeRunTree(_ReplaySafeRunTree):
         if "run_id" in kwargs:
             kwargs["id"] = kwargs.pop("run_id")
 
-        # Inherit ls_client and session_name from bridge.
+        # Inherit ls_client and session_name from factory.
         # session_name must be passed at construction time.
         kwargs.setdefault("ls_client", self._run.ls_client)
         kwargs.setdefault("session_name", self._run.session_name)
@@ -752,16 +761,17 @@ class _LangSmithWorkflowInboundInterceptor(
             "enabled": True,
         }
         # When add_temporal_runs=False and no external parent, create a
-        # _ContextBridgeRunTree so @traceable calls get a _ReplaySafeRunTree
-        # parent via create_child. The bridge is invisible in LangSmith.
-        bridge: _ContextBridgeRunTree | None = None
+        # _RootReplaySafeRunTreeFactory so @traceable calls get a
+        # _ReplaySafeRunTree parent via create_child. The factory is
+        # invisible in LangSmith.
+        factory: _RootReplaySafeRunTreeFactory | None = None
         if not self._config._add_temporal_runs and parent is None:
-            bridge = _ContextBridgeRunTree(
+            factory = _RootReplaySafeRunTreeFactory(
                 ls_client=self._config._client,
                 executor=self._config._executor,
                 session_name=self._config._project_name,
             )
-            ctx_kwargs["parent"] = bridge
+            ctx_kwargs["parent"] = factory
             ctx_kwargs["project_name"] = self._config._project_name
         elif parent:
             ctx_kwargs["parent"] = parent

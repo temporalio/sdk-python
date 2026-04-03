@@ -884,7 +884,7 @@ class TestComprehensiveTracing:
 
 
 # ---------------------------------------------------------------------------
-# TestBackgroundIOIntegration — _ContextBridgeRunTree + sync @traceable
+# TestBackgroundIOIntegration — _RootReplaySafeRunTreeFactory + sync @traceable
 # ---------------------------------------------------------------------------
 
 
@@ -907,12 +907,12 @@ async def _async_calls_sync(prompt: str) -> str:
 
 
 @workflow.defn
-class BridgeTraceableWorkflow:
-    """Workflow exercising _ContextBridgeRunTree with async, sync, and mixed @traceable.
+class FactoryTraceableWorkflow:
+    """Workflow exercising _RootReplaySafeRunTreeFactory with async, sync, and mixed @traceable.
 
     Covers three code paths through create_child:
     - async→async nesting
-    - sync→sync nesting (sync @traceable entry to bridge)
+    - sync→sync nesting (sync @traceable entry to factory)
     - async→sync nesting (cross-boundary case)
     """
 
@@ -932,23 +932,23 @@ class BridgeTraceableWorkflow:
 class TestBackgroundIOIntegration:
     """Integration tests for workflows using add_temporal_runs=False without external context.
 
-    Exercises the _ContextBridgeRunTree path with sync, async, and mixed @traceable
+    Exercises the _RootReplaySafeRunTreeFactory path with sync, async, and mixed @traceable
     nesting. Verifies root-run creation, correct nesting hierarchy, and replay safety.
     """
 
-    async def test_bridge_traceable_no_external_context(
+    async def test_factory_traceable_no_external_context(
         self,
         client: Client,
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
-        """Exercises _ContextBridgeRunTree: add_temporal_runs=False, no external context.
+        """Exercises _RootReplaySafeRunTreeFactory: add_temporal_runs=False, no external context.
 
         Uses a workflow with async→async, sync→sync, and async→sync @traceable
         nesting, plus an activity with nested @traceable. Verifies:
-        - Each top-level @traceable becomes a root run (bridge creates root children)
+        - Each top-level @traceable becomes a root run (factory creates root children)
         - Nested @traceable calls nest correctly under their parent
         - Activity @traceable also produces correct hierarchy
-        - No phantom bridge run appears in collected runs
+        - No phantom factory run appears in collected runs
         - No duplicate run IDs after replay (max_cached_workflows=0)
         """
         temporal_client, collector, _ = _make_client_and_collector(
@@ -957,13 +957,13 @@ class TestBackgroundIOIntegration:
 
         async with new_worker(
             temporal_client,
-            BridgeTraceableWorkflow,
+            FactoryTraceableWorkflow,
             activities=[nested_traceable_activity],
             max_cached_workflows=0,
         ) as worker:
             handle = await temporal_client.start_workflow(
-                BridgeTraceableWorkflow.run,
-                id=f"bridge-{uuid.uuid4()}",
+                FactoryTraceableWorkflow.run,
+                id=f"factory-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
             result = await handle.result()
@@ -995,25 +995,25 @@ class TestBackgroundIOIntegration:
             set(run_ids)
         ), f"Duplicate run IDs found (replay issue): {run_ids}"
 
-    async def test_bridge_passes_project_name_to_children(
+    async def test_factory_passes_project_name_to_children(
         self,
         client: Client,
         env: WorkflowEnvironment,  # type:ignore[reportUnusedParameter]
     ) -> None:
-        """Bridge children inherit project_name (session_name) from plugin config."""
+        """Factory children inherit project_name (session_name) from plugin config."""
         temporal_client, _collector, mock_ls_client = _make_client_and_collector(
             client, add_temporal_runs=False, project_name="my-ls-project"
         )
 
         async with new_worker(
             temporal_client,
-            BridgeTraceableWorkflow,
+            FactoryTraceableWorkflow,
             activities=[nested_traceable_activity],
             max_cached_workflows=0,
         ) as worker:
             handle = await temporal_client.start_workflow(
-                BridgeTraceableWorkflow.run,
-                id=f"bridge-proj-{uuid.uuid4()}",
+                FactoryTraceableWorkflow.run,
+                id=f"factory-proj-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
             await handle.result()
@@ -1044,12 +1044,12 @@ class TestBackgroundIOIntegration:
 
         async with new_worker(
             temporal_client,
-            BridgeTraceableWorkflow,
+            FactoryTraceableWorkflow,
             activities=[nested_traceable_activity],
             max_cached_workflows=0,
         ) as worker:
             handle = await temporal_client.start_workflow(
-                BridgeTraceableWorkflow.run,
+                FactoryTraceableWorkflow.run,
                 id=f"mixed-temporal-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
@@ -1064,8 +1064,8 @@ class TestBackgroundIOIntegration:
         # With add_temporal_runs=True, Temporal operations get their own runs.
         # @traceable calls nest under the RunWorkflow run.
         expected = [
-            "StartWorkflow:BridgeTraceableWorkflow",
-            "  RunWorkflow:BridgeTraceableWorkflow",
+            "StartWorkflow:FactoryTraceableWorkflow",
+            "  RunWorkflow:FactoryTraceableWorkflow",
             "    outer_chain",
             "      inner_llm_call",
             "    sync_outer_chain",
