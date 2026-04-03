@@ -31,7 +31,6 @@ _PATCH_IN_WORKFLOW = f"{_MOD}.temporalio.workflow.in_workflow"
 _PATCH_IS_REPLAYING = f"{_MOD}.temporalio.workflow.unsafe.is_replaying_history_events"
 _PATCH_WF_NOW = f"{_MOD}.temporalio.workflow.now"
 _PATCH_WF_INFO = f"{_MOD}.temporalio.workflow.info"
-_PATCH_SANDBOX = f"{_MOD}.temporalio.workflow.unsafe.sandbox_unrestricted"
 _PATCH_TRACING_CTX = f"{_MOD}.tracing_context"
 _PATCH_EXTRACT_NEXUS = f"{_MOD}._extract_nexus_context"
 _PATCH_INJECT_NEXUS = f"{_MOD}._inject_nexus_context"
@@ -617,7 +616,6 @@ class TestWorkflowInboundInterceptor:
 
     @pytest.mark.asyncio
     @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
-    @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
@@ -628,7 +626,6 @@ class TestWorkflowInboundInterceptor:
         _mock_in_wf: Any,
         _mock_replaying: Any,
         MockRunTree: Any,
-        mock_sandbox: Any,
         _mock_now: Any,
     ) -> None:
         """execute_workflow creates a run named RunWorkflow:{workflow_type}."""
@@ -650,8 +647,6 @@ class TestWorkflowInboundInterceptor:
             "temporalWorkflowID": "test-wf-id",
             "temporalRunID": "test-run-id",
         }
-        # Verify sandbox_unrestricted was called (for post/patch inside workflow)
-        mock_sandbox.assert_called()
         # Verify super() called and result passed through
         mock_next.execute_workflow.assert_called_once()
         assert result == "wf_result"
@@ -673,7 +668,6 @@ class TestWorkflowInboundInterceptor:
     )
     @pytest.mark.asyncio
     @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
-    @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
@@ -684,7 +678,6 @@ class TestWorkflowInboundInterceptor:
         _mock_in_wf: Any,
         _mock_replaying: Any,
         MockRunTree: Any,
-        mock_sandbox: Any,
         _mock_now: Any,
         method: str,
         input_attr: str,
@@ -706,7 +699,6 @@ class TestWorkflowInboundInterceptor:
             await result
 
         assert _get_runtree_name(MockRunTree) == expected_name
-        mock_sandbox.assert_called()
         getattr(mock_next, method).assert_called_once()
 
 
@@ -806,7 +798,6 @@ class TestWorkflowOutboundInterceptor:
     )
     @pytest.mark.asyncio
     @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
-    @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
@@ -815,7 +806,6 @@ class TestWorkflowOutboundInterceptor:
         _mock_in_wf: Any,
         _mock_replaying: Any,
         MockRunTree: Any,
-        mock_sandbox: Any,
         _mock_now: Any,
         method: str,
         input_attr: str,
@@ -838,7 +828,6 @@ class TestWorkflowOutboundInterceptor:
 
         assert _get_runtree_name(MockRunTree) == expected_name
         assert HEADER_KEY in mock_input.headers
-        mock_sandbox.assert_called()
         getattr(mock_next, method).assert_called_once()
 
     @patch(_PATCH_RUNTREE)
@@ -864,7 +853,6 @@ class TestWorkflowOutboundInterceptor:
 
     @pytest.mark.asyncio
     @patch(_PATCH_WF_NOW, return_value=datetime.now(timezone.utc))
-    @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
@@ -873,7 +861,6 @@ class TestWorkflowOutboundInterceptor:
         _mock_in_wf: Any,
         _mock_replaying: Any,
         MockRunTree: Any,
-        mock_sandbox: Any,
         _mock_now: Any,
     ) -> None:
         """start_nexus_operation creates a trace named StartNexusOperation:{service}/{operation}."""
@@ -892,7 +879,6 @@ class TestWorkflowOutboundInterceptor:
         assert _get_runtree_name(MockRunTree) == "StartNexusOperation:MyService/do_op"
         # Nexus uses string headers, so context injection uses _inject_nexus_context
         # The headers dict should be modified
-        mock_sandbox.assert_called()
         mock_next.start_nexus_operation.assert_called_once()
 
 
@@ -1044,7 +1030,6 @@ class TestAddTemporalRunsToggle:
 
     @pytest.mark.asyncio
     @patch(_PATCH_TRACING_CTX)
-    @patch(_PATCH_SANDBOX)
     @patch(_PATCH_RUNTREE)
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)
@@ -1057,7 +1042,6 @@ class TestAddTemporalRunsToggle:
         _mock_in_wf: Any,
         _mock_replaying: Any,
         MockRunTree: Any,
-        _mock_sandbox: Any,
         mock_tracing_ctx: Any,
     ) -> None:
         """With add_temporal_runs=False, no runs are created but context still propagates.

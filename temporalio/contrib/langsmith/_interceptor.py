@@ -310,8 +310,7 @@ class _ReplaySafeRunTree(RunTree):
         if temporalio.workflow.in_workflow():
             if _is_replaying():
                 return
-            with temporalio.workflow.unsafe.sandbox_unrestricted():
-                self._submit(self._run.post, exclude_child_runs=exclude_child_runs)
+            self._submit(self._run.post, exclude_child_runs=exclude_child_runs)
         else:
             self._run.post(exclude_child_runs=exclude_child_runs)
 
@@ -333,8 +332,7 @@ class _ReplaySafeRunTree(RunTree):
         if temporalio.workflow.in_workflow():
             if _is_replaying():
                 return
-            with temporalio.workflow.unsafe.sandbox_unrestricted():
-                self._submit(self._run.patch, exclude_inputs=exclude_inputs)
+            self._submit(self._run.patch, exclude_inputs=exclude_inputs)
         else:
             self._run.patch(exclude_inputs=exclude_inputs)
 
