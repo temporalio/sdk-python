@@ -114,7 +114,7 @@ class TestContextPropagation:
         mock_extracted = MagicMock()
         MockRunTree.from_headers.return_value = mock_extracted
 
-        extracted = _extract_context(result, _make_executor())
+        extracted = _extract_context(result, _make_executor(), MagicMock())
         # extracted should be a _ReplaySafeRunTree wrapping the reconstructed run
         assert isinstance(extracted, _ReplaySafeRunTree)
         assert extracted._run is mock_extracted
@@ -123,7 +123,7 @@ class TestContextPropagation:
     def test_extract_missing_header(self) -> None:
         """When the _temporal-langsmith-context header is absent, returns None."""
         headers: dict[str, Payload] = {}
-        result = _extract_context(headers, _make_executor())
+        result = _extract_context(headers, _make_executor(), MagicMock())
         assert result is None
 
     def test_inject_preserves_existing_headers(self) -> None:
@@ -1110,7 +1110,10 @@ class TestAddTemporalRunsToggle:
         # tracing_context SHOULD be called with the client and extracted parent
         # (unconditionally, before _maybe_run)
         mock_tracing_ctx.assert_called_once_with(
-            client=config._client, enabled=True, parent=mock_extracted_parent
+            client=config._client,
+            enabled=True,
+            project_name=None,
+            parent=mock_extracted_parent,
         )
         mock_act_next.execute_activity.assert_called_once()
 
@@ -1141,5 +1144,7 @@ class TestAddTemporalRunsToggle:
 
         MockRunTree.assert_not_called()
         # tracing_context called with client and enabled (no parent)
-        mock_tracing_ctx.assert_called_once_with(client=config._client, enabled=True)
+        mock_tracing_ctx.assert_called_once_with(
+            client=config._client, enabled=True, project_name=None, parent=None
+        )
         mock_act_next.execute_activity.assert_called_once()

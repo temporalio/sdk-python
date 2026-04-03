@@ -89,6 +89,7 @@ def _inject_current_context(
 def _extract_context(
     headers: Mapping[str, Payload],
     executor: ThreadPoolExecutor,
+    ls_client: langsmith.Client,
 ) -> _ReplaySafeRunTree | None:
     """Extract LangSmith context from Temporal payload headers.
 
@@ -102,7 +103,10 @@ def _extract_context(
         return None
     ls_headers = _payload_converter.from_payloads([header])[0]
     run = RunTree.from_headers(ls_headers)
-    return _ReplaySafeRunTree(run, executor=executor) if run else None
+    if run is None:
+        return None
+    run.ls_client = ls_client
+    return _ReplaySafeRunTree(run, executor=executor)
 
 
 def _inject_nexus_context(
@@ -120,6 +124,7 @@ def _inject_nexus_context(
 def _extract_nexus_context(
     headers: Mapping[str, str],
     executor: ThreadPoolExecutor,
+    ls_client: langsmith.Client,
 ) -> _ReplaySafeRunTree | None:
     """Extract LangSmith context from Nexus string headers."""
     raw = headers.get(HEADER_KEY)
@@ -127,7 +132,10 @@ def _extract_nexus_context(
         return None
     ls_headers = json.loads(raw)
     run = RunTree.from_headers(ls_headers)
-    return _ReplaySafeRunTree(run, executor=executor) if run else None
+    if run is None:
+        return None
+    run.ls_client = ls_client
+    return _ReplaySafeRunTree(run, executor=executor)
 
 
 def _get_current_run_for_propagation() -> RunTree | None:
@@ -495,10 +503,7 @@ def _maybe_run(
     if project_name is not None:
         run_tree_args["project_name"] = project_name
     if parent is not None:
-        # Unwrap _ReplaySafeRunTree so RunTree gets the real parent
-        run_tree_args["parent_run"] = (
-            parent._run if isinstance(parent, _ReplaySafeRunTree) else parent
-        )
+        run_tree_args["parent_run"] = parent
     if metadata:
         run_tree_args["extra"] = {"metadata": metadata}
     if tags:
@@ -687,7 +692,9 @@ class _LangSmithActivityInboundInterceptor(
     async def execute_activity(
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
-        parent = _extract_context(input.headers, self._config._executor)
+        parent = _extract_context(
+            input.headers, self._config._executor, self._config._client
+        )
         info = temporalio.activity.info()
         extra_metadata = {
             "temporalWorkflowID": info.workflow_id or "",
@@ -697,19 +704,12 @@ class _LangSmithActivityInboundInterceptor(
         # Unconditionally set tracing context so @traceable functions inside
         # activities inherit the plugin's client and parent, regardless of
         # the add_temporal_runs toggle.
-        #
-        # Override ls_client so @traceable children use the plugin's client
-        # rather than lazily creating one with different configuration.
-        if parent is not None and hasattr(parent, "ls_client"):
-            parent.ls_client = self._config._client
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
             "enabled": True,
+            "project_name": self._config._project_name,
+            "parent": parent,
         }
-        if self._config._project_name:
-            tracing_args["project_name"] = self._config._project_name
-        if parent:
-            tracing_args["parent"] = parent
         with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 f"RunActivity:{info.activity_type}",
@@ -748,33 +748,37 @@ class _LangSmithWorkflowInboundInterceptor(
         code can discover the parent and LangSmith client, independent of the
         ``add_temporal_runs`` toggle.
         """
-        parent = _extract_context(headers, self._config._executor) if headers else None
-        if parent is not None:
-            parent.ls_client = self._config._client
+        parent = (
+            _extract_context(headers, self._config._executor, self._config._client)
+            if headers
+            else None
+        )
+        # When add_temporal_runs=False and no external parent, create a
+        # _RootReplaySafeRunTreeFactory so @traceable calls get a
+        # _ReplaySafeRunTree parent via create_child. The factory is
+        # invisible in LangSmith.
+        # tracing_parent can be None when add_temporal_runs=True but no parent was
+        # propagated via headers — maybe_run will later create a root run in that case.
+        tracing_parent: _ReplaySafeRunTree | _RootReplaySafeRunTreeFactory | None = (
+            parent
+            if parent is not None or self._config._add_temporal_runs
+            else _RootReplaySafeRunTreeFactory(
+                ls_client=self._config._client,
+                executor=self._config._executor,
+                session_name=self._config._project_name,
+            )
+        )
+        tracing_args: dict[str, Any] = {
+            "client": self._config._client,
+            "enabled": True,
+            "project_name": self._config._project_name,
+            "parent": tracing_parent,
+        }
         info = temporalio.workflow.info()
         extra_metadata = {
             "temporalWorkflowID": info.workflow_id,
             "temporalRunID": info.run_id,
         }
-        tracing_args: dict[str, Any] = {
-            "client": self._config._client,
-            "enabled": True,
-        }
-        # When add_temporal_runs=False and no external parent, create a
-        # _RootReplaySafeRunTreeFactory so @traceable calls get a
-        # _ReplaySafeRunTree parent via create_child. The factory is
-        # invisible in LangSmith.
-        factory: _RootReplaySafeRunTreeFactory | None = None
-        if not self._config._add_temporal_runs and parent is None:
-            factory = _RootReplaySafeRunTreeFactory(
-                ls_client=self._config._client,
-                executor=self._config._executor,
-                session_name=self._config._project_name,
-            )
-            tracing_args["parent"] = factory
-            tracing_args["project_name"] = self._config._project_name
-        elif parent:
-            tracing_args["parent"] = parent
         with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 name,
@@ -922,17 +926,15 @@ class _LangSmithNexusOperationInboundInterceptor(
         nexusrpc.handler.StartOperationResultSync[Any]
         | nexusrpc.handler.StartOperationResultAsync
     ):
-        parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
-        if parent is not None and hasattr(parent, "ls_client"):
-            parent.ls_client = self._config._client
+        parent = _extract_nexus_context(
+            input.ctx.headers, self._config._executor, self._config._client
+        )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
             "enabled": True,
+            "project_name": self._config._project_name,
+            "parent": parent,
         }
-        if self._config._project_name:
-            tracing_args["project_name"] = self._config._project_name
-        if parent:
-            tracing_args["parent"] = parent
         with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
@@ -944,17 +946,15 @@ class _LangSmithNexusOperationInboundInterceptor(
     async def execute_nexus_operation_cancel(
         self, input: temporalio.worker.ExecuteNexusOperationCancelInput
     ) -> None:
-        parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
-        if parent is not None and hasattr(parent, "ls_client"):
-            parent.ls_client = self._config._client
+        parent = _extract_nexus_context(
+            input.ctx.headers, self._config._executor, self._config._client
+        )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
             "enabled": True,
+            "project_name": self._config._project_name,
+            "parent": parent,
         }
-        if self._config._project_name:
-            tracing_args["project_name"] = self._config._project_name
-        if parent:
-            tracing_args["parent"] = parent
         with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 f"RunCancelNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
