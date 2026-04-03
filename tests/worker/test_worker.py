@@ -1212,9 +1212,7 @@ async def set_current_deployment_version(
                     deployment_name=version.deployment_name,
                 )
             )
-            current_version = (
-                describe_resp.worker_deployment_info.routing_config.current_deployment_version
-            )
+            current_version = describe_resp.worker_deployment_info.routing_config.current_deployment_version
             if (
                 current_version.deployment_name == version.deployment_name
                 and current_version.build_id == version.build_id
