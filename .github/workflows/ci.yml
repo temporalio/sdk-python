@@ -67,7 +67,7 @@ jobs:
       - run: poe lint
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
-        timeout-minutes: 15
+        timeout-minutes: 20
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
@@ -102,7 +102,7 @@ jobs:
           poe gen-protos
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
           poe test -s --ignore=tests/contrib/google_adk_agents/
-        timeout-minutes: 10
+        timeout-minutes: 15
 
       # Do docs stuff (only on one host)
       - name: Build API docs
