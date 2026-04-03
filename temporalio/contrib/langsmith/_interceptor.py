@@ -477,7 +477,7 @@ def _maybe_run(
     if parent is None:
         parent = _get_current_run_for_propagation()
 
-    kwargs: dict[str, Any] = dict(
+    run_tree_args: dict[str, Any] = dict(
         name=name,
         run_type=run_type,
         inputs=inputs or {},
@@ -490,20 +490,20 @@ def _maybe_run(
     # returns None. Deterministic IDs aren't needed — these aren't replayed.
     # LangSmith will auto-generate a random UUID.
     if rng is not None:
-        kwargs["id"] = _uuid_from_random(rng)
-        kwargs["start_time"] = temporalio.workflow.now()
+        run_tree_args["id"] = _uuid_from_random(rng)
+        run_tree_args["start_time"] = temporalio.workflow.now()
     if project_name is not None:
-        kwargs["project_name"] = project_name
+        run_tree_args["project_name"] = project_name
     if parent is not None:
         # Unwrap _ReplaySafeRunTree so RunTree gets the real parent
-        kwargs["parent_run"] = (
+        run_tree_args["parent_run"] = (
             parent._run if isinstance(parent, _ReplaySafeRunTree) else parent
         )
     if metadata:
-        kwargs["extra"] = {"metadata": metadata}
+        run_tree_args["extra"] = {"metadata": metadata}
     if tags:
-        kwargs["tags"] = tags
-    run_tree = _ReplaySafeRunTree(RunTree(**kwargs), executor=executor)
+        run_tree_args["tags"] = tags
+    run_tree = _ReplaySafeRunTree(RunTree(**run_tree_args), executor=executor)
     run_tree.post()
     try:
         with tracing_context(parent=run_tree, client=client):
@@ -702,15 +702,15 @@ class _LangSmithActivityInboundInterceptor(
         # rather than lazily creating one with different configuration.
         if parent is not None and hasattr(parent, "ls_client"):
             parent.ls_client = self._config._client
-        ctx_kwargs: dict[str, Any] = {
+        tracing_args: dict[str, Any] = {
             "client": self._config._client,
             "enabled": True,
         }
         if self._config._project_name:
-            ctx_kwargs["project_name"] = self._config._project_name
+            tracing_args["project_name"] = self._config._project_name
         if parent:
-            ctx_kwargs["parent"] = parent
-        with tracing_context(**ctx_kwargs):
+            tracing_args["parent"] = parent
+        with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 f"RunActivity:{info.activity_type}",
                 run_type="tool",
@@ -756,7 +756,7 @@ class _LangSmithWorkflowInboundInterceptor(
             "temporalWorkflowID": info.workflow_id,
             "temporalRunID": info.run_id,
         }
-        ctx_kwargs: dict[str, Any] = {
+        tracing_args: dict[str, Any] = {
             "client": self._config._client,
             "enabled": True,
         }
@@ -771,11 +771,11 @@ class _LangSmithWorkflowInboundInterceptor(
                 executor=self._config._executor,
                 session_name=self._config._project_name,
             )
-            ctx_kwargs["parent"] = factory
-            ctx_kwargs["project_name"] = self._config._project_name
+            tracing_args["parent"] = factory
+            tracing_args["project_name"] = self._config._project_name
         elif parent:
-            ctx_kwargs["parent"] = parent
-        with tracing_context(**ctx_kwargs):
+            tracing_args["parent"] = parent
+        with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 name,
                 parent=parent,
@@ -925,15 +925,15 @@ class _LangSmithNexusOperationInboundInterceptor(
         parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
         if parent is not None and hasattr(parent, "ls_client"):
             parent.ls_client = self._config._client
-        ctx_kwargs: dict[str, Any] = {
+        tracing_args: dict[str, Any] = {
             "client": self._config._client,
             "enabled": True,
         }
         if self._config._project_name:
-            ctx_kwargs["project_name"] = self._config._project_name
+            tracing_args["project_name"] = self._config._project_name
         if parent:
-            ctx_kwargs["parent"] = parent
-        with tracing_context(**ctx_kwargs):
+            tracing_args["parent"] = parent
+        with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
                 run_type="tool",
@@ -947,15 +947,15 @@ class _LangSmithNexusOperationInboundInterceptor(
         parent = _extract_nexus_context(input.ctx.headers, self._config._executor)
         if parent is not None and hasattr(parent, "ls_client"):
             parent.ls_client = self._config._client
-        ctx_kwargs: dict[str, Any] = {
+        tracing_args: dict[str, Any] = {
             "client": self._config._client,
             "enabled": True,
         }
         if self._config._project_name:
-            ctx_kwargs["project_name"] = self._config._project_name
+            tracing_args["project_name"] = self._config._project_name
         if parent:
-            ctx_kwargs["parent"] = parent
-        with tracing_context(**ctx_kwargs):
+            tracing_args["parent"] = parent
+        with tracing_context(**tracing_args):
             with self._config.maybe_run(
                 f"RunCancelNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
                 run_type="tool",
