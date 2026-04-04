@@ -15,12 +15,12 @@ from typing import Any, TypeVar
 from temporalio.api.common.v1 import Payload
 from temporalio.contrib.aws.s3driver._client import S3StorageDriverClient
 from temporalio.converter import (
-    ActivitySerializationContext,
     StorageDriver,
+    StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
-    WorkflowSerializationContext,
+    StorageDriverWorkflowInfo,
 )
 
 _T = TypeVar("_T")
@@ -113,40 +113,25 @@ class S3StorageDriver(StorageDriver):
         (e.g. proto binary). The returned list is the same length as
         ``payloads``.
         """
-        workflow_id: str | None = None
-        activity_id: str | None = None
-        namespace: str | None = None
-        if isinstance(context.serialization_context, WorkflowSerializationContext):
-            workflow_id = context.serialization_context.workflow_id
-            namespace = context.serialization_context.namespace
-        if isinstance(context.serialization_context, ActivitySerializationContext):
-            # Prioritize workflow over activity so that the same payload that
-            # may be stored across workflow and activity boundaries are deduplicated.
-            if context.serialization_context.workflow_id:
-                workflow_id = context.serialization_context.workflow_id
-            elif context.serialization_context.activity_id:
-                activity_id = context.serialization_context.activity_id
-            namespace = context.serialization_context.namespace
 
-        # URL encode values to avoid characters that break the key format
-        # e.g. spaces, forward-slashes, etc.
-        if namespace:
-            namespace = urllib.parse.quote(namespace, safe="")
-        if workflow_id:
-            workflow_id = urllib.parse.quote(workflow_id, safe="")
-        if activity_id:
-            activity_id = urllib.parse.quote(activity_id, safe="")
+        def _quote(val: str | None) -> str | None:
+            return urllib.parse.quote(val, safe="") if val else None
 
-        namespace_segments = f"/ns/{namespace}" if namespace else ""
-
+        # Build context segments from the target identity.
         context_segments = ""
-        # Prioritize workflow over activity so that the same payload that
-        # may be stored across workflow and activity boundaries are deduplicated.
-        # Workflow and Activity IDs are case sensitive.
-        if workflow_id:
-            context_segments += f"/wfi/{workflow_id}"
-        elif activity_id:
-            context_segments += f"/aci/{activity_id}"
+        target = context.target
+        namespace = _quote(target.namespace) if target is not None else None
+        namespace_segment = f"/ns/{namespace}" if namespace else ""
+        if isinstance(target, StorageDriverWorkflowInfo):
+            wf_type = _quote(target.type) or "null"
+            wf_id = _quote(target.id) or "null"
+            wf_run_id = _quote(target.run_id) or "null"
+            context_segments = f"/wt/{wf_type}/wi/{wf_id}/ri/{wf_run_id}"
+        elif isinstance(target, StorageDriverActivityInfo):
+            act_type = _quote(target.type) or "null"
+            act_id = _quote(target.id) or "null"
+            act_run_id = _quote(target.run_id) or "null"
+            context_segments = f"/at/{act_type}/ai/{act_id}/ri/{act_run_id}"
 
         async def _upload(payload: Payload) -> StorageDriverClaim:
             bucket = self._get_bucket(context, payload)
@@ -162,7 +147,7 @@ class S3StorageDriver(StorageDriver):
 
             digest_segments = f"/d/sha256/{hash_digest}"
 
-            key = f"v0{namespace_segments}{context_segments}{digest_segments}"
+            key = f"v0{namespace_segment}{context_segments}{digest_segments}"
 
             try:
                 if not await self._client.object_exists(bucket=bucket, key=key):

@@ -11,6 +11,7 @@ import pytest
 import temporalio
 import temporalio.bridge.client
 import temporalio.bridge.worker
+import temporalio.client
 import temporalio.converter
 import temporalio.worker._workflow
 from temporalio import activity, workflow
@@ -19,9 +20,12 @@ from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.common import RetryPolicy
 from temporalio.converter import (
     ExternalStorage,
+    StorageDriver,
+    StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
+    StorageDriverWorkflowInfo,
     StorageWarning,
 )
 from temporalio.exceptions import ActivityError, ApplicationError
@@ -859,3 +863,543 @@ async def test_tmprl1104_with_extstore_download_and_upload(
     assert getattr(records[1], "payload_upload_count") == 1
     assert getattr(records[1], "payload_upload_size") == expected_output_size
     assert getattr(records[1], "payload_upload_duration") > timedelta(0)
+
+
+# ---------------------------------------------------------------------------
+# Store-metadata context tests
+# ---------------------------------------------------------------------------
+
+
+class ContextTrackingStorageDriver(StorageDriver):
+    """In-memory driver that records the store context on each store/retrieve."""
+
+    def __init__(self) -> None:
+        self._storage: dict[str, bytes] = {}
+        self.store_contexts: list[StorageDriverStoreContext] = []
+
+    def name(self) -> str:
+        return "context-tracking"
+
+    async def store(
+        self,
+        context: StorageDriverStoreContext,
+        payloads: Sequence[Payload],
+    ) -> list[StorageDriverClaim]:
+        self.store_contexts.append(context)
+        claims: list[StorageDriverClaim] = []
+        for payload in payloads:
+            key = f"payload-{len(self._storage)}"
+            self._storage[key] = payload.SerializeToString()
+            claims.append(StorageDriverClaim(claim_data={"key": key}))
+        return claims
+
+    async def retrieve(
+        self,
+        context: StorageDriverRetrieveContext,
+        claims: Sequence[StorageDriverClaim],
+    ) -> list[Payload]:
+        results: list[Payload] = []
+        for claim in claims:
+            payload = Payload()
+            payload.ParseFromString(self._storage[claim.claim_data["key"]])
+            results.append(payload)
+        return results
+
+
+@workflow.defn
+class SignalWaitWorkflow:
+    def __init__(self) -> None:
+        self._signal_data: str | None = None
+
+    @workflow.run
+    async def run(self, _arg: str) -> str:
+        await workflow.wait_condition(lambda: self._signal_data is not None)
+        return self._signal_data  # type: ignore
+
+    @workflow.signal
+    async def my_signal(self, data: str) -> None:
+        self._signal_data = data
+
+
+@workflow.defn
+class EchoWorkflow:
+    @workflow.run
+    async def run(self, data: str) -> str:
+        return data
+
+
+@workflow.defn
+class ChildWorkflowStoreMetadataTestWorkflow:
+    @workflow.run
+    async def run(self, data: str) -> str:
+        return await workflow.execute_child_workflow(
+            EchoWorkflow.run,
+            data,
+            id=f"{workflow.info().workflow_id}-child",
+        )
+
+
+async def _make_tracking_client(
+    env: WorkflowEnvironment,
+) -> tuple[Client, ContextTrackingStorageDriver]:
+    driver = ContextTrackingStorageDriver()
+    client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=0,
+            ),
+        ),
+    )
+    return client, driver
+
+
+async def test_store_metadata_start_workflow(env: WorkflowEnvironment) -> None:
+    """start_workflow should set workflow id and type on store context."""
+    client, driver = await _make_tracking_client(env)
+    workflow_id = str(uuid.uuid4())
+
+    async with new_worker(client, EchoWorkflow) as worker:
+        await client.execute_workflow(
+            EchoWorkflow.run,
+            "hello",
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+    assert len(driver.store_contexts) == 2
+
+    # [0] Workflow input arg
+    client_ctx = driver.store_contexts[0]
+    assert isinstance(client_ctx.target, StorageDriverWorkflowInfo)
+    assert client_ctx.target.namespace == client.namespace
+    assert client_ctx.target.id == workflow_id
+    assert client_ctx.target.type == "EchoWorkflow"
+    assert client_ctx.target.run_id is None
+
+    # [1] Workflow result
+    worker_ctx = driver.store_contexts[1]
+    assert isinstance(worker_ctx.target, StorageDriverWorkflowInfo)
+    assert worker_ctx.target.namespace == client.namespace
+    assert worker_ctx.target.id == workflow_id
+    assert worker_ctx.target.type == "EchoWorkflow"
+    assert worker_ctx.target.run_id is not None
+
+
+async def test_store_metadata_signal_with_start(env: WorkflowEnvironment) -> None:
+    """signal_with_start should set workflow metadata for signal arg encoding."""
+    client, driver = await _make_tracking_client(env)
+    workflow_id = str(uuid.uuid4())
+
+    async with new_worker(client, SignalWaitWorkflow) as worker:
+        handle = await client.start_workflow(
+            SignalWaitWorkflow.run,
+            "hello",
+            id=workflow_id,
+            task_queue=worker.task_queue,
+            start_signal="my_signal",
+            start_signal_args=["signal-data"],
+        )
+        await handle.result()
+
+    assert len(driver.store_contexts) == 3
+
+    # [0] Workflow input arg
+    input_ctx = driver.store_contexts[0]
+    assert isinstance(input_ctx.target, StorageDriverWorkflowInfo)
+    assert input_ctx.target.id == workflow_id
+    assert input_ctx.target.type == "SignalWaitWorkflow"
+    assert input_ctx.target.run_id is None
+
+    # [1] Signal arg
+    signal_ctx = driver.store_contexts[1]
+    assert isinstance(signal_ctx.target, StorageDriverWorkflowInfo)
+    assert signal_ctx.target.id == workflow_id
+    assert signal_ctx.target.type == "SignalWaitWorkflow"
+    assert signal_ctx.target.run_id is None
+
+    # [2] Workflow result
+    result_ctx = driver.store_contexts[2]
+    assert isinstance(result_ctx.target, StorageDriverWorkflowInfo)
+    assert result_ctx.target.id == workflow_id
+    assert result_ctx.target.type == "SignalWaitWorkflow"
+    assert result_ctx.target.run_id is not None
+
+
+async def test_store_metadata_signal_workflow(env: WorkflowEnvironment) -> None:
+    """signal_workflow should set workflow id on store context."""
+    client, driver = await _make_tracking_client(env)
+    workflow_id = str(uuid.uuid4())
+
+    async with new_worker(client, SignalWaitWorkflow) as worker:
+        handle = await client.start_workflow(
+            SignalWaitWorkflow.run,
+            "hello",
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+        # Signal separately (not signal-with-start)
+        await handle.signal(SignalWaitWorkflow.my_signal, "signal-data")
+        await handle.result()
+
+    assert len(driver.store_contexts) == 3
+
+    # [0] Client starts workflow
+    start_ctx = driver.store_contexts[0]
+    assert isinstance(start_ctx.target, StorageDriverWorkflowInfo)
+    assert start_ctx.target.id == workflow_id
+    assert start_ctx.target.type == "SignalWaitWorkflow"
+    assert start_ctx.target.run_id is None
+
+    # [1] Client sends signal: type and run_id are unknown at signal time
+    signal_ctx = driver.store_contexts[1]
+    assert isinstance(signal_ctx.target, StorageDriverWorkflowInfo)
+    assert signal_ctx.target.id == workflow_id
+    assert signal_ctx.target.type is None
+    assert signal_ctx.target.run_id is None
+
+    # [2] Workflow worker returns result
+    result_ctx = driver.store_contexts[2]
+    assert isinstance(result_ctx.target, StorageDriverWorkflowInfo)
+    assert result_ctx.target.id == workflow_id
+    assert result_ctx.target.type == "SignalWaitWorkflow"
+    assert result_ctx.target.run_id is not None
+
+
+async def test_store_metadata_schedule_action(env: WorkflowEnvironment) -> None:
+    """Schedule action _to_proto should set workflow metadata."""
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+    client, driver = await _make_tracking_client(env)
+    task_queue = str(uuid.uuid4())
+    schedule_id = f"sched-{uuid.uuid4()}"
+
+    try:
+        await client.create_schedule(
+            schedule_id,
+            temporalio.client.Schedule(
+                action=temporalio.client.ScheduleActionStartWorkflow(
+                    EchoWorkflow.run,
+                    "hello",
+                    id=f"wf-{schedule_id}",
+                    task_queue=task_queue,
+                ),
+                spec=temporalio.client.ScheduleSpec(),
+            ),
+        )
+
+        assert len(driver.store_contexts) == 1
+
+        # [0] Client encodes workflow args when creating the schedule action
+        ctx = driver.store_contexts[0]
+        assert isinstance(ctx.target, StorageDriverWorkflowInfo)
+        assert ctx.target.namespace == client.namespace
+        assert ctx.target.id == f"wf-{schedule_id}"
+        assert ctx.target.type == "EchoWorkflow"
+        assert ctx.target.run_id is None
+    finally:
+        try:
+            handle = client.get_schedule_handle(schedule_id)
+            await handle.delete()
+        except Exception:
+            pass
+
+
+async def test_store_metadata_child_workflow(env: WorkflowEnvironment) -> None:
+    """External storage should receive the child workflow as the target when scheduling."""
+    client, driver = await _make_tracking_client(env)
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    child_workflow_id = f"{workflow_id}-child"
+
+    async with new_worker(
+        client,
+        ChildWorkflowStoreMetadataTestWorkflow,
+        EchoWorkflow,
+    ) as worker:
+        await client.execute_workflow(
+            ChildWorkflowStoreMetadataTestWorkflow.run,
+            "hello",
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+    assert len(driver.store_contexts) == 4
+
+    # [0] Client starts parent workflow
+    client_ctx = driver.store_contexts[0]
+    assert isinstance(client_ctx.target, StorageDriverWorkflowInfo)
+    assert client_ctx.target.id == workflow_id
+    assert client_ctx.target.type == "ChildWorkflowStoreMetadataTestWorkflow"
+    assert client_ctx.target.run_id is None
+
+    # [1] Parent schedules child: target = child workflow
+    start_child_ctx = driver.store_contexts[1]
+    assert isinstance(start_child_ctx.target, StorageDriverWorkflowInfo)
+    assert start_child_ctx.target.id == child_workflow_id
+    assert start_child_ctx.target.type == "EchoWorkflow"
+    assert start_child_ctx.target.run_id is None
+
+    # [2] Child returns result: target = parent workflow (child results are
+    # stored in the parent's key space so they remain accessible during replay)
+    child_result_ctx = driver.store_contexts[2]
+    assert isinstance(child_result_ctx.target, StorageDriverWorkflowInfo)
+    assert child_result_ctx.target.id == workflow_id
+    # ParentInfo does not carry workflow type
+    assert child_result_ctx.target.type is None
+    assert child_result_ctx.target.run_id is not None
+
+    # [3] Parent returns result: target = parent (current execution)
+    parent_result_ctx = driver.store_contexts[3]
+    assert isinstance(parent_result_ctx.target, StorageDriverWorkflowInfo)
+    assert parent_result_ctx.target.id == workflow_id
+    assert parent_result_ctx.target.type == "ChildWorkflowStoreMetadataTestWorkflow"
+    assert parent_result_ctx.target.run_id is not None
+
+
+# Workflow definitions for gap tests
+
+
+@activity.defn
+async def echo_activity(input: str) -> str:
+    """Simple activity that returns its input."""
+    return input
+
+
+@workflow.defn
+class ActivityScheduleMetadataWorkflow:
+    """Workflow that schedules an activity to test activity metadata on the store context."""
+
+    @workflow.run
+    async def run(self, data: str) -> str:
+        return await workflow.execute_activity(
+            echo_activity,
+            data,
+            activity_id="my-activity-id",
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+@workflow.defn
+class SignalExternalMetadataWorkflow:
+    """Workflow that signals another workflow."""
+
+    @workflow.run
+    async def run(self, target_workflow_id: str) -> None:
+        await workflow.get_external_workflow_handle(target_workflow_id).signal(
+            SignalWaitWorkflow.my_signal, "signal-from-workflow"
+        )
+
+
+async def test_store_metadata_activity_scheduling(env: WorkflowEnvironment) -> None:
+    """When a workflow schedules an activity, context.activity should be populated."""
+    client, driver = await _make_tracking_client(env)
+    workflow_id = f"workflow-{uuid.uuid4()}"
+
+    async with new_worker(
+        client,
+        ActivityScheduleMetadataWorkflow,
+        activities=[echo_activity],
+    ) as worker:
+        await client.execute_workflow(
+            ActivityScheduleMetadataWorkflow.run,
+            "hello",
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+    assert len(driver.store_contexts) == 4
+
+    # [0] Client starts workflow
+    client_ctx = driver.store_contexts[0]
+    assert isinstance(client_ctx.target, StorageDriverWorkflowInfo)
+    assert client_ctx.target.id == workflow_id
+    assert client_ctx.target.type == "ActivityScheduleMetadataWorkflow"
+    assert client_ctx.target.run_id is None
+
+    # [1] Workflow worker schedules activity
+    schedule_ctx = driver.store_contexts[1]
+    assert isinstance(schedule_ctx.target, StorageDriverWorkflowInfo)
+    assert schedule_ctx.target.namespace == client.namespace
+    assert schedule_ctx.target.id == workflow_id
+    assert schedule_ctx.target.type == "ActivityScheduleMetadataWorkflow"
+    assert schedule_ctx.target.run_id is not None
+
+    # [2] Activity worker completes
+    execute_ctx = driver.store_contexts[2]
+    assert isinstance(execute_ctx.target, StorageDriverWorkflowInfo)
+    assert execute_ctx.target.namespace == client.namespace
+    assert execute_ctx.target.id == workflow_id
+    assert execute_ctx.target.type == "ActivityScheduleMetadataWorkflow"
+    assert execute_ctx.target.run_id is not None
+
+    # [3] Workflow returns result
+    result_ctx = driver.store_contexts[3]
+    assert isinstance(result_ctx.target, StorageDriverWorkflowInfo)
+    assert result_ctx.target.id == workflow_id
+    assert result_ctx.target.type == "ActivityScheduleMetadataWorkflow"
+    assert result_ctx.target.run_id is not None
+
+
+async def test_store_metadata_signal_external_workflow(
+    env: WorkflowEnvironment,
+) -> None:
+    """Signaling an external workflow should set workflow.id to the target."""
+    client, driver = await _make_tracking_client(env)
+    target_workflow_id = f"target-{uuid.uuid4()}"
+    sender_workflow_id = f"sender-{uuid.uuid4()}"
+
+    async with new_worker(
+        client,
+        SignalExternalMetadataWorkflow,
+        SignalWaitWorkflow,
+    ) as worker:
+        # Start the target workflow first
+        target_handle = await client.start_workflow(
+            SignalWaitWorkflow.run,
+            "waiting",
+            id=target_workflow_id,
+            task_queue=worker.task_queue,
+        )
+        # Start the sender which will signal the target
+        await client.execute_workflow(
+            SignalExternalMetadataWorkflow.run,
+            target_workflow_id,
+            id=sender_workflow_id,
+            task_queue=worker.task_queue,
+        )
+        await target_handle.result()
+
+    assert len(driver.store_contexts) == 5
+
+    # [0] Client starts target workflow (SignalWaitWorkflow)
+    target_start_ctx = driver.store_contexts[0]
+    assert isinstance(target_start_ctx.target, StorageDriverWorkflowInfo)
+    assert target_start_ctx.target.id == target_workflow_id
+    assert target_start_ctx.target.type == "SignalWaitWorkflow"
+    assert target_start_ctx.target.run_id is None
+
+    # [1] Client starts sender workflow (SignalExternalMetadataWorkflow)
+    sender_start_ctx = driver.store_contexts[1]
+    assert isinstance(sender_start_ctx.target, StorageDriverWorkflowInfo)
+    assert sender_start_ctx.target.id == sender_workflow_id
+    assert sender_start_ctx.target.type == "SignalExternalMetadataWorkflow"
+    assert sender_start_ctx.target.run_id is None
+
+    # [2] Sender signals target: target = the workflow being signaled
+    signal_ctx = driver.store_contexts[2]
+    assert isinstance(signal_ctx.target, StorageDriverWorkflowInfo)
+    assert signal_ctx.target.id == target_workflow_id
+    assert signal_ctx.target.type is None
+    assert signal_ctx.target.run_id is None
+
+    # [3] and [4] are the sender and target workflow completions in some order.
+    # The sender's WFT 2 (after signal resolution) and the target's WFT (after
+    # receiving the signal) are both scheduled by the server at nearly the same
+    # time, so the order of their completions is non-deterministic.
+    completion_ctxs = {
+        ctx.target.id: ctx
+        for ctx in driver.store_contexts[3:5]
+        if isinstance(ctx.target, StorageDriverWorkflowInfo) and ctx.target.id
+    }
+    assert sender_workflow_id in completion_ctxs
+    assert target_workflow_id in completion_ctxs
+
+    sender_result_ctx = completion_ctxs[sender_workflow_id]
+    assert isinstance(sender_result_ctx.target, StorageDriverWorkflowInfo)
+    assert sender_result_ctx.target.run_id is not None
+
+    target_result_ctx = completion_ctxs[target_workflow_id]
+    assert isinstance(target_result_ctx.target, StorageDriverWorkflowInfo)
+    assert target_result_ctx.target.run_id is not None
+
+
+async def test_store_metadata_standalone_activity(env: WorkflowEnvironment) -> None:
+    """Standalone activity worker should use StorageDriverActivityInfo as target."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    client, driver = await _make_tracking_client(env)
+    activity_id = f"activity-{uuid.uuid4()}"
+
+    async with new_worker(client, activities=[echo_activity]) as worker:
+        await client.execute_activity(
+            echo_activity,
+            "hello",
+            id=activity_id,
+            task_queue=worker.task_queue,
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
+
+    assert len(driver.store_contexts) == 2
+
+    client_ctx = driver.store_contexts[0]
+    # [0] Client schedules standalone activity
+    assert isinstance(client_ctx.target, StorageDriverActivityInfo)
+    assert client_ctx.target.namespace == client.namespace
+    assert client_ctx.target.id == activity_id
+    assert client_ctx.target.type == "echo_activity"
+    assert client_ctx.target.run_id is None
+
+    # [1] Activity worker completes: target = activity (no parent workflow)
+    execute_ctx = driver.store_contexts[1]
+    assert isinstance(execute_ctx.target, StorageDriverActivityInfo)
+    assert execute_ctx.target.namespace == client.namespace
+    assert execute_ctx.target.id == activity_id
+    assert execute_ctx.target.type == "echo_activity"
+    assert execute_ctx.target.run_id is None
+
+
+@workflow.defn
+class ContinueAsNewExtStoreWorkflow:
+    """Workflow that continues-as-new once with a large payload.
+
+    Run 1: called with large_payload, calls continue_as_new with same payload.
+    Run 2: called with large_payload again (from CaN), returns immediately.
+    """
+
+    @workflow.run
+    async def run(self, large_payload: str) -> str:
+        if workflow.info().continued_run_id is None:
+            workflow.continue_as_new(large_payload)
+        return "done"
+
+
+async def test_extstore_continue_as_new_result_stored_under_current_run(
+    env: WorkflowEnvironment,
+) -> None:
+    """A CaN continuation's result payloads are stored under the continuation's
+    own run_id, not under the originating run's run_id.
+    """
+    client, driver = await _make_tracking_client(env)
+
+    async with new_worker(client, ContinueAsNewExtStoreWorkflow) as worker:
+        handle = await client.start_workflow(
+            ContinueAsNewExtStoreWorkflow.run,
+            "x" * 1024,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        first_run_id = (await handle.describe()).run_id
+        await handle.result()
+        last_run_id = (await handle.describe()).run_id
+    assert len(driver.store_contexts) == 3
+
+    # [0] Client starts workflow
+    client_ctx = driver.store_contexts[0]
+    assert isinstance(client_ctx.target, StorageDriverWorkflowInfo)
+    assert client_ctx.target.run_id is None
+
+    # [1] Workflow 1 encodes CaN args
+    can_args_ctx = driver.store_contexts[1]
+    assert isinstance(can_args_ctx.target, StorageDriverWorkflowInfo)
+    assert can_args_ctx.target.run_id == first_run_id
+
+    # [2] Workflow 2 encodes result in its own context
+    result_ctx = driver.store_contexts[2]
+    assert isinstance(result_ctx.target, StorageDriverWorkflowInfo)
+    assert result_ctx.target.run_id is not None
+    assert result_ctx.target.run_id == last_run_id

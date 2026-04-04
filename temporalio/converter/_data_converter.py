@@ -17,6 +17,7 @@ import temporalio.common
 from temporalio.converter._extstore import (
     _REFERENCE_ENCODING,
     ExternalStorage,
+    StorageDriverStoreContext,
     StorageWarning,
 )
 from temporalio.converter._failure_converter import (
@@ -198,6 +199,25 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "failure_converter", failure_converter)
         object.__setattr__(cloned, "external_storage", external_storage)
         return cloned
+
+    def _with_store_context(
+        self, store_ctx: StorageDriverStoreContext
+    ) -> DataConverter:
+        """Return an instance with ``store_ctx`` bound into :attr:`external_storage`."""
+        if self.external_storage is None:
+            return self
+        return dataclasses.replace(
+            self,
+            external_storage=self.external_storage._with_store_context(store_ctx),
+        )
+
+    def _with_contexts(
+        self,
+        serialization_ctx: SerializationContext,
+        store_ctx: StorageDriverStoreContext,
+    ) -> DataConverter:
+        """Return an instance with both serialization and store contexts applied."""
+        return self.with_context(serialization_ctx)._with_store_context(store_ctx)
 
     def _with_payload_error_limits(
         self, limits: _ServerPayloadErrorLimits | None

@@ -28,6 +28,7 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
+from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 
 from . import _command_aware_visitor
 from ._interceptor import (
@@ -294,7 +295,21 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 namespace=self._namespace,
                 workflow_id=workflow_id,
             )
-            data_converter = self._data_converter.with_context(workflow_context)
+            data_converter = self._data_converter._with_contexts(
+                workflow_context,
+                StorageDriverStoreContext(
+                    target=StorageDriverWorkflowInfo(
+                        id=workflow_id,
+                        run_id=act.run_id,
+                        type=(
+                            workflow.workflow_type
+                            if workflow
+                            else (init_job.workflow_type if init_job else None)
+                        ),
+                        namespace=self._namespace,
+                    ),
+                ),
+            )
             if workflow:
                 data_converter = _CommandAwareDataConverter.create(
                     instance=workflow.instance,
@@ -313,6 +328,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 workflow = _RunningWorkflow(
                     self._create_workflow_instance(act, init_job),
                     workflow_id,
+                    workflow_type=init_job.workflow_type,
                 )
                 self._running_workflows[act.run_id] = workflow
 
@@ -802,9 +818,15 @@ class _DeadlockError(Exception):
 
 
 class _RunningWorkflow:
-    def __init__(self, instance: WorkflowInstance, workflow_id: str):
+    def __init__(
+        self,
+        instance: WorkflowInstance,
+        workflow_id: str,
+        workflow_type: str | None = None,
+    ):
         self.instance = instance
         self.workflow_id = workflow_id
+        self.workflow_type = workflow_type
         self.deadlocked_activation_task: Awaitable | None = None
         self._deadlock_can_be_interrupted_lock = threading.Lock()
         self._deadlock_can_be_interrupted = False
@@ -902,7 +924,10 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
     async def _external_store_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        return await self._get_current_dc()._external_store_payload_sequence(payloads)
+        command_info = _command_aware_visitor.current_command_info.get()
+        store_ctx = self._ca_instance.get_external_store_context(command_info)
+        dc = self._get_current_dc()._with_store_context(store_ctx)
+        return await dc._external_store_payload_sequence(payloads)
 
     async def _external_retrieve_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]

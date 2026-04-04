@@ -27,12 +27,12 @@ from temporalio.contrib.aws.s3driver import (
     S3StorageDriverClient,
 )
 from temporalio.converter import (
-    ActivitySerializationContext,
     JSONPlainPayloadConverter,
+    StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
-    WorkflowSerializationContext,
+    StorageDriverWorkflowInfo,
 )
 from tests.contrib.aws.s3driver.conftest import BUCKET
 
@@ -51,34 +51,36 @@ def make_payload(value: str = "hello") -> Payload:
 
 
 def make_store_context(
-    serialization_context: WorkflowSerializationContext
-    | ActivitySerializationContext
-    | None = None,
+    target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None = None,
 ) -> StorageDriverStoreContext:
-    return StorageDriverStoreContext(serialization_context=serialization_context)
+    return StorageDriverStoreContext(
+        target=target,
+    )
 
 
 def make_workflow_context(
     namespace: str = "my-namespace",
     workflow_id: str = "my-workflow",
-) -> WorkflowSerializationContext:
-    return WorkflowSerializationContext(namespace=namespace, workflow_id=workflow_id)
+    workflow_type: str | None = None,
+    run_id: str | None = None,
+) -> StorageDriverStoreContext:
+    return make_store_context(
+        target=StorageDriverWorkflowInfo(
+            id=workflow_id, type=workflow_type, run_id=run_id, namespace=namespace
+        ),
+    )
 
 
 def make_activity_context(
     namespace: str = "my-namespace",
     activity_id: str | None = "my-activity",
-    workflow_id: str | None = None,
-    activity_task_queue: str | None = None,
-) -> ActivitySerializationContext:
-    return ActivitySerializationContext(
-        namespace=namespace,
-        activity_id=activity_id,
-        activity_type=None,
-        activity_task_queue=activity_task_queue,
-        workflow_id=workflow_id,
-        workflow_type=None,
-        is_local=False,
+    activity_type: str | None = None,
+    run_id: str | None = None,
+) -> StorageDriverStoreContext:
+    return make_store_context(
+        target=StorageDriverActivityInfo(
+            id=activity_id, type=activity_type, run_id=run_id, namespace=namespace
+        ),
     )
 
 
@@ -211,48 +213,70 @@ class TestS3StorageDriverKeyConstruction:
     ) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
-        ctx = make_store_context(
-            make_workflow_context(namespace="ns1", workflow_id="wf1")
-        )
+        ctx = make_workflow_context(namespace="ns1", workflow_id="wf1")
         [claim] = await driver.store(ctx, [payload])
         expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
-        assert claim.claim_data["key"] == f"v0/ns/ns1/wfi/wf1/d/sha256/{expected_hash}"
-
-    async def test_key_context_workflow_activity(
-        self, driver_client: S3StorageDriverClient
-    ) -> None:
-        """workflow_id takes priority over activity_id in ActivitySerializationContext."""
-        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
-        payload = make_payload()
-        ctx = make_store_context(
-            make_activity_context(
-                namespace="ns1", workflow_id="wf1", activity_id="act1"
-            )
+        assert (
+            claim.claim_data["key"]
+            == f"v0/ns/ns1/wt/null/wi/wf1/ri/null/d/sha256/{expected_hash}"
         )
-        [claim] = await driver.store(ctx, [payload])
-        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
-        assert claim.claim_data["key"] == f"v0/ns/ns1/wfi/wf1/d/sha256/{expected_hash}"
 
-    async def test_key_context_standalone_activityt(
+    async def test_key_context_workflow_with_type_and_run_id(
         self, driver_client: S3StorageDriverClient
     ) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
-        ctx = make_store_context(
-            make_activity_context(namespace="ns1", activity_id="act1", workflow_id=None)
+        ctx = make_workflow_context(
+            namespace="ns1",
+            workflow_id="wf1",
+            workflow_type="MyWorkflow",
+            run_id="run-abc",
         )
         [claim] = await driver.store(ctx, [payload])
         expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
-        assert claim.claim_data["key"] == f"v0/ns/ns1/aci/act1/d/sha256/{expected_hash}"
+        assert (
+            claim.claim_data["key"]
+            == f"v0/ns/ns1/wt/MyWorkflow/wi/wf1/ri/run-abc/d/sha256/{expected_hash}"
+        )
+
+    async def test_key_context_activity(
+        self, driver_client: S3StorageDriverClient
+    ) -> None:
+        """activity target uses activity key segment."""
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        ctx = make_activity_context(namespace="ns1", activity_id="act1")
+        [claim] = await driver.store(ctx, [payload])
+        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert (
+            claim.claim_data["key"]
+            == f"v0/ns/ns1/at/null/ai/act1/ri/null/d/sha256/{expected_hash}"
+        )
+
+    async def test_key_context_activity_with_type_and_run_id(
+        self, driver_client: S3StorageDriverClient
+    ) -> None:
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        ctx = make_activity_context(
+            namespace="ns1",
+            activity_id="act1",
+            activity_type="MyActivity",
+            run_id="run-abc",
+        )
+        [claim] = await driver.store(ctx, [payload])
+        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert (
+            claim.claim_data["key"]
+            == f"v0/ns/ns1/at/MyActivity/ai/act1/ri/run-abc/d/sha256/{expected_hash}"
+        )
 
     async def test_key_preserves_case(
         self, driver_client: S3StorageDriverClient
     ) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
-        ctx = make_store_context(
-            make_workflow_context(namespace="MyNamespace", workflow_id="MyWorkflow")
-        )
+        ctx = make_workflow_context(namespace="MyNamespace", workflow_id="MyWorkflow")
         [claim] = await driver.store(ctx, [payload])
         key = claim.claim_data["key"]
         assert "MyNamespace" in key
@@ -263,14 +287,12 @@ class TestS3StorageDriverKeyConstruction:
     ) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
-        ctx = make_store_context(
-            make_workflow_context(namespace="ns1", workflow_id="order/123/v2")
-        )
+        ctx = make_workflow_context(namespace="ns1", workflow_id="order/123/v2")
         [claim] = await driver.store(ctx, [payload])
         expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
         assert (
             claim.claim_data["key"]
-            == f"v0/ns/ns1/wfi/order%2F123%2Fv2/d/sha256/{expected_hash}"
+            == f"v0/ns/ns1/wt/null/wi/order%2F123%2Fv2/ri/null/d/sha256/{expected_hash}"
         )
 
     async def test_key_urlencodes_workflow_id_with_special_chars(
@@ -278,14 +300,12 @@ class TestS3StorageDriverKeyConstruction:
     ) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
-        ctx = make_store_context(
-            make_workflow_context(namespace="ns1", workflow_id="wf#1 &foo=bar")
-        )
+        ctx = make_workflow_context(namespace="ns1", workflow_id="wf#1 &foo=bar")
         [claim] = await driver.store(ctx, [payload])
         expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
         assert (
             claim.claim_data["key"]
-            == f"v0/ns/ns1/wfi/wf%231%20%26foo%3Dbar/d/sha256/{expected_hash}"
+            == f"v0/ns/ns1/wt/null/wi/wf%231%20%26foo%3Dbar/ri/null/d/sha256/{expected_hash}"
         )
 
     async def test_key_urlencodes_activity_id(
@@ -293,16 +313,12 @@ class TestS3StorageDriverKeyConstruction:
     ) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
-        ctx = make_store_context(
-            make_activity_context(
-                namespace="ns1", activity_id="act/1#2", workflow_id=None
-            )
-        )
+        ctx = make_activity_context(namespace="ns1", activity_id="act/1#2")
         [claim] = await driver.store(ctx, [payload])
         expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
         assert (
             claim.claim_data["key"]
-            == f"v0/ns/ns1/aci/act%2F1%232/d/sha256/{expected_hash}"
+            == f"v0/ns/ns1/at/null/ai/act%2F1%232/ri/null/d/sha256/{expected_hash}"
         )
 
     async def test_key_urlencodes_namespace(
@@ -310,14 +326,12 @@ class TestS3StorageDriverKeyConstruction:
     ) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
-        ctx = make_store_context(
-            make_workflow_context(namespace="my/ns#1", workflow_id="wf1")
-        )
+        ctx = make_workflow_context(namespace="my/ns#1", workflow_id="wf1")
         [claim] = await driver.store(ctx, [payload])
         expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
         assert (
             claim.claim_data["key"]
-            == f"v0/ns/my%2Fns%231/wfi/wf1/d/sha256/{expected_hash}"
+            == f"v0/ns/my%2Fns%231/wt/null/wi/wf1/ri/null/d/sha256/{expected_hash}"
         )
 
     async def test_key_urlencoded_roundtrip(
@@ -326,9 +340,7 @@ class TestS3StorageDriverKeyConstruction:
         """Payloads stored with special-char IDs can be retrieved correctly."""
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload("special-char-roundtrip")
-        ctx = make_store_context(
-            make_workflow_context(namespace="ns/1", workflow_id="wf/2#3")
-        )
+        ctx = make_workflow_context(namespace="ns/1", workflow_id="wf/2#3")
         [claim] = await driver.store(ctx, [payload])
         [retrieved] = await driver.retrieve(StorageDriverRetrieveContext(), [claim])
         assert retrieved == payload
@@ -528,45 +540,42 @@ class TestS3StorageDriverBucketCallable:
         )
         assert call_count == 3
 
-    async def test_selector_routes_by_activity_task_queue(
+    async def test_selector_routes_by_activity_type(
         self, aioboto3_client: S3Client, driver_client: S3StorageDriverClient
     ) -> None:
-        """bucket callable can route payloads to different buckets by activity task queue."""
-        bucket_a = "bucket-queue-a"
-        bucket_b = "bucket-queue-b"
+        """bucket callable can route payloads to different buckets by activity type."""
+        bucket_a = "bucket-type-a"
+        bucket_b = "bucket-type-b"
         await aioboto3_client.create_bucket(Bucket=bucket_a)
         await aioboto3_client.create_bucket(Bucket=bucket_b)
 
-        queue_buckets = {"queue-a": bucket_a, "queue-b": bucket_b}
+        type_buckets = {"type-a": bucket_a, "type-b": bucket_b}
 
-        def queue_selector(ctx: StorageDriverStoreContext, p: Payload) -> str:
+        def type_selector(ctx: StorageDriverStoreContext, p: Payload) -> str:
             del p
-            if isinstance(ctx.serialization_context, ActivitySerializationContext):
-                queue = ctx.serialization_context.activity_task_queue
-                if queue and queue in queue_buckets:
-                    return queue_buckets[queue]
+            act = (
+                ctx.target
+                if isinstance(ctx.target, StorageDriverActivityInfo)
+                else None
+            )
+            if act and act.type and act.type in type_buckets:
+                return type_buckets[act.type]
             return BUCKET
 
-        driver = S3StorageDriver(client=driver_client, bucket=queue_selector)
+        driver = S3StorageDriver(client=driver_client, bucket=type_selector)
 
-        ctx_a = make_store_context(
-            make_activity_context(
-                namespace="ns1",
-                activity_id="act1",
-                workflow_id="wf1",
-                activity_task_queue="queue-a",
-            )
+        ctx_a = make_activity_context(
+            namespace="ns1",
+            activity_id="act1",
+            activity_type="type-a",
         )
         [claim_a] = await driver.store(ctx_a, [make_payload("payload-a")])
         assert claim_a.claim_data["bucket"] == bucket_a
 
-        ctx_b = make_store_context(
-            make_activity_context(
-                namespace="ns1",
-                activity_id="act2",
-                workflow_id="wf1",
-                activity_task_queue="queue-b",
-            )
+        ctx_b = make_activity_context(
+            namespace="ns1",
+            activity_id="act2",
+            activity_type="type-b",
         )
         [claim_b] = await driver.store(ctx_b, [make_payload("payload-b")])
         assert claim_b.claim_data["bucket"] == bucket_b
@@ -581,7 +590,7 @@ class TestS3StorageDriverBucketCallable:
             return BUCKET
 
         payload = make_payload()
-        store_ctx = make_store_context(make_workflow_context())
+        store_ctx = make_workflow_context()
         driver = S3StorageDriver(client=driver_client, bucket=capturing_selector)
         await driver.store(store_ctx, [payload])
 

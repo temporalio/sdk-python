@@ -107,8 +107,17 @@ async def test_s3_driver_workflow_input_key(
             execution_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
-    assert len(keys) == 1
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[0]
+
+    # Client stores workflow input with ri=null (run ID not yet assigned);
+    # worker stores activity input with ri=run_id — same bytes, two S3 objects.
+    assert len(keys) == 2
+    assert all(
+        f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k for k in keys
+    )
+    # Client-side store: ri=null because run ID is not yet known.
+    assert sum(1 for k in keys if "/ri/null/" in k) == 1
+    # Worker-side store: ri=run_id, assigned by the server.
+    assert sum(1 for k in keys if "/ri/null/" not in k) == 1
 
 
 async def test_s3_driver_workflow_output_key(
@@ -127,8 +136,11 @@ async def test_s3_driver_workflow_output_key(
         )
     assert result == LARGE
     keys = await _list_keys(aioboto3_client)
+    # Activity result and workflow result dedup to same key
     assert len(keys) == 1
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[0]
+    assert f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in keys[0]
+    # Run ID is known for both activity completion and workflow completion
+    assert "/ri/null/" not in keys[0]
 
 
 async def test_s3_driver_workflow_activity_input_key(
@@ -146,11 +158,14 @@ async def test_s3_driver_workflow_activity_input_key(
             execution_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
-    assert len(keys) == 1
-    assert f"/ns/default/wfi/{workflow_id}/" in keys[0]
-    assert (
-        "/aci/" not in keys[0]
-    ), "Activity input should use workflow_id, not activity_id"
+    # Client start (ri=null) + worker schedules activity (ri=run_id) — same bytes, two objects.
+    assert len(keys) == 2
+    # Both keys are under the workflow wi/ri prefix, not the activity.
+    assert all(
+        f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k for k in keys
+    )
+    # Activity input is keyed under the scheduling workflow, not the activity.
+    assert all("/ai/" not in k for k in keys)
 
 
 async def test_s3_driver_workflow_activity_output_key(
@@ -168,8 +183,63 @@ async def test_s3_driver_workflow_activity_output_key(
             execution_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
+    # Activity result and workflow result are both LARGE so they deduplicate to one object.
     assert len(keys) == 1
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[0]
+    assert f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in keys[0]
+    # ri=run_id for both stores (run ID is known by the time the activity completes).
+    assert "/ri/null/" not in keys[0]
+
+
+async def test_s3_driver_standalone_activity_input_key(
+    env: WorkflowEnvironment, tmprl_client: Client, aioboto3_client: S3Client
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    activity_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+    async with new_worker(
+        tmprl_client, activities=[large_io_activity], task_queue=task_queue
+    ):
+        await tmprl_client.execute_activity(
+            large_io_activity,
+            LARGE,
+            id=activity_id,
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+    keys = await _list_keys(aioboto3_client)
+    # Input and output are the same LARGE bytes, so they deduplicate to one key.
+    assert len(keys) == 1
+    # Keyed under the activity, not a workflow.
+    assert f"/ns/default/at/large_io_activity/ai/{activity_id}/ri/null/" in keys[0]
+    assert "/wt/" not in keys[0]
+
+
+async def test_s3_driver_standalone_activity_output_key(
+    env: WorkflowEnvironment, tmprl_client: Client, aioboto3_client: S3Client
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    activity_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+    async with new_worker(
+        tmprl_client, activities=[large_output_activity], task_queue=task_queue
+    ):
+        await tmprl_client.execute_activity(
+            large_output_activity,
+            id=activity_id,
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+    keys = await _list_keys(aioboto3_client)
+    # Only the output is large; keyed under the activity.
+    assert len(keys) == 1
+    assert f"/ns/default/at/large_output_activity/ai/{activity_id}/ri/null/" in keys[0]
+    assert "/wt/" not in keys[0]
 
 
 async def test_s3_driver_signal_arg_key(
@@ -186,8 +256,12 @@ async def test_s3_driver_signal_arg_key(
         await handle.signal(SignalQueryUpdateWorkflow.finish, LARGE)
         await handle.result()
     keys = await _list_keys(aioboto3_client)
-    assert len(keys) == 1
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[0]
+    # Signal arg + workflow result — two distinct keys (different wt and ri).
+    assert len(keys) == 2
+    # Signal arg: client stores with wt=null (type not known) and ri=null.
+    assert any(f"/wt/null/wi/{workflow_id}/ri/null/" in k for k in keys)
+    # Workflow result: worker stores with real type and ri=run_id.
+    assert any(f"/wt/SignalQueryUpdateWorkflow/wi/{workflow_id}/" in k for k in keys)
 
 
 async def test_s3_driver_query_result_key(
@@ -206,8 +280,12 @@ async def test_s3_driver_query_result_key(
         await handle.signal(SignalQueryUpdateWorkflow.finish, "done")
         await handle.result()
     keys = await _list_keys(aioboto3_client)
-    assert len(keys) == 1
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[0]
+    # Query arg + (query result deduplicated with workflow result) — two distinct keys.
+    assert len(keys) == 2
+    # Query arg: client stores with wt=null (type not known) and ri=null.
+    assert any(f"/wt/null/wi/{workflow_id}/ri/null/" in k for k in keys)
+    # Query result and workflow result are both LARGE and deduplicate to one key with ri=run_id.
+    assert any(f"/wt/SignalQueryUpdateWorkflow/wi/{workflow_id}/" in k for k in keys)
 
 
 async def test_s3_driver_update_result_key(
@@ -226,8 +304,12 @@ async def test_s3_driver_update_result_key(
         await handle.signal(SignalQueryUpdateWorkflow.finish, "done")
         await handle.result()
     keys = await _list_keys(aioboto3_client)
-    assert len(keys) == 1
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[0]
+    # Update arg + (update result deduplicated with workflow result) — two distinct keys.
+    assert len(keys) == 2
+    # Update arg: client stores with wt=null (type not known) and ri=null.
+    assert any(f"/wt/null/wi/{workflow_id}/ri/null/" in k for k in keys)
+    # Update result and workflow result are both LARGE and deduplicate to one key with ri=run_id.
+    assert any(f"/wt/SignalQueryUpdateWorkflow/wi/{workflow_id}/" in k for k in keys)
 
 
 async def test_s3_driver_child_workflow_input_key(
@@ -244,9 +326,11 @@ async def test_s3_driver_child_workflow_input_key(
             execution_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
-    assert len(keys) == 1
     child_workflow_id = f"{workflow_id}-child"
-    assert f"/ns/default/wfi/{child_workflow_id}/d/sha256/" in keys[0]
+    # Child input is the only large payload — stored under the child's wi/ri.
+    assert len(keys) == 1
+    # Keyed under the child: child input is stored in the child's context.
+    assert f"/ns/default/wt/ChildWorkflow/wi/{child_workflow_id}/ri/" in keys[0]
 
 
 async def test_s3_driver_identified_casing(
@@ -264,10 +348,11 @@ async def test_s3_driver_identified_casing(
             execution_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
-    assert len(keys) == 1
-    assert "/ns/default/" in keys[0], "Namespace segment should be present"
-    assert (
-        f"/wfi/{workflow_id}/" in keys[0]
+    # Client start (ri=null) + worker stores (ri=run_id) — two objects.
+    assert len(keys) == 2
+    # Workflow ID is percent-encoded but casing is preserved verbatim.
+    assert all(
+        f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k for k in keys
     ), "Workflow ID should preserve original case in the key"
 
 
@@ -290,9 +375,14 @@ async def test_s3_driver_content_dedup(
             execution_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
+    # Two distinct content hashes (LARGE from download, LARGE_2 from extract) → two keys.
     assert len(keys) == 2
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[0]
-    assert f"/ns/default/wfi/{workflow_id}/d/sha256/" in keys[1]
+    # Both are under the same workflow wi/ri prefix despite crossing activity boundaries.
+    assert all(
+        f"/ns/default/wt/DocumentIngestionWorkflow/wi/{workflow_id}/ri/" in k
+        for k in keys
+    )
+    # The two keys differ by content hash only.
     assert keys[0] != keys[1]
 
 
@@ -301,8 +391,7 @@ async def test_s3_driver_single_workflow_same_key_namespace(
 ) -> None:
     """A training job started with a large config, injected with large override
     parameters mid-run, and polled for large metrics — all produce S3 keys
-    under the same workflow ID prefix, regardless of which primitive carried
-    the payload."""
+    containing the same workflow ID."""
     workflow_id = str(uuid.uuid4())
     async with new_worker(tmprl_client, ModelTrainingWorkflow) as worker:
         handle = await tmprl_client.start_workflow(
@@ -320,19 +409,19 @@ async def test_s3_driver_single_workflow_same_key_namespace(
         await handle.signal(ModelTrainingWorkflow.complete)
         await handle.result()
     keys = await _list_keys(aioboto3_client)
-    # LARGE (input + signal arg) and LARGE_2 (metrics result) deduplicate to
-    # two distinct keys — both anchored under the same workflow ID prefix.
-    assert len(keys) == 2
-    assert all(f"/ns/default/wfi/{workflow_id}/" in key for key in keys)
+    # Four distinct keys: client start, signal arg, update result, workflow result.
+    assert len(keys) == 4
+    # All keys are anchored under the same workflow ID regardless of which primitive carried the payload.
+    assert all(f"/wi/{workflow_id}/" in k for k in keys)
 
 
 async def test_s3_driver_parent_child_independent_key_namespaces(
     tmprl_client: Client, aioboto3_client: S3Client
 ) -> None:
-    """An order fulfillment workflow spawns a child payment processor, passes it
-    a large order payload, and returns the child's large payment confirmation.
-    Each workflow accumulates S3 keys under its own workflow ID prefix —
-    parent and child key namespaces are fully independent."""
+    """An order fulfillment workflow spawns a child payment processor and passes
+    it a large order payload. Child input is keyed under the parent (it lives in
+    the parent's history); child output is keyed under the parent (for lifecycle
+    resilience — the child result lives in the parent's completion history)."""
     workflow_id = str(uuid.uuid4())
     payment_id = f"{workflow_id}-payment"
     async with new_worker(
@@ -346,16 +435,15 @@ async def test_s3_driver_parent_child_independent_key_namespaces(
             execution_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
-    parent_prefix = f"/ns/default/wfi/{workflow_id}/d/"
-    child_prefix = f"/ns/default/wfi/{payment_id}/d/"
-    parent_keys = [k for k in keys if parent_prefix in k]
-    child_keys = [k for k in keys if child_prefix in k]
-    # The parent stores its input (LARGE) and the child's result propagated
-    # back (LARGE_2) under the parent's prefix → 2 keys.
-    # The child stores its input (LARGE) and its result (LARGE_2) under the
-    # child's prefix → 2 keys.
-    assert len(parent_keys) == 2
-    assert len(child_keys) == 2
+    parent_keys = [k for k in keys if f"/wi/{workflow_id}/" in k]
+    child_keys = [k for k in keys if f"/wi/{payment_id}/" in k]
+    # Parent accumulates 3 keys:
+    #   1. Client start stored in parent's key space (ri=null)
+    #   2. Child result stored in parent's key space
+    #   3. Parent's own workflow result
+    assert len(parent_keys) == 3
+    # Child accumulates 1 key: its input from the parent
+    assert len(child_keys) == 1
 
 
 async def test_s3_store_failure_surfaces_in_workflow_history(
@@ -400,7 +488,6 @@ async def test_s3_store_failure_surfaces_in_workflow_history(
     large_payload = JSONPlainPayloadConverter().to_payload(LARGE)
     assert large_payload is not None
     expected_hash = hashlib.sha256(large_payload.SerializeToString()).hexdigest()
-    expected_key = f"v0/ns/default/wfi/{workflow_id}/d/sha256/{expected_hash}"
 
     assert isinstance(exc_info.value, WorkflowFailureError)
     activity_error = exc_info.value.__cause__
@@ -408,7 +495,8 @@ async def test_s3_store_failure_surfaces_in_workflow_history(
     app_error = activity_error.__cause__
     assert isinstance(app_error, ApplicationError)
     assert app_error.type == "RuntimeError"
-    assert (
-        app_error.message
-        == f"S3StorageDriver store failed [bucket={bad_bucket}, key={expected_key}]"
-    )
+    # Key includes run_id which is only known at runtime; use substring checks.
+    msg = app_error.message
+    assert f"S3StorageDriver store failed [bucket={bad_bucket}, key=" in msg
+    assert f"/wt/LargeOutputNoRetryWorkflow/wi/{workflow_id}/ri/" in msg
+    assert f"/d/sha256/{expected_hash}]" in msg
