@@ -40,6 +40,10 @@ py_fixes = [
         re.compile(r"from dependencies\.").sub, r"from temporalio.api.dependencies."
     ),
     partial(
+        re.compile(r"from protoc_gen_openapiv2\.").sub,
+        r"from temporalio.api.dependencies.protoc_gen_openapiv2.",
+    ),
+    partial(
         re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
     ),
     partial(
@@ -50,6 +54,10 @@ py_fixes = [
 
 pyi_fixes = [
     partial(re.compile(r"temporal\.api\.").sub, r"temporalio.api."),
+    partial(
+        re.compile(r"protoc_gen_openapiv2\.").sub,
+        r"temporalio.api.dependencies.protoc_gen_openapiv2.",
+    ),
     partial(re.compile(r"temporal\.sdk\.core\.").sub, r"temporalio.bridge.proto."),
 ]
 
@@ -163,6 +171,7 @@ def generate_protos(output_dir: Path):
             f"--proto_path={core_proto_dir}",
             f"--proto_path={testsrv_proto_dir}",
             f"--proto_path={health_proto_dir}",
+            f"--proto_path={proto_dir}",
             f"--proto_path={test_proto_dir}",
             f"--proto_path={additional_proto_dir}",
             f"--python_out={output_dir}",
@@ -182,11 +191,16 @@ def generate_protos(output_dir: Path):
             grpc_file.unlink()
     # Apply fixes before moving code
     fix_generated_output(output_dir)
+    # Move openapiv2 dependency protos
+    deps_out_dir = api_out_dir / "dependencies"
+    shutil.rmtree(deps_out_dir / "protoc_gen_openapiv2", ignore_errors=True)
+    deps_out_dir.mkdir(exist_ok=True)
+    (output_dir / "protoc_gen_openapiv2").replace(deps_out_dir / "protoc_gen_openapiv2")
+    (deps_out_dir / "__init__.py").touch()
     # Move protos
     for p in (output_dir / "temporal" / "api").iterdir():
         shutil.rmtree(api_out_dir / p.name, ignore_errors=True)
         p.replace(api_out_dir / p.name)
-    shutil.rmtree(api_out_dir / "dependencies", ignore_errors=True)
     for p in (output_dir / "temporal" / "sdk" / "core").iterdir():
         shutil.rmtree(sdk_out_dir / p.name, ignore_errors=True)
         p.replace(sdk_out_dir / p.name)
