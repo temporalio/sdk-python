@@ -74,6 +74,7 @@ class PubSubMixin:
     @workflow.update(name="__pubsub_poll")
     async def _pubsub_poll(self, input: PollInput) -> PollResult:
         """Long-poll: block until new items available or draining, then return."""
+        self._check_initialized()
         await workflow.wait_condition(
             lambda: len(self._pubsub_log) > input.from_offset
             or self._pubsub_draining,
@@ -96,4 +97,5 @@ class PubSubMixin:
     @workflow.query(name="__pubsub_offset")
     def _pubsub_offset(self) -> int:
         """Return the current log length (next offset)."""
+        self._check_initialized()
         return len(self._pubsub_log)

@@ -81,6 +81,8 @@ Topics are plain strings with exact matching. No hierarchy or wildcards.
 Carry pub/sub state across continue-as-new boundaries:
 
 ```python
+from dataclasses import dataclass
+from temporalio import workflow
 from temporalio.contrib.pubsub import PubSubMixin, PubSubState
 
 @dataclass
@@ -89,10 +91,12 @@ class WorkflowInput:
 
 @workflow.defn
 class MyWorkflow(PubSubMixin):
-    @workflow.run
-    async def run(self, input: WorkflowInput) -> None:
+    @workflow.init
+    def __init__(self, input: WorkflowInput) -> None:
         self.init_pubsub(prior_state=input.pubsub_state)
 
+    @workflow.run
+    async def run(self, input: WorkflowInput) -> None:
         # ... do work ...
 
         if workflow.info().is_continue_as_new_suggested():
