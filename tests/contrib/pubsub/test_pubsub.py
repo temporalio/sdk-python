@@ -8,14 +8,19 @@ from datetime import timedelta
 
 import pytest
 
+from typing import Any
+
+from pydantic import BaseModel
 from temporalio import activity, workflow
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.contrib.pubsub import (
     PollInput,
     PollResult,
     PubSubClient,
     PubSubItem,
     PubSubMixin,
+    PubSubState,
     PublishEntry,
     PublishInput,
     activity_pubsub_client,
@@ -553,3 +558,188 @@ async def test_mixin_coexistence(client: Client) -> None:
         assert items[0].topic == "events"
 
         await handle.signal(MixinCoexistenceWorkflow.close)
+
+
+# ---------------------------------------------------------------------------
+# Continue-as-new workflow and test
+# ---------------------------------------------------------------------------
+
+
+class CANWorkflowInputAny(BaseModel):
+    """Uses Any typing — reproduces the samples pattern."""
+    pubsub_state: Any = None
+
+
+class CANWorkflowInputTyped(BaseModel):
+    """Uses proper typing."""
+    pubsub_state: PubSubState | None = None
+
+
+@workflow.defn
+class ContinueAsNewAnyWorkflow(PubSubMixin):
+    """CAN workflow using Any-typed pubsub_state (reproduces samples pattern)."""
+
+    @workflow.init
+    def __init__(self, input: CANWorkflowInputAny) -> None:
+        self.init_pubsub(prior_state=input.pubsub_state)
+        self._should_continue = False
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.signal
+    def trigger_continue(self) -> None:
+        self._should_continue = True
+
+    @workflow.run
+    async def run(self, input: CANWorkflowInputAny) -> None:
+        while True:
+            await workflow.wait_condition(
+                lambda: self._should_continue or self._closed
+            )
+            if self._closed:
+                return
+            if self._should_continue:
+                self._should_continue = False
+                self.drain_pubsub()
+                await workflow.wait_condition(workflow.all_handlers_finished)
+                workflow.continue_as_new(args=[CANWorkflowInputAny(
+                    pubsub_state=self.get_pubsub_state(),
+                )])
+
+
+@workflow.defn
+class ContinueAsNewTypedWorkflow(PubSubMixin):
+    """CAN workflow using properly-typed pubsub_state."""
+
+    @workflow.init
+    def __init__(self, input: CANWorkflowInputTyped) -> None:
+        self.init_pubsub(prior_state=input.pubsub_state)
+        self._should_continue = False
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.signal
+    def trigger_continue(self) -> None:
+        self._should_continue = True
+
+    @workflow.run
+    async def run(self, input: CANWorkflowInputTyped) -> None:
+        while True:
+            await workflow.wait_condition(
+                lambda: self._should_continue or self._closed
+            )
+            if self._closed:
+                return
+            if self._should_continue:
+                self._should_continue = False
+                self.drain_pubsub()
+                await workflow.wait_condition(workflow.all_handlers_finished)
+                workflow.continue_as_new(args=[CANWorkflowInputTyped(
+                    pubsub_state=self.get_pubsub_state(),
+                )])
+
+
+async def _run_can_test(can_client: Client, workflow_cls, input_cls) -> None:
+    """Shared CAN test logic: publish, CAN, verify items survive."""
+    async with new_worker(
+        can_client,
+        workflow_cls,
+    ) as worker:
+        handle = await can_client.start_workflow(
+            workflow_cls.run,
+            input_cls(),
+            id=f"pubsub-can-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish 3 items via signal
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[
+                PublishEntry(topic="events", data=b"item-0"),
+                PublishEntry(topic="events", data=b"item-1"),
+                PublishEntry(topic="events", data=b"item-2"),
+            ]),
+        )
+
+        # Verify items are there
+        items_before = await collect_items(handle, None, 0, 3)
+        assert len(items_before) == 3
+
+        # Trigger continue-as-new
+        await handle.signal(workflow_cls.trigger_continue)
+
+        # Wait for new run to start
+        await asyncio.sleep(2)
+
+        # Get a fresh handle (not pinned to old run)
+        new_handle = can_client.get_workflow_handle(handle.id)
+
+        # The 3 items from before CAN should still be readable
+        items_after = await collect_items(new_handle, None, 0, 3)
+        assert len(items_after) == 3
+        assert items_after[0].data == b"item-0"
+        assert items_after[1].data == b"item-1"
+        assert items_after[2].data == b"item-2"
+
+        # New items should get offset 3+
+        await new_handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[PublishEntry(topic="events", data=b"item-3")]),
+        )
+        items_all = await collect_items(new_handle, None, 0, 4)
+        assert len(items_all) == 4
+        assert items_all[3].offset == 3
+        assert items_all[3].data == b"item-3"
+
+        await new_handle.signal(workflow_cls.close)
+
+
+@pytest.mark.asyncio
+async def test_continue_as_new_any_typed_fails(client: Client) -> None:
+    """Any-typed pubsub_state does NOT survive CAN — documents the pitfall.
+
+    Pydantic deserializes Any fields as plain dicts, losing the PubSubState
+    type. Use ``PubSubState | None`` instead.
+    """
+    can_client = Client(**{**client.config(), "data_converter": pydantic_data_converter})
+
+    async with new_worker(
+        can_client,
+        ContinueAsNewAnyWorkflow,
+    ) as worker:
+        handle = await can_client.start_workflow(
+            ContinueAsNewAnyWorkflow.run,
+            CANWorkflowInputAny(),
+            id=f"pubsub-can-any-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[PublishEntry(topic="events", data=b"item-0")]),
+        )
+        items = await collect_items(handle, None, 0, 1)
+        assert len(items) == 1
+
+        # Trigger CAN — the new run will fail to deserialize pubsub_state
+        await handle.signal(ContinueAsNewAnyWorkflow.trigger_continue)
+        await asyncio.sleep(2)
+
+        # The new run should be broken — items are NOT accessible
+        new_handle = can_client.get_workflow_handle(handle.id)
+        items_after = await collect_items(new_handle, None, 0, 1, timeout=3.0)
+        assert len(items_after) == 0  # fails because workflow can't start
+
+
+@pytest.mark.asyncio
+async def test_continue_as_new_properly_typed(client: Client) -> None:
+    """CAN with PubSubState-typed pubsub_state field."""
+    can_client = Client(**{**client.config(), "data_converter": pydantic_data_converter})
+    await _run_can_test(can_client, ContinueAsNewTypedWorkflow, CANWorkflowInputTyped)

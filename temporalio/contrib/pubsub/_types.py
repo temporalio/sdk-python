@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from pydantic import BaseModel
+
 
 @dataclass
 class PubSubItem:
@@ -46,8 +48,12 @@ class PollResult:
     next_offset: int = 0
 
 
-@dataclass
-class PubSubState:
-    """Serializable snapshot of pub/sub state for continue-as-new."""
+class PubSubState(BaseModel):
+    """Serializable snapshot of pub/sub state for continue-as-new.
 
-    log: list[PubSubItem] = field(default_factory=list)
+    This is a Pydantic model (not a dataclass) so that Pydantic-based data
+    converters can properly reconstruct it when the containing workflow input
+    uses ``Any``-typed fields.
+    """
+
+    log: list[PubSubItem] = []

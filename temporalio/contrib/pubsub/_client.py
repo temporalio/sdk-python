@@ -10,8 +10,6 @@ import asyncio
 from collections.abc import AsyncIterator
 from typing import Self
 
-import logging
-
 from temporalio import activity
 from temporalio.client import (
     WorkflowExecutionStatus,
@@ -20,8 +18,6 @@ from temporalio.client import (
 )
 
 from ._types import PollInput, PollResult, PubSubItem, PublishEntry, PublishInput
-
-logger = logging.getLogger(__name__)
 
 
 class PubSubClient:
@@ -135,12 +131,8 @@ class PubSubClient:
                 return
             except WorkflowUpdateRPCTimeoutOrCancelledError:
                 if follow_continues and await self._follow_continue_as_new():
-                    continue  # retry poll against new run
+                    continue
                 return
-            except Exception:
-                if follow_continues and await self._follow_continue_as_new():
-                    continue  # retry poll against new run
-                raise
             for item in result.items:
                 yield item
             offset = result.next_offset
