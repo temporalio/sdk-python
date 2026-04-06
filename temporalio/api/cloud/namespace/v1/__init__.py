@@ -1,6 +1,8 @@
 from .message_pb2 import (
     ApiKeyAuthSpec,
     AWSPrivateLinkInfo,
+    Capacity,
+    CapacitySpec,
     CertificateFilterSpec,
     CodecServerSpec,
     Endpoints,
@@ -11,6 +13,7 @@ from .message_pb2 import (
     Limits,
     MtlsAuthSpec,
     Namespace,
+    NamespaceCapacityInfo,
     NamespaceRegionStatus,
     NamespaceSpec,
     PrivateConnectivity,
@@ -19,6 +22,8 @@ from .message_pb2 import (
 __all__ = [
     "AWSPrivateLinkInfo",
     "ApiKeyAuthSpec",
+    "Capacity",
+    "CapacitySpec",
     "CertificateFilterSpec",
     "CodecServerSpec",
     "Endpoints",
@@ -29,6 +34,7 @@ __all__ = [
     "Limits",
     "MtlsAuthSpec",
     "Namespace",
+    "NamespaceCapacityInfo",
     "NamespaceRegionStatus",
     "NamespaceSpec",
     "PrivateConnectivity",

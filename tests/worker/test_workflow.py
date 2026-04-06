@@ -38,6 +38,7 @@ import temporalio.activity
 import temporalio.api.sdk.v1
 import temporalio.client
 import temporalio.converter
+import temporalio.converter._extstore
 import temporalio.worker
 import temporalio.worker._command_aware_visitor
 import temporalio.workflow
@@ -1625,6 +1626,12 @@ class CustomWorkflowInstance(WorkflowInstance):
         command_info: temporalio.worker._command_aware_visitor.CommandInfo | None,
     ) -> temporalio.converter.SerializationContext | None:
         return self._unsandboxed.get_serialization_context(command_info)
+
+    def get_external_store_context(
+        self,
+        command_info: temporalio.worker._command_aware_visitor.CommandInfo | None,
+    ) -> temporalio.converter._extstore.StorageDriverStoreContext:
+        return self._unsandboxed.get_external_store_context(command_info)
 
 
 async def test_workflow_with_custom_runner(client: Client):

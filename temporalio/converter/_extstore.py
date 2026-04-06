@@ -19,10 +19,6 @@ from typing_extensions import Self
 
 from temporalio.api.common.v1 import Payload, Payloads
 from temporalio.converter._payload_converter import JSONPlainPayloadConverter
-from temporalio.converter._serialization_context import (
-    SerializationContext,
-    WithSerializationContext,
-)
 
 _T = TypeVar("_T")
 
@@ -92,6 +88,48 @@ class StorageDriverClaim:
     """
 
 
+@dataclass(frozen=True, kw_only=True)
+class StorageDriverWorkflowInfo:
+    """Workflow identity information for external storage operations.
+
+    .. warning::
+        This API is experimental.
+    """
+
+    namespace: str
+    """The namespace of the workflow execution."""
+
+    id: str | None = None
+    """The workflow ID."""
+
+    run_id: str | None = None
+    """The workflow run ID, if available."""
+
+    type: str | None = None
+    """The workflow type name, if available."""
+
+
+@dataclass(frozen=True, kw_only=True)
+class StorageDriverActivityInfo:
+    """Activity identity information for external storage operations.
+
+    .. warning::
+        This API is experimental.
+    """
+
+    namespace: str
+    """The namespace of the activity execution."""
+
+    id: str | None = None
+    """The activity ID."""
+
+    run_id: str | None = None
+    """The activity run ID (only for standalone activities)."""
+
+    type: str | None = None
+    """The activity type name, if available."""
+
+
 @dataclass(frozen=True)
 class StorageDriverStoreContext:
     """Context passed to :meth:`StorageDriver.store` and ``driver_selector`` calls.
@@ -100,10 +138,14 @@ class StorageDriverStoreContext:
         This API is experimental.
     """
 
-    serialization_context: SerializationContext | None = None
-    """The serialization context active when this store operation was initiated,
-    or ``None`` if no context has been set.
-    """
+    target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None = None
+    """The workflow or activity for which this payload is being stored.
+
+    For payloads being stored on behalf of an explicit target (e.g. a child
+    workflow being started, an activity being scheduled, an external workflow
+    being signaled), this is that target's identity.  When no explicit target
+    exists the current execution context (workflow or activity) is used as the
+    target instead."""
 
 
 @dataclass(frozen=True)
@@ -182,7 +224,7 @@ class _StorageReference:
 
 
 @dataclass(frozen=True)
-class ExternalStorage(WithSerializationContext):
+class ExternalStorage:
     """Configuration for external storage behavior.
 
     .. warning::
@@ -222,9 +264,13 @@ class ExternalStorage(WithSerializationContext):
     for retrieval lookups.
     """
 
-    _context: SerializationContext | None = dataclasses.field(
-        init=False, default=None, repr=False, compare=False
+    _store_context: StorageDriverStoreContext = dataclasses.field(
+        default=StorageDriverStoreContext(target=None),
+        init=False,
+        repr=False,
+        compare=False,
     )
+    """Store context bound to this instance via :meth:`_with_store_context`."""
 
     _claim_converter: ClassVar[JSONPlainPayloadConverter] = JSONPlainPayloadConverter(
         encoding=_REFERENCE_ENCODING.decode()
@@ -261,12 +307,6 @@ class ExternalStorage(WithSerializationContext):
             driver_map[name] = driver
         object.__setattr__(self, "_driver_map", driver_map)
 
-    def with_context(self, context: SerializationContext) -> Self:
-        """Return a copy of these options with the serialization context applied."""
-        result = dataclasses.replace(self)
-        object.__setattr__(result, "_context", context)
-        return result
-
     def _select_driver(
         self, context: StorageDriverStoreContext, payload: Payload
     ) -> StorageDriver | None:
@@ -293,15 +333,20 @@ class ExternalStorage(WithSerializationContext):
             raise ValueError(f"No driver found with name '{name}'")
         return driver
 
+    def _with_store_context(self, ctx: StorageDriverStoreContext) -> ExternalStorage:
+        """Return a copy of this instance with ``ctx`` bound as the store context."""
+        result = dataclasses.replace(self)
+        object.__setattr__(result, "_store_context", ctx)
+        return result
+
     async def _store_payload(self, payload: Payload) -> Payload:
         start_time = time.monotonic()
-        context = StorageDriverStoreContext(serialization_context=self._context)
 
-        driver = self._select_driver(context, payload)
+        driver = self._select_driver(self._store_context, payload)
         if driver is None:
             return payload
 
-        claims = await driver.store(context, [payload])
+        claims = await driver.store(self._store_context, [payload])
 
         self._validate_claim_length(claims, expected=1, driver=driver)
 
@@ -336,11 +381,10 @@ class ExternalStorage(WithSerializationContext):
         start_time = time.monotonic()
 
         results = list(payloads)
-        context = StorageDriverStoreContext(serialization_context=self._context)
 
         to_store: list[tuple[int, Payload, StorageDriver]] = []
         for index, payload in enumerate(payloads):
-            driver = self._select_driver(context, payload)
+            driver = self._select_driver(self._store_context, payload)
             if driver is None:
                 continue
             to_store.append((index, payload, driver))
@@ -356,7 +400,7 @@ class ExternalStorage(WithSerializationContext):
 
         all_claims = await _gather_cancel_on_error(
             [
-                driver.store(context, [p for _, p in indexed_payloads])
+                driver.store(self._store_context, [p for _, p in indexed_payloads])
                 for driver, indexed_payloads in driver_group_list
             ]
         )
