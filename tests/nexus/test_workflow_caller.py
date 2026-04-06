@@ -1101,10 +1101,13 @@ async def test_async_response(
             return
 
         handler_wf_info = await handler_wf_handle.describe()
-        assert handler_wf_info.status in [
+        expected_statuses = [
             WorkflowExecutionStatus.RUNNING,
             WorkflowExecutionStatus.COMPLETED,
         ]
+        if request_cancel:
+            expected_statuses.append(WorkflowExecutionStatus.CANCELED)
+        assert handler_wf_info.status in expected_statuses
         await assert_handler_workflow_has_link_to_caller_workflow(
             caller_wf_handle, handler_wf_handle
         )

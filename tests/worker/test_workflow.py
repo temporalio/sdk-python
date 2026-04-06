@@ -8545,23 +8545,13 @@ class CustomLogHandler(logging.Handler):
 async def test_disable_logger_sandbox(
     client: Client,
 ):
-    logger = workflow.logger.logger
-    handler = CustomLogHandler()
-    with LogHandler.apply(logger, handler):
+    async def execute_with_new_worker(*, disable_sandbox: bool) -> None:
+        workflow.logger.unsafe_disable_sandbox(disable_sandbox)
         async with new_worker(
             client,
             DisableLoggerSandbox,
             activities=[],
         ) as worker:
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
-            workflow.logger.unsafe_disable_sandbox()
             await client.execute_workflow(
                 DisableLoggerSandbox.run,
                 id=f"workflow-{uuid.uuid4()}",
@@ -8569,15 +8559,15 @@ async def test_disable_logger_sandbox(
                 run_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
-            workflow.logger.unsafe_disable_sandbox(False)
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
+
+    logger = workflow.logger.logger
+    handler = CustomLogHandler()
+    with LogHandler.apply(logger, handler):
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
+        await execute_with_new_worker(disable_sandbox=True)
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
 
 
 @workflow.defn
