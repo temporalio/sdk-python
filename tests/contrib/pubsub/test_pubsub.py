@@ -180,6 +180,29 @@ class FlushOnExitWorkflow(PubSubMixin):
 
 
 @workflow.defn
+class MaxBatchWorkflow(PubSubMixin):
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.init_pubsub()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.run
+    async def run(self, count: int) -> None:
+        await workflow.execute_activity(
+            "publish_with_max_batch",
+            count,
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=10),
+        )
+        self.publish("status", b"activity_done")
+        await workflow.wait_condition(lambda: self._closed)
+
+
+@workflow.defn
 class MixinCoexistenceWorkflow(PubSubMixin):
     @workflow.init
     def __init__(self) -> None:
@@ -247,6 +270,17 @@ async def publish_batch_test(count: int) -> None:
         for i in range(count):
             activity.heartbeat()
             client.publish("events", f"item-{i}".encode())
+
+
+@activity.defn(name="publish_with_max_batch")
+async def publish_with_max_batch(count: int) -> None:
+    client = activity_pubsub_client(batch_interval=60.0, max_batch_size=3)
+    async with client:
+        for i in range(count):
+            activity.heartbeat()
+            client.publish("events", f"item-{i}".encode())
+        # Long batch_interval ensures only max_batch_size triggers flushes
+        # Context manager exit flushes any remainder
 
 
 # ---------------------------------------------------------------------------
@@ -567,6 +601,53 @@ async def test_mixin_coexistence(client: Client) -> None:
         assert items[0].topic == "events"
 
         await handle.signal(MixinCoexistenceWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_max_batch_size(client: Client) -> None:
+    """max_batch_size triggers auto-flush without waiting for timer."""
+    count = 7  # with max_batch_size=3: flushes at 3, 6, then remainder 1 on exit
+    async with new_worker(
+        client,
+        MaxBatchWorkflow,
+        activities=[publish_with_max_batch],
+        max_cached_workflows=0,
+    ) as worker:
+        handle = await client.start_workflow(
+            MaxBatchWorkflow.run,
+            count,
+            id=f"pubsub-maxbatch-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # count items from activity + 1 "activity_done" from workflow
+        items = await collect_items(handle, None, 0, count + 1, timeout=15.0)
+        assert len(items) == count + 1
+        for i in range(count):
+            assert items[i].data == f"item-{i}".encode()
+        await handle.signal(MaxBatchWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_replay_safety(client: Client) -> None:
+    """Pub/sub mixin survives workflow replay (max_cached_workflows=0)."""
+    async with new_worker(
+        client,
+        InterleavedWorkflow,
+        activities=[publish_items],
+        max_cached_workflows=0,
+    ) as worker:
+        handle = await client.start_workflow(
+            InterleavedWorkflow.run,
+            5,
+            id=f"pubsub-replay-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # 1 (started) + 5 (activity) + 1 (done) = 7
+        items = await collect_items(handle, None, 0, 7)
+        assert len(items) == 7
+        assert items[0].data == b"started"
+        assert items[6].data == b"done"
+        await handle.signal(InterleavedWorkflow.close)
 
 
 @pytest.mark.asyncio

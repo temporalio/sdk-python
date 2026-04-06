@@ -38,6 +38,7 @@ class PubSubMixin:
 
     def get_pubsub_state(self) -> PubSubState:
         """Return a serializable snapshot of pub/sub state for continue-as-new."""
+        self._check_initialized()
         return PubSubState(log=list(self._pubsub_log))
 
     def drain_pubsub(self) -> None:
@@ -46,6 +47,7 @@ class PubSubMixin:
         Call this before ``await workflow.wait_condition(workflow.all_handlers_finished)``
         and ``workflow.continue_as_new()``.
         """
+        self._check_initialized()
         self._pubsub_draining = True
 
     def _check_initialized(self) -> None:
