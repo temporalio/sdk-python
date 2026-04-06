@@ -2,6 +2,12 @@
 
 This Temporal [plugin](https://docs.temporal.io/develop/plugins-guide) allows your [LangSmith](https://smith.langchain.com/) traces to be fully replay safe when added to Temporal workflows and activities. It propagates trace context across worker boundaries so that `@traceable` calls, LLM invocations, and Temporal operations show up in a single connected trace, and ensures that replaying does not generate duplicate traces.
 
+## Installation
+
+```
+pip install temporalio[langsmith]
+```
+
 ## Quick Start
 
 Register the plugin on your Temporal client. You need it on both the client (starter) side and the workers:
