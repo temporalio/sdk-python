@@ -2066,6 +2066,12 @@ To execute tests:
 poe test
 ```
 
+For a faster local run that spreads tests across multiple worker processes:
+
+```bash
+poe test-parallel
+```
+
 This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
 server, pass `--workflow-environment time-skipping`. To run against the `default` namespace of an already-running
 server, pass the `host:port` to `--workflow-environment`. Can also use regular pytest arguments. For example, here's how

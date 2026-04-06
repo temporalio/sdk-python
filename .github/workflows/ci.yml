@@ -66,11 +66,11 @@ jobs:
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
-      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+      - run: poe test-parallel ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+        run: poe test-parallel ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
         timeout-minutes: 10
       - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
         run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
@@ -101,7 +101,7 @@ jobs:
           poe build-develop
           poe gen-protos
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
-          poe test -s --ignore=tests/contrib/google_adk_agents/
+          poe test-parallel -s --ignore=tests/contrib/google_adk_agents/
         timeout-minutes: 10
 
       # Do docs stuff (only on one host)
@@ -150,7 +150,7 @@ jobs:
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
-      - run: poe test  -s --junit-xml=junit-xml/latest-deps.xml
+      - run: poe test-parallel -s --junit-xml=junit-xml/latest-deps.xml
         timeout-minutes: 15
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@v4

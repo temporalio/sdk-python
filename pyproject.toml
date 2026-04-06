@@ -68,6 +68,7 @@ dev = [
   "openinference-instrumentation-google-adk>=0.1.8",
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
+  "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
 ]
 
@@ -109,6 +110,7 @@ lint-types = [
 ]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
+test-parallel = "uv run pytest -n auto --dist=worksteal"
 
 
 [tool.pytest.ini_options]
