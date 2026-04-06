@@ -48,14 +48,23 @@ class PubSubMixin:
         """
         self._pubsub_draining = True
 
+    def _check_initialized(self) -> None:
+        if not hasattr(self, "_pubsub_log"):
+            raise RuntimeError(
+                "PubSubMixin not initialized. Call self.init_pubsub() in "
+                "your workflow's __init__ or at the start of run()."
+            )
+
     def publish(self, topic: str, data: bytes) -> None:
         """Publish an item from within workflow code. Deterministic — just appends."""
+        self._check_initialized()
         offset = len(self._pubsub_log)
         self._pubsub_log.append(PubSubItem(offset=offset, topic=topic, data=data))
 
     @workflow.signal(name="__pubsub_publish")
     def _pubsub_publish(self, input: PublishInput) -> None:
         """Receive publications from external clients (activities, starters)."""
+        self._check_initialized()
         for entry in input.items:
             offset = len(self._pubsub_log)
             self._pubsub_log.append(

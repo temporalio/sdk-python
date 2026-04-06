@@ -25,7 +25,7 @@ from temporalio.contrib.pubsub import (
     PublishInput,
     activity_pubsub_client,
 )
-from tests.helpers import new_worker
+from tests.helpers import assert_eq_eventually, new_worker
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +252,15 @@ async def publish_batch_test(count: int) -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+async def _is_different_run(old_handle, new_handle) -> bool:
+    """Check if new_handle points to a different run than old_handle."""
+    try:
+        desc = await new_handle.describe()
+        return desc.run_id != old_handle.result_run_id
+    except Exception:
+        return False
 
 
 async def collect_items(
@@ -560,6 +569,29 @@ async def test_mixin_coexistence(client: Client) -> None:
         await handle.signal(MixinCoexistenceWorkflow.close)
 
 
+@pytest.mark.asyncio
+async def test_flush_retains_items_on_signal_failure(client: Client) -> None:
+    """If flush signal fails, items remain buffered for retry."""
+    # Use a bogus workflow ID so the signal fails
+    bogus_handle = client.get_workflow_handle("nonexistent-workflow-id")
+    pubsub = PubSubClient(bogus_handle)
+
+    pubsub.publish("events", b"item-0")
+    pubsub.publish("events", b"item-1")
+    assert len(pubsub._buffer) == 2
+
+    # flush should fail (workflow doesn't exist)
+    try:
+        await pubsub.flush()
+    except Exception:
+        pass
+
+    # Items should still be in the buffer
+    assert len(pubsub._buffer) == 2
+    assert pubsub._buffer[0].data == b"item-0"
+    assert pubsub._buffer[1].data == b"item-1"
+
+
 # ---------------------------------------------------------------------------
 # Continue-as-new workflow and test
 # ---------------------------------------------------------------------------
@@ -675,11 +707,12 @@ async def _run_can_test(can_client: Client, workflow_cls, input_cls) -> None:
         # Trigger continue-as-new
         await handle.signal(workflow_cls.trigger_continue)
 
-        # Wait for new run to start
-        await asyncio.sleep(2)
-
-        # Get a fresh handle (not pinned to old run)
+        # Wait for new run to start (poll, don't sleep)
         new_handle = can_client.get_workflow_handle(handle.id)
+        await assert_eq_eventually(
+            True,
+            lambda: _is_different_run(handle, new_handle),
+        )
 
         # The 3 items from before CAN should still be readable
         items_after = await collect_items(new_handle, None, 0, 3)
@@ -730,10 +763,15 @@ async def test_continue_as_new_any_typed_fails(client: Client) -> None:
 
         # Trigger CAN — the new run will fail to deserialize pubsub_state
         await handle.signal(ContinueAsNewAnyWorkflow.trigger_continue)
-        await asyncio.sleep(2)
+
+        # Wait for CAN to happen
+        new_handle = can_client.get_workflow_handle(handle.id)
+        await assert_eq_eventually(
+            True,
+            lambda: _is_different_run(handle, new_handle),
+        )
 
         # The new run should be broken — items are NOT accessible
-        new_handle = can_client.get_workflow_handle(handle.id)
         items_after = await collect_items(new_handle, None, 0, 1, timeout=3.0)
         assert len(items_after) == 0  # fails because workflow can't start
 

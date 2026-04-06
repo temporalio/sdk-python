@@ -12,7 +12,7 @@ from typing import Self
 
 from temporalio import activity
 from temporalio.client import (
-    WorkflowExecutionStatus,
+    Client,
     WorkflowHandle,
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
@@ -23,16 +23,19 @@ from ._types import PollInput, PollResult, PubSubItem, PublishEntry, PublishInpu
 class PubSubClient:
     """Client for publishing to and subscribing from a pub/sub workflow.
 
-    For publishing, use as an async context manager to get automatic batching
-    with a background flush timer::
+    Create via :py:meth:`for_workflow` (preferred) or by passing a handle
+    directly to the constructor.
 
-        async with PubSubClient(handle, batch_interval=2.0) as client:
+    For publishing, use as an async context manager to get automatic batching::
+
+        client = PubSubClient.for_workflow(temporal_client, workflow_id)
+        async with client:
             client.publish("events", b"hello")
-            client.publish("events", b"world", priority=True)  # flushes immediately
+            client.publish("events", b"world", priority=True)
 
     For subscribing::
 
-        client = PubSubClient(handle)
+        client = PubSubClient.for_workflow(temporal_client, workflow_id)
         async for item in client.subscribe(["events"], from_offset=0):
             process(item)
     """
@@ -40,15 +43,56 @@ class PubSubClient:
     def __init__(
         self,
         handle: WorkflowHandle,
+        *,
         batch_interval: float = 2.0,
         max_batch_size: int | None = None,
     ) -> None:
+        """Create a pub/sub client from a workflow handle.
+
+        Prefer :py:meth:`for_workflow` when you need ``follow_continues``
+        in ``subscribe()``.
+
+        Args:
+            handle: Workflow handle to the pub/sub workflow.
+            batch_interval: Seconds between automatic flushes.
+            max_batch_size: Auto-flush when buffer reaches this size.
+        """
         self._handle = handle
+        self._client: Client | None = None
+        self._workflow_id = handle.id
         self._batch_interval = batch_interval
         self._max_batch_size = max_batch_size
         self._buffer: list[PublishEntry] = []
         self._flush_event = asyncio.Event()
         self._flush_task: asyncio.Task[None] | None = None
+
+    @classmethod
+    def for_workflow(
+        cls,
+        client: Client,
+        workflow_id: str,
+        *,
+        batch_interval: float = 2.0,
+        max_batch_size: int | None = None,
+    ) -> PubSubClient:
+        """Create a pub/sub client from a Temporal client and workflow ID.
+
+        This is the preferred constructor. It enables ``follow_continues``
+        in ``subscribe()`` because it can construct fresh handles after
+        continue-as-new.
+
+        Args:
+            client: Temporal client.
+            workflow_id: ID of the pub/sub workflow.
+            batch_interval: Seconds between automatic flushes.
+            max_batch_size: Auto-flush when buffer reaches this size.
+        """
+        handle = client.get_workflow_handle(workflow_id)
+        instance = cls(
+            handle, batch_interval=batch_interval, max_batch_size=max_batch_size
+        )
+        instance._client = client
+        return instance
 
     async def __aenter__(self) -> Self:
         self._flush_task = asyncio.create_task(self._run_flusher())
@@ -80,13 +124,17 @@ class PubSubClient:
             self._flush_event.set()
 
     async def flush(self) -> None:
-        """Send all buffered messages to the workflow via signal."""
+        """Send all buffered messages to the workflow via signal.
+
+        Items are removed from the buffer only after the signal succeeds.
+        If the signal fails, the items remain buffered for retry.
+        """
         if self._buffer:
-            batch = self._buffer.copy()
-            self._buffer.clear()
+            batch = list(self._buffer)
             await self._handle.signal(
                 "__pubsub_publish", PublishInput(items=batch)
             )
+            del self._buffer[: len(batch)]
 
     async def _run_flusher(self) -> None:
         """Background task: wait for timer OR priority wakeup, then flush."""
@@ -112,9 +160,9 @@ class PubSubClient:
         Args:
             topics: Topic filter. None or empty list means all topics.
             from_offset: Global offset to start reading from.
-            follow_continues: If True, automatically follow continue-as-new
-                chains. The subscriber re-targets the new run and retries
-                from the same offset.
+            follow_continues: If True and the client was created via
+                :py:meth:`for_workflow`, automatically follow
+                continue-as-new chains.
 
         Yields:
             PubSubItem for each matching item.
@@ -130,41 +178,44 @@ class PubSubClient:
             except asyncio.CancelledError:
                 return
             except WorkflowUpdateRPCTimeoutOrCancelledError:
-                if follow_continues and await self._follow_continue_as_new():
+                if follow_continues and self._follow_continue_as_new():
                     continue
                 return
             for item in result.items:
                 yield item
             offset = result.next_offset
 
-    async def _follow_continue_as_new(self) -> bool:
-        """Check if the workflow continued-as-new and update the handle.
-
-        Returns True if the handle was updated (caller should retry).
-        """
-        try:
-            desc = await self._handle.describe()
-        except Exception:
+    def _follow_continue_as_new(self) -> bool:
+        """Re-target the handle to the latest run if client is available."""
+        if self._client is None:
             return False
-        if desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW:
-            self._handle = self._handle._client.get_workflow_handle(
-                self._handle.id
-            )
-            return True
-        return False
+        self._handle = self._client.get_workflow_handle(self._workflow_id)
+        return True
 
     async def get_offset(self) -> int:
         """Query the current log offset (length)."""
         return await self._handle.query("__pubsub_offset", result_type=int)
 
 
-def activity_pubsub_client(**kwargs: object) -> PubSubClient:
+def activity_pubsub_client(
+    batch_interval: float = 2.0,
+    max_batch_size: int | None = None,
+) -> PubSubClient:
     """Create a PubSubClient for the current activity's parent workflow.
 
-    Must be called from within an activity. Passes all kwargs to PubSubClient.
+    Must be called from within an activity. Uses :py:meth:`PubSubClient.for_workflow`
+    so ``follow_continues`` works in ``subscribe()``.
+
+    Args:
+        batch_interval: Seconds between automatic flushes.
+        max_batch_size: Auto-flush when buffer reaches this size.
     """
     info = activity.info()
     workflow_id = info.workflow_id
     assert workflow_id is not None, "activity must be called from within a workflow"
-    handle = activity.client().get_workflow_handle(workflow_id)
-    return PubSubClient(handle, **kwargs)  # type: ignore[arg-type]
+    return PubSubClient.for_workflow(
+        activity.client(),
+        workflow_id,
+        batch_interval=batch_interval,
+        max_batch_size=max_batch_size,
+    )
