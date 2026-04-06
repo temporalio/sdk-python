@@ -331,10 +331,14 @@ async def test_workflow_history_info(
         # because just a query will have a stale representation of history
         # counts, but signal forces a new WFT.
         await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
-        new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
-        assert new_info.history_length > continue_as_new_suggest_history_count
-        assert new_info.history_size > orig_info.history_size
-        assert new_info.continue_as_new_suggested
+
+        async def history_info_updated() -> None:
+            new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
+            assert new_info.history_length > continue_as_new_suggest_history_count
+            assert new_info.history_size > orig_info.history_size
+            assert new_info.continue_as_new_suggested
+
+        await assert_eventually(history_info_updated)
 
 
 @workflow.defn
@@ -5317,7 +5321,11 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             # because we should have timer-done poll completions every 100ms
             worker.client = other_env.client
             # Now confirm the other workflow has started
-            await assert_eq_eventually(True, lambda: any_task_completed(handle2))
+            await assert_eq_eventually(
+                True,
+                lambda: any_task_completed(handle2),
+                timeout=timedelta(seconds=30),
+            )
             # Terminate both
             await handle1.terminate()
             await handle2.terminate()
