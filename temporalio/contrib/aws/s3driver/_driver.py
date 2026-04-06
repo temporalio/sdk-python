@@ -64,7 +64,7 @@ class S3StorageDriver(StorageDriver):
 
         Args:
             client: An :class:`S3StorageDriverClient` implementation. Use
-                :func:`~temporalio.contrib.aws.s3driver.aioboto3.new_aioboto3_client` to
+                :func:`temporalio.contrib.aws.s3driver.aioboto3.new_aioboto3_client` to
                 wrap an aioboto3 S3 client.
             bucket: S3 bucket name, access point ARN, or a callable that
                 accepts ``(StorageDriverStoreContext, Payload)`` and returns
@@ -73,7 +73,7 @@ class S3StorageDriver(StorageDriver):
             driver_name: Name of this driver instance. Defaults to
                 ``"aws.s3driver"``. Override when registering
                 multiple S3StorageDriver instances with distinct configurations
-                under the same :attr:`~temporalio.extstore.Options.drivers` list.
+                under the same ``temporalio.extstore.Options.drivers`` list.
             max_payload_size: Maximum serialized payload size in bytes that the
                 driver will accept. Defaults to 52428800 (50 MiB). Raise this
                 value if your workload requires larger payloads; lower it to
@@ -105,7 +105,7 @@ class S3StorageDriver(StorageDriver):
         context: StorageDriverStoreContext,
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
-        """Stores payloads in S3 and returns a :class:`~temporalio.extstore.DriverClaim` for each one.
+        """Stores payloads in S3 and returns a ``temporalio.extstore.DriverClaim`` for each one.
 
         Payloads are keyed by their SHA-256 hash, so identical serialized bytes
         share the same S3 object. Deduplication is best-effort because the same
@@ -175,7 +175,7 @@ class S3StorageDriver(StorageDriver):
         context: StorageDriverRetrieveContext,  # noqa: ARG002
         claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
-        """Retrieves payloads from S3 for the given :class:`~temporalio.extstore.DriverClaim` list."""
+        """Retrieves payloads from S3 for the given ``temporalio.extstore.DriverClaim`` list."""
 
         async def _download(claim: StorageDriverClaim) -> Payload:
             bucket = claim.claim_data["bucket"]
