@@ -2066,10 +2066,11 @@ To execute tests:
 poe test
 ```
 
-For a faster local run that spreads tests across multiple worker processes:
+`poe test` spreads tests across multiple worker processes by default. If you
+need a serial run for debugging, invoke pytest directly:
 
 ```bash
-poe test-parallel
+uv run pytest
 ```
 
 This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
