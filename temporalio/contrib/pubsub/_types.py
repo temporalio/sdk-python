@@ -52,8 +52,8 @@ class PubSubState(BaseModel):
     """Serializable snapshot of pub/sub state for continue-as-new.
 
     This is a Pydantic model (not a dataclass) so that Pydantic-based data
-    converters can properly reconstruct it when the containing workflow input
-    uses ``Any``-typed fields.
+    converters can properly reconstruct it. The containing workflow input
+    must type the field as ``PubSubState | None``, not ``Any``.
     """
 
     log: list[PubSubItem] = []

@@ -91,6 +91,7 @@ class PubSubMixin:
 
     @_pubsub_poll.validator
     def _validate_pubsub_poll(self, input: PollInput) -> None:
+        self._check_initialized()
         if self._pubsub_draining:
             raise RuntimeError("Workflow is draining for continue-as-new")
 
