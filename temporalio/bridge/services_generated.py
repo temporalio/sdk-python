@@ -2189,6 +2189,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def create_account_audit_log_sink(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.CreateAccountAuditLogSinkRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.CreateAccountAuditLogSinkResponse:
+        """Invokes the CloudService.create_account_audit_log_sink rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_account_audit_log_sink",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.CreateAccountAuditLogSinkResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def create_api_key(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateApiKeyRequest,
@@ -2202,6 +2220,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.CreateApiKeyResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def create_billing_report(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.CreateBillingReportRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.CreateBillingReportResponse:
+        """Invokes the CloudService.create_billing_report rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_billing_report",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.CreateBillingReportResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2328,6 +2364,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.CreateUserGroupResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_account_audit_log_sink(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.DeleteAccountAuditLogSinkRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.DeleteAccountAuditLogSinkResponse:
+        """Invokes the CloudService.delete_account_audit_log_sink rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_account_audit_log_sink",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.DeleteAccountAuditLogSinkResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2531,6 +2585,42 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_account_audit_log_sink(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetAccountAuditLogSinkRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetAccountAuditLogSinkResponse:
+        """Invokes the CloudService.get_account_audit_log_sink rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_account_audit_log_sink",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetAccountAuditLogSinkResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_account_audit_log_sinks(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetAccountAuditLogSinksRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetAccountAuditLogSinksResponse:
+        """Invokes the CloudService.get_account_audit_log_sinks rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_account_audit_log_sinks",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetAccountAuditLogSinksResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_api_key(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetApiKeyRequest,
@@ -2585,6 +2675,42 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_audit_logs(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetAuditLogsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetAuditLogsResponse:
+        """Invokes the CloudService.get_audit_logs rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_audit_logs",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetAuditLogsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_billing_report(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetBillingReportRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetBillingReportResponse:
+        """Invokes the CloudService.get_billing_report rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_billing_report",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetBillingReportResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_connectivity_rule(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetConnectivityRuleRequest,
@@ -2621,6 +2747,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_current_identity(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCurrentIdentityRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCurrentIdentityResponse:
+        """Invokes the CloudService.get_current_identity rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_current_identity",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCurrentIdentityResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetNamespaceRequest,
@@ -2634,6 +2778,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.GetNamespaceResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_namespace_capacity_info(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetNamespaceCapacityInfoRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetNamespaceCapacityInfoResponse:
+        """Invokes the CloudService.get_namespace_capacity_info rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_namespace_capacity_info",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetNamespaceCapacityInfoResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3012,6 +3174,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.UpdateAccountResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_account_audit_log_sink(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.UpdateAccountAuditLogSinkRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.UpdateAccountAuditLogSinkResponse:
+        """Invokes the CloudService.update_account_audit_log_sink rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_account_audit_log_sink",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.UpdateAccountAuditLogSinkResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,

@@ -15,6 +15,11 @@ class CloudServiceStub:
     """
 
     def __init__(self, channel: grpc.Channel) -> None: ...
+    GetCurrentIdentity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
+    ]
+    """Get information about the current authenticated user or service account principal"""
     GetUsers: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
@@ -303,6 +308,11 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
     ]
     """Deletes a connectivity rule by id"""
+    GetAuditLogs: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
+    ]
+    """Get audit logs"""
     ValidateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
@@ -310,12 +320,59 @@ class CloudServiceStub:
     """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
     The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
     """
+    CreateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
+    ]
+    """Create an audit log sink"""
+    GetAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
+    ]
+    """Get an audit log sink"""
+    GetAccountAuditLogSinks: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
+    ]
+    """Get audit log sinks"""
+    UpdateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
+    ]
+    """Update an audit log sink"""
+    DeleteAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
+    ]
+    """Delete an audit log sink"""
+    GetNamespaceCapacityInfo: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
+    ]
+    """Get namespace capacity information"""
+    CreateBillingReport: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
+    ]
+    """Create a billing report"""
+    GetBillingReport: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
+    ]
+    """Get a billing report"""
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
     incompatible ways.
     """
 
+    @abc.abstractmethod
+    def GetCurrentIdentity(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse:
+        """Get information about the current authenticated user or service account principal"""
     @abc.abstractmethod
     def GetUsers(
         self,
@@ -725,6 +782,13 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse:
         """Deletes a connectivity rule by id"""
     @abc.abstractmethod
+    def GetAuditLogs(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse:
+        """Get audit logs"""
+    @abc.abstractmethod
     def ValidateAccountAuditLogSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
@@ -733,6 +797,62 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
         The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
         """
+    @abc.abstractmethod
+    def CreateAccountAuditLogSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse:
+        """Create an audit log sink"""
+    @abc.abstractmethod
+    def GetAccountAuditLogSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse:
+        """Get an audit log sink"""
+    @abc.abstractmethod
+    def GetAccountAuditLogSinks(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse:
+        """Get audit log sinks"""
+    @abc.abstractmethod
+    def UpdateAccountAuditLogSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse:
+        """Update an audit log sink"""
+    @abc.abstractmethod
+    def DeleteAccountAuditLogSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse:
+        """Delete an audit log sink"""
+    @abc.abstractmethod
+    def GetNamespaceCapacityInfo(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse:
+        """Get namespace capacity information"""
+    @abc.abstractmethod
+    def CreateBillingReport(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse:
+        """Create a billing report"""
+    @abc.abstractmethod
+    def GetBillingReport(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse:
+        """Get a billing report"""
 
 def add_CloudServiceServicer_to_server(
     servicer: CloudServiceServicer, server: grpc.Server
