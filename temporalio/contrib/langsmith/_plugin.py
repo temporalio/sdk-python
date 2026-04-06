@@ -11,8 +11,8 @@ import langsmith
 
 import temporalio.client
 from temporalio.contrib.langsmith._interceptor import LangSmithInterceptor
-from temporalio.plugin import SimplePlugin, WorkerConfig
-from temporalio.worker import WorkflowRunner
+from temporalio.plugin import SimplePlugin
+from temporalio.worker import WorkerConfig, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
@@ -56,17 +56,18 @@ class LangSmithPlugin(SimplePlugin):
 
         Args:
             client: A langsmith.Client instance. If None, one will be created
-                lazily (using LANGSMITH_API_KEY env var).
+                automatically (using LANGSMITH_API_KEY env var).
             project_name: LangSmith project name for traces.
             add_temporal_runs: Whether to create LangSmith runs for Temporal
                 operations. Defaults to False.
             metadata: Default metadata to attach to all runs.
             tags: Default tags to attach to all runs.
         """
+        ls_client = client or langsmith.Client()
 
         def make_interceptor() -> LangSmithInterceptor:
             return LangSmithInterceptor(
-                client=client,
+                client=ls_client,
                 project_name=project_name,
                 add_temporal_runs=add_temporal_runs,
                 default_metadata=metadata,
@@ -74,7 +75,6 @@ class LangSmithPlugin(SimplePlugin):
             )
 
         wrapper = _ClientOnlyLangSmithInterceptor(make_interceptor())
-        ls_client = wrapper._interceptor._client
         self._make_interceptor = make_interceptor
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
