@@ -1511,6 +1511,9 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
     client: Client,
     env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
