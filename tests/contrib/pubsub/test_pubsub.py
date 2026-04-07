@@ -15,15 +15,12 @@ from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.contrib.pubsub import (
-    PollInput,
-    PollResult,
     PubSubClient,
     PubSubItem,
     PubSubMixin,
     PubSubState,
     PublishEntry,
     PublishInput,
-    activity_pubsub_client,
 )
 from tests.helpers import assert_eq_eventually, new_worker
 
@@ -234,7 +231,7 @@ class MixinCoexistenceWorkflow(PubSubMixin):
 
 @activity.defn(name="publish_items")
 async def publish_items(count: int) -> None:
-    client = activity_pubsub_client(batch_interval=0.5)
+    client = PubSubClient.for_workflow(batch_interval=0.5)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -244,7 +241,7 @@ async def publish_items(count: int) -> None:
 @activity.defn(name="publish_multi_topic")
 async def publish_multi_topic(count: int) -> None:
     topics = ["a", "b", "c"]
-    client = activity_pubsub_client(batch_interval=0.5)
+    client = PubSubClient.for_workflow(batch_interval=0.5)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -254,7 +251,7 @@ async def publish_multi_topic(count: int) -> None:
 
 @activity.defn(name="publish_with_priority")
 async def publish_with_priority() -> None:
-    client = activity_pubsub_client(batch_interval=60.0)
+    client = PubSubClient.for_workflow(batch_interval=60.0)
     async with client:
         client.publish("events", b"normal-0")
         client.publish("events", b"normal-1")
@@ -265,7 +262,7 @@ async def publish_with_priority() -> None:
 
 @activity.defn(name="publish_batch_test")
 async def publish_batch_test(count: int) -> None:
-    client = activity_pubsub_client(batch_interval=60.0)
+    client = PubSubClient.for_workflow(batch_interval=60.0)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -274,7 +271,7 @@ async def publish_batch_test(count: int) -> None:
 
 @activity.defn(name="publish_with_max_batch")
 async def publish_with_max_batch(count: int) -> None:
-    client = activity_pubsub_client(batch_interval=60.0, max_batch_size=3)
+    client = PubSubClient.for_workflow(batch_interval=60.0, max_batch_size=3)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -309,7 +306,9 @@ async def collect_items(
     items: list[PubSubItem] = []
     try:
         async with asyncio.timeout(timeout):
-            async for item in client.subscribe(topics=topics, from_offset=from_offset):
+            async for item in client.subscribe(
+                topics=topics, from_offset=from_offset, poll_interval=0
+            ):
                 items.append(item)
                 if len(items) >= expected_count:
                     break
@@ -346,7 +345,6 @@ async def test_activity_publish_and_subscribe(client: Client) -> None:
         for i in range(count):
             assert items[i].topic == "events"
             assert items[i].data == f"item-{i}".encode()
-            assert items[i].offset == i
 
         # Check workflow-side status item
         assert items[count].topic == "status"
@@ -491,7 +489,9 @@ async def test_iterator_cancellation(client: Client) -> None:
 
         async def subscribe_and_collect():
             items = []
-            async for item in pubsub_client.subscribe(from_offset=0):
+            async for item in pubsub_client.subscribe(
+                from_offset=0, poll_interval=0
+            ):
                 items.append(item)
             return items
 
@@ -667,10 +667,72 @@ async def test_flush_retains_items_on_signal_failure(client: Client) -> None:
     except Exception:
         pass
 
-    # Items should still be in the buffer
+    # Items should still be in the buffer (restored after failed swap)
     assert len(pubsub._buffer) == 2
     assert pubsub._buffer[0].data == b"item-0"
     assert pubsub._buffer[1].data == b"item-1"
+    # Sequence advances even on failure — the next flush uses a new sequence
+    # to avoid dedup-dropping newly buffered items merged with the retry batch
+    assert pubsub._sequence == 1
+
+
+@pytest.mark.asyncio
+async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
+    """Workflow deduplicates signals with the same publisher_id + sequence."""
+    async with new_worker(
+        client,
+        BasicPubSubWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            BasicPubSubWorkflow.run,
+            id=f"pubsub-dedup-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Send a batch with publisher_id and sequence
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=b"item-0")],
+                publisher_id="test-pub",
+                sequence=1,
+            ),
+        )
+
+        # Send the same sequence again — should be deduped
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=b"duplicate")],
+                publisher_id="test-pub",
+                sequence=1,
+            ),
+        )
+
+        # Send a new sequence — should go through
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=b"item-1")],
+                publisher_id="test-pub",
+                sequence=2,
+            ),
+        )
+
+        await asyncio.sleep(0.5)
+
+        # Should have 2 items, not 3
+        items = await collect_items(handle, None, 0, 2)
+        assert len(items) == 2
+        assert items[0].data == b"item-0"
+        assert items[1].data == b"item-1"
+
+        # Verify offset is 2 (not 3)
+        pubsub_client = PubSubClient(handle)
+        offset = await pubsub_client.get_offset()
+        assert offset == 2
+
+        await handle.signal(BasicPubSubWorkflow.close)
 
 
 # ---------------------------------------------------------------------------
@@ -809,7 +871,6 @@ async def _run_can_test(can_client: Client, workflow_cls, input_cls) -> None:
         )
         items_all = await collect_items(new_handle, None, 0, 4)
         assert len(items_all) == 4
-        assert items_all[3].offset == 3
         assert items_all[3].data == b"item-3"
 
         await new_handle.signal(workflow_cls.close)

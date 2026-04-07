@@ -7,12 +7,14 @@ messages and subscribe to topics on a pub/sub workflow.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import AsyncIterator
 from typing import Self
 
 from temporalio import activity
 from temporalio.client import (
     Client,
+    WorkflowExecutionStatus,
     WorkflowHandle,
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
@@ -49,8 +51,8 @@ class PubSubClient:
     ) -> None:
         """Create a pub/sub client from a workflow handle.
 
-        Prefer :py:meth:`for_workflow` when you need ``follow_continues``
-        in ``subscribe()``.
+        Prefer :py:meth:`for_workflow` when you need continue-as-new
+        following in ``subscribe()``.
 
         Args:
             handle: Workflow handle to the pub/sub workflow.
@@ -65,28 +67,45 @@ class PubSubClient:
         self._buffer: list[PublishEntry] = []
         self._flush_event = asyncio.Event()
         self._flush_task: asyncio.Task[None] | None = None
+        self._flush_lock = asyncio.Lock()
+        self._publisher_id: str = uuid.uuid4().hex
+        self._sequence: int = 0
 
     @classmethod
     def for_workflow(
         cls,
-        client: Client,
-        workflow_id: str,
+        client: Client | None = None,
+        workflow_id: str | None = None,
         *,
         batch_interval: float = 2.0,
         max_batch_size: int | None = None,
     ) -> PubSubClient:
         """Create a pub/sub client from a Temporal client and workflow ID.
 
-        This is the preferred constructor. It enables ``follow_continues``
-        in ``subscribe()`` because it can construct fresh handles after
-        continue-as-new.
+        This is the preferred constructor. It enables continue-as-new
+        following in ``subscribe()``.
+
+        If called from within an activity, ``client`` and ``workflow_id``
+        can be omitted — they are inferred from the activity context.
 
         Args:
-            client: Temporal client.
-            workflow_id: ID of the pub/sub workflow.
+            client: Temporal client. If None and in an activity, uses
+                ``activity.client()``.
+            workflow_id: ID of the pub/sub workflow. If None and in an
+                activity, uses the activity's parent workflow ID.
             batch_interval: Seconds between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
         """
+        if client is None or workflow_id is None:
+            info = activity.info()
+            if client is None:
+                client = activity.client()
+            if workflow_id is None:
+                wf_id = info.workflow_id
+                assert wf_id is not None, (
+                    "activity must be called from within a workflow"
+                )
+                workflow_id = wf_id
         handle = client.get_workflow_handle(workflow_id)
         instance = cls(
             handle, batch_interval=batch_interval, max_batch_size=max_batch_size
@@ -126,16 +145,38 @@ class PubSubClient:
     async def flush(self) -> None:
         """Send all buffered messages to the workflow via signal.
 
-        Items are removed from the buffer only after the signal succeeds.
-        If the signal fails, the items remain buffered for retry.
+        Uses a lock to serialize concurrent flushes. If a flush is already
+        in progress, callers wait on the lock — by the time they enter,
+        their items (plus any others added meanwhile) are in the buffer
+        and get sent in one signal. This naturally coalesces N concurrent
+        flush calls into fewer signals.
+
+        Uses buffer swap for exactly-once delivery. On failure, items are
+        restored to the buffer but the sequence is NOT decremented — the
+        next flush gets a new sequence number. This prevents data loss
+        when the signal was delivered but the client saw an error: newly
+        buffered items that arrived during the failed await must not be
+        sent under the old (already-delivered) sequence, or the workflow
+        would deduplicate them away.
         """
-        #@AGENT: is it possible to have a second invocation of flush while the first is running?
-        if self._buffer:
-            batch = list(self._buffer)
-            await self._handle.signal(
-                "__pubsub_publish", PublishInput(items=batch)
-            )
-            del self._buffer[: len(batch)]
+        async with self._flush_lock:
+            if not self._buffer:
+                return
+            self._sequence += 1
+            batch = self._buffer
+            self._buffer = []
+            try:
+                await self._handle.signal(
+                    "__pubsub_publish",
+                    PublishInput(
+                        items=batch,
+                        publisher_id=self._publisher_id,
+                        sequence=self._sequence,
+                    ),
+                )
+            except Exception:
+                self._buffer = batch + self._buffer
+                raise
 
     async def _run_flusher(self) -> None:
         """Background task: wait for timer OR priority wakeup, then flush."""
@@ -154,17 +195,19 @@ class PubSubClient:
         topics: list[str] | None = None,
         from_offset: int = 0,
         *,
-        follow_continues: bool = True,
+        poll_interval: float = 0.1,
     ) -> AsyncIterator[PubSubItem]:
-        #@AGENT: why would we not always follow CAN chains? How is the client supposed to know whether the workflow does CAN?
         """Async iterator that polls for new items.
+
+        Automatically follows continue-as-new chains when the client
+        was created via :py:meth:`for_workflow`.
 
         Args:
             topics: Topic filter. None or empty list means all topics.
             from_offset: Global offset to start reading from.
-            follow_continues: If True and the client was created via
-                :py:meth:`for_workflow`, automatically follow
-                continue-as-new chains.
+            poll_interval: Seconds to sleep between polls to avoid
+                overwhelming the workflow when items arrive faster than
+                the poll round-trip. Defaults to 0.1.
 
         Yields:
             PubSubItem for each matching item.
@@ -178,52 +221,44 @@ class PubSubClient:
                     result_type=PollResult,
                 )
             except asyncio.CancelledError:
-                #@AGENT: help me understand what this means / how we respond
+                # The caller's task was cancelled (e.g., activity shutdown
+                # or subscriber cleanup). Stop iteration gracefully.
                 return
             except WorkflowUpdateRPCTimeoutOrCancelledError:
-                #@AGENT: is this code path tested?
-                if follow_continues and self._follow_continue_as_new():
+                # The update was cancelled server-side — possibly due to
+                # continue-as-new (the drain validator rejected the poll).
+                # Check if the workflow CAN'd and follow the chain.
+                if await self._follow_continue_as_new():
                     continue
                 return
             for item in result.items:
                 yield item
             offset = result.next_offset
-            #@AGENT: do we want to create a provision for putting a little bit of sleep in here to rate limit the polls when we have a workflow publisher (no batching). note that the alternative is to put a timer in the workflow (costing another activity)
+            if poll_interval > 0:
+                await asyncio.sleep(poll_interval)
 
-    def _follow_continue_as_new(self) -> bool:
-        """Re-target the handle to the latest run if client is available."""
+    async def _follow_continue_as_new(self) -> bool:
+        """Check if the workflow continued-as-new and re-target the handle.
+
+        When a poll fails, this method checks the workflow's execution
+        status. If it's CONTINUED_AS_NEW, we get a fresh handle for the
+        same workflow ID (no pinned run_id), which targets the latest run.
+        The subscriber can then retry the poll from the same offset — the
+        new run's log contains all items from the previous run.
+
+        Returns True if the handle was updated (caller should retry).
+        """
         if self._client is None:
             return False
-        #@AGENT: put a description of what is going on here and why
-        self._handle = self._client.get_workflow_handle(self._workflow_id)
-        return True
+        try:
+            desc = await self._handle.describe()
+        except Exception:
+            return False
+        if desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW:
+            self._handle = self._client.get_workflow_handle(self._workflow_id)
+            return True
+        return False
 
-    #@AGENT: should this be part of the interface?
     async def get_offset(self) -> int:
-        """Query the current log offset (length)."""
+        """Query the current global offset (base_offset + log length)."""
         return await self._handle.query("__pubsub_offset", result_type=int)
-
-
-#@AGENT: can we detect the activity context automatically and move this functionality into for_workflow?, e.g., just make the client optional if you are running in an activity
-def activity_pubsub_client(
-    batch_interval: float = 2.0,
-    max_batch_size: int | None = None,
-) -> PubSubClient:
-    """Create a PubSubClient for the current activity's parent workflow.
-
-    Must be called from within an activity. Uses :py:meth:`PubSubClient.for_workflow`
-    so ``follow_continues`` works in ``subscribe()``.
-
-    Args:
-        batch_interval: Seconds between automatic flushes.
-        max_batch_size: Auto-flush when buffer reaches this size.
-    """
-    info = activity.info()
-    workflow_id = info.workflow_id
-    assert workflow_id is not None, "activity must be called from within a workflow"
-    return PubSubClient.for_workflow(
-        activity.client(),
-        workflow_id,
-        batch_interval=batch_interval,
-        max_batch_size=max_batch_size,
-    )

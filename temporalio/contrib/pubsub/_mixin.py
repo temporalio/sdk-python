@@ -1,10 +1,11 @@
 """Workflow-side pub/sub mixin.
 
 Add PubSubMixin as a base class to any workflow to get pub/sub signal, update,
-and query handlers. Call ``init_pubsub()`` in your workflow's ``__init__`` or
-at the start of ``run()``.
+and query handlers.
+
+Call ``init_pubsub()`` in ``__init__`` for fresh workflows, or in ``run()``
+when accepting ``prior_state`` from continue-as-new arguments.
 """
-#@AGENT: can we give specific advice on the preferred path for calling init_pubsub()? I don't like giving options without a framework for making the decision in your situation
 
 from __future__ import annotations
 
@@ -18,31 +19,45 @@ class PubSubMixin:
 
     Provides:
     - ``publish(topic, data)`` for workflow-side publishing
-    - ``__pubsub_publish`` signal for external publishing
+    - ``__pubsub_publish`` signal for external publishing (with dedup)
     - ``__pubsub_poll`` update for long-poll subscription
     - ``__pubsub_offset`` query for current log length
     - ``drain_pubsub()`` / ``get_pubsub_state()`` for continue-as-new
     """
 
+    _pubsub_log: list[PubSubItem]
+    _pubsub_base_offset: int
+    _pubsub_publisher_sequences: dict[str, int]
+    _pubsub_draining: bool
+
     def init_pubsub(self, prior_state: PubSubState | None = None) -> None:
         """Initialize pub/sub state.
 
         Args:
-            prior_state: State from a previous run (via get_pubsub_state()).
-                         Pass None on the first run.
+            prior_state: State carried from a previous run via
+                ``get_pubsub_state()`` through continue-as-new. Pass None
+                on the first run.
         """
-        #@AGENT: clarify that this is used with continue-as-new
         if prior_state is not None:
-            #@AGENT: i'm seeing a pywright error here - did you run that?
-            self._pubsub_log: list[PubSubItem] = list(prior_state.log)
+            self._pubsub_log = list(prior_state.log)
+            self._pubsub_base_offset = prior_state.base_offset
+            self._pubsub_publisher_sequences = dict(
+                prior_state.publisher_sequences
+            )
         else:
             self._pubsub_log = []
+            self._pubsub_base_offset = 0
+            self._pubsub_publisher_sequences = {}
         self._pubsub_draining = False
 
     def get_pubsub_state(self) -> PubSubState:
         """Return a serializable snapshot of pub/sub state for continue-as-new."""
         self._check_initialized()
-        return PubSubState(log=list(self._pubsub_log))
+        return PubSubState(
+            log=list(self._pubsub_log),
+            base_offset=self._pubsub_base_offset,
+            publisher_sequences=dict(self._pubsub_publisher_sequences),
+        )
 
     def drain_pubsub(self) -> None:
         """Unblock all waiting poll handlers and reject new polls.
@@ -63,31 +78,48 @@ class PubSubMixin:
     def publish(self, topic: str, data: bytes) -> None:
         """Publish an item from within workflow code. Deterministic — just appends."""
         self._check_initialized()
-        offset = len(self._pubsub_log)
-        self._pubsub_log.append(PubSubItem(offset=offset, topic=topic, data=data))
+        self._pubsub_log.append(PubSubItem(topic=topic, data=data))
 
     @workflow.signal(name="__pubsub_publish")
     def _pubsub_publish(self, input: PublishInput) -> None:
-        """Receive publications from external clients (activities, starters)."""
+        """Receive publications from external clients (activities, starters).
+
+        Deduplicates using (publisher_id, sequence). If publisher_id is set
+        and the sequence is <= the last seen sequence for that publisher,
+        the entire batch is dropped as a duplicate.
+        """
         self._check_initialized()
-        #@AGENT: do we have a more pythonic way to do this?
+        if input.publisher_id:
+            last_seq = self._pubsub_publisher_sequences.get(
+                input.publisher_id, 0
+            )
+            if input.sequence <= last_seq:
+                return
+            self._pubsub_publisher_sequences[input.publisher_id] = (
+                input.sequence
+            )
         for entry in input.items:
-            offset = len(self._pubsub_log)
             self._pubsub_log.append(
-                PubSubItem(offset=offset, topic=entry.topic, data=entry.data)
+                PubSubItem(topic=entry.topic, data=entry.data)
             )
 
     @workflow.update(name="__pubsub_poll")
     async def _pubsub_poll(self, input: PollInput) -> PollResult:
         """Long-poll: block until new items available or draining, then return."""
         self._check_initialized()
+        log_offset = input.from_offset - self._pubsub_base_offset
+        if log_offset < 0:
+            raise ValueError(
+                f"Requested offset {input.from_offset} is before base offset "
+                f"{self._pubsub_base_offset} (log has been truncated)"
+            )
         await workflow.wait_condition(
-            lambda: len(self._pubsub_log) > input.from_offset
+            lambda: len(self._pubsub_log) > log_offset
             or self._pubsub_draining,
             timeout=input.timeout,
         )
-        all_new = self._pubsub_log[input.from_offset :]
-        next_offset = len(self._pubsub_log)
+        all_new = self._pubsub_log[log_offset:]
+        next_offset = self._pubsub_base_offset + len(self._pubsub_log)
         if input.topics:
             topic_set = set(input.topics)
             filtered = [item for item in all_new if item.topic in topic_set]
@@ -96,14 +128,20 @@ class PubSubMixin:
         return PollResult(items=filtered, next_offset=next_offset)
 
     @_pubsub_poll.validator
-    def _validate_pubsub_poll(self, input: PollInput) -> None:
-        #@AGENT: run pyright- unused arg. also, help me understand what this is for
+    def _validate_pubsub_poll(self, input: PollInput) -> None:  # noqa: A002
+        """Reject new polls when draining for continue-as-new.
+
+        Update validators run synchronously before the update handler is
+        accepted. By rejecting here, the update is never accepted, so no
+        new handler starts — this allows ``all_handlers_finished()`` to
+        stabilize. See DESIGN-ADDENDUM-CAN.md.
+        """
         self._check_initialized()
         if self._pubsub_draining:
             raise RuntimeError("Workflow is draining for continue-as-new")
 
     @workflow.query(name="__pubsub_offset")
     def _pubsub_offset(self) -> int:
-        """Return the current log length (next offset)."""
+        """Return the current global offset (base_offset + log length)."""
         self._check_initialized()
-        return len(self._pubsub_log)
+        return self._pubsub_base_offset + len(self._pubsub_log)

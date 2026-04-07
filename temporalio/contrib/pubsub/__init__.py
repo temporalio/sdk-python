@@ -7,7 +7,7 @@ and subscribe through the workflow handle using Temporal primitives.
 Payloads are opaque byte strings for cross-language compatibility.
 """
 
-from temporalio.contrib.pubsub._client import PubSubClient, activity_pubsub_client
+from temporalio.contrib.pubsub._client import PubSubClient
 from temporalio.contrib.pubsub._mixin import PubSubMixin
 from temporalio.contrib.pubsub._types import (
     PollInput,
@@ -27,5 +27,4 @@ __all__ = [
     "PubSubState",
     "PublishEntry",
     "PublishInput",
-    "activity_pubsub_client",
 ]

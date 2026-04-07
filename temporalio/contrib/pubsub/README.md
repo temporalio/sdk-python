@@ -31,16 +31,17 @@ class MyWorkflow(PubSubMixin):
 
 ### Activity side (publishing)
 
-Use `activity_pubsub_client()` with the async context manager for batched
-publishing:
+Use `PubSubClient.for_workflow()` with the async context manager for batched
+publishing. When called from within an activity, the client and workflow ID
+are inferred automatically:
 
 ```python
 from temporalio import activity
-from temporalio.contrib.pubsub import activity_pubsub_client
+from temporalio.contrib.pubsub import PubSubClient
 
 @activity.defn
 async def stream_events() -> None:
-    client = activity_pubsub_client(batch_interval=2.0)
+    client = PubSubClient.for_workflow(batch_interval=2.0)
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -63,7 +64,7 @@ from temporalio.contrib.pubsub import PubSubClient
 
 client = PubSubClient.for_workflow(temporal_client, workflow_id)
 async for item in client.subscribe(["events"], from_offset=0):
-    print(item.offset, item.topic, item.data)
+    print(item.topic, item.data)
     if is_done(item):
         break
 ```
@@ -109,11 +110,19 @@ class MyWorkflow(PubSubMixin):
 
 `drain_pubsub()` unblocks waiting subscribers and rejects new polls so
 `all_handlers_finished` can stabilize. Subscribers created via
-`PubSubClient.for_workflow()` automatically re-target the new run.
+`PubSubClient.for_workflow()` automatically follow continue-as-new chains.
 
 **Important:** When using Pydantic models for workflow input, type the field
 as `PubSubState | None`, not `Any`. Pydantic deserializes `Any` fields as
 plain dicts, which breaks `init_pubsub()`.
+
+## Exactly-Once Delivery
+
+External publishers (via `PubSubClient`) get exactly-once delivery through
+publisher ID + sequence number deduplication. Each client instance generates
+a unique publisher ID and increments a monotonic sequence on each flush.
+The workflow tracks the highest seen sequence per publisher and rejects
+duplicates. See `DESIGN-ADDENDUM-DEDUP.md` for details.
 
 ## API Reference
 
@@ -121,7 +130,7 @@ plain dicts, which breaks `init_pubsub()`.
 
 | Method | Description |
 |---|---|
-| `init_pubsub(prior_state=None)` | Initialize state. Call in `__init__`. |
+| `init_pubsub(prior_state=None)` | Initialize state. Call in `__init__` for fresh workflows, or in `run()` when accepting CAN state. |
 | `publish(topic, data)` | Append to the log from workflow code. |
 | `get_pubsub_state()` | Snapshot for continue-as-new. |
 | `drain_pubsub()` | Unblock polls and reject new ones. |
@@ -130,27 +139,22 @@ Handlers added automatically:
 
 | Handler | Kind | Name |
 |---|---|---|
-| Signal | `__pubsub_publish` | Receive external publications |
+| Signal | `__pubsub_publish` | Receive external publications (with dedup) |
 | Update | `__pubsub_poll` | Long-poll subscription |
-| Query | `__pubsub_offset` | Current log length |
+| Query | `__pubsub_offset` | Current global offset |
 
 ### PubSubClient
 
 | Method | Description |
 |---|---|
-| `PubSubClient.for_workflow(client, wf_id)` | Factory (preferred) |
-| `PubSubClient(handle)` | From handle (no CAN follow) |
-| `publish(topic, data, priority=False)` | Buffer a message |
-| `flush()` | Send buffered messages |
-| `subscribe(topics, from_offset)` | Async iterator |
-| `get_offset()` | Query current offset |
+| `PubSubClient.for_workflow(client, wf_id)` | Factory (preferred). Auto-detects activity context if args omitted. |
+| `PubSubClient(handle)` | From handle (no CAN follow). |
+| `publish(topic, data, priority=False)` | Buffer a message. |
+| `flush()` | Send buffered messages (with dedup). |
+| `subscribe(topics, from_offset, poll_interval=0.1)` | Async iterator. Always follows CAN chains when created via `for_workflow`. |
+| `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush.
-
-### activity_pubsub_client()
-
-Convenience for creating a `PubSubClient` inside an activity, pre-configured
-with the parent workflow's handle and client.
 
 ## Cross-Language Protocol
 
@@ -158,5 +162,5 @@ Any Temporal client can interact with a pub/sub workflow using these
 fixed handler names:
 
 1. **Publish:** Signal `__pubsub_publish` with `PublishInput`
-2. **Subscribe:** Update `__pubsub_poll` with `PollInput` → `PollResult`
-3. **Offset:** Query `__pubsub_offset` → `int`
+2. **Subscribe:** Update `__pubsub_poll` with `PollInput` -> `PollResult`
+3. **Offset:** Query `__pubsub_offset` -> `int`

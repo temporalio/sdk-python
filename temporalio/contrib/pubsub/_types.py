@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 @dataclass
 class PubSubItem:
-    """A single item in the pub/sub log."""
+    """A single item in the pub/sub log.
 
-    #@AGENT: why are we repeating the topic and storing the offset? why not have a list of dicts? do we need this full granularity to preserve global ordering? it seems expensive. is there anything more efficient. Perhaps we should back off of the global ordering guarantee - let's consider it as a design trade-off
-    offset: int
+    The global offset is not stored on the item — it is the item's index
+    in the log (adjusted by base_offset). See DESIGN-ADDENDUM-TOPICS.md.
+    """
+
     topic: str
     data: bytes
 
@@ -20,16 +22,22 @@ class PubSubItem:
 @dataclass
 class PublishEntry:
     """A single entry to publish (used in batch signals)."""
-    #@AGENT: this feels verbose. should we have lists by topic? or do we need the full granularity to preserve ordering
+
     topic: str
     data: bytes
 
 
 @dataclass
 class PublishInput:
-    """Signal payload: batch of entries to publish."""
+    """Signal payload: batch of entries to publish.
+
+    Includes publisher_id and sequence for exactly-once deduplication.
+    See DESIGN-ADDENDUM-DEDUP.md.
+    """
 
     items: list[PublishEntry] = field(default_factory=list)
+    publisher_id: str = ""
+    sequence: int = 0
 
 
 @dataclass
@@ -38,7 +46,6 @@ class PollInput:
 
     topics: list[str] = field(default_factory=list)
     from_offset: int = 0
-    #@AGENT: I think we should list the offset for each topic individually, the global offset is not exposed to the world
     timeout: float = 300.0
 
 
@@ -50,7 +57,6 @@ class PollResult:
     next_offset: int = 0
 
 
-#@AGENT: let's check to make sure this really needs to be a pydantic - but only after we confirm the data model
 class PubSubState(BaseModel):
     """Serializable snapshot of pub/sub state for continue-as-new.
 
@@ -58,5 +64,7 @@ class PubSubState(BaseModel):
     converters can properly reconstruct it. The containing workflow input
     must type the field as ``PubSubState | None``, not ``Any``.
     """
-    #@AGENT: should we have some sort of versioning, or does pydantic take care of that
-    log: list[PubSubItem] = []
+
+    log: list[PubSubItem] = Field(default_factory=list)
+    base_offset: int = 0
+    publisher_sequences: dict[str, int] = Field(default_factory=dict)

@@ -124,10 +124,16 @@ Key behaviors:
 - **Buffer swap before send.** Items are moved out of the buffer before the
   signal await. New `publish()` calls during the await write to the fresh
   buffer and are not affected by a retry.
-- **Sequence reuse on failure.** If the signal raises, the sequence counter is
-  decremented so the retry uses the same `(publisher_id, sequence)` pair. If
-  the first signal was actually delivered, the workflow's dedup rejects the
-  retry. If it was not delivered, the retry succeeds. Exactly-once either way.
+- **Sequence advances on failure.** If the signal raises, the sequence counter
+  is NOT decremented. The failed batch is restored to the buffer, but the next
+  flush uses a new sequence number. This prevents data loss: if the original
+  signal was delivered but the client saw an error, items published during the
+  failed await would be merged into the retry batch. With the old sequence,
+  the workflow would deduplicate the entire merged batch, silently dropping
+  the newly-published items. With a new sequence, the retry is treated as a
+  fresh batch. The tradeoff is that the original items may be delivered twice
+  (at-least-once), but the workflow-side dedup catches the common case where
+  the batch is retried unchanged.
 - **Lock for coalescing.** An `asyncio.Lock` serializes flushes. Multiple
   concurrent `flush()` callers queue on the lock; by the time each enters,
   later items have accumulated. This naturally coalesces N flush calls into
