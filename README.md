@@ -578,7 +578,7 @@ class MyDriver(StorageDriver):
         claims = []
         for payload in payloads:
             key = await my_storage.put(payload.SerializeToString())
-            claims.append(StorageDriverClaim(data={"key": key}))
+            claims.append(StorageDriverClaim(claim_data={"key": key}))
         return claims
 
     async def retrieve(
@@ -586,7 +586,7 @@ class MyDriver(StorageDriver):
     ) -> list[Payload]:
         payloads = []
         for claim in claims:
-            data = await my_storage.get(claim.data["key"])
+            data = await my_storage.get(claim.claim_data["key"])
             p = Payload()
             p.ParseFromString(data)
             payloads.append(p)
@@ -597,7 +597,7 @@ Some things to note about implementing a custom driver:
 
 * `StorageDriver.name()` must return a string that is unique among all drivers in `ExternalStorage.drivers`. This name is embedded in the reference payload stored in workflow history and used to look up the correct driver during retrieval — changing it after payloads have been stored will break retrieval.
 * `StorageDriver.type()` is automatically implemented to return the name of the class. This can be overridden in subclasses but must remain consistent across all instances of the subclass.
-* Implement `temporalio.converter.WithSerializationContext` on your driver to receive workflow or activity context (namespace, workflow ID, activity ID, etc.) at serialization time.
+* Use `StorageDriverStoreContext.target` inside `store()` when you need workflow or activity identity (namespace, workflow ID, activity ID, etc.) to choose where or how to store payloads.
 
 ### Workers
 
