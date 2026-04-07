@@ -501,7 +501,10 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
 
 
 @pytest.mark.asyncio
-async def test_single_agent_telemetry(client: Client):
+async def test_single_agent_telemetry(
+    client: Client,
+    reset_otel_tracer_provider,  # type: ignore[reportUnusedParameter]
+):
     exporter = InMemorySpanExporter()
     provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))

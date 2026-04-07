@@ -9,9 +9,10 @@ import logging
 import os
 import sys
 import threading
+import time
 from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import dataclass
-from datetime import timezone
+from datetime import timedelta, timezone
 from types import TracebackType
 
 import temporalio.api.common.v1
@@ -21,11 +22,13 @@ import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._extstore
 import temporalio.converter._payload_limits
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
+from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 
 from . import _command_aware_visitor
 from ._interceptor import (
@@ -44,6 +47,14 @@ logger = logging.getLogger(__name__)
 
 # Set to true to log all activations and completions
 LOG_PROTOS = False
+
+# Value was chosen abitrarily as a small number that allows some concurrency and prevents
+# large numbers of concurrent external storage operations causing resource contention.
+# This default limit is per workflow task activation and does not limit the total number
+# of concurrent external storage operations across all workflow task activations.
+# Advise customers to adjust based on their workload needs and to report issues with the
+# value if problems are encountered. This setting is experimental.
+_DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY: int = 3
 
 
 class _WorkflowWorker:  # type:ignore[reportUnusedClass]
@@ -72,6 +83,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
         encode_headers: bool,
+        max_workflow_task_external_storage_concurrency: int,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -110,6 +122,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
         self._encode_headers = encode_headers
+        self._max_workflow_task_external_storage_concurrency = (
+            max_workflow_task_external_storage_concurrency
+        )
         self._throw_after_activation: Exception | None = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
@@ -255,6 +270,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         completion.successful.SetInParent()
         workflow = None
         data_converter = self._data_converter
+        task_start_time = time.monotonic()
+        download_metrics = temporalio.converter._extstore.StorageOperationMetrics()
         try:
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
@@ -278,29 +295,40 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 namespace=self._namespace,
                 workflow_id=workflow_id,
             )
-            data_converter = self._data_converter.with_context(workflow_context)
-            if self._data_converter.payload_codec:
-                assert data_converter.payload_codec
-                if workflow:
-                    data_converter = dataclasses.replace(
-                        data_converter,
-                        payload_codec=_CommandAwarePayloadCodec(
-                            workflow.instance,
-                            context_free_payload_codec=self._data_converter.payload_codec,
-                            workflow_context_payload_codec=data_converter.payload_codec,
-                            workflow_context=workflow_context,
+            data_converter = self._data_converter._with_contexts(
+                workflow_context,
+                StorageDriverStoreContext(
+                    target=StorageDriverWorkflowInfo(
+                        id=workflow_id,
+                        run_id=act.run_id,
+                        type=(
+                            workflow.workflow_type
+                            if workflow
+                            else (init_job.workflow_type if init_job else None)
                         ),
-                    )
-            await temporalio.bridge.worker.decode_activation(
+                        namespace=self._namespace,
+                    ),
+                ),
+            )
+            if workflow:
+                data_converter = _CommandAwareDataConverter.create(
+                    instance=workflow.instance,
+                    context_free_dc=self._data_converter,
+                    workflow_context_dc=data_converter,
+                    workflow_context=workflow_context,
+                )
+            download_metrics = await temporalio.bridge.worker.decode_activation(
                 act,
                 data_converter,
                 decode_headers=self._encode_headers,
+                storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
             )
             if not workflow:
                 assert init_job
                 workflow = _RunningWorkflow(
                     self._create_workflow_instance(act, init_job),
                     workflow_id,
+                    workflow_type=init_job.workflow_type,
                 )
                 self._running_workflows[act.run_id] = workflow
 
@@ -384,27 +412,26 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         completion.run_id = act.run_id
 
         # Encode completion
-        if self._data_converter.payload_codec and workflow:
-            assert data_converter.payload_codec
-            data_converter = dataclasses.replace(
-                data_converter,
-                payload_codec=_CommandAwarePayloadCodec(
-                    workflow.instance,
-                    context_free_payload_codec=self._data_converter.payload_codec,
-                    workflow_context_payload_codec=data_converter.payload_codec,
-                    workflow_context=temporalio.converter.WorkflowSerializationContext(
-                        namespace=self._namespace,
-                        workflow_id=workflow.workflow_id,
-                    ),
-                ),
+        if workflow:
+            workflow_context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._namespace,
+                workflow_id=workflow.workflow_id,
+            )
+            data_converter = _CommandAwareDataConverter.create(
+                instance=workflow.instance,
+                context_free_dc=self._data_converter,
+                workflow_context_dc=self._data_converter.with_context(workflow_context),
+                workflow_context=workflow_context,
             )
 
+        upload_metrics = temporalio.converter._extstore.StorageOperationMetrics()
         try:
             try:
-                await temporalio.bridge.worker.encode_completion(
+                upload_metrics = await temporalio.bridge.worker.encode_completion(
                     completion,
                     data_converter,
                     encode_headers=self._encode_headers,
+                    storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
                 )
             except temporalio.converter._payload_limits._PayloadSizeError as err:
                 logger.warning(err.message)
@@ -427,6 +454,71 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             # TODO(cretz): Per others, this is supposed to crash the worker
             logger.exception(
                 "Failed completing activation on workflow with run ID %s", act.run_id
+            )
+
+        # Log workflow task duration with external storage metrics
+        self._log_workflow_task_duration(
+            act, task_start_time, download_metrics, upload_metrics
+        )
+
+    @staticmethod
+    def _log_workflow_task_duration(
+        act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+        task_start_time: float,
+        download_metrics: temporalio.converter._extstore.StorageOperationMetrics,
+        upload_metrics: temporalio.converter._extstore.StorageOperationMetrics,
+    ) -> None:
+        task_duration = timedelta(seconds=time.monotonic() - task_start_time)
+
+        def _fmt_duration(td: timedelta) -> str:
+            secs = td.total_seconds()
+            if secs >= 1:
+                return f"{secs:.3f}s"
+            return f"{secs * 1000:.3f}ms"
+
+        msg_details: dict[str, object] = {
+            "event_id": act.history_length,
+            "workflow_task_duration": _fmt_duration(task_duration),
+        }
+        extra: dict[str, object] = {
+            "event_id": act.history_length,
+            "workflow_task_duration": task_duration,
+        }
+        if download_metrics.payload_count > 0:
+            msg_details["payload_download_count"] = download_metrics.payload_count
+            msg_details["payload_download_size"] = download_metrics.total_size
+            msg_details["payload_download_duration"] = _fmt_duration(
+                download_metrics.total_duration
+            )
+            extra["payload_download_count"] = download_metrics.payload_count
+            extra["payload_download_size"] = download_metrics.total_size
+            extra["payload_download_duration"] = download_metrics.total_duration
+        if upload_metrics.payload_count > 0:
+            msg_details["payload_upload_count"] = upload_metrics.payload_count
+            msg_details["payload_upload_size"] = upload_metrics.total_size
+            msg_details["payload_upload_duration"] = _fmt_duration(
+                upload_metrics.total_duration
+            )
+            extra["payload_upload_count"] = upload_metrics.payload_count
+            extra["payload_upload_size"] = upload_metrics.total_size
+            extra["payload_upload_duration"] = upload_metrics.total_duration
+        if task_duration.total_seconds() > 10:
+            logger.warning(
+                "[TMPRL1104] Workflow task exceeded 10 seconds (%s)",
+                msg_details,
+                extra=extra,
+            )
+        elif task_duration.total_seconds() > 5:
+            logger.info(
+                "[TMPRL1104] Workflow task exceeded 5 seconds (%s)",
+                msg_details,
+                extra=extra,
+            )
+        else:
+            logger.debug(
+                "[TMPRL1104] Workflow task duration information (%s)",
+                msg_details,
+                extra=extra,
             )
 
     async def _handle_cache_eviction(
@@ -726,9 +818,15 @@ class _DeadlockError(Exception):
 
 
 class _RunningWorkflow:
-    def __init__(self, instance: WorkflowInstance, workflow_id: str):
+    def __init__(
+        self,
+        instance: WorkflowInstance,
+        workflow_id: str,
+        workflow_type: str | None = None,
+    ):
         self.instance = instance
         self.workflow_id = workflow_id
+        self.workflow_type = workflow_type
         self.deadlocked_activation_task: Awaitable | None = None
         self._deadlock_can_be_interrupted_lock = threading.Lock()
         self._deadlock_can_be_interrupted = False
@@ -759,45 +857,95 @@ class _RunningWorkflow:
 
 
 @dataclass(frozen=True)
-class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
-    """A payload codec that sets serialization context for the command associated with each payload.
+class _CommandAwareDataConverter(temporalio.converter.DataConverter):
+    """Data converter that resolves serialization context per-command.
 
-    This codec responds to the context variable set by
+    Responds to the context variable set by
     :py:class:`_command_aware_visitor.CommandAwarePayloadVisitor`.
     """
 
-    instance: WorkflowInstance
-    context_free_payload_codec: temporalio.converter.PayloadCodec
-    workflow_context_payload_codec: temporalio.converter.PayloadCodec
-    workflow_context: temporalio.converter.WorkflowSerializationContext
+    _ca_instance: WorkflowInstance = dataclasses.field(
+        default=None,
+        repr=False,
+        compare=False,  # type: ignore[assignment]
+    )
+    _ca_context_free_dc: temporalio.converter.DataConverter = dataclasses.field(
+        default=None,
+        repr=False,
+        compare=False,  # type: ignore[assignment]
+    )
+    _ca_workflow_context_dc: temporalio.converter.DataConverter = dataclasses.field(
+        default=None,
+        repr=False,
+        compare=False,  # type: ignore[assignment]
+    )
+    _ca_workflow_context: temporalio.converter.WorkflowSerializationContext = (
+        dataclasses.field(
+            default=None,
+            repr=False,
+            compare=False,  # type: ignore[assignment]
+        )
+    )
 
-    async def encode(
-        self,
-        payloads: Sequence[temporalio.api.common.v1.Payload],
-    ) -> list[temporalio.api.common.v1.Payload]:
-        return await self._get_current_command_codec().encode(payloads)
+    @staticmethod
+    def create(
+        instance: WorkflowInstance,
+        context_free_dc: temporalio.converter.DataConverter,
+        workflow_context_dc: temporalio.converter.DataConverter,
+        workflow_context: temporalio.converter.WorkflowSerializationContext,
+    ) -> _CommandAwareDataConverter:
+        return _CommandAwareDataConverter(
+            payload_converter_class=workflow_context_dc.payload_converter_class,
+            payload_codec=workflow_context_dc.payload_codec,
+            failure_converter_class=workflow_context_dc.failure_converter_class,
+            payload_limits=workflow_context_dc.payload_limits,
+            external_storage=workflow_context_dc.external_storage,
+            _ca_instance=instance,
+            _ca_context_free_dc=context_free_dc,
+            _ca_workflow_context_dc=workflow_context_dc,
+            _ca_workflow_context=workflow_context,
+        )
 
-    async def decode(
-        self,
-        payloads: Sequence[temporalio.api.common.v1.Payload],
-    ) -> list[temporalio.api.common.v1.Payload]:
-        return await self._get_current_command_codec().decode(payloads)
-
-    def _get_current_command_codec(self) -> temporalio.converter.PayloadCodec:
-        if not isinstance(
-            self.context_free_payload_codec,
-            temporalio.converter.WithSerializationContext,
-        ):
-            return self.context_free_payload_codec
-
-        if context := self.instance.get_serialization_context(
+    def _get_current_dc(self) -> temporalio.converter.DataConverter:
+        context = self._ca_instance.get_serialization_context(
             _command_aware_visitor.current_command_info.get(),
-        ):
-            if context == self.workflow_context:
-                return self.workflow_context_payload_codec
-            return self.context_free_payload_codec.with_context(context)
+        )
+        if context is None:
+            return self._ca_context_free_dc
+        if context == self._ca_workflow_context:
+            return self._ca_workflow_context_dc
+        return self._ca_context_free_dc.with_context(context)
 
-        return self.context_free_payload_codec
+    async def _encode_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return await self._get_current_dc()._encode_payload_sequence(payloads)
+
+    async def _external_store_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        command_info = _command_aware_visitor.current_command_info.get()
+        store_ctx = self._ca_instance.get_external_store_context(command_info)
+        dc = self._get_current_dc()._with_store_context(store_ctx)
+        return await dc._external_store_payload_sequence(payloads)
+
+    async def _external_retrieve_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return await self._get_current_dc()._external_retrieve_payload_sequence(
+            payloads
+        )
+
+    async def _decode_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return await self._get_current_dc()._decode_payload_sequence(payloads)
+
+    def _validate_payload_limits(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+    ) -> None:
+        self._get_current_dc()._validate_payload_limits(payloads)
 
 
 class _InterruptDeadlockError(BaseException):

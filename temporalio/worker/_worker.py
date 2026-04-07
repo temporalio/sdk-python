@@ -36,7 +36,10 @@ from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
 from ._plugin import Plugin
 from ._tuning import WorkerTuner
-from ._workflow import _WorkflowWorker
+from ._workflow import (
+    _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
+    _WorkflowWorker,
+)
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
@@ -142,6 +145,7 @@ class Worker:
             maximum=5
         ),
         disable_payload_error_limit: bool = False,
+        max_workflow_task_external_storage_concurrency: int = _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -316,6 +320,13 @@ class Worker:
                 and cause a task failure if the size limit is exceeded. The default is False.
                 See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
                 details.
+            max_workflow_task_external_storage_concurrency: Maximum number of
+                external storage payload operations (store/retrieve) that may run
+                concurrently within a single workflow task activation.
+                Defaults to 3. Adjust this value based on your workload's needs.
+                Please report any issues you encounter with this setting or if you
+                feel the default should be changed.
+                WARNING: This setting is experimental.
 
         """
         config = WorkerConfig(
@@ -361,6 +372,7 @@ class Worker:
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
             disable_payload_error_limit=disable_payload_error_limit,
+            max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
         )
 
         plugins_from_client = cast(
@@ -414,6 +426,14 @@ class Worker:
             raise ValueError(
                 "default_versioning_behavior must be UNSPECIFIED when use_worker_versioning is False"
             )
+        max_workflow_task_external_storage_concurrency = config.get(
+            "max_workflow_task_external_storage_concurrency",
+            _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
+        )
+        if max_workflow_task_external_storage_concurrency < 1:
+            raise ValueError(
+                "max_workflow_task_external_storage_concurrency must be positive"
+            )
 
         # Prepend applicable client interceptors to the given ones
         client_config = config["client"].config(active_config=True)  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -422,6 +442,10 @@ class Worker:
             [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
         )
         interceptors = interceptors_from_client + list(config["interceptors"])  # type: ignore[reportTypedDictNotRequiredAccess]
+
+        # Extract storage drivers from the client's data converter
+        _ext_storage = client_config["data_converter"].external_storage
+        self._storage_drivers = list(_ext_storage.drivers) if _ext_storage else []
 
         # Extract the bridge service client
         bridge_client = _extract_bridge_client_for_worker(config["client"])  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -514,6 +538,7 @@ class Worker:
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
+                max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
             )
 
         tuner = config.get("tuner")
@@ -572,6 +597,9 @@ class Worker:
             )
 
         deduped_plugin_names = list({plugin.name() for plugin in self._plugins})
+        deduped_storage_driver_types = {
+            driver.type() for driver in self._storage_drivers
+        }
 
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
@@ -636,6 +664,7 @@ class Worker:
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),  # type: ignore[reportTypedDictNotRequiredAccess,reportOptionalMemberAccess]
                 plugins=deduped_plugin_names,
+                storage_drivers=deduped_storage_driver_types,
             ),
         )
 
@@ -956,6 +985,7 @@ class WorkerConfig(TypedDict, total=False):
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
     disable_payload_error_limit: bool
+    max_workflow_task_external_storage_concurrency: int
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(

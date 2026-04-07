@@ -18,7 +18,6 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
 from temporalio import workflow
-from temporalio.api.cloud.cloudservice.v1 import GetNamespaceRequest
 from temporalio.api.enums.v1 import (
     CancelExternalWorkflowExecutionFailedCause,
     ContinueAsNewInitiator,
@@ -42,7 +41,6 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
-    CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
     QueryWorkflowInput,
@@ -1481,19 +1479,6 @@ async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
     assert reachability.build_id_reachability["1.1"].task_queue_reachability[tq] == []
 
 
-async def test_cloud_client_simple():
-    if "TEMPORAL_CLIENT_CLOUD_API_KEY" not in os.environ:
-        pytest.skip("No cloud API key")
-    client = await CloudOperationsClient.connect(
-        api_key=os.environ["TEMPORAL_CLIENT_CLOUD_API_KEY"],
-        version=os.environ["TEMPORAL_CLIENT_CLOUD_API_VERSION"],
-    )
-    result = await client.cloud_service.get_namespace(
-        GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
-    )
-    assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace
-
-
 @workflow.defn
 class LastCompletionResultWorkflow:
     @workflow.run
@@ -1565,6 +1550,21 @@ class TestForkCreateClient(_TestFork):
         )
         self._env = env  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)
+
+
+def test_client_connect_config_matches_connect_params():
+    """ClientConnectConfig TypedDict keys must match Client.connect kwargs."""
+    import inspect
+
+    from temporalio.client import Client, ClientConnectConfig
+
+    connect_params = set(inspect.signature(Client.connect).parameters.keys()) - {"cls"}
+    config_keys = set(ClientConnectConfig.__annotations__.keys())
+    assert config_keys == connect_params, (
+        f"ClientConnectConfig is out of sync with Client.connect. "
+        f"Missing from config: {connect_params - config_keys}. "
+        f"Extra in config: {config_keys - connect_params}."
+    )
 
 
 class TestForkUseClient(_TestFork):
