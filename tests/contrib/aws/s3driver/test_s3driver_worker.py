@@ -210,11 +210,17 @@ async def test_s3_driver_standalone_activity_input_key(
             start_to_close_timeout=timedelta(seconds=5),
         )
     keys = await _list_keys(aioboto3_client)
-    # Input and output are the same LARGE bytes, so they deduplicate to one key.
-    assert len(keys) == 1
-    # Keyed under the activity, not a workflow.
-    assert f"/ns/default/at/large_io_activity/ai/{activity_id}/ri/null/" in keys[0]
-    assert "/wt/" not in keys[0]
+    # Input and output are the same LARGE bytes but stored under different keys.
+    assert len(keys) == 2
+    # Both keyed under the activity, not a workflow.
+    assert all(
+        f"/ns/default/at/large_io_activity/ai/{activity_id}/ri/" in k for k in keys
+    )
+    assert all("/wt/" not in k for k in keys)
+    # Client-side store does not have run ID information
+    assert sum(1 for k in keys if "/ri/null/" in k) == 1
+    # Worker-side store does have run ID information
+    assert sum(1 for k in keys if "/ri/null/" not in k) == 1
 
 
 async def test_s3_driver_standalone_activity_output_key(
@@ -238,7 +244,8 @@ async def test_s3_driver_standalone_activity_output_key(
     keys = await _list_keys(aioboto3_client)
     # Only the output is large; keyed under the activity.
     assert len(keys) == 1
-    assert f"/ns/default/at/large_output_activity/ai/{activity_id}/ri/null/" in keys[0]
+    assert f"/ns/default/at/large_output_activity/ai/{activity_id}/ri/" in keys[0]
+    assert "/ri/null/" not in keys[0]
     assert "/wt/" not in keys[0]
 
 

@@ -349,6 +349,7 @@ class _ActivityWorker:
             store_target = StorageDriverActivityInfo(
                 id=start.activity_id or None,
                 type=start.activity_type or None,
+                run_id=start.run_id or None,
                 namespace=ns,
             )
         data_converter = self._data_converter._with_contexts(
