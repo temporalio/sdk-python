@@ -28,8 +28,8 @@ class LangSmithPlugin(SimplePlugin):
         client: langsmith.Client | None = None,
         project_name: str | None = None,
         add_temporal_runs: bool = False,
-        metadata: dict[str, Any] | None = None,
-        tags: list[str] | None = None,
+        default_metadata: dict[str, Any] | None = None,
+        default_tags: list[str] | None = None,
     ) -> None:
         """Initialize the LangSmith plugin.
 
@@ -39,15 +39,15 @@ class LangSmithPlugin(SimplePlugin):
             project_name: LangSmith project name for traces.
             add_temporal_runs: Whether to create LangSmith runs for Temporal
                 operations. Defaults to False.
-            metadata: Default metadata to attach to all runs.
-            tags: Default tags to attach to all runs.
+            default_metadata: Default metadata to attach to all runs.
+            default_tags: Default tags to attach to all runs.
         """
         interceptor = LangSmithInterceptor(
             client=client,
             project_name=project_name,
             add_temporal_runs=add_temporal_runs,
-            default_metadata=metadata,
-            default_tags=tags,
+            default_metadata=default_metadata,
+            default_tags=default_tags,
         )
         interceptors = [interceptor]
 

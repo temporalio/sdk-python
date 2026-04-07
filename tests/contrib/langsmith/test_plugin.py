@@ -37,8 +37,8 @@ class TestPluginConstruction:
             client=mock_client,
             project_name="my-project",
             add_temporal_runs=False,
-            metadata={"env": "prod"},
-            tags=["v1"],
+            default_metadata={"env": "prod"},
+            default_tags=["v1"],
         )
         assert plugin.interceptors is not None
         assert len(plugin.interceptors) > 0
