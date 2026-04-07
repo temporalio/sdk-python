@@ -129,6 +129,7 @@ class PubSubClient:
         Items are removed from the buffer only after the signal succeeds.
         If the signal fails, the items remain buffered for retry.
         """
+        #@AGENT: is it possible to have a second invocation of flush while the first is running?
         if self._buffer:
             batch = list(self._buffer)
             await self._handle.signal(
@@ -155,6 +156,7 @@ class PubSubClient:
         *,
         follow_continues: bool = True,
     ) -> AsyncIterator[PubSubItem]:
+        #@AGENT: why would we not always follow CAN chains? How is the client supposed to know whether the workflow does CAN?
         """Async iterator that polls for new items.
 
         Args:
@@ -176,27 +178,33 @@ class PubSubClient:
                     result_type=PollResult,
                 )
             except asyncio.CancelledError:
+                #@AGENT: help me understand what this means / how we respond
                 return
             except WorkflowUpdateRPCTimeoutOrCancelledError:
+                #@AGENT: is this code path tested?
                 if follow_continues and self._follow_continue_as_new():
                     continue
                 return
             for item in result.items:
                 yield item
             offset = result.next_offset
+            #@AGENT: do we want to create a provision for putting a little bit of sleep in here to rate limit the polls when we have a workflow publisher (no batching). note that the alternative is to put a timer in the workflow (costing another activity)
 
     def _follow_continue_as_new(self) -> bool:
         """Re-target the handle to the latest run if client is available."""
         if self._client is None:
             return False
+        #@AGENT: put a description of what is going on here and why
         self._handle = self._client.get_workflow_handle(self._workflow_id)
         return True
 
+    #@AGENT: should this be part of the interface?
     async def get_offset(self) -> int:
         """Query the current log offset (length)."""
         return await self._handle.query("__pubsub_offset", result_type=int)
 
 
+#@AGENT: can we detect the activity context automatically and move this functionality into for_workflow?, e.g., just make the client optional if you are running in an activity
 def activity_pubsub_client(
     batch_interval: float = 2.0,
     max_batch_size: int | None = None,

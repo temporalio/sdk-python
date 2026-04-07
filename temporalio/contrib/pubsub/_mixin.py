@@ -4,6 +4,7 @@ Add PubSubMixin as a base class to any workflow to get pub/sub signal, update,
 and query handlers. Call ``init_pubsub()`` in your workflow's ``__init__`` or
 at the start of ``run()``.
 """
+#@AGENT: can we give specific advice on the preferred path for calling init_pubsub()? I don't like giving options without a framework for making the decision in your situation
 
 from __future__ import annotations
 
@@ -30,7 +31,9 @@ class PubSubMixin:
             prior_state: State from a previous run (via get_pubsub_state()).
                          Pass None on the first run.
         """
+        #@AGENT: clarify that this is used with continue-as-new
         if prior_state is not None:
+            #@AGENT: i'm seeing a pywright error here - did you run that?
             self._pubsub_log: list[PubSubItem] = list(prior_state.log)
         else:
             self._pubsub_log = []
@@ -67,6 +70,7 @@ class PubSubMixin:
     def _pubsub_publish(self, input: PublishInput) -> None:
         """Receive publications from external clients (activities, starters)."""
         self._check_initialized()
+        #@AGENT: do we have a more pythonic way to do this?
         for entry in input.items:
             offset = len(self._pubsub_log)
             self._pubsub_log.append(
@@ -93,6 +97,7 @@ class PubSubMixin:
 
     @_pubsub_poll.validator
     def _validate_pubsub_poll(self, input: PollInput) -> None:
+        #@AGENT: run pyright- unused arg. also, help me understand what this is for
         self._check_initialized()
         if self._pubsub_draining:
             raise RuntimeError("Workflow is draining for continue-as-new")
