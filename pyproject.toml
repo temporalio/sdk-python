@@ -77,6 +77,7 @@ dev = [
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
+  "setuptools<82",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
