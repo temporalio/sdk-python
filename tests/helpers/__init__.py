@@ -422,12 +422,12 @@ class LogCapturer:
         self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
 
     @contextmanager
-    def logs_captured(self, *loggers: logging.Logger):
+    def logs_captured(self, *loggers: logging.Logger, level: int = logging.INFO):
         handler = logging.handlers.QueueHandler(self.log_queue)
 
         prev_levels = [l.level for l in loggers]
         for l in loggers:
-            l.setLevel(logging.INFO)
+            l.setLevel(level)
             l.addHandler(handler)
         try:
             yield self
@@ -446,6 +446,15 @@ class LogCapturer:
             if pred(record):
                 return record
         return None
+
+    def find_all(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> list[logging.LogRecord]:
+        return [
+            record
+            for record in cast(list[logging.LogRecord], self.log_queue.queue)
+            if pred(record)
+        ]
 
 
 class LogHandler:

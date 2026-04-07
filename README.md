@@ -56,6 +56,7 @@ informal introduction to the features and their implementation.
         - [Custom Type Data Conversion](#custom-type-data-conversion)
         - [External Storage](#external-storage)
           - [Driver Selection](#driver-selection)
+          - [Built-in Drivers](#built-in-drivers)
           - [Custom Drivers](#custom-drivers)
     - [Workers](#workers)
     - [Workflows](#workflows)
@@ -467,31 +468,42 @@ External storage allows large payloads to be offloaded to an external storage se
 
 External storage is configured via the `external_storage` parameter on `DataConverter`.  It should be configured on the `Client` both for clients of your workflow as well as on the worker -- anywhere large payloads may be uploaded or downloaded.
 
-A `StorageDriver` handles uploading and downloading payloads. Temporal provides built-in drivers for common storage solutions, or you may customize one. Here's an example using our provided `InMemoryTestDriver`.
+A `StorageDriver` handles uploading and downloading payloads. Temporal provides [built-in drivers](#built-in-drivers) for common storage solutions, or you may implement a [custom driver](#custom-drivers). Here's an example using the built-in `S3StorageDriver` with the SDK's `aioboto3` client:
 
 ```python
+import aioboto3
 import dataclasses
-from temporalio.client import Client
+from temporalio.client import Client, ClientConfig
+from temporalio.contrib.aws.s3driver import S3StorageDriver
+from temporalio.contrib.aws.s3driver.aioboto3 import new_aioboto3_client
 from temporalio.converter import DataConverter
 from temporalio.converter import ExternalStorage
 
-driver = InMemoryTestDriver()
+client_config = ClientConfig.load_client_connect_config()
 
-client = await Client.connect(
-    "localhost:7233",
-    data_converter=dataclasses.replace(
-        DataConverter.default,
-        external_storage=ExternalStorage(drivers=[driver]),
-    ),
-)
+session = aioboto3.Session()
+async with session.client("s3") as s3_client:
+    driver = S3StorageDriver(
+        client=new_aioboto3_client(s3_client),
+        bucket="my-bucket",
+    )
+    client = await Client.connect(
+        **client_config,
+        data_converter=dataclasses.replace(
+            DataConverter.default,
+            external_storage=ExternalStorage(drivers=[driver]),
+        ),
+    )
 ```
+
+See the [S3 driver README](temporalio/contrib/aws/s3driver/) for further details.
 
 Some things to note about external storage:
 
 * Only payloads that meet or exceed `ExternalStorage.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
 * External storage applies transparently to all payloads, whether they are workflow inputs/outputs, activity inputs/outputs, signal inputs, query outputs, update inputs/outputs, or failure details.
 * The `DataConverter`'s `payload_codec` (if configured) is applied to the payload *before* it is handed to the storage driver, so the driver always stores encoded bytes. The reference payload written to workflow history is not encoded by the `DataConverter` codec.
-* Setting `ExternalStorage.payload_size_threshold` to `None` causes every payload to be considered for external storage regardless of size.
+* Setting `ExternalStorage.payload_size_threshold` to `0` causes every payload to be considered for external storage regardless of size.
 
 ###### Driver Selection
 
@@ -521,11 +533,11 @@ def feature_flag_is_on(workflow_id: str | None) -> bool:
 def feature_flag_selector(
     context: temporalio.converter.StorageDriverStoreContext, _payload: Payload
 ) -> temporalio.converter.StorageDriver | None:
-    workflow_id = None
-    if isinstance(context.serialization_context, temporalio.converter.WorkflowSerializationContext):
-        workflow_id = context.serialization_context.workflow_id
-    elif isinstance(context.serialization_context, temporalio.converter.ActivitySerializationContext):
-        workflow_id = context.serialization_context.workflow_id
+    workflow_id = (
+        context.target.id
+        if isinstance(context.target, temporalio.converter.StorageDriverWorkflowInfo)
+        else None
+    )
     return my_driver if feature_flag_is_on(workflow_id) else None
 
 options = ExternalStorage(
@@ -539,6 +551,10 @@ Some things to note about driver selection:
 * A `driver_selector` is required when more than one driver is registered. With a single driver, `driver_selector` may be omitted and that driver is used for all store operations.
 * Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
 * The driver instance returned by the selector must be one of the instances registered in `ExternalStorage.drivers`. If it is not, an error is raised.
+
+###### Built-in Drivers
+
+- **[S3 Storage Driver](temporalio/contrib/aws/s3driver/)**: ⚠️ **Experimental** ⚠️ Amazon S3 driver. Ships with an aioboto3 client, or bring your own by subclassing `S3StorageDriverClient`.
 
 ###### Custom Drivers
 

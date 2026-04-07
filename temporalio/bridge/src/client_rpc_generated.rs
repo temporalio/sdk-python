@@ -1129,6 +1129,15 @@ impl ClientRef {
                         add_user_group_member
                     )
                 }
+                "create_account_audit_log_sink" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        create_account_audit_log_sink
+                    )
+                }
                 "create_api_key" => {
                     rpc_call!(
                         connection,
@@ -1136,6 +1145,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         create_api_key
+                    )
+                }
+                "create_billing_report" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        create_billing_report
                     )
                 }
                 "create_connectivity_rule" => {
@@ -1193,6 +1211,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         create_user_group
+                    )
+                }
+                "delete_account_audit_log_sink" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        delete_account_audit_log_sink
                     )
                 }
                 "delete_api_key" => {
@@ -1282,6 +1309,24 @@ impl ClientRef {
                 "get_account" => {
                     rpc_call!(connection, call, CloudService, cloud_service, get_account)
                 }
+                "get_account_audit_log_sink" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_account_audit_log_sink
+                    )
+                }
+                "get_account_audit_log_sinks" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_account_audit_log_sinks
+                    )
+                }
                 "get_api_key" => {
                     rpc_call!(connection, call, CloudService, cloud_service, get_api_key)
                 }
@@ -1295,6 +1340,24 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         get_async_operation
+                    )
+                }
+                "get_audit_logs" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_audit_logs
+                    )
+                }
+                "get_billing_report" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_billing_report
                     )
                 }
                 "get_connectivity_rule" => {
@@ -1315,8 +1378,26 @@ impl ClientRef {
                         get_connectivity_rules
                     )
                 }
+                "get_current_identity" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_current_identity
+                    )
+                }
                 "get_namespace" => {
                     rpc_call!(connection, call, CloudService, cloud_service, get_namespace)
+                }
+                "get_namespace_capacity_info" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_namespace_capacity_info
+                    )
                 }
                 "get_namespace_export_sink" => {
                     rpc_call!(
@@ -1475,6 +1556,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         update_account
+                    )
+                }
+                "update_account_audit_log_sink" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        update_account_audit_log_sink
                     )
                 }
                 "update_api_key" => {
