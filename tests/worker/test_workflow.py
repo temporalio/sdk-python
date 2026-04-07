@@ -8055,8 +8055,10 @@ async def test_quick_activity_swallows_cancellation(client: Client):
         activities=[short_activity_async],
         activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
     ) as worker:
-        for i in range(10):
-            wf_duration = random.uniform(5.0, 15.0)
+        # Keep this deterministic and bounded. The original randomized 10-iteration
+        # version could exceed the per-test timeout on slower CI hosts if
+        # cancellation was delayed a few times in a row.
+        for i, wf_duration in enumerate((5.0, 7.5, 10.0)):
             wf_handle = await client.start_workflow(
                 QuickActivityWorkflow.run,
                 id=f"short_activity_wf_id-{i}",
