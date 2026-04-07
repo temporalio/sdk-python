@@ -74,17 +74,7 @@ async def nested_traceable_activity() -> str:
 @workflow.defn
 class TraceableActivityWorkflow:
     @workflow.run
-    async def run(self) -> str:
-        return await workflow.execute_activity(
-            traceable_activity,
-            start_to_close_timeout=timedelta(seconds=10),
-        )
-
-
-@workflow.defn
-class SimpleNexusWorkflow:
-    @workflow.run
-    async def run(self, _input: str) -> str:
+    async def run(self, _input: str = "") -> str:
         return await workflow.execute_activity(
             traceable_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -98,7 +88,7 @@ class NexusService:
         self, ctx: nexus.WorkflowRunOperationContext, input: str
     ) -> nexus.WorkflowHandle[str]:
         return await ctx.start_workflow(
-            SimpleNexusWorkflow.run,
+            TraceableActivityWorkflow.run,
             input,
             id=f"nexus-wf-{ctx.request_id}",
         )
@@ -617,7 +607,6 @@ class TestComprehensiveTracing:
                 temporal_client_1,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
-                SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
                 task_queue=task_queue,
@@ -644,7 +633,6 @@ class TestComprehensiveTracing:
                 temporal_client_2,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
-                SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
                 task_queue=task_queue,
@@ -702,8 +690,8 @@ class TestComprehensiveTracing:
             "            inner_llm_call",
             "    StartNexusOperation:NexusService/run_operation",
             "    RunStartNexusOperationHandler:NexusService/run_operation",
-            "      StartWorkflow:SimpleNexusWorkflow",
-            "      RunWorkflow:SimpleNexusWorkflow",
+            "      StartWorkflow:TraceableActivityWorkflow",
+            "      RunWorkflow:TraceableActivityWorkflow",
             "        StartActivity:traceable_activity",
             "        RunActivity:traceable_activity",
             "          traceable_activity",
@@ -712,8 +700,8 @@ class TestComprehensiveTracing:
             "    step_with_nexus",
             "      StartNexusOperation:NexusService/run_operation",
             "      RunStartNexusOperationHandler:NexusService/run_operation",
-            "        StartWorkflow:SimpleNexusWorkflow",
-            "        RunWorkflow:SimpleNexusWorkflow",
+            "        StartWorkflow:TraceableActivityWorkflow",
+            "        RunWorkflow:TraceableActivityWorkflow",
             "          StartActivity:traceable_activity",
             "          RunActivity:traceable_activity",
             "            traceable_activity",
@@ -798,7 +786,6 @@ class TestComprehensiveTracing:
                 temporal_client_1,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
-                SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
                 task_queue=task_queue,
@@ -825,7 +812,6 @@ class TestComprehensiveTracing:
                 temporal_client_2,
                 ComprehensiveWorkflow,
                 TraceableActivityWorkflow,
-                SimpleNexusWorkflow,
                 activities=[nested_traceable_activity, traceable_activity],
                 nexus_service_handlers=[NexusService()],
                 task_queue=task_queue,
