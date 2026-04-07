@@ -11,7 +11,16 @@ from __future__ import annotations
 
 from temporalio import workflow
 
-from ._types import PollInput, PollResult, PubSubItem, PubSubState, PublishInput
+from ._types import (
+    PollInput,
+    PollResult,
+    PubSubItem,
+    PubSubState,
+    PublishInput,
+    _WireItem,
+    decode_data,
+    encode_data,
+)
 
 
 class PubSubMixin:
@@ -41,7 +50,10 @@ class PubSubMixin:
                 on the first run.
         """
         if prior_state is not None:
-            self._pubsub_log = list(prior_state.log)
+            self._pubsub_log = [
+                PubSubItem(topic=item.topic, data=decode_data(item.data))
+                for item in prior_state.log
+            ]
             self._pubsub_base_offset = prior_state.base_offset
             self._pubsub_publisher_sequences = dict(
                 prior_state.publisher_sequences
@@ -86,7 +98,10 @@ class PubSubMixin:
                     active_last_seen[pid] = ts
 
         return PubSubState(
-            log=list(self._pubsub_log),
+            log=[
+                _WireItem(topic=item.topic, data=encode_data(item.data))
+                for item in self._pubsub_log
+            ],
             base_offset=self._pubsub_base_offset,
             publisher_sequences=active_sequences,
             publisher_last_seen=active_last_seen,
@@ -162,7 +177,7 @@ class PubSubMixin:
             )
         for entry in input.items:
             self._pubsub_log.append(
-                PubSubItem(topic=entry.topic, data=entry.data)
+                PubSubItem(topic=entry.topic, data=decode_data(entry.data))
             )
 
     @workflow.update(name="__pubsub_poll")
@@ -187,7 +202,13 @@ class PubSubMixin:
             filtered = [item for item in all_new if item.topic in topic_set]
         else:
             filtered = list(all_new)
-        return PollResult(items=filtered, next_offset=next_offset)
+        return PollResult(
+            items=[
+                _WireItem(topic=item.topic, data=encode_data(item.data))
+                for item in filtered
+            ],
+            next_offset=next_offset,
+        )
 
     @_pubsub_poll.validator
     def _validate_pubsub_poll(self, input: PollInput) -> None:  # noqa: A002

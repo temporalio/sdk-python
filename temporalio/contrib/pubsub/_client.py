@@ -20,7 +20,15 @@ from temporalio.client import (
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
 
-from ._types import PollInput, PollResult, PubSubItem, PublishEntry, PublishInput
+from ._types import (
+    PollInput,
+    PollResult,
+    PubSubItem,
+    PublishEntry,
+    PublishInput,
+    decode_data,
+    encode_data,
+)
 
 
 class PubSubClient:
@@ -152,7 +160,7 @@ class PubSubClient:
             priority: If True, wake the flusher to send immediately
                 (fire-and-forget — does not block the caller).
         """
-        self._buffer.append(PublishEntry(topic=topic, data=data))
+        self._buffer.append(PublishEntry(topic=topic, data=encode_data(data)))
         if priority or (
             self._max_batch_size is not None
             and len(self._buffer) >= self._max_batch_size
@@ -261,8 +269,11 @@ class PubSubClient:
                 if await self._follow_continue_as_new():
                     continue
                 return
-            for item in result.items:
-                yield item
+            for wire_item in result.items:
+                yield PubSubItem(
+                    topic=wire_item.topic,
+                    data=decode_data(wire_item.data),
+                )
             offset = result.next_offset
             if poll_cooldown > 0:
                 await asyncio.sleep(poll_cooldown)

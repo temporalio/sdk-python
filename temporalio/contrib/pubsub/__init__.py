@@ -4,7 +4,8 @@ This module provides a reusable pub/sub pattern where a workflow acts as a
 message broker. External clients (activities, starters, other services) publish
 and subscribe through the workflow handle using Temporal primitives.
 
-Payloads are opaque byte strings for cross-language compatibility.
+Payloads are opaque bytes. Base64 encoding is used on the wire for
+cross-language compatibility, but users work with native byte types.
 """
 
 from temporalio.contrib.pubsub._client import PubSubClient

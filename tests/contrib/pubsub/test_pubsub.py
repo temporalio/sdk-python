@@ -22,6 +22,7 @@ from temporalio.contrib.pubsub import (
     PublishEntry,
     PublishInput,
 )
+from temporalio.contrib.pubsub._types import encode_data
 from tests.helpers import assert_eq_eventually, new_worker
 
 
@@ -580,7 +581,7 @@ async def test_mixin_coexistence(client: Client) -> None:
         # Use pub/sub signal
         await handle.signal(
             "__pubsub_publish",
-            PublishInput(items=[PublishEntry(topic="events", data=b"test-item")]),
+            PublishInput(items=[PublishEntry(topic="events", data=encode_data(b"test-item"))]),
         )
 
         # Give signals time to be processed
@@ -674,8 +675,8 @@ async def test_flush_keeps_pending_on_signal_failure(client: Client) -> None:
     assert len(pubsub._buffer) == 0
     assert pubsub._pending is not None
     assert len(pubsub._pending) == 2
-    assert pubsub._pending[0].data == b"item-0"
-    assert pubsub._pending[1].data == b"item-1"
+    assert pubsub._pending[0].data == encode_data(b"item-0")
+    assert pubsub._pending[1].data == encode_data(b"item-1")
     # Pending sequence is set, confirmed sequence is NOT advanced
     assert pubsub._pending_seq == 1
     assert pubsub._sequence == 0
@@ -732,7 +733,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=b"item-0")],
+                items=[PublishEntry(topic="events", data=encode_data(b"item-0"))],
                 publisher_id="test-pub",
                 sequence=1,
             ),
@@ -742,7 +743,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=b"duplicate")],
+                items=[PublishEntry(topic="events", data=encode_data(b"duplicate"))],
                 publisher_id="test-pub",
                 sequence=1,
             ),
@@ -752,7 +753,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=b"item-1")],
+                items=[PublishEntry(topic="events", data=encode_data(b"item-1"))],
                 publisher_id="test-pub",
                 sequence=2,
             ),
@@ -791,7 +792,7 @@ async def test_truncate_pubsub(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(items=[
-                PublishEntry(topic="events", data=f"item-{i}".encode())
+                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
                 for i in range(5)
             ]),
         )
@@ -839,7 +840,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=b"from-a")],
+                items=[PublishEntry(topic="events", data=encode_data(b"from-a"))],
                 publisher_id="pub-a",
                 sequence=1,
             ),
@@ -847,7 +848,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=b"from-b")],
+                items=[PublishEntry(topic="events", data=encode_data(b"from-b"))],
                 publisher_id="pub-b",
                 sequence=1,
             ),
@@ -1021,9 +1022,9 @@ async def _run_can_test(can_client: Client, workflow_cls, input_cls) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(items=[
-                PublishEntry(topic="events", data=b"item-0"),
-                PublishEntry(topic="events", data=b"item-1"),
-                PublishEntry(topic="events", data=b"item-2"),
+                PublishEntry(topic="events", data=encode_data(b"item-0")),
+                PublishEntry(topic="events", data=encode_data(b"item-1")),
+                PublishEntry(topic="events", data=encode_data(b"item-2")),
             ]),
         )
 
@@ -1051,7 +1052,7 @@ async def _run_can_test(can_client: Client, workflow_cls, input_cls) -> None:
         # New items should get offset 3+
         await new_handle.signal(
             "__pubsub_publish",
-            PublishInput(items=[PublishEntry(topic="events", data=b"item-3")]),
+            PublishInput(items=[PublishEntry(topic="events", data=encode_data(b"item-3"))]),
         )
         items_all = await collect_items(new_handle, None, 0, 4)
         assert len(items_all) == 4
@@ -1082,7 +1083,7 @@ async def test_continue_as_new_any_typed_fails(client: Client) -> None:
 
         await handle.signal(
             "__pubsub_publish",
-            PublishInput(items=[PublishEntry(topic="events", data=b"item-0")]),
+            PublishInput(items=[PublishEntry(topic="events", data=encode_data(b"item-0"))]),
         )
         items = await collect_items(handle, None, 0, 1)
         assert len(items) == 1

@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
+
+
+def encode_data(data: bytes) -> str:
+    """Encode bytes to base64 string for wire format."""
+    return base64.b64encode(data).decode("ascii")
+
+
+def decode_data(data: str) -> bytes:
+    """Decode base64 string from wire format to bytes."""
+    return base64.b64decode(data)
 
 
 @dataclass
@@ -21,10 +32,14 @@ class PubSubItem:
 
 @dataclass
 class PublishEntry:
-    """A single entry to publish (used in batch signals)."""
+    """A single entry to publish via signal (wire type).
+
+    The ``data`` field is a base64-encoded string for cross-language
+    compatibility over Temporal's JSON payload converter.
+    """
 
     topic: str
-    data: bytes
+    data: str  # base64-encoded bytes
 
 
 @dataclass
@@ -50,10 +65,21 @@ class PollInput:
 
 
 @dataclass
-class PollResult:
-    """Update response: items matching the poll request."""
+class _WireItem:
+    """Wire representation of a PubSubItem (base64 data)."""
 
-    items: list[PubSubItem] = field(default_factory=list)
+    topic: str
+    data: str  # base64-encoded bytes
+
+
+@dataclass
+class PollResult:
+    """Update response: items matching the poll request.
+
+    Items use base64-encoded data for cross-language wire compatibility.
+    """
+
+    items: list[_WireItem] = field(default_factory=list)
     next_offset: int = 0
 
 
@@ -63,9 +89,11 @@ class PubSubState(BaseModel):
     This is a Pydantic model (not a dataclass) so that Pydantic-based data
     converters can properly reconstruct it. The containing workflow input
     must type the field as ``PubSubState | None``, not ``Any``.
+
+    The log items use base64-encoded data for serialization stability.
     """
 
-    log: list[PubSubItem] = Field(default_factory=list)
+    log: list[_WireItem] = Field(default_factory=list)
     base_offset: int = 0
     publisher_sequences: dict[str, int] = Field(default_factory=dict)
     publisher_last_seen: dict[str, float] = Field(default_factory=dict)

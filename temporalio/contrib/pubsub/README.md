@@ -4,7 +4,7 @@ Reusable pub/sub for Temporal workflows. The workflow acts as a message broker
 with an append-only log. External clients (activities, starters, other services)
 publish and subscribe through the workflow handle using Temporal primitives.
 
-Payloads are opaque byte strings for cross-language compatibility.
+Payloads are base64-encoded byte strings for cross-language compatibility.
 
 ## Quick Start
 
