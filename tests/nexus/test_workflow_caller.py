@@ -1101,10 +1101,13 @@ async def test_async_response(
             return
 
         handler_wf_info = await handler_wf_handle.describe()
-        assert handler_wf_info.status in [
+        expected_statuses = [
             WorkflowExecutionStatus.RUNNING,
             WorkflowExecutionStatus.COMPLETED,
         ]
+        if request_cancel:
+            expected_statuses.append(WorkflowExecutionStatus.CANCELED)
+        assert handler_wf_info.status in expected_statuses
         await assert_handler_workflow_has_link_to_caller_workflow(
             caller_wf_handle, handler_wf_handle
         )
@@ -1508,6 +1511,9 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
     client: Client,
     env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
