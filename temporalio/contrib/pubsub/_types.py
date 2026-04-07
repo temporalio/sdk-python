@@ -68,3 +68,4 @@ class PubSubState(BaseModel):
     log: list[PubSubItem] = Field(default_factory=list)
     base_offset: int = 0
     publisher_sequences: dict[str, int] = Field(default_factory=dict)
+    publisher_last_seen: dict[str, float] = Field(default_factory=dict)

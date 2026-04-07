@@ -231,7 +231,7 @@ class MixinCoexistenceWorkflow(PubSubMixin):
 
 @activity.defn(name="publish_items")
 async def publish_items(count: int) -> None:
-    client = PubSubClient.for_workflow(batch_interval=0.5)
+    client = PubSubClient.create(batch_interval=0.5)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -241,7 +241,7 @@ async def publish_items(count: int) -> None:
 @activity.defn(name="publish_multi_topic")
 async def publish_multi_topic(count: int) -> None:
     topics = ["a", "b", "c"]
-    client = PubSubClient.for_workflow(batch_interval=0.5)
+    client = PubSubClient.create(batch_interval=0.5)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -251,7 +251,7 @@ async def publish_multi_topic(count: int) -> None:
 
 @activity.defn(name="publish_with_priority")
 async def publish_with_priority() -> None:
-    client = PubSubClient.for_workflow(batch_interval=60.0)
+    client = PubSubClient.create(batch_interval=60.0)
     async with client:
         client.publish("events", b"normal-0")
         client.publish("events", b"normal-1")
@@ -262,7 +262,7 @@ async def publish_with_priority() -> None:
 
 @activity.defn(name="publish_batch_test")
 async def publish_batch_test(count: int) -> None:
-    client = PubSubClient.for_workflow(batch_interval=60.0)
+    client = PubSubClient.create(batch_interval=60.0)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -271,7 +271,7 @@ async def publish_batch_test(count: int) -> None:
 
 @activity.defn(name="publish_with_max_batch")
 async def publish_with_max_batch(count: int) -> None:
-    client = PubSubClient.for_workflow(batch_interval=60.0, max_batch_size=3)
+    client = PubSubClient.create(batch_interval=60.0, max_batch_size=3)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -307,7 +307,7 @@ async def collect_items(
     try:
         async with asyncio.timeout(timeout):
             async for item in client.subscribe(
-                topics=topics, from_offset=from_offset, poll_interval=0
+                topics=topics, from_offset=from_offset, poll_cooldown=0
             ):
                 items.append(item)
                 if len(items) >= expected_count:
@@ -490,7 +490,7 @@ async def test_iterator_cancellation(client: Client) -> None:
         async def subscribe_and_collect():
             items = []
             async for item in pubsub_client.subscribe(
-                from_offset=0, poll_interval=0
+                from_offset=0, poll_cooldown=0
             ):
                 items.append(item)
             return items
@@ -651,9 +651,14 @@ async def test_replay_safety(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_flush_retains_items_on_signal_failure(client: Client) -> None:
-    """If flush signal fails, items remain buffered for retry."""
-    # Use a bogus workflow ID so the signal fails
+async def test_flush_keeps_pending_on_signal_failure(client: Client) -> None:
+    """If flush signal fails, items stay in _pending for retry with same sequence.
+
+    This matches the TLA+-verified algorithm (PubSubDedup.tla): on failure,
+    the pending batch and sequence are kept so the next _flush() retries with
+    the SAME sequence number. The confirmed sequence (_sequence) does NOT
+    advance until delivery is confirmed.
+    """
     bogus_handle = client.get_workflow_handle("nonexistent-workflow-id")
     pubsub = PubSubClient(bogus_handle)
 
@@ -662,18 +667,52 @@ async def test_flush_retains_items_on_signal_failure(client: Client) -> None:
     assert len(pubsub._buffer) == 2
 
     # flush should fail (workflow doesn't exist)
-    try:
-        await pubsub.flush()
-    except Exception:
-        pass
+    with pytest.raises(Exception):
+        await pubsub._flush()
 
-    # Items should still be in the buffer (restored after failed swap)
-    assert len(pubsub._buffer) == 2
-    assert pubsub._buffer[0].data == b"item-0"
-    assert pubsub._buffer[1].data == b"item-1"
-    # Sequence advances even on failure — the next flush uses a new sequence
-    # to avoid dedup-dropping newly buffered items merged with the retry batch
-    assert pubsub._sequence == 1
+    # Items moved to _pending (not restored to _buffer)
+    assert len(pubsub._buffer) == 0
+    assert pubsub._pending is not None
+    assert len(pubsub._pending) == 2
+    assert pubsub._pending[0].data == b"item-0"
+    assert pubsub._pending[1].data == b"item-1"
+    # Pending sequence is set, confirmed sequence is NOT advanced
+    assert pubsub._pending_seq == 1
+    assert pubsub._sequence == 0
+
+    # New items published during failure go to _buffer (not _pending)
+    pubsub.publish("events", b"item-2")
+    assert len(pubsub._buffer) == 1
+    assert pubsub._pending is not None  # Still set for retry
+
+    # Next flush retries the pending batch with the same sequence
+    with pytest.raises(Exception):
+        await pubsub._flush()
+    assert pubsub._pending_seq == 1  # Same sequence on retry
+    assert pubsub._sequence == 0  # Still not advanced
+
+
+@pytest.mark.asyncio
+async def test_max_retry_duration_expiry(client: Client) -> None:
+    """Flush raises TimeoutError when max_retry_duration is exceeded."""
+    bogus_handle = client.get_workflow_handle("nonexistent-workflow-id")
+    pubsub = PubSubClient(bogus_handle, max_retry_duration=0.1)
+
+    pubsub.publish("events", b"item-0")
+
+    # First flush fails, sets pending
+    with pytest.raises(Exception, match="not found"):
+        await pubsub._flush()
+    assert pubsub._pending is not None
+
+    # Wait for retry duration to expire
+    await asyncio.sleep(0.2)
+
+    # Next flush should raise TimeoutError and clear pending
+    with pytest.raises(TimeoutError, match="max_retry_duration"):
+        await pubsub._flush()
+    assert pubsub._pending is None
+    assert pubsub._sequence == 0
 
 
 @pytest.mark.asyncio
@@ -733,6 +772,151 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         assert offset == 2
 
         await handle.signal(BasicPubSubWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_truncate_pubsub(client: Client) -> None:
+    """truncate_pubsub discards prefix and adjusts base_offset."""
+    async with new_worker(
+        client,
+        TruncateSignalWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            TruncateSignalWorkflow.run,
+            id=f"pubsub-truncate-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish 5 items via signal
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[
+                PublishEntry(topic="events", data=f"item-{i}".encode())
+                for i in range(5)
+            ]),
+        )
+        await asyncio.sleep(0.5)
+
+        # Verify all 5 items
+        items = await collect_items(handle, None, 0, 5)
+        assert len(items) == 5
+
+        # Truncate up to offset 3 (discard items 0, 1, 2)
+        await handle.signal("truncate", 3)
+        await asyncio.sleep(0.3)
+
+        # Offset should still be 5
+        pubsub_client = PubSubClient(handle)
+        offset = await pubsub_client.get_offset()
+        assert offset == 5
+
+        # Reading from offset 3 should work (items 3, 4)
+        items_after = await collect_items(handle, None, 3, 2)
+        assert len(items_after) == 2
+        assert items_after[0].data == b"item-3"
+        assert items_after[1].data == b"item-4"
+
+        await handle.signal("close")
+
+
+@pytest.mark.asyncio
+async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
+    """get_pubsub_state prunes stale publisher entries based on TTL."""
+    pydantic_client = Client(
+        **{**client.config(), "data_converter": pydantic_data_converter}
+    )
+    async with new_worker(
+        pydantic_client,
+        TTLTestWorkflow,
+    ) as worker:
+        handle = await pydantic_client.start_workflow(
+            TTLTestWorkflow.run,
+            id=f"pubsub-ttl-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish from two different publishers
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=b"from-a")],
+                publisher_id="pub-a",
+                sequence=1,
+            ),
+        )
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=b"from-b")],
+                publisher_id="pub-b",
+                sequence=1,
+            ),
+        )
+        await asyncio.sleep(0.5)
+
+        # Query state with a very long TTL — both publishers retained
+        state = await handle.query(TTLTestWorkflow.get_state_with_ttl, 9999.0)
+        assert "pub-a" in state.publisher_sequences
+        assert "pub-b" in state.publisher_sequences
+
+        # Query state with TTL=0 — both publishers pruned
+        state_pruned = await handle.query(TTLTestWorkflow.get_state_with_ttl, 0.0)
+        assert "pub-a" not in state_pruned.publisher_sequences
+        assert "pub-b" not in state_pruned.publisher_sequences
+
+        # Items are still in the log regardless of pruning
+        assert len(state_pruned.log) == 2
+
+        await handle.signal("close")
+
+
+# ---------------------------------------------------------------------------
+# Truncate and TTL test workflows
+# ---------------------------------------------------------------------------
+
+
+@workflow.defn
+class TruncateSignalWorkflow(PubSubMixin):
+    """Workflow that accepts a truncate signal for testing."""
+
+    @workflow.init
+    def __init__(self) -> None:
+        self.init_pubsub()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.signal
+    def truncate(self, up_to_offset: int) -> None:
+        self.truncate_pubsub(up_to_offset)
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._closed)
+
+
+@workflow.defn
+class TTLTestWorkflow(PubSubMixin):
+    """Workflow that exposes get_pubsub_state via query for TTL testing."""
+
+    @workflow.init
+    def __init__(self) -> None:
+        self.init_pubsub()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.query
+    def get_state_with_ttl(self, ttl: float) -> PubSubState:
+        return self.get_pubsub_state(publisher_ttl=ttl)
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._closed)
 
 
 # ---------------------------------------------------------------------------

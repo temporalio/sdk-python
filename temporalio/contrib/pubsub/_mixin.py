@@ -23,11 +23,13 @@ class PubSubMixin:
     - ``__pubsub_poll`` update for long-poll subscription
     - ``__pubsub_offset`` query for current log length
     - ``drain_pubsub()`` / ``get_pubsub_state()`` for continue-as-new
+    - ``truncate_pubsub(offset)`` for log prefix truncation
     """
 
     _pubsub_log: list[PubSubItem]
     _pubsub_base_offset: int
     _pubsub_publisher_sequences: dict[str, int]
+    _pubsub_publisher_last_seen: dict[str, float]
     _pubsub_draining: bool
 
     def init_pubsub(self, prior_state: PubSubState | None = None) -> None:
@@ -44,19 +46,51 @@ class PubSubMixin:
             self._pubsub_publisher_sequences = dict(
                 prior_state.publisher_sequences
             )
+            self._pubsub_publisher_last_seen = dict(
+                prior_state.publisher_last_seen
+            )
         else:
             self._pubsub_log = []
             self._pubsub_base_offset = 0
             self._pubsub_publisher_sequences = {}
+            self._pubsub_publisher_last_seen = {}
         self._pubsub_draining = False
 
-    def get_pubsub_state(self) -> PubSubState:
-        """Return a serializable snapshot of pub/sub state for continue-as-new."""
+    def get_pubsub_state(
+        self, *, publisher_ttl: float = 900.0
+    ) -> PubSubState:
+        """Return a serializable snapshot of pub/sub state for continue-as-new.
+
+        Prunes publisher dedup entries older than ``publisher_ttl`` seconds.
+        The TTL must exceed the ``max_retry_duration`` of any client that
+        may still be retrying a failed flush. See verification/PROOF.md
+        for the formal safety argument.
+
+        Args:
+            publisher_ttl: Seconds after which a publisher's dedup entry
+                is pruned. Default 900 (15 minutes).
+        """
         self._check_initialized()
+        now = workflow.time()
+
+        # Determine which publishers to retain. Publishers with timestamps
+        # are pruned by TTL. Publishers without timestamps (legacy state
+        # from before publisher_last_seen was added) are always retained
+        # to avoid silently dropping dedup entries on upgrade.
+        active_sequences: dict[str, int] = {}
+        active_last_seen: dict[str, float] = {}
+        for pid, seq in self._pubsub_publisher_sequences.items():
+            ts = self._pubsub_publisher_last_seen.get(pid)
+            if ts is None or now - ts < publisher_ttl:
+                active_sequences[pid] = seq
+                if ts is not None:
+                    active_last_seen[pid] = ts
+
         return PubSubState(
             log=list(self._pubsub_log),
             base_offset=self._pubsub_base_offset,
-            publisher_sequences=dict(self._pubsub_publisher_sequences),
+            publisher_sequences=active_sequences,
+            publisher_last_seen=active_last_seen,
         )
 
     def drain_pubsub(self) -> None:
@@ -67,6 +101,31 @@ class PubSubMixin:
         """
         self._check_initialized()
         self._pubsub_draining = True
+
+    def truncate_pubsub(self, up_to_offset: int) -> None:
+        """Discard log entries before ``up_to_offset``.
+
+        After truncation, polls requesting an offset before the new
+        base will receive a ValueError. All global offsets remain
+        monotonic.
+
+        Args:
+            up_to_offset: The global offset to truncate up to (exclusive).
+                Entries at offsets ``[base_offset, up_to_offset)`` are
+                discarded.
+        """
+        self._check_initialized()
+        log_index = up_to_offset - self._pubsub_base_offset
+        if log_index <= 0:
+            return
+        if log_index > len(self._pubsub_log):
+            raise ValueError(
+                f"Cannot truncate to offset {up_to_offset}: "
+                f"only {self._pubsub_base_offset + len(self._pubsub_log)} "
+                f"items exist"
+            )
+        self._pubsub_log = self._pubsub_log[log_index:]
+        self._pubsub_base_offset = up_to_offset
 
     def _check_initialized(self) -> None:
         if not hasattr(self, "_pubsub_log"):
@@ -86,7 +145,9 @@ class PubSubMixin:
 
         Deduplicates using (publisher_id, sequence). If publisher_id is set
         and the sequence is <= the last seen sequence for that publisher,
-        the entire batch is dropped as a duplicate.
+        the entire batch is dropped as a duplicate. Batches are atomic:
+        the dedup decision applies to the whole batch, not individual items.
+        See verification/PROOF.md for the formal correctness proof.
         """
         self._check_initialized()
         if input.publisher_id:
@@ -97,6 +158,9 @@ class PubSubMixin:
                 return
             self._pubsub_publisher_sequences[input.publisher_id] = (
                 input.sequence
+            )
+            self._pubsub_publisher_last_seen[input.publisher_id] = (
+                workflow.time()
             )
         for entry in input.items:
             self._pubsub_log.append(
@@ -129,13 +193,7 @@ class PubSubMixin:
 
     @_pubsub_poll.validator
     def _validate_pubsub_poll(self, input: PollInput) -> None:  # noqa: A002
-        """Reject new polls when draining for continue-as-new.
-
-        Update validators run synchronously before the update handler is
-        accepted. By rejecting here, the update is never accepted, so no
-        new handler starts — this allows ``all_handlers_finished()`` to
-        stabilize. See DESIGN-ADDENDUM-CAN.md.
-        """
+        """Reject new polls when draining for continue-as-new."""
         self._check_initialized()
         if self._pubsub_draining:
             raise RuntimeError("Workflow is draining for continue-as-new")

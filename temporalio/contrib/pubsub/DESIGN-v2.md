@@ -79,8 +79,9 @@ continue-as-new state, call it in `run()` with the `prior_state` argument
 |---|---|---|
 | `init_pubsub(prior_state=None)` | instance method | Initialize internal state. Must be called before use. |
 | `publish(topic, data)` | instance method | Append to the log from workflow code. |
-| `get_pubsub_state()` | instance method | Snapshot for continue-as-new. |
+| `get_pubsub_state(publisher_ttl=900)` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
 | `drain_pubsub()` | instance method | Unblock polls and reject new ones for CAN. |
+| `truncate_pubsub(up_to_offset)` | instance method | Discard log entries before offset. |
 | `__pubsub_publish` | `@workflow.signal` | Receives publications from external clients (with dedup). |
 | `__pubsub_poll` | `@workflow.update` | Long-poll subscription: blocks until new items or drain. |
 | `__pubsub_offset` | `@workflow.query` | Returns the current global offset. |
@@ -93,7 +94,7 @@ Used by activities, starters, and any code with a workflow handle.
 from temporalio.contrib.pubsub import PubSubClient
 
 # Preferred: factory method (enables CAN following + activity auto-detect)
-client = PubSubClient.for_workflow(temporal_client, workflow_id)
+client = PubSubClient.create(temporal_client, workflow_id)
 
 # --- Publishing (with batching) ---
 async with client:
@@ -110,24 +111,26 @@ async for item in client.subscribe(["events"], from_offset=0):
 
 | Method | Description |
 |---|---|
-| `PubSubClient.for_workflow(client?, wf_id?)` | Factory (preferred). Auto-detects activity context if args omitted. |
+| `PubSubClient.create(client?, wf_id?)` | Factory (preferred). Auto-detects activity context if args omitted. |
 | `PubSubClient(handle)` | From handle directly (no CAN following). |
-| `publish(topic, data, priority=False)` | Buffer a message. Priority forces immediate flush. |
-| `flush()` | Send buffered messages via signal (with dedup, lock, coalescing). |
-| `subscribe(topics, from_offset, poll_interval=0.1)` | Async iterator. Always follows CAN chains when created via `for_workflow`. |
+| `publish(topic, data, priority=False)` | Buffer a message. Priority triggers immediate flush (fire-and-forget). |
+| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Always follows CAN chains when created via `create`. |
 | `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush on exit.
+There is no public `flush()` method — use `priority=True` on `publish()`
+for immediate delivery, or rely on the background flusher and context
+manager exit flush.
 
 #### Activity convenience
 
 When called from within an activity, `client` and `workflow_id` can be
-omitted from `for_workflow()` — they are inferred from the activity context:
+omitted from `create()` — they are inferred from the activity context:
 
 ```python
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.for_workflow(batch_interval=2.0)
+    client = PubSubClient.create(batch_interval=2.0)
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -168,6 +171,7 @@ class PubSubState(BaseModel):  # Pydantic for CAN round-tripping
     log: list[PubSubItem] = []
     base_offset: int = 0
     publisher_sequences: dict[str, int] = {}
+    publisher_last_seen: dict[str, float] = {}  # For TTL pruning
 ```
 
 `PubSubItem` does not carry an offset field. The global offset is derived
@@ -308,46 +312,72 @@ Client                              Workflow
   │───────────────────────────────────►│ seq 2 > 1 → accept, record seq=2
 ```
 
-### Client-side flush
+### Client-side flush (TLA+-verified algorithm)
+
+The flush algorithm has been formally verified using TLA+ model checking.
+See `verification/PROOF.md` for the full correctness proof and
+`verification/PubSubDedup.tla` for the spec.
 
 ```python
-async def flush(self) -> None:
+async def _flush(self) -> None:
     async with self._flush_lock:
-        if not self._buffer:
+        if self._pending is not None:
+            # Retry failed batch with same sequence
+            batch = self._pending
+            seq = self._pending_seq
+        elif self._buffer:
+            # New batch
+            seq = self._sequence + 1
+            batch = self._buffer
+            self._buffer = []
+            self._pending = batch
+            self._pending_seq = seq
+        else:
             return
-        self._sequence += 1
-        batch = self._buffer
-        self._buffer = []          # swap before send
         try:
             await self._handle.signal(
                 "__pubsub_publish",
                 PublishInput(items=batch, publisher_id=self._publisher_id,
-                             sequence=self._sequence),
+                             sequence=seq),
             )
+            self._sequence = seq     # advance confirmed sequence
+            self._pending = None     # clear pending
         except Exception:
-            self._buffer = batch + self._buffer  # restore, but keep new sequence
+            pass                     # pending stays for retry
             raise
 ```
 
-- **Buffer swap before send**: new `publish()` calls during the await write to
-  the fresh buffer.
-- **Sequence advances on failure**: the sequence is NOT decremented on error.
-  The failed batch is restored to the buffer, but the next flush uses a new
-  sequence. This prevents a subtle data-loss bug: if the signal was delivered
-  but the client saw an error, items published during the await would be merged
-  into the retry batch. Reusing the old sequence would cause the workflow to
-  deduplicate the entire merged batch, dropping the new items. A fresh sequence
-  means the retry is treated as a new batch (at-least-once for the original
-  items, but no data loss).
-- **Lock for coalescing**: concurrent `flush()` callers queue on the lock. By
-  the time each enters, accumulated items get sent in one signal.
+- **Separate pending from buffer**: failed batches stay in `_pending`, not
+  restored to `_buffer`. New `publish()` calls during retry go to the fresh
+  buffer. This prevents the data-loss bug where items would be merged into a
+  retry batch under a different sequence number.
+- **Retry with same sequence**: on failure, the next `_flush()` retries the
+  same `_pending` with the same `_pending_seq`. If the signal was delivered
+  but the client saw an error, the workflow deduplicates the retry.
+- **Sequence advances only on success**: `_sequence` (confirmed) is updated
+  only after the signal call returns without error.
+- **Lock for coalescing**: concurrent `_flush()` callers queue on the lock.
+- **max_retry_duration**: if set, the client gives up retrying after this
+  duration and raises `TimeoutError`. Must be less than the workflow's
+  `publisher_ttl` to preserve exactly-once guarantees.
 
-### Dedup state
+### Dedup state and TTL pruning
 
 `publisher_sequences` is `dict[str, int]` — bounded by number of publishers
 (typically 1-2), not number of flushes. Carried through continue-as-new in
 `PubSubState`. If `publisher_id` is empty (workflow-internal publish or legacy
 client), dedup is skipped.
+
+`publisher_last_seen` tracks the last `workflow.time()` each publisher was
+seen. During `get_pubsub_state(publisher_ttl=900)`, entries older than TTL
+are pruned to bound memory across long-lived workflow chains.
+
+**Safety constraint**: `publisher_ttl` must exceed the client's
+`max_retry_duration`. If a publisher's dedup entry is pruned while it still
+has a pending retry, the retry could be accepted as new, creating duplicates.
+This is formally verified in `verification/PubSubDedupTTL.tla` — TLC finds
+the counterexample for unsafe pruning and confirms safe pruning preserves
+NoDuplicates.
 
 ## Continue-as-New
 
@@ -365,9 +395,10 @@ class PubSubState(BaseModel):
     log: list[PubSubItem] = []
     base_offset: int = 0
     publisher_sequences: dict[str, int] = {}
+    publisher_last_seen: dict[str, float] = {}
 ```
 
-`init_pubsub(prior_state)` restores all three fields. `get_pubsub_state()`
+`init_pubsub(prior_state)` restores all four fields. `get_pubsub_state()`
 snapshots them.
 
 ### Draining
@@ -479,5 +510,12 @@ temporalio/contrib/pubsub/
 ├── DESIGN.md                    # Historical: original design
 ├── DESIGN-ADDENDUM-CAN.md       # Historical: CAN exploration
 ├── DESIGN-ADDENDUM-TOPICS.md    # Historical: offset model exploration
-└── DESIGN-ADDENDUM-DEDUP.md     # Historical: dedup exploration
+├── DESIGN-ADDENDUM-DEDUP.md     # Historical: dedup exploration
+└── verification/                # TLA+ formal verification
+    ├── README.md                # Overview and running instructions
+    ├── PROOF.md                 # Full correctness proof
+    ├── PubSubDedup.tla          # Correct single-publisher protocol
+    ├── PubSubDedupInductive.tla # Inductive invariant (unbounded proof)
+    ├── PubSubDedupTTL.tla       # Multi-publisher + TTL pruning
+    └── PubSubDedupBroken.tla    # Old (broken) algorithm — counterexample
 ```

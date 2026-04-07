@@ -7,6 +7,7 @@ messages and subscribe to topics on a pub/sub workflow.
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Self
@@ -25,19 +26,19 @@ from ._types import PollInput, PollResult, PubSubItem, PublishEntry, PublishInpu
 class PubSubClient:
     """Client for publishing to and subscribing from a pub/sub workflow.
 
-    Create via :py:meth:`for_workflow` (preferred) or by passing a handle
+    Create via :py:meth:`create` (preferred) or by passing a handle
     directly to the constructor.
 
     For publishing, use as an async context manager to get automatic batching::
 
-        client = PubSubClient.for_workflow(temporal_client, workflow_id)
+        client = PubSubClient.create(temporal_client, workflow_id)
         async with client:
             client.publish("events", b"hello")
             client.publish("events", b"world", priority=True)
 
     For subscribing::
 
-        client = PubSubClient.for_workflow(temporal_client, workflow_id)
+        client = PubSubClient.create(temporal_client, workflow_id)
         async for item in client.subscribe(["events"], from_offset=0):
             process(item)
     """
@@ -48,37 +49,47 @@ class PubSubClient:
         *,
         batch_interval: float = 2.0,
         max_batch_size: int | None = None,
+        max_retry_duration: float = 600.0,
     ) -> None:
         """Create a pub/sub client from a workflow handle.
 
-        Prefer :py:meth:`for_workflow` when you need continue-as-new
+        Prefer :py:meth:`create` when you need continue-as-new
         following in ``subscribe()``.
 
         Args:
             handle: Workflow handle to the pub/sub workflow.
             batch_interval: Seconds between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
+            max_retry_duration: Maximum seconds to retry a failed flush
+                before raising TimeoutError. Must be less than the
+                workflow's ``publisher_ttl`` (default 900s) to preserve
+                exactly-once delivery. Default: 600s.
         """
         self._handle = handle
         self._client: Client | None = None
         self._workflow_id = handle.id
         self._batch_interval = batch_interval
         self._max_batch_size = max_batch_size
+        self._max_retry_duration = max_retry_duration
         self._buffer: list[PublishEntry] = []
         self._flush_event = asyncio.Event()
         self._flush_task: asyncio.Task[None] | None = None
         self._flush_lock = asyncio.Lock()
-        self._publisher_id: str = uuid.uuid4().hex
+        self._publisher_id: str = uuid.uuid4().hex[:16]
         self._sequence: int = 0
+        self._pending: list[PublishEntry] | None = None
+        self._pending_seq: int = 0
+        self._pending_since: float | None = None
 
     @classmethod
-    def for_workflow(
+    def create(
         cls,
         client: Client | None = None,
         workflow_id: str | None = None,
         *,
         batch_interval: float = 2.0,
         max_batch_size: int | None = None,
+        max_retry_duration: float = 600.0,
     ) -> PubSubClient:
         """Create a pub/sub client from a Temporal client and workflow ID.
 
@@ -95,6 +106,8 @@ class PubSubClient:
                 activity, uses the activity's parent workflow ID.
             batch_interval: Seconds between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
+            max_retry_duration: Maximum seconds to retry a failed flush
+                before raising TimeoutError. Default: 600s.
         """
         if client is None or workflow_id is None:
             info = activity.info()
@@ -108,7 +121,10 @@ class PubSubClient:
                 workflow_id = wf_id
         handle = client.get_workflow_handle(workflow_id)
         instance = cls(
-            handle, batch_interval=batch_interval, max_batch_size=max_batch_size
+            handle,
+            batch_interval=batch_interval,
+            max_batch_size=max_batch_size,
+            max_retry_duration=max_retry_duration,
         )
         instance._client = client
         return instance
@@ -125,7 +141,7 @@ class PubSubClient:
             except asyncio.CancelledError:
                 pass
             self._flush_task = None
-        await self.flush()
+        await self._flush()
 
     def publish(self, topic: str, data: bytes, priority: bool = False) -> None:
         """Buffer a message for publishing.
@@ -133,7 +149,8 @@ class PubSubClient:
         Args:
             topic: Topic string.
             data: Opaque byte payload.
-            priority: If True, wake the flusher to send immediately.
+            priority: If True, wake the flusher to send immediately
+                (fire-and-forget — does not block the caller).
         """
         self._buffer.append(PublishEntry(topic=topic, data=data))
         if priority or (
@@ -142,40 +159,70 @@ class PubSubClient:
         ):
             self._flush_event.set()
 
-    async def flush(self) -> None:
-        """Send all buffered messages to the workflow via signal.
+    async def _flush(self) -> None:
+        """Send buffered or pending messages to the workflow via signal.
 
-        Uses a lock to serialize concurrent flushes. If a flush is already
-        in progress, callers wait on the lock — by the time they enter,
-        their items (plus any others added meanwhile) are in the buffer
-        and get sent in one signal. This naturally coalesces N concurrent
-        flush calls into fewer signals.
+        Implements the TLA+-verified dedup algorithm (see verification/PROOF.md):
 
-        Uses buffer swap for exactly-once delivery. On failure, items are
-        restored to the buffer but the sequence is NOT decremented — the
-        next flush gets a new sequence number. This prevents data loss
-        when the signal was delivered but the client saw an error: newly
-        buffered items that arrived during the failed await must not be
-        sent under the old (already-delivered) sequence, or the workflow
-        would deduplicate them away.
+        1. If there is a pending batch from a prior failure, retry it with
+           the SAME sequence number. Check max_retry_duration first.
+        2. Otherwise, if the buffer is non-empty, swap it into pending with
+           a new sequence number.
+        3. On success: advance confirmed sequence, clear pending.
+        4. On failure: pending stays for retry on the next call.
+
+        Correspondence to TLA+ spec (PubSubDedup.tla):
+            _buffer      ↔ buffer
+            _pending     ↔ pending
+            _pending_seq ↔ pending_seq
+            _sequence    ↔ confirmed_seq
         """
         async with self._flush_lock:
-            if not self._buffer:
+            if self._pending is not None:
+                # Retry path: check max_retry_duration
+                if (
+                    self._pending_since is not None
+                    and time.monotonic() - self._pending_since
+                    > self._max_retry_duration
+                ):
+                    self._pending = None
+                    self._pending_seq = 0
+                    self._pending_since = None
+                    raise TimeoutError(
+                        f"Flush retry exceeded max_retry_duration "
+                        f"({self._max_retry_duration}s). Pending batch dropped. "
+                        f"If the signal was delivered, items are in the log. "
+                        f"If not, they are lost."
+                    )
+                batch = self._pending
+                seq = self._pending_seq
+            elif self._buffer:
+                # New batch path
+                seq = self._sequence + 1
+                batch = self._buffer
+                self._buffer = []
+                self._pending = batch
+                self._pending_seq = seq
+                self._pending_since = time.monotonic()
+            else:
                 return
-            self._sequence += 1
-            batch = self._buffer
-            self._buffer = []
+
             try:
                 await self._handle.signal(
                     "__pubsub_publish",
                     PublishInput(
                         items=batch,
                         publisher_id=self._publisher_id,
-                        sequence=self._sequence,
+                        sequence=seq,
                     ),
                 )
+                # Success: advance confirmed sequence, clear pending
+                self._sequence = seq
+                self._pending = None
+                self._pending_seq = 0
+                self._pending_since = None
             except Exception:
-                self._buffer = batch + self._buffer
+                # Pending stays set for retry on the next _flush() call
                 raise
 
     async def _run_flusher(self) -> None:
@@ -188,24 +235,24 @@ class PubSubClient:
             except asyncio.TimeoutError:
                 pass
             self._flush_event.clear()
-            await self.flush()
+            await self._flush()
 
     async def subscribe(
         self,
         topics: list[str] | None = None,
         from_offset: int = 0,
         *,
-        poll_interval: float = 0.1,
+        poll_cooldown: float = 0.1,
     ) -> AsyncIterator[PubSubItem]:
         """Async iterator that polls for new items.
 
         Automatically follows continue-as-new chains when the client
-        was created via :py:meth:`for_workflow`.
+        was created via :py:meth:`create`.
 
         Args:
             topics: Topic filter. None or empty list means all topics.
             from_offset: Global offset to start reading from.
-            poll_interval: Seconds to sleep between polls to avoid
+            poll_cooldown: Minimum seconds between polls to avoid
                 overwhelming the workflow when items arrive faster than
                 the poll round-trip. Defaults to 0.1.
 
@@ -221,30 +268,19 @@ class PubSubClient:
                     result_type=PollResult,
                 )
             except asyncio.CancelledError:
-                # The caller's task was cancelled (e.g., activity shutdown
-                # or subscriber cleanup). Stop iteration gracefully.
                 return
             except WorkflowUpdateRPCTimeoutOrCancelledError:
-                # The update was cancelled server-side — possibly due to
-                # continue-as-new (the drain validator rejected the poll).
-                # Check if the workflow CAN'd and follow the chain.
                 if await self._follow_continue_as_new():
                     continue
                 return
             for item in result.items:
                 yield item
             offset = result.next_offset
-            if poll_interval > 0:
-                await asyncio.sleep(poll_interval)
+            if poll_cooldown > 0:
+                await asyncio.sleep(poll_cooldown)
 
     async def _follow_continue_as_new(self) -> bool:
         """Check if the workflow continued-as-new and re-target the handle.
-
-        When a poll fails, this method checks the workflow's execution
-        status. If it's CONTINUED_AS_NEW, we get a fresh handle for the
-        same workflow ID (no pinned run_id), which targets the latest run.
-        The subscriber can then retry the poll from the same offset — the
-        new run's log contains all items from the previous run.
 
         Returns True if the handle was updated (caller should retry).
         """
