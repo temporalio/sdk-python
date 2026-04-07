@@ -163,7 +163,7 @@ jobs:
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
-      - run: poe test  -s --junit-xml=junit-xml/latest-deps.xml
+      - run: poe test -s --junit-xml=junit-xml/latest-deps.xml
         timeout-minutes: 15
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@v4

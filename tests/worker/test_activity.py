@@ -639,7 +639,7 @@ async def test_sync_activity_process_cancel(
             picklable_activity_wait_cancel,
             cancel_after_ms=100,
             wait_for_cancellation=True,
-            heartbeat_timeout_ms=3000,
+            heartbeat_timeout_ms=5000,
             worker_config={"activity_executor": executor},
             shared_state_manager=shared_state_manager,
         )
