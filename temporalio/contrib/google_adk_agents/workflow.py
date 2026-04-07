@@ -29,7 +29,15 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
         # Decorator kwargs are defaults.
         options = kwargs.copy()
 
-        return await workflow.execute_activity(activity_def, *activity_args, **options)
+        if not activity_args:
+            return await workflow.execute_activity(activity_def, **options)
+        if len(activity_args) == 1:
+            return await workflow.execute_activity(
+                activity_def, activity_args[0], **options
+            )
+        return await workflow.execute_activity(
+            activity_def, args=activity_args, **options
+        )
 
     # Copy metadata
     wrapper.__name__ = activity_def.__name__

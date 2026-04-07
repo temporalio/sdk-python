@@ -56,8 +56,6 @@ from temporalio.workflow import ActivityConfig
 from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
 
 logger = logging.getLogger(__name__)
-
-
 @activity.defn
 async def get_weather(city: str) -> str:  #  type: ignore[reportUnusedParameter]
     """Activity that gets weather for a given city."""
@@ -113,8 +111,6 @@ class WeatherAgent:
                 last_event = event
 
         return last_event
-
-
 @workflow.defn
 class MultiAgentWorkflow:
     @workflow.run
@@ -234,8 +230,6 @@ class WeatherModel(TestModel):
     @classmethod
     def supported_models(cls) -> list[str]:
         return ["weather_model"]
-
-
 @pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.asyncio
 async def test_single_agent(client: Client, use_local_model: bool):
@@ -567,3 +561,197 @@ async def test_single_agent_telemetry(client: Client):
 async def test_unsetting_timeout():
     model = TemporalModel("", ActivityConfig(start_to_close_timeout=None))
     assert model._activity_config.get("start_to_close_timeout", None) is None
+
+
+complex_activity_inputs_seen: dict[str, object] = {}
+
+
+@activity.defn
+async def book_trip(origin: str, destination: str, passengers: int) -> str:
+    """Activity that formats multiple discrete arguments."""
+    complex_activity_inputs_seen["book_trip"] = (origin, destination, passengers)
+    return f"{origin}->{destination}:{passengers}"
+
+
+@activity.defn
+async def summarize_payload(
+    name: str, metadata: dict[str, str | int | list[str]]
+) -> str:
+    """Activity that formats compound map input."""
+    complex_activity_inputs_seen["summarize_payload"] = (name, metadata)
+    tags = metadata.get("tags", [])
+    assert isinstance(tags, list)
+    return (
+        f"{name}:{metadata['count']}:{metadata['owner']}:"
+        + ",".join(str(tag) for tag in tags)
+    )
+
+
+class ComplexActivityMethodHolder:
+    def __init__(self, prefix: str) -> None:
+        self.prefix = prefix
+
+    @activity.defn
+    async def annotate_trip(self, trip: str) -> str:
+        complex_activity_inputs_seen["annotate_trip"] = trip
+        return f"{self.prefix}:{trip}"
+
+
+@workflow.defn
+class ComplexActivityInputAgent:
+    @workflow.run
+    async def run(self, prompt: str, model_name: str) -> str:
+        logger.info("Workflow started.")
+        method_holder = ComplexActivityMethodHolder("method")
+
+        agent = Agent(
+            name="complex_input_agent",
+            model=TemporalModel(model_name),
+            tools=[
+                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                    book_trip, start_to_close_timeout=timedelta(seconds=60)
+                ),
+                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                    summarize_payload, start_to_close_timeout=timedelta(seconds=60)
+                ),
+                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                    method_holder.annotate_trip,
+                    start_to_close_timeout=timedelta(seconds=60),
+                ),
+            ],
+        )
+
+        runner = InMemoryRunner(
+            agent=agent,
+            app_name="complex_input_app",
+        )
+
+        session = await runner.session_service.create_session(
+            app_name="complex_input_app", user_id="test"
+        )
+
+        final_text = ""
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text=prompt)]),
+            )
+        ) as agen:
+            async for event in agen:
+                logger.info(f"Event: {event}")
+                if event.content and event.content.parts:
+                    for part in event.content.parts:
+                        if part.text is not None:
+                            final_text = part.text
+
+        return final_text
+
+
+class ComplexActivityInputModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                name="book_trip",
+                                args={
+                                    "origin": "SFO",
+                                    "destination": "LAX",
+                                    "passengers": 3,
+                                },
+                            )
+                        )
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                name="summarize_payload",
+                                args={
+                                    "name": "fixture",
+                                    "metadata": {
+                                        "count": 2,
+                                        "owner": "team-a",
+                                        "tags": ["alpha", "beta"],
+                                    },
+                                },
+                            )
+                        )
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                name="annotate_trip",
+                                args={"trip": "SFO->LAX:3"},
+                            )
+                        )
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[Part(text="completed complex input tool calls")],
+                )
+            ),
+        ]
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["complex_activity_input_model"]
+
+
+@pytest.mark.asyncio
+async def test_activity_tool_supports_complex_inputs_via_adk(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+    complex_activity_inputs_seen.clear()
+    method_holder = ComplexActivityMethodHolder("method")
+
+    async with Worker(
+        client,
+        task_queue="adk-task-queue-complex-inputs",
+        activities=[
+            book_trip,
+            summarize_payload,
+            method_holder.annotate_trip,
+        ],
+        workflows=[ComplexActivityInputAgent],
+        max_cached_workflows=0,
+    ):
+        LLMRegistry.register(ComplexActivityInputModel)
+
+        handle = await client.start_workflow(
+            ComplexActivityInputAgent.run,
+            args=[
+                "Run every registered tool using structured inputs.",
+                "complex_activity_input_model",
+            ],
+            id=f"complex-activity-input-workflow-{uuid.uuid4()}",
+            task_queue="adk-task-queue-complex-inputs",
+            execution_timeout=timedelta(seconds=60),
+        )
+        result = await handle.result()
+        assert result == "completed complex input tool calls"
+        assert complex_activity_inputs_seen == {
+            "book_trip": ("SFO", "LAX", 3),
+            "summarize_payload": (
+                "fixture",
+                {"count": 2, "owner": "team-a", "tags": ["alpha", "beta"]},
+            ),
+            "annotate_trip": "SFO->LAX:3",
+        }
