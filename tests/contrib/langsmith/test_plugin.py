@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from langsmith import traceable, tracing_context
 
-import temporalio.worker
 from temporalio.client import Client, WorkflowHandle
 from temporalio.contrib.langsmith import LangSmithInterceptor, LangSmithPlugin
-from temporalio.contrib.langsmith._plugin import _ClientOnlyLangSmithInterceptor
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from tests.contrib.langsmith.conftest import dump_traces
 from tests.contrib.langsmith.test_integration import (
     ComprehensiveWorkflow,
@@ -45,123 +42,13 @@ class TestPluginConstruction:
         )
         assert plugin.interceptors is not None
         assert len(plugin.interceptors) > 0
-        wrapper = plugin.interceptors[0]
-        assert isinstance(wrapper, _ClientOnlyLangSmithInterceptor)
-        interceptor = wrapper._interceptor
+        interceptor = plugin.interceptors[0]
         assert isinstance(interceptor, LangSmithInterceptor)
         assert interceptor._client is mock_client
         assert interceptor._project_name == "my-project"
         assert interceptor._add_temporal_runs is False
         assert interceptor._default_metadata == {"env": "prod"}
         assert interceptor._default_tags == ["v1"]
-
-    def test_construction_without_client(self) -> None:
-        """Plugin creates a LangSmith client when none is provided."""
-        plugin = LangSmithPlugin()
-        assert plugin.interceptors is not None
-        wrapper = plugin.interceptors[0]
-        assert isinstance(wrapper, _ClientOnlyLangSmithInterceptor)
-        assert wrapper._interceptor._client is not None
-
-    def test_configure_worker_creates_fresh_interceptor(self) -> None:
-        """Each configure_worker call produces a distinct LangSmithInterceptor."""
-        mock_client = MagicMock()
-        plugin = LangSmithPlugin(
-            client=mock_client,
-            project_name="test-project",
-            add_temporal_runs=True,
-            metadata={"k": "v"},
-            tags=["t1"],
-        )
-
-        # Build a minimal worker config — super().configure_worker needs
-        # config["client"].config(active_config=True) and a workflow_runner
-        mock_temporal_client = MagicMock()
-        mock_temporal_client.config.return_value = {}
-        base_config: dict[str, Any] = {
-            "client": mock_temporal_client,
-            "workflow_runner": SandboxedWorkflowRunner(),
-        }
-
-        config1 = plugin.configure_worker(cast(Any, dict(base_config)))
-        config2 = plugin.configure_worker(cast(Any, dict(base_config)))
-
-        interceptors1 = [
-            i
-            for i in config1.get("interceptors", [])
-            if isinstance(i, LangSmithInterceptor)
-        ]
-        interceptors2 = [
-            i
-            for i in config2.get("interceptors", [])
-            if isinstance(i, LangSmithInterceptor)
-        ]
-        assert len(interceptors1) == 1
-        assert len(interceptors2) == 1
-        assert interceptors1[0] is not interceptors2[0]
-
-        # Verify the fresh interceptor has the correct config
-        fresh = interceptors1[0]
-        assert fresh._client is mock_client
-        assert fresh._project_name == "test-project"
-        assert fresh._add_temporal_runs is True
-        assert fresh._default_metadata == {"k": "v"}
-        assert fresh._default_tags == ["t1"]
-
-    def test_wrapper_not_worker_interceptor(self) -> None:
-        """The client-only wrapper must not be a worker.Interceptor."""
-        mock_client = MagicMock()
-        plugin = LangSmithPlugin(client=mock_client)
-        assert plugin.interceptors is not None
-        wrapper = plugin.interceptors[0]
-        assert isinstance(wrapper, _ClientOnlyLangSmithInterceptor)
-        assert not isinstance(wrapper, temporalio.worker.Interceptor)
-
-    def test_no_duplicate_interceptors_after_merge(self) -> None:
-        """Simulating the full Worker merge flow yields exactly one LangSmithInterceptor."""
-        mock_client = MagicMock()
-        plugin = LangSmithPlugin(client=mock_client, add_temporal_runs=True)
-
-        # Step 1: configure_client — adds the wrapper to client interceptors
-        client_config = plugin.configure_client(cast(Any, {"interceptors": []}))
-
-        # Step 2: build worker config where config["client"].config(active_config=True)
-        # returns the client config (so the wrapper is in the client's interceptors)
-        mock_temporal_client = MagicMock()
-        mock_temporal_client.config.return_value = client_config
-
-        # Step 3: configure_worker — adds a fresh LangSmithInterceptor
-        worker_config = plugin.configure_worker(
-            cast(
-                Any,
-                {
-                    "client": mock_temporal_client,
-                    "interceptors": [],
-                    "workflow_runner": SandboxedWorkflowRunner(),
-                },
-            )
-        )
-
-        # Step 4: simulate _init_from_config merge (worker/_worker.py:435-441)
-        client_interceptors = client_config.get("interceptors", [])
-        interceptors_from_client = [
-            i
-            for i in client_interceptors
-            if isinstance(i, temporalio.worker.Interceptor)
-        ]
-        assert (
-            len(interceptors_from_client) == 0
-        ), "Wrapper should not pass worker.Interceptor filter"
-        final_interceptors = interceptors_from_client + list(
-            worker_config.get("interceptors", [])
-        )
-
-        # The wrapper should NOT pass the isinstance filter, so only the fresh
-        # one from configure_worker should be present
-        langsmith_interceptors = [
-            i for i in final_interceptors if isinstance(i, LangSmithInterceptor)
-        ]
-        assert len(langsmith_interceptors) == 1
 
 
 class TestPluginIntegration:

@@ -9,31 +9,10 @@ from typing import Any
 
 import langsmith
 
-import temporalio.client
 from temporalio.contrib.langsmith._interceptor import LangSmithInterceptor
 from temporalio.plugin import SimplePlugin
-from temporalio.worker import WorkerConfig, WorkflowRunner
+from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
-
-
-class _ClientOnlyLangSmithInterceptor(temporalio.client.Interceptor):
-    """Wrapper that exposes only the client interceptor interface.
-
-    This prevents ``_init_from_config`` from detecting it as a
-    ``worker.Interceptor`` and automatically pulling it into every worker.
-    Each worker gets its own ``LangSmithInterceptor`` via
-    ``LangSmithPlugin.configure_worker`` instead.
-    """
-
-    def __init__(self, interceptor: LangSmithInterceptor) -> None:
-        super().__init__()
-        self._interceptor = interceptor
-
-    def intercept_client(
-        self, next: temporalio.client.OutboundInterceptor
-    ) -> temporalio.client.OutboundInterceptor:
-        """Delegate to the wrapped interceptor."""
-        return self._interceptor.intercept_client(next)
 
 
 class LangSmithPlugin(SimplePlugin):
@@ -63,19 +42,14 @@ class LangSmithPlugin(SimplePlugin):
             metadata: Default metadata to attach to all runs.
             tags: Default tags to attach to all runs.
         """
-        ls_client = client or langsmith.Client()
-
-        def make_interceptor() -> LangSmithInterceptor:
-            return LangSmithInterceptor(
-                client=ls_client,
-                project_name=project_name,
-                add_temporal_runs=add_temporal_runs,
-                default_metadata=metadata,
-                default_tags=tags,
-            )
-
-        wrapper = _ClientOnlyLangSmithInterceptor(make_interceptor())
-        self._make_interceptor = make_interceptor
+        interceptor = LangSmithInterceptor(
+            client=client,
+            project_name=project_name,
+            add_temporal_runs=add_temporal_runs,
+            default_metadata=metadata,
+            default_tags=tags,
+        )
+        interceptors = [interceptor]
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
@@ -94,20 +68,11 @@ class LangSmithPlugin(SimplePlugin):
             try:
                 yield
             finally:
-                ls_client.flush()
+                interceptor._client.flush()
 
         super().__init__(
             "langchain.LangSmithPlugin",
-            interceptors=[wrapper],
+            interceptors=interceptors,
             workflow_runner=workflow_runner,
             run_context=run_context,
         )
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        """Create a fresh LangSmithInterceptor for each worker."""
-        config = super().configure_worker(config)
-        worker_interceptor = self._make_interceptor()
-        interceptors = list(config.get("interceptors") or [])
-        interceptors.append(worker_interceptor)
-        config["interceptors"] = interceptors
-        return config
