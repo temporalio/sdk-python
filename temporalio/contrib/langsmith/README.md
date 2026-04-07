@@ -2,13 +2,13 @@
 
 This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows your [LangSmith](https://smith.langchain.com/) traces to work within Temporal Workflows. It propagates trace context across Worker boundaries so that `@traceable` calls, LLM invocations, and Temporal operations show up in a single connected trace, and ensures that replaying does not generate duplicate traces.
 
-## Installation
+## Quick Start
 
-```
+Install Temporal with the LangSmith feature enabled:
+
+```bash
 pip install temporalio[langsmith]
 ```
-
-## Quick Start
 
 Register the Plugin on your Temporal Client. You need it on both the Client (starter) side and the Workers:
 
