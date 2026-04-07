@@ -892,12 +892,16 @@ fn convert_versioning_strategy(
                         build_id: options.version.build_id,
                     },
                     use_worker_versioning: options.use_worker_versioning,
-                    default_versioning_behavior: Some(
-                        options
-                            .default_versioning_behavior
-                            .try_into()
-                            .unwrap_or_default(),
-                    ),
+                    default_versioning_behavior: if options.use_worker_versioning {
+                        Some(
+                            options
+                                .default_versioning_behavior
+                                .try_into()
+                                .unwrap_or_default(),
+                        )
+                    } else {
+                        None
+                    },
                 },
             )
         }

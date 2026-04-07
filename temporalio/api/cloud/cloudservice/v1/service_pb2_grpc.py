@@ -19,6 +19,11 @@ class CloudServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.GetCurrentIdentity = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetCurrentIdentity",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCurrentIdentityRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCurrentIdentityResponse.FromString,
+        )
         self.GetUsers = channel.unary_unary(
             "/temporal.api.cloud.cloudservice.v1.CloudService/GetUsers",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUsersRequest.SerializeToString,
@@ -304,10 +309,55 @@ class CloudServiceStub(object):
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleResponse.FromString,
         )
+        self.GetAuditLogs = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetAuditLogs",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAuditLogsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAuditLogsResponse.FromString,
+        )
         self.ValidateAccountAuditLogSink = channel.unary_unary(
             "/temporal.api.cloud.cloudservice.v1.CloudService/ValidateAccountAuditLogSink",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkResponse.FromString,
+        )
+        self.CreateAccountAuditLogSink = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateAccountAuditLogSink",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateAccountAuditLogSinkRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateAccountAuditLogSinkResponse.FromString,
+        )
+        self.GetAccountAuditLogSink = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetAccountAuditLogSink",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinkRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinkResponse.FromString,
+        )
+        self.GetAccountAuditLogSinks = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetAccountAuditLogSinks",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinksRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinksResponse.FromString,
+        )
+        self.UpdateAccountAuditLogSink = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/UpdateAccountAuditLogSink",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateAccountAuditLogSinkRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateAccountAuditLogSinkResponse.FromString,
+        )
+        self.DeleteAccountAuditLogSink = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteAccountAuditLogSink",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteAccountAuditLogSinkRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteAccountAuditLogSinkResponse.FromString,
+        )
+        self.GetNamespaceCapacityInfo = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetNamespaceCapacityInfo",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetNamespaceCapacityInfoRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetNamespaceCapacityInfoResponse.FromString,
+        )
+        self.CreateBillingReport = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateBillingReport",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateBillingReportRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateBillingReportResponse.FromString,
+        )
+        self.GetBillingReport = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetBillingReport",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetBillingReportRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetBillingReportResponse.FromString,
         )
 
 
@@ -315,6 +365,12 @@ class CloudServiceServicer(object):
     """WARNING: This service is currently experimental and may change in
     incompatible ways.
     """
+
+    def GetCurrentIdentity(self, request, context):
+        """Get information about the current authenticated user or service account principal"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def GetUsers(self, request, context):
         """Gets all known users"""
@@ -662,6 +718,12 @@ class CloudServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def GetAuditLogs(self, request, context):
+        """Get audit logs"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def ValidateAccountAuditLogSink(self, request, context):
         """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
         The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
@@ -670,9 +732,62 @@ class CloudServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def CreateAccountAuditLogSink(self, request, context):
+        """Create an audit log sink"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetAccountAuditLogSink(self, request, context):
+        """Get an audit log sink"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetAccountAuditLogSinks(self, request, context):
+        """Get audit log sinks"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateAccountAuditLogSink(self, request, context):
+        """Update an audit log sink"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteAccountAuditLogSink(self, request, context):
+        """Delete an audit log sink"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetNamespaceCapacityInfo(self, request, context):
+        """Get namespace capacity information"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CreateBillingReport(self, request, context):
+        """Create a billing report"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetBillingReport(self, request, context):
+        """Get a billing report"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_CloudServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+        "GetCurrentIdentity": grpc.unary_unary_rpc_method_handler(
+            servicer.GetCurrentIdentity,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCurrentIdentityRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCurrentIdentityResponse.SerializeToString,
+        ),
         "GetUsers": grpc.unary_unary_rpc_method_handler(
             servicer.GetUsers,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUsersRequest.FromString,
@@ -958,10 +1073,55 @@ def add_CloudServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleResponse.SerializeToString,
         ),
+        "GetAuditLogs": grpc.unary_unary_rpc_method_handler(
+            servicer.GetAuditLogs,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAuditLogsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAuditLogsResponse.SerializeToString,
+        ),
         "ValidateAccountAuditLogSink": grpc.unary_unary_rpc_method_handler(
             servicer.ValidateAccountAuditLogSink,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkResponse.SerializeToString,
+        ),
+        "CreateAccountAuditLogSink": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateAccountAuditLogSink,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateAccountAuditLogSinkRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateAccountAuditLogSinkResponse.SerializeToString,
+        ),
+        "GetAccountAuditLogSink": grpc.unary_unary_rpc_method_handler(
+            servicer.GetAccountAuditLogSink,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinkRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinkResponse.SerializeToString,
+        ),
+        "GetAccountAuditLogSinks": grpc.unary_unary_rpc_method_handler(
+            servicer.GetAccountAuditLogSinks,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinksRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinksResponse.SerializeToString,
+        ),
+        "UpdateAccountAuditLogSink": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateAccountAuditLogSink,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateAccountAuditLogSinkRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateAccountAuditLogSinkResponse.SerializeToString,
+        ),
+        "DeleteAccountAuditLogSink": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteAccountAuditLogSink,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteAccountAuditLogSinkRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteAccountAuditLogSinkResponse.SerializeToString,
+        ),
+        "GetNamespaceCapacityInfo": grpc.unary_unary_rpc_method_handler(
+            servicer.GetNamespaceCapacityInfo,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetNamespaceCapacityInfoRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetNamespaceCapacityInfoResponse.SerializeToString,
+        ),
+        "CreateBillingReport": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateBillingReport,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateBillingReportRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateBillingReportResponse.SerializeToString,
+        ),
+        "GetBillingReport": grpc.unary_unary_rpc_method_handler(
+            servicer.GetBillingReport,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetBillingReportRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetBillingReportResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -975,6 +1135,35 @@ class CloudService(object):
     """WARNING: This service is currently experimental and may change in
     incompatible ways.
     """
+
+    @staticmethod
+    def GetCurrentIdentity(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetCurrentIdentity",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCurrentIdentityRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCurrentIdentityResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
     def GetUsers(
@@ -2630,6 +2819,35 @@ class CloudService(object):
         )
 
     @staticmethod
+    def GetAuditLogs(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetAuditLogs",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAuditLogsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAuditLogsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def ValidateAccountAuditLogSink(
         request,
         target,
@@ -2648,6 +2866,238 @@ class CloudService(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/ValidateAccountAuditLogSink",
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkRequest.SerializeToString,
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CreateAccountAuditLogSink(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateAccountAuditLogSink",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateAccountAuditLogSinkRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateAccountAuditLogSinkResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetAccountAuditLogSink(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetAccountAuditLogSink",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinkRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinkResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetAccountAuditLogSinks(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetAccountAuditLogSinks",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinksRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetAccountAuditLogSinksResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateAccountAuditLogSink(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/UpdateAccountAuditLogSink",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateAccountAuditLogSinkRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateAccountAuditLogSinkResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteAccountAuditLogSink(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteAccountAuditLogSink",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteAccountAuditLogSinkRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteAccountAuditLogSinkResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetNamespaceCapacityInfo(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetNamespaceCapacityInfo",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetNamespaceCapacityInfoRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetNamespaceCapacityInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CreateBillingReport(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateBillingReport",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateBillingReportRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateBillingReportResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetBillingReport(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetBillingReport",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetBillingReportRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetBillingReportResponse.FromString,
             options,
             channel_credentials,
             insecure,

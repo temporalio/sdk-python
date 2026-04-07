@@ -5,14 +5,17 @@ isort:skip_file
 
 import builtins
 import sys
+import typing
 
 import google.protobuf.descriptor
+import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import google.protobuf.timestamp_pb2
 
 import temporalio.api.cloud.resource.v1.message_pb2
 import temporalio.api.cloud.sink.v1.message_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
@@ -200,3 +203,100 @@ class AuditLogSinkSpec(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["kinesis_sink", "pub_sub_sink"] | None: ...
 
 global___AuditLogSinkSpec = AuditLogSinkSpec
+
+class AuditLogSink(google.protobuf.message.Message):
+    """AuditLogSink is only used by Audit Log"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Health:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _HealthEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            AuditLogSink._Health.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        HEALTH_UNSPECIFIED: AuditLogSink._Health.ValueType  # 0
+        HEALTH_OK: AuditLogSink._Health.ValueType  # 1
+        """The audit log sink is healthy and functioning correctly."""
+        HEALTH_ERROR_INTERNAL: AuditLogSink._Health.ValueType  # 2
+        """The audit log sink has an internal error."""
+        HEALTH_ERROR_USER_CONFIGURATION: AuditLogSink._Health.ValueType  # 3
+        """The audit log sink has a configuration error."""
+
+    class Health(_Health, metaclass=_HealthEnumTypeWrapper):
+        """The health status of the audit log sink."""
+
+    HEALTH_UNSPECIFIED: AuditLogSink.Health.ValueType  # 0
+    HEALTH_OK: AuditLogSink.Health.ValueType  # 1
+    """The audit log sink is healthy and functioning correctly."""
+    HEALTH_ERROR_INTERNAL: AuditLogSink.Health.ValueType  # 2
+    """The audit log sink has an internal error."""
+    HEALTH_ERROR_USER_CONFIGURATION: AuditLogSink.Health.ValueType  # 3
+    """The audit log sink has a configuration error."""
+
+    NAME_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    HEALTH_FIELD_NUMBER: builtins.int
+    ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+    LAST_SUCCEEDED_TIME_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """Name of the sink e.g. "audit_log_01" """
+    resource_version: builtins.str
+    """The version of the audit log sink resource."""
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the audit log sink."""
+    @property
+    def spec(self) -> global___AuditLogSinkSpec:
+        """The specification details of the audit log sink."""
+    health: global___AuditLogSink.Health.ValueType
+    """The health status of the audit log sink."""
+    error_message: builtins.str
+    """An error message describing any issues with the audit log sink, if applicable."""
+    @property
+    def last_succeeded_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The last succeeded timestamp for the internal workflow responsible for adding data to the sink."""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        resource_version: builtins.str = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
+        spec: global___AuditLogSinkSpec | None = ...,
+        health: global___AuditLogSink.Health.ValueType = ...,
+        error_message: builtins.str = ...,
+        last_succeeded_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "last_succeeded_time", b"last_succeeded_time", "spec", b"spec"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "error_message",
+            b"error_message",
+            "health",
+            b"health",
+            "last_succeeded_time",
+            b"last_succeeded_time",
+            "name",
+            b"name",
+            "resource_version",
+            b"resource_version",
+            "spec",
+            b"spec",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
+
+global___AuditLogSink = AuditLogSink

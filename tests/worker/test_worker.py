@@ -1543,3 +1543,18 @@ async def test_continue_as_new_with_version_upgrade(
         # Expect workflow to return "v2.0", indicating that it continued-as-new and completed on v2
         result = await handle.result()
         assert result == "v2.0"
+
+
+def test_worker_config_matches_init_params():
+    """WorkerConfig TypedDict keys must match Worker.__init__ kwargs."""
+    import inspect
+
+    from temporalio.worker import Worker, WorkerConfig
+
+    init_params = set(inspect.signature(Worker.__init__).parameters.keys()) - {"self"}
+    config_keys = set(WorkerConfig.__annotations__.keys())
+    assert config_keys == init_params, (
+        f"WorkerConfig is out of sync with Worker.__init__. "
+        f"Missing from config: {init_params - config_keys}. "
+        f"Extra in config: {config_keys - init_params}."
+    )

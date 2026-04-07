@@ -503,7 +503,7 @@ Some things to note about external storage:
 * Only payloads that meet or exceed `ExternalStorage.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
 * External storage applies transparently to all payloads, whether they are workflow inputs/outputs, activity inputs/outputs, signal inputs, query outputs, update inputs/outputs, or failure details.
 * The `DataConverter`'s `payload_codec` (if configured) is applied to the payload *before* it is handed to the storage driver, so the driver always stores encoded bytes. The reference payload written to workflow history is not encoded by the `DataConverter` codec.
-* Setting `ExternalStorage.payload_size_threshold` to `None` causes every payload to be considered for external storage regardless of size.
+* Setting `ExternalStorage.payload_size_threshold` to `0` causes every payload to be considered for external storage regardless of size.
 
 ###### Driver Selection
 
@@ -533,11 +533,11 @@ def feature_flag_is_on(workflow_id: str | None) -> bool:
 def feature_flag_selector(
     context: temporalio.converter.StorageDriverStoreContext, _payload: Payload
 ) -> temporalio.converter.StorageDriver | None:
-    workflow_id = None
-    if isinstance(context.serialization_context, temporalio.converter.WorkflowSerializationContext):
-        workflow_id = context.serialization_context.workflow_id
-    elif isinstance(context.serialization_context, temporalio.converter.ActivitySerializationContext):
-        workflow_id = context.serialization_context.workflow_id
+    workflow_id = (
+        context.target.id
+        if isinstance(context.target, temporalio.converter.StorageDriverWorkflowInfo)
+        else None
+    )
     return my_driver if feature_flag_is_on(workflow_id) else None
 
 options = ExternalStorage(
@@ -2064,6 +2064,13 @@ To execute tests:
 
 ```bash
 poe test
+```
+
+`poe test` spreads tests across multiple worker processes by default. If you
+need a serial run for debugging, invoke pytest directly:
+
+```bash
+uv run pytest
 ```
 
 This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test

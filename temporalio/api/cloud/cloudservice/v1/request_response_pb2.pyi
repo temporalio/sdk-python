@@ -13,6 +13,8 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.cloud.account.v1.message_pb2
+import temporalio.api.cloud.auditlog.v1.message_pb2
+import temporalio.api.cloud.billing.v1.message_pb2
 import temporalio.api.cloud.connectivityrule.v1.message_pb2
 import temporalio.api.cloud.identity.v1.message_pb2
 import temporalio.api.cloud.namespace.v1.message_pb2
@@ -27,6 +29,73 @@ else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+
+class GetCurrentIdentityRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___GetCurrentIdentityRequest = GetCurrentIdentityRequest
+
+class GetCurrentIdentityResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    USER_FIELD_NUMBER: builtins.int
+    SERVICE_ACCOUNT_FIELD_NUMBER: builtins.int
+    PRINCIPAL_API_KEY_FIELD_NUMBER: builtins.int
+    @property
+    def user(self) -> temporalio.api.cloud.identity.v1.message_pb2.User:
+        """The user is a regular user"""
+    @property
+    def service_account(
+        self,
+    ) -> temporalio.api.cloud.identity.v1.message_pb2.ServiceAccount:
+        """The user is a service account"""
+    @property
+    def principal_api_key(self) -> temporalio.api.cloud.identity.v1.message_pb2.ApiKey:
+        """The API key info used to authenticate the request, if any"""
+    def __init__(
+        self,
+        *,
+        user: temporalio.api.cloud.identity.v1.message_pb2.User | None = ...,
+        service_account: temporalio.api.cloud.identity.v1.message_pb2.ServiceAccount
+        | None = ...,
+        principal_api_key: temporalio.api.cloud.identity.v1.message_pb2.ApiKey
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "principal",
+            b"principal",
+            "principal_api_key",
+            b"principal_api_key",
+            "service_account",
+            b"service_account",
+            "user",
+            b"user",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "principal",
+            b"principal",
+            "principal_api_key",
+            b"principal_api_key",
+            "service_account",
+            b"service_account",
+            "user",
+            b"user",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["principal", b"principal"]
+    ) -> typing_extensions.Literal["user", "service_account"] | None: ...
+
+global___GetCurrentIdentityResponse = GetCurrentIdentityResponse
 
 class GetUsersRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1157,6 +1226,7 @@ class GetApiKeysRequest(google.protobuf.message.Message):
     owner_type_deprecated: builtins.str
     """Filter api keys by owner type - optional.
     Possible values: user, service-account
+    temporal:versioning:max_version=v0.3.0
     """
     owner_type: temporalio.api.cloud.identity.v1.message_pb2.OwnerType.ValueType
     """Filter api keys by owner type - optional.
@@ -3688,6 +3758,90 @@ class DeleteConnectivityRuleResponse(google.protobuf.message.Message):
 
 global___DeleteConnectivityRuleResponse = DeleteConnectivityRuleResponse
 
+class GetAuditLogsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    START_TIME_INCLUSIVE_FIELD_NUMBER: builtins.int
+    END_TIME_EXCLUSIVE_FIELD_NUMBER: builtins.int
+    page_size: builtins.int
+    """The requested size of the page to retrieve - optional.
+    Cannot exceed 1000. Defaults to 100.
+    """
+    page_token: builtins.str
+    """The page token if this is continuing from another response - optional."""
+    @property
+    def start_time_inclusive(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Filter for UTC time >= (defaults to 30 days ago) - optional."""
+    @property
+    def end_time_exclusive(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Filter for UTC time < (defaults to current time) - optional."""
+    def __init__(
+        self,
+        *,
+        page_size: builtins.int = ...,
+        page_token: builtins.str = ...,
+        start_time_inclusive: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        end_time_exclusive: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end_time_exclusive",
+            b"end_time_exclusive",
+            "start_time_inclusive",
+            b"start_time_inclusive",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end_time_exclusive",
+            b"end_time_exclusive",
+            "page_size",
+            b"page_size",
+            "page_token",
+            b"page_token",
+            "start_time_inclusive",
+            b"start_time_inclusive",
+        ],
+    ) -> None: ...
+
+global___GetAuditLogsRequest = GetAuditLogsRequest
+
+class GetAuditLogsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    LOGS_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def logs(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.auditlog.v1.message_pb2.LogRecord
+    ]:
+        """The list of audit logs ordered by emit time, log_id"""
+    next_page_token: builtins.str
+    """The next page's token."""
+    def __init__(
+        self,
+        *,
+        logs: collections.abc.Iterable[
+            temporalio.api.cloud.auditlog.v1.message_pb2.LogRecord
+        ]
+        | None = ...,
+        next_page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "logs", b"logs", "next_page_token", b"next_page_token"
+        ],
+    ) -> None: ...
+
+global___GetAuditLogsResponse = GetAuditLogsResponse
+
 class ValidateAccountAuditLogSinkRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3717,3 +3871,430 @@ class ValidateAccountAuditLogSinkResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ValidateAccountAuditLogSinkResponse = ValidateAccountAuditLogSinkResponse
+
+class CreateAccountAuditLogSinkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPEC_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    @property
+    def spec(self) -> temporalio.api.cloud.account.v1.message_pb2.AuditLogSinkSpec:
+        """The specification for the audit log sink."""
+    async_operation_id: builtins.str
+    """Optional. The ID to use for this async operation."""
+    def __init__(
+        self,
+        *,
+        spec: temporalio.api.cloud.account.v1.message_pb2.AuditLogSinkSpec | None = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id", b"async_operation_id", "spec", b"spec"
+        ],
+    ) -> None: ...
+
+global___CreateAccountAuditLogSinkRequest = CreateAccountAuditLogSinkRequest
+
+class CreateAccountAuditLogSinkResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___CreateAccountAuditLogSinkResponse = CreateAccountAuditLogSinkResponse
+
+class GetAccountAuditLogSinkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """The name of the sink to retrieve."""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["name", b"name"]
+    ) -> None: ...
+
+global___GetAccountAuditLogSinkRequest = GetAccountAuditLogSinkRequest
+
+class GetAccountAuditLogSinkResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SINK_FIELD_NUMBER: builtins.int
+    @property
+    def sink(self) -> temporalio.api.cloud.account.v1.message_pb2.AuditLogSink:
+        """The audit log sink retrieved."""
+    def __init__(
+        self,
+        *,
+        sink: temporalio.api.cloud.account.v1.message_pb2.AuditLogSink | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["sink", b"sink"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["sink", b"sink"]
+    ) -> None: ...
+
+global___GetAccountAuditLogSinkResponse = GetAccountAuditLogSinkResponse
+
+class GetAccountAuditLogSinksRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    page_size: builtins.int
+    """The requested size of the page to retrieve. Cannot exceed 1000.
+    Defaults to 100 if not specified.
+    """
+    page_token: builtins.str
+    """The page token if this is continuing from another response - optional."""
+    def __init__(
+        self,
+        *,
+        page_size: builtins.int = ...,
+        page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "page_size", b"page_size", "page_token", b"page_token"
+        ],
+    ) -> None: ...
+
+global___GetAccountAuditLogSinksRequest = GetAccountAuditLogSinksRequest
+
+class GetAccountAuditLogSinksResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SINKS_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def sinks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.account.v1.message_pb2.AuditLogSink
+    ]:
+        """The list of audit log sinks retrieved."""
+    next_page_token: builtins.str
+    """The next page token, set if there is another page."""
+    def __init__(
+        self,
+        *,
+        sinks: collections.abc.Iterable[
+            temporalio.api.cloud.account.v1.message_pb2.AuditLogSink
+        ]
+        | None = ...,
+        next_page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "next_page_token", b"next_page_token", "sinks", b"sinks"
+        ],
+    ) -> None: ...
+
+global___GetAccountAuditLogSinksResponse = GetAccountAuditLogSinksResponse
+
+class UpdateAccountAuditLogSinkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPEC_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    @property
+    def spec(self) -> temporalio.api.cloud.account.v1.message_pb2.AuditLogSinkSpec:
+        """The updated audit log sink specification."""
+    resource_version: builtins.str
+    """The version of the audit log sink to update. The latest version can be
+    retrieved using the GetAuditLogSink call.
+    """
+    async_operation_id: builtins.str
+    """The ID to use for this async operation - optional."""
+    def __init__(
+        self,
+        *,
+        spec: temporalio.api.cloud.account.v1.message_pb2.AuditLogSinkSpec | None = ...,
+        resource_version: builtins.str = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "resource_version",
+            b"resource_version",
+            "spec",
+            b"spec",
+        ],
+    ) -> None: ...
+
+global___UpdateAccountAuditLogSinkRequest = UpdateAccountAuditLogSinkRequest
+
+class UpdateAccountAuditLogSinkResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___UpdateAccountAuditLogSinkResponse = UpdateAccountAuditLogSinkResponse
+
+class DeleteAccountAuditLogSinkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """The name of the sink to delete."""
+    resource_version: builtins.str
+    """The version of the sink to delete. The latest version can be
+    retrieved using the GetAccountAuditLogSink call.
+    """
+    async_operation_id: builtins.str
+    """The ID to use for this async operation - optional."""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        resource_version: builtins.str = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "name",
+            b"name",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___DeleteAccountAuditLogSinkRequest = DeleteAccountAuditLogSinkRequest
+
+class DeleteAccountAuditLogSinkResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___DeleteAccountAuditLogSinkResponse = DeleteAccountAuditLogSinkResponse
+
+class GetNamespaceCapacityInfoRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """The namespace identifier.
+    Required.
+    """
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["namespace", b"namespace"]
+    ) -> None: ...
+
+global___GetNamespaceCapacityInfoRequest = GetNamespaceCapacityInfoRequest
+
+class GetNamespaceCapacityInfoResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CAPACITY_INFO_FIELD_NUMBER: builtins.int
+    @property
+    def capacity_info(
+        self,
+    ) -> temporalio.api.cloud.namespace.v1.message_pb2.NamespaceCapacityInfo:
+        """Capacity information for the namespace."""
+    def __init__(
+        self,
+        *,
+        capacity_info: temporalio.api.cloud.namespace.v1.message_pb2.NamespaceCapacityInfo
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["capacity_info", b"capacity_info"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["capacity_info", b"capacity_info"]
+    ) -> None: ...
+
+global___GetNamespaceCapacityInfoResponse = GetNamespaceCapacityInfoResponse
+
+class CreateBillingReportRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPEC_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    @property
+    def spec(self) -> temporalio.api.cloud.billing.v1.message_pb2.BillingReportSpec:
+        """The specification for the billing report."""
+    async_operation_id: builtins.str
+    """Optional, if not provided a random id will be generated."""
+    def __init__(
+        self,
+        *,
+        spec: temporalio.api.cloud.billing.v1.message_pb2.BillingReportSpec
+        | None = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id", b"async_operation_id", "spec", b"spec"
+        ],
+    ) -> None: ...
+
+global___CreateBillingReportRequest = CreateBillingReportRequest
+
+class CreateBillingReportResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BILLING_REPORT_ID_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    billing_report_id: builtins.str
+    """The id of the billing report created."""
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        billing_report_id: builtins.str = ...,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation",
+            b"async_operation",
+            "billing_report_id",
+            b"billing_report_id",
+        ],
+    ) -> None: ...
+
+global___CreateBillingReportResponse = CreateBillingReportResponse
+
+class GetBillingReportRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BILLING_REPORT_ID_FIELD_NUMBER: builtins.int
+    billing_report_id: builtins.str
+    """The id of the billing report to retrieve."""
+    def __init__(
+        self,
+        *,
+        billing_report_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "billing_report_id", b"billing_report_id"
+        ],
+    ) -> None: ...
+
+global___GetBillingReportRequest = GetBillingReportRequest
+
+class GetBillingReportResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    BILLING_REPORT_FIELD_NUMBER: builtins.int
+    @property
+    def billing_report(
+        self,
+    ) -> temporalio.api.cloud.billing.v1.message_pb2.BillingReport:
+        """The billing report retrieved."""
+    def __init__(
+        self,
+        *,
+        billing_report: temporalio.api.cloud.billing.v1.message_pb2.BillingReport
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["billing_report", b"billing_report"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["billing_report", b"billing_report"]
+    ) -> None: ...
+
+global___GetBillingReportResponse = GetBillingReportResponse

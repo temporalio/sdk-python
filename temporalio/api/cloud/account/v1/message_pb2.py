@@ -14,6 +14,8 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
+
 from temporalio.api.cloud.resource.v1 import (
     message_pb2 as temporal_dot_api_dot_cloud_dot_resource_dot_v1_dot_message__pb2,
 )
@@ -22,7 +24,7 @@ from temporalio.api.cloud.sink.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n+temporal/api/cloud/account/v1/message.proto\x12\x1dtemporal.api.cloud.account.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a(temporal/api/cloud/sink/v1/message.proto")\n\x0bMetricsSpec\x12\x1a\n\x12\x61\x63\x63\x65pted_client_ca\x18\x02 \x01(\x0c"J\n\x0b\x41\x63\x63ountSpec\x12;\n\x07metrics\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.account.v1.MetricsSpec"\x16\n\x07Metrics\x12\x0b\n\x03uri\x18\x01 \x01(\t"\xfc\x01\n\x07\x41\x63\x63ount\x12\n\n\x02id\x18\x01 \x01(\t\x12\x38\n\x04spec\x18\x02 \x01(\x0b\x32*.temporal.api.cloud.account.v1.AccountSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12<\n\x05state\x18\x04 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x37\n\x07metrics\x18\x06 \x01(\x0b\x32&.temporal.api.cloud.account.v1.Metrics"\xbf\x01\n\x10\x41uditLogSinkSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12?\n\x0ckinesis_sink\x18\x02 \x01(\x0b\x32\'.temporal.api.cloud.sink.v1.KinesisSpecH\x00\x12>\n\x0cpub_sub_sink\x18\x03 \x01(\x0b\x32&.temporal.api.cloud.sink.v1.PubSubSpecH\x00\x12\x0f\n\x07\x65nabled\x18\x04 \x01(\x08\x42\x0b\n\tsink_typeB\xa7\x01\n io.temporal.api.cloud.account.v1B\x0cMessageProtoP\x01Z+go.temporal.io/api/cloud/account/v1;account\xaa\x02\x1fTemporalio.Api.Cloud.Account.V1\xea\x02#Temporalio::Api::Cloud::Account::V1b\x06proto3'
+    b'\n+temporal/api/cloud/account/v1/message.proto\x12\x1dtemporal.api.cloud.account.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a(temporal/api/cloud/sink/v1/message.proto\x1a\x1fgoogle/protobuf/timestamp.proto")\n\x0bMetricsSpec\x12\x1a\n\x12\x61\x63\x63\x65pted_client_ca\x18\x02 \x01(\x0c"J\n\x0b\x41\x63\x63ountSpec\x12;\n\x07metrics\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.account.v1.MetricsSpec"\x16\n\x07Metrics\x12\x0b\n\x03uri\x18\x01 \x01(\t"\xfc\x01\n\x07\x41\x63\x63ount\x12\n\n\x02id\x18\x01 \x01(\t\x12\x38\n\x04spec\x18\x02 \x01(\x0b\x32*.temporal.api.cloud.account.v1.AccountSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12<\n\x05state\x18\x04 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x37\n\x07metrics\x18\x06 \x01(\x0b\x32&.temporal.api.cloud.account.v1.Metrics"\xbf\x01\n\x10\x41uditLogSinkSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12?\n\x0ckinesis_sink\x18\x02 \x01(\x0b\x32\'.temporal.api.cloud.sink.v1.KinesisSpecH\x00\x12>\n\x0cpub_sub_sink\x18\x03 \x01(\x0b\x32&.temporal.api.cloud.sink.v1.PubSubSpecH\x00\x12\x0f\n\x07\x65nabled\x18\x04 \x01(\x08\x42\x0b\n\tsink_type"\xb8\x03\n\x0c\x41uditLogSink\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12<\n\x05state\x18\x03 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12=\n\x04spec\x18\x04 \x01(\x0b\x32/.temporal.api.cloud.account.v1.AuditLogSinkSpec\x12\x42\n\x06health\x18\x05 \x01(\x0e\x32\x32.temporal.api.cloud.account.v1.AuditLogSink.Health\x12\x15\n\rerror_message\x18\x06 \x01(\t\x12\x37\n\x13last_succeeded_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"o\n\x06Health\x12\x16\n\x12HEALTH_UNSPECIFIED\x10\x00\x12\r\n\tHEALTH_OK\x10\x01\x12\x19\n\x15HEALTH_ERROR_INTERNAL\x10\x02\x12#\n\x1fHEALTH_ERROR_USER_CONFIGURATION\x10\x03\x42\xa7\x01\n io.temporal.api.cloud.account.v1B\x0cMessageProtoP\x01Z+go.temporal.io/api/cloud/account/v1;account\xaa\x02\x1fTemporalio.Api.Cloud.Account.V1\xea\x02#Temporalio::Api::Cloud::Account::V1b\x06proto3'
 )
 
 
@@ -31,6 +33,8 @@ _ACCOUNTSPEC = DESCRIPTOR.message_types_by_name["AccountSpec"]
 _METRICS = DESCRIPTOR.message_types_by_name["Metrics"]
 _ACCOUNT = DESCRIPTOR.message_types_by_name["Account"]
 _AUDITLOGSINKSPEC = DESCRIPTOR.message_types_by_name["AuditLogSinkSpec"]
+_AUDITLOGSINK = DESCRIPTOR.message_types_by_name["AuditLogSink"]
+_AUDITLOGSINK_HEALTH = _AUDITLOGSINK.enum_types_by_name["Health"]
 MetricsSpec = _reflection.GeneratedProtocolMessageType(
     "MetricsSpec",
     (_message.Message,),
@@ -86,17 +90,32 @@ AuditLogSinkSpec = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(AuditLogSinkSpec)
 
+AuditLogSink = _reflection.GeneratedProtocolMessageType(
+    "AuditLogSink",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _AUDITLOGSINK,
+        "__module__": "temporalio.api.cloud.account.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.account.v1.AuditLogSink)
+    },
+)
+_sym_db.RegisterMessage(AuditLogSink)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n io.temporal.api.cloud.account.v1B\014MessageProtoP\001Z+go.temporal.io/api/cloud/account/v1;account\252\002\037Temporalio.Api.Cloud.Account.V1\352\002#Temporalio::Api::Cloud::Account::V1"
-    _METRICSSPEC._serialized_start = 166
-    _METRICSSPEC._serialized_end = 207
-    _ACCOUNTSPEC._serialized_start = 209
-    _ACCOUNTSPEC._serialized_end = 283
-    _METRICS._serialized_start = 285
-    _METRICS._serialized_end = 307
-    _ACCOUNT._serialized_start = 310
-    _ACCOUNT._serialized_end = 562
-    _AUDITLOGSINKSPEC._serialized_start = 565
-    _AUDITLOGSINKSPEC._serialized_end = 756
+    _METRICSSPEC._serialized_start = 199
+    _METRICSSPEC._serialized_end = 240
+    _ACCOUNTSPEC._serialized_start = 242
+    _ACCOUNTSPEC._serialized_end = 316
+    _METRICS._serialized_start = 318
+    _METRICS._serialized_end = 340
+    _ACCOUNT._serialized_start = 343
+    _ACCOUNT._serialized_end = 595
+    _AUDITLOGSINKSPEC._serialized_start = 598
+    _AUDITLOGSINKSPEC._serialized_end = 789
+    _AUDITLOGSINK._serialized_start = 792
+    _AUDITLOGSINK._serialized_end = 1232
+    _AUDITLOGSINK_HEALTH._serialized_start = 1121
+    _AUDITLOGSINK_HEALTH._serialized_end = 1232
 # @@protoc_insertion_point(module_scope)

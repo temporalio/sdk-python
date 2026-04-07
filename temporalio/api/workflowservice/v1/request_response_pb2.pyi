@@ -1423,6 +1423,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     QUERY_RESULTS_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     WORKER_VERSION_STAMP_FIELD_NUMBER: builtins.int
     MESSAGES_FIELD_NUMBER: builtins.int
     SDK_METADATA_FIELD_NUMBER: builtins.int
@@ -1471,6 +1472,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     ]:
         """Responses to the `queries` field in the task being responded to"""
     namespace: builtins.str
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the workflow ID from the original task."""
     @property
     def worker_version_stamp(
         self,
@@ -1538,6 +1541,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         ]
         | None = ...,
         namespace: builtins.str = ...,
+        resource_id: builtins.str = ...,
         worker_version_stamp: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
         messages: collections.abc.Iterable[
@@ -1599,6 +1603,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             b"namespace",
             "query_results",
             b"query_results",
+            "resource_id",
+            b"resource_id",
             "return_new_workflow_task",
             b"return_new_workflow_task",
             "sdk_metadata",
@@ -1671,6 +1677,7 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     MESSAGES_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     DEPLOYMENT_FIELD_NUMBER: builtins.int
@@ -1691,6 +1698,8 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
     Worker process' unique binary id
     """
     namespace: builtins.str
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the workflow ID from the original task."""
     @property
     def messages(
         self,
@@ -1725,6 +1734,7 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         binary_checksum: builtins.str = ...,
         namespace: builtins.str = ...,
+        resource_id: builtins.str = ...,
         messages: collections.abc.Iterable[
             temporalio.api.protocol.v1.message_pb2.Message
         ]
@@ -1767,6 +1777,8 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
             b"messages",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "task_token",
             b"task_token",
             "worker_version",
@@ -2090,6 +2102,7 @@ class RecordActivityTaskHeartbeatRequest(google.protobuf.message.Message):
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollActivityTaskQueueResponse`"""
     @property
@@ -2098,6 +2111,8 @@ class RecordActivityTaskHeartbeatRequest(google.protobuf.message.Message):
     identity: builtins.str
     """The identity of the worker/client"""
     namespace: builtins.str
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the workflow ID or activity ID for standalone activities."""
     def __init__(
         self,
         *,
@@ -2105,6 +2120,7 @@ class RecordActivityTaskHeartbeatRequest(google.protobuf.message.Message):
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
         namespace: builtins.str = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["details", b"details"]
@@ -2118,6 +2134,8 @@ class RecordActivityTaskHeartbeatRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "task_token",
             b"task_token",
         ],
@@ -2171,6 +2189,7 @@ class RecordActivityTaskHeartbeatByIdRequest(google.protobuf.message.Message):
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
     workflow_id: builtins.str
@@ -2186,6 +2205,8 @@ class RecordActivityTaskHeartbeatByIdRequest(google.protobuf.message.Message):
         """Arbitrary data, of which the most recent call is kept, to store for this activity"""
     identity: builtins.str
     """The identity of the worker/client"""
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:workflow_id" or "activity:activity_id" for standalone activities."""
     def __init__(
         self,
         *,
@@ -2195,6 +2216,7 @@ class RecordActivityTaskHeartbeatByIdRequest(google.protobuf.message.Message):
         activity_id: builtins.str = ...,
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["details", b"details"]
@@ -2210,6 +2232,8 @@ class RecordActivityTaskHeartbeatByIdRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "run_id",
             b"run_id",
             "workflow_id",
@@ -2265,6 +2289,7 @@ class RespondActivityTaskCompletedRequest(google.protobuf.message.Message):
     RESULT_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     DEPLOYMENT_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
@@ -2276,6 +2301,8 @@ class RespondActivityTaskCompletedRequest(google.protobuf.message.Message):
     identity: builtins.str
     """The identity of the worker/client"""
     namespace: builtins.str
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the workflow ID or activity ID for standalone activities."""
     @property
     def worker_version(self) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
         """Version info of the worker who processed this task. This message's `build_id` field should
@@ -2301,6 +2328,7 @@ class RespondActivityTaskCompletedRequest(google.protobuf.message.Message):
         result: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
         namespace: builtins.str = ...,
+        resource_id: builtins.str = ...,
         worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
         deployment: temporalio.api.deployment.v1.message_pb2.Deployment | None = ...,
@@ -2331,6 +2359,8 @@ class RespondActivityTaskCompletedRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "result",
             b"result",
             "task_token",
@@ -2360,6 +2390,7 @@ class RespondActivityTaskCompletedByIdRequest(google.protobuf.message.Message):
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     RESULT_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
     workflow_id: builtins.str
@@ -2375,6 +2406,8 @@ class RespondActivityTaskCompletedByIdRequest(google.protobuf.message.Message):
         """The serialized result of activity execution"""
     identity: builtins.str
     """The identity of the worker/client"""
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:workflow_id" or "activity:activity_id" for standalone activities."""
     def __init__(
         self,
         *,
@@ -2384,6 +2417,7 @@ class RespondActivityTaskCompletedByIdRequest(google.protobuf.message.Message):
         activity_id: builtins.str = ...,
         result: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["result", b"result"]
@@ -2397,6 +2431,8 @@ class RespondActivityTaskCompletedByIdRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "result",
             b"result",
             "run_id",
@@ -2428,6 +2464,7 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
     FAILURE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     LAST_HEARTBEAT_DETAILS_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     DEPLOYMENT_FIELD_NUMBER: builtins.int
@@ -2440,6 +2477,8 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
     identity: builtins.str
     """The identity of the worker/client"""
     namespace: builtins.str
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the workflow ID or activity ID for standalone activities."""
     @property
     def last_heartbeat_details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Additional details to be stored as last activity heartbeat"""
@@ -2468,6 +2507,7 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
         identity: builtins.str = ...,
         namespace: builtins.str = ...,
+        resource_id: builtins.str = ...,
         last_heartbeat_details: temporalio.api.common.v1.message_pb2.Payloads
         | None = ...,
         worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
@@ -2506,6 +2546,8 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
             b"last_heartbeat_details",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "task_token",
             b"task_token",
             "worker_version",
@@ -2552,6 +2594,7 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
     FAILURE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     LAST_HEARTBEAT_DETAILS_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
     workflow_id: builtins.str
@@ -2570,6 +2613,8 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
     @property
     def last_heartbeat_details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Additional details to be stored as last activity heartbeat"""
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:workflow_id" or "activity:activity_id" for standalone activities."""
     def __init__(
         self,
         *,
@@ -2581,6 +2626,7 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         last_heartbeat_details: temporalio.api.common.v1.message_pb2.Payloads
         | None = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2601,6 +2647,8 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
             b"last_heartbeat_details",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "run_id",
             b"run_id",
             "workflow_id",
@@ -2644,6 +2692,7 @@ class RespondActivityTaskCanceledRequest(google.protobuf.message.Message):
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     DEPLOYMENT_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
@@ -2655,6 +2704,8 @@ class RespondActivityTaskCanceledRequest(google.protobuf.message.Message):
     identity: builtins.str
     """The identity of the worker/client"""
     namespace: builtins.str
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the workflow ID or activity ID for standalone activities."""
     @property
     def worker_version(self) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
         """Version info of the worker who processed this task. This message's `build_id` field should
@@ -2680,6 +2731,7 @@ class RespondActivityTaskCanceledRequest(google.protobuf.message.Message):
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         identity: builtins.str = ...,
         namespace: builtins.str = ...,
+        resource_id: builtins.str = ...,
         worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
         deployment: temporalio.api.deployment.v1.message_pb2.Deployment | None = ...,
@@ -2712,6 +2764,8 @@ class RespondActivityTaskCanceledRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "task_token",
             b"task_token",
             "worker_version",
@@ -2740,6 +2794,7 @@ class RespondActivityTaskCanceledByIdRequest(google.protobuf.message.Message):
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
     workflow_id: builtins.str
@@ -2760,6 +2815,8 @@ class RespondActivityTaskCanceledByIdRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:workflow_id" or "activity:activity_id" for standalone activities."""
     def __init__(
         self,
         *,
@@ -2771,6 +2828,7 @@ class RespondActivityTaskCanceledByIdRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2791,6 +2849,8 @@ class RespondActivityTaskCanceledByIdRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "run_id",
             b"run_id",
             "workflow_id",
@@ -7562,6 +7622,7 @@ class ExecuteMultiOperationRequest(google.protobuf.message.Message):
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     OPERATIONS_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def operations(
@@ -7578,6 +7639,8 @@ class ExecuteMultiOperationRequest(google.protobuf.message.Message):
 
         Note that additional operation-specific restrictions have to be considered.
         """
+    resource_id: builtins.str
+    """Resource ID for routing. Should match operations[0].start_workflow.workflow_id"""
     def __init__(
         self,
         *,
@@ -7586,11 +7649,17 @@ class ExecuteMultiOperationRequest(google.protobuf.message.Message):
             global___ExecuteMultiOperationRequest.Operation
         ]
         | None = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "namespace", b"namespace", "operations", b"operations"
+            "namespace",
+            b"namespace",
+            "operations",
+            b"operations",
+            "resource_id",
+            b"resource_id",
         ],
     ) -> None: ...
 
@@ -9884,6 +9953,7 @@ class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace this worker belongs to."""
     identity: builtins.str
@@ -9894,6 +9964,8 @@ class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
     ]: ...
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the worker grouping key."""
     def __init__(
         self,
         *,
@@ -9903,6 +9975,7 @@ class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
             temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
         ]
         | None = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -9911,6 +9984,8 @@ class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "resource_id",
+            b"resource_id",
             "worker_heartbeat",
             b"worker_heartbeat",
         ],
@@ -10196,6 +10271,7 @@ class FetchWorkerConfigRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
     SELECTOR_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace this worker belongs to."""
     identity: builtins.str
@@ -10207,6 +10283,8 @@ class FetchWorkerConfigRequest(google.protobuf.message.Message):
         """Defines which workers should receive this command.
         only single worker is supported at this time.
         """
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the worker grouping key."""
     def __init__(
         self,
         *,
@@ -10214,6 +10292,7 @@ class FetchWorkerConfigRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         reason: builtins.str = ...,
         selector: temporalio.api.common.v1.message_pb2.WorkerSelector | None = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["selector", b"selector"]
@@ -10227,6 +10306,8 @@ class FetchWorkerConfigRequest(google.protobuf.message.Message):
             b"namespace",
             "reason",
             b"reason",
+            "resource_id",
+            b"resource_id",
             "selector",
             b"selector",
         ],
@@ -10265,6 +10346,7 @@ class UpdateWorkerConfigRequest(google.protobuf.message.Message):
     WORKER_CONFIG_FIELD_NUMBER: builtins.int
     UPDATE_MASK_FIELD_NUMBER: builtins.int
     SELECTOR_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace this worker belongs to."""
     identity: builtins.str
@@ -10282,6 +10364,8 @@ class UpdateWorkerConfigRequest(google.protobuf.message.Message):
     @property
     def selector(self) -> temporalio.api.common.v1.message_pb2.WorkerSelector:
         """Defines which workers should receive this command."""
+    resource_id: builtins.str
+    """Resource ID for routing. Contains the worker grouping key."""
     def __init__(
         self,
         *,
@@ -10292,6 +10376,7 @@ class UpdateWorkerConfigRequest(google.protobuf.message.Message):
         | None = ...,
         update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
         selector: temporalio.api.common.v1.message_pb2.WorkerSelector | None = ...,
+        resource_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -10313,6 +10398,8 @@ class UpdateWorkerConfigRequest(google.protobuf.message.Message):
             b"namespace",
             "reason",
             b"reason",
+            "resource_id",
+            b"resource_id",
             "selector",
             b"selector",
             "update_mask",

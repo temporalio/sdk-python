@@ -268,6 +268,7 @@ pub enum BufferedMetricUpdateValue {
     U64(u64),
     U128(u128),
     F64(f64),
+    I64(i64),
 }
 
 // WARNING: This must match temporalio.runtime.BufferedMetric protocol
@@ -348,6 +349,7 @@ fn convert_metric_event(
                             metrics::core::MetricKind::Histogram
                             | metrics::core::MetricKind::HistogramF64
                             | metrics::core::MetricKind::HistogramDuration => 2,
+                            metrics::core::MetricKind::UpDownCounter => 3,
                         },
                     },
                 )
@@ -412,6 +414,7 @@ fn convert_metric_event(
                 metrics::core::MetricUpdateVal::DeltaF64(v) => BufferedMetricUpdateValue::F64(v),
                 metrics::core::MetricUpdateVal::Value(v) => BufferedMetricUpdateValue::U64(v),
                 metrics::core::MetricUpdateVal::ValueF64(v) => BufferedMetricUpdateValue::F64(v),
+                metrics::core::MetricUpdateVal::SignedDelta(v) => BufferedMetricUpdateValue::I64(v),
             },
             attributes: attributes
                 .get()
