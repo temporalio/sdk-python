@@ -121,19 +121,20 @@ from temporalio.contrib.google_adk_agents import (
     TemporalMcpToolSet,
 )
 
-# Share one MCP toolset factory between the plugin and the agent.
-toolset_factory = lambda _: McpToolset(
-    connection_params=StdioConnectionParams(
-        server_params=StdioServerParameters(
-            command="npx",
-            args=[
-                "-y",
-                "@modelcontextprotocol/server-filesystem",
-                os.path.dirname(os.path.abspath(__file__)),
-            ],
+
+def toolset_factory(_):
+    return McpToolset(
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="npx",
+                args=[
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            ),
         ),
-    ),
-)
+    )
 
 # Use in agent workflow
 agent = Agent(
@@ -172,27 +173,23 @@ The same agent definitions can also be exercised outside Temporal with
 
 - `TemporalModel` and `activity_tool(...)` work in local ADK runs without
   additional configuration.
-- If the agent uses `TemporalMcpToolSet`, provide
-  `not_in_workflow_toolset=...` so the agent can fall back to the underlying
-  `McpToolset` when it is not running inside `workflow.in_workflow()`.
+- If the agent uses `TemporalMcpToolSet`, define a shared toolset factory,
+  register it with `TemporalMcpToolSetProvider(...)` for workflow runs, and
+  reuse the same function for `not_in_workflow_toolset=...` so the agent can
+  fall back to the underlying `McpToolset` when it is not running inside
+  `workflow.in_workflow()`.
 
 Example:
 
 ```python
+# Reuse the same toolset_factory registered in GoogleAdkPlugin above.
 agent = Agent(
     name="test_agent",
     model=TemporalModel("gemini-2.5-pro"),
     tools=[
         TemporalMcpToolSet(
             "my-tools",
-            not_in_workflow_toolset=lambda _: McpToolset(
-                connection_params=StdioConnectionParams(
-                    server_params=StdioServerParameters(
-                        command="npx",
-                        args=["-y", "@modelcontextprotocol/server-filesystem", "."],
-                    ),
-                ),
-            ),
+            not_in_workflow_toolset=toolset_factory,
         )
     ],
 )
