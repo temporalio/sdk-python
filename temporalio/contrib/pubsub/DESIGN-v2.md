@@ -235,10 +235,18 @@ importance ranking.
 
 ### 6. Session ordering
 
-Publications from a single client are ordered. The workflow serializes all
-signal processing, so concurrent publishers get a total order (though the
-interleaving is nondeterministic). Once items are in the log, their order is
-stable — reads are repeatable.
+Publications from a single client are ordered. This relies on two Temporal
+guarantees: (1) signals sent sequentially from the same client appear in
+workflow history in send order, and (2) signal handlers are invoked in
+history order. The `PubSubClient` flush lock ensures signals are never in
+flight concurrently, so both guarantees apply.
+
+Concurrent publishers get a total order in the log (the workflow serializes
+all signal processing), but the interleaving is nondeterministic — it depends
+on arrival order at the server. Per-publisher ordering is preserved. This is
+formally verified as `OrderPreservedPerPublisher` in `PubSubDedupTTL.tla`.
+
+Once items are in the log, their order is stable — reads are repeatable.
 
 ### 7. Batching is built into the client
 
