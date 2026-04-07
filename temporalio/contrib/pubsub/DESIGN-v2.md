@@ -217,9 +217,35 @@ per-topic offsets with cursor hints, and accepting the leakage. See
 analysis.
 
 **Decision:** Global offsets are the right choice for workflow-scoped pub/sub.
-The subscriber is the BFF — trusted server-side code. Information leakage is
-contained at the BFF trust boundary, which assigns its own gapless SSE event
-IDs to the browser. The global offset never reaches the end client.
+
+**Why not per-topic offsets?** The most sophisticated alternative — per-topic
+offsets with opaque cursors carrying global position hints (Option F in the
+addendum) — was rejected for three reasons:
+
+1. **The threat model doesn't apply.** Information leakage assumes untrusted
+   multi-tenant subscribers who shouldn't learn about each other's traffic
+   volumes. That's Kafka's world — separate consumers for separate services.
+   In workflow-scoped pub/sub, the subscriber is the BFF: trusted server-side
+   code that could just as easily subscribe to all topics.
+
+2. **Cursor portability.** A global offset is a stream position that works
+   regardless of which topics you filter on. You can subscribe to `["events"]`,
+   then later subscribe to `["events", "thinking"]` with the same offset.
+   Per-topic cursors are coupled to the filter — you need a separate cursor per
+   topic, and adding a topic to your subscription requires starting it from the
+   beginning.
+
+3. **Unjustified complexity.** Per-topic cursors require cursor
+   parsing/formatting, a `topic_counts` dict that survives continue-as-new, a
+   multi-cursor alignment algorithm, and stale-hint fallback paths. For log
+   sizes of thousands of items where a filtered slice is microseconds, this
+   machinery adds cost without measurable benefit.
+
+**Leakage is contained at the BFF trust boundary.** The global offset stays
+between workflow and BFF. The BFF assigns its own gapless SSE event IDs to the
+browser. The global offset never reaches the end client. See
+[Information Leakage and the BFF](#information-leakage-and-the-bff) for the
+full mechanism.
 
 ### 4. No topic creation
 
@@ -266,6 +292,14 @@ The primitive is `__pubsub_poll` (a Temporal update with `wait_condition`).
 
 Temporal has no server-push to external clients. Updates with `wait_condition`
 are the closest thing — the workflow blocks until data is available.
+
+**Poll efficiency.** The poll slices `self._pubsub_log[from_offset - base_offset:]`
+and filters by topic. The common case — single topic, continuing from last
+poll — is O(new items since last poll). The global offset points directly to
+the resume position with no scanning or cursor alignment. Multi-topic polls
+are the same cost: one slice, one filter pass. The worst case is a poll from
+offset 0 (full log scan), which only happens on first connection or after the
+subscriber falls behind.
 
 ### 9. Workflow can publish but should not subscribe
 
@@ -480,18 +514,66 @@ complete before triggering CAN.
 
 Global offsets leak cross-topic activity (a single-topic subscriber sees gaps).
 This is acceptable within the pub/sub API because the subscriber is the BFF —
-trusted server-side code.
+trusted server-side code. The leakage must not reach the end client (browser).
 
-The BFF contains the leakage by assigning its own gapless SSE event IDs:
+### The problem
+
+If the BFF forwarded `PollResult.next_offset` to the browser (e.g., as an SSE
+reconnection cursor), the browser could observe gaps and infer activity on
+topics it is not subscribed to. Even if the offset is "opaque," a monotonic
+integer with gaps is trivially inspectable.
+
+### Options considered
+
+We evaluated four approaches for browser-side reconnection:
+
+1. **BFF tracks the cursor server-side.** The BFF maintains a per-session
+   `session_id → last_offset` mapping. The browser reconnects with just the
+   session ID. On BFF restart, cursors are lost — fall back to replaying from
+   turn start.
+
+2. **Opaque token from the BFF.** The BFF wraps the global offset in an
+   encoded or encrypted token. The browser passes it back on reconnect.
+   `base64(offset)` is trivially reversible (security theater); real encryption
+   needs a key and adds a layer for marginal benefit over option 1.
+
+3. **BFF assigns SSE event IDs with `Last-Event-ID`.** The BFF emits SSE
+   events with `id: 1`, `id: 2`, `id: 3` (a BFF-local counter per stream).
+   On reconnect, the browser sends `Last-Event-ID` (built into the SSE spec).
+   The BFF maps that back to a global offset internally.
+
+4. **No mid-stream resume.** Browser reconnects, BFF replays from start of
+   the current turn. Frontend deduplicates. Simplest, but replays more data
+   than necessary.
+
+### Decision: SSE event IDs (option 3)
+
+The BFF assigns gapless integer IDs to SSE events and maintains a small
+mapping from SSE event index to global offset. The browser never sees the
+workflow's offset — it sees the BFF's event numbering.
 
 ```python
+sse_id = 0
+sse_id_to_offset: dict[int, int] = {}
+
 start_offset = await pubsub.get_offset()
 async for item in pubsub.subscribe(topics=["events"], from_offset=start_offset):
-    yield sse_event(item, id=next_sse_id())
+    sse_id += 1
+    sse_id_to_offset[sse_id] = item_global_offset
+    yield f"id: {sse_id}\ndata: {item.data}\n\n"
 ```
 
-The browser sees `id: 1`, `id: 2`, `id: 3`. On reconnect, `Last-Event-ID`
-maps back to a global offset at the BFF layer.
+On reconnect, the browser sends `Last-Event-ID: 47`. The BFF looks up the
+corresponding global offset and resumes the subscription from there.
+
+The BFF is already per-session and stateful (it holds the SSE connection).
+The `sse_id → global_offset` mapping is negligible additional state. On BFF
+restart, the mapping is lost — fall back to replaying from turn start (option
+4), which is acceptable because agent turns produce modest event volumes and
+the frontend reducer is idempotent.
+
+This uses the SSE spec as designed: `Last-Event-ID` exists for exactly this
+reconnection pattern.
 
 ## Cross-Language Protocol
 
