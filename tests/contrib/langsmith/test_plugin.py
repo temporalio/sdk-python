@@ -102,6 +102,9 @@ class TestPluginIntegration:
                 ), "Workflow never reached signal wait point"
                 await handle.query(ComprehensiveWorkflow.my_query)
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
+                await handle.execute_update(
+                    ComprehensiveWorkflow.my_unvalidated_update, "test"
+                )
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 result = await handle.result()
 
@@ -206,4 +209,14 @@ class TestPluginIntegration:
             "StartWorkflowUpdate:my_update",
             "  ValidateUpdate:my_update",
             "  HandleUpdate:my_update",
+        ]
+
+        # Update without a validator — no ValidateUpdate trace
+        unvalidated_traces = [
+            t for t in traces if t[0] == "StartWorkflowUpdate:my_unvalidated_update"
+        ]
+        assert len(unvalidated_traces) == 1
+        assert unvalidated_traces[0] == [
+            "StartWorkflowUpdate:my_unvalidated_update",
+            "  HandleUpdate:my_unvalidated_update",
         ]

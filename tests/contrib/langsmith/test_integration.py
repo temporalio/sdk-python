@@ -219,6 +219,10 @@ class ComprehensiveWorkflow:
         if not value:
             raise ValueError("empty")
 
+    @workflow.update
+    def my_unvalidated_update(self, value: str) -> str:
+        return f"unvalidated-{value}"
+
 
 # ---------------------------------------------------------------------------
 # Error workflows and activities
@@ -641,6 +645,9 @@ class TestComprehensiveTracing:
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle_2.query(ComprehensiveWorkflow.my_query)
                 await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
+                await handle_2.execute_update(
+                    ComprehensiveWorkflow.my_unvalidated_update, "test"
+                )
                 await handle_2.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 result = await handle_2.result()
 
@@ -751,6 +758,16 @@ class TestComprehensiveTracing:
             "  HandleUpdate:my_update",
         ]
 
+        # Update without a validator — no ValidateUpdate trace
+        unvalidated_traces = [
+            t for t in traces if t[0] == "StartWorkflowUpdate:my_unvalidated_update"
+        ]
+        assert len(unvalidated_traces) == 1
+        assert unvalidated_traces[0] == [
+            "StartWorkflowUpdate:my_unvalidated_update",
+            "  HandleUpdate:my_unvalidated_update",
+        ]
+
     async def test_comprehensive_without_temporal_runs(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
@@ -819,6 +836,9 @@ class TestComprehensiveTracing:
             ):
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
+                await handle_2.execute_update(
+                    ComprehensiveWorkflow.my_unvalidated_update, "test"
+                )
                 await handle_2.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 result = await handle_2.result()
 
