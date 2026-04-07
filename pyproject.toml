@@ -30,7 +30,7 @@ opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.3,<0.7", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=1.27.0,<2"]
-langsmith = ["langsmith>=0.7.0"]
+langsmith = ["langsmith>=0.7.0,<0.8"]
 aioboto3 = [
   "aioboto3>=10.4.0",
   "types-aioboto3[s3]>=10.4.0",
@@ -70,7 +70,7 @@ dev = [
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
   "moto[s3,server]>=5",
-  "langsmith>=0.7.0",
+  "langsmith>=0.7.0,<0.8",
 ]
 
 [tool.poe.tasks]
