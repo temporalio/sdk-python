@@ -68,7 +68,7 @@ class ChatbotWorkflow:
             message = self._pending_message
             self._pending_message = None
 
-            @traceable(name=f"Request: {message[:60]}", run_type="chain")
+            @traceable(name=f"Query: {message[:60]}", run_type="chain")
             async def _query(msg: str) -> str:
                 response = await workflow.execute_activity(
                     call_openai,
@@ -105,12 +105,14 @@ With the default configuration (`add_temporal_runs=False`), the trace contains o
 
 ```
 Session Apr 03 14:30
-  Request: "What's the weather in NYC?"
+  Query: "What's the weather in NYC?"
     Call OpenAI
       openai.responses.create  (auto-traced by wrap_openai)
 ```
 
-<!-- Screenshot: LangSmith trace tree with add_temporal_runs=False showing clean application-only hierarchy -->
+An actual look at the LangSmith UI:
+
+![Screenshot: LangSmith trace tree with add_temporal_runs=False showing clean application-only hierarchy](images/langsmith-no-temporal.png)
 
 ## `add_temporal_runs` — Temporal Operation Visibility
 
@@ -127,7 +129,7 @@ Ask Chatbot                      # @traceable wrapper around client.start_workfl
   StartWorkflow:ChatbotWorkflow
   RunWorkflow:ChatbotWorkflow
     Session Apr 03 14:30
-      Request: "What's the weather in NYC?"
+      Query: "What's the weather in NYC?"
         StartActivity:call_openai
         RunActivity:call_openai
           Call OpenAI
@@ -136,9 +138,13 @@ Ask Chatbot                      # @traceable wrapper around client.start_workfl
 
 Note: `StartFoo` and `RunFoo` appear as siblings. The start is the short-lived outbound RPC that enqueues work on a task queue and completes immediately, and the run is the actual execution which may be delayed and may take much longer.
 
-<!-- Screenshot: LangSmith trace tree with add_temporal_runs=True showing Temporal operation nodes -->
+An actual look at the LangSmith UI:
 
-<!-- Screenshot: Temporal UI showing the corresponding Workflow execution -->
+![Screenshot: LangSmith trace tree with add_temporal_runs=True showing Temporal operation nodes](images/langsmith-with-temporal.png)
+
+And here is a waterfall view of the Workflow in Temporal UI:
+
+![Screenshot: Temporal UI showing the corresponding Workflow execution](images/temporal-ui.png)
 
 ## Migrating Existing LangSmith Code to Temporal
 
@@ -169,13 +175,15 @@ You don't need to do anything special for this. Your `@traceable` functions beha
 
 ```
 1. Workflow starts, executes Activity A          -> trace appears in LangSmith
-2. Worker crashes
+2. Worker crashes during Activity B
 3. New Worker picks up the Workflow
 4. Workflow replays Activity A (skips execution) -> NO duplicate trace
 5. Workflow executes Activity B (new work)       -> new trace appears
 ```
 
-<!-- Screenshot: LangSmith showing a Workflow trace that survived a Worker restart with no duplicate runs -->
+As you can see in the UI example below, a crash in the `Call OpenAI` activity didn't cause earlier traces to be duplicated:
+
+![Screenshot: LangSmith showing a Workflow trace that survived a Worker restart with no duplicate runs](images/langsmith-with-crash-no-temporal.png)
 
 ### Example: Wrapping Retriable Steps in a Trace
 
