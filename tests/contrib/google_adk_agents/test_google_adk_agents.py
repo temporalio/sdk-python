@@ -56,6 +56,8 @@ from temporalio.workflow import ActivityConfig
 from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
 
 logger = logging.getLogger(__name__)
+
+
 @activity.defn
 async def get_weather(city: str) -> str:  #  type: ignore[reportUnusedParameter]
     """Activity that gets weather for a given city."""
@@ -111,6 +113,8 @@ class WeatherAgent:
                 last_event = event
 
         return last_event
+
+
 @workflow.defn
 class MultiAgentWorkflow:
     @workflow.run
@@ -230,6 +234,8 @@ class WeatherModel(TestModel):
     @classmethod
     def supported_models(cls) -> list[str]:
         return ["weather_model"]
+
+
 @pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.asyncio
 async def test_single_agent(client: Client, use_local_model: bool):
@@ -581,9 +587,8 @@ async def summarize_payload(
     complex_activity_inputs_seen["summarize_payload"] = (name, metadata)
     tags = metadata.get("tags", [])
     assert isinstance(tags, list)
-    return (
-        f"{name}:{metadata['count']}:{metadata['owner']}:"
-        + ",".join(str(tag) for tag in tags)
+    return f"{name}:{metadata['count']}:{metadata['owner']}:" + ",".join(
+        str(tag) for tag in tags
     )
 
 
