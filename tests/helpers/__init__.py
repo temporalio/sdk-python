@@ -71,6 +71,7 @@ async def assert_eventually(
     *,
     timeout: timedelta = timedelta(seconds=10),
     interval: timedelta = timedelta(milliseconds=200),
+    retry_on_rpc_cancelled: bool = True,
 ) -> T:
     start_sec = time.monotonic()
     while True:
@@ -79,6 +80,11 @@ async def assert_eventually(
             return res
         except AssertionError:
             if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
+                raise
+        except RPCError as e:
+            if retry_on_rpc_cancelled and e.status == RPCStatusCode.CANCELLED:
+                continue
+            else:
                 raise
         await asyncio.sleep(interval.total_seconds())
 
@@ -416,12 +422,12 @@ class LogCapturer:
         self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
 
     @contextmanager
-    def logs_captured(self, *loggers: logging.Logger):
+    def logs_captured(self, *loggers: logging.Logger, level: int = logging.INFO):
         handler = logging.handlers.QueueHandler(self.log_queue)
 
         prev_levels = [l.level for l in loggers]
         for l in loggers:
-            l.setLevel(logging.INFO)
+            l.setLevel(level)
             l.addHandler(handler)
         try:
             yield self
@@ -440,6 +446,15 @@ class LogCapturer:
             if pred(record):
                 return record
         return None
+
+    def find_all(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> list[logging.LogRecord]:
+        return [
+            record
+            for record in cast(list[logging.LogRecord], self.log_queue.queue)
+            if pred(record)
+        ]
 
 
 class LogHandler:

@@ -1,6 +1,8 @@
 from .request_response_pb2 import (
     CountActivityExecutionsRequest,
     CountActivityExecutionsResponse,
+    CountSchedulesRequest,
+    CountSchedulesResponse,
     CountWorkflowExecutionsRequest,
     CountWorkflowExecutionsResponse,
     CreateScheduleRequest,
@@ -212,6 +214,8 @@ from .request_response_pb2 import (
 __all__ = [
     "CountActivityExecutionsRequest",
     "CountActivityExecutionsResponse",
+    "CountSchedulesRequest",
+    "CountSchedulesResponse",
     "CountWorkflowExecutionsRequest",
     "CountWorkflowExecutionsResponse",
     "CreateScheduleRequest",

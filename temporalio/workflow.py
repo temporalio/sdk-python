@@ -50,6 +50,8 @@ from typing_extensions import (
 )
 
 import temporalio.api.common.v1
+import temporalio.api.enums
+import temporalio.api.enums.v1
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
 import temporalio.bridge.proto.nexus
@@ -601,6 +603,16 @@ class Info:
         """
         return _Runtime.current().workflow_is_continue_as_new_suggested()
 
+    def is_target_worker_deployment_version_changed(self) -> bool:
+        """Check whether the target worker deployment version has changed.
+
+        Note: Upgrade-on-Continue-as-New is currently experimental.
+
+        Returns:
+            True if the target worker deployment version has changed.
+        """
+        return _Runtime.current().workflow_is_target_worker_deployment_version_changed()
+
 
 @dataclass(frozen=True)
 class ParentInfo:
@@ -690,6 +702,7 @@ class _Runtime(ABC):
             temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
         ),
         versioning_intent: VersioningIntent | None,
+        initial_versioning_behavior: ContinueAsNewVersioningBehavior | None,
     ) -> NoReturn: ...
 
     @abstractmethod
@@ -734,6 +747,9 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_continue_as_new_suggested(self) -> bool: ...
+
+    @abstractmethod
+    def workflow_is_target_worker_deployment_version_changed(self) -> bool: ...
 
     @abstractmethod
     def workflow_is_replaying(self) -> bool: ...
@@ -856,6 +872,8 @@ class _Runtime(ABC):
         input: Any,
         output_type: type[OutputT] | None,
         schedule_to_close_timeout: timedelta | None,
+        schedule_to_start_timeout: timedelta | None,
+        start_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
@@ -4638,11 +4656,7 @@ async def execute_child_workflow(
 
 
 class NexusOperationHandle(Generic[OutputT]):
-    """Handle for interacting with a Nexus operation.
-
-    .. warning::
-        This API is experimental and unstable.
-    """
+    """Handle for interacting with a Nexus operation."""
 
     # TODO(nexus-preview): should attempts to instantiate directly throw?
 
@@ -4798,6 +4812,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4816,6 +4831,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4835,6 +4851,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4854,6 +4871,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4873,6 +4891,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4891,6 +4910,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
 
@@ -4932,6 +4952,7 @@ def continue_as_new(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
+        initial_versioning_behavior=initial_versioning_behavior,
     )
 
 
@@ -5348,6 +5369,34 @@ class VersioningIntent(Enum):
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
 
 
+class ContinueAsNewVersioningBehavior(IntEnum):
+    """Experimental. Optionally decide the versioning behavior that the first task of the new run should use.
+    For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
+    of the previous run.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+    )
+    """An initial versioning behavior is not set, follow the existing continue-as-new inheritance semantics.
+    See https://docs.temporal.io/worker-versioning#inheritance-semantics for more detail.
+    """
+
+    AUTO_UPGRADE = int(
+        temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    )
+    """Start the new run with AutoUpgrade behavior. Use the Target Version of the workflow's task queue at
+    start-time, as AutoUpgrade workflows do. After the first workflow task completes, use whatever
+    Versioning Behavior the workflow is annotated with in the workflow code.
+    
+    Note that if the previous workflow had a Pinned override, that override will be inherited by the
+    new workflow run regardless of the ContinueAsNewVersioningBehavior specified in the continue-as-new
+    command. If a Pinned override is inherited by the new run, and the new run starts with AutoUpgrade
+    behavior, the base version of the new run will be the Target Version as described above, but the
+    effective version will be whatever is specified by the Versioning Override until the override is removed.
+    """
+
+
 ServiceT = TypeVar("ServiceT")
 
 
@@ -5391,9 +5440,6 @@ class NexusOperationCancellationType(IntEnum):
 class NexusClient(ABC, Generic[ServiceT]):
     """A client for invoking Nexus operations.
 
-    .. warning::
-        This API is experimental and unstable.
-
     Example::
 
         nexus_client = workflow.create_nexus_client(
@@ -5418,6 +5464,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5433,6 +5481,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5451,6 +5501,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5469,6 +5521,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5487,6 +5541,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5504,6 +5560,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5517,6 +5575,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5528,6 +5588,8 @@ class NexusClient(ABC, Generic[ServiceT]):
             input: The Nexus operation input.
             output_type: The Nexus operation output type.
             schedule_to_close_timeout: Timeout for the entire operation attempt.
+            schedule_to_start_timeout: Timeout for the operation to be started.
+            start_to_close_timeout: Timeout for async operations to complete after starting.
             headers: Headers to send with the Nexus HTTP request.
 
         Returns:
@@ -5548,6 +5610,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5563,6 +5627,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5581,6 +5647,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5599,6 +5667,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5617,6 +5687,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5635,6 +5707,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5648,6 +5722,8 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5659,6 +5735,8 @@ class NexusClient(ABC, Generic[ServiceT]):
             input: The Nexus operation input.
             output_type: The Nexus operation output type.
             schedule_to_close_timeout: Timeout for the entire operation attempt.
+            schedule_to_start_timeout: Timeout for the operation to be started.
+            start_to_close_timeout: Timeout for async operations to complete after starting.
             headers: Headers to send with the Nexus HTTP request.
 
         Returns:
@@ -5701,6 +5779,8 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5713,6 +5793,8 @@ class _NexusClient(NexusClient[ServiceT]):
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
                 cancellation_type=cancellation_type,
                 headers=headers,
                 summary=summary,
@@ -5726,6 +5808,8 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
@@ -5735,6 +5819,8 @@ class _NexusClient(NexusClient[ServiceT]):
             input,
             output_type=output_type,
             schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
             cancellation_type=cancellation_type,
             headers=headers,
             summary=summary,
@@ -5764,9 +5850,6 @@ def create_nexus_client(
     endpoint: str,
 ) -> NexusClient[ServiceT]:
     """Create a Nexus client.
-
-    .. warning::
-        This API is experimental and unstable.
 
     Args:
         service: The Nexus service.

@@ -23,7 +23,7 @@ from temporalio.client import (
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.nexus.test_workflow_caller_cancellation_types import (
     assert_event_subsequence,
     get_event_time,
@@ -222,7 +222,9 @@ async def test_cancellation_type(
         workflows=[CallerWorkflow, HandlerWorkflow],
         nexus_service_handlers=[ServiceHandler()],
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(worker.task_queue), worker.task_queue
+        )
 
         # Start the caller workflow, wait for the nexus op to have started and retrieve the nexus op
         # token

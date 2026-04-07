@@ -58,6 +58,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
+from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
@@ -182,6 +183,21 @@ class WorkflowInstance(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_external_store_context(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> StorageDriverStoreContext:
+        """Return appropriate store context for external storage operations.
+
+        Args:
+            command_info: Optional information identifying the associated command.
+
+        Returns:
+            The store context associated with the command.
+        """
+        raise NotImplementedError
+
     def get_thread_id(self) -> int | None:
         """Return the thread identifier that this workflow is running on.
 
@@ -251,6 +267,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_history_length = 0
         self._current_history_size = 0
         self._continue_as_new_suggested = False
+        self._target_worker_deployment_version_changed = False
         # Lazily loaded
         self._untyped_converted_memo: MutableMapping[str, Any] | None = None
         # Handles which are ready to run on the next event loop iteration
@@ -405,6 +422,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_history_length = act.history_length
         self._current_history_size = act.history_size_bytes
         self._continue_as_new_suggested = act.continue_as_new_suggested
+        self._target_worker_deployment_version_changed = (
+            act.target_worker_deployment_version_changed
+        )
         self._time_ns = act.timestamp.ToNanoseconds()
         self._is_replaying = act.is_replaying
         self._current_thread_id = threading.get_ident()
@@ -1131,6 +1151,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
         ),
         versioning_intent: temporalio.workflow.VersioningIntent | None,
+        initial_versioning_behavior: temporalio.workflow.ContinueAsNewVersioningBehavior
+        | None,
     ) -> NoReturn:
         self._assert_not_read_only("continue as new")
         # Use definition if callable
@@ -1158,6 +1180,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 headers={},
                 arg_types=arg_types,
                 versioning_intent=versioning_intent,
+                initial_versioning_behavior=initial_versioning_behavior,
             )
         )
 
@@ -1226,6 +1249,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def workflow_is_continue_as_new_suggested(self) -> bool:
         return self._continue_as_new_suggested
+
+    def workflow_is_target_worker_deployment_version_changed(self) -> bool:
+        return self._target_worker_deployment_version_changed
 
     def workflow_is_replaying(self) -> bool:
         return self._is_replaying
@@ -1596,6 +1622,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         input: Any,
         output_type: type[OutputT] | None,
         schedule_to_close_timeout: timedelta | None,
+        schedule_to_start_timeout: timedelta | None,
+        start_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
@@ -1609,6 +1637,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
                 cancellation_type=cancellation_type,
                 headers=headers,
                 summary=summary,
@@ -1645,7 +1675,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             mut_attrs.update(attributes)
             for k, vals in attributes.items():
                 # Add to command
-                v.search_attributes[k].CopyFrom(
+                v.search_attributes.indexed_fields[k].CopyFrom(
                     temporalio.converter.encode_search_attribute_values(vals)
                 )
 
@@ -1686,7 +1716,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Update typed and untyped keys, replacing typed as needed
             for update in attributes:
                 # Set on command (delete is a proper null)
-                v.search_attributes[update.key.name].CopyFrom(
+                v.search_attributes.indexed_fields[update.key.name].CopyFrom(
                     temporalio.converter.encode_typed_search_attribute_value(
                         update.key, update.value
                     )
@@ -1735,10 +1765,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         fut = self.create_future()
-        self._timer_impl(
+        timer_handle = self._timer_impl(
             duration,
             _TimerOptions(user_metadata=user_metadata),
-            lambda: fut.set_result(None),
+            lambda: fut.set_result(None) if not fut.done() else None,
+        )
+        fut.add_done_callback(
+            lambda f: timer_handle.cancel() if f.cancelled() else None
         )
         await fut
 
@@ -1777,9 +1810,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_details = details
 
     def workflow_is_failure_exception(self, err: BaseException) -> bool:
-        # An exception is a failure instead of a task fail if it's already a
-        # failure error or if it is a timeout error or if it is an instance of
-        # any of the failure types in the worker or workflow-level setting
+        # An exception causes the workflow to fail (rather than the task) if it
+        # is already a failure error, a timeout error, or an instance of any of the
+        # failure exception types configured at the worker or workflow level.
         wf_failure_exception_types = self._defn.failure_exception_types
         if self._dynamic_failure_exception_types is not None:
             wf_failure_exception_types = self._dynamic_failure_exception_types
@@ -1834,7 +1867,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     # These are in alphabetical order and all start with "_outbound_".
 
     def _outbound_continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
-        # Just throw
         raise _ContinueAsNewError(self, input)
 
     def _outbound_schedule_activity(
@@ -2204,6 +2236,74 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 namespace=self._info.namespace,
                 workflow_id=self._info.workflow_id,
             )
+
+    def get_external_store_context(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> StorageDriverStoreContext:
+        # The current workflow is the default target for external store
+        # operations. For commands that target other workflows, those workflows
+        # are the target for that command's external store operation. For
+        # workflow activities, the target is the current workflow since the
+        # activity is bound to the lifetime of the current workflow, the
+        # activity run information is the same as the current workflow, and
+        # successfully completed activities are not involved in replay.
+        # Otherwise, the storage space for a given workflow would be disparate
+        # if stored under activity information.
+        current_wf = StorageDriverWorkflowInfo(
+            id=self._info.workflow_id,
+            run_id=self._info.run_id,
+            type=self._info.workflow_type,
+            namespace=self._info.namespace,
+        )
+
+        if command_info is None:
+            return StorageDriverStoreContext(target=current_wf)
+
+        COMMAND_TYPE = temporalio.api.enums.v1.command_type_pb2.CommandType
+
+        if (
+            command_info.command_type
+            == COMMAND_TYPE.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION
+            and command_info.command_seq in self._pending_child_workflows
+        ):
+            child = self._pending_child_workflows[command_info.command_seq]
+            return StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=child._input.id,
+                    type=child._input.workflow,
+                    namespace=self._info.namespace,
+                ),
+            )
+
+        elif (
+            command_info.command_type
+            == COMMAND_TYPE.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION
+            and command_info.command_seq in self._pending_external_signals
+        ):
+            _, target_id = self._pending_external_signals[command_info.command_seq]
+            return StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=target_id, namespace=self._info.namespace
+                ),
+            )
+
+        elif (
+            command_info.command_type
+            == COMMAND_TYPE.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION
+            and self._info.parent is not None
+            and self._info.continued_run_id is None
+        ):
+            return StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=self._info.parent.workflow_id,
+                    run_id=self._info.parent.run_id,
+                    namespace=self._info.parent.namespace,
+                ),
+            )
+
+        else:
+            return StorageDriverStoreContext(target=current_wf)
 
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
@@ -3201,7 +3301,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 v.memo[k].CopyFrom(self._payload_converter.to_payloads([val])[0])
         if self._input.search_attributes:
             _encode_search_attributes(
-                self._input.search_attributes, v.search_attributes
+                self._input.search_attributes, v.search_attributes.indexed_fields
             )
         v.cancellation_type = cast(
             temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType,
@@ -3340,6 +3440,12 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout
             )
+        if self._input.schedule_to_start_timeout is not None:
+            v.schedule_to_start_timeout.FromTimedelta(
+                self._input.schedule_to_start_timeout
+            )
+        if self._input.start_to_close_timeout is not None:
+            v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         v.cancellation_type = cast(
             temporalio.bridge.proto.nexus.NexusOperationCancellationType.ValueType,
             int(self._input.cancellation_type),
@@ -3411,10 +3517,15 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
                 v.memo[k].CopyFrom(val)
         if self._input.search_attributes:
             _encode_search_attributes(
-                self._input.search_attributes, v.search_attributes
+                self._input.search_attributes, v.search_attributes.indexed_fields
             )
         if self._input.versioning_intent:
             v.versioning_intent = self._input.versioning_intent._to_proto()
+        if self._input.initial_versioning_behavior:
+            v.initial_versioning_behavior = cast(
+                "temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.ValueType",
+                int(self._input.initial_versioning_behavior),
+            )
 
 
 def _encode_search_attributes(

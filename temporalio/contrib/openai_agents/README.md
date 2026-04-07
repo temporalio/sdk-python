@@ -1,6 +1,5 @@
 # OpenAI Agents SDK Integration for Temporal
 
-⚠️ **Public Preview** - The interface to this module is subject to change prior to General Availability.
 We welcome questions and feedback in the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
 
 ## Introduction
@@ -538,6 +537,8 @@ SQLite storage is not suited to a distributed environment.
 
 ## OpenTelemetry Integration
 
+⚠️ **Public Preview** - This functionality is subject to change prior to General Availability.
+
 This integration provides seamless export of OpenAI agent telemetry to OpenTelemetry (OTEL) endpoints for observability and monitoring. The integration automatically handles workflow replay semantics, ensuring spans are only exported when workflows actually complete.
 
 ### Quick Start
@@ -545,22 +546,21 @@ This integration provides seamless export of OpenAI agent telemetry to OpenTelem
 To enable OTEL telemetry export, you need to set up a global `ReplaySafeTracerProvider` and enable the integration in the `OpenAIAgentsPlugin`:
 
 ```python
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+from datetime import timedelta
+from temporalio.client import Client
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 from temporalio.contrib.opentelemetry import create_tracer_provider
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry import trace
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 # Configure your OTEL exporters
-exporters = [
-    OTLPSpanExporter(endpoint="http://localhost:4317"),
-    # Add multiple exporters for different endpoints as needed
-]
 
 # Set up the global tracer provider
-tracer_provider = create_tracer_provider(exporters=exporters)
+tracer_provider = create_tracer_provider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint="http://localhost:4317")))
 trace.set_tracer_provider(tracer_provider)
 
-# For production applications
 client = await Client.connect(
     "localhost:7233",
     plugins=[
@@ -572,15 +572,6 @@ client = await Client.connect(
         ),
     ],
 )
-
-# For testing
-from temporalio.contrib.openai_agents.testing import AgentEnvironment
-
-async with AgentEnvironment(
-    model=my_test_model,
-    use_otel_instrumentation=True  # Enable OTEL integration for tests
-) as env:
-    client = env.applied_on_client(base_client)
 ```
 
 ### Features

@@ -4,7 +4,6 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 
-import pytest
 from nexusrpc.handler import service_handler
 
 from temporalio import nexus, workflow
@@ -12,7 +11,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 @dataclass
@@ -91,9 +90,6 @@ class CallerWorkflow:
 async def test_multiple_operation_invocations_can_connect_to_same_handler_workflow(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     workflow_id = str(uuid.uuid4())
 
@@ -103,7 +99,9 @@ async def test_multiple_operation_invocations_can_connect_to_same_handler_workfl
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
     ):
-        await create_nexus_endpoint(task_queue, client)
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
         caller_handle = await client.start_workflow(
             CallerWorkflow.run,
             args=[

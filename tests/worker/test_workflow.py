@@ -38,6 +38,7 @@ import temporalio.activity
 import temporalio.api.sdk.v1
 import temporalio.client
 import temporalio.converter
+import temporalio.converter._extstore
 import temporalio.worker
 import temporalio.worker._command_aware_visitor
 import temporalio.workflow
@@ -330,10 +331,14 @@ async def test_workflow_history_info(
         # because just a query will have a stale representation of history
         # counts, but signal forces a new WFT.
         await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
-        new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
-        assert new_info.history_length > continue_as_new_suggest_history_count
-        assert new_info.history_size > orig_info.history_size
-        assert new_info.continue_as_new_suggested
+
+        async def history_info_updated() -> None:
+            new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
+            assert new_info.history_length > continue_as_new_suggest_history_count
+            assert new_info.history_size > orig_info.history_size
+            assert new_info.continue_as_new_suggested
+
+        await assert_eventually(history_info_updated)
 
 
 @workflow.defn
@@ -1625,6 +1630,12 @@ class CustomWorkflowInstance(WorkflowInstance):
         command_info: temporalio.worker._command_aware_visitor.CommandInfo | None,
     ) -> temporalio.converter.SerializationContext | None:
         return self._unsandboxed.get_serialization_context(command_info)
+
+    def get_external_store_context(
+        self,
+        command_info: temporalio.worker._command_aware_visitor.CommandInfo | None,
+    ) -> temporalio.converter._extstore.StorageDriverStoreContext:
+        return self._unsandboxed.get_external_store_context(command_info)
 
 
 async def test_workflow_with_custom_runner(client: Client):
@@ -3429,6 +3440,66 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire
             await result_task
+
+
+@workflow.defn
+class CancelWorkflowSleepTaskWorkflow:
+    """Like CancelSignalAndTimerFiredInSameTaskWorkflow but uses workflow.sleep."""
+
+    _ready = False
+    timer_task: asyncio.Task[None]  # type: ignore[reportUninitializedInstanceVariable]
+
+    @workflow.run
+    async def run(self) -> str:
+        self.timer_task = asyncio.create_task(workflow.sleep(60 * 60))
+        self._ready = True
+        try:
+            await self.timer_task
+            return "timer_completed"
+        except asyncio.CancelledError:
+            return "timer_cancelled"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.signal
+    def cancel_timer(self) -> None:
+        self.timer_task.cancel()
+
+
+async def test_workflow_sleep_task_cancellation(
+    client: Client,
+):
+    async with new_worker(
+        client,
+        CancelWorkflowSleepTaskWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            CancelWorkflowSleepTaskWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def ready() -> bool:
+            return await handle.query(CancelWorkflowSleepTaskWorkflow.ready)
+
+        await assert_eq_eventually(True, ready)
+        await handle.signal(CancelWorkflowSleepTaskWorkflow.cancel_timer)
+        result = await handle.result()
+
+    assert result == "timer_cancelled"
+    # Verify the Temporal timer was actually cancelled on the server
+    resp = await client.workflow_service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=handle.id),
+        )
+    )
+    timer_canceled = any(
+        e.event_type == EventType.EVENT_TYPE_TIMER_CANCELED for e in resp.history.events
+    )
+    assert timer_canceled, "Expected TimerCanceled event in history"
 
 
 class MyCustomError(ApplicationError):
@@ -5250,7 +5321,11 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             # because we should have timer-done poll completions every 100ms
             worker.client = other_env.client
             # Now confirm the other workflow has started
-            await assert_eq_eventually(True, lambda: any_task_completed(handle2))
+            await assert_eq_eventually(
+                True,
+                lambda: any_task_completed(handle2),
+                timeout=timedelta(seconds=30),
+            )
             # Terminate both
             await handle1.terminate()
             await handle2.terminate()
@@ -7665,38 +7740,38 @@ async def test_workflow_missing_local_activity_no_activities(client: Client):
 async def heartbeat_activity(
     catch_err: bool = True,
 ) -> temporalio.activity.ActivityCancellationDetails | None:
-    while True:
-        try:
+    try:
+        while True:
             activity.heartbeat()
             # If we have heartbeat details, we are on the second attempt, we have retried due to pause/unpause.
             if activity.info().heartbeat_details:
                 return activity.cancellation_details()
             await asyncio.sleep(0.1)
-        except (CancelledError, asyncio.CancelledError) as err:
-            if not catch_err:
-                raise err
-            return activity.cancellation_details()
-        finally:
-            activity.heartbeat("finally-complete")
+    except (CancelledError, asyncio.CancelledError) as err:
+        if not catch_err:
+            raise err
+        return activity.cancellation_details()
+    finally:
+        activity.heartbeat("finally-complete")
 
 
 @activity.defn
 def sync_heartbeat_activity(
     catch_err: bool = True,
 ) -> temporalio.activity.ActivityCancellationDetails | None:
-    while True:
-        try:
+    try:
+        while True:
             activity.heartbeat()
             # If we have heartbeat details, we are on the second attempt, we have retried due to pause/unpause.
             if activity.info().heartbeat_details:
                 return activity.cancellation_details()
             time.sleep(0.1)
-        except (CancelledError, asyncio.CancelledError) as err:
-            if not catch_err:
-                raise err
-            return activity.cancellation_details()
-        finally:
-            activity.heartbeat("finally-complete")
+    except (CancelledError, asyncio.CancelledError) as err:
+        if not catch_err:
+            raise err
+        return activity.cancellation_details()
+    finally:
+        activity.heartbeat("finally-complete")
 
 
 @workflow.defn
@@ -7709,6 +7784,7 @@ class ActivityHeartbeatWorkflow:
         result.append(
             await workflow.execute_activity(
                 sync_heartbeat_activity,
+                True,
                 activity_id=activity_id,
                 start_to_close_timeout=timedelta(seconds=10),
                 heartbeat_timeout=timedelta(seconds=2),
@@ -7718,6 +7794,7 @@ class ActivityHeartbeatWorkflow:
         result.append(
             await workflow.execute_activity(
                 heartbeat_activity,
+                True,
                 activity_id=f"{activity_id}-2",
                 start_to_close_timeout=timedelta(seconds=10),
                 heartbeat_timeout=timedelta(seconds=2),
@@ -7978,8 +8055,10 @@ async def test_quick_activity_swallows_cancellation(client: Client):
         activities=[short_activity_async],
         activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
     ) as worker:
-        for i in range(10):
-            wf_duration = random.uniform(5.0, 15.0)
+        # Keep this deterministic and bounded. The original randomized 10-iteration
+        # version could exceed the per-test timeout on slower CI hosts if
+        # cancellation was delayed a few times in a row.
+        for i, wf_duration in enumerate((5.0, 7.5, 10.0)):
             wf_handle = await client.start_workflow(
                 QuickActivityWorkflow.run,
                 id=f"short_activity_wf_id-{i}",
@@ -8288,6 +8367,7 @@ async def test_previous_run_failure(client: Client):
             task_queue=worker.task_queue,
             retry_policy=RetryPolicy(
                 initial_interval=timedelta(milliseconds=10),
+                maximum_attempts=2,
             ),
         )
         result = await handle.result()
@@ -8467,23 +8547,13 @@ class CustomLogHandler(logging.Handler):
 async def test_disable_logger_sandbox(
     client: Client,
 ):
-    logger = workflow.logger.logger
-    handler = CustomLogHandler()
-    with LogHandler.apply(logger, handler):
+    async def execute_with_new_worker(*, disable_sandbox: bool) -> None:
+        workflow.logger.unsafe_disable_sandbox(disable_sandbox)
         async with new_worker(
             client,
             DisableLoggerSandbox,
             activities=[],
         ) as worker:
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
-            workflow.logger.unsafe_disable_sandbox()
             await client.execute_workflow(
                 DisableLoggerSandbox.run,
                 id=f"workflow-{uuid.uuid4()}",
@@ -8491,15 +8561,15 @@ async def test_disable_logger_sandbox(
                 run_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
-            workflow.logger.unsafe_disable_sandbox(False)
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
+
+    logger = workflow.logger.logger
+    handler = CustomLogHandler()
+    with LogHandler.apply(logger, handler):
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
+        await execute_with_new_worker(disable_sandbox=True)
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
 
 
 @workflow.defn

@@ -76,6 +76,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     INHERITED_PINNED_VERSION_FIELD_NUMBER: builtins.int
     INHERITED_AUTO_UPGRADE_INFO_FIELD_NUMBER: builtins.int
     EAGER_EXECUTION_ACCEPTED_FIELD_NUMBER: builtins.int
+    DECLINED_TARGET_VERSION_UPGRADE_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     parent_workflow_namespace: builtins.str
@@ -286,6 +287,19 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     eager execution was accepted by the server.
     Only populated by server with version >= 1.29.0.
     """
+    @property
+    def declined_target_version_upgrade(self) -> global___DeclinedTargetVersionUpgrade:
+        """During a previous run of this workflow, the server may have notified the SDK
+        that the Target Worker Deployment Version changed, but the SDK declined to
+        upgrade (e.g., by continuing-as-new with PINNED behavior). This field records
+        the target version that was declined.
+
+        This is a wrapper message to distinguish "never declined" (nil wrapper) from
+        "declined an unversioned target" (non-nil wrapper with nil deployment_version).
+
+        Used internally by the server during continue-as-new and retry.
+        Should not be read or interpreted by SDKs.
+        """
     def __init__(
         self,
         *,
@@ -340,12 +354,16 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         inherited_auto_upgrade_info: temporalio.api.deployment.v1.message_pb2.InheritedAutoUpgradeInfo
         | None = ...,
         eager_execution_accepted: builtins.bool = ...,
+        declined_target_version_upgrade: global___DeclinedTargetVersionUpgrade
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "continued_failure",
             b"continued_failure",
+            "declined_target_version_upgrade",
+            b"declined_target_version_upgrade",
             "first_workflow_task_backoff",
             b"first_workflow_task_backoff",
             "header",
@@ -403,6 +421,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"continued_failure",
             "cron_schedule",
             b"cron_schedule",
+            "declined_target_version_upgrade",
+            b"declined_target_version_upgrade",
             "eager_execution_accepted",
             b"eager_execution_accepted",
             "first_execution_run_id",
@@ -475,6 +495,39 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
 global___WorkflowExecutionStartedEventAttributes = (
     WorkflowExecutionStartedEventAttributes
 )
+
+class DeclinedTargetVersionUpgrade(google.protobuf.message.Message):
+    """Wrapper for a target deployment version that the SDK declined to upgrade to.
+    See declined_target_version_upgrade on WorkflowExecutionStartedEventAttributes.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
+    @property
+    def deployment_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
+    def __init__(
+        self,
+        *,
+        deployment_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment_version", b"deployment_version"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment_version", b"deployment_version"
+        ],
+    ) -> None: ...
+
+global___DeclinedTargetVersionUpgrade = DeclinedTargetVersionUpgrade
 
 class WorkflowExecutionCompletedEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -805,6 +858,7 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
     REQUEST_ID_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_REASONS_FIELD_NUMBER: builtins.int
+    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     BUILD_ID_REDIRECT_COUNTER_FIELD_NUMBER: builtins.int
@@ -831,6 +885,11 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
         """The reason(s) that suggest_continue_as_new is true, if it is.
         Unset if suggest_continue_as_new is false.
         """
+    target_worker_deployment_version_changed: builtins.bool
+    """True if Workflow's Target Worker Deployment Version is different from its Pinned Version and
+    the workflow is Pinned.
+    Experimental.
+    """
     history_size_bytes: builtins.int
     """Total history size in bytes, which the workflow might use to decide when to
     continue-as-new regardless of the suggestion. Note that history event count is
@@ -857,6 +916,7 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
             temporalio.api.enums.v1.workflow_pb2.SuggestContinueAsNewReason.ValueType
         ]
         | None = ...,
+        target_worker_deployment_version_changed: builtins.bool = ...,
         history_size_bytes: builtins.int = ...,
         worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
@@ -882,6 +942,8 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
             b"suggest_continue_as_new",
             "suggest_continue_as_new_reasons",
             b"suggest_continue_as_new_reasons",
+            "target_worker_deployment_version_changed",
+            b"target_worker_deployment_version_changed",
             "worker_version",
             b"worker_version",
         ],

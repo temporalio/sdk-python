@@ -32,7 +32,13 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._payload_limits
 import temporalio.exceptions
+from temporalio.converter import (
+    StorageDriverActivityInfo,
+    StorageDriverStoreContext,
+    StorageDriverWorkflowInfo,
+)
 
 from ._interceptor import (
     ActivityInboundInterceptor,
@@ -128,7 +134,8 @@ class _ActivityWorker:
 
     async def run(
         self,
-        payload_error_limits: temporalio.converter._ServerPayloadErrorLimits | None,
+        payload_error_limits: temporalio.converter._payload_limits._ServerPayloadErrorLimits
+        | None,
     ) -> None:
         """Continually poll for activity tasks and dispatch to handlers."""
         self._data_converter = self._data_converter._with_payload_error_limits(
@@ -260,7 +267,17 @@ class _ActivityWorker:
                 activity_task_queue=self._task_queue,
                 is_local=activity.info.is_local,
             )
-            data_converter = data_converter.with_context(context)
+            data_converter = data_converter._with_contexts(
+                context,
+                StorageDriverStoreContext(
+                    target=StorageDriverActivityInfo(
+                        id=activity.info.activity_id,
+                        type=activity.info.activity_type,
+                        run_id=activity.info.activity_run_id,
+                        namespace=activity.info.namespace,
+                    ),
+                ),
+            )
 
         # Perform the heartbeat
         try:
@@ -268,7 +285,6 @@ class _ActivityWorker:
                 task_token=task_token
             )
             if details:
-                # Convert to core payloads
                 heartbeat.details.extend(await data_converter.encode(details))
             logger.debug("Recording heartbeat with details %s", details)
             self._bridge_worker().record_activity_heartbeat(heartbeat)
@@ -314,6 +330,31 @@ class _ActivityWorker:
             is_local=start.is_local,
         )
         data_converter = self._data_converter.with_context(context)
+
+        # Build store context for external storage
+        ns = start.workflow_namespace or self._client.namespace
+        # Store context is set for the full activity task lifetime (input
+        # decode, execution, result/failure encode). Each activity task runs
+        # in its own coroutine so the value won't leak to other tasks.
+        started_by_workflow = bool(start.workflow_execution.workflow_id)
+        store_target: StorageDriverWorkflowInfo | StorageDriverActivityInfo
+        if started_by_workflow:
+            store_target = StorageDriverWorkflowInfo(
+                id=start.workflow_execution.workflow_id or None,
+                type=start.workflow_type or None,
+                run_id=start.workflow_execution.run_id or None,
+                namespace=ns,
+            )
+        else:
+            store_target = StorageDriverActivityInfo(
+                id=start.activity_id or None,
+                type=start.activity_type or None,
+                run_id=start.run_id or None,
+                namespace=ns,
+            )
+        data_converter = self._data_converter._with_contexts(
+            context, StorageDriverStoreContext(target=store_target)
+        )
         try:
             result = await self._execute_activity(
                 start, running_activity, task_token, data_converter
@@ -403,7 +444,7 @@ class _ActivityWorker:
                         )
                     elif isinstance(
                         err,
-                        temporalio.converter._PayloadSizeError,
+                        temporalio.converter._payload_limits._PayloadSizeError,
                     ):
                         temporalio.activity.logger.warning(
                             err.message,
@@ -444,7 +485,9 @@ class _ActivityWorker:
                         if isinstance(err, concurrent.futures.BrokenExecutor):
                             self._fail_worker_exception_queue.put_nowait(err)
                 # Handle PayloadSizeError from attempting to encode failure information
-                except temporalio.converter._PayloadSizeError as inner_err:
+                except (
+                    temporalio.converter._payload_limits._PayloadSizeError
+                ) as inner_err:
                     temporalio.activity.logger.exception(inner_err.message)
                     completion.result.Clear()
                     await data_converter.encode_failure(
@@ -625,9 +668,11 @@ class _ActivityWorker:
             else None,
         )
 
-        if self._encode_headers and data_converter._decode_payload_has_effect:
+        if self._encode_headers:
             for payload in start.header_fields.values():
-                payload.CopyFrom(await data_converter._decode_payload(payload))
+                payload.CopyFrom(
+                    await data_converter._transform_inbound_payload(payload)
+                )
 
         running_activity.info = info
         input = ExecuteActivityInput(

@@ -33,6 +33,9 @@ class _ReplaySafeSpan(Span):
         self._exception: BaseException | None = None
         self._span = span
 
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._span, name)
+
     def end(self, end_time: int | None = None) -> None:
         if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
             # Skip ending spans during workflow replay to avoid duplicate telemetry
@@ -75,7 +78,6 @@ class _ReplaySafeSpan(Span):
     def set_status(
         self, status: Status | StatusCode, description: str | None = None
     ) -> None:
-        self._status = status
         self._span.set_status(status, description)
 
     def record_exception(

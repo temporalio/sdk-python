@@ -54,6 +54,7 @@ import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._search_attributes
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.nexus._operation_context
@@ -65,6 +66,9 @@ from temporalio.converter import (
     ActivitySerializationContext,
     DataConverter,
     SerializationContext,
+    StorageDriverActivityInfo,
+    StorageDriverStoreContext,
+    StorageDriverWorkflowInfo,
     WithSerializationContext,
     WorkflowSerializationContext,
 )
@@ -2801,6 +2805,29 @@ class Client:
         )
 
 
+class ClientConnectConfig(TypedDict, total=False):
+    """TypedDict of keyword arguments for :py:meth:`Client.connect`."""
+
+    target_host: str
+    namespace: str
+    api_key: str | None
+    data_converter: temporalio.converter.DataConverter
+    plugins: Sequence[Plugin]
+    interceptors: Sequence[Interceptor]
+    default_workflow_query_reject_condition: (
+        temporalio.common.QueryRejectCondition | None
+    )
+    tls: bool | TLSConfig | None
+    retry_config: RetryConfig | None
+    keep_alive_config: KeepAliveConfig | None
+    rpc_metadata: Mapping[str, str | bytes]
+    identity: str | None
+    lazy: bool
+    runtime: temporalio.runtime.Runtime | None
+    http_connect_proxy_config: HttpConnectProxyConfig | None
+    header_codec_behavior: HeaderCodecBehavior
+
+
 class ClientConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:meth:`Client`."""
 
@@ -4433,7 +4460,9 @@ class ActivityExecutionCountAggregationGroup:
         return ActivityExecutionCountAggregationGroup(
             count=raw.count,
             group_values=[
-                temporalio.converter._decode_search_attribute_value(v)
+                temporalio.converter._search_attributes._decode_search_attribute_value(
+                    v
+                )
                 for v in raw.group_values
             ],
         )
@@ -5127,7 +5156,9 @@ class WorkflowExecutionCountAggregationGroup:
         return WorkflowExecutionCountAggregationGroup(
             count=raw.count,
             group_values=[
-                temporalio.converter._decode_search_attribute_value(v)
+                temporalio.converter._search_attributes._decode_search_attribute_value(
+                    v
+                )
                 for v in raw.group_values
             ],
         )
@@ -6156,11 +6187,16 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         priority: temporalio.api.common.v1.Priority | None = None
         if self.priority:
             priority = self.priority._to_proto()
-        data_converter = client.data_converter.with_context(
+        data_converter = client.data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=client.namespace,
                 workflow_id=self.id,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=self.id, type=self.workflow, namespace=client.namespace
+                ),
+            ),
         )
         action = temporalio.api.schedule.v1.ScheduleAction(
             start_workflow=temporalio.api.workflow.v1.NewWorkflowExecutionInfo(
@@ -6205,7 +6241,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         # TODO (dan): confirm whether this be `is not None`
         if self.typed_search_attributes:
             temporalio.converter.encode_search_attributes(
-                self.typed_search_attributes, action.start_workflow.search_attributes
+                self.typed_search_attributes,
+                action.start_workflow.search_attributes,
             )
         if self.headers:
             await _apply_headers(
@@ -8072,11 +8109,16 @@ class _ClientImpl(OutboundInterceptor):
         self, input: StartWorkflowInput
     ) -> temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest:
         assert input.start_signal
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client.data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=input.id, type=input.workflow, namespace=self._client.namespace
+                ),
+            ),
         )
         req = temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest(
             signal_name=input.start_signal
@@ -8103,11 +8145,16 @@ class _ClientImpl(OutboundInterceptor):
         ),
         input: StartWorkflowInput | UpdateWithStartStartWorkflowInput,
     ) -> None:
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client.data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=input.id, type=input.workflow, namespace=self._client.namespace
+                ),
+            ),
         )
         req.namespace = self._client.namespace
         req.workflow_id = input.id
@@ -8223,11 +8270,18 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client.data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=input.id,
+                    run_id=input.run_id or None,
+                    namespace=self._client.namespace,
+                ),
+            ),
         )
         req = temporalio.api.workflowservice.v1.QueryWorkflowRequest(
             namespace=self._client.namespace,
@@ -8250,7 +8304,10 @@ class _ClientImpl(OutboundInterceptor):
             await self._apply_headers(input.headers, req.query.header.fields)
         try:
             resp = await self._client.workflow_service.query_workflow(
-                req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+                req,
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
             )
         except RPCError as err:
             # If the status is INVALID_ARGUMENT, we can assume it's a query
@@ -8276,11 +8333,18 @@ class _ClientImpl(OutboundInterceptor):
         return results[0]
 
     async def signal_workflow(self, input: SignalWorkflowInput) -> None:
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client.data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=input.id,
+                    run_id=input.run_id or None,
+                    namespace=self._client.namespace,
+                ),
+            ),
         )
         req = temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest(
             namespace=self._client.namespace,
@@ -8301,11 +8365,18 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client.data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=input.id,
+                    run_id=input.run_id or None,
+                    namespace=self._client.namespace,
+                ),
+            ),
         )
         req = temporalio.api.workflowservice.v1.TerminateWorkflowExecutionRequest(
             namespace=self._client.namespace,
@@ -8360,7 +8431,7 @@ class _ClientImpl(OutboundInterceptor):
         self, input: StartActivityInput
     ) -> temporalio.api.workflowservice.v1.StartActivityExecutionRequest:
         """Build StartActivityExecutionRequest from input."""
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client.data_converter._with_contexts(
             ActivitySerializationContext(
                 namespace=self._client.namespace,
                 activity_id=input.id,
@@ -8369,7 +8440,14 @@ class _ClientImpl(OutboundInterceptor):
                 is_local=False,
                 workflow_id=None,
                 workflow_type=None,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverActivityInfo(
+                    id=input.id,
+                    type=input.activity_type,
+                    namespace=self._client.namespace,
+                ),
+            ),
         )
 
         req = temporalio.api.workflowservice.v1.StartActivityExecutionRequest(
@@ -8555,11 +8633,20 @@ class _ClientImpl(OutboundInterceptor):
         input: StartWorkflowUpdateInput | UpdateWithStartUpdateWorkflowInput,
         workflow_id: str,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest:
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client.data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=workflow_id,
-            )
+            ),
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(
+                    id=workflow_id,
+                    run_id=(input.run_id or None)
+                    if isinstance(input, StartWorkflowUpdateInput)
+                    else None,
+                    namespace=self._client.namespace,
+                ),
+            ),
         )
         run_id, first_execution_run_id = (
             (
@@ -8734,10 +8821,34 @@ class _ClientImpl(OutboundInterceptor):
 
     ### Async activity calls
 
+    def _get_async_activity_store_context(
+        self, id_or_token: AsyncActivityIDReference | bytes
+    ) -> StorageDriverStoreContext:
+        if isinstance(id_or_token, AsyncActivityIDReference):
+            if id_or_token.workflow_id:
+                return StorageDriverStoreContext(
+                    target=StorageDriverWorkflowInfo(
+                        id=id_or_token.workflow_id or None,
+                        run_id=id_or_token.run_id or None,
+                        namespace=self._client.namespace,
+                    ),
+                )
+            return StorageDriverStoreContext(
+                target=StorageDriverActivityInfo(
+                    id=id_or_token.activity_id,
+                    run_id=id_or_token.run_id or None,
+                    namespace=self._client.namespace,
+                ),
+            )
+        else:
+            return StorageDriverStoreContext(target=None)
+
     async def heartbeat_async_activity(
         self, input: HeartbeatAsyncActivityInput
     ) -> None:
-        data_converter = input.data_converter_override or self._client.data_converter
+        data_converter = (
+            input.data_converter_override or self._client.data_converter
+        )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
         details = (
             None
             if not input.details
@@ -8792,7 +8903,9 @@ class _ClientImpl(OutboundInterceptor):
                 )
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
-        data_converter = input.data_converter_override or self._client.data_converter
+        data_converter = (
+            input.data_converter_override or self._client.data_converter
+        )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
         result = (
             None
             if input.result is temporalio.common._arg_unset
@@ -8826,7 +8939,9 @@ class _ClientImpl(OutboundInterceptor):
             )
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
-        data_converter = input.data_converter_override or self._client.data_converter
+        data_converter = (
+            input.data_converter_override or self._client.data_converter
+        )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
 
         failure = temporalio.api.failure.v1.Failure()
         await data_converter.encode_failure(input.error, failure)
@@ -8867,7 +8982,9 @@ class _ClientImpl(OutboundInterceptor):
     async def report_cancellation_async_activity(
         self, input: ReportCancellationAsyncActivityInput
     ) -> None:
-        data_converter = input.data_converter_override or self._client.data_converter
+        data_converter = (
+            input.data_converter_override or self._client.data_converter
+        )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
         details = (
             None
             if not input.details
@@ -9180,7 +9297,7 @@ async def _apply_headers(
         return
     if encode_headers:
         for payload in source.values():
-            payload.CopyFrom(await data_converter._encode_payload(payload))
+            payload.CopyFrom(await data_converter._transform_outbound_payload(payload))
     temporalio.common._apply_headers(source, dest)
 
 

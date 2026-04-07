@@ -4,8 +4,10 @@ import os
 import sys
 from collections.abc import AsyncGenerator, Iterator
 
+import opentelemetry.trace
 import pytest
 import pytest_asyncio
+from opentelemetry.util._once import Once
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
@@ -98,7 +100,6 @@ def env_type(request: pytest.FixtureRequest) -> str:
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
-        http_port = 7243
         env = await WorkflowEnvironment.start_local(
             dev_server_extra_args=[
                 "--dynamic-config-value",
@@ -125,13 +126,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "history.enableChasm=true",
                 "--dynamic-config-value",
                 "history.enableTransitionHistory=true",
-                "--http-port",
-                str(http_port),
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
-        # TODO(nexus-preview): expose this in a more principled way
-        env._http_port = http_port  # type: ignore
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
     else:
@@ -190,9 +187,16 @@ async def worker(
 @pytest.hookimpl(hookwrapper=True, trylast=True)
 def pytest_cmdline_main(config):  # type: ignore[reportMissingParameterType, reportUnusedParameter]
     result = yield
-    if result.get_result() == 0:
+    exit_code = result.get_result()
+    numprocesses = getattr(config.option, "numprocesses", None)
+    running_with_xdist = hasattr(config, "workerinput") or numprocesses not in (
+        None,
+        0,
+        "0",
+    )
+    if exit_code == 0 and not running_with_xdist:
         os._exit(0)
-    return result.get_result()
+    return exit_code
 
 
 CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
@@ -201,3 +205,13 @@ CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
 @pytest.fixture
 def continue_as_new_suggest_history_count() -> int:
     return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT
+
+
+@pytest.fixture
+def reset_otel_tracer_provider():
+    """Reset global OpenTelemetry tracer provider state around tests."""
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.trace._TRACER_PROVIDER = None
+    yield
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.trace._TRACER_PROVIDER = None

@@ -21,7 +21,7 @@ import temporalio.common
 import temporalio.nexus
 import temporalio.nexus._util
 import temporalio.workflow
-from temporalio.workflow import VersioningIntent
+from temporalio.workflow import ContinueAsNewVersioningBehavior, VersioningIntent
 
 
 class Interceptor:
@@ -172,6 +172,7 @@ class ContinueAsNewInput:
     )
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: VersioningIntent | None
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None
     # The types may be absent
     arg_types: list[type] | None
 
@@ -303,6 +304,8 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     operation: nexusrpc.Operation[InputT, OutputT] | str | Callable[..., Any]
     input: InputT
     schedule_to_close_timeout: timedelta | None
+    schedule_to_start_timeout: timedelta | None
+    start_to_close_timeout: timedelta | None
     cancellation_type: temporalio.workflow.NexusOperationCancellationType
     headers: Mapping[str, str] | None
     summary: str | None

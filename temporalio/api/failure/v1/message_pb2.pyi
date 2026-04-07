@@ -293,6 +293,8 @@ class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
 global___ChildWorkflowExecutionFailureInfo = ChildWorkflowExecutionFailureInfo
 
 class NexusOperationFailureInfo(google.protobuf.message.Message):
+    """Representation of the Temporal SDK NexusOperationError object that is returned to workflow callers."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int

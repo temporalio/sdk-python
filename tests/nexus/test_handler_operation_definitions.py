@@ -42,7 +42,6 @@ class NotCalled(_TestCase):
     expected_operations = {
         "my_workflow_run_operation_handler": nexusrpc.Operation(
             name="my_workflow_run_operation_handler",
-            method_name="my_workflow_run_operation_handler",
             input_type=Input,
             output_type=Output,
         ),
@@ -73,7 +72,6 @@ class CalledWithNameOverride(_TestCase):
     expected_operations = {
         "workflow_run_operation_with_name_override": nexusrpc.Operation(
             name="operation-name",
-            method_name="workflow_run_operation_with_name_override",
             input_type=Input,
             output_type=Output,
         ),
