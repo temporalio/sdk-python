@@ -28,6 +28,7 @@ from tests.contrib.langsmith.conftest import (
     InMemoryRunCollector,
     dump_runs,
     dump_traces,
+    find_traces,
     make_mock_ls_client,
 )
 from tests.helpers import new_worker
@@ -656,7 +657,7 @@ class TestComprehensiveTracing:
         traces = dump_traces(collector)
 
         # user_pipeline trace: StartWorkflow + full workflow execution tree
-        workflow_traces = [t for t in traces if t[0] == "user_pipeline"]
+        workflow_traces = find_traces(traces, "user_pipeline")
         assert len(workflow_traces) == 1
         assert workflow_traces[0] == [
             "user_pipeline",
@@ -722,7 +723,7 @@ class TestComprehensiveTracing:
         ]
 
         # poll_query trace (separate root, variable number of iterations)
-        poll_traces = [t for t in traces if t[0] == "poll_query"]
+        poll_traces = find_traces(traces, "poll_query")
         assert len(poll_traces) == 1
         poll = poll_traces[0]
         assert poll[0] == "poll_query"
@@ -736,21 +737,21 @@ class TestComprehensiveTracing:
         assert len(raw_query_traces) == 1
 
         # Phase 2: each operation is its own root trace
-        query_traces = [t for t in traces if t[0] == "QueryWorkflow:my_query"]
+        query_traces = find_traces(traces, "QueryWorkflow:my_query")
         assert len(query_traces) == 1
         assert query_traces[0] == [
             "QueryWorkflow:my_query",
             "  HandleQuery:my_query",
         ]
 
-        signal_traces = [t for t in traces if t[0] == "SignalWorkflow:my_signal"]
+        signal_traces = find_traces(traces, "SignalWorkflow:my_signal")
         assert len(signal_traces) == 1
         assert signal_traces[0] == [
             "SignalWorkflow:my_signal",
             "  HandleSignal:my_signal",
         ]
 
-        update_traces = [t for t in traces if t[0] == "StartWorkflowUpdate:my_update"]
+        update_traces = find_traces(traces, "StartWorkflowUpdate:my_update")
         assert len(update_traces) == 1
         assert update_traces[0] == [
             "StartWorkflowUpdate:my_update",
@@ -759,9 +760,9 @@ class TestComprehensiveTracing:
         ]
 
         # Update without a validator — no ValidateUpdate trace
-        unvalidated_traces = [
-            t for t in traces if t[0] == "StartWorkflowUpdate:my_unvalidated_update"
-        ]
+        unvalidated_traces = find_traces(
+            traces, "StartWorkflowUpdate:my_unvalidated_update"
+        )
         assert len(unvalidated_traces) == 1
         assert unvalidated_traces[0] == [
             "StartWorkflowUpdate:my_unvalidated_update",
@@ -847,7 +848,7 @@ class TestComprehensiveTracing:
         traces = dump_traces(collector)
 
         # Main workflow trace (only @traceable runs, nested under user_pipeline)
-        workflow_traces = [t for t in traces if t[0] == "user_pipeline"]
+        workflow_traces = find_traces(traces, "user_pipeline")
         assert len(workflow_traces) == 1
         expected_workflow = [
             "user_pipeline",
@@ -884,7 +885,7 @@ class TestComprehensiveTracing:
         )
 
         # Poll query — separate root, just the @traceable wrapper, no Temporal children
-        poll_traces = [t for t in traces if t[0] == "poll_query"]
+        poll_traces = find_traces(traces, "poll_query")
         assert len(poll_traces) == 1
         assert poll_traces[0] == ["poll_query"]
 

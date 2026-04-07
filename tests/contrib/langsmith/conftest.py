@@ -103,6 +103,11 @@ def dump_runs(collector: InMemoryRunCollector) -> list[str]:
     return [run for trace in dump_traces(collector) for run in trace]
 
 
+def find_traces(traces: list[list[str]], root_name: str) -> list[list[str]]:
+    """Filter traces by exact root name match."""
+    return [t for t in traces if t[0] == root_name]
+
+
 def make_mock_ls_client(collector: InMemoryRunCollector) -> MagicMock:
     """Create a mock langsmith.Client wired to a collector."""
     client = MagicMock()

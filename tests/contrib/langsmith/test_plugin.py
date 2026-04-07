@@ -12,7 +12,7 @@ from langsmith import traceable, tracing_context
 from temporalio.client import Client, WorkflowHandle
 from temporalio.contrib.langsmith import LangSmithInterceptor, LangSmithPlugin
 from temporalio.testing import WorkflowEnvironment
-from tests.contrib.langsmith.conftest import dump_traces
+from tests.contrib.langsmith.conftest import dump_traces, find_traces
 from tests.contrib.langsmith.test_integration import (
     ComprehensiveWorkflow,
     NexusService,
@@ -113,7 +113,7 @@ class TestPluginIntegration:
         traces = dump_traces(collector)
 
         # user_pipeline trace: StartWorkflow + full workflow execution tree
-        workflow_traces = [t for t in traces if t[0] == "user_pipeline"]
+        workflow_traces = find_traces(traces, "user_pipeline")
         assert len(workflow_traces) == 1
         assert workflow_traces[0] == [
             "user_pipeline",
@@ -179,7 +179,7 @@ class TestPluginIntegration:
         ]
 
         # poll_query trace (separate root, variable number of iterations)
-        poll_traces = [t for t in traces if t[0] == "poll_query"]
+        poll_traces = find_traces(traces, "poll_query")
         assert len(poll_traces) == 1
         poll = poll_traces[0]
         assert poll[0] == "poll_query"
@@ -189,21 +189,21 @@ class TestPluginIntegration:
             assert poll_children[i + 1] == "    HandleQuery:is_waiting_for_signal"
 
         # Each remaining operation is its own root trace
-        query_traces = [t for t in traces if t[0] == "QueryWorkflow:my_query"]
+        query_traces = find_traces(traces, "QueryWorkflow:my_query")
         assert len(query_traces) == 1
         assert query_traces[0] == [
             "QueryWorkflow:my_query",
             "  HandleQuery:my_query",
         ]
 
-        signal_traces = [t for t in traces if t[0] == "SignalWorkflow:my_signal"]
+        signal_traces = find_traces(traces, "SignalWorkflow:my_signal")
         assert len(signal_traces) == 1
         assert signal_traces[0] == [
             "SignalWorkflow:my_signal",
             "  HandleSignal:my_signal",
         ]
 
-        update_traces = [t for t in traces if t[0] == "StartWorkflowUpdate:my_update"]
+        update_traces = find_traces(traces, "StartWorkflowUpdate:my_update")
         assert len(update_traces) == 1
         assert update_traces[0] == [
             "StartWorkflowUpdate:my_update",
@@ -212,9 +212,9 @@ class TestPluginIntegration:
         ]
 
         # Update without a validator — no ValidateUpdate trace
-        unvalidated_traces = [
-            t for t in traces if t[0] == "StartWorkflowUpdate:my_unvalidated_update"
-        ]
+        unvalidated_traces = find_traces(
+            traces, "StartWorkflowUpdate:my_unvalidated_update"
+        )
         assert len(unvalidated_traces) == 1
         assert unvalidated_traces[0] == [
             "StartWorkflowUpdate:my_unvalidated_update",
