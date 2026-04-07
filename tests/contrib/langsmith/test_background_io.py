@@ -643,13 +643,6 @@ class TestPostShutdownRaises:
 class Test_ReplaySafeRunTreeConstructor:
     """Tests for _ReplaySafeRunTree accepting executor parameter."""
 
-    def test_constructor_requires_executor(self) -> None:
-        """_ReplaySafeRunTree requires an executor parameter."""
-        mock_run = _make_mock_run()
-        executor = _make_executor()
-        tree = _ReplaySafeRunTree(mock_run, executor=executor)
-        assert tree._executor is executor
-
     def test_constructor_stores_executor(self) -> None:
         """The executor is stored and accessible."""
         executor = _make_executor()
