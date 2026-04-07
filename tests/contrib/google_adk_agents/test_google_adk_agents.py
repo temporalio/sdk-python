@@ -18,8 +18,9 @@ import logging
 import os
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator
 from datetime import timedelta
+from typing import Any
 
 import pytest
 from google.adk import Agent, Runner
@@ -64,6 +65,19 @@ async def get_weather(city: str) -> str:  #  type: ignore[reportUnusedParameter]
     return "Warm and sunny. 17 degrees."
 
 
+def weather_agent(model_name: str) -> Agent:
+    # Wraps 'get_weather' activity as a Tool
+    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+        get_weather, start_to_close_timeout=timedelta(seconds=60)
+    )
+
+    return Agent(
+        name="test_agent",
+        model=TemporalModel(model_name),
+        tools=[weather_tool],
+    )
+
+
 @workflow.defn
 class WeatherAgent:
     @workflow.run
@@ -73,17 +87,7 @@ class WeatherAgent:
         # 1. Define Agent using Temporal Helpers
         # Note: AgentPlugin in the Runner automatically handles Runtime setup
         # and Model Activity interception. We use standard ADK models now.
-
-        # Wraps 'get_weather' activity as a Tool
-        weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
-            get_weather, start_to_close_timeout=timedelta(seconds=60)
-        )
-
-        agent = Agent(
-            name="test_agent",
-            model=TemporalModel(model_name),
-            tools=[weather_tool],
-        )
+        agent = weather_agent(model_name)
 
         # 2. Create runner
         runner = InMemoryRunner(
@@ -357,6 +361,30 @@ async def test_multi_agent(client: Client, use_local_model: bool):
             assert result == "haiku"
 
 
+def example_toolset(_: Any | None) -> McpToolset:
+    return McpToolset(
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="npx",
+                args=[
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            ),
+        ),
+    )
+
+
+def mcp_agent(model_name: str) -> Agent:
+    return Agent(
+        name="test_agent",
+        # instruction="Always use your tools to answer questions.",
+        model=TemporalModel(model_name),
+        tools=[TemporalMcpToolSet("test_set", not_in_workflow_toolset=example_toolset)],
+    )
+
+
 @workflow.defn
 class McpAgent:
     @workflow.run
@@ -364,14 +392,7 @@ class McpAgent:
         logger.info("Workflow started.")
 
         # 1. Define Agent using Temporal Helpers
-        # Note: AgentPlugin in the Runner automatically handles Runtime setup
-        # and Model Activity interception. We use standard ADK models now.
-        agent = Agent(
-            name="test_agent",
-            # instruction="Always use your tools to answer questions.",
-            model=TemporalModel(model_name),
-            tools=[TemporalMcpToolSet("test_set")],
-        )
+        agent = mcp_agent(model_name)
 
         # 2. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
         session_service = InMemorySessionService()
@@ -408,38 +429,35 @@ class McpAgent:
         return last_event.content.parts[0].text
 
 
-class McpModel(BaseLlm):
-    responses: list[LlmResponse] = [
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[
-                    Part(
-                        function_call=FunctionCall(
-                            args={"path": os.path.dirname(os.path.abspath(__file__))},
-                            name="list_directory",
+class McpModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                args={
+                                    "path": os.path.dirname(os.path.abspath(__file__))
+                                },
+                                name="list_directory",
+                            )
                         )
-                    )
-                ],
-            )
-        ),
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[Part(text="Some files.")],
-            )
-        ),
-    ]
-    response_iter: Iterator[LlmResponse] = iter(responses)
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[Part(text="Some files.")],
+                )
+            ),
+        ]
 
     @classmethod
     def supported_models(cls) -> list[str]:
         return ["mcp_model"]
-
-    async def generate_content_async(
-        self, llm_request: LlmRequest, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        yield next(self.response_iter)
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
@@ -455,18 +473,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
             toolset_providers=[
                 TemporalMcpToolSetProvider(
                     "test_set",
-                    lambda _: McpToolset(
-                        connection_params=StdioConnectionParams(
-                            server_params=StdioServerParameters(
-                                command="npx",
-                                args=[
-                                    "-y",
-                                    "@modelcontextprotocol/server-filesystem",
-                                    os.path.dirname(os.path.abspath(__file__)),
-                                ],
-                            ),
-                        ),
-                    ),
+                    example_toolset,
                 )
             ],
         )
@@ -570,6 +577,91 @@ async def test_single_agent_telemetry(
 async def test_unsetting_timeout():
     model = TemporalModel("", ActivityConfig(start_to_close_timeout=None))
     assert model._activity_config.get("start_to_close_timeout", None) is None
+
+
+@pytest.mark.asyncio
+async def test_agent_outside_workflow():
+    """Test that an agent using TemporalModel and activity_tool works outside a Temporal workflow."""
+    LLMRegistry.register(WeatherModel)
+
+    agent = weather_agent("weather_model")
+
+    runner = InMemoryRunner(
+        agent=agent,
+        app_name="test_app_local",
+    )
+
+    session = await runner.session_service.create_session(
+        app_name="test_app_local", user_id="test"
+    )
+
+    last_event = None
+    async with Aclosing(
+        runner.run_async(
+            user_id="test",
+            session_id=session.id,
+            new_message=types.Content(
+                role="user", parts=[types.Part(text="What is the weather in New York?")]
+            ),
+        )
+    ) as agen:
+        async for event in agen:
+            last_event = event
+
+    assert last_event is not None
+    assert last_event.content is not None
+    assert last_event.content.parts is not None
+    assert last_event.content.parts[0].text == "warm and sunny"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip  # Doesn't work well in CI currently
+async def test_mcp_agent_outside_workflow():
+    """Test that an agent using TemporalMcpToolSet works outside a Temporal workflow."""
+    LLMRegistry.register(McpModel)
+
+    agent = mcp_agent("mcp_model")
+
+    session_service = InMemorySessionService()
+    session = await session_service.create_session(
+        app_name="test_app_local", user_id="test"
+    )
+
+    runner = Runner(
+        agent=agent,
+        app_name="test_app_local",
+        session_service=session_service,
+    )
+
+    last_event = None
+    async with Aclosing(
+        runner.run_async(
+            user_id="test",
+            session_id=session.id,
+            new_message=types.Content(
+                role="user",
+                parts=[types.Part(text="What files are in the current directory?")],
+            ),
+        )
+    ) as agen:
+        async for event in agen:
+            last_event = event
+
+    assert last_event is not None
+    assert last_event.content is not None
+    assert last_event.content.parts is not None
+    assert last_event.content.parts[0].text == "Some files."
+
+
+@pytest.mark.asyncio
+async def test_mcp_toolset_outside_workflow_no_not_in_workflow_toolset():
+    """Test that TemporalMcpToolSet raises ValueError outside a workflow with no not_in_workflow_toolset."""
+    toolset = TemporalMcpToolSet("test_set_no_local")
+    with pytest.raises(
+        ValueError,
+        match="not_in_workflow_toolset",
+    ):
+        await toolset.get_tools()
 
 
 complex_activity_inputs_seen: dict[str, object] = {}

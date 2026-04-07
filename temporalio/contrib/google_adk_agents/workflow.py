@@ -3,6 +3,7 @@
 import inspect
 from typing import Any, Callable
 
+import temporalio.workflow
 from temporalio import workflow
 
 
@@ -28,6 +29,14 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
 
         # Decorator kwargs are defaults.
         options = kwargs.copy()
+
+        if not temporalio.workflow.in_workflow():
+            # If executed outside a workflow, like when doing local adk runs, use the function directly
+            result = activity_def(*args, **kw)
+            if inspect.isawaitable(result):
+                return await result
+            else:
+                return result
 
         if not activity_args:
             return await workflow.execute_activity(activity_def, **options)
