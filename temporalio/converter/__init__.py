@@ -7,9 +7,11 @@ from temporalio.converter._data_converter import (
 from temporalio.converter._extstore import (
     ExternalStorage,
     StorageDriver,
+    StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
+    StorageDriverWorkflowInfo,
     StorageWarning,
 )
 from temporalio.converter._failure_converter import (
@@ -54,9 +56,11 @@ __all__ = [
     "ActivitySerializationContext",
     "ExternalStorage",
     "StorageDriver",
+    "StorageDriverActivityInfo",
     "StorageDriverClaim",
     "StorageDriverRetrieveContext",
     "StorageDriverStoreContext",
+    "StorageDriverWorkflowInfo",
     "StorageWarning",
     "AdvancedJSONEncoder",
     "BinaryNullPayloadConverter",

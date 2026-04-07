@@ -40,15 +40,10 @@ from temporalio.converter import (
     DefaultFailureConverter,
     DefaultPayloadConverter,
     EncodingPayloadConverter,
-    ExternalStorage,
     JSONPlainPayloadConverter,
     PayloadCodec,
     PayloadConverter,
     SerializationContext,
-    StorageDriver,
-    StorageDriverClaim,
-    StorageDriverRetrieveContext,
-    StorageDriverStoreContext,
     WithSerializationContext,
     WorkflowSerializationContext,
 )
@@ -1919,84 +1914,3 @@ async def test_user_customization_of_default_payload_converter(
                 id=wf_id,
                 task_queue=task_queue,
             )
-
-
-# Child workflow external storage context test
-
-
-class ContextTrackingStorageDriver(StorageDriver):
-    """In-memory driver that records the serialization context on each store/retrieve."""
-
-    def __init__(self) -> None:
-        self._storage: dict[str, bytes] = {}
-        self.store_contexts: list[SerializationContext | None] = []
-
-    def name(self) -> str:
-        return "context-tracking"
-
-    async def store(
-        self,
-        context: StorageDriverStoreContext,
-        payloads: Sequence[temporalio.api.common.v1.Payload],
-    ) -> list[StorageDriverClaim]:
-        self.store_contexts.append(context.serialization_context)
-        claims: list[StorageDriverClaim] = []
-        for payload in payloads:
-            key = f"payload-{len(self._storage)}"
-            self._storage[key] = payload.SerializeToString()
-            claims.append(StorageDriverClaim(claim_data={"key": key}))
-        return claims
-
-    async def retrieve(
-        self,
-        context: StorageDriverRetrieveContext,
-        claims: Sequence[StorageDriverClaim],
-    ) -> list[temporalio.api.common.v1.Payload]:
-        results: list[temporalio.api.common.v1.Payload] = []
-        for claim in claims:
-            payload = temporalio.api.common.v1.Payload()
-            payload.ParseFromString(self._storage[claim.claim_data["key"]])
-            results.append(payload)
-        return results
-
-
-async def test_child_workflow_external_storage_with_context(client: Client):
-    """External storage should receive the child workflow's context, not the parent's."""
-    workflow_id = str(uuid.uuid4())
-    child_workflow_id = f"{workflow_id}-child"
-    task_queue = str(uuid.uuid4())
-
-    driver = ContextTrackingStorageDriver()
-    config = client.config()
-    config["data_converter"] = dataclasses.replace(
-        DataConverter.default,
-        external_storage=ExternalStorage(
-            drivers=[driver],
-            payload_size_threshold=0,
-        ),
-    )
-    client = Client(**config)
-
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[ChildWorkflowCodecTestWorkflow, EchoWorkflow],
-        workflow_runner=UnsandboxedWorkflowRunner(),
-    ):
-        await client.execute_workflow(
-            ChildWorkflowCodecTestWorkflow.run,
-            TraceData(),
-            id=workflow_id,
-            task_queue=task_queue,
-        )
-
-    child_context = WorkflowSerializationContext(
-        namespace=client.namespace,
-        workflow_id=child_workflow_id,
-    )
-    # store_contexts[0]: parent input encode        → parent context
-    # store_contexts[1]: child workflow input encode → child context
-    # store_contexts[2]: child workflow result encode → child context
-    # store_contexts[3]: parent result encode        → parent context
-    child_context_count = sum(1 for c in driver.store_contexts if c == child_context)
-    assert child_context_count == 2

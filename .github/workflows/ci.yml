@@ -28,9 +28,6 @@ jobs:
             docsTarget: true
             openaiTestTarget: true
             clippyLinter: true
-          - os: ubuntu-latest
-            python: "3.10"
-            protoCheckTarget: true
           - python: "3.10"
             pytestExtraArgs: "--reruns 3 --only-rerun \"RuntimeError: Failed validating workflow\""
           - os: ubuntu-arm
@@ -85,25 +82,6 @@ jobs:
           path: junit-xml
           retention-days: 14
 
-      # Confirm protos are already generated properly with older protobuf
-      # library and run test with that older version. We must downgrade protobuf
-      # so we can generate 3.x and 4.x compatible API. We have to use older
-      # Python to run this check because the grpcio-tools version we use
-      # is <= 3.10.
-      - name: Check generated protos and test protobuf 3.x
-        if: ${{ matrix.protoCheckTarget }}
-        env:
-          TEMPORAL_TEST_PROTO3: 1
-        run: |
-          uv remove google-adk --optional google-adk
-          uv add --python 3.10 "protobuf<4"
-          uv sync --all-extras
-          poe build-develop
-          poe gen-protos
-          [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
-          poe test -s --ignore=tests/contrib/google_adk_agents/
-        timeout-minutes: 10
-
       # Do docs stuff (only on one host)
       - name: Build API docs
         if: ${{ matrix.docsTarget }}
@@ -122,6 +100,41 @@ jobs:
         run: |
           npx doctoc README.md
           [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
+
+  check-protos:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: temporalio/bridge -> target
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: arduino/setup-protoc@v3
+        with:
+          # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
+          version: "23.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv tool install poethepoet
+      - run: uv remove google-adk --optional google-adk
+      - run: uv add --python 3.10 "protobuf<4"
+      - run: uv sync --all-extras
+      - run: poe build-develop
+      - run: poe gen-protos
+      - name: Check generation unchanged
+        run: |
+          [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
+      - name: Test with protobuf 3.x
+        run: poe test -s --ignore=tests/contrib/google_adk_agents/
+        env:
+          TEMPORAL_TEST_PROTO3: 1
+
   test-latest-deps:
     timeout-minutes: 30
     runs-on: ubuntu-latest
