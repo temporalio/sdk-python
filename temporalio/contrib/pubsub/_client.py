@@ -162,20 +162,8 @@ class PubSubClient:
     async def _flush(self) -> None:
         """Send buffered or pending messages to the workflow via signal.
 
-        Implements the TLA+-verified dedup algorithm (see verification/PROOF.md):
-
-        1. If there is a pending batch from a prior failure, retry it with
-           the SAME sequence number. Check max_retry_duration first.
-        2. Otherwise, if the buffer is non-empty, swap it into pending with
-           a new sequence number.
-        3. On success: advance confirmed sequence, clear pending.
-        4. On failure: pending stays for retry on the next call.
-
-        Correspondence to TLA+ spec (PubSubDedup.tla):
-            _buffer      ↔ buffer
-            _pending     ↔ pending
-            _pending_seq ↔ pending_seq
-            _sequence    ↔ confirmed_seq
+        On failure, the pending batch and sequence are kept for retry.
+        Only advances the confirmed sequence on success.
         """
         async with self._flush_lock:
             if self._pending is not None:

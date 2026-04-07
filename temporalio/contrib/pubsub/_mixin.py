@@ -63,8 +63,7 @@ class PubSubMixin:
 
         Prunes publisher dedup entries older than ``publisher_ttl`` seconds.
         The TTL must exceed the ``max_retry_duration`` of any client that
-        may still be retrying a failed flush. See verification/PROOF.md
-        for the formal safety argument.
+        may still be retrying a failed flush.
 
         Args:
             publisher_ttl: Seconds after which a publisher's dedup entry
@@ -147,7 +146,6 @@ class PubSubMixin:
         and the sequence is <= the last seen sequence for that publisher,
         the entire batch is dropped as a duplicate. Batches are atomic:
         the dedup decision applies to the whole batch, not individual items.
-        See verification/PROOF.md for the formal correctness proof.
         """
         self._check_initialized()
         if input.publisher_id:
