@@ -187,9 +187,16 @@ async def worker(
 @pytest.hookimpl(hookwrapper=True, trylast=True)
 def pytest_cmdline_main(config):  # type: ignore[reportMissingParameterType, reportUnusedParameter]
     result = yield
-    if result.get_result() == 0:
+    exit_code = result.get_result()
+    numprocesses = getattr(config.option, "numprocesses", None)
+    running_with_xdist = hasattr(config, "workerinput") or numprocesses not in (
+        None,
+        0,
+        "0",
+    )
+    if exit_code == 0 and not running_with_xdist:
         os._exit(0)
-    return result.get_result()
+    return exit_code
 
 
 CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50

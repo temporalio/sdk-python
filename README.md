@@ -2066,6 +2066,13 @@ To execute tests:
 poe test
 ```
 
+`poe test` spreads tests across multiple worker processes by default. If you
+need a serial run for debugging, invoke pytest directly:
+
+```bash
+uv run pytest
+```
+
 This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
 server, pass `--workflow-environment time-skipping`. To run against the `default` namespace of an already-running
 server, pass the `host:port` to `--workflow-environment`. Can also use regular pytest arguments. For example, here's how

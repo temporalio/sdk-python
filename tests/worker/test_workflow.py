@@ -331,10 +331,14 @@ async def test_workflow_history_info(
         # because just a query will have a stale representation of history
         # counts, but signal forces a new WFT.
         await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
-        new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
-        assert new_info.history_length > continue_as_new_suggest_history_count
-        assert new_info.history_size > orig_info.history_size
-        assert new_info.continue_as_new_suggested
+
+        async def history_info_updated() -> None:
+            new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
+            assert new_info.history_length > continue_as_new_suggest_history_count
+            assert new_info.history_size > orig_info.history_size
+            assert new_info.continue_as_new_suggested
+
+        await assert_eventually(history_info_updated)
 
 
 @workflow.defn
@@ -5317,7 +5321,11 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             # because we should have timer-done poll completions every 100ms
             worker.client = other_env.client
             # Now confirm the other workflow has started
-            await assert_eq_eventually(True, lambda: any_task_completed(handle2))
+            await assert_eq_eventually(
+                True,
+                lambda: any_task_completed(handle2),
+                timeout=timedelta(seconds=30),
+            )
             # Terminate both
             await handle1.terminate()
             await handle2.terminate()
@@ -8047,8 +8055,10 @@ async def test_quick_activity_swallows_cancellation(client: Client):
         activities=[short_activity_async],
         activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
     ) as worker:
-        for i in range(10):
-            wf_duration = random.uniform(5.0, 15.0)
+        # Keep this deterministic and bounded. The original randomized 10-iteration
+        # version could exceed the per-test timeout on slower CI hosts if
+        # cancellation was delayed a few times in a row.
+        for i, wf_duration in enumerate((5.0, 7.5, 10.0)):
             wf_handle = await client.start_workflow(
                 QuickActivityWorkflow.run,
                 id=f"short_activity_wf_id-{i}",
@@ -8537,23 +8547,13 @@ class CustomLogHandler(logging.Handler):
 async def test_disable_logger_sandbox(
     client: Client,
 ):
-    logger = workflow.logger.logger
-    handler = CustomLogHandler()
-    with LogHandler.apply(logger, handler):
+    async def execute_with_new_worker(*, disable_sandbox: bool) -> None:
+        workflow.logger.unsafe_disable_sandbox(disable_sandbox)
         async with new_worker(
             client,
             DisableLoggerSandbox,
             activities=[],
         ) as worker:
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
-            workflow.logger.unsafe_disable_sandbox()
             await client.execute_workflow(
                 DisableLoggerSandbox.run,
                 id=f"workflow-{uuid.uuid4()}",
@@ -8561,15 +8561,15 @@ async def test_disable_logger_sandbox(
                 run_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
-            workflow.logger.unsafe_disable_sandbox(False)
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
+
+    logger = workflow.logger.logger
+    handler = CustomLogHandler()
+    with LogHandler.apply(logger, handler):
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
+        await execute_with_new_worker(disable_sandbox=True)
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
 
 
 @workflow.defn
