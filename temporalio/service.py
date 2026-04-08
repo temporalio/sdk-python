@@ -24,7 +24,7 @@ import temporalio.exceptions
 import temporalio.runtime
 from temporalio.bridge.client import RPCError as BridgeRPCError
 
-__version__ = "1.24.0"
+__version__ = "1.25.0"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
