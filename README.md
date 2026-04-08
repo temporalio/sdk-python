@@ -1934,7 +1934,6 @@ To build the SDK from source for use as a dependency, the following prerequisite
 * [Rust](https://www.rust-lang.org/)
 * [Protobuf Compiler](https://protobuf.dev/)
 * [Node.js](https://nodejs.org/)
-* [`pnpm`](https://pnpm.io/)
 
 Use `uv` to install `poe`:
 
@@ -2079,7 +2078,8 @@ tests.
 The local build and lint flows also regenerate Temporal system Nexus models. By default this pulls
 in `nexus-rpc-gen@0.1.0-alpha.4` via `npx`. To use an existing checkout instead, set
 `TEMPORAL_NEXUS_RPC_GEN_DIR` to the `nexus-rpc-gen` repo root or its `src` directory before
-running `poe build-develop`, `poe lint`, or `poe gen-protos`.
+running `poe build-develop`, `poe lint`, or `poe gen-protos`. The local checkout override path
+also requires [`pnpm`](https://pnpm.io/) to be installed.
 
 ### Style
 
