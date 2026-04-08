@@ -279,6 +279,106 @@ async def test_single_agent(client: Client, use_local_model: bool):
             assert result.content.parts[0].text == "warm and sunny"
 
 
+class SurrogateModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(text="thinking \ud83d\ude00 about this", thought=True),
+                        Part(text="answer is \ud800 done"),
+                    ],
+                )
+            ),
+        ]
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["surrogate_model"]
+
+
+@pytest.mark.asyncio
+async def test_invoke_model_normalizes_surrogates():
+    import pydantic_core
+
+    from temporalio.contrib.google_adk_agents._model import invoke_model
+    from temporalio.testing import ActivityEnvironment
+
+    LLMRegistry.register(SurrogateModel)
+    request = LlmRequest(model="surrogate_model", contents=[])
+    env = ActivityEnvironment()
+    responses = await env.run(invoke_model, request)
+    assert responses[0].content is not None
+    assert responses[0].content.parts is not None
+    assert responses[0].content.parts[0].text == "thinking \U0001f600 about this"
+    assert responses[0].content.parts[1].text == "answer is \ufffd done"
+    # Verify pydantic_core.to_json() succeeds without crashing
+    pydantic_core.to_json(responses[0].content.parts[0].text)
+    pydantic_core.to_json(responses[0].content.parts[1].text)
+
+
+@workflow.defn
+class SurrogateAgent:
+    @workflow.run
+    async def run(self, model_name: str) -> Event | None:
+        agent = Agent(
+            name="surrogate_agent",
+            model=TemporalModel(model_name),
+        )
+
+        runner = InMemoryRunner(
+            agent=agent,
+            app_name="surrogate_app",
+        )
+
+        session = await runner.session_service.create_session(
+            app_name="surrogate_app", user_id="test"
+        )
+
+        last_event = None
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text="test")]),
+            )
+        ) as agen:
+            async for event in agen:
+                last_event = event
+
+        return last_event
+
+
+@pytest.mark.asyncio
+async def test_surrogate_model(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+
+    async with Worker(
+        client,
+        task_queue="adk-task-queue-surrogate",
+        workflows=[SurrogateAgent],
+        max_cached_workflows=0,
+    ):
+        LLMRegistry.register(SurrogateModel)
+
+        handle = await client.start_workflow(
+            SurrogateAgent.run,
+            args=["surrogate_model"],
+            id=f"surrogate-agent-workflow-{uuid.uuid4()}",
+            task_queue="adk-task-queue-surrogate",
+            execution_timeout=timedelta(seconds=60),
+        )
+        result = await handle.result()
+        assert result is not None
+        assert result.content is not None
+        assert result.content.parts is not None
+        assert result.content.parts[0].text == "thinking \U0001f600 about this"
+        assert result.content.parts[1].text == "answer is \ufffd done"
+
+
 class ResearchModel(TestModel):
     def responses(self) -> list[LlmResponse]:
         return [

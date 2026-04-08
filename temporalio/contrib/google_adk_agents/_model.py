@@ -29,10 +29,20 @@ async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
     if not llm:
         raise ValueError(f"Failed to create LLM for model: {llm_request.model}")
 
-    return [
+    responses = [
         response
         async for response in llm.generate_content_async(llm_request=llm_request)
     ]
+
+    for response in responses:
+        if response.content and response.content.parts:
+            for part in response.content.parts:
+                if part.text:
+                    part.text = part.text.encode("utf-16", "surrogatepass").decode(
+                        "utf-16", "replace"
+                    )
+
+    return responses
 
 
 class TemporalModel(BaseLlm):
