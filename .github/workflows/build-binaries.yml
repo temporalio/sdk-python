@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+      - build_binaries_otel
 permissions:
   contents: read
 
@@ -67,7 +68,7 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             bindir=Scripts
           fi
-          ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic
+          ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk
           ./.venv/$bindir/pip install --prefer-binary ../dist/*.whl
           ./.venv/$bindir/python -m pytest -s tests/worker/test_workflow.py -k test_workflow_hello
 

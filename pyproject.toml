@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.24.0"
+version = "1.25.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -30,6 +30,7 @@ opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.3,<0.7", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=1.27.0,<2"]
+langsmith = ["langsmith>=0.7.0,<0.8"]
 lambda-worker-otel = [
   "opentelemetry-api>=1.11.1,<2",
   "opentelemetry-sdk>=1.11.1,<2",
@@ -77,6 +78,7 @@ dev = [
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
+  "langsmith>=0.7.0,<0.8",
   "setuptools<82",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
