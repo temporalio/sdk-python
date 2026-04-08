@@ -309,13 +309,19 @@ async def test_invoke_model_normalizes_surrogates():
     request = LlmRequest(model="surrogate_model", contents=[])
     env = ActivityEnvironment()
     responses = await env.run(invoke_model, request)
-    assert responses[0].content is not None
-    assert responses[0].content.parts is not None
-    assert responses[0].content.parts[0].text == "thinking \U0001f600 about this"
-    assert responses[0].content.parts[1].text == "answer is \ufffd done"
-    # Verify pydantic_core.to_json() succeeds without crashing
-    pydantic_core.to_json(responses[0].content.parts[0].text)
-    pydantic_core.to_json(responses[0].content.parts[1].text)
+
+    expected = LlmResponse(
+        content=Content(
+            role="model",
+            parts=[
+                Part(text="thinking \U0001f600 about this", thought=True),
+                Part(text="answer is \ufffd done"),
+            ],
+        )
+    )
+    assert responses[0] == expected
+    # Verify pydantic_core.to_json() succeeds (this was the original crash)
+    pydantic_core.to_json(responses[0])
 
 
 @workflow.defn
@@ -375,8 +381,11 @@ async def test_surrogate_model(client: Client):
         assert result is not None
         assert result.content is not None
         assert result.content.parts is not None
-        assert result.content.parts[0].text == "thinking \U0001f600 about this"
-        assert result.content.parts[1].text == "answer is \ufffd done"
+        expected_parts = [
+            Part(text="thinking \U0001f600 about this", thought=True),
+            Part(text="answer is \ufffd done"),
+        ]
+        assert list(result.content.parts) == expected_parts
 
 
 class ResearchModel(TestModel):
