@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -202,9 +201,6 @@ class EventType(Enum):
         "EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED"
     )
     EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT = "EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT"
-    EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED = (
-        "EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED"
-    )
     EVENT_TYPE_WORKFLOW_EXECUTION_UNPAUSED = "EVENT_TYPE_WORKFLOW_EXECUTION_UNPAUSED"
     EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED = (
         "EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED"
@@ -421,42 +417,6 @@ class TaskQueue(BaseModel):
     normal_name: Optional[str] = Field(None, alias="normalName")
     """Iff kind == TASK_QUEUE_KIND_STICKY, then this field contains the name of
     the normal task queue that the sticky worker is running on.
-    """
-
-
-class TimeSkippingConfig(BaseModel):
-    """Time-skipping configuration. If not set, time skipping is disabled.
-
-    Configuration for time skipping during a workflow execution.
-    When enabled, virtual time advances automatically whenever there is no in-flight work.
-    In-flight work includes activities, child workflows, Nexus operations, signal/cancel
-    external workflow operations,
-    and possibly other features added in the future.
-    User timers are not classified as in-flight work and will be skipped over.
-    When time advances, it skips to the earlier of the next user timer or the configured
-    bound, if either exists.
-    """
-
-    disable_propagation: Optional[bool] = Field(None, alias="disablePropagation")
-    """If set, the enabled field is not propagated to transitively related workflows."""
-
-    enabled: Optional[bool] = None
-    """Enables or disables time skipping for this workflow execution.
-    By default, this field is propagated to transitively related workflows (child
-    workflows/start-as-new/reset)
-    at the time they are started.
-    Changes made after a transitively related workflow has started are not propagated.
-    """
-    max_elapsed_duration: Optional[str] = Field(None, alias="maxElapsedDuration")
-    """Maximum elapsed time since time skipping was enabled.
-    This includes both skipped time and real time elapsing.
-    """
-    max_skipped_duration: Optional[str] = Field(None, alias="maxSkippedDuration")
-    """Maximum total virtual time that can be skipped."""
-
-    max_target_time: Optional[datetime] = Field(None, alias="maxTargetTime")
-    """Absolute virtual timestamp at which time skipping is disabled.
-    Time skipping will not advance beyond this point.
     """
 
 
@@ -717,11 +677,6 @@ class WorkflowServiceSignalWithStartWorkflowExecutionInput(BaseModel):
 
     task_queue: Optional[TaskQueue] = Field(None, alias="taskQueue")
     """The task queue to start this workflow on, if it will be started"""
-
-    time_skipping_config: Optional[TimeSkippingConfig] = Field(
-        None, alias="timeSkippingConfig"
-    )
-    """Time-skipping configuration. If not set, time skipping is disabled."""
 
     user_metadata: Optional[UserMetadata] = Field(None, alias="userMetadata")
     """Metadata on the workflow if it is started. This is carried over to the

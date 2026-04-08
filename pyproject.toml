@@ -68,11 +68,11 @@ dev = [
 
 [tool.poe.tasks]
 build-develop = [
-  { ref = "gen-nexus-system-test-models" },
+  { ref = "gen-nexus-system-models" },
   { cmd = "uv run maturin develop --uv" },
 ]
 build-develop-with-release = [
-  { ref = "gen-nexus-system-test-models" },
+  { ref = "gen-nexus-system-models" },
   { cmd = "uv run maturin develop --release --uv" },
 ]
 format = [
@@ -85,7 +85,7 @@ gen-protos = [
   { cmd = "uv run scripts/gen_protos.py" },
   { cmd = "uv run scripts/gen_payload_visitor.py" },
   { cmd = "uv run scripts/gen_bridge_client.py" },
-  { ref = "gen-nexus-system-test-models" },
+  { ref = "gen-nexus-system-models" },
   { ref = "format" },
 ]
 gen-protos-docker = [
@@ -105,12 +105,12 @@ bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "uv run pydocstyle --ignore-decorators=overload"
 lint-types = [
-  { ref = "gen-nexus-system-test-models" },
+  { ref = "gen-nexus-system-models" },
   { cmd = "uv run pyright" },
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ." },
   { cmd = "uv run basedpyright" },
 ]
-gen-nexus-system-test-models = "uv run scripts/gen_nexus_system_test_models.py"
+gen-nexus-system-models = "uv run scripts/gen_nexus_system_models.py"
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
 

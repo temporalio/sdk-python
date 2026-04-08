@@ -1,0 +1,9 @@
+nexusrpc: 1.0.0
+services:
+  WorkflowService:
+    operations:
+      SignalWithStartWorkflowExecution:
+        input:
+          $ref: ../../bridge/sdk-core/crates/common/protos/api_upstream/openapi/openapiv3.yaml#/components/schemas/SignalWithStartWorkflowExecutionRequest
+        output:
+          $ref: ../../bridge/sdk-core/crates/common/protos/api_upstream/openapi/openapiv3.yaml#/components/schemas/SignalWithStartWorkflowExecutionResponse
