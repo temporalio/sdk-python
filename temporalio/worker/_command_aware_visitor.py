@@ -31,6 +31,8 @@ class CommandInfo:
 
     command_type: CommandType.ValueType
     command_seq: int
+    nexus_service: str | None = None
+    nexus_operation: str | None = None
 
 
 current_command_info: contextvars.ContextVar[CommandInfo | None] = (
@@ -81,7 +83,12 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
     async def _visit_coresdk_workflow_commands_ScheduleNexusOperation(
         self, fs: VisitorFunctions, o: ScheduleNexusOperation
     ) -> None:
-        with current_command(CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq):
+        with current_command(
+            CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION,
+            o.seq,
+            nexus_service=o.service,
+            nexus_operation=o.operation,
+        ):
             await super()._visit_coresdk_workflow_commands_ScheduleNexusOperation(fs, o)
 
     # Workflow activation jobs with payloads
@@ -150,11 +157,20 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
 
 @contextmanager
 def current_command(
-    command_type: CommandType.ValueType, command_seq: int
+    command_type: CommandType.ValueType,
+    command_seq: int,
+    *,
+    nexus_service: str | None = None,
+    nexus_operation: str | None = None,
 ) -> Iterator[None]:
     """Context manager for setting command info."""
     token = current_command_info.set(
-        CommandInfo(command_type=command_type, command_seq=command_seq)
+        CommandInfo(
+            command_type=command_type,
+            command_seq=command_seq,
+            nexus_service=nexus_service,
+            nexus_operation=nexus_operation,
+        )
     )
     try:
         yield
