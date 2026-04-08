@@ -193,7 +193,6 @@ class PubSubMixin:
         await workflow.wait_condition(
             lambda: len(self._pubsub_log) > log_offset
             or self._pubsub_draining,
-            timeout=input.timeout,
         )
         all_new = self._pubsub_log[log_offset:]
         next_offset = self._pubsub_base_offset + len(self._pubsub_log)

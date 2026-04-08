@@ -61,7 +61,6 @@ class PollInput:
 
     topics: list[str] = field(default_factory=list)
     from_offset: int = 0
-    timeout: float = 300.0
 
 
 @dataclass

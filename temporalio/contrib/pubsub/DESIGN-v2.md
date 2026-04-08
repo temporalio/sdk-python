@@ -160,7 +160,6 @@ class PublishInput:
 class PollInput:
     topics: list[str]          # Filter (empty = all)
     from_offset: int = 0       # Global offset to resume from
-    timeout: float = 300.0     # Server-side wait timeout
 
 @dataclass
 class PollResult:
@@ -320,6 +319,30 @@ subscriber has fallen behind truncation — the poll raises an error.
 Truncation is deferred to a future iteration. Until then, the log grows
 without bound within a run and is compacted only through continue-as-new.
 
+### 11. No timeout on long-poll
+
+`wait_condition` in the poll handler has no timeout. The poll blocks
+indefinitely until one of three things happens:
+
+1. **New data arrives** — the `len(log) > offset` condition fires.
+2. **Draining for continue-as-new** — `drain_pubsub()` sets the flag.
+3. **Client disconnects** — the BFF drops the SSE connection, cancels the
+   update RPC, and the handler becomes an inert coroutine cleaned up at
+   the next drain cycle.
+
+A previous design used a 5-minute timeout as a defensive "don't block
+forever" mechanism. This was removed because:
+
+- **It adds unnecessary history events.** Every poll creates a `TimerStarted`
+  event. For a streaming session doing hundreds of polls, this doubles the
+  history event count and accelerates approach to the ~50K event CAN threshold.
+- **The drain mechanism already handles cleanup.** `drain_pubsub()` unblocks
+  all waiting polls, and the update validator rejects new polls, so
+  `all_handlers_finished()` converges without timers.
+- **Zombie polls are harmless.** If a client crashes without cancelling, its
+  poll handler is just an in-memory coroutine waiting on a condition. It
+  consumes no Temporal actions and is cleaned up at the next CAN cycle.
+
 ## Exactly-Once Publish Delivery
 
 External publishers get exactly-once delivery through publisher ID + sequence
@@ -445,8 +468,8 @@ snapshots them.
 
 ### Draining
 
-A long-poll `__pubsub_poll` can block for up to 300 seconds. To allow CAN to
-proceed, draining uses two mechanisms:
+A long-poll `__pubsub_poll` blocks indefinitely until new data arrives. To
+allow CAN to proceed, draining uses two mechanisms:
 
 1. **`drain_pubsub()`** sets a flag that unblocks all waiting poll handlers
    (the `or self._pubsub_draining` clause in `wait_condition`).
