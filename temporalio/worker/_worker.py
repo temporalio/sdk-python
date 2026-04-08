@@ -781,6 +781,7 @@ class Worker:
         if self._started:
             raise RuntimeError("Already started")
         self._started = True
+        logger.error("SHUTDOWN-DEBUG: worker started (instrumented build)")
 
         # Create a task that raises when a shutdown is requested
         async def raise_on_shutdown():
