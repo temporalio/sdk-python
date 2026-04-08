@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
@@ -154,7 +155,28 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         else:
             summary = None
 
-        if self.model_params.use_local_activity:
+        if self.model_params.enable_streaming:
+            if self.model_params.use_local_activity:
+                raise ValueError(
+                    "Streaming is incompatible with local activities "
+                    "(local activities do not support heartbeats)."
+                )
+            return await workflow.execute_activity_method(
+                ModelActivity.invoke_model_activity_streaming,
+                activity_input,
+                summary=summary,
+                task_queue=self.model_params.task_queue,
+                schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+                schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+                start_to_close_timeout=self.model_params.start_to_close_timeout,
+                heartbeat_timeout=self.model_params.heartbeat_timeout
+                or timedelta(seconds=30),
+                retry_policy=self.model_params.retry_policy,
+                cancellation_type=self.model_params.cancellation_type,
+                versioning_intent=self.model_params.versioning_intent,
+                priority=self.model_params.priority,
+            )
+        elif self.model_params.use_local_activity:
             return await workflow.execute_local_activity_method(
                 ModelActivity.invoke_model_activity,
                 activity_input,

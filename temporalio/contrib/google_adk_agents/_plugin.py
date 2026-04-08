@@ -8,7 +8,10 @@ from contextlib import asynccontextmanager
 
 from temporalio import workflow
 from temporalio.contrib.google_adk_agents._mcp import TemporalMcpToolSetProvider
-from temporalio.contrib.google_adk_agents._model import invoke_model
+from temporalio.contrib.google_adk_agents._model import (
+    invoke_model,
+    invoke_model_streaming,
+)
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter as _DefaultPydanticPayloadConverter,
 )
@@ -94,7 +97,7 @@ class GoogleAdkPlugin(SimplePlugin):
                 )
             return runner
 
-        new_activities = [invoke_model]
+        new_activities = [invoke_model, invoke_model_streaming]
         if toolset_providers is not None:
             for toolset_provider in toolset_providers:
                 new_activities.extend(toolset_provider._get_activities())

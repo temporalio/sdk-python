@@ -68,3 +68,9 @@ class ModelActivityParameters:
 
     use_local_activity: bool = False
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
+
+    enable_streaming: bool = False
+    """When True, the model activity uses the streaming LLM endpoint and
+    publishes token events via PubSubClient. The workflow is unaffected --
+    it still receives a complete ModelResponse. Incompatible with
+    use_local_activity (local activities do not support heartbeats)."""
