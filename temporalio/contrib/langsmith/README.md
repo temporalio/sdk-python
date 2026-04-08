@@ -7,7 +7,7 @@ This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows yo
 Install Temporal with the LangSmith feature enabled:
 
 ```bash
-pip install temporalio[langsmith]
+uv add temporalio[langsmith]
 ```
 
 Register the Plugin on your Temporal Client. You need it on both the Client (starter) side and the Workers:
