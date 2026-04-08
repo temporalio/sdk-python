@@ -5,6 +5,7 @@ from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 
+import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.workflow import ActivityConfig
 
@@ -67,6 +68,14 @@ class TemporalModel(BaseLlm):
         Yields:
             The responses from the model.
         """
+        # If executed outside a workflow, like when doing local adk runs, use the model directly
+        if not temporalio.workflow.in_workflow():
+            async for response in LLMRegistry.new_llm(
+                self._model_name
+            ).generate_content_async(llm_request, stream=stream):
+                yield response
+            return
+
         responses = await workflow.execute_activity(
             invoke_model,
             args=[llm_request],

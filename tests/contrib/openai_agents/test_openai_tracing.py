@@ -265,19 +265,16 @@ def print_otel_spans(spans: tuple[ReadableSpan, ...]):
 def set_test_tracer_provider() -> InMemorySpanExporter:
     exporter = InMemorySpanExporter()
 
-    # Reset global so tests don't conflict
-    from opentelemetry.util._once import Once
-
-    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
-    opentelemetry.trace._TRACER_PROVIDER = None
-
     provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
     return exporter
 
 
-async def test_external_trace_to_workflow_spans(client: Client):
+async def test_external_trace_to_workflow_spans(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
     """Test: External trace -> workflow spans (with worker restart)."""
     exporter = set_test_tracer_provider()
     workflow_id = None
@@ -364,7 +361,10 @@ async def test_external_trace_to_workflow_spans(client: Client):
     ), f"All spans should have unique IDs, got: {span_ids}"
 
 
-async def test_external_trace_and_span_to_workflow_spans(client: Client):
+async def test_external_trace_and_span_to_workflow_spans(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
     """Test: External trace + span -> workflow spans (with worker restart)."""
     exporter = set_test_tracer_provider()
     workflow_id = None
@@ -461,7 +461,10 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
     ), f"All spans should have unique IDs, got: {span_ids}"
 
 
-async def test_workflow_only_trace_to_spans(client: Client):
+async def test_workflow_only_trace_to_spans(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
     """Test: Workflow-only trace -> spans (with worker restart)."""
     exporter = set_test_tracer_provider()
     workflow_id = None
@@ -551,7 +554,10 @@ class SimpleWorkflow:
                 return "done"
 
 
-async def test_custom_span_without_trace_context(client: Client):
+async def test_custom_span_without_trace_context(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
     """Test that custom_span() without a trace context emits no spans.
 
     This validates our hypothesis about why the main test fails:
@@ -591,7 +597,10 @@ async def test_custom_span_without_trace_context(client: Client):
     ), f"Expected no spans without trace context, but found: {[s.name for s in spans]}"
 
 
-async def test_otel_tracing_in_runner(client: Client):
+async def test_otel_tracing_in_runner(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
     """Test the tracing when executing an actual OpenAI Runner."""
     exporter = set_test_tracer_provider()
 
@@ -750,7 +759,10 @@ class OtelSpanWorkflow:
         self._proceed = True
 
 
-async def test_sdk_trace_to_otel_span_parenting(client: Client):
+async def test_sdk_trace_to_otel_span_parenting(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
     """Test that OTEL spans started in workflow are properly parented to client SDK trace."""
     exporter = set_test_tracer_provider()
     workflow_id = None

@@ -17,6 +17,7 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
     ResolveSignalExternalWorkflow,
 )
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
+    CompleteWorkflowExecution,
     ScheduleActivity,
     ScheduleLocalActivity,
     ScheduleNexusOperation,
@@ -67,6 +68,14 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
         )
 
     # Workflow commands with payloads
+    async def _visit_coresdk_workflow_commands_CompleteWorkflowExecution(
+        self, fs: VisitorFunctions, o: CompleteWorkflowExecution
+    ) -> None:
+        with current_command(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, 0):
+            await super()._visit_coresdk_workflow_commands_CompleteWorkflowExecution(
+                fs, o
+            )
+
     async def _visit_coresdk_workflow_commands_ScheduleActivity(
         self, fs: VisitorFunctions, o: ScheduleActivity
     ) -> None:

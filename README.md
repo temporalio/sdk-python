@@ -503,7 +503,7 @@ Some things to note about external storage:
 * Only payloads that meet or exceed `ExternalStorage.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
 * External storage applies transparently to all payloads, whether they are workflow inputs/outputs, activity inputs/outputs, signal inputs, query outputs, update inputs/outputs, or failure details.
 * The `DataConverter`'s `payload_codec` (if configured) is applied to the payload *before* it is handed to the storage driver, so the driver always stores encoded bytes. The reference payload written to workflow history is not encoded by the `DataConverter` codec.
-* Setting `ExternalStorage.payload_size_threshold` to `None` causes every payload to be considered for external storage regardless of size.
+* Setting `ExternalStorage.payload_size_threshold` to `0` causes every payload to be considered for external storage regardless of size.
 
 ###### Driver Selection
 
@@ -533,11 +533,11 @@ def feature_flag_is_on(workflow_id: str | None) -> bool:
 def feature_flag_selector(
     context: temporalio.converter.StorageDriverStoreContext, _payload: Payload
 ) -> temporalio.converter.StorageDriver | None:
-    workflow_id = None
-    if isinstance(context.serialization_context, temporalio.converter.WorkflowSerializationContext):
-        workflow_id = context.serialization_context.workflow_id
-    elif isinstance(context.serialization_context, temporalio.converter.ActivitySerializationContext):
-        workflow_id = context.serialization_context.workflow_id
+    workflow_id = (
+        context.target.id
+        if isinstance(context.target, temporalio.converter.StorageDriverWorkflowInfo)
+        else None
+    )
     return my_driver if feature_flag_is_on(workflow_id) else None
 
 options = ExternalStorage(
@@ -578,7 +578,7 @@ class MyDriver(StorageDriver):
         claims = []
         for payload in payloads:
             key = await my_storage.put(payload.SerializeToString())
-            claims.append(StorageDriverClaim(data={"key": key}))
+            claims.append(StorageDriverClaim(claim_data={"key": key}))
         return claims
 
     async def retrieve(
@@ -586,7 +586,7 @@ class MyDriver(StorageDriver):
     ) -> list[Payload]:
         payloads = []
         for claim in claims:
-            data = await my_storage.get(claim.data["key"])
+            data = await my_storage.get(claim.claim_data["key"])
             p = Payload()
             p.ParseFromString(data)
             payloads.append(p)
@@ -597,7 +597,7 @@ Some things to note about implementing a custom driver:
 
 * `StorageDriver.name()` must return a string that is unique among all drivers in `ExternalStorage.drivers`. This name is embedded in the reference payload stored in workflow history and used to look up the correct driver during retrieval — changing it after payloads have been stored will break retrieval.
 * `StorageDriver.type()` is automatically implemented to return the name of the class. This can be overridden in subclasses but must remain consistent across all instances of the subclass.
-* Implement `temporalio.converter.WithSerializationContext` on your driver to receive workflow or activity context (namespace, workflow ID, activity ID, etc.) at serialization time.
+* Use `StorageDriverStoreContext.target` inside `store()` when you need workflow or activity identity (namespace, workflow ID, activity ID, etc.) to choose where or how to store payloads.
 
 ### Workers
 
@@ -828,7 +828,6 @@ Some things to note about the above code:
   capabilities are needed.
 * Local activities work very similarly except the functions are `workflow.start_local_activity()` and
   `workflow.execute_local_activity()`
-  * ⚠️Local activities are currently experimental
 * Activities can be methods of a class. Invokers should use `workflow.start_activity_method()`,
   `workflow.execute_activity_method()`, `workflow.start_local_activity_method()`, and
   `workflow.execute_local_activity_method()` instead.
@@ -2064,6 +2063,13 @@ To execute tests:
 
 ```bash
 poe test
+```
+
+`poe test` spreads tests across multiple worker processes by default. If you
+need a serial run for debugging, invoke pytest directly:
+
+```bash
+uv run pytest
 ```
 
 This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test

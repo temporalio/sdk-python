@@ -90,7 +90,9 @@ class TemporalMcpToolSetProvider:
     within Temporal workflows.
     """
 
-    def __init__(self, name: str, toolset_factory: Callable[[Any | None], McpToolset]):
+    def __init__(
+        self, name: str, toolset_factory: Callable[[Any | None], McpToolset]
+    ) -> None:
         """Initializes the toolset provider.
 
         Args:
@@ -215,6 +217,7 @@ class TemporalMcpToolSet(BaseToolset):
         name: str,
         config: ActivityConfig | None = None,
         factory_argument: Any | None = None,
+        not_in_workflow_toolset: Callable[[Any | None], McpToolset] | None = None,
     ):
         """Initializes the Temporal MCP toolset.
 
@@ -222,6 +225,12 @@ class TemporalMcpToolSet(BaseToolset):
             name: Name of the toolset (used for activity naming).
             config: Optional activity configuration.
             factory_argument: Optional argument passed to toolset factory.
+            not_in_workflow_toolset: Optional factory that returns the
+                underlying ``McpToolset`` to use when this wrapper executes
+                outside ``workflow.in_workflow()``, such as local ADK runs.
+                This is not needed during normal workflow execution, but
+                ``get_tools()`` raises ``ValueError`` outside a workflow if it
+                is omitted.
         """
         super().__init__()
         self._name = name
@@ -229,6 +238,7 @@ class TemporalMcpToolSet(BaseToolset):
         self._config = config or ActivityConfig(
             start_to_close_timeout=timedelta(minutes=1)
         )
+        self._not_in_workflow_toolset = not_in_workflow_toolset
 
     async def get_tools(
         self, readonly_context: ReadonlyContext | None = None
@@ -241,6 +251,17 @@ class TemporalMcpToolSet(BaseToolset):
         Returns:
             List of available tools wrapped as Temporal activities.
         """
+        # If executed outside a workflow, like when doing local adk runs, use the mcp server directly
+        if not workflow.in_workflow():
+            if self._not_in_workflow_toolset is None:
+                raise ValueError(
+                    "Attempted to use TemporalMcpToolSet outside a workflow, but "
+                    "no not_in_workflow_toolset was provided. Either use "
+                    "McpToolSet directly or pass a factory that returns the "
+                    "underlying McpToolset for non-workflow execution."
+                )
+            return await self._not_in_workflow_toolset(None).get_tools(readonly_context)
+
         tool_results: list[_ToolResult] = await workflow.execute_activity(
             self._name + "-list-tools",
             _GetToolsArguments(self._factory_argument),

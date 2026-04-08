@@ -56,6 +56,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         WORKFLOW_PAUSE_FIELD_NUMBER: builtins.int
         STANDALONE_ACTIVITIES_FIELD_NUMBER: builtins.int
         WORKER_POLL_COMPLETE_ON_SHUTDOWN_FIELD_NUMBER: builtins.int
+        POLLER_AUTOSCALING_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -77,6 +78,8 @@ class NamespaceInfo(google.protobuf.message.Message):
         an empty response. When this flag is true, workers should allow polls to return gracefully
         rather than terminating any open polls on shutdown.
         """
+        poller_autoscaling: builtins.bool
+        """True if the namespace supports poller autoscaling"""
         def __init__(
             self,
             *,
@@ -88,6 +91,7 @@ class NamespaceInfo(google.protobuf.message.Message):
             workflow_pause: builtins.bool = ...,
             standalone_activities: builtins.bool = ...,
             worker_poll_complete_on_shutdown: builtins.bool = ...,
+            poller_autoscaling: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -96,6 +100,8 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"async_update",
                 "eager_workflow_start",
                 b"eager_workflow_start",
+                "poller_autoscaling",
+                b"poller_autoscaling",
                 "reported_problems_search_attribute",
                 b"reported_problems_search_attribute",
                 "standalone_activities",

@@ -4,8 +4,10 @@ import os
 import sys
 from collections.abc import AsyncGenerator, Iterator
 
+import opentelemetry.trace
 import pytest
 import pytest_asyncio
+from opentelemetry.util._once import Once
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
@@ -185,9 +187,16 @@ async def worker(
 @pytest.hookimpl(hookwrapper=True, trylast=True)
 def pytest_cmdline_main(config):  # type: ignore[reportMissingParameterType, reportUnusedParameter]
     result = yield
-    if result.get_result() == 0:
+    exit_code = result.get_result()
+    numprocesses = getattr(config.option, "numprocesses", None)
+    running_with_xdist = hasattr(config, "workerinput") or numprocesses not in (
+        None,
+        0,
+        "0",
+    )
+    if exit_code == 0 and not running_with_xdist:
         os._exit(0)
-    return result.get_result()
+    return exit_code
 
 
 CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
@@ -196,3 +205,13 @@ CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
 @pytest.fixture
 def continue_as_new_suggest_history_count() -> int:
     return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT
+
+
+@pytest.fixture
+def reset_otel_tracer_provider():
+    """Reset global OpenTelemetry tracer provider state around tests."""
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.trace._TRACER_PROVIDER = None
+    yield
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.trace._TRACER_PROVIDER = None

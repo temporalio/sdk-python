@@ -13,7 +13,6 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 from opentelemetry.trace import (
     get_tracer,
 )
-from opentelemetry.util._once import Once
 
 import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
@@ -28,16 +27,6 @@ from tests.helpers import new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture
-def reset_otel_tracer_provider():
-    """Reset OpenTelemetry tracer provider state to allow multiple test runs."""
-    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
-    opentelemetry.trace._TRACER_PROVIDER = None
-    yield
-    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
-    opentelemetry.trace._TRACER_PROVIDER = None
 
 
 @activity.defn

@@ -316,7 +316,26 @@ class OpenTelemetryMetricTemporality(Enum):
 
 @dataclass(frozen=True)
 class OpenTelemetryConfig:
-    """Configuration for OpenTelemetry collector."""
+    """Configuration for OpenTelemetry collector.
+
+    Attributes:
+        url: URL of the OpenTelemetry collector endpoint (e.g.
+            ``"http://localhost:4317"`` for gRPC or
+            ``"http://localhost:4318/v1/metrics"`` for HTTP).
+        headers: Optional headers to include with each export request.
+            Useful for authentication tokens or routing metadata.
+        metric_periodicity: How often metrics are exported to the collector.
+            Defaults to 1s (set by sdk-core) when ``None``.
+        metric_temporality: Whether metrics are exported as cumulative
+            or delta values. Defaults to ``CUMULATIVE``.
+        durations_as_seconds: If ``True``, export duration metrics as
+            floating-point seconds instead of integer milliseconds.
+            Defaults to ``False``.
+        http: If ``True``, use HTTP/protobuf transport instead of gRPC.
+            When enabled, the ``url`` should point to the HTTP endpoint
+            (e.g. ``"http://localhost:4318/v1/metrics"``).
+            Defaults to ``False`` (gRPC).
+    """
 
     url: str
     headers: Mapping[str, str] | None = None
@@ -346,7 +365,28 @@ class OpenTelemetryConfig:
 
 @dataclass(frozen=True)
 class PrometheusConfig:
-    """Configuration for Prometheus metrics endpoint."""
+    """Configuration for Prometheus metrics endpoint.
+
+    Starts an HTTP server on the given address that exposes a ``/metrics``
+    endpoint for Prometheus scraping.
+
+    Attributes:
+        bind_address: Address to bind the metrics HTTP server to (e.g.
+            ``"0.0.0.0:9000"`` or ``"127.0.0.1:9090"``). Prometheus
+            will scrape ``http://<bind_address>/metrics``.
+        counters_total_suffix: If ``True``, append ``_total`` suffix to
+            counter metric names, following the OpenMetrics convention.
+            Defaults to ``False``.
+        unit_suffix: If ``True``, append unit suffixes (e.g. ``_seconds``,
+            ``_bytes``) to metric names. Defaults to ``False``.
+        durations_as_seconds: If ``True``, report duration metrics as
+            floating-point seconds instead of integer milliseconds.
+            Defaults to ``False``.
+        histogram_bucket_overrides: Override the default histogram bucket
+            boundaries for specific metrics. Keys are metric names and
+            values are sequences of bucket boundaries (e.g.
+            ``{"workflow_task_schedule_to_start_latency": [0.01, 0.05, 0.1, 0.5, 1.0, 5.0]}``).
+    """
 
     bind_address: str
     counters_total_suffix: bool = False
