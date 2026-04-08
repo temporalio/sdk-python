@@ -285,46 +285,13 @@ class _Visitor(VisitorFunctions):
     def __init__(
         self,
         f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
-        payload_codec: temporalio.converter.PayloadCodec | None = None,
     ):
         self._f = f
-        self._payload_codec = payload_codec
 
     async def visit_payload(self, payload: Payload) -> None:
-        if self._payload_codec:
-            rewritten_payload = await self._maybe_rewrite_nexus_payload(payload)
-            if rewritten_payload is not None:
-                if rewritten_payload is not payload:
-                    payload.CopyFrom(rewritten_payload)
-                return
-        new_payload = (await self._f([payload]))[0]
-        if new_payload is not payload:
-            payload.CopyFrom(new_payload)
-
-    async def _maybe_rewrite_nexus_payload(self, payload: Payload) -> Payload | None:
-        command_info = _command_aware_visitor.current_command_info.get()
-        if (
-            command_info is None
-            or command_info.command_type
-            != CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
-            or not command_info.nexus_service
-            or not command_info.nexus_operation
-        ):
-            return None
-
-        rewrite = temporalio.nexus.system.get_payload_codec_rewriter(
-            command_info.nexus_service,
-            command_info.nexus_operation,
-        )
-        if rewrite is None:
-            return None
-
-        rewritten_payload = await rewrite(payload, self._payload_codec)
-        if not isinstance(rewritten_payload, Payload):
-            raise TypeError(
-                "temporal nexus payload codec rewriter must return a Payload"
-            )
-        return rewritten_payload
+        rewritten_payload = (await self._f([payload]))[0]
+        if rewritten_payload is not payload:
+            payload.CopyFrom(rewritten_payload)
 
     async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
         if len(payloads) == 0:
@@ -334,6 +301,43 @@ class _Visitor(VisitorFunctions):
             return
         del payloads[:]
         payloads.extend(new_payloads)
+
+
+async def _encode_completion_payloads(
+    data_converter: temporalio.converter.DataConverter,
+    payloads: Sequence[Payload],
+) -> list[Payload]:
+    if len(payloads) != 1:
+        return await data_converter._encode_payload_sequence(payloads)
+
+    # A single payload may be the outer envelope for a system Nexus operation.
+    # In that case we leave the envelope itself unencoded so the server can read
+    # it, but still route any nested Temporal payloads through normal payload
+    # processing via the generated operation-specific rewriter.
+    payload = payloads[0]
+    command_info = _command_aware_visitor.current_command_info.get()
+    if (
+        command_info is None
+        or command_info.command_type
+        != CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
+        or not command_info.nexus_service
+        or not command_info.nexus_operation
+    ):
+        return await data_converter._encode_payload_sequence(payloads)
+
+    rewrite = temporalio.nexus.system.get_payload_rewriter(
+        command_info.nexus_service,
+        command_info.nexus_operation,
+    )
+    if rewrite is None:
+        return await data_converter._encode_payload_sequence(payloads)
+
+    rewritten_payload = await rewrite(
+        payload,
+        data_converter._encode_payload_sequence,
+        False,
+    )
+    return [rewritten_payload]
 
 
 async def decode_activation(
@@ -356,6 +360,6 @@ async def encode_completion(
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True, skip_headers=not encode_headers
     ).visit(
-        _Visitor(data_converter._encode_payload_sequence, data_converter.payload_codec),
+        _Visitor(lambda payloads: _encode_completion_payloads(data_converter, payloads)),
         completion,
     )

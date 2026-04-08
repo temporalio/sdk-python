@@ -14,7 +14,7 @@ import temporalio.api.common.v1
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.converter import PayloadCodec
+from temporalio.converter import ExternalStorage, PayloadCodec
 from temporalio.nexus.system import (
     WorkflowService,
     WorkflowServiceSignalWithStartWorkflowExecutionInput,
@@ -24,6 +24,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.test_extstore import InMemoryTestDriver
 
 
 @nexusrpc.handler.service_handler(service=WorkflowService)
@@ -34,12 +35,21 @@ class WorkflowServicePayloadHandler:
         _ctx: nexusrpc.handler.StartOperationContext,
         request: WorkflowServiceSignalWithStartWorkflowExecutionInput,
     ) -> WorkflowServiceSignalWithStartWorkflowExecutionOutput:
+        request_dict = request.model_dump(by_alias=True)
         for field_name in ("input", "signalInput"):
-            payloads = request.model_dump(by_alias=True)[field_name]["payloads"]
-            assert "test-codec" in payloads[0]["metadata"]
+            payloads = request_dict[field_name]["payloads"]
+            assert payloads[0]["externalPayloads"]
         for field_name in ("memo", "header"):
-            fields = request.model_dump(by_alias=True)[field_name]["fields"]
-            assert "test-codec" in next(iter(fields.values()))["metadata"]
+            fields = request_dict[field_name]["fields"]
+            assert next(iter(fields.values()))["externalPayloads"]
+        for field_name in ("summary", "details"):
+            payload = request_dict["userMetadata"][field_name]
+            assert payload["externalPayloads"]
+        search_attribute_payload = request_dict["searchAttributes"]["indexedFields"][
+            "custom-key"
+        ]
+        assert "externalPayloads" not in search_attribute_payload
+        assert "test-codec" not in search_attribute_payload["metadata"]
         return WorkflowServiceSignalWithStartWorkflowExecutionOutput(
             runId=f"{request.workflow_id}-run"
         )
@@ -98,6 +108,30 @@ class SystemNexusCallerWithPayloadsWorkflow:
                         }
                     )
                 ),
+                "userMetadata": {
+                    "summary": MessageToDict(
+                        temporalio.api.common.v1.Payload(
+                            metadata={"encoding": b"json/plain"},
+                            data=b'"summary-value"',
+                        )
+                    ),
+                    "details": MessageToDict(
+                        temporalio.api.common.v1.Payload(
+                            metadata={"encoding": b"json/plain"},
+                            data=b'"details-value"',
+                        )
+                    ),
+                },
+                "searchAttributes": {
+                    "indexedFields": {
+                        "custom-key": MessageToDict(
+                            temporalio.api.common.v1.Payload(
+                                metadata={"encoding": b"json/plain"},
+                                data=b'"search-attribute-value"',
+                            )
+                        )
+                    }
+                },
             }
         )
         handle = await nexus_client.start_operation(
@@ -151,10 +185,15 @@ async def test_workflow_service_signal_with_start_nested_payloads_use_codec_with
         pytest.skip("Nexus tests don't work with the Java test server")
 
     codec = RejectOuterSystemNexusCodec()
+    driver = InMemoryTestDriver()
     config = env.client.config()
     config["data_converter"] = dataclasses.replace(
         pydantic_data_converter,
         payload_codec=codec,
+        external_storage=ExternalStorage(
+            drivers=[driver],
+            payload_size_threshold=1,
+        ),
     )
     client = Client(**config)
 
@@ -175,4 +214,19 @@ async def test_workflow_service_signal_with_start_nested_payloads_use_codec_with
         )
 
     assert result == "system-nexus-workflow-id-run"
-    assert codec.encode_count >= 4
+    assert codec.encode_count >= 6
+    stored_payloads: list[temporalio.api.common.v1.Payload] = []
+    for stored_payload_bytes in driver._storage.values():
+        stored_payload = temporalio.api.common.v1.Payload()
+        stored_payload.ParseFromString(stored_payload_bytes)
+        stored_payloads.append(stored_payload)
+        assert stored_payload.metadata["test-codec"] == b"true"
+    stored_payload_data = {payload.data for payload in stored_payloads}
+    assert {
+        b'"workflow-input"',
+        b'"signal-input"',
+        b'"memo-value"',
+        b'"header-value"',
+        b'"summary-value"',
+        b'"details-value"',
+    }.issubset(stored_payload_data)

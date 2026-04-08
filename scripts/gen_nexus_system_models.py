@@ -11,6 +11,8 @@ NEXUS_RPC_GEN_VERSION = "0.1.0-alpha.4"
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
+    # TODO: Remove the local .nexusrpc.yaml shim once the upstream API repo
+    # checks in the Nexus definition we can consume directly.
     override_root = normalize_nexus_rpc_gen_root(
         Path.cwd(), env_value=NEXUS_RPC_GEN_ENV_VAR
     )
