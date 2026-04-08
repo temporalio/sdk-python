@@ -34,6 +34,16 @@ async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
         async for response in llm.generate_content_async(llm_request=llm_request)
     ]
 
+    # LLM responses may contain Unicode surrogate characters in text
+    # fields, which pydantic_core.to_json() cannot encode to UTF-8.
+    # Encoding to UTF-16 then decoding back normalizes these:
+    #   - Surrogate pairs (e.g. \ud83d\ude00) are combined into proper
+    #     code points (e.g. U+1F600 😀) — no data loss.
+    #   - Lone surrogates (invalid Unicode) are replaced with U+FFFD,
+    #     which is the Unicode spec's prescribed error handling.
+    # The "surrogatepass" error handler on encode allows surrogates to
+    # pass through to UTF-16 bytes; the "replace" handler on decode
+    # substitutes U+FFFD for any that couldn't form valid pairs.
     for response in responses:
         if response.content and response.content.parts:
             for part in response.content.parts:
