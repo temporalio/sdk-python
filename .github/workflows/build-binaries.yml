@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+      - build_binaries_otel
 permissions:
   contents: read
 
