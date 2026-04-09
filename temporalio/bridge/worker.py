@@ -289,9 +289,9 @@ class _Visitor(VisitorFunctions):
         self._f = f
 
     async def visit_payload(self, payload: Payload) -> None:
-        rewritten_payload = (await self._f([payload]))[0]
-        if rewritten_payload is not payload:
-            payload.CopyFrom(rewritten_payload)
+        new_payload = (await self._f([payload]))[0]
+        if new_payload is not payload:
+            payload.CopyFrom(new_payload)
 
     async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
         if len(payloads) == 0:
@@ -331,12 +331,12 @@ async def _encode_completion_payloads(
     if rewrite is None:
         return await data_converter._encode_payload_sequence(payloads)
 
-    rewritten_payload = await rewrite(
+    new_payload = await rewrite(
         payload,
         data_converter._encode_payload_sequence,
         False,
     )
-    return [rewritten_payload]
+    return [new_payload]
 
 
 async def decode_activation(
