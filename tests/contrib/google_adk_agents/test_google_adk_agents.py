@@ -924,8 +924,7 @@ async def test_litellm_model(client: Client):
             return self._make_response(model)
 
         async def acompletion(self, *args: Any, **kwargs: Any) -> ModelResponse:
-            model = args[0] if args else kwargs.get("model", "unknown")
-            return self._make_response(model)
+            return self.completion(*args, **kwargs)
 
     class FakeLiteLlm(LiteLlm):
         """LiteLlm subclass that handles fake/.* model names for testing."""
