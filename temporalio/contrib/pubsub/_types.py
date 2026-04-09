@@ -5,8 +5,6 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, Field
-
 
 def encode_data(data: bytes) -> str:
     """Encode bytes to base64 string for wire format."""
@@ -82,17 +80,18 @@ class PollResult:
     next_offset: int = 0
 
 
-class PubSubState(BaseModel):
+@dataclass
+class PubSubState:
     """Serializable snapshot of pub/sub state for continue-as-new.
 
-    This is a Pydantic model (not a dataclass) so that Pydantic-based data
-    converters can properly reconstruct it. The containing workflow input
-    must type the field as ``PubSubState | None``, not ``Any``.
+    The containing workflow input must type the field as
+    ``PubSubState | None``, not ``Any``, so that the default data converter
+    can reconstruct the dataclass from JSON.
 
     The log items use base64-encoded data for serialization stability.
     """
 
-    log: list[_WireItem] = Field(default_factory=list)
+    log: list[_WireItem] = field(default_factory=list)
     base_offset: int = 0
-    publisher_sequences: dict[str, int] = Field(default_factory=dict)
-    publisher_last_seen: dict[str, float] = Field(default_factory=dict)
+    publisher_sequences: dict[str, int] = field(default_factory=dict)
+    publisher_last_seen: dict[str, float] = field(default_factory=dict)

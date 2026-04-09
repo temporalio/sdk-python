@@ -241,8 +241,9 @@ to where the last poll left off. No scanning, no alignment, no cursor parsing.
 ### Continue-as-new state
 
 ```python
-class PubSubState(BaseModel):
-    log: list[PubSubItem]
+@dataclass
+class PubSubState:
+    log: list[PubSubItem] = field(default_factory=list)
     base_offset: int = 0
 ```
 

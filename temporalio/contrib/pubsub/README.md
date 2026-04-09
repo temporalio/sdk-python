@@ -112,9 +112,8 @@ class MyWorkflow(PubSubMixin):
 `all_handlers_finished` can stabilize. Subscribers created via
 `PubSubClient.for_workflow()` automatically follow continue-as-new chains.
 
-**Important:** When using Pydantic models for workflow input, type the field
-as `PubSubState | None`, not `Any`. Pydantic deserializes `Any` fields as
-plain dicts, which breaks `init_pubsub()`.
+**Important:** Type the pubsub_state field as `PubSubState | None`, not `Any`.
+`Any`-typed fields deserialize as plain dicts, which breaks `init_pubsub()`.
 
 ## Exactly-Once Delivery
 

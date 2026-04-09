@@ -166,21 +166,20 @@ class PollResult:
     items: list[PubSubItem]
     next_offset: int = 0       # Offset for next poll
 
-class PubSubState(BaseModel):  # Pydantic for CAN round-tripping
-    log: list[PubSubItem] = []
+@dataclass
+class PubSubState:
+    log: list[PubSubItem] = field(default_factory=list)
     base_offset: int = 0
-    publisher_sequences: dict[str, int] = {}
-    publisher_last_seen: dict[str, float] = {}  # For TTL pruning
+    publisher_sequences: dict[str, int] = field(default_factory=dict)
+    publisher_last_seen: dict[str, float] = field(default_factory=dict)  # For TTL pruning
 ```
 
 `PubSubItem` does not carry an offset field. The global offset is derived
 from the item's position in the log plus `base_offset`. It is exposed only
 through `PollResult.next_offset` and the `__pubsub_offset` query.
 
-`PubSubState` is a Pydantic model (not a dataclass) so that Pydantic-based
-data converters can properly reconstruct it through continue-as-new. The
-containing workflow input must type the field as `PubSubState | None`, not
-`Any` — Pydantic deserializes `Any` fields as plain dicts, losing the type.
+The containing workflow input must type the field as `PubSubState | None`,
+not `Any` — `Any`-typed fields deserialize as plain dicts, losing the type.
 
 ## Design Decisions
 
@@ -456,11 +455,12 @@ the history while carrying the canonical log copy forward.
 ### State
 
 ```python
-class PubSubState(BaseModel):
-    log: list[PubSubItem] = []
+@dataclass
+class PubSubState:
+    log: list[PubSubItem] = field(default_factory=list)
     base_offset: int = 0
-    publisher_sequences: dict[str, int] = {}
-    publisher_last_seen: dict[str, float] = {}
+    publisher_sequences: dict[str, int] = field(default_factory=dict)
+    publisher_last_seen: dict[str, float] = field(default_factory=dict)
 ```
 
 `init_pubsub(prior_state)` restores all four fields. `get_pubsub_state()`

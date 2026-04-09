@@ -174,10 +174,11 @@ Initialized in `init_pubsub()` from `PubSubState.publisher_sequences`.
 `PubSubState` gains a `publisher_sequences` field:
 
 ```python
-class PubSubState(BaseModel):
-    log: list[PubSubItem] = []
+@dataclass
+class PubSubState:
+    log: list[PubSubItem] = field(default_factory=list)
     base_offset: int = 0
-    publisher_sequences: dict[str, int] = {}
+    publisher_sequences: dict[str, int] = field(default_factory=dict)
 ```
 
 This is carried through CAN so that dedup survives across runs. The dict is

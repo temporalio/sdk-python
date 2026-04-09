@@ -10,10 +10,10 @@ import pytest
 
 from typing import Any
 
-from pydantic import BaseModel
+from dataclasses import dataclass
+
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.contrib.pubsub import (
     PubSubClient,
     PubSubItem,
@@ -823,14 +823,11 @@ async def test_truncate_pubsub(client: Client) -> None:
 @pytest.mark.asyncio
 async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
     """get_pubsub_state prunes stale publisher entries based on TTL."""
-    pydantic_client = Client(
-        **{**client.config(), "data_converter": pydantic_data_converter}
-    )
     async with new_worker(
-        pydantic_client,
+        client,
         TTLTestWorkflow,
     ) as worker:
-        handle = await pydantic_client.start_workflow(
+        handle = await client.start_workflow(
             TTLTestWorkflow.run,
             id=f"pubsub-ttl-{uuid.uuid4()}",
             task_queue=worker.task_queue,
@@ -925,12 +922,14 @@ class TTLTestWorkflow(PubSubMixin):
 # ---------------------------------------------------------------------------
 
 
-class CANWorkflowInputAny(BaseModel):
-    """Uses Any typing — reproduces the samples pattern."""
+@dataclass
+class CANWorkflowInputAny:
+    """Uses Any typing — reproduces the pitfall."""
     pubsub_state: Any = None
 
 
-class CANWorkflowInputTyped(BaseModel):
+@dataclass
+class CANWorkflowInputTyped:
     """Uses proper typing."""
     pubsub_state: PubSubState | None = None
 
@@ -1065,16 +1064,14 @@ async def _run_can_test(can_client: Client, workflow_cls, input_cls) -> None:
 async def test_continue_as_new_any_typed_fails(client: Client) -> None:
     """Any-typed pubsub_state does NOT survive CAN — documents the pitfall.
 
-    Pydantic deserializes Any fields as plain dicts, losing the PubSubState
-    type. Use ``PubSubState | None`` instead.
+    The default data converter deserializes Any fields as plain dicts, losing
+    the PubSubState type. Use ``PubSubState | None`` instead.
     """
-    can_client = Client(**{**client.config(), "data_converter": pydantic_data_converter})
-
     async with new_worker(
-        can_client,
+        client,
         ContinueAsNewAnyWorkflow,
     ) as worker:
-        handle = await can_client.start_workflow(
+        handle = await client.start_workflow(
             ContinueAsNewAnyWorkflow.run,
             CANWorkflowInputAny(),
             id=f"pubsub-can-any-{uuid.uuid4()}",
@@ -1092,7 +1089,7 @@ async def test_continue_as_new_any_typed_fails(client: Client) -> None:
         await handle.signal(ContinueAsNewAnyWorkflow.trigger_continue)
 
         # Wait for CAN to happen
-        new_handle = can_client.get_workflow_handle(handle.id)
+        new_handle = client.get_workflow_handle(handle.id)
         await assert_eq_eventually(
             True,
             lambda: _is_different_run(handle, new_handle),
@@ -1106,5 +1103,4 @@ async def test_continue_as_new_any_typed_fails(client: Client) -> None:
 @pytest.mark.asyncio
 async def test_continue_as_new_properly_typed(client: Client) -> None:
     """CAN with PubSubState-typed pubsub_state field."""
-    can_client = Client(**{**client.config(), "data_converter": pydantic_data_converter})
-    await _run_can_test(can_client, ContinueAsNewTypedWorkflow, CANWorkflowInputTyped)
+    await _run_can_test(client, ContinueAsNewTypedWorkflow, CANWorkflowInputTyped)
