@@ -218,7 +218,6 @@ exclude = [
   "temporalio/api",
   "temporalio/bridge/proto",
   "temporalio/bridge/_visitor.py",
-  "temporalio/nexus/system/_workflow_service_generated.py",
   "tests/worker/workflow_sandbox/testmodules/proto",
 ]
 

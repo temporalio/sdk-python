@@ -3357,13 +3357,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             if temporalio.nexus.system.is_system_operation(v.service, v.operation)
             else self._payload_converter
         )
-        payload = payload_converter.to_payload(self._input.input)
-        if payload is None:
-            raise RuntimeError(
-                "Nexus operation input could not be converted to a payload"
-            )
-        payload_message: temporalio.api.common.v1.Payload = payload
-        v.input.CopyFrom(payload_message)
+        v.input.CopyFrom(payload_converter.to_payload(self._input.input))
         if self._input.schedule_to_close_timeout is not None:
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout

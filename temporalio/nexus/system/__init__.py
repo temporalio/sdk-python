@@ -24,7 +24,7 @@ TemporalNexusPayloadRewriter = Callable[
     Awaitable[temporalio.api.common.v1.Payload],
 ]
 
-_SYSTEM_NEXUS_PAYLOAD_CONVERTER = temporalio.converter.JSONPlainPayloadConverter()
+_SYSTEM_NEXUS_PAYLOAD_CONVERTER = temporalio.converter.default().payload_converter
 
 
 def get_payload_rewriter(
@@ -40,7 +40,7 @@ def is_system_operation(service: str, operation: str) -> bool:
     return get_payload_rewriter(service, operation) is not None
 
 
-def get_payload_converter() -> temporalio.converter.EncodingPayloadConverter:
+def get_payload_converter() -> temporalio.converter.PayloadConverter:
     """Return the fixed payload converter for system Nexus outer envelopes."""
     return _SYSTEM_NEXUS_PAYLOAD_CONVERTER
 
