@@ -5120,7 +5120,7 @@ dev = [
     { name = "grpcio-tools", specifier = ">=1.48.2,<2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "langsmith", specifier = ">=0.7.0,<0.8" },
-    { name = "litellm", specifier = ">=1.75.5" },
+    { name = "litellm", specifier = ">=1.83.0" },
     { name = "maturin", specifier = ">=1.8.2" },
     { name = "moto", extras = ["s3", "server"], specifier = ">=5" },
     { name = "mypy", specifier = "==1.18.2" },
