@@ -57,6 +57,7 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.service import __version__
 
@@ -3345,14 +3346,24 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             self._result_fut.set_result(None)
 
     def _apply_schedule_command(self) -> None:
-        payload = self._payload_converter.to_payload(self._input.input)
         command = self._instance._add_command()
         v = command.schedule_nexus_operation
         v.seq = self._seq
         v.endpoint = self._input.endpoint
         v.service = self._input.service
         v.operation = self._input.operation_name
-        v.input.CopyFrom(payload)
+        payload_converter = (
+            temporalio.nexus.system.get_payload_converter()
+            if temporalio.nexus.system.is_system_operation(v.service, v.operation)
+            else self._payload_converter
+        )
+        payload = payload_converter.to_payload(self._input.input)
+        if payload is None:
+            raise RuntimeError(
+                "Nexus operation input could not be converted to a payload"
+            )
+        payload_message: temporalio.api.common.v1.Payload = payload
+        v.input.CopyFrom(payload_message)
         if self._input.schedule_to_close_timeout is not None:
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout

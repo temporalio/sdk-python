@@ -7,13 +7,10 @@ Higher-level ergonomic APIs may wrap these generated types.
 from collections.abc import Awaitable, Callable, Sequence
 
 import temporalio.api.common.v1
+import temporalio.converter
 
-from ._workflow_service_generated import (
-    WorkflowService,
-    WorkflowServiceSignalWithStartWorkflowExecutionInput,
-    WorkflowServiceSignalWithStartWorkflowExecutionOutput,
-    __temporal_nexus_payload_rewriters__,
-)
+from . import _workflow_service_generated as generated
+from ._workflow_service_generated import __temporal_nexus_payload_rewriters__
 
 TemporalNexusPayloadRewriter = Callable[
     [
@@ -27,6 +24,8 @@ TemporalNexusPayloadRewriter = Callable[
     Awaitable[temporalio.api.common.v1.Payload],
 ]
 
+_SYSTEM_NEXUS_PAYLOAD_CONVERTER = temporalio.converter.JSONPlainPayloadConverter()
+
 
 def get_payload_rewriter(
     service: str,
@@ -36,9 +35,19 @@ def get_payload_rewriter(
     return __temporal_nexus_payload_rewriters__.get((service, operation))
 
 
+def is_system_operation(service: str, operation: str) -> bool:
+    """Return whether a Nexus operation uses the generated system envelope."""
+    return get_payload_rewriter(service, operation) is not None
+
+
+def get_payload_converter() -> temporalio.converter.EncodingPayloadConverter:
+    """Return the fixed payload converter for system Nexus outer envelopes."""
+    return _SYSTEM_NEXUS_PAYLOAD_CONVERTER
+
+
 __all__ = (
-    "WorkflowService",
-    "WorkflowServiceSignalWithStartWorkflowExecutionInput",
-    "WorkflowServiceSignalWithStartWorkflowExecutionOutput",
+    "generated",
+    "get_payload_converter",
     "get_payload_rewriter",
+    "is_system_operation",
 )

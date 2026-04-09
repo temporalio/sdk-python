@@ -326,8 +326,7 @@ async def _encode_completion_payloads(
         return await data_converter._encode_payload_sequence(payloads)
 
     rewrite = temporalio.nexus.system.get_payload_rewriter(
-        command_info.nexus_service,
-        command_info.nexus_operation,
+        command_info.nexus_service, command_info.nexus_operation
     )
     if rewrite is None:
         return await data_converter._encode_payload_sequence(payloads)
@@ -360,6 +359,8 @@ async def encode_completion(
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True, skip_headers=not encode_headers
     ).visit(
-        _Visitor(lambda payloads: _encode_completion_payloads(data_converter, payloads)),
+        _Visitor(
+            lambda payloads: _encode_completion_payloads(data_converter, payloads)
+        ),
         completion,
     )
