@@ -17,6 +17,7 @@ from temporalio.client import (
     Client,
     WorkflowExecutionStatus,
     WorkflowHandle,
+    WorkflowUpdateFailedError,
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
 
@@ -265,6 +266,17 @@ class PubSubClient:
                 )
             except asyncio.CancelledError:
                 return
+            except WorkflowUpdateFailedError as e:
+                if (
+                    e.cause
+                    and getattr(e.cause, "type", None) == "TruncatedOffset"
+                ):
+                    # Subscriber fell behind truncation. Retry from offset 0
+                    # which the mixin treats as "from the beginning of
+                    # whatever exists" (i.e., from base_offset).
+                    offset = 0
+                    continue
+                raise
             except WorkflowUpdateRPCTimeoutOrCancelledError:
                 if await self._follow_continue_as_new():
                     continue

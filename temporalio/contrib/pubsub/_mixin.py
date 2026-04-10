@@ -10,6 +10,7 @@ when accepting ``prior_state`` from continue-as-new arguments.
 from __future__ import annotations
 
 from temporalio import workflow
+from temporalio.exceptions import ApplicationError
 
 from ._types import (
     PollInput,
@@ -186,10 +187,20 @@ class PubSubMixin:
         self._check_initialized()
         log_offset = input.from_offset - self._pubsub_base_offset
         if log_offset < 0:
-            raise ValueError(
-                f"Requested offset {input.from_offset} is before base offset "
-                f"{self._pubsub_base_offset} (log has been truncated)"
-            )
+            if input.from_offset == 0:
+                # "From the beginning" — start at whatever is available.
+                log_offset = 0
+            else:
+                # Subscriber had a specific position that's been truncated.
+                # ApplicationError fails this update (client gets the error)
+                # without crashing the workflow task — avoids a poison pill
+                # during replay.
+                raise ApplicationError(
+                    f"Requested offset {input.from_offset} has been truncated. "
+                    f"Current base offset is {self._pubsub_base_offset}.",
+                    type="TruncatedOffset",
+                    non_retryable=True,
+                )
         await workflow.wait_condition(
             lambda: len(self._pubsub_log) > log_offset
             or self._pubsub_draining,

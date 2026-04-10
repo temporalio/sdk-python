@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.contrib.pubsub import (
+    PollInput,
+    PollResult,
     PubSubClient,
     PubSubItem,
     PubSubMixin,
@@ -509,6 +511,133 @@ async def test_per_item_offsets_after_truncation(client: Client) -> None:
         assert len(items) == 2
         assert items[0].offset == 3
         assert items[1].offset == 4
+
+        await handle.signal("close")
+
+
+@pytest.mark.asyncio
+async def test_poll_truncated_offset_returns_application_error(client: Client) -> None:
+    """Polling a truncated offset raises ApplicationError (not ValueError)
+    and does not crash the workflow task."""
+    async with new_worker(
+        client,
+        TruncateSignalWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            TruncateSignalWorkflow.run,
+            id=f"pubsub-trunc-error-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish 5 items
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[
+                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                for i in range(5)
+            ]),
+        )
+        await asyncio.sleep(0.5)
+
+        # Truncate up to offset 3
+        await handle.signal("truncate", 3)
+        await asyncio.sleep(0.3)
+
+        # Poll from offset 1 (truncated) — should get ApplicationError,
+        # NOT crash the workflow task.
+        from temporalio.client import WorkflowUpdateFailedError
+        with pytest.raises(WorkflowUpdateFailedError):
+            await handle.execute_update(
+                "__pubsub_poll",
+                PollInput(topics=[], from_offset=1),
+                result_type=PollResult,
+            )
+
+        # Workflow should still be usable — poll from valid offset 3
+        items = await collect_items(handle, None, 3, 2)
+        assert len(items) == 2
+        assert items[0].offset == 3
+
+        await handle.signal("close")
+
+
+@pytest.mark.asyncio
+async def test_poll_offset_zero_after_truncation(client: Client) -> None:
+    """Polling from offset 0 after truncation returns items from base_offset."""
+    async with new_worker(
+        client,
+        TruncateSignalWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            TruncateSignalWorkflow.run,
+            id=f"pubsub-trunc-zero-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish 5 items, truncate first 3
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[
+                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                for i in range(5)
+            ]),
+        )
+        await asyncio.sleep(0.5)
+        await handle.signal("truncate", 3)
+        await asyncio.sleep(0.3)
+
+        # Poll from offset 0 — should get items starting from base_offset (3)
+        items = await collect_items(handle, None, 0, 2)
+        assert len(items) == 2
+        assert items[0].offset == 3
+        assert items[1].offset == 4
+
+        await handle.signal("close")
+
+
+@pytest.mark.asyncio
+async def test_subscribe_recovers_from_truncation(client: Client) -> None:
+    """subscribe() auto-recovers when offset falls behind truncation."""
+    async with new_worker(
+        client,
+        TruncateSignalWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            TruncateSignalWorkflow.run,
+            id=f"pubsub-trunc-recover-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish 5 items
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[
+                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                for i in range(5)
+            ]),
+        )
+        await asyncio.sleep(0.5)
+
+        # Truncate first 3
+        await handle.signal("truncate", 3)
+        await asyncio.sleep(0.3)
+
+        # subscribe from offset 1 (truncated) — should auto-recover
+        # and deliver items from base_offset (3)
+        pubsub = PubSubClient(handle)
+        items: list[PubSubItem] = []
+        try:
+            async with asyncio.timeout(5):
+                async for item in pubsub.subscribe(
+                    from_offset=1, poll_cooldown=0
+                ):
+                    items.append(item)
+                    if len(items) >= 2:
+                        break
+        except asyncio.TimeoutError:
+            pass
+        assert len(items) == 2
+        assert items[0].offset == 3
 
         await handle.signal("close")
 
