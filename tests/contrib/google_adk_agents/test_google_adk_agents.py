@@ -927,11 +927,11 @@ async def test_litellm_model(client: Client):
             return self.completion(*args, **kwargs)
 
     class FakeLiteLlm(LiteLlm):
-        """LiteLlm subclass that handles fake/.* model names for testing."""
+        """LiteLlm subclass that supports the fake/test-model name for testing."""
 
         @classmethod
         def supported_models(cls) -> list[str]:
-            return [r"fake/.*"]
+            return ["fake/test-model"]
 
     # Register our fake provider with litellm
     litellm_module.custom_provider_map = [
