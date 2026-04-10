@@ -126,6 +126,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "history.enableChasm=true",
                 "--dynamic-config-value",
                 "history.enableTransitionHistory=true",
+                "--dynamic-config-value",
+                "frontend.enableCancelWorkerPollsOnShutdown=true",
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
