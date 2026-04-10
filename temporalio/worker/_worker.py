@@ -782,6 +782,7 @@ class Worker:
         if self._started:
             raise RuntimeError("Already started")
         self._started = True
+        logger.error("SHUTDOWN-DEBUG: worker started (instrumented build)")
 
         # Create a task that raises when a shutdown is requested
         async def raise_on_shutdown():
@@ -838,7 +839,9 @@ class Worker:
         )
 
         # Initiate core worker shutdown
+        logger.error("SHUTDOWN-DEBUG: initiate_shutdown called")
         self._bridge_worker.initiate_shutdown()
+        logger.error("SHUTDOWN-DEBUG: initiate_shutdown returned")
 
         # If any worker task had an exception, replace that task with a queue drain
         for worker, task in tasks.items():
@@ -854,7 +857,9 @@ class Worker:
             self._nexus_worker.notify_shutdown()
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
+        logger.error("SHUTDOWN-DEBUG: awaiting poller loops")
         await asyncio.wait(tasks.values())
+        logger.error("SHUTDOWN-DEBUG: poller loops stopped")
         # Sometimes both workers throw an exception and since we only take the
         # first, Python may complain with "Task exception was never retrieved"
         # if we don't get the others. Therefore we call cancel on each task
@@ -872,7 +877,9 @@ class Worker:
 
         # Do final shutdown
         try:
+            logger.error("SHUTDOWN-DEBUG: finalize_shutdown called")
             await self._bridge_worker.finalize_shutdown()
+            logger.error("SHUTDOWN-DEBUG: finalize_shutdown returned")
         except:
             # Ignore errors here that can arise in some tests where the bridge
             # worker still has a reference
