@@ -273,6 +273,7 @@ class PubSubClient:
                 yield PubSubItem(
                     topic=wire_item.topic,
                     data=decode_data(wire_item.data),
+                    offset=wire_item.offset,
                 )
             offset = result.next_offset
             if poll_cooldown > 0:

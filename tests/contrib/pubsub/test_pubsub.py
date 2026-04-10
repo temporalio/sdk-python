@@ -416,6 +416,104 @@ async def test_subscribe_from_offset(client: Client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_per_item_offsets(client: Client) -> None:
+    """Each yielded PubSubItem carries its correct global offset."""
+    count = 5
+    async with new_worker(
+        client,
+        WorkflowSidePublishWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            WorkflowSidePublishWorkflow.run,
+            count,
+            id=f"pubsub-item-offset-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        items = await collect_items(handle, None, 0, count)
+        assert len(items) == count
+        for i, item in enumerate(items):
+            assert item.offset == i, f"item {i} has offset {item.offset}"
+
+        # Subscribe from offset 3 — offsets should be 3, 4
+        later_items = await collect_items(handle, None, 3, 2)
+        assert len(later_items) == 2
+        assert later_items[0].offset == 3
+        assert later_items[1].offset == 4
+
+        await handle.signal(WorkflowSidePublishWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_per_item_offsets_with_topic_filter(client: Client) -> None:
+    """Per-item offsets are global (not per-topic) even when filtering."""
+    count = 9  # 3 per topic (a, b, c round-robin)
+    async with new_worker(
+        client,
+        MultiTopicWorkflow,
+        activities=[publish_multi_topic],
+    ) as worker:
+        handle = await client.start_workflow(
+            MultiTopicWorkflow.run,
+            count,
+            id=f"pubsub-item-offset-filter-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Subscribe to topic "a" only — items are at global offsets 0, 3, 6
+        a_items = await collect_items(handle, ["a"], 0, 3)
+        assert len(a_items) == 3
+        assert a_items[0].offset == 0
+        assert a_items[1].offset == 3
+        assert a_items[2].offset == 6
+
+        # Subscribe to topic "b" — items are at global offsets 1, 4, 7
+        b_items = await collect_items(handle, ["b"], 0, 3)
+        assert len(b_items) == 3
+        assert b_items[0].offset == 1
+        assert b_items[1].offset == 4
+        assert b_items[2].offset == 7
+
+        await handle.signal(MultiTopicWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_per_item_offsets_after_truncation(client: Client) -> None:
+    """Per-item offsets remain correct after log truncation."""
+    async with new_worker(
+        client,
+        TruncateSignalWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            TruncateSignalWorkflow.run,
+            id=f"pubsub-item-offset-trunc-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish 5 items
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(items=[
+                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                for i in range(5)
+            ]),
+        )
+        await asyncio.sleep(0.5)
+
+        # Truncate up to offset 3
+        await handle.signal("truncate", 3)
+        await asyncio.sleep(0.3)
+
+        # Items 3, 4 should have offsets 3, 4
+        items = await collect_items(handle, None, 3, 2)
+        assert len(items) == 2
+        assert items[0].offset == 3
+        assert items[1].offset == 4
+
+        await handle.signal("close")
+
+
+@pytest.mark.asyncio
 async def test_workflow_and_activity_publish_interleaved(client: Client) -> None:
     """Workflow publishes status events around activity publishing."""
     count = 5

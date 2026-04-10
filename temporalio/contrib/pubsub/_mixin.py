@@ -198,13 +198,20 @@ class PubSubMixin:
         next_offset = self._pubsub_base_offset + len(self._pubsub_log)
         if input.topics:
             topic_set = set(input.topics)
-            filtered = [item for item in all_new if item.topic in topic_set]
+            filtered = [
+                (self._pubsub_base_offset + log_offset + i, item)
+                for i, item in enumerate(all_new)
+                if item.topic in topic_set
+            ]
         else:
-            filtered = list(all_new)
+            filtered = [
+                (self._pubsub_base_offset + log_offset + i, item)
+                for i, item in enumerate(all_new)
+            ]
         return PollResult(
             items=[
-                _WireItem(topic=item.topic, data=encode_data(item.data))
-                for item in filtered
+                _WireItem(topic=item.topic, data=encode_data(item.data), offset=off)
+                for off, item in filtered
             ],
             next_offset=next_offset,
         )

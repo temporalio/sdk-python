@@ -20,12 +20,14 @@ def decode_data(data: str) -> bytes:
 class PubSubItem:
     """A single item in the pub/sub log.
 
-    The global offset is not stored on the item — it is the item's index
-    in the log (adjusted by base_offset). See DESIGN-ADDENDUM-TOPICS.md.
+    The ``offset`` field is populated at poll time from the item's position
+    in the global log. It defaults to 0 ("unknown") for backward compatibility.
+    See DESIGN-ADDENDUM-ITEM-OFFSET.md.
     """
 
     topic: str
     data: bytes
+    offset: int = 0
 
 
 @dataclass
@@ -67,6 +69,7 @@ class _WireItem:
 
     topic: str
     data: str  # base64-encoded bytes
+    offset: int = 0
 
 
 @dataclass
