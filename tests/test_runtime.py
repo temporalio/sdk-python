@@ -269,6 +269,109 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     await assert_eventually(check_metrics)
 
 
+async def test_opentelemetry_histogram_bucket_overrides(client: Client):
+    # Mirrors test_prometheus_histogram_bucket_overrides but routes metrics
+    # through an in-process OTLP/HTTP receiver and asserts the exported
+    # histogram explicit_bounds match the configured overrides.
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
+        ExportMetricsServiceRequest,
+        ExportMetricsServiceResponse,
+    )
+
+    special_value = float(1234.5678)
+    histogram_overrides = {
+        "temporal_long_request_latency": [special_value / 2, special_value],
+        "custom_histogram": [special_value / 2, special_value],
+    }
+
+    captured: dict[str, list[float]] = {}
+    lock = threading.Lock()
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass  # silence default stderr logging
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", "0"))
+            req = ExportMetricsServiceRequest()
+            req.ParseFromString(self.rfile.read(length))
+            with lock:
+                for rm in req.resource_metrics:
+                    for sm in rm.scope_metrics:
+                        for m in sm.metrics:
+                            if m.HasField("histogram"):
+                                for dp in m.histogram.data_points:
+                                    captured[m.name] = list(dp.explicit_bounds)
+            body = ExportMetricsServiceResponse().SerializeToString()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-protobuf")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    otel_port = find_free_port()
+    server = HTTPServer(("127.0.0.1", otel_port), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        runtime = Runtime(
+            telemetry=TelemetryConfig(
+                metrics=OpenTelemetryConfig(
+                    url=f"http://127.0.0.1:{otel_port}/v1/metrics",
+                    http=True,
+                    metric_periodicity=timedelta(milliseconds=100),
+                    durations_as_seconds=False,
+                    histogram_bucket_overrides=histogram_overrides,
+                ),
+            ),
+        )
+
+        # Create and record to a custom histogram
+        custom_histogram = runtime.metric_meter.create_histogram(
+            "custom_histogram", "Custom histogram", "ms"
+        )
+        custom_histogram.record(600)
+
+        # Run a workflow so built-in histograms (e.g. temporal_long_request_latency)
+        # are recorded and exported.
+        client_with_overrides = await Client.connect(
+            client.service_client.config.target_host,
+            namespace=client.namespace,
+            runtime=runtime,
+        )
+        task_queue = f"task-queue-{uuid.uuid4()}"
+        async with Worker(
+            client_with_overrides,
+            task_queue=task_queue,
+            workflows=[HelloWorkflow],
+        ):
+            assert "Hello, World!" == await client_with_overrides.execute_workflow(
+                HelloWorkflow.run,
+                "World",
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+        async def check_metrics() -> None:
+            with lock:
+                snapshot = dict(captured)
+            for key, buckets in histogram_overrides.items():
+                assert (
+                    key in snapshot
+                ), f"Missing {key} in captured metrics: {list(snapshot)}"
+                assert snapshot[key] == pytest.approx(
+                    buckets
+                ), f"Bucket mismatch for {key}: got {snapshot[key]} expected {buckets}"
+
+        await assert_eventually(check_metrics)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_runtime_options_invalid_heartbeat() -> None:
     with pytest.raises(ValueError):
         Runtime(
