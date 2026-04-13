@@ -103,14 +103,20 @@ class AnthropicProvider:
 
         tool_results = []
         for call in tool_calls:
-            result = self._registry.dispatch(call["name"], call.get("input", {}))
-            tool_results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": call["id"],
-                    "content": result,
-                }
-            )
+            is_error = False
+            try:
+                result = self._registry.dispatch(call["name"], call.get("input", {}))
+            except Exception as e:
+                result = f"error: {e}"
+                is_error = True
+            entry: dict[str, Any] = {
+                "type": "tool_result",
+                "tool_use_id": call["id"],
+                "content": result,
+            }
+            if is_error:
+                entry["is_error"] = True
+            tool_results.append(entry)
         messages.append({"role": "user", "content": tool_results})
         return False
 
@@ -194,7 +200,10 @@ class OpenAIProvider:
             if tc.type != "function":
                 continue
             args = json.loads(tc.function.arguments or "{}")
-            result = self._registry.dispatch(tc.function.name, args)
+            try:
+                result = self._registry.dispatch(tc.function.name, args)
+            except Exception as e:
+                result = f"error: {e}"
             messages.append(
                 {
                     "role": "tool",

@@ -65,9 +65,8 @@ async def analyze(prompt: str) -> list[str]:
 | Crash-safe heartbeat resume | ✓ (via `agentic_session`) | ✗ |
 | Agent orchestration (handoffs, etc.) | ✗ | ✓ |
 
-Use `openai_agents` when you need OpenAI Agents SDK orchestration features (handoffs, agent networks).
-Use `tool_registry` for direct Anthropic support, multi-provider flexibility,
-or crash-safe agentic sessions.
+Use `openai_agents`, `google_adk_agents`, or `langgraph` when you are already building with those frameworks and want each model call to be a separately observable, retryable Temporal activity.
+Use `tool_registry` for direct Anthropic support, crash-safe sessions that survive server-side session expiry, or when you need the same implementation pattern across all six Temporal SDKs (Go, Java, Ruby, .NET have no framework-level integrations).
 
 ## Sandbox passthrough
 

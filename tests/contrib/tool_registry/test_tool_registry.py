@@ -192,6 +192,103 @@ def test_crash_after_turns_raises():
         crasher.run_turn(messages, ToolRegistry())
 
 
+# ── is_error / handler error tests ───────────────────────────────────────────
+
+
+def test_anthropic_handler_error_sets_is_error_and_does_not_crash():
+    """Handler exceptions are caught; the tool result carries is_error=True."""
+    from temporalio.contrib.tool_registry._providers import AnthropicProvider
+
+    registry = ToolRegistry()
+
+    @registry.handler({"name": "boom", "description": "d", "input_schema": {}})
+    def handle(inp: dict) -> str:
+        raise ValueError("intentional failure")
+
+    # Minimal Anthropic mock: first call returns a tool_use, second returns end_turn.
+    calls: list[int] = []
+
+    class _MockMessages:
+        def create(self, **_kwargs):  # type: ignore[override]
+            calls.append(1)
+            if len(calls) == 1:
+                return _FakeResponse(
+                    content=[{"type": "tool_use", "id": "c1", "name": "boom", "input": {}}],
+                    stop_reason="tool_use",
+                )
+            return _FakeResponse(content=[{"type": "text", "text": "done"}], stop_reason="end_turn")
+
+    class _FakeClient:
+        messages = _MockMessages()
+
+    class _FakeResponse:
+        def __init__(self, content, stop_reason):
+            self.content = content
+            self.stop_reason = stop_reason
+
+    provider = AnthropicProvider(registry, "sys", client=_FakeClient())
+    messages: list[dict] = [{"role": "user", "content": "go"}]
+    provider.run_turn(messages)
+
+    # Second message is the tool result wrapper from the user role.
+    tool_result_msg = messages[1]
+    assert tool_result_msg["role"] == "user"
+    tool_result = tool_result_msg["content"][0]
+    assert tool_result["type"] == "tool_result"
+    assert tool_result["is_error"] is True
+    assert "intentional failure" in tool_result["content"]
+
+
+def test_openai_handler_error_does_not_crash():
+    """Handler exceptions in OpenAI provider are caught and returned as error strings."""
+    from temporalio.contrib.tool_registry._providers import OpenAIProvider
+
+    registry = ToolRegistry()
+
+    @registry.handler({"name": "boom", "description": "d", "input_schema": {}})
+    def handle(inp: dict) -> str:
+        raise RuntimeError("openai error test")
+
+    class _MockCompletions:
+        def create(self, **_kwargs):  # type: ignore[override]
+            return _FakeResp()
+
+    class _FakeClient:
+        class chat:
+            completions = _MockCompletions()
+
+    class _FakeTc:
+        id = "tc1"
+        type = "function"
+
+        class function:
+            name = "boom"
+            arguments = "{}"
+
+    class _FakeMsg:
+        content = None
+        tool_calls = [_FakeTc()]
+
+    class _FakeChoice:
+        message = _FakeMsg()
+        finish_reason = "tool_calls"
+
+    class _FakeResp:
+        choices = [_FakeChoice()]
+
+    provider = OpenAIProvider(registry, "sys", client=_FakeClient())
+    messages: list[dict] = [{"role": "user", "content": "go"}]
+    # Should not raise even though the handler throws.
+    try:
+        provider.run_turn(messages)
+    except Exception as e:
+        pytest.fail(f"run_turn raised unexpectedly: {e}")
+
+    tool_msg = messages[-1]
+    assert tool_msg["role"] == "tool"
+    assert "openai error test" in tool_msg["content"]
+
+
 # ── Integration test (skipped unless RUN_INTEGRATION_TESTS=true) ─────────────
 
 
