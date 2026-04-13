@@ -247,6 +247,25 @@ wheels = [
 ]
 
 [[package]]
+name = "anthropic"
+version = "0.94.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "docstring-parser" },
+    { name = "httpx" },
+    { name = "jiter" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/60/d7/11a649b986da06aaeb81334632f1843d70e3797f54ca4a9c5d604b7987d0/anthropic-0.94.0.tar.gz", hash = "sha256:dde8c57de73538c5136c1bca9b16da92e75446b53a73562cc911574e4934435c", size = 654236, upload-time = "2026-04-10T22:27:59.853Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/ac/7185750e8688f6ff79b0e3d6a61372c88b81ba81fcda8798c70598e18aca/anthropic-0.94.0-py3-none-any.whl", hash = "sha256:42550b401eed8fcd7f6654234560f99c428306301bca726d32bca4bfb6feb748", size = 627519, upload-time = "2026-04-10T22:27:57.541Z" },
+]
+
+[[package]]
 name = "antlr4-python3-runtime"
 version = "4.13.2"
 source = { registry = "https://pypi.org/simple" }
@@ -5049,6 +5068,13 @@ opentelemetry = [
 pydantic = [
     { name = "pydantic" },
 ]
+tool-registry = [
+    { name = "anthropic" },
+]
+tool-registry-openai = [
+    { name = "anthropic" },
+    { name = "openai" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -5090,11 +5116,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
+    { name = "anthropic", marker = "extra == 'tool-registry'", specifier = ">=0.40.0" },
+    { name = "anthropic", marker = "extra == 'tool-registry-openai'", specifier = ">=0.40.0" },
     { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=1.27.0,<2" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.7.0,<0.8" },
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
     { name = "nexus-rpc", specifier = "==1.4.0" },
+    { name = "openai", marker = "extra == 'tool-registry-openai'", specifier = ">=1.0.0" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.3,<0.7" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
@@ -5110,7 +5139,7 @@ requires-dist = [
     { name = "types-protobuf", specifier = ">=3.20,<7.0.0" },
     { name = "typing-extensions", specifier = ">=4.2.0,<5" },
 ]
-provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langsmith", "lambda-worker-otel", "aioboto3"]
+provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langsmith", "lambda-worker-otel", "tool-registry", "tool-registry-openai", "aioboto3"]
 
 [package.metadata.requires-dev]
 dev = [
