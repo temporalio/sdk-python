@@ -76,7 +76,7 @@ class AnthropicProvider:
         else:
             self._client = client
 
-    def run_turn(self, messages: list[dict[str, Any]]) -> bool:
+    async def run_turn(self, messages: list[dict[str, Any]]) -> bool:
         """Execute one turn of the conversation.
 
         Appends the assistant response (and any tool results) to *messages*
@@ -105,7 +105,7 @@ class AnthropicProvider:
         for call in tool_calls:
             is_error = False
             try:
-                result = self._registry.dispatch(call["name"], call.get("input", {}))
+                result = await self._registry.adispatch(call["name"], call.get("input", {}))
             except Exception as e:
                 result = f"error: {e}"
                 is_error = True
@@ -120,9 +120,9 @@ class AnthropicProvider:
         messages.append({"role": "user", "content": tool_results})
         return False
 
-    def run_loop(self, messages: list[dict[str, Any]]) -> None:
+    async def run_loop(self, messages: list[dict[str, Any]]) -> None:
         """Run turns until the model stops using tools."""
-        while not self.run_turn(messages):
+        while not await self.run_turn(messages):
             pass
 
 
@@ -155,7 +155,7 @@ class OpenAIProvider:
         else:
             self._client = client
 
-    def run_turn(self, messages: list[dict[str, Any]]) -> bool:
+    async def run_turn(self, messages: list[dict[str, Any]]) -> bool:
         """Execute one turn of the conversation.
 
         Appends the assistant response (and any tool results) to *messages*
@@ -201,7 +201,7 @@ class OpenAIProvider:
                 continue
             args = json.loads(tc.function.arguments or "{}")
             try:
-                result = self._registry.dispatch(tc.function.name, args)
+                result = await self._registry.adispatch(tc.function.name, args)
             except Exception as e:
                 result = f"error: {e}"
             messages.append(
@@ -213,9 +213,9 @@ class OpenAIProvider:
             )
         return False
 
-    def run_loop(self, messages: list[dict[str, Any]]) -> None:
+    async def run_loop(self, messages: list[dict[str, Any]]) -> None:
         """Run turns until the model stops calling functions."""
-        while not self.run_turn(messages):
+        while not await self.run_turn(messages):
             pass
 
 
@@ -263,9 +263,9 @@ async def run_tool_loop(
         kwargs["client"] = client
 
     if provider == "anthropic":
-        AnthropicProvider(tools, system, **kwargs).run_loop(messages)
+        await AnthropicProvider(tools, system, **kwargs).run_loop(messages)
     elif provider == "openai":
-        OpenAIProvider(tools, system, **kwargs).run_loop(messages)
+        await OpenAIProvider(tools, system, **kwargs).run_loop(messages)
     else:
         raise ValueError(f"Unknown provider {provider!r}. Use 'anthropic' or 'openai'.")
     return messages

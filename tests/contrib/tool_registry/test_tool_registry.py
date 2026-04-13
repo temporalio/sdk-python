@@ -6,6 +6,8 @@ Tests run without an API key or Temporal server.  LLM calls are replaced by
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from temporalio.contrib.tool_registry import ToolRegistry, run_tool_loop
@@ -33,6 +35,42 @@ def test_dispatch_unknown_raises():
     registry = ToolRegistry()
     with pytest.raises(KeyError, match="unknown"):
         registry.dispatch("unknown", {})
+
+
+def test_adispatch_sync_handler():
+    """adispatch works with a plain def handler."""
+    registry = ToolRegistry()
+
+    @registry.handler({"name": "greet", "description": "d", "input_schema": {}})
+    def handle_greet(inp: dict) -> str:
+        return f"hello {inp.get('name')}"
+
+    result = asyncio.run(registry.adispatch("greet", {"name": "world"}))
+    assert result == "hello world"
+
+
+def test_adispatch_async_handler():
+    """adispatch awaits async handlers."""
+    registry = ToolRegistry()
+
+    @registry.handler({"name": "async_greet", "description": "d", "input_schema": {}})
+    async def handle_async_greet(inp: dict) -> str:
+        return f"async hello {inp.get('name')}"
+
+    result = asyncio.run(registry.adispatch("async_greet", {"name": "world"}))
+    assert result == "async hello world"
+
+
+def test_dispatch_async_handler_raises_typeerror():
+    """dispatch() on an async handler raises TypeError — use adispatch instead."""
+    registry = ToolRegistry()
+
+    @registry.handler({"name": "async_tool", "description": "d", "input_schema": {}})
+    async def handle(inp: dict) -> str:
+        return "async result"
+
+    with pytest.raises(TypeError, match="adispatch"):
+        registry.dispatch("async_tool", {})
 
 
 def test_to_openai_format():
@@ -165,8 +203,6 @@ def test_fake_registry_records_calls():
 
 
 def test_run_tool_loop_unknown_provider_raises():
-    import asyncio
-
     async def _run():
         await run_tool_loop(
             provider="gemini",
@@ -195,7 +231,8 @@ def test_crash_after_turns_raises():
 # ── is_error / handler error tests ───────────────────────────────────────────
 
 
-def test_anthropic_handler_error_sets_is_error_and_does_not_crash():
+@pytest.mark.asyncio
+async def test_anthropic_handler_error_sets_is_error_and_does_not_crash():
     """Handler exceptions are caught; the tool result carries is_error=True."""
     from temporalio.contrib.tool_registry._providers import AnthropicProvider
 
@@ -228,10 +265,10 @@ def test_anthropic_handler_error_sets_is_error_and_does_not_crash():
 
     provider = AnthropicProvider(registry, "sys", client=_FakeClient())
     messages: list[dict] = [{"role": "user", "content": "go"}]
-    provider.run_turn(messages)
+    await provider.run_turn(messages)
 
-    # Second message is the tool result wrapper from the user role.
-    tool_result_msg = messages[1]
+    # messages[1] is the assistant message; messages[2] is the tool result wrapper.
+    tool_result_msg = messages[2]
     assert tool_result_msg["role"] == "user"
     tool_result = tool_result_msg["content"][0]
     assert tool_result["type"] == "tool_result"
@@ -239,7 +276,53 @@ def test_anthropic_handler_error_sets_is_error_and_does_not_crash():
     assert "intentional failure" in tool_result["content"]
 
 
-def test_openai_handler_error_does_not_crash():
+@pytest.mark.asyncio
+async def test_async_handler_invoked_via_adispatch():
+    """Async handlers are awaited by providers via adispatch."""
+    from temporalio.contrib.tool_registry._providers import AnthropicProvider
+
+    registry = ToolRegistry()
+    invocations: list[str] = []
+
+    @registry.handler({"name": "async_tool", "description": "d", "input_schema": {}})
+    async def handle(inp: dict) -> str:
+        invocations.append("called")
+        return "async result"
+
+    calls: list[int] = []
+
+    class _MockMessages:
+        def create(self, **_kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                return _FakeResponse(
+                    content=[{"type": "tool_use", "id": "c1", "name": "async_tool", "input": {}}],
+                    stop_reason="tool_use",
+                )
+            return _FakeResponse(content=[{"type": "text", "text": "done"}], stop_reason="end_turn")
+
+    class _FakeClient:
+        messages = _MockMessages()
+
+    class _FakeResponse:
+        def __init__(self, content, stop_reason):
+            self.content = content
+            self.stop_reason = stop_reason
+
+    provider = AnthropicProvider(registry, "sys", client=_FakeClient())
+    messages: list[dict] = [{"role": "user", "content": "go"}]
+    await provider.run_turn(messages)
+
+    assert invocations == ["called"]
+    # messages[1] is the assistant message; messages[2] is the tool result wrapper.
+    tool_result_msg = messages[2]
+    tool_result = tool_result_msg["content"][0]
+    assert tool_result["content"] == "async result"
+    assert "is_error" not in tool_result
+
+
+@pytest.mark.asyncio
+async def test_openai_handler_error_does_not_crash():
     """Handler exceptions in OpenAI provider are caught and returned as error strings."""
     from temporalio.contrib.tool_registry._providers import OpenAIProvider
 
@@ -280,7 +363,7 @@ def test_openai_handler_error_does_not_crash():
     messages: list[dict] = [{"role": "user", "content": "go"}]
     # Should not raise even though the handler throws.
     try:
-        provider.run_turn(messages)
+        await provider.run_turn(messages)
     except Exception as e:
         pytest.fail(f"run_turn raised unexpectedly: {e}")
 

@@ -167,13 +167,13 @@ class FakeToolRegistry(ToolRegistry):
 
 
 class MockAgenticSession:
-    """A pre-canned :class:`AgenticSession` that returns fixed issues without LLM calls.
+    """A pre-canned :class:`AgenticSession` that returns fixed results without LLM calls.
 
     Use this to test code that calls :func:`agentic_session` and inspects
-    ``session.issues`` without needing an API key or a running server.
+    ``session.results`` without needing an API key or a running server.
 
     Args:
-        issues: Pre-canned issues to populate ``session.issues`` immediately
+        results: Pre-canned results to populate ``session.results`` immediately
             on construction.
 
     Example::
@@ -184,13 +184,13 @@ class MockAgenticSession:
         async def run_with_mock(prompt: str) -> list:
             session = MockAgenticSession([{"type": "missing", "symbol": "x", "description": "gone"}])
             # Simulate the agentic loop completing without LLM calls
-            return session.issues
+            return session.results
     """
 
-    def __init__(self, issues: list[Any] | None = None) -> None:
-        """Initialize MockAgenticSession with optional pre-seeded issues."""
+    def __init__(self, results: list[Any] | None = None) -> None:
+        """Initialize MockAgenticSession with optional pre-seeded results."""
         self.messages: list[dict[str, Any]] = []
-        self.issues: list[Any] = list(issues or [])
+        self.results: list[Any] = list(results or [])
 
     async def run_tool_loop(
         self,
@@ -204,7 +204,7 @@ class MockAgenticSession:
         """No-op — does not call any LLM."""
         if not self.messages:
             self.messages = [{"role": "user", "content": prompt}]
-        # No LLM calls; session.issues already set by constructor.
+        # No LLM calls; session.results already set by constructor.
 
     def _checkpoint(self) -> None:
         """No-op — does not call activity.heartbeat() in tests."""

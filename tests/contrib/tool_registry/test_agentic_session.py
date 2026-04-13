@@ -35,19 +35,20 @@ def _make_activity_info(heartbeat_details=None):
 
 
 async def test_fresh_start_empty_state():
-    """No heartbeat details → session starts with empty messages and issues."""
+    """No heartbeat details → session starts with empty messages and results."""
     with patch("temporalio.contrib.tool_registry._session.activity") as mock_activity:
         mock_activity.info.return_value = _make_activity_info()
         async with agentic_session() as session:
             assert session.messages == []
-            assert session.issues == []
+            assert session.results == []
 
 
 async def test_restores_from_checkpoint():
-    """Heartbeat details present → session restores messages and issues on retry."""
+    """Heartbeat details present → session restores messages and results on retry."""
     saved = {
+        "version": 1,
         "messages": [{"role": "user", "content": "analyze this"}],
-        "issues": [{"type": "missing", "symbol": "patched", "description": "removed"}],
+        "results": [{"type": "missing", "symbol": "patched", "description": "removed"}],
     }
     with patch("temporalio.contrib.tool_registry._session.activity") as mock_activity:
         mock_activity.info.return_value = _make_activity_info(
@@ -55,9 +56,9 @@ async def test_restores_from_checkpoint():
         )
         async with agentic_session() as session:
             assert session.messages == saved["messages"]
-            assert len(session.issues) == 1
-            assert session.issues[0]["type"] == "missing"
-            assert session.issues[0]["symbol"] == "patched"
+            assert len(session.results) == 1
+            assert session.results[0]["type"] == "missing"
+            assert session.results[0]["symbol"] == "patched"
 
 
 async def test_ignores_invalid_checkpoint():
@@ -68,14 +69,14 @@ async def test_ignores_invalid_checkpoint():
         )
         async with agentic_session() as session:
             assert session.messages == []
-            assert session.issues == []
+            assert session.results == []
 
 
 # ── AgenticSession._checkpoint tests ─────────────────────────────────────────
 
 
-def test_checkpoint_serializes_messages_and_issues():
-    """_checkpoint() heartbeats JSON with messages + issues."""
+def test_checkpoint_serializes_messages_and_results():
+    """_checkpoint() heartbeats JSON with messages + results."""
     heartbeat_calls = []
     with patch("temporalio.contrib.tool_registry._session.activity") as mock_activity:
         mock_activity.heartbeat.side_effect = lambda s: heartbeat_calls.append(
@@ -83,26 +84,26 @@ def test_checkpoint_serializes_messages_and_issues():
         )
 
         @dataclasses.dataclass
-        class Issue:
+        class Result:
             type: str
             symbol: str
             description: str
 
         session = AgenticSession(
             messages=[{"role": "user", "content": "hi"}],
-            issues=[Issue(type="missing", symbol="x", description="gone")],
+            results=[Result(type="missing", symbol="x", description="gone")],
         )
         session._checkpoint()
 
     assert len(heartbeat_calls) == 1
     payload = heartbeat_calls[0]
     assert payload["messages"] == [{"role": "user", "content": "hi"}]
-    assert len(payload["issues"]) == 1
-    assert payload["issues"][0]["type"] == "missing"
+    assert len(payload["results"]) == 1
+    assert payload["results"][0]["type"] == "missing"
 
 
 def test_checkpoint_empty_state():
-    """_checkpoint() with no messages/issues produces valid empty JSON."""
+    """_checkpoint() with no messages/results produces valid empty JSON."""
     heartbeat_calls = []
     with patch("temporalio.contrib.tool_registry._session.activity") as mock_activity:
         mock_activity.heartbeat.side_effect = lambda s: heartbeat_calls.append(
@@ -110,24 +111,24 @@ def test_checkpoint_empty_state():
         )
         AgenticSession()._checkpoint()
 
-    assert heartbeat_calls[0] == {"version": 1, "messages": [], "issues": []}
+    assert heartbeat_calls[0] == {"version": 1, "messages": [], "results": []}
 
 
-def test_checkpoint_plain_dict_issues():
-    """_checkpoint() handles plain dict issues (not just dataclasses)."""
+def test_checkpoint_plain_dict_results():
+    """_checkpoint() handles plain dict results (not just dataclasses)."""
     heartbeat_calls = []
     with patch("temporalio.contrib.tool_registry._session.activity") as mock_activity:
         mock_activity.heartbeat.side_effect = lambda s: heartbeat_calls.append(
             json.loads(s)
         )
         session = AgenticSession(
-            issues=[
+            results=[
                 {"type": "deprecated", "symbol": "old_api", "description": "use new"}
             ]
         )
         session._checkpoint()
 
-    assert heartbeat_calls[0]["issues"][0]["symbol"] == "old_api"
+    assert heartbeat_calls[0]["results"][0]["symbol"] == "old_api"
 
 
 # ── AgenticSession.run_tool_loop tests ────────────────────────────────────────
@@ -289,9 +290,9 @@ def test_checkpoint_round_trip_preserves_tool_calls():
         }
     ]
     assistant_msg = {"role": "assistant", "tool_calls": tool_calls_in_memory}
-    issue = {"type": "smell", "file": "foo.py"}
+    result = {"type": "smell", "file": "foo.py"}
 
-    session = AgenticSession(messages=[assistant_msg], issues=[issue])
+    session = AgenticSession(messages=[assistant_msg], results=[result])
     heartbeat_calls: list[str] = []
 
     with patch("temporalio.contrib.tool_registry._session.activity") as mock_activity:
@@ -307,8 +308,8 @@ def test_checkpoint_round_trip_preserves_tool_calls():
     assert len(tool_calls_restored) == 1
     assert tool_calls_restored[0]["id"] == "call_abc"
     assert tool_calls_restored[0]["function"]["name"] == "my_tool"
-    assert restored["issues"][0]["type"] == "smell"
-    assert restored["issues"][0]["file"] == "foo.py"
+    assert restored["results"][0]["type"] == "smell"
+    assert restored["results"][0]["file"] == "foo.py"
 
 
 # ── heartbeat_every tests (T7) ────────────────────────────────────────────────
@@ -387,10 +388,10 @@ async def test_heartbeat_every_n_skips_turns():
 # ── MockAgenticSession tests ──────────────────────────────────────────────────
 
 
-async def test_mock_agentic_session_returns_pre_canned_issues():
-    """MockAgenticSession returns fixed issues without LLM calls."""
+async def test_mock_agentic_session_returns_pre_canned_results():
+    """MockAgenticSession returns fixed results without LLM calls."""
     session = MockAgenticSession(
-        issues=[{"type": "deprecated", "symbol": "old_fn", "description": "removed"}]
+        results=[{"type": "deprecated", "symbol": "old_fn", "description": "removed"}]
     )
     await session.run_tool_loop(
         registry=ToolRegistry(),
@@ -398,14 +399,14 @@ async def test_mock_agentic_session_returns_pre_canned_issues():
         system="s",
         prompt="p",
     )
-    assert len(session.issues) == 1
-    assert session.issues[0]["symbol"] == "old_fn"
+    assert len(session.results) == 1
+    assert session.results[0]["symbol"] == "old_fn"
 
 
-async def test_mock_agentic_session_empty_issues():
-    """MockAgenticSession with no issues starts empty."""
+async def test_mock_agentic_session_empty_results():
+    """MockAgenticSession with no results starts empty."""
     session = MockAgenticSession()
-    assert session.issues == []
+    assert session.results == []
 
 
 # ── Integration test (skipped unless RUN_INTEGRATION_TESTS=true) ─────────────

@@ -15,7 +15,7 @@ Example::
                                      "properties": {"description": {"type": "string"}},
                                      "required": ["description"]}})
     def handle_flag_issue(inp: dict) -> str:
-        issues.append(inp["description"])
+        results.append(inp["description"])
         return "recorded"
 
     # Use with Anthropic
@@ -25,13 +25,14 @@ Example::
     response = client.chat.completions.create(tools=tools.to_openai(), ...)
 
     # Dispatch a tool call returned by the model
-    result = tools.dispatch(tool_name, tool_input)
+    result = await tools.dispatch(tool_name, tool_input)
 """
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Awaitable, Union
 
 
 class ToolRegistry:
@@ -41,12 +42,14 @@ class ToolRegistry:
     ``name``, ``description``, and ``input_schema`` keys).  The registry
     can then export the same tools for Anthropic or OpenAI providers, and
     dispatch incoming tool calls to the appropriate handler.
+
+    Handlers may be synchronous (``def``) or asynchronous (``async def``).
     """
 
     def __init__(self) -> None:
         """Initialize ToolRegistry with empty definitions and handlers."""
         self._definitions: list[dict[str, Any]] = []
-        self._handlers: dict[str, Callable[[dict[str, Any]], str]] = {}
+        self._handlers: dict[str, Callable[..., Any]] = {}
 
     # ── Registration ──────────────────────────────────────────────────────────
 
@@ -65,11 +68,11 @@ class ToolRegistry:
 
             @tools.handler({"name": "my_tool", "description": "...",
                             "input_schema": {...}})
-            def handle_my_tool(inp: dict) -> str:
-                return "result"
+            async def handle_my_tool(inp: dict) -> str:
+                return await some_async_call(inp)
         """
 
-        def decorator(fn: Callable[[dict[str, Any]], str]) -> Callable:
+        def decorator(fn: Callable[..., Any]) -> Callable:
             self._definitions.append(definition)
             self._handlers[definition["name"]] = fn
             return fn
@@ -148,6 +151,37 @@ class ToolRegistry:
     def dispatch(self, name: str, input_dict: dict[str, Any]) -> str:
         """Call the handler registered for ``name`` with ``input_dict``.
 
+        Synchronous version. Raises ``TypeError`` if the registered handler is
+        an ``async def`` — use :meth:`adispatch` for async handlers.
+
+        Args:
+            name: Tool name as returned by the model.
+            input_dict: Parsed tool input as a plain ``dict``.
+
+        Returns:
+            String result from the handler.
+
+        Raises:
+            KeyError: If no handler is registered for ``name``.
+            TypeError: If the handler is async (use :meth:`adispatch` instead).
+        """
+        handler = self._handlers.get(name)
+        if handler is None:
+            raise KeyError(f"Unknown tool: {name!r}")
+        if inspect.iscoroutinefunction(handler):
+            raise TypeError(
+                f"Handler for {name!r} is async — use `await registry.adispatch(...)` "
+                "from an async context."
+            )
+        return handler(input_dict)
+
+    async def adispatch(self, name: str, input_dict: dict[str, Any]) -> str:
+        """Call the handler registered for ``name`` with ``input_dict``.
+
+        Supports both synchronous and asynchronous handlers. An
+        ``async def`` handler is awaited; a plain ``def`` handler is called
+        directly. This is the method called internally by all providers.
+
         Args:
             name: Tool name as returned by the model.
             input_dict: Parsed tool input as a plain ``dict``.
@@ -161,4 +195,6 @@ class ToolRegistry:
         handler = self._handlers.get(name)
         if handler is None:
             raise KeyError(f"Unknown tool: {name!r}")
+        if inspect.iscoroutinefunction(handler):
+            return await handler(input_dict)
         return handler(input_dict)

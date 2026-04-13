@@ -23,7 +23,7 @@ Example::
                             "input_schema": {"type": "object",
                                              "properties": {"msg": {"type": "string"}}}})
             def handle_flag(inp: dict) -> str:
-                session.issues.append(inp)
+                session.results.append(inp)
                 return "recorded"
 
             await session.run_tool_loop(
@@ -32,7 +32,7 @@ Example::
                 system="You are a code reviewer...",
                 prompt=prompt,
             )
-        return session.issues
+        return session.results
 """
 
 from __future__ import annotations
@@ -65,13 +65,13 @@ class AgenticSession:
     Attributes:
         messages: Full conversation history in provider-neutral format.
             Appended to by :meth:`run_tool_loop` on each turn.
-        issues: Application-level results accumulated during the session.
+        results: Application-level results accumulated during the session.
             Serialized to JSON for checkpoint storage — elements must be
             JSON-serializable (plain dicts or dataclass instances).
     """
 
     messages: list[dict[str, Any]] = dataclasses.field(default_factory=list)
-    issues: list[Any] = dataclasses.field(default_factory=list)
+    results: list[Any] = dataclasses.field(default_factory=list)
 
     async def run_tool_loop(
         self,
@@ -137,7 +137,7 @@ class AgenticSession:
                 turn += 1
                 if (turn - 1) % heartbeat_every == 0:
                     self._checkpoint()
-                if p.run_turn(self.messages):
+                if await p.run_turn(self.messages):
                     break
 
         elif provider == "openai":
@@ -151,7 +151,7 @@ class AgenticSession:
                 turn += 1
                 if (turn - 1) % heartbeat_every == 0:
                     self._checkpoint()
-                if p_oa.run_turn(self.messages):
+                if await p_oa.run_turn(self.messages):
                     break
 
         else:
@@ -165,24 +165,24 @@ class AgenticSession:
         :func:`activity.heartbeat` sends the payload to the Temporal server.
         On retry, ``activity.info().heartbeat_details[0]`` contains this JSON.
         :func:`agentic_session` reads it on entry and restores messages +
-        issues.
+        results.
 
-        Issues are serialized with :func:`dataclasses.asdict` if they are
+        Results are serialized with :func:`dataclasses.asdict` if they are
         dataclass instances, or left as-is if they are already plain dicts.
 
         Raises:
-            ApplicationError: (non-retryable) If any issue is not JSON-serializable.
+            ApplicationError: (non-retryable) If any result is not JSON-serializable.
         """
 
-        def _serialize_issue(issue: Any, idx: int) -> dict[str, Any]:
-            if dataclasses.is_dataclass(issue) and not isinstance(issue, type):
-                s = dataclasses.asdict(issue)
+        def _serialize_result(result: Any, idx: int) -> dict[str, Any]:
+            if dataclasses.is_dataclass(result) and not isinstance(result, type):
+                s = dataclasses.asdict(result)
             else:
                 try:
-                    s = dict(issue)
+                    s = dict(result)
                 except (TypeError, ValueError) as e:
                     raise ApplicationError(
-                        f"AgenticSession: issues[{idx}] cannot be converted to dict: {e}. "
+                        f"AgenticSession: results[{idx}] cannot be converted to dict: {e}. "
                         "Store only plain dicts or dataclass instances.",
                         non_retryable=True,
                     ) from e
@@ -190,20 +190,20 @@ class AgenticSession:
                 json.dumps(s)
             except (TypeError, ValueError) as e:
                 raise ApplicationError(
-                    f"AgenticSession: issues[{idx}] is not JSON-serializable: {e}. "
+                    f"AgenticSession: results[{idx}] is not JSON-serializable: {e}. "
                     "Store only plain dicts or dataclasses with JSON-serializable fields.",
                     non_retryable=True,
                 ) from e
             return s
 
-        serialized_issues = [_serialize_issue(iss, i) for i, iss in enumerate(self.issues)]
+        serialized_results = [_serialize_result(r, i) for i, r in enumerate(self.results)]
 
         activity.heartbeat(
             json.dumps(
                 {
                     "version": 1,
                     "messages": self.messages,
-                    "issues": serialized_issues,
+                    "results": serialized_results,
                 }
             )
         )
@@ -213,7 +213,7 @@ class AgenticSession:
 async def agentic_session() -> AsyncGenerator[AgenticSession, None]:
     """Async context manager for a durable, checkpointed LLM tool-use session.
 
-    On entry, restores conversation state (messages + issues) from
+    On entry, restores conversation state (messages + results) from
     :attr:`activity.info().heartbeat_details`, if present. This handles the
     retry case — the session resumes mid-conversation instead of restarting
     from the first turn.
@@ -232,7 +232,7 @@ async def agentic_session() -> AsyncGenerator[AgenticSession, None]:
                 system=SYSTEM,
                 prompt=prompt,
             )
-        # session.issues contains all results accumulated during the run
+        # session.results contains all results accumulated during the run
 
     Retry behavior:
         A 10-turn LLM analysis that crashes on turn 9 resumes from turn 9.
@@ -266,6 +266,6 @@ async def agentic_session() -> AsyncGenerator[AgenticSession, None]:
 
     session = AgenticSession(
         messages=saved.get("messages", []),
-        issues=saved.get("issues", []),
+        results=saved.get("results", []),
     )
     yield session

@@ -30,7 +30,7 @@ from temporalio.contrib.tool_registry import ToolRegistry, run_tool_loop
 
 @activity.defn  # Remove for standalone use — no worker needed
 async def analyze(prompt: str) -> list[str]:
-    issues: list[str] = []
+    results: list[str] = []
     tools = ToolRegistry()
 
     @tools.handler({
@@ -43,7 +43,7 @@ async def analyze(prompt: str) -> list[str]:
         },
     })
     def handle_flag(inp: dict) -> str:
-        issues.append(inp["description"])
+        results.append(inp["description"])
         return "recorded"  # this string is sent back to the LLM as the tool result
 
     await run_tool_loop(
@@ -52,7 +52,7 @@ async def analyze(prompt: str) -> list[str]:
         prompt=prompt,
         tools=tools,
     )
-    return issues
+    return results
 ```
 
 ## Feature matrix
@@ -135,7 +135,7 @@ async def long_analysis(prompt: str) -> list[str]:
 
         @tools.handler({"name": "flag", "description": "...", "input_schema": {"type": "object"}})
         def handle_flag(inp: dict) -> str:
-            session.issues.append(inp)
+            session.results.append(inp)
             return "ok"  # this string is sent back to the LLM as the tool result
 
         await session.run_tool_loop(
@@ -144,7 +144,7 @@ async def long_analysis(prompt: str) -> list[str]:
             system="...",
             prompt=prompt,
         )
-    return session.issues
+    return session.results
 ```
 
 ## Testing without an API key
@@ -184,7 +184,7 @@ incur billing — expect a few cents per full test run.
 
 ## Storing application results
 
-`session.issues` accumulates application-level results during the tool loop.
+`session.results` accumulates application-level results during the tool loop.
 Elements are serialized to JSON inside each heartbeat checkpoint — they must be
 plain maps/dicts with JSON-serializable values. A non-serializable value raises
 a non-retryable `ApplicationError` at heartbeat time rather than silently losing
@@ -199,15 +199,15 @@ the session:
 import dataclasses
 
 @dataclasses.dataclass
-class Issue:
+class Finding:
     type: str
     file: str
 
 # Inside tool handler:
-session.issues.append(dataclasses.asdict(Issue(type="smell", file="foo.py")))
+session.results.append(dataclasses.asdict(Finding(type="smell", file="foo.py")))
 
 # After session:
-issues = [Issue(**i) for i in session.issues]
+findings = [Finding(**r) for r in session.results]
 ```
 
 ## Per-turn LLM timeout
@@ -228,3 +228,19 @@ Recommended timeouts:
 |---|---|
 | Standard (Claude 3.x, GPT-4o) | 30 s |
 | Reasoning (o1, o3, extended thinking) | 300 s |
+
+### Activity-level timeout
+
+Set `schedule_to_close_timeout` on the activity options to bound the entire conversation:
+
+```python
+await workflow.execute_activity(
+    long_analysis,
+    prompt,
+    schedule_to_close_timeout=timedelta(seconds=600),
+)
+```
+
+The per-turn client timeout and `schedule_to_close_timeout` are complementary:
+- Per-turn timeout fires if one LLM call hangs (protects against a single stuck turn)
+- `schedule_to_close_timeout` bounds the entire conversation including all retries (protects against runaway multi-turn loops)
