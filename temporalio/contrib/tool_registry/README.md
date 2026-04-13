@@ -147,6 +147,133 @@ async def long_analysis(prompt: str) -> list[str]:
     return session.results
 ```
 
+## Human-in-the-loop tool calls
+
+A tool handler can block waiting for a human decision before returning a result to the
+LLM. Because conversation state is stored in the heartbeat — not in a provider-side
+session — the activity can wait hours without losing context. Framework plugins that rely
+on API session IDs cannot do this: those sessions expire.
+
+The pattern: the handler starts a Temporal workflow that notifies a reviewer, then blocks
+on its result. The human signals the workflow to approve or reject. If the activity
+crashes while waiting, the next retry re-attaches to the same workflow via a deterministic
+ID — no duplicate notifications, no lost decisions.
+
+The rejection reason is returned to the LLM as the tool result. The model can read it and
+revise its next proposal accordingly.
+
+```python
+import asyncio
+from datetime import timedelta
+from temporalio import activity, workflow
+from temporalio.client import Client, WorkflowIDConflictPolicy
+from temporalio.contrib.tool_registry import ToolRegistry, agentic_session
+
+
+# ── Approval workflow ──────────────────────────────────────────────────────────
+
+@workflow.defn
+class FixApprovalWorkflow:
+    """Waits for a human to approve or reject a proposed code fix."""
+
+    def __init__(self) -> None:
+        self._decision: dict | None = None
+
+    @workflow.run
+    async def run(self, fix: dict) -> dict:
+        # Notify reviewer here (Slack, email, etc.) using workflow.execute_activity
+        await workflow.wait_condition(
+            lambda: self._decision is not None,
+            timeout=timedelta(hours=24),
+        )
+        return self._decision or {"approved": False, "reason": "timed out"}
+
+    @workflow.signal
+    def decide(self, decision: dict) -> None:
+        self._decision = decision
+
+
+# ── Activity ───────────────────────────────────────────────────────────────────
+
+@activity.defn
+async def review_and_fix(diff: str) -> list[dict]:
+    """Review a code diff; each proposed fix requires human sign-off."""
+
+    async with agentic_session() as session:
+        tools = ToolRegistry()
+
+        @tools.handler({
+            "name": "propose_fix",
+            "description": (
+                "Propose a code fix requiring human approval. "
+                "Returns 'approved' or 'rejected: <reason>'. "
+                "If rejected, revise your approach using the stated reason."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string"},
+                    "description": {"type": "string"},
+                    "patch": {"type": "string", "description": "Unified diff to apply"},
+                },
+                "required": ["file", "description", "patch"],
+            },
+        })
+        async def handle_propose_fix(inp: dict) -> str:
+            client = await Client.connect("localhost:7233")
+
+            # Deterministic ID: crash-retry re-attaches to the existing workflow
+            # rather than starting a duplicate. If the human already decided before
+            # the crash, handle.result() returns immediately.
+            wf_id = f"fix-{activity.info().activity_id}-{inp['file']}"
+            handle = await client.start_workflow(
+                FixApprovalWorkflow.run,
+                inp,
+                id=wf_id,
+                task_queue="approvals",
+                id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            )
+
+            # agentic_session heartbeats before each LLM turn, not during tool
+            # execution. Heartbeat manually here so the activity isn't timed out
+            # while waiting for a human reviewer.
+            async def _heartbeat() -> None:
+                while True:
+                    activity.heartbeat()
+                    await asyncio.sleep(10)
+
+            hb = asyncio.create_task(_heartbeat())
+            try:
+                decision = await handle.result()
+            finally:
+                hb.cancel()
+
+            if decision["approved"]:
+                session.results.append(inp)
+                return "approved — fix applied"
+            return f"rejected: {decision.get('reason', 'no reason given')}"
+
+        await session.run_tool_loop(
+            registry=tools,
+            provider="anthropic",
+            system=(
+                "You are a code reviewer. Propose fixes using propose_fix. "
+                "If a fix is rejected, revise your approach using the stated reason."
+            ),
+            prompt=f"Review this diff and propose fixes:\n\n{diff}",
+        )
+    return session.results
+```
+
+Reviewer signals approval from any Temporal client:
+
+```python
+handle = client.get_workflow_handle(wf_id)
+await handle.signal(FixApprovalWorkflow.decide, {"approved": True})
+# or with a rejection reason the LLM will read:
+await handle.signal(FixApprovalWorkflow.decide, {"approved": False, "reason": "scope too broad — fix one thing at a time"})
+```
+
 ## Testing without an API key
 
 ```python
