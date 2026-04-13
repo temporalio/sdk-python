@@ -8,12 +8,12 @@ from typing import cast
 from urllib.request import urlopen
 
 import pytest
-
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.runtime import (
     LogForwardingConfig,
     LoggingConfig,
+    OpenTelemetryConfig,
     PrometheusConfig,
     Runtime,
     TelemetryConfig,
@@ -21,6 +21,7 @@ from temporalio.runtime import (
     _RuntimeRef,
 )
 from temporalio.worker import Worker
+
 from tests.helpers import (
     LogHandler,
     assert_eq_eventually,
@@ -270,9 +271,7 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
 
 async def test_opentelemetry_histogram_bucket_overrides(client: Client):
-    # Mirrors test_prometheus_histogram_bucket_overrides but routes metrics
-    # through an in-process OTLP/HTTP receiver and asserts the exported
-    # histogram explicit_bounds match the configured overrides.
+    # Set up an OpenTelemetry configuration with custom histogram bucket overrides
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
