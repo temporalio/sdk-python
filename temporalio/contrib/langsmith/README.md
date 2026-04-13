@@ -1,5 +1,7 @@
 # LangSmith Plugin for Temporal Python SDK
 
+> ⚠️ **This package is currently at an experimental release stage.** ⚠️
+
 This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows your [LangSmith](https://smith.langchain.com/) traces to work within Temporal Workflows. It propagates trace context across Worker boundaries so that `@traceable` calls, LLM invocations, and Temporal operations show up in a single connected trace, and ensures that replaying does not generate duplicate traces.
 
 ## Quick Start

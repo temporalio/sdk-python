@@ -533,6 +533,10 @@ class LangSmithInterceptor(
 ):
     """Interceptor that supports client and worker LangSmith run creation
     and context propagation.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
     """
 
     def __init__(
