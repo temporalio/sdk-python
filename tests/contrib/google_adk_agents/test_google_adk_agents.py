@@ -979,8 +979,12 @@ def test_unset_none_fields_stripped() -> None:
 
     assert serialized["model"] == "gemini-2.0-flash"
     assert "contents" in serialized
-    for field in ("cache_config", "cache_metadata",
-                  "cacheable_contents_token_count", "previous_interaction_id"):
+    for field in (
+        "cache_config",
+        "cache_metadata",
+        "cacheable_contents_token_count",
+        "previous_interaction_id",
+    ):
         assert field not in serialized, f"Unset field {field!r} should be stripped"
 
 

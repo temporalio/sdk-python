@@ -112,9 +112,7 @@ class GoogleAdkPlugin(SimplePlugin):
         self, converter: DataConverter | None
     ) -> DataConverter:
         if converter is None:
-            return DataConverter(
-                payload_converter_class=_AdkPayloadConverter
-            )
+            return DataConverter(payload_converter_class=_AdkPayloadConverter)
         elif converter.payload_converter_class is DefaultPayloadConverter:
             return dataclasses.replace(
                 converter, payload_converter_class=_AdkPayloadConverter
