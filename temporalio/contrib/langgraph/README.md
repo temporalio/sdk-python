@@ -1,6 +1,8 @@
-# LangGraph Temporal Plugin
+# LangGraph Plugin for Temporal Python SDK
 
-A [Temporal](https://temporal.io) plugin that runs [LangGraph](https://www.langchain.com/langgraph) nodes and tasks as Temporal Activities, giving your AI workflows durable execution, automatic retries, and timeouts.
+⚠️ **This package is currently at an experimental release stage.** ⚠️
+
+This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows you to run [LangGraph](https://www.langchain.com/langgraph) nodes and tasks as Temporal Activities, giving your AI workflows durable execution, automatic retries, and timeouts. It supports both the LangGraph Graph API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
 
 ## Installation
 

@@ -1,13 +1,17 @@
 from dataclasses import replace
 from typing import Any, Callable
 
-from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
 from langgraph._internal._runnable import RunnableCallable
 from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
-from temporalio.contrib.langgraph.task_cache import _get_task_cache, _set_task_cache, _task_id
 
 from temporalio import activity
+from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
+from temporalio.contrib.langgraph.task_cache import (
+    _get_task_cache,
+    _set_task_cache,
+    _task_id,
+)
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -18,6 +22,18 @@ _entrypoint_registry: dict[str, Pregel] = {}
 
 
 class LangGraphPlugin(SimplePlugin):
+    """LangGraph plugin for Temporal SDK.
+
+    .. warning::
+        This package is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This plugin runs `LangGraph <https://github.com/langchain-ai/langgraph>`_ nodes
+    and tasks as Temporal Activities, giving your AI agent workflows durable
+    execution, automatic retries, and timeouts. It supports both the LangGraph Graph
+    API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
+    """
+
     def __init__(
         self,
         # Graph API

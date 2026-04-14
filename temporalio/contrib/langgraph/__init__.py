@@ -1,13 +1,19 @@
-"""Support for using LangGraph as part of Temporal workflows.
+"""LangGraph plugin for Temporal SDK.
 
-This module provides compatibility between
-`LangGraph <https://github.com/langchain-ai/langgraph>`_ and Temporal workflows.
+.. warning::
+    This package is experimental and may change in future versions.
+    Use with caution in production environments.
+
+This plugin runs `LangGraph <https://github.com/langchain-ai/langgraph>`_ nodes
+and tasks as Temporal Activities, giving your AI agent workflows durable
+execution, automatic retries, and timeouts. It supports both the LangGraph Graph
+API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
 """
 
 from temporalio.contrib.langgraph.langgraph_plugin import (
     LangGraphPlugin,
-    entrypoint,
     cache,
+    entrypoint,
     graph,
 )
 
