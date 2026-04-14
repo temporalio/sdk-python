@@ -104,6 +104,11 @@ class VisitorFunctions(abc.ABC):
         \"\"\"Called when encountering multiple payloads together.\"\"\"
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+        \"\"\"Called when encountering a recognized system Nexus envelope payload.\"\"\"
+        raise NotImplementedError()
+
 class PayloadVisitor:
     \"\"\"A visitor for payloads. 
     Applies a function to every payload in a tree of messages.
@@ -125,6 +130,26 @@ class PayloadVisitor:
             await method(fs, root)
         else:
             raise ValueError(f"Unknown root message type: {root.DESCRIPTOR.full_name}")
+
+    async def _visit_system_nexus_payload(self, fs, service, operation, payload) -> None:
+        import temporalio.nexus.system
+
+        rewrite = temporalio.nexus.system.get_payload_rewriter(service, operation)
+        if rewrite is None:
+            await self._visit_temporal_api_common_v1_Payload(fs, payload)
+            return
+
+        async def payload_visitor(payloads):
+            new_payloads = list(payloads)
+            await fs.visit_payloads(new_payloads)
+            return new_payloads
+
+        new_payload = await rewrite(
+            payload, payload_visitor, not self.skip_search_attributes
+        )
+        if new_payload is not payload:
+            payload.CopyFrom(new_payload)
+        await fs.visit_system_nexus_envelope(payload)
 
 """
 
@@ -202,6 +227,17 @@ class PayloadVisitor:
 
         # Process regular fields first
         for field in regular_fields:
+            if (
+                desc.full_name == "coresdk.workflow_commands.ScheduleNexusOperation"
+                and field.name == "input"
+            ):
+                has_payload = True
+                lines.append(
+                    """\
+        if o.HasField("input"):
+            await self._visit_system_nexus_payload(fs, o.service, o.operation, o.input)"""
+                )
+                continue
             # Repeated fields (including maps which are represented as repeated messages)
             if field.label == FieldDescriptor.LABEL_REPEATED:
                 if (

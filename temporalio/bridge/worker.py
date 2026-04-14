@@ -20,9 +20,7 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
-import temporalio.nexus.system
 from temporalio.api.common.v1.message_pb2 import Payload
-from temporalio.api.enums.v1.command_type_pb2 import CommandType
 from temporalio.bridge._visitor import VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
@@ -30,7 +28,6 @@ from temporalio.bridge.temporal_sdk_bridge import (
 from temporalio.bridge.temporal_sdk_bridge import (
     PollShutdownError,  # type: ignore # noqa: F401
 )
-from temporalio.worker import _command_aware_visitor
 from temporalio.worker._command_aware_visitor import CommandAwarePayloadVisitor
 
 
@@ -285,8 +282,10 @@ class _Visitor(VisitorFunctions):
     def __init__(
         self,
         f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
+        visit_system_nexus_envelope: Callable[[Payload], Awaitable[None]] | None = None,
     ):
         self._f = f
+        self._visit_system_nexus_envelope = visit_system_nexus_envelope
 
     async def visit_payload(self, payload: Payload) -> None:
         new_payload = (await self._f([payload]))[0]
@@ -302,41 +301,9 @@ class _Visitor(VisitorFunctions):
         del payloads[:]
         payloads.extend(new_payloads)
 
-
-async def _encode_completion_payloads(
-    data_converter: temporalio.converter.DataConverter,
-    payloads: Sequence[Payload],
-) -> list[Payload]:
-    if len(payloads) != 1:
-        return await data_converter._encode_payload_sequence(payloads)
-
-    # A single payload may be the outer envelope for a system Nexus operation.
-    # In that case we leave the envelope itself unencoded so the server can read
-    # it, but still route any nested Temporal payloads through normal payload
-    # processing via the generated operation-specific rewriter.
-    payload = payloads[0]
-    command_info = _command_aware_visitor.current_command_info.get()
-    if (
-        command_info is None
-        or command_info.command_type
-        != CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
-        or not command_info.nexus_service
-        or not command_info.nexus_operation
-    ):
-        return await data_converter._encode_payload_sequence(payloads)
-
-    rewrite = temporalio.nexus.system.get_payload_rewriter(
-        command_info.nexus_service, command_info.nexus_operation
-    )
-    if rewrite is None:
-        return await data_converter._encode_payload_sequence(payloads)
-
-    new_payload = await rewrite(
-        payload,
-        data_converter._encode_payload_sequence,
-        False,
-    )
-    return [new_payload]
+    async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+        if self._visit_system_nexus_envelope is not None:
+            await self._visit_system_nexus_envelope(payload)
 
 
 async def decode_activation(
@@ -356,11 +323,16 @@ async def encode_completion(
     encode_headers: bool,
 ) -> None:
     """Encode all payloads in the completion."""
+
+    async def visit_system_nexus_envelope(payload: Payload) -> None:
+        data_converter._validate_payload_limits([payload])
+
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True, skip_headers=not encode_headers
     ).visit(
         _Visitor(
-            lambda payloads: _encode_completion_payloads(data_converter, payloads)
+            data_converter._encode_payload_sequence,
+            visit_system_nexus_envelope=visit_system_nexus_envelope,
         ),
         completion,
     )
