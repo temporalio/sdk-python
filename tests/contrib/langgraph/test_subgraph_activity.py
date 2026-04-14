@@ -15,12 +15,12 @@ class State(TypedDict):
     value: str
 
 
-async def child_node(state: State) -> dict[str, str]:
+async def child_node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
     return {"value": "child"}
 
 
 async def parent_node(state: State) -> dict[str, str]:
-    child = StateGraph(State)
+    child: StateGraph[State, None, State, State] = StateGraph(State)
     child.add_node("child_node", child_node)
     child.add_edge(START, "child_node")
 

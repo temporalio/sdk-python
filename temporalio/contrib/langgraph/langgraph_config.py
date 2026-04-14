@@ -1,3 +1,5 @@
+# pyright: reportMissingTypeStubs=false
+
 from typing import Any
 
 from langchain_core.runnables.config import var_child_runnable_config

@@ -11,6 +11,11 @@ from temporalio.contrib.langgraph.langgraph_config import (
     get_langgraph_config,
     set_langgraph_config,
 )
+from temporalio.contrib.langgraph.task_cache import (
+    cache_key,
+    cache_lookup,
+    cache_put,
+)
 
 
 @dataclass
@@ -49,16 +54,10 @@ def wrap_execute_activity(
     **execute_activity_kwargs: Any,
 ) -> Callable[..., Any]:
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        from temporalio.contrib.langgraph.task_cache import (
-            _cache_key,
-            _cache_lookup,
-            _cache_put,
-        )
-
         # Check task result cache (for continue-as-new deduplication).
-        key = _cache_key(task_id, args, kwargs) if task_id else ""
+        key = cache_key(task_id, args, kwargs) if task_id else ""
         if task_id:
-            found, cached = _cache_lookup(key)
+            found, cached = cache_lookup(key)
             if found:
                 return cached
 
@@ -73,7 +72,7 @@ def wrap_execute_activity(
 
         # Store in cache for future continue-as-new cycles.
         if task_id:
-            _cache_put(key, output.result)
+            cache_put(key, output.result)
 
         return output.result
 

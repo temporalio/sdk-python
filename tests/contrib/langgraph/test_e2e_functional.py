@@ -6,6 +6,7 @@ Requires a running Temporal test server (started by conftest.py).
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 from uuid import uuid4
 
 from temporalio.client import Client
@@ -37,7 +38,7 @@ from tests.contrib.langgraph.e2e_functional_workflows import (
 )
 
 
-def _activity_opts(*task_funcs) -> dict[str, dict]:
+def _activity_opts(*task_funcs: Any) -> dict[str, dict]:
     """Build activity_options dict giving every task the same 30s timeout."""
     return {
         t.func.__name__: {"start_to_close_timeout": timedelta(seconds=30)}

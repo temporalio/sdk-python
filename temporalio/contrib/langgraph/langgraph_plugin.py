@@ -1,3 +1,5 @@
+# pyright: reportMissingTypeStubs=false
+
 from dataclasses import replace
 from typing import Any, Callable
 
@@ -8,16 +10,16 @@ from langgraph.pregel import Pregel
 from temporalio import activity
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
 from temporalio.contrib.langgraph.task_cache import (
-    _get_task_cache,
-    _set_task_cache,
-    _task_id,
+    get_task_cache,
+    set_task_cache,
+    task_id,
 )
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 # Save registered graphs/entrypoints at the module level to avoid being refreshed by the sandbox.
-_graph_registry: dict[str, StateGraph] = {}
+_graph_registry: dict[str, StateGraph[Any]] = {}
 _entrypoint_registry: dict[str, Pregel] = {}
 
 
@@ -105,14 +107,16 @@ class LangGraphPlugin(SimplePlugin):
         if execute_in == "activity":
             a = activity.defn(name=func.__name__)(wrap_activity(func))
             self.activities.append(a)
-            return wrap_execute_activity(a, task_id=_task_id(func), **(kwargs or {}))
+            return wrap_execute_activity(a, task_id=task_id(func), **(kwargs or {}))
         elif execute_in == "workflow":
             return func
         else:
             raise ValueError(f"Invalid execute_in value: {execute_in}")
 
 
-def graph(name: str, cache: dict[str, Any] | None = None) -> StateGraph:
+def graph(
+    name: str, cache: dict[str, Any] | None = None
+) -> StateGraph[Any, None, Any, Any]:
     """Retrieve a registered graph by name.
 
     Args:
@@ -122,7 +126,7 @@ def graph(name: str, cache: dict[str, Any] | None = None) -> StateGraph:
             not re-executed after continue-as-new.
     """
     _patch_event_loop()
-    _set_task_cache(cache or {})
+    set_task_cache(cache or {})
     return _graph_registry[name]
 
 
@@ -136,7 +140,7 @@ def entrypoint(name: str, cache: dict[str, Any] | None = None) -> Pregel:
             not re-executed after continue-as-new.
     """
     _patch_event_loop()
-    _set_task_cache(cache or {})
+    set_task_cache(cache or {})
     return _entrypoint_registry[name]
 
 
@@ -147,7 +151,7 @@ def cache() -> dict[str, Any] | None:
     restore cached task results across continue-as-new boundaries.
     Returns None if the cache is empty.
     """
-    return _get_task_cache() or None
+    return get_task_cache() or None
 
 
 def _patch_event_loop():
@@ -155,4 +159,4 @@ def _patch_event_loop():
     from asyncio import get_event_loop
 
     loop = get_event_loop()
-    loop.is_running = lambda: True
+    setattr(loop, "is_running", lambda: True)

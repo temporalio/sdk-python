@@ -14,7 +14,7 @@ class State(TypedDict):
     value: str
 
 
-async def node(state: State) -> dict[str, str]:
+async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
     return {"value": "done"}
 
 

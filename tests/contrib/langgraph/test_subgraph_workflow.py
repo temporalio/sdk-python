@@ -15,7 +15,7 @@ class State(TypedDict):
     value: str
 
 
-async def child_node(state: State) -> dict[str, str]:
+async def child_node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
     return {"value": "child"}
 
 

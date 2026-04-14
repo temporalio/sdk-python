@@ -24,7 +24,7 @@ class State(TypedDict):
     value: str
 
 
-async def node(state: State) -> dict[str, str]:
+async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
     return {"value": interrupt("Continue?")}
 
 
@@ -38,7 +38,7 @@ class InterruptV2Workflow:
         result = await g.ainvoke({"value": input}, config, version="v2")
 
         # v2: interrupts are on result.interrupts, not result["__interrupt__"]
-        assert result.value == {}
+        assert result.value == {"value": ""}
         assert len(result.interrupts) == 1
         assert result.interrupts[0].value == "Continue?"
 

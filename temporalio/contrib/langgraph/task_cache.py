@@ -17,15 +17,15 @@ _task_cache: ContextVar[dict[str, Any] | None] = ContextVar(
 )
 
 
-def _set_task_cache(cache: dict[str, Any] | None) -> None:
+def set_task_cache(cache: dict[str, Any] | None) -> None:
     _task_cache.set(cache)
 
 
-def _get_task_cache() -> dict[str, Any] | None:
+def get_task_cache() -> dict[str, Any] | None:
     return _task_cache.get()
 
 
-def _task_id(func: Any) -> str:
+def task_id(func: Any) -> str:
     """Return the fully-qualified module.qualname for a function.
 
     Raises ValueError for functions that cannot be identified unambiguously
@@ -52,7 +52,7 @@ def _task_id(func: Any) -> str:
     return f"{module}.{qualname}"
 
 
-def _cache_key(task_id: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+def cache_key(task_id: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
     """Build a cache key from the full task identifier and arguments."""
     try:
         key_str = dumps([task_id, args, kwargs], sort_keys=True, default=str)
@@ -61,7 +61,7 @@ def _cache_key(task_id: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> s
     return sha256(key_str.encode()).hexdigest()[:32]
 
 
-def _cache_lookup(key: str) -> tuple[bool, Any]:
+def cache_lookup(key: str) -> tuple[bool, Any]:
     """Return (True, value) if cached, (False, None) otherwise."""
     cache = _task_cache.get()
     if cache is not None and key in cache:
@@ -69,7 +69,7 @@ def _cache_lookup(key: str) -> tuple[bool, Any]:
     return False, None
 
 
-def _cache_put(key: str, value: Any) -> None:
+def cache_put(key: str, value: Any) -> None:
     cache = _task_cache.get()
     if cache is not None:
         cache[key] = value
