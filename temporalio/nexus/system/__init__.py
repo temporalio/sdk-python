@@ -10,9 +10,9 @@ import temporalio.api.common.v1
 import temporalio.converter
 
 from . import _workflow_service_generated as generated
-from ._workflow_service_generated import __temporal_nexus_payload_rewriters__
+from ._workflow_service_generated import __temporal_nexus_payload_visitors__
 
-TemporalNexusPayloadRewriter = Callable[
+TemporalNexusPayloadVisitor = Callable[
     [
         temporalio.api.common.v1.Payload,
         Callable[
@@ -27,17 +27,17 @@ TemporalNexusPayloadRewriter = Callable[
 _SYSTEM_NEXUS_PAYLOAD_CONVERTER = temporalio.converter.default().payload_converter
 
 
-def get_payload_rewriter(
+def get_payload_visitor(
     service: str,
     operation: str,
-) -> TemporalNexusPayloadRewriter | None:
-    """Return the generated nested-payload rewriter for a system Nexus operation."""
-    return __temporal_nexus_payload_rewriters__.get((service, operation))
+) -> TemporalNexusPayloadVisitor | None:
+    """Return the generated nested-payload visitor for a system Nexus operation."""
+    return __temporal_nexus_payload_visitors__.get((service, operation))
 
 
 def is_system_operation(service: str, operation: str) -> bool:
     """Return whether a Nexus operation uses the generated system envelope."""
-    return get_payload_rewriter(service, operation) is not None
+    return get_payload_visitor(service, operation) is not None
 
 
 def get_payload_converter() -> temporalio.converter.PayloadConverter:
@@ -48,6 +48,6 @@ def get_payload_converter() -> temporalio.converter.PayloadConverter:
 __all__ = (
     "generated",
     "get_payload_converter",
-    "get_payload_rewriter",
+    "get_payload_visitor",
     "is_system_operation",
 )

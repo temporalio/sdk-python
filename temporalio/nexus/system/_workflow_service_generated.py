@@ -701,7 +701,7 @@ class WorkflowService:
     ] = Operation(name="SignalWithStartWorkflowExecution")
 
 
-class _TemporalNexusPayloadRewriter:
+class _TemporalNexusPayloadVisitor:
     def __init__(
         self,
         payload_visitor: collections.abc.Callable[
@@ -713,105 +713,101 @@ class _TemporalNexusPayloadRewriter:
         self._payload_visitor = payload_visitor
         self._visit_search_attributes = visit_search_attributes
 
-    async def _rewrite_payload_json(self, value: dict) -> dict:
+    async def _visit_payload_json(self, value: dict) -> dict:
         payload = ParseDict(value, temporalio.api.common.v1.Payload())
-        [rewritten_payload] = await self._payload_visitor([payload])
-        return MessageToDict(rewritten_payload)
+        [visited_payload] = await self._payload_visitor([payload])
+        return MessageToDict(visited_payload)
 
-    async def _rewrite_payloads_json(self, value: dict) -> dict:
+    async def _visit_payloads_json(self, value: dict) -> dict:
         payloads = ParseDict(value, temporalio.api.common.v1.Payloads())
-        rewritten_payloads = await self._payload_visitor(payloads.payloads)
+        visited_payloads = await self._payload_visitor(payloads.payloads)
         del payloads.payloads[:]
-        payloads.payloads.extend(rewritten_payloads)
+        payloads.payloads.extend(visited_payloads)
         return MessageToDict(payloads)
 
-    async def _rewrite_payload_map_json(self, message_type: type, value: dict) -> dict:
+    async def _visit_payload_map_json(self, message_type: type, value: dict) -> dict:
         message = message_type()
         keys = list(value.keys())
-        rewritten_payloads = await self._payload_visitor(
+        visited_payloads = await self._payload_visitor(
             [ParseDict(value[key], temporalio.api.common.v1.Payload()) for key in keys]
         )
-        for key, rewritten_payload in zip(keys, rewritten_payloads):
-            message.fields[key].CopyFrom(rewritten_payload)
+        for key, visited_payload in zip(keys, visited_payloads):
+            message.fields[key].CopyFrom(visited_payload)
         return MessageToDict(message).get("fields", {})
 
-    async def _temporal_nexus_rewrite_header_json(self, value: dict) -> dict:
-        rewritten = dict(value)
-        if rewritten.get("fields") is not None:
-            rewritten["fields"] = await self._rewrite_payload_map_json(
-                temporalio.api.common.v1.Header, rewritten["fields"]
+    async def _temporal_nexus_visit_header_json(self, value: dict) -> dict:
+        visited = dict(value)
+        if visited.get("fields") is not None:
+            visited["fields"] = await self._visit_payload_map_json(
+                temporalio.api.common.v1.Header, visited["fields"]
             )
-        return rewritten
+        return visited
 
-    async def _temporal_nexus_rewrite_input_json(self, value: dict) -> dict:
-        return await self._rewrite_payloads_json(value)
+    async def _temporal_nexus_visit_input_json(self, value: dict) -> dict:
+        return await self._visit_payloads_json(value)
 
-    async def _temporal_nexus_rewrite_memo_json(self, value: dict) -> dict:
-        rewritten = dict(value)
-        if rewritten.get("fields") is not None:
-            rewritten["fields"] = await self._rewrite_payload_map_json(
-                temporalio.api.common.v1.Memo, rewritten["fields"]
+    async def _temporal_nexus_visit_memo_json(self, value: dict) -> dict:
+        visited = dict(value)
+        if visited.get("fields") is not None:
+            visited["fields"] = await self._visit_payload_map_json(
+                temporalio.api.common.v1.Memo, visited["fields"]
             )
-        return rewritten
+        return visited
 
-    async def _temporal_nexus_rewrite_search_attributes_json(self, value: dict) -> dict:
+    async def _temporal_nexus_visit_search_attributes_json(self, value: dict) -> dict:
         if not self._visit_search_attributes:
             return value
-        rewritten = dict(value)
-        if rewritten.get("indexedFields") is not None:
-            rewritten["indexedFields"] = await self._rewrite_payload_map_json(
-                temporalio.api.common.v1.SearchAttributes, rewritten["indexedFields"]
+        visited = dict(value)
+        if visited.get("indexedFields") is not None:
+            visited["indexedFields"] = await self._visit_payload_map_json(
+                temporalio.api.common.v1.SearchAttributes, visited["indexedFields"]
             )
-        return rewritten
+        return visited
 
-    async def _temporal_nexus_rewrite_user_metadata_json(self, value: dict) -> dict:
-        rewritten = dict(value)
-        if rewritten.get("details") is not None:
-            rewritten["details"] = await self._rewrite_payload_json(
-                rewritten["details"]
-            )
-        if rewritten.get("summary") is not None:
-            rewritten["summary"] = await self._rewrite_payload_json(
-                rewritten["summary"]
-            )
-        return rewritten
+    async def _temporal_nexus_visit_user_metadata_json(self, value: dict) -> dict:
+        visited = dict(value)
+        if visited.get("details") is not None:
+            visited["details"] = await self._visit_payload_json(visited["details"])
+        if visited.get("summary") is not None:
+            visited["summary"] = await self._visit_payload_json(visited["summary"])
+        return visited
 
-    async def _temporal_nexus_rewrite_workflow_service_signal_with_start_workflow_execution_input_json(
+    async def _temporal_nexus_visit_workflow_service_signal_with_start_workflow_execution_input_json(
         self, value: dict
     ) -> dict:
-        rewritten = dict(value)
-        if rewritten.get("header") is not None:
-            rewritten["header"] = await self._temporal_nexus_rewrite_header_json(
-                rewritten["header"]
+        visited = dict(value)
+        if visited.get("header") is not None:
+            visited["header"] = await self._temporal_nexus_visit_header_json(
+                visited["header"]
             )
-        if rewritten.get("input") is not None:
-            rewritten["input"] = await self._temporal_nexus_rewrite_input_json(
-                rewritten["input"]
+        if visited.get("input") is not None:
+            visited["input"] = await self._temporal_nexus_visit_input_json(
+                visited["input"]
             )
-        if rewritten.get("memo") is not None:
-            rewritten["memo"] = await self._temporal_nexus_rewrite_memo_json(
-                rewritten["memo"]
+        if visited.get("memo") is not None:
+            visited["memo"] = await self._temporal_nexus_visit_memo_json(
+                visited["memo"]
             )
-        if rewritten.get("searchAttributes") is not None:
-            rewritten[
+        if visited.get("searchAttributes") is not None:
+            visited[
                 "searchAttributes"
-            ] = await self._temporal_nexus_rewrite_search_attributes_json(
-                rewritten["searchAttributes"]
+            ] = await self._temporal_nexus_visit_search_attributes_json(
+                visited["searchAttributes"]
             )
-        if rewritten.get("signalInput") is not None:
-            rewritten["signalInput"] = await self._temporal_nexus_rewrite_input_json(
-                rewritten["signalInput"]
+        if visited.get("signalInput") is not None:
+            visited["signalInput"] = await self._temporal_nexus_visit_input_json(
+                visited["signalInput"]
             )
-        if rewritten.get("userMetadata") is not None:
-            rewritten[
+        if visited.get("userMetadata") is not None:
+            visited[
                 "userMetadata"
-            ] = await self._temporal_nexus_rewrite_user_metadata_json(
-                rewritten["userMetadata"]
+            ] = await self._temporal_nexus_visit_user_metadata_json(
+                visited["userMetadata"]
             )
-        return rewritten
+        return visited
 
 
-async def _temporal_nexus_rewrite_workflow_service_signal_with_start_workflow_execution_input(
+async def _temporal_nexus_visit_workflow_service_signal_with_start_workflow_execution_input(
     payload: temporalio.api.common.v1.Payload,
     payload_visitor: collections.abc.Callable[
         [collections.abc.Sequence[temporalio.api.common.v1.Payload]],
@@ -825,19 +821,19 @@ async def _temporal_nexus_rewrite_workflow_service_signal_with_start_workflow_ex
         return payload
     if not isinstance(value, dict):
         return payload
-    rewriter = _TemporalNexusPayloadRewriter(payload_visitor, visit_search_attributes)
-    rewritten = await rewriter._temporal_nexus_rewrite_workflow_service_signal_with_start_workflow_execution_input_json(
+    visitor = _TemporalNexusPayloadVisitor(payload_visitor, visit_search_attributes)
+    visited = await visitor._temporal_nexus_visit_workflow_service_signal_with_start_workflow_execution_input_json(
         value
     )
     return temporalio.api.common.v1.Payload(
         metadata=dict(payload.metadata),
-        data=json.dumps(rewritten, separators=(",", ":"), sort_keys=True).encode(),
+        data=json.dumps(visited, separators=(",", ":"), sort_keys=True).encode(),
     )
 
 
-__temporal_nexus_payload_rewriters__ = {
+__temporal_nexus_payload_visitors__ = {
     (
         "WorkflowService",
         "SignalWithStartWorkflowExecution",
-    ): _temporal_nexus_rewrite_workflow_service_signal_with_start_workflow_execution_input,
+    ): _temporal_nexus_visit_workflow_service_signal_with_start_workflow_execution_input,
 }

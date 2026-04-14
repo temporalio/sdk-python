@@ -50,8 +50,8 @@ class PayloadVisitor:
     async def _visit_system_nexus_payload(self, fs, service, operation, payload) -> None:
         import temporalio.nexus.system
 
-        rewrite = temporalio.nexus.system.get_payload_rewriter(service, operation)
-        if rewrite is None:
+        visitor = temporalio.nexus.system.get_payload_visitor(service, operation)
+        if visitor is None:
             await self._visit_temporal_api_common_v1_Payload(fs, payload)
             return
 
@@ -60,7 +60,7 @@ class PayloadVisitor:
             await fs.visit_payloads(new_payloads)
             return new_payloads
 
-        new_payload = await rewrite(
+        new_payload = await visitor(
             payload, payload_visitor, not self.skip_search_attributes
         )
         if new_payload is not payload:
