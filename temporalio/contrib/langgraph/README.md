@@ -16,8 +16,6 @@ or with pip:
 pip install temporalio[langgraph]
 ```
 
-Requires `langgraph==1.1.3` and `temporalio>=1.24.0`.
-
 ## Plugin Initialization
 
 ### Graph API

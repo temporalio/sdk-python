@@ -105,12 +105,13 @@ class LangGraphPlugin(SimplePlugin):
 
     def execute(self, func: Callable, kwargs: dict[str, Any] | None = None) -> Callable:
         """Prepare a node or task to execute as an activity or inline in the workflow."""
-        execute_in = (kwargs or {}).pop("execute_in", "activity")
+        opts = kwargs or {}
+        execute_in = opts.pop("execute_in", "activity")
 
         if execute_in == "activity":
             a = activity.defn(name=func.__name__)(wrap_activity(func))
             self.activities.append(a)
-            return wrap_execute_activity(a, task_id=task_id(func), **(kwargs or {}))
+            return wrap_execute_activity(a, task_id=task_id(func), **opts)
         elif execute_in == "workflow":
             return func
         else:
