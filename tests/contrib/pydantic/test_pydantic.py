@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import json
 import os
 import pathlib
 import uuid
@@ -9,7 +10,12 @@ import pytest
 from pydantic import BaseModel
 
 from temporalio.client import Client
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.pydantic import (
+    PydanticJSONPlainPayloadConverter,
+    ToJsonOptions,
+    _sanitize_for_json,
+    pydantic_data_converter,
+)
 from temporalio.worker import Worker
 from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictionContext,
@@ -380,3 +386,109 @@ def test_model_instantiation_from_restricted_proxy_values():
     assert p.path_field == restricted_path
     assert p.uuid_field == restricted_uuid
     assert p.datetime_field == restricted_datetime
+
+
+# --- Surrogate / non-UTF-8 sanitization tests ---
+
+
+def test_sanitize_for_json_surrogate_pair():
+    # A surrogate pair encodes U+1F600 (grinning face); sanitization
+    # should decode it to the proper codepoint losslessly.
+    result = _sanitize_for_json("\ud83d\ude00")
+    assert result == "\U0001f600"
+
+
+def test_sanitize_for_json_lone_surrogate():
+    result = _sanitize_for_json("\ud800")
+    assert result == "\ufffd"
+
+
+def test_sanitize_for_json_invalid_bytes():
+    result = _sanitize_for_json(b"\x89PNG")
+    # \x89 is not valid UTF-8; it becomes U+FFFD (\xef\xbf\xbd in UTF-8)
+    assert result == b"\xef\xbf\xbdPNG"
+
+
+def test_to_payload_raises_without_lossy_utf8():
+    converter = PydanticJSONPlainPayloadConverter()
+    with pytest.raises(Exception):
+        converter.to_payload({"text": "hello \ud800 world"})
+
+
+def test_to_payload_with_surrogate_string():
+    converter = PydanticJSONPlainPayloadConverter(ToJsonOptions(lossy_utf8=True))
+    payload = converter.to_payload({"text": "hello \ud800 world"})
+    assert payload is not None
+    # The result must be valid JSON (no surrogates).
+    parsed = json.loads(payload.data)
+    assert parsed["text"] == "hello \ufffd world"
+
+
+def test_to_payload_with_invalid_bytes():
+    class BytesModel(BaseModel):
+        data: bytes
+
+    converter = PydanticJSONPlainPayloadConverter(ToJsonOptions(lossy_utf8=True))
+    payload = converter.to_payload(BytesModel(data=b"\x89PNG\r\n"))
+    assert payload is not None
+
+
+def test_to_payload_with_exclude_unset():
+    class UnsetModel(BaseModel):
+        text: str
+        count: int = 0
+
+    converter = PydanticJSONPlainPayloadConverter(
+        ToJsonOptions(exclude_unset=True, lossy_utf8=True)
+    )
+    # Only set the text field (with a surrogate), leave count at default.
+    model = UnsetModel(text="hello \ud800 world")
+    payload = converter.to_payload(model)
+    assert payload is not None
+    parsed = json.loads(payload.data)
+    # Surrogate is sanitized
+    assert parsed["text"] == "hello \ufffd world"
+    # Unset field is excluded
+    assert "count" not in parsed
+
+
+def test_sanitize_for_json_pydantic_model():
+    class MixedModel(BaseModel):
+        text: str
+        data: bytes
+        count: int
+
+    model = MixedModel(text="hello \ud800", data=b"\x89PNG", count=42)
+    result = _sanitize_for_json(model)
+
+    assert isinstance(result, MixedModel)
+    assert result.text == "hello \ufffd"
+    assert result.data == b"\xef\xbf\xbdPNG"
+    assert result.count == 42
+
+
+def test_sanitize_for_json_dataclass():
+    @dataclasses.dataclass
+    class MixedDC:
+        text: str
+        data: bytes
+        count: int
+
+    dc = MixedDC(text="hello \ud800", data=b"\x89PNG", count=42)
+    result = _sanitize_for_json(dc)
+
+    assert isinstance(result, MixedDC)
+    assert result.text == "hello \ufffd"
+    assert result.data == b"\xef\xbf\xbdPNG"
+    assert result.count == 42
+
+
+def test_sanitize_for_json_nested_structures():
+    class InnerModel(BaseModel):
+        value: str
+
+    data = {"items": [InnerModel(value="abc \ud800 def")]}
+    result = _sanitize_for_json(data)
+
+    assert isinstance(result["items"][0], InnerModel)
+    assert result["items"][0].value == "abc \ufffd def"

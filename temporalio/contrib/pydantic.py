@@ -13,6 +13,7 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 Pydantic v1 is not supported.
 """
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,11 +34,63 @@ from temporalio.converter import (
 # implements __get_pydantic_core_schema__ so that pydantic unwraps proxied types.
 
 
+def _sanitize_for_json(obj: Any) -> Any:
+    """Sanitize a value tree so pydantic_core's Rust serializer can encode it.
+
+    Handles two cases that crash ``pydantic_core.to_json``:
+    * **str** with Unicode surrogates (U+D800-U+DFFF)
+    * **bytes** with non-UTF-8 content
+    """
+    if isinstance(obj, str):
+        return obj.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace").encode("utf-8")
+    if isinstance(obj, dict):
+        new_dict: dict[Any, Any] = {}
+        changed = False
+        for k, v in obj.items():
+            new_k = _sanitize_for_json(k)
+            new_v = _sanitize_for_json(v)
+            new_dict[new_k] = new_v
+            if new_k is not k or new_v is not v:
+                changed = True
+        return new_dict if changed else obj
+    if isinstance(obj, (list, tuple)):
+        new_items = [_sanitize_for_json(item) for item in obj]
+        changed = any(new is not old for new, old in zip(new_items, obj))
+        if not changed:
+            return obj
+        return type(obj)(new_items)
+    if hasattr(obj, "model_fields"):
+        updates: dict[str, Any] = {}
+        for field_name in obj.model_fields:
+            val = getattr(obj, field_name)
+            sanitized = _sanitize_for_json(val)
+            if sanitized is not val:
+                updates[field_name] = sanitized
+        return obj.model_copy(update=updates) if updates else obj
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        updates = {}
+        for f in dataclasses.fields(obj):
+            val = getattr(obj, f.name)
+            sanitized = _sanitize_for_json(val)
+            if sanitized is not val:
+                updates[f.name] = sanitized
+        return dataclasses.replace(obj, **updates) if updates else obj
+    return obj
+
+
 @dataclass
 class ToJsonOptions:
     """Options for converting to JSON with pydantic."""
 
     exclude_unset: bool = False
+    lossy_utf8: bool = False
+    """If ``True``, sanitize values that would crash pydantic_core's Rust
+    serializer (strings with Unicode surrogates, bytes with non-UTF-8 content)
+    instead of raising. Surrogates are replaced with U+FFFD and non-UTF-8 bytes
+    are decoded with ``errors='replace'``. This is lossy but prevents
+    serialization failures when payloads contain arbitrary binary data."""
 
 
 class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
@@ -71,13 +124,29 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         See
         https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
         """
-        data = (
-            self._schema_serializer.to_json(
-                value, exclude_unset=self._to_json_options.exclude_unset
+        try:
+            data = (
+                self._schema_serializer.to_json(
+                    value, exclude_unset=self._to_json_options.exclude_unset
+                )
+                if self._to_json_options
+                else to_json(value)
             )
-            if self._to_json_options
-            else to_json(value)
-        )
+        except Exception:
+            if not (self._to_json_options and self._to_json_options.lossy_utf8):
+                raise
+            # pydantic_core's Rust serializer cannot encode strings with
+            # Unicode surrogates or bytes with non-UTF-8 content.
+            # Sanitize the value tree, then retry the same serializer path.
+            sanitized = _sanitize_for_json(value)
+            data = (
+                self._schema_serializer.to_json(
+                    sanitized,
+                    exclude_unset=self._to_json_options.exclude_unset,
+                )
+                if self._to_json_options
+                else to_json(sanitized)
+            )
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self.encoding.encode()}, data=data
         )
