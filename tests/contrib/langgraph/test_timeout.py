@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from langgraph.graph import START, StateGraph
 from pytest import raises
+from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
@@ -13,20 +14,24 @@ from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
 from temporalio.worker import Worker
 
 
-async def node(_: str) -> str:
+class State(TypedDict):
+    value: str
+
+
+async def node(state: State) -> dict[str, str]:
     await sleep(1)  # 1 second
-    return "done"
+    return {"value": "done"}
 
 
 @workflow.defn
 class TimeoutWorkflow:
     @workflow.run
     async def run(self, input: str) -> Any:
-        return await graph("my-graph").compile().ainvoke(input)
+        return await graph("my-graph").compile().ainvoke({"value": input})
 
 
 async def test_timeout(client: Client):
-    g = StateGraph(str)
+    g = StateGraph(State)
     g.add_node(
         "node",
         node,

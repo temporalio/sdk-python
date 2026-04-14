@@ -3,6 +3,7 @@ from typing import Any
 from uuid import uuid4
 
 from langgraph.graph import START, StateGraph
+from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -10,11 +11,15 @@ from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
 from temporalio.worker import Worker
 
 
-async def child_node(_: str) -> str:
-    return "child"
+class State(TypedDict):
+    value: str
 
 
-async def parent_node(state: str) -> str:
+async def child_node(state: State) -> dict[str, str]:
+    return {"value": "child"}
+
+
+async def parent_node(state: State) -> dict[str, str]:
     return await graph("child").compile().ainvoke(state)
 
 
@@ -22,11 +27,11 @@ async def parent_node(state: str) -> str:
 class WorkflowSubgraphWorkflow:
     @workflow.run
     async def run(self, input: str) -> Any:
-        return await graph("parent").compile().ainvoke(input)
+        return await graph("parent").compile().ainvoke({"value": input})
 
 
 async def test_workflow_subgraph(client: Client):
-    child = StateGraph(str)
+    child = StateGraph(State)
     child.add_node(
         "child_node",
         child_node,
@@ -34,7 +39,7 @@ async def test_workflow_subgraph(client: Client):
     )
     child.add_edge(START, "child_node")
 
-    parent = StateGraph(str)
+    parent = StateGraph(State)
     parent.add_node("parent_node", parent_node, metadata={"execute_in": "workflow"})
     parent.add_edge(START, "parent_node")
 
@@ -53,4 +58,4 @@ async def test_workflow_subgraph(client: Client):
             task_queue=task_queue,
         )
 
-    assert result == "child"
+    assert result == {"value": "child"}

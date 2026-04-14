@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from langgraph.graph import START, StateGraph
+from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -24,19 +25,23 @@ def _reset():
     _execution_counts.clear()
 
 
-async def multiply_by_3(state: int) -> int:
+class State(TypedDict):
+    value: int
+
+
+async def multiply_by_3(state: State) -> dict[str, int]:
     _execution_counts["multiply"] = _execution_counts.get("multiply", 0) + 1
-    return state * 3
+    return {"value": state["value"] * 3}
 
 
-async def add_100(state: int) -> int:
+async def add_100(state: State) -> dict[str, int]:
     _execution_counts["add"] = _execution_counts.get("add", 0) + 1
-    return state + 100
+    return {"value": state["value"] + 100}
 
 
-async def double(state: int) -> int:
+async def double(state: State) -> dict[str, int]:
     _execution_counts["double"] = _execution_counts.get("double", 0) + 1
-    return state * 2
+    return {"value": state["value"] * 2}
 
 
 @dataclass
@@ -59,9 +64,9 @@ class GraphContinueAsNewWorkflow:
     """
 
     @workflow.run
-    async def run(self, input_data: GraphContinueAsNewInput) -> int:
+    async def run(self, input_data: GraphContinueAsNewInput) -> dict[str, int]:
         g = graph("cached-graph", cache=input_data.cache).compile()
-        result = await g.ainvoke(input_data.value)
+        result = await g.ainvoke({"value": input_data.value})
 
         if input_data.phase < 3:
             workflow.continue_as_new(
@@ -84,7 +89,7 @@ async def test_graph_continue_as_new_cached(client: Client):
     _reset()
 
     timeout = {"start_to_close_timeout": timedelta(seconds=10)}
-    g = StateGraph(int)
+    g = StateGraph(State)
     g.add_node("multiply_by_3", multiply_by_3, metadata=timeout)
     g.add_node("add_100", add_100, metadata=timeout)
     g.add_node("double", double, metadata=timeout)
@@ -109,7 +114,7 @@ async def test_graph_continue_as_new_cached(client: Client):
         )
 
     # 10 * 3 = 30 -> + 100 = 130 -> * 2 = 260
-    assert result == 260
+    assert result == {"value": 260}
 
     # Each node should execute exactly once — phases 2 and 3 use cached results.
     assert (

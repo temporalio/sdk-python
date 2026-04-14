@@ -1,3 +1,4 @@
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from inspect import iscoroutinefunction
 from typing import Any, Callable
@@ -25,7 +26,9 @@ class ActivityOutput:
     langgraph_interrupts: tuple[Interrupt] | None = None
 
 
-def wrap_activity(func: Callable) -> Callable:
+def wrap_activity(
+    func: Callable,
+) -> Callable[[ActivityInput], Awaitable[ActivityOutput]]:
     async def wrapper(input: ActivityInput) -> ActivityOutput:
         set_langgraph_config(input.langgraph_config)
         try:
@@ -41,11 +44,11 @@ def wrap_activity(func: Callable) -> Callable:
 
 
 def wrap_execute_activity(
-    afunc: Callable,
+    afunc: Callable[[ActivityInput], Awaitable[ActivityOutput]],
     task_id: str = "",
-    **execute_activity_kwargs: dict[str, Any],
-) -> Callable:
-    async def wrapper(*args: Any, **kwargs: dict[str, Any]) -> Any:
+    **execute_activity_kwargs: Any,
+) -> Callable[..., Any]:
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         from temporalio.contrib.langgraph.task_cache import (
             _cache_key,
             _cache_lookup,
@@ -62,8 +65,8 @@ def wrap_execute_activity(
         input = ActivityInput(
             args=args, kwargs=kwargs, langgraph_config=get_langgraph_config()
         )
-        output: ActivityOutput = await workflow.execute_activity(
-            afunc, input, result_type=ActivityOutput, **execute_activity_kwargs
+        output = await workflow.execute_activity(
+            afunc, input, **execute_activity_kwargs
         )
         if output.langgraph_interrupts is not None:
             raise GraphInterrupt(output.langgraph_interrupts)

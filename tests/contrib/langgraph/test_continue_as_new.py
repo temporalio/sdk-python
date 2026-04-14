@@ -5,6 +5,7 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import RunnableConfig
+from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -12,21 +13,25 @@ from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
 from temporalio.worker import Worker
 
 
-async def node(state: str) -> str:
-    return state + "a"
+class State(TypedDict):
+    value: str
+
+
+async def node(state: State) -> dict[str, str]:
+    return {"value": state["value"] + "a"}
 
 
 @workflow.defn
 class ContinueAsNewWorkflow:
     @workflow.run
-    async def run(self, values: str) -> Any:
+    async def run(self, values: dict[str, str]) -> Any:
         g = graph("my-graph").compile(checkpointer=InMemorySaver())
         config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
         await g.aupdate_state(config, values)
         await g.ainvoke(values, config)
 
-        if len(values) < 3:
+        if len(values["value"]) < 3:
             state = await g.aget_state(config)
             workflow.continue_as_new(state.values)
 
@@ -34,7 +39,7 @@ class ContinueAsNewWorkflow:
 
 
 async def test_continue_as_new(client: Client):
-    g = StateGraph(str)
+    g = StateGraph(State)
     g.add_node(
         "node",
         node,
@@ -52,9 +57,9 @@ async def test_continue_as_new(client: Client):
     ):
         result = await client.execute_workflow(
             ContinueAsNewWorkflow.run,
-            "",
+            {"value": ""},
             id=f"test-workflow-{uuid4()}",
             task_queue=task_queue,
         )
 
-    assert result == "aaa"
+    assert result == {"value": "aaa"}

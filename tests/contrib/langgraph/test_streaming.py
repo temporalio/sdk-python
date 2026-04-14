@@ -3,6 +3,7 @@ from typing import Any
 from uuid import uuid4
 
 from langgraph.graph import START, StateGraph
+from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -10,12 +11,16 @@ from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
 from temporalio.worker import Worker
 
 
-async def node_a(state: str) -> str:
-    return state + "a"
+class State(TypedDict):
+    value: str
 
 
-async def node_b(state: str) -> str:
-    return state + "b"
+async def node_a(state: State) -> dict[str, str]:
+    return {"value": state["value"] + "a"}
+
+
+async def node_b(state: State) -> dict[str, str]:
+    return {"value": state["value"] + "b"}
 
 
 @workflow.defn
@@ -23,13 +28,13 @@ class StreamingWorkflow:
     @workflow.run
     async def run(self, input: str) -> Any:
         chunks = []
-        async for chunk in graph("streaming").compile().astream(input):
+        async for chunk in graph("streaming").compile().astream({"value": input}):
             chunks.append(chunk)
         return chunks
 
 
 async def test_streaming(client: Client):
-    g = StateGraph(str)
+    g = StateGraph(State)
     g.add_node(
         "node_a",
         node_a,
@@ -58,4 +63,4 @@ async def test_streaming(client: Client):
             task_queue=task_queue,
         )
 
-    assert chunks == [{"node_a": "a"}, {"node_b": "ab"}]
+    assert chunks == [{"node_a": {"value": "a"}}, {"node_b": {"value": "ab"}}]

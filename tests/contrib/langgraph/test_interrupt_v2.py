@@ -12,6 +12,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import RunnableConfig
 from langgraph.types import Command, interrupt
+from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -19,8 +20,12 @@ from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
 from temporalio.worker import Worker
 
 
-async def node(_: str) -> str:
-    return interrupt("Continue?")
+class State(TypedDict):
+    value: str
+
+
+async def node(state: State) -> dict[str, str]:
+    return {"value": interrupt("Continue?")}
 
 
 @workflow.defn
@@ -30,7 +35,7 @@ class InterruptV2Workflow:
         g = graph("interrupt-v2-graph").compile(checkpointer=InMemorySaver())
         config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
-        result = await g.ainvoke(input, config, version="v2")
+        result = await g.ainvoke({"value": input}, config, version="v2")
 
         # v2: interrupts are on result.interrupts, not result["__interrupt__"]
         assert result.value == {}
@@ -41,7 +46,7 @@ class InterruptV2Workflow:
 
 
 async def test_interrupt_v2(client: Client):
-    g = StateGraph(str)
+    g = StateGraph(State)
     g.add_node(
         "node",
         node,
@@ -64,4 +69,4 @@ async def test_interrupt_v2(client: Client):
             task_queue=task_queue,
         )
 
-    assert result == "yes"
+    assert result == {"value": "yes"}
