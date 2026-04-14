@@ -1,3 +1,5 @@
+"""Activity wrappers for executing LangGraph nodes and tasks."""
+
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from inspect import iscoroutinefunction
@@ -20,6 +22,8 @@ from temporalio.contrib.langgraph.task_cache import (
 
 @dataclass
 class ActivityInput:
+    """Input for a LangGraph activity, containing args, kwargs, and config."""
+
     args: tuple[Any, ...]
     kwargs: dict[str, Any]
     langgraph_config: dict[str, Any]
@@ -27,6 +31,8 @@ class ActivityInput:
 
 @dataclass
 class ActivityOutput:
+    """Output from a LangGraph activity, containing result or interrupts."""
+
     result: Any = None
     langgraph_interrupts: tuple[Interrupt] | None = None
 
@@ -34,6 +40,8 @@ class ActivityOutput:
 def wrap_activity(
     func: Callable,
 ) -> Callable[[ActivityInput], Awaitable[ActivityOutput]]:
+    """Wrap a function as a Temporal activity that handles LangGraph config and interrupts."""
+
     async def wrapper(input: ActivityInput) -> ActivityOutput:
         set_langgraph_config(input.langgraph_config)
         try:
@@ -53,6 +61,8 @@ def wrap_execute_activity(
     task_id: str = "",
     **execute_activity_kwargs: Any,
 ) -> Callable[..., Any]:
+    """Wrap an activity function to be called via workflow.execute_activity with caching."""
+
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Check task result cache (for continue-as-new deduplication).
         key = cache_key(task_id, args, kwargs) if task_id else ""

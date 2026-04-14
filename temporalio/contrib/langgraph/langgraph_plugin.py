@@ -1,3 +1,5 @@
+"""LangGraph plugin for running LangGraph nodes and tasks as Temporal activities."""
+
 # pyright: reportMissingTypeStubs=false
 
 from dataclasses import replace
@@ -47,6 +49,7 @@ class LangGraphPlugin(SimplePlugin):
         activity_options: dict[str, dict] | None = None,
         # TODO: Add default_activity_options that apply to all nodes or tasks
     ):
+        """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
         self.activities: list = []
 
         # Graph API: Wrap graph nodes as Activities.
@@ -100,8 +103,8 @@ class LangGraphPlugin(SimplePlugin):
             workflow_runner=workflow_runner,
         )
 
-    # Prepare a [node, @task] to execute as a [Activity, Workflow].
     def execute(self, func: Callable, kwargs: dict[str, Any] | None = None) -> Callable:
+        """Prepare a node or task to execute as an activity or inline in the workflow."""
         execute_in = (kwargs or {}).pop("execute_in", "activity")
 
         if execute_in == "activity":

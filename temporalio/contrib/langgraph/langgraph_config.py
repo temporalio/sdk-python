@@ -1,3 +1,5 @@
+"""LangGraph configuration management for Temporal workflows."""
+
 # pyright: reportMissingTypeStubs=false
 
 from typing import Any
@@ -13,6 +15,7 @@ from langgraph.pregel._algo import LazyAtomicCounter, PregelScratchpad
 
 
 def get_langgraph_config() -> dict[str, Any]:
+    """Get the current LangGraph runnable config as a serializable dict."""
     config = var_child_runnable_config.get() or {}
     configurable = config.get("configurable") or {}
     scratchpad = configurable.get(CONFIG_KEY_SCRATCHPAD)
@@ -31,6 +34,7 @@ def get_langgraph_config() -> dict[str, Any]:
 
 
 def set_langgraph_config(config: dict[str, Any]) -> None:
+    """Restore a LangGraph runnable config from a serialized dict."""
     configurable = config.get("configurable") or {}
     scratchpad = configurable.get(CONFIG_KEY_SCRATCHPAD) or {}
     null_resume_box = [scratchpad.get("null_resume")]

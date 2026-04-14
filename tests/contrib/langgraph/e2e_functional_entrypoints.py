@@ -5,8 +5,8 @@ These define @task and @entrypoint functions used in functional API E2E tests.
 
 from __future__ import annotations
 
-from langgraph.func import entrypoint, task
-from langgraph.types import interrupt
+import langgraph.types
+from langgraph.func import entrypoint, task  # pyright: ignore[reportMissingTypeStubs]
 
 
 @task
@@ -120,7 +120,7 @@ async def partial_execution_entrypoint(input_data: dict) -> dict:
 
 @task
 def ask_human(question: str) -> str:
-    return interrupt(question)
+    return langgraph.types.interrupt(question)
 
 
 @entrypoint()

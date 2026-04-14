@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
-from langgraph.graph import START, StateGraph
+from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from pytest import raises
 from typing_extensions import TypedDict
 

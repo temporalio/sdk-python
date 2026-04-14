@@ -9,7 +9,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
-from langgraph.graph import START, StateGraph
+from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from typing_extensions import TypedDict
 
 from temporalio import workflow

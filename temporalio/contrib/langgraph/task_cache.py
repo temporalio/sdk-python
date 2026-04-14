@@ -18,10 +18,12 @@ _task_cache: ContextVar[dict[str, Any] | None] = ContextVar(
 
 
 def set_task_cache(cache: dict[str, Any] | None) -> None:
+    """Set the task result cache for the current context."""
     _task_cache.set(cache)
 
 
 def get_task_cache() -> dict[str, Any] | None:
+    """Get the task result cache for the current context."""
     return _task_cache.get()
 
 
@@ -70,6 +72,7 @@ def cache_lookup(key: str) -> tuple[bool, Any]:
 
 
 def cache_put(key: str, value: Any) -> None:
+    """Store a value in the task result cache."""
     cache = _task_cache.get()
     if cache is not None:
         cache[key] = value

@@ -2,10 +2,12 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
+import langgraph.types
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.graph import START, StateGraph
-from langgraph.graph.state import RunnableConfig
-from langgraph.types import Command, interrupt
+from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
+from langgraph.graph.state import (  # pyright: ignore[reportMissingTypeStubs]
+    RunnableConfig,
+)
 from typing_extensions import TypedDict
 
 from temporalio import workflow
@@ -19,7 +21,7 @@ class State(TypedDict):
 
 
 async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
-    return {"value": interrupt("Continue?")}
+    return {"value": langgraph.types.interrupt("Continue?")}
 
 
 @workflow.defn
@@ -32,7 +34,7 @@ class InterruptWorkflow:
         result = await g.ainvoke({"value": input}, config)
         assert result["__interrupt__"][0].value == "Continue?"
 
-        return await g.ainvoke(Command(resume="yes"), config)
+        return await g.ainvoke(langgraph.types.Command(resume="yes"), config)
 
 
 async def test_interrupt(client: Client):

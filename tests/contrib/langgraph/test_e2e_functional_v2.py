@@ -13,8 +13,10 @@ from uuid import uuid4
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.func import entrypoint as lg_entrypoint
-from langgraph.func import task
+from langgraph.func import (  # pyright: ignore[reportMissingTypeStubs]
+    entrypoint as lg_entrypoint,
+)
+from langgraph.func import task  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.types import Command
 
 from temporalio import workflow
