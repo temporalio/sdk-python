@@ -5,11 +5,11 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import RunnableConfig
+
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.worker import Worker
-
 from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.worker import Worker
 
 
 async def node(state: str) -> str:
@@ -20,12 +20,8 @@ async def node(state: str) -> str:
 class ContinueAsNewWorkflow:
     @workflow.run
     async def run(self, values: str) -> Any:
-        g = graph("my-graph").compile(
-            checkpointer=InMemorySaver()
-        )
-        config = RunnableConfig(
-            {"configurable": {"thread_id": "1"}}
-        )
+        g = graph("my-graph").compile(checkpointer=InMemorySaver())
+        config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
         await g.aupdate_state(config, values)
         await g.ainvoke(values, config)

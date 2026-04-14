@@ -4,17 +4,17 @@ Verifies that node results are cached across continue-as-new boundaries,
 so nodes don't re-execute when the graph is re-invoked with the same state.
 """
 
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 from uuid import uuid4
-from dataclasses import dataclass
 
 from langgraph.graph import START, StateGraph
+
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.worker import Worker
-
 from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, cache, graph
+from temporalio.worker import Worker
 
 # Track execution counts to verify caching
 _execution_counts: dict[str, int] = {}
@@ -112,12 +112,12 @@ async def test_graph_continue_as_new_cached(client: Client):
     assert result == 260
 
     # Each node should execute exactly once — phases 2 and 3 use cached results.
-    assert _execution_counts.get("multiply", 0) == 1, (
-        f"multiply executed {_execution_counts.get('multiply', 0)} times, expected 1"
-    )
-    assert _execution_counts.get("add", 0) == 1, (
-        f"add executed {_execution_counts.get('add', 0)} times, expected 1"
-    )
-    assert _execution_counts.get("double", 0) == 1, (
-        f"double executed {_execution_counts.get('double', 0)} times, expected 1"
-    )
+    assert (
+        _execution_counts.get("multiply", 0) == 1
+    ), f"multiply executed {_execution_counts.get('multiply', 0)} times, expected 1"
+    assert (
+        _execution_counts.get("add", 0) == 1
+    ), f"add executed {_execution_counts.get('add', 0)} times, expected 1"
+    assert (
+        _execution_counts.get("double", 0) == 1
+    ), f"double executed {_execution_counts.get('double', 0)} times, expected 1"

@@ -4,9 +4,12 @@ from typing import Any, Callable
 
 from langgraph.errors import GraphInterrupt
 from langgraph.types import Interrupt
-from temporalio import workflow
 
-from temporalio.contrib.langgraph.langgraph_config import get_langgraph_config, set_langgraph_config
+from temporalio import workflow
+from temporalio.contrib.langgraph.langgraph_config import (
+    get_langgraph_config,
+    set_langgraph_config,
+)
 
 
 @dataclass
@@ -43,7 +46,11 @@ def wrap_execute_activity(
     **execute_activity_kwargs: dict[str, Any],
 ) -> Callable:
     async def wrapper(*args: Any, **kwargs: dict[str, Any]) -> Any:
-        from temporalio.contrib.langgraph.task_cache import _cache_key, _cache_lookup, _cache_put
+        from temporalio.contrib.langgraph.task_cache import (
+            _cache_key,
+            _cache_lookup,
+            _cache_put,
+        )
 
         # Check task result cache (for continue-as-new deduplication).
         key = _cache_key(task_id, args, kwargs) if task_id else ""

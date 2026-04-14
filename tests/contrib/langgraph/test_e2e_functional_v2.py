@@ -11,16 +11,16 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.types import Command
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.func import entrypoint as lg_entrypoint
 from langgraph.func import task
+from langgraph.types import Command
+
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.worker import Worker
-
 from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, entrypoint
+from temporalio.worker import Worker
 from tests.contrib.langgraph.e2e_functional_entrypoints import (
     ask_human,
     interrupt_entrypoint,
@@ -78,9 +78,7 @@ class InterruptV2FunctionalWorkflow:
         assert result.interrupts[0].value == "Do you approve?"
 
         # Resume with approval
-        resumed = await app.ainvoke(
-            Command(resume="approved"), config, version="v2"
-        )
+        resumed = await app.ainvoke(Command(resume="approved"), config, version="v2")
         return resumed.value
 
 

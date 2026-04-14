@@ -12,11 +12,11 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 from langgraph.graph.state import RunnableConfig
 from langgraph.types import Command, interrupt
+
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.worker import Worker
-
 from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.worker import Worker
 
 
 async def node(_: str) -> str:
@@ -27,12 +27,8 @@ async def node(_: str) -> str:
 class InterruptV2Workflow:
     @workflow.run
     async def run(self, input: str) -> Any:
-        g = graph("interrupt-v2-graph").compile(
-            checkpointer=InMemorySaver()
-        )
-        config = RunnableConfig(
-            {"configurable": {"thread_id": "1"}}
-        )
+        g = graph("interrupt-v2-graph").compile(checkpointer=InMemorySaver())
+        config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
         result = await g.ainvoke(input, config, version="v2")
 

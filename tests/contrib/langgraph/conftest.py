@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 
 from pytest import fixture
 from pytest_asyncio import fixture as async_fixture
+
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 
