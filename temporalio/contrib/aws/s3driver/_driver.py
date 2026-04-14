@@ -188,23 +188,28 @@ class S3StorageDriver(StorageDriver):
                     f"S3StorageDriver retrieve failed [bucket={bucket}, key={key}]"
                 ) from e
 
-            expected_hash = claim.claim_data.get("hash_value")
             hash_algorithm = claim.claim_data.get("hash_algorithm")
-            if expected_hash and hash_algorithm:
-                if hash_algorithm != "sha256":
-                    raise ValueError(
-                        f"S3StorageDriver unsupported hash algorithm "
-                        f"[bucket={bucket}, key={key}]: "
-                        f"expected sha256, got {hash_algorithm}"
-                    )
-                actual_hash = hashlib.sha256(payload_bytes).hexdigest().lower()
-                if actual_hash != expected_hash:
-                    raise ValueError(
-                        f"S3StorageDriver integrity check failed "
-                        f"[bucket={bucket}, key={key}]: "
-                        f"expected {hash_algorithm}:{expected_hash}, "
-                        f"got {hash_algorithm}:{actual_hash}"
-                    )
+            expected_hash = claim.claim_data.get("hash_value")
+            if not hash_algorithm or not expected_hash:
+                raise ValueError(
+                    f"S3StorageDriver claim is missing required content hash information "
+                    f"[bucket={bucket}, key={key}]: "
+                    f"claim_data must contain 'hash_algorithm' and 'hash_value'"
+                )
+            if hash_algorithm != "sha256":
+                raise ValueError(
+                    f"S3StorageDriver unsupported hash algorithm "
+                    f"[bucket={bucket}, key={key}]: "
+                    f"expected sha256, got {hash_algorithm}"
+                )
+            actual_hash = hashlib.sha256(payload_bytes).hexdigest().lower()
+            if actual_hash != expected_hash:
+                raise ValueError(
+                    f"S3StorageDriver integrity check failed "
+                    f"[bucket={bucket}, key={key}]: "
+                    f"expected {hash_algorithm}:{expected_hash}, "
+                    f"got {hash_algorithm}:{actual_hash}"
+                )
 
             payload = Payload()
             payload.ParseFromString(payload_bytes)

@@ -10,7 +10,8 @@ from temporalio import workflow
 from temporalio.contrib.google_adk_agents._mcp import TemporalMcpToolSetProvider
 from temporalio.contrib.google_adk_agents._model import invoke_model
 from temporalio.contrib.pydantic import (
-    PydanticPayloadConverter as _DefaultPydanticPayloadConverter,
+    PydanticPayloadConverter,
+    ToJsonOptions,
 )
 from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
@@ -111,11 +112,16 @@ class GoogleAdkPlugin(SimplePlugin):
         self, converter: DataConverter | None
     ) -> DataConverter:
         if converter is None:
-            return DataConverter(
-                payload_converter_class=_DefaultPydanticPayloadConverter
-            )
+            return DataConverter(payload_converter_class=_AdkPayloadConverter)
         elif converter.payload_converter_class is DefaultPayloadConverter:
             return dataclasses.replace(
-                converter, payload_converter_class=_DefaultPydanticPayloadConverter
+                converter, payload_converter_class=_AdkPayloadConverter
             )
         return converter
+
+
+class _AdkPayloadConverter(PydanticPayloadConverter):
+    """PayloadConverter for Google ADK that strips unset None fields."""
+
+    def __init__(self) -> None:
+        super().__init__(ToJsonOptions(exclude_unset=True))

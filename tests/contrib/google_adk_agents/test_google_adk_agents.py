@@ -14,6 +14,7 @@
 
 """Integration tests for ADK Temporal support."""
 
+import json
 import logging
 import os
 import uuid
@@ -963,3 +964,41 @@ async def test_litellm_model(client: Client):
     assert result.content is not None
     assert result.content.parts is not None
     assert result.content.parts[0].text == "hello from litellm"
+
+
+def test_unset_none_fields_stripped() -> None:
+    """ADK plugin converter strips unset None fields from Pydantic payloads."""
+    plugin = GoogleAdkPlugin()
+    converter = plugin._configure_data_converter(None)
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        contents=[Content(parts=[Part(text="hello")])],
+    )
+    payloads = converter.payload_converter.to_payloads([request])
+    serialized = json.loads(payloads[0].data)
+
+    assert serialized["model"] == "gemini-2.0-flash"
+    assert "contents" in serialized
+    for field in (
+        "cache_config",
+        "cache_metadata",
+        "cacheable_contents_token_count",
+        "previous_interaction_id",
+    ):
+        assert field not in serialized, f"Unset field {field!r} should be stripped"
+
+
+def test_explicitly_set_none_preserved() -> None:
+    """Explicitly-set None is preserved (exclude_unset, not exclude_none)."""
+    plugin = GoogleAdkPlugin()
+    converter = plugin._configure_data_converter(None)
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        contents=[Content(parts=[Part(text="hello")])],
+        cache_config=None,
+    )
+    payloads = converter.payload_converter.to_payloads([request])
+    serialized = json.loads(payloads[0].data)
+
+    assert "cache_config" in serialized, "Explicitly-set None should be preserved"
+    assert serialized["cache_config"] is None
