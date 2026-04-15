@@ -11,7 +11,13 @@ from temporalio.workflow import ActivityConfig
 
 
 class AdkActivityConfig(ActivityConfig, total=False):
-    """Activity config with ADK-specific options."""
+    """Activity config with ADK-specific options.
+
+    Attributes:
+        summary_fn: Optional callable that receives the LlmRequest and returns
+            a summary string (or None). Must be deterministic as it is called
+            during workflow execution.
+    """
 
     summary_fn: Callable[[LlmRequest], str | None] | None
 
