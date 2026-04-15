@@ -1,7 +1,6 @@
 """Tests for sandbox validation in TemporalOpenAIRunner."""
 
 import io
-import platform
 import uuid
 from datetime import timedelta
 from pathlib import Path
@@ -10,7 +9,6 @@ from typing import Any, Literal
 import pytest
 from agents import Agent, FunctionTool, RunConfig, Runner, Tool
 from agents.sandbox import Capability, Manifest, SandboxAgent, SandboxRunConfig
-from agents.sandbox.sandboxes import UnixLocalSandboxClientOptions
 from agents.sandbox.session.base_sandbox_session import BaseSandboxSession
 from agents.sandbox.session.sandbox_client import (
     BaseSandboxClient,
@@ -647,6 +645,10 @@ class _TestSandboxCapability(Capability):
         ]
 
 
+class _TestSandboxClientOptions(BaseSandboxClientOptions):
+    type: str = "test"  # type: ignore[reportIncompatibleVariableOverride]
+
+
 @workflow.defn
 class SandboxE2EWorkflow:
     @workflow.run
@@ -660,17 +662,13 @@ class SandboxE2EWorkflow:
             run_config=RunConfig(
                 sandbox=SandboxRunConfig(
                     client=temporal_sandbox_client("mock"),
-                    options=UnixLocalSandboxClientOptions(),
+                    options=_TestSandboxClientOptions(),
                 ),
             ),
         )
         return result.final_output
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="TODO: broken on Windows, UnixLocalSandboxClientOptions invalid there",
-)
 async def test_sandbox_e2e_runner(client: Client):
     """End-to-end: Runner.run() with SandboxAgent exercises the full sandbox
     lifecycle (create, start, stop, shutdown, delete) through Temporal activities."""
