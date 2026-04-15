@@ -57,17 +57,21 @@ class LangGraphPlugin(SimplePlugin):
 
         # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
-            for graph in graphs.values():
-                for name, node in graph.nodes.items():
+            for graph_name, graph in graphs.items():
+                for node_name, node in graph.nodes.items():
                     runnable = node.runnable
                     if (
                         not isinstance(runnable, RunnableCallable)
                         or runnable.afunc is None
                     ):
-                        raise ValueError(f"Node {name} must have an async function")
+                        raise ValueError(
+                            f"Node {node_name} must have an async function"
+                        )
                     # Remove LangSmith-related callback functions that can't be serialized between the workflow and activity.
                     runnable.func_accepts = {}
-                    runnable.afunc = self.execute(runnable.afunc, node.metadata)
+                    runnable.afunc = self.execute(
+                        f"{graph_name}.{node_name}", runnable.afunc, node.metadata
+                    )
 
         # Functional API: Wrap @task functions as Temporal Activities.
         if tasks:
@@ -75,7 +79,9 @@ class LangGraphPlugin(SimplePlugin):
                 name = task.func.__name__
                 opts = (activity_options or {}).get(name, {})
 
-                task.func = self.execute(task.func, opts)
+                task.func = self.execute(
+                    task_id(task.func), task.func, opts
+                )
                 task.func.__name__ = name
                 task.func.__qualname__ = getattr(task.func, "__qualname__", name)
 
@@ -114,13 +120,18 @@ class LangGraphPlugin(SimplePlugin):
             _entrypoint_registry.setdefault(task_queue, {}).update(self._entrypoints)
         return super().configure_worker(config)
 
-    def execute(self, func: Callable, kwargs: dict[str, Any] | None = None) -> Callable:
+    def execute(
+        self,
+        activity_name: str,
+        func: Callable,
+        kwargs: dict[str, Any] | None = None,
+    ) -> Callable:
         """Prepare a node or task to execute as an activity or inline in the workflow."""
         opts = kwargs or {}
         execute_in = opts.pop("execute_in", "activity")
 
         if execute_in == "activity":
-            a = activity.defn(name=func.__name__)(wrap_activity(func))
+            a = activity.defn(name=activity_name)(wrap_activity(func))
             self.activities.append(a)
             return wrap_execute_activity(a, task_id=task_id(func), **opts)
         elif execute_in == "workflow":
