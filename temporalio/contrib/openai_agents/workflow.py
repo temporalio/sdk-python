@@ -254,9 +254,8 @@ def temporal_sandbox_client(
         This is experimental and may change in future versions.
         Use with caution in production environments.
 
-    This returns a :class:`~agents.sandbox.session.sandbox_client.BaseSandboxClient`
-    that dispatches all sandbox operations as Temporal activities, targeting the
-    :class:`~temporalio.contrib.openai_agents.SandboxClientProvider` registered
+    This returns a ``BaseSandboxClient`` that dispatches all sandbox operations
+    as Temporal activities, targeting the ``SandboxClientProvider`` registered
     on the worker with the matching ``name``.
 
     Example::

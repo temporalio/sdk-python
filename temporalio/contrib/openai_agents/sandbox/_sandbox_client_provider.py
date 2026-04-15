@@ -43,7 +43,7 @@ class SandboxClientProvider:
         This class is experimental and may change in future versions.
         Use with caution in production environments.
 
-    Wraps a :class:`BaseSandboxClient` with a unique name so that multiple
+    Wraps a ``BaseSandboxClient`` with a unique name so that multiple
     sandbox backends can be registered on a single Temporal worker.  Each
     provider gets its own set of Temporal activities whose names are prefixed
     with the provider name, allowing them to coexist on the same task queue.
@@ -70,7 +70,7 @@ class SandboxClientProvider:
     Args:
         name: A unique name for this sandbox backend (e.g. ``"daytona"``,
             ``"local"``).  Must match the name used on the workflow side.
-        client: The real :class:`BaseSandboxClient` that performs sandbox
+        client: The real ``BaseSandboxClient`` that performs sandbox
             lifecycle and I/O operations on the worker.
     """
 

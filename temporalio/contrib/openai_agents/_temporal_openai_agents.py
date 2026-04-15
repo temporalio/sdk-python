@@ -165,7 +165,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 on the worker.  Each provider pairs a unique name with a real
                 ``BaseSandboxClient`` (e.g. ``DaytonaSandboxClient``,
                 ``UnixLocalSandboxClient``).  On the workflow side, use
-                :func:`~temporalio.contrib.openai_agents.workflow.temporal_sandbox_client`
+                ``temporal_sandbox_client``
                 with the matching name to target the correct backend.
                 Warning: sandbox_clients is experimental and behavior may change in future versions.
                 Use with caution in production environments.

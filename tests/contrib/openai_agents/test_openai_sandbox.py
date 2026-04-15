@@ -1,6 +1,7 @@
 """Tests for sandbox validation in TemporalOpenAIRunner."""
 
 import io
+import platform
 import uuid
 from datetime import timedelta
 from pathlib import Path
@@ -666,6 +667,10 @@ class SandboxE2EWorkflow:
         return result.final_output
 
 
+@pytest.mark.skipif(
+    platform.system() == "Windows",
+    reason="TODO: broken on Windows, UnixLocalSandboxClientOptions invalid there",
+)
 async def test_sandbox_e2e_runner(client: Client):
     """End-to-end: Runner.run() with SandboxAgent exercises the full sandbox
     lifecycle (create, start, stop, shutdown, delete) through Temporal activities."""
