@@ -79,9 +79,7 @@ class LangGraphPlugin(SimplePlugin):
                 name = task.func.__name__
                 opts = (activity_options or {}).get(name, {})
 
-                task.func = self.execute(
-                    task_id(task.func), task.func, opts
-                )
+                task.func = self.execute(task_id(task.func), task.func, opts)
                 task.func.__name__ = name
                 task.func.__qualname__ = getattr(task.func, "__qualname__", name)
 
