@@ -4905,11 +4905,12 @@ async def test_workflow_timeout_support(client: Client, approach: str):
 
 @workflow.defn
 class BuildIDInfoWorkflow:
+    do_continue = False
     do_finish = False
 
     @workflow.run
     async def run(self):
-        await asyncio.sleep(1)
+        await workflow.wait_condition(lambda: self.do_continue)
         if workflow.info().get_current_build_id() == "1.0":
             await workflow.execute_activity(
                 say_hello, "yo", schedule_to_close_timeout=timedelta(seconds=5)
@@ -4919,6 +4920,10 @@ class BuildIDInfoWorkflow:
     @workflow.query
     def get_build_id(self) -> str:
         return workflow.info().get_current_build_id()
+
+    @workflow.signal
+    async def continue_run(self):
+        self.do_continue = True
 
     @workflow.signal
     async def finish(self):
@@ -4964,9 +4969,11 @@ async def test_workflow_current_build_id_appropriately_set(
     ) as worker:
         bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
         assert bid == "1.0"
+        await handle.signal(BuildIDInfoWorkflow.continue_run)
+        await assert_eq_eventually(
+            "1.1", lambda: handle.query(BuildIDInfoWorkflow.get_build_id)
+        )
         await handle.signal(BuildIDInfoWorkflow.finish)
-        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
-        assert bid == "1.1"
         await handle.result()
         bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
         assert bid == "1.1"
@@ -8558,7 +8565,7 @@ async def test_disable_logger_sandbox(
                 DisableLoggerSandbox.run,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                run_timeout=timedelta(seconds=1),
+                run_timeout=timedelta(seconds=5),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
