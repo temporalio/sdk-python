@@ -49,7 +49,7 @@ class BatchJob:
     jobId: Optional[str] = None
 
 
-class EventType(Enum):
+class EventType(str, Enum):
     EVENT_TYPE_ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY = (
         "EVENT_TYPE_ACTIVITY_PROPERTIES_MODIFIED_EXTERNALLY"
     )
@@ -175,14 +175,14 @@ class EventRef:
     """EventReference is a direct reference to a history event through the event ID."""
 
     eventId: Optional[str] = None
-    eventType: Optional[EventType] = None
+    eventType: Optional["EventType"] = None
 
 
 @dataclass
 class RequestIDRef:
     """RequestIdReference is a indirect reference to a history event through the request ID."""
 
-    eventType: Optional[EventType] = None
+    eventType: Optional["EventType"] = None
     requestId: Optional[str] = None
 
 
@@ -347,7 +347,7 @@ class SearchAttributes:
     indexedFields: Optional[Dict[str, Any]] = None
 
 
-class Kind(Enum):
+class Kind(str, Enum):
     """Default: TASK_QUEUE_KIND_NORMAL."""
 
     TASK_QUEUE_KIND_NORMAL = "TASK_QUEUE_KIND_NORMAL"
@@ -362,7 +362,7 @@ class TaskQueue:
     See https://docs.temporal.io/docs/concepts/task-queues/
     """
 
-    kind: Optional[Kind] = None
+    kind: Optional["Kind"] = None
     """Default: TASK_QUEUE_KIND_NORMAL."""
 
     name: Optional[str] = None
@@ -400,7 +400,7 @@ class UserMetadata:
     """
 
 
-class VersioningOverrideBehavior(Enum):
+class VersioningOverrideBehavior(str, Enum):
     """Required.
     Deprecated. Use `override`.
     """
@@ -440,7 +440,7 @@ class Deployment:
     """
 
 
-class PinnedBehavior(Enum):
+class PinnedBehavior(str, Enum):
     """Defaults to PINNED_OVERRIDE_BEHAVIOR_UNSPECIFIED.
     See `PinnedOverrideBehavior` for details.
     """
@@ -483,7 +483,7 @@ class Version:
 class Pinned:
     """Override the workflow to have Pinned behavior."""
 
-    behavior: Optional[PinnedBehavior] = None
+    behavior: Optional["PinnedBehavior"] = None
     """Defaults to PINNED_OVERRIDE_BEHAVIOR_UNSPECIFIED.
     See `PinnedOverrideBehavior` for details.
     """
@@ -522,7 +522,7 @@ class VersioningOverride:
     autoUpgrade: Optional[bool] = None
     """Override the workflow to have AutoUpgrade behavior."""
 
-    behavior: Optional[VersioningOverrideBehavior] = None
+    behavior: Optional["VersioningOverrideBehavior"] = None
     """Required.
     Deprecated. Use `override`.
     """
@@ -542,7 +542,7 @@ class VersioningOverride:
     """
 
 
-class WorkflowIDConflictPolicy(Enum):
+class WorkflowIDConflictPolicy(str, Enum):
     """Defines how to resolve a workflow id conflict with a *running* workflow.
     The default policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING.
     Note that WORKFLOW_ID_CONFLICT_POLICY_FAIL is an invalid option.
@@ -561,7 +561,7 @@ class WorkflowIDConflictPolicy(Enum):
     )
 
 
-class WorkflowIDReusePolicy(Enum):
+class WorkflowIDReusePolicy(str, Enum):
     """Defines whether to allow re-using the workflow id from a previously *closed* workflow.
     The default policy is WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
 
@@ -650,7 +650,7 @@ class WorkflowServiceSignalWithStartWorkflowExecutionInput:
     """Total workflow execution timeout including retries and continue as new"""
 
     workflowId: Optional[str] = None
-    workflowIdConflictPolicy: Optional[WorkflowIDConflictPolicy] = None
+    workflowIdConflictPolicy: Optional["WorkflowIDConflictPolicy"] = None
     """Defines how to resolve a workflow id conflict with a *running* workflow.
     The default policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING.
     Note that WORKFLOW_ID_CONFLICT_POLICY_FAIL is an invalid option.
@@ -658,7 +658,7 @@ class WorkflowServiceSignalWithStartWorkflowExecutionInput:
     See `workflow_id_reuse_policy` for handling a workflow id duplication with a *closed*
     workflow.
     """
-    workflowIdReusePolicy: Optional[WorkflowIDReusePolicy] = None
+    workflowIdReusePolicy: Optional["WorkflowIDReusePolicy"] = None
     """Defines whether to allow re-using the workflow id from a previously *closed* workflow.
     The default policy is WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
     

@@ -8,7 +8,7 @@ from google.protobuf.json_format import MessageToDict
 
 import temporalio.bridge.worker
 import temporalio.converter
-from temporalio import nexus
+import temporalio.nexus.system as nexus_system
 from temporalio.api.common.v1.message_pb2 import (
     Payload,
     Payloads,
@@ -219,11 +219,11 @@ async def test_visit_payloads_on_other_commands():
 
 async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
     envelope = (
-        nexus.system.generated.WorkflowServiceSignalWithStartWorkflowExecutionInput(
+        nexus_system.generated.WorkflowServiceSignalWithStartWorkflowExecutionInput(
             namespace="default",
             workflowId="workflow-id",
             signalName="signal-name",
-            input=nexus.system.generated.Input(
+            input=nexus_system.generated.Input(
                 payloads=[
                     MessageToDict(
                         Payload(
@@ -232,7 +232,7 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
                     )
                 ]
             ),
-            signalInput=nexus.system.generated.Input(
+            signalInput=nexus_system.generated.Input(
                 payloads=[
                     MessageToDict(
                         Payload(
@@ -241,7 +241,7 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
                     )
                 ]
             ),
-            memo=nexus.system.generated.Memo(
+            memo=nexus_system.generated.Memo(
                 fields={
                     "memo-key": MessageToDict(
                         Payload(
@@ -250,7 +250,7 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
                     )
                 }
             ),
-            searchAttributes=nexus.system.generated.SearchAttributes(
+            searchAttributes=nexus_system.generated.SearchAttributes(
                 indexedFields={
                     "search-key": MessageToDict(
                         Payload(
@@ -300,12 +300,12 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
 
 async def test_bridge_encoding_checks_system_nexus_envelope_size():
     envelope = (
-        nexus.system.generated.WorkflowServiceSignalWithStartWorkflowExecutionInput(
+        nexus_system.generated.WorkflowServiceSignalWithStartWorkflowExecutionInput(
             namespace="default",
             workflowId="workflow-id",
             signalName="signal-name",
             requestId="x" * 2048,
-            input=nexus.system.generated.Input(
+            input=nexus_system.generated.Input(
                 payloads=[
                     MessageToDict(
                         Payload(

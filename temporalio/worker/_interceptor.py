@@ -242,6 +242,36 @@ class SignalExternalWorkflowInput:
 
 
 @dataclass
+class SignalWithStartExternalWorkflowInput:
+    """Input for
+    :py:meth:`WorkflowOutboundInterceptor.signal_with_start_external_workflow`.
+    """
+
+    signal: str
+    signal_args: Sequence[Any]
+    namespace: str
+    workflow_id: str
+    workflow: str
+    workflow_args: Sequence[Any]
+    task_queue: str
+    execution_timeout: timedelta | None
+    run_timeout: timedelta | None
+    task_timeout: timedelta | None
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy
+    retry_policy: temporalio.common.RetryPolicy | None
+    cron_schedule: str
+    memo: Mapping[str, Any] | None
+    search_attributes: temporalio.common.TypedSearchAttributes | None
+    static_summary: str | None
+    static_details: str | None
+    start_delay: timedelta | None
+    priority: temporalio.common.Priority
+    versioning_override: temporalio.common.VersioningOverride | None
+    headers: Mapping[str, str] | None
+
+
+@dataclass
 class StartActivityInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_activity`."""
 
@@ -449,6 +479,15 @@ class WorkflowOutboundInterceptor:
         :py:meth:`temporalio.workflow.ExternalWorkflowHandle.signal` call.
         """
         return await self.next.signal_external_workflow(input)
+
+    async def signal_with_start_external_workflow(
+        self, input: SignalWithStartExternalWorkflowInput
+    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
+        """Called for every
+        :py:meth:`temporalio.workflow.ExternalWorkflowHandle.signal_with_start_workflow`
+        call.
+        """
+        return await self.next.signal_with_start_external_workflow(input)
 
     def start_activity(
         self, input: StartActivityInput
