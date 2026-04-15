@@ -17,6 +17,7 @@ This document is organized as follows:
 - **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
 - **[Full Example](#full-example)** Running the Hello World Durable Agent example.
 - **[Tool Calling](#tool-calling).** Calling agent Tools in Temporal.
+- **[Sandbox Support](#sandbox-support).** Running sandbox agents in Temporal.
 - **[Feature Support](#feature-support).** Compatibility matrix.
 
 The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains examples including basic usage, common agent patterns, and more complete samples.
@@ -449,6 +450,131 @@ To recover from such failures, you need to implement your own application-level 
 ### Hosted MCP Tool
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
+
+## Sandbox Support
+
+⚠️ **Pre-release** - This functionality is subject to change prior to General Availability.
+
+The sandbox integration lets `SandboxAgent` from the OpenAI Agents SDK execute inside a remote or local sandbox (Daytona, Docker, E2B, local Unix, etc.) while keeping all coordination durable in Temporal.
+
+Every sandbox operation — creating a session, running commands, reading/writing files, PTY interactions — is dispatched as a Temporal activity. This means sandbox work is fully observable, retryable, and recoverable like any other activity, and sandbox session state is serialized with the workflow so it survives worker restarts.
+
+### Architecture
+
+```text
+Workflow Code
+  ↓
+temporal_sandbox_client("daytona")   [returns TemporalSandboxClient]
+  ↓
+SandboxAgent.run(run_config=RunConfig(sandbox=SandboxRunConfig(client=...)))
+  ↓
+sandbox agent calls session.exec / session.read / session.write / …
+  ↓
+TemporalSandboxSession routes each call as a Temporal activity
+("daytona-sandbox_session_exec", "daytona-sandbox_session_read", …)
+  ↓
+SandboxClientProvider activities on the worker call the real sandbox client
+  ↓
+Actual sandbox backend (Daytona, Docker, local, …)
+```
+
+### Worker Configuration
+
+Register one or more `SandboxClientProvider` instances with the plugin. Each provider pairs a unique name with a real `BaseSandboxClient` implementation. The plugin automatically registers all required activities on the worker.
+
+```python
+import asyncio
+import docker
+from temporalio.client import Client
+from temporalio.worker import Worker
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, SandboxClientProvider, ModelActivityParameters
+from agents.extensions.sandbox.daytona import DaytonaSandboxClient
+from agents.extensions.sandbox.unix_local import UnixLocalSandboxClient
+
+async def main():
+    client = await Client.connect(
+        "localhost:7233",
+        plugins=[
+            OpenAIAgentsPlugin(
+                model_params=ModelActivityParameters(
+                    start_to_close_timeout=timedelta(seconds=30)
+                ),
+                sandbox_clients=[
+                    SandboxClientProvider("daytona", DaytonaSandboxClient()),
+                    SandboxClientProvider("local", UnixLocalSandboxClient()),
+                ],
+            ),
+        ],
+    )
+
+    worker = Worker(
+        client,
+        task_queue="my-task-queue",
+        workflows=[MyWorkflow],
+    )
+    await worker.run()
+```
+
+Provider names must be unique. Each name becomes the prefix for that backend's activities, allowing multiple backends to coexist on a single worker.
+
+### Workflow Usage
+
+In the workflow, use `temporal_sandbox_client()` to create a reference to a registered backend by name. Pass it to `SandboxRunConfig` inside `RunConfig`:
+
+```python
+from temporalio import workflow
+from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
+from agents import Runner
+from agents.sandbox import SandboxAgent, SandboxRunConfig
+from agents.run import RunConfig
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        agent = SandboxAgent(
+            name="Coding Assistant",
+            instructions="You are a helpful coding assistant with access to a sandbox.",
+        )
+
+        result = await Runner.run(
+            agent,
+            prompt,
+            run_config=RunConfig(
+                sandbox=SandboxRunConfig(
+                    client=temporal_sandbox_client("daytona"),
+                    options=DaytonaSandboxClientOptions(pause_on_exit=False),
+                ),
+            ),
+        )
+        return result.final_output
+```
+
+The name passed to `temporal_sandbox_client()` must exactly match the name used in `SandboxClientProvider` on the worker.
+
+### Multiple Backends
+
+A single workflow can target different backends by name. Register all backends on the worker and reference each by name in the workflow:
+
+```python
+# Run a task on the "daytona" backend
+result = await Runner.run(
+    agent, prompt,
+    run_config=RunConfig(sandbox=SandboxRunConfig(
+        client=temporal_sandbox_client("daytona"),
+        options=DaytonaSandboxClientOptions(pause_on_exit=False),
+    )),
+)
+
+# Run a different task on the "local" backend
+result = await Runner.run(
+    agent, prompt,
+    run_config=RunConfig(sandbox=SandboxRunConfig(
+        client=temporal_sandbox_client("local"),
+        options=UnixLocalSandboxClientOptions(),
+    )),
+)
+```
 
 ## Feature Support
 
