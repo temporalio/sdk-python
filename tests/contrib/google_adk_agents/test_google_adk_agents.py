@@ -580,6 +580,99 @@ async def test_unsetting_timeout():
     assert model._activity_config.get("start_to_close_timeout", None) is None
 
 
+class SummaryFnModel(TestModel):
+    """Returns a single text response for summary_fn testing."""
+
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(content=Content(role="model", parts=[Part(text="response")])),
+        ]
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["summary_fn_model"]
+
+
+@workflow.defn
+class SummaryFnWorkflow:
+    @workflow.run
+    async def run(self, model_name: str) -> str | None:
+        from temporalio.contrib.google_adk_agents import AdkActivityConfig
+
+        agent = Agent(
+            name="summary_fn_agent",
+            model=TemporalModel(
+                model_name,
+                AdkActivityConfig(summary_fn=lambda req: f"Invoking {req.model}"),
+            ),
+        )
+        runner = InMemoryRunner(agent=agent, app_name="summary_fn_app")
+        session = await runner.session_service.create_session(
+            app_name="summary_fn_app", user_id="test"
+        )
+        last_event = None
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text="hi")]),
+            )
+        ) as agen:
+            async for event in agen:
+                last_event = event
+        if last_event and last_event.content and last_event.content.parts:
+            return last_event.content.parts[0].text
+        return None
+
+
+@pytest.mark.asyncio
+async def test_summary_fn_produces_dynamic_summary(client: Client):
+    """summary_fn in AdkActivityConfig sets summary on invoke_model activity."""
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+    LLMRegistry.register(SummaryFnModel)
+
+    async with Worker(
+        client,
+        task_queue="adk-summary-fn-test",
+        workflows=[SummaryFnWorkflow],
+        max_cached_workflows=0,
+    ):
+        handle = await client.start_workflow(
+            SummaryFnWorkflow.run,
+            "summary_fn_model",
+            id=f"summary-fn-{uuid.uuid4()}",
+            task_queue="adk-summary-fn-test",
+            execution_timeout=timedelta(seconds=60),
+        )
+        await handle.result()
+
+        found = False
+        async for e in handle.fetch_history_events():
+            if e.HasField("activity_task_scheduled_event_attributes"):
+                attrs = e.activity_task_scheduled_event_attributes
+                if attrs.activity_type.name == "invoke_model":
+                    assert (
+                        e.user_metadata.summary.data == b'"Invoking summary_fn_model"'
+                    )
+                    found = True
+        assert found, "No invoke_model activity found in history"
+
+
+def test_summary_and_summary_fn_raises():
+    """Cannot specify both summary and summary_fn."""
+    from temporalio.contrib.google_adk_agents import AdkActivityConfig
+
+    with pytest.raises(
+        ValueError, match="Cannot specify both 'summary' and 'summary_fn'"
+    ):
+        TemporalModel(
+            "m",
+            AdkActivityConfig(summary="static", summary_fn=lambda req: "dynamic"),
+        )
+
+
 @pytest.mark.asyncio
 async def test_agent_outside_workflow():
     """Test that an agent using TemporalModel and activity_tool works outside a Temporal workflow."""

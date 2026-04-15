@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from datetime import timedelta
 
 from google.adk.models import BaseLlm, LLMRegistry
@@ -8,6 +8,12 @@ from google.adk.models.llm_response import LlmResponse
 import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.workflow import ActivityConfig
+
+
+class AdkActivityConfig(ActivityConfig, total=False):
+    """Activity config with ADK-specific options."""
+
+    summary_fn: Callable[[LlmRequest], str | None] | None
 
 
 @activity.defn
@@ -40,21 +46,29 @@ class TemporalModel(BaseLlm):
     """A Temporal-based LLM model that executes model invocations as activities."""
 
     def __init__(
-        self, model_name: str, activity_config: ActivityConfig | None = None
+        self,
+        model_name: str,
+        activity_config: AdkActivityConfig | ActivityConfig | None = None,
     ) -> None:
         """Initialize the TemporalModel.
 
         Args:
             model_name: The name of the model to use.
             activity_config: Configuration options for the activity execution.
+
+        Raises:
+            ValueError: If both 'summary' and 'summary_fn' are set.
         """
         super().__init__(model=model_name)
         self._model_name = model_name
-        self._activity_config = ActivityConfig(
-            start_to_close_timeout=timedelta(seconds=60)
-        )
-        if activity_config:
-            self._activity_config.update(activity_config)
+        raw = dict(activity_config) if activity_config else {}
+        self._summary_fn: Callable[[LlmRequest], str | None] | None = raw.pop(
+            "summary_fn", None
+        )  # type: ignore[assignment]
+        raw.setdefault("start_to_close_timeout", timedelta(seconds=60))
+        if raw.get("summary") is not None and self._summary_fn is not None:
+            raise ValueError("Cannot specify both 'summary' and 'summary_fn'")
+        self._activity_config = ActivityConfig(**raw)  # type: ignore[typeddict-item]
 
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
@@ -76,10 +90,20 @@ class TemporalModel(BaseLlm):
                 yield response
             return
 
+        config = self._activity_config.copy()
+        if self._summary_fn is not None:
+            summary = self._summary_fn(llm_request)
+            if summary is not None:
+                config["summary"] = summary
+        elif "summary" not in config:
+            if llm_request.config and llm_request.config.labels:
+                agent_name = llm_request.config.labels.get("adk_agent_name")
+                if agent_name:
+                    config["summary"] = agent_name
         responses = await workflow.execute_activity(
             invoke_model,
             args=[llm_request],
-            **self._activity_config,
+            **config,
         )
         for response in responses:
             yield response
