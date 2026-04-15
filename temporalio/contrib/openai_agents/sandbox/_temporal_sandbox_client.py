@@ -53,6 +53,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
         name: str,
         config: ActivityConfig | None = None,
     ) -> None:
+        """Initialize the client."""
         self._name = name
         self._config: ActivityConfig = config or ActivityConfig(
             start_to_close_timeout=timedelta(minutes=5),
@@ -66,6 +67,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
         manifest: Manifest | None = None,
         options: BaseSandboxClientOptions,
     ) -> SandboxSession:
+        """Create a new sandbox session via activity."""
         result: SessionResult = await workflow.execute_activity(
             f"{self._name}-sandbox_client_create",
             arg=CreateSessionArgs(
@@ -90,6 +92,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
         )
 
     async def resume(self, state: SandboxSessionState) -> SandboxSession:
+        """Resume an existing sandbox session via activity."""
         result: SessionResult = await workflow.execute_activity(
             f"{self._name}-sandbox_client_resume",
             arg=ResumeSessionArgs(state=state),
@@ -108,6 +111,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
         )
 
     async def delete(self, session: TemporalSandboxSession) -> TemporalSandboxSession:  # type: ignore[override]
+        """Delete a sandbox session via activity."""
         await workflow.execute_activity(
             f"{self._name}-sandbox_client_delete",
             arg=StopArgs(state=session.state),
@@ -116,4 +120,5 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
         return session
 
     def deserialize_session_state(self, payload: dict[str, Any]) -> SandboxSessionState:
+        """Deserialize a session state from a dict."""
         return SandboxSessionState.parse(payload)

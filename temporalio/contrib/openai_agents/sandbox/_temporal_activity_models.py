@@ -60,6 +60,8 @@ class _HasState(BaseModel):
 
 
 class ExecArgs(_HasState):
+    """Arguments for exec activity."""
+
     command: list[str]
     timeout: float | None = None
     shell: bool | list[str] = True
@@ -67,27 +69,39 @@ class ExecArgs(_HasState):
 
 
 class ReadArgs(_HasState):
+    """Arguments for read activity."""
+
     path: str
 
 
 class WriteArgs(_HasState):
+    """Arguments for write activity."""
+
     path: str
     data: JsonSafeBytes
 
 
 class RunningArgs(_HasState):
+    """Arguments for running check activity."""
+
     pass
 
 
 class PersistWorkspaceArgs(_HasState):
+    """Arguments for persist workspace activity."""
+
     pass
 
 
 class HydrateWorkspaceArgs(_HasState):
+    """Arguments for hydrate workspace activity."""
+
     data: JsonSafeBytes
 
 
 class PtyExecStartArgs(_HasState):
+    """Arguments for PTY exec start activity."""
+
     command: list[str]
     timeout: float | None = None
     shell: bool | list[str] = True
@@ -98,6 +112,8 @@ class PtyExecStartArgs(_HasState):
 
 
 class PtyWriteStdinArgs(_HasState):
+    """Arguments for PTY write stdin activity."""
+
     session_id: int
     chars: str
     yield_time_s: float | None = None
@@ -105,10 +121,14 @@ class PtyWriteStdinArgs(_HasState):
 
 
 class StartArgs(_HasState):
+    """Arguments for start activity."""
+
     pass
 
 
 class StopArgs(_HasState):
+    """Arguments for stop activity."""
+
     pass
 
 
@@ -118,12 +138,16 @@ class StopArgs(_HasState):
 
 
 class ExecResult(BaseModel):
+    """Result of an exec activity."""
+
     stdout: JsonSafeBytes
     stderr: JsonSafeBytes
     exit_code: int
 
 
 class PtyExecUpdateResult(BaseModel):
+    """Result of a PTY exec activity."""
+
     process_id: int | None
     output: JsonSafeBytes
     exit_code: int | None
@@ -131,19 +155,21 @@ class PtyExecUpdateResult(BaseModel):
 
 
 class ReadResult(BaseModel):
+    """Result of a read activity."""
+
     data: JsonSafeBytes
 
 
 class RunningResult(BaseModel):
+    """Result of a running check activity."""
+
     is_running: bool
 
 
 class PersistWorkspaceResult(BaseModel):
+    """Result of a persist workspace activity."""
+
     data: JsonSafeBytes
-
-
-class VoidResult(BaseModel):
-    pass
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +178,8 @@ class VoidResult(BaseModel):
 
 
 class CreateSessionArgs(BaseModel):
+    """Arguments for create session activity."""
+
     snapshot_spec: SnapshotSpecUnion | SerializeAsAny[SnapshotBase] | None = None
     manifest: Manifest | None = None
     client_options: SerializeAsAny[BaseSandboxClientOptions] | None = None
@@ -179,6 +207,8 @@ class CreateSessionArgs(BaseModel):
 
 
 class ResumeSessionArgs(_HasState):
+    """Arguments for resume session activity."""
+
     pass
 
 

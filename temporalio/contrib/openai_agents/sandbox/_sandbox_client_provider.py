@@ -75,6 +75,7 @@ class SandboxClientProvider:
     """
 
     def __init__(self, name: str, client: BaseSandboxClient[Any]) -> None:
+        """Initialize the provider."""
         self._name = name
         self._client = client
         self._sessions: dict[str, SandboxSession] = {}
