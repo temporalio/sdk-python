@@ -22,7 +22,7 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 # Save registered graphs/entrypoints at the module level to avoid being refreshed by the sandbox.
 _graph_registry: dict[str, StateGraph[Any]] = {}
-_entrypoint_registry: dict[str, Pregel] = {}
+_entrypoint_registry: dict[str, Pregel[Any, Any, Any, Any]] = {}
 
 
 class LangGraphPlugin(SimplePlugin):
@@ -43,7 +43,7 @@ class LangGraphPlugin(SimplePlugin):
         # Graph API
         graphs: dict[str, StateGraph] | None = None,
         # Functional API
-        entrypoints: dict[str, Pregel] | None = None,
+        entrypoints: dict[str, Pregel[Any, Any, Any, Any]] | None = None,
         tasks: list | None = None,
         # TODO: Remove activity_options when we have support for @task(metadata=...)
         activity_options: dict[str, dict] | None = None,
@@ -134,7 +134,9 @@ def graph(
     return _graph_registry[name]
 
 
-def entrypoint(name: str, cache: dict[str, Any] | None = None) -> Pregel:
+def entrypoint(
+    name: str, cache: dict[str, Any] | None = None
+) -> Pregel[Any, Any, Any, Any]:
     """Retrieve a registered entrypoint by name.
 
     Args:
