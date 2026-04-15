@@ -93,13 +93,13 @@ class ShellToolInput:
 class _NoopApplyPatchEditor:
     """Satisfies the ApplyPatchEditor protocol for tool reconstruction during model calls."""
 
-    def create_file(self, operation: Any) -> None:
+    def create_file(self, operation: Any) -> None:  # type: ignore[reportUnusedParameter]
         return None
 
-    def update_file(self, operation: Any) -> None:
+    def update_file(self, operation: Any) -> None:  # type: ignore[reportUnusedParameter]
         return None
 
-    def delete_file(self, operation: Any) -> None:
+    def delete_file(self, operation: Any) -> None:  # type: ignore[reportUnusedParameter]
         return None
 
 
@@ -229,7 +229,7 @@ class ModelActivity:
                 return tool
             elif isinstance(tool, ShellToolInput):
 
-                async def _noop_executor(*a: Any, **kw: Any) -> str:
+                async def _noop_executor(*a: Any, **kw: Any) -> str:  # type: ignore[reportUnusedParameter]
                     return ""
 
                 return ShellTool(

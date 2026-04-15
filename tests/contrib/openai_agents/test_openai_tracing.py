@@ -733,7 +733,7 @@ async def test_otel_tracing_in_runner(
 
     def is_descendant_of(child: ReadableSpan, ancestor_span_id: int) -> bool:
         """Check if child is a descendant of the span with ancestor_span_id."""
-        current = child
+        current: ReadableSpan | None = child
         while current and current.parent:
             if current.parent.span_id == ancestor_span_id:
                 return True

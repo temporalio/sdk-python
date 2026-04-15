@@ -56,7 +56,6 @@ from temporalio.contrib.openai_agents.testing import (
     TestModelProvider,
 )
 from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
-from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ActivityConfig
 from tests.helpers import new_worker
 
@@ -251,11 +250,11 @@ class _MockSandboxSession(BaseSandboxSession):
         self.exec_calls.append((command, timeout))
         return ExecResult(stdout=b"ok\n", stderr=b"", exit_code=0)
 
-    async def read(self, path: Path, *, user=None) -> io.IOBase:
+    async def read(self, path: Path, *, user: Any = None) -> io.IOBase:  # type: ignore[reportUnusedParameter]
         self.read_calls.append(path)
         return io.BytesIO(b"file-content")
 
-    async def write(self, path: Path, data: io.IOBase, *, user=None) -> None:
+    async def write(self, path: Path, data: io.IOBase, *, user: Any = None) -> None:  # type: ignore[reportUnusedParameter]
         self.write_calls.append((path, data.read()))
 
     async def persist_workspace(self) -> io.IOBase:
@@ -332,7 +331,7 @@ def _activity_map(
 ) -> dict[str, Any]:
     """Build a short-name → callable dict from all() for easy test dispatch."""
     return {
-        act.__temporal_activity_definition.name: act  # type: ignore[union-attr]
+        act.__temporal_activity_definition.name: act  # type: ignore[attr-defined, union-attr]
         for act in sandbox_activities._get_activities()
     }
 
@@ -587,21 +586,21 @@ class _TestSandboxCapability(Capability):
     def tools(self) -> list[Tool]:
         session = self._session
 
-        async def _run_cmd(ctx: Any, args: str) -> str:
+        async def _run_cmd(ctx: Any, args: str) -> str:  # type: ignore[reportUnusedParameter]
             import json
 
             cmd = json.loads(args)["cmd"]
             result = await session.exec(cmd, shell=True)  # type: ignore[union-attr]
             return result.stdout.decode()
 
-        async def _read_file(ctx: Any, args: str) -> str:
+        async def _read_file(ctx: Any, args: str) -> str:  # type: ignore[reportUnusedParameter]
             import json
 
             path = json.loads(args)["path"]
             handle = await session.read(Path(path))  # type: ignore[union-attr]
             return handle.read().decode()
 
-        async def _write_file(ctx: Any, args: str) -> str:
+        async def _write_file(ctx: Any, args: str) -> str:  # type: ignore[reportUnusedParameter]
             import json
 
             parsed = json.loads(args)
@@ -734,7 +733,7 @@ _BYTE_PAYLOADS = [
 ]
 
 
-def _roundtrip(model_cls, **kwargs):
+def _roundtrip(model_cls: Any, **kwargs: Any) -> Any:
     """Serialize a model to JSON via pydantic_core and deserialize back."""
     json_bytes = to_json(model_cls(**kwargs))
     return TypeAdapter(model_cls).validate_json(json_bytes)
