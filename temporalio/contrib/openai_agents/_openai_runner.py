@@ -1,6 +1,6 @@
 import dataclasses
 from collections.abc import Awaitable
-from typing import Any, Callable, Unpack
+from typing import Any, Callable
 
 from agents import (
     Agent,
@@ -17,6 +17,7 @@ from agents import (
 )
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner, RunOptions
 from agents.sandbox import SandboxAgent
+from typing_extensions import Unpack
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
