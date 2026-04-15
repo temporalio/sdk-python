@@ -155,7 +155,6 @@ def build_signal_with_start_workflow_execution_input(
     signal: str,
     signal_args: Sequence[Any],
     task_queue: str,
-    request_id: str,
     payload_converter: temporalio.converter.PayloadConverter,
     execution_timeout: timedelta | None = None,
     run_timeout: timedelta | None = None,
@@ -186,7 +185,6 @@ def build_signal_with_start_workflow_execution_input(
         workflowTaskTimeout=(
             f"{task_timeout.total_seconds()}s" if task_timeout else None
         ),
-        requestId=request_id,
         workflowIdReusePolicy=_workflow_id_reuse_policy_to_generated(id_reuse_policy),
         workflowIdConflictPolicy=_workflow_id_conflict_policy_to_generated(
             id_conflict_policy

@@ -4282,10 +4282,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
     priority: temporalio.common.Priority
 
 
-_SYSTEM_NEXUS_ENDPOINT = "temporal-system"
-# TODO: Switch this back to "__temporal_system" once the server supports reserved
-# endpoint names for system operations.
-
+_SYSTEM_NEXUS_ENDPOINT = "__temporal_system"
 
 # Overload for no-param workflow
 @overload

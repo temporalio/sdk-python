@@ -1972,7 +1972,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 signal=input.signal,
                 signal_args=input.signal_args,
                 task_queue=input.task_queue,
-                request_id=str(uuid.uuid4()),
                 payload_converter=payload_converter,
                 execution_timeout=input.execution_timeout,
                 run_timeout=input.run_timeout,
