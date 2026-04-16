@@ -3411,10 +3411,12 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
         # Start worker for 30 mins. Need to disable workflow cache since we
         # restart the worker and don't want to pay the sticky queue penalty.
         async with new_worker(
-            client, CancelSignalAndTimerFiredInSameTaskWorkflow, max_cached_workflows=0
+            env.client,
+            CancelSignalAndTimerFiredInSameTaskWorkflow,
+            max_cached_workflows=0,
         ) as worker:
             task_queue = worker.task_queue
-            handle = await client.start_workflow(
+            handle = await env.client.start_workflow(
                 CancelSignalAndTimerFiredInSameTaskWorkflow.run,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=task_queue,
@@ -3432,7 +3434,7 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
 
         # Start worker again and wait for workflow completion
         async with new_worker(
-            client,
+            env.client,
             CancelSignalAndTimerFiredInSameTaskWorkflow,
             task_queue=task_queue,
             max_cached_workflows=0,
@@ -6512,19 +6514,23 @@ async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
 @workflow.defn
 class WorkflowSleepWorkflow:
     @workflow.run
-    async def run(self) -> None:
+    async def run(self) -> float:
+        start_time = workflow.time()
         await workflow.sleep(1)
+        return workflow.time() - start_time
 
 
-async def test_workflow_sleep(client: Client):
+async def test_workflow_sleep(client: Client, env: WorkflowEnvironment):
     async with new_worker(client, WorkflowSleepWorkflow) as worker:
         start_time = datetime.now()
-        await client.execute_workflow(
+        workflow_elapsed = await client.execute_workflow(
             WorkflowSleepWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        assert (datetime.now() - start_time) >= timedelta(seconds=1)
+        assert workflow_elapsed >= 1
+        if not env.supports_time_skipping:
+            assert (datetime.now() - start_time) >= timedelta(seconds=1)
 
 
 @workflow.defn
