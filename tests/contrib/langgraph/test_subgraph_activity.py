@@ -36,11 +36,7 @@ class ActivitySubgraphWorkflow:
 
 async def test_activity_subgraph(client: Client):
     parent = StateGraph(State)
-    parent.add_node(
-        "parent_node",
-        parent_node,
-        metadata={"start_to_close_timeout": timedelta(seconds=10)},
-    )
+    parent.add_node("parent_node", parent_node)
     parent.add_edge(START, "parent_node")
 
     task_queue = f"subgraph-{uuid4()}"
@@ -49,7 +45,14 @@ async def test_activity_subgraph(client: Client):
         client,
         task_queue=task_queue,
         workflows=[ActivitySubgraphWorkflow],
-        plugins=[LangGraphPlugin(graphs={"parent": parent})],
+        plugins=[
+            LangGraphPlugin(
+                graphs={"parent": parent},
+                default_activity_options={
+                    "start_to_close_timeout": timedelta(seconds=10)
+                },
+            )
+        ],
     ):
         result = await client.execute_workflow(
             ActivitySubgraphWorkflow.run,

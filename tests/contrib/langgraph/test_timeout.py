@@ -32,14 +32,7 @@ class TimeoutWorkflow:
 
 async def test_timeout(client: Client):
     g = StateGraph(State)
-    g.add_node(
-        "node",
-        node,
-        metadata={
-            "start_to_close_timeout": timedelta(milliseconds=100),
-            "retry_policy": RetryPolicy(maximum_attempts=1),
-        },
-    )
+    g.add_node("node", node)
     g.add_edge(START, "node")
 
     task_queue = f"my-graph-{uuid4()}"
@@ -48,7 +41,15 @@ async def test_timeout(client: Client):
         client,
         task_queue=task_queue,
         workflows=[TimeoutWorkflow],
-        plugins=[LangGraphPlugin(graphs={"my-graph": g})],
+        plugins=[
+            LangGraphPlugin(
+                graphs={"my-graph": g},
+                default_activity_options={
+                    "start_to_close_timeout": timedelta(milliseconds=100),
+                    "retry_policy": RetryPolicy(maximum_attempts=1),
+                },
+            )
+        ],
     ):
         with raises(WorkflowFailureError):
             await client.execute_workflow(

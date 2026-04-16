@@ -101,11 +101,8 @@ class TestFunctionalAPIV2:
                 LangGraphPlugin(
                     entrypoints={"v2_simple": simple_v2_entrypoint},
                     tasks=tasks,
-                    activity_options={
-                        "triple_value": {
-                            "start_to_close_timeout": timedelta(seconds=30)
-                        },
-                        "add_five": {"start_to_close_timeout": timedelta(seconds=30)},
+                    default_activity_options={
+                        "start_to_close_timeout": timedelta(seconds=30)
                     },
                 )
             ],
@@ -134,8 +131,8 @@ class TestFunctionalAPIV2:
                 LangGraphPlugin(
                     entrypoints={"v2_interrupt": interrupt_entrypoint},
                     tasks=tasks,
-                    activity_options={
-                        "ask_human": {"start_to_close_timeout": timedelta(seconds=30)},
+                    default_activity_options={
+                        "start_to_close_timeout": timedelta(seconds=30)
                     },
                 )
             ],

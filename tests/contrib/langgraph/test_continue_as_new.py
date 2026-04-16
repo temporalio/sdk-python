@@ -42,11 +42,7 @@ class ContinueAsNewWorkflow:
 
 async def test_continue_as_new(client: Client):
     g = StateGraph(State)
-    g.add_node(
-        "node",
-        node,
-        metadata={"start_to_close_timeout": timedelta(seconds=10)},
-    )
+    g.add_node("node", node)
     g.add_edge(START, "node")
 
     task_queue = f"my-graph-{uuid4()}"
@@ -55,7 +51,14 @@ async def test_continue_as_new(client: Client):
         client,
         task_queue=task_queue,
         workflows=[ContinueAsNewWorkflow],
-        plugins=[LangGraphPlugin(graphs={"my-graph": g})],
+        plugins=[
+            LangGraphPlugin(
+                graphs={"my-graph": g},
+                default_activity_options={
+                    "start_to_close_timeout": timedelta(seconds=10)
+                },
+            )
+        ],
     ):
         result = await client.execute_workflow(
             ContinueAsNewWorkflow.run,

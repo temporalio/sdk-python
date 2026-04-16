@@ -6,7 +6,6 @@ Requires a running Temporal test server (started by conftest.py).
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
 from uuid import uuid4
 
 from temporalio.client import Client
@@ -37,13 +36,7 @@ from tests.contrib.langgraph.e2e_functional_workflows import (
     SimpleFunctionalE2EWorkflow,
 )
 
-
-def _activity_opts(*task_funcs: Any) -> dict[str, dict]:
-    """Build activity_options dict giving every task the same 30s timeout."""
-    return {
-        t.func.__name__: {"start_to_close_timeout": timedelta(seconds=30)}
-        for t in task_funcs
-    }
+_DEFAULT_ACTIVITY_OPTIONS = {"start_to_close_timeout": timedelta(seconds=30)}
 
 
 class TestFunctionalAPIBasicExecution:
@@ -60,7 +53,7 @@ class TestFunctionalAPIBasicExecution:
                 LangGraphPlugin(
                     entrypoints={"e2e_simple_functional": simple_functional_entrypoint},
                     tasks=tasks,
-                    activity_options=_activity_opts(*tasks),
+                    default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
         ):
@@ -93,7 +86,7 @@ class TestFunctionalAPIContinueAsNew:
                         "e2e_continue_as_new_functional": continue_as_new_entrypoint
                     },
                     tasks=tasks,
-                    activity_options=_activity_opts(*tasks),
+                    default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
         ):
@@ -135,7 +128,7 @@ class TestFunctionalAPIPartialExecution:
                 LangGraphPlugin(
                     entrypoints={"e2e_partial_execution": partial_execution_entrypoint},
                     tasks=tasks,
-                    activity_options=_activity_opts(*tasks),
+                    default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
         ):

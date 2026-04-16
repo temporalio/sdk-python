@@ -35,16 +35,8 @@ class StreamingWorkflow:
 
 async def test_streaming(client: Client):
     g = StateGraph(State)
-    g.add_node(
-        "node_a",
-        node_a,
-        metadata={"start_to_close_timeout": timedelta(seconds=10)},
-    )
-    g.add_node(
-        "node_b",
-        node_b,
-        metadata={"start_to_close_timeout": timedelta(seconds=10)},
-    )
+    g.add_node("node_a", node_a)
+    g.add_node("node_b", node_b)
     g.add_edge(START, "node_a")
     g.add_edge("node_a", "node_b")
 
@@ -54,7 +46,14 @@ async def test_streaming(client: Client):
         client,
         task_queue=task_queue,
         workflows=[StreamingWorkflow],
-        plugins=[LangGraphPlugin(graphs={"streaming": g})],
+        plugins=[
+            LangGraphPlugin(
+                graphs={"streaming": g},
+                default_activity_options={
+                    "start_to_close_timeout": timedelta(seconds=10)
+                },
+            )
+        ],
     ):
         chunks = await client.execute_workflow(
             StreamingWorkflow.run,

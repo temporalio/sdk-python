@@ -48,7 +48,7 @@ class LangGraphPlugin(SimplePlugin):
         tasks: list | None = None,
         # TODO: Remove activity_options when we have support for @task(metadata=...)
         activity_options: dict[str, dict] | None = None,
-        # TODO: Add default_activity_options that apply to all nodes or tasks
+        default_activity_options: dict[str, Any] | None = None,
     ):
         """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
         self.activities: list = []
@@ -69,15 +69,16 @@ class LangGraphPlugin(SimplePlugin):
                         )
                     # Remove LangSmith-related callback functions that can't be serialized between the workflow and activity.
                     runnable.func_accepts = {}
+                    opts = {**(default_activity_options or {}), **(node.metadata or {})}
                     runnable.afunc = self.execute(
-                        f"{graph_name}.{node_name}", runnable.afunc, node.metadata
+                        f"{graph_name}.{node_name}", runnable.afunc, opts
                     )
 
         # Functional API: Wrap @task functions as Temporal Activities.
         if tasks:
             for task in tasks:
                 name = task.func.__name__
-                opts = (activity_options or {}).get(name, {})
+                opts = {**(default_activity_options or {}), **(activity_options or {}).get(name, {})}
 
                 task.func = self.execute(task_id(task.func), task.func, opts)
                 task.func.__name__ = name

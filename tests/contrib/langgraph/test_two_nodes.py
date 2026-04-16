@@ -32,16 +32,8 @@ class TwoNodesWorkflow:
 
 async def test_two_nodes(client: Client):
     g = StateGraph(State)
-    g.add_node(
-        "node_a",
-        node_a,
-        metadata={"start_to_close_timeout": timedelta(seconds=10)},
-    )
-    g.add_node(
-        "node_b",
-        node_b,
-        metadata={"start_to_close_timeout": timedelta(seconds=10)},
-    )
+    g.add_node("node_a", node_a)
+    g.add_node("node_b", node_b)
     g.add_edge(START, "node_a")
     g.add_edge("node_a", "node_b")
 
@@ -51,7 +43,14 @@ async def test_two_nodes(client: Client):
         client,
         task_queue=task_queue,
         workflows=[TwoNodesWorkflow],
-        plugins=[LangGraphPlugin(graphs={"my-graph": g})],
+        plugins=[
+            LangGraphPlugin(
+                graphs={"my-graph": g},
+                default_activity_options={
+                    "start_to_close_timeout": timedelta(seconds=10)
+                },
+            )
+        ],
     ):
         result = await client.execute_workflow(
             TwoNodesWorkflow.run,
