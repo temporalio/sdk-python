@@ -218,7 +218,7 @@ jobs:
 
   # Runs the sdk features repo tests with this repo's current SDK code
   features-tests:
-    uses: temporalio/features/.github/workflows/python.yaml@77f9b4a762855a6e2d74684630b89453bd02a297 # main
+    uses: temporalio/features/.github/workflows/python.yaml@main
     with:
       python-repo-path: ${{github.event.pull_request.head.repo.full_name}}
       version: ${{github.event.pull_request.head.ref}}

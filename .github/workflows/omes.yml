@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   omes-image-build:
-    uses: temporalio/omes/.github/workflows/docker-images.yml@c58f877688a4871a94889574d3d9835c79beb5f7 # main
+    uses: temporalio/omes/.github/workflows/docker-images.yml@main
     secrets: inherit
     with:
       lang: python

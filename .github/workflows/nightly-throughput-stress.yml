@@ -44,7 +44,7 @@ env:
 
   # Omes configuration
   OMES_REPO: temporalio/omes
-  OMES_REF: c58f877688a4871a94889574d3d9835c79beb5f7 # main
+  OMES_REF: main
   RUN_ID: ${{ github.run_id }}-throughput-stress
 
   # Prometheus version
