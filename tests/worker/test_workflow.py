@@ -3397,7 +3397,7 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
 
 
 async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
-    client: Client, env: WorkflowEnvironment
+    env: WorkflowEnvironment,
 ):
     # This test only works when we support time skipping
     if not env.supports_time_skipping:
