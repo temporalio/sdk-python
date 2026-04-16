@@ -703,7 +703,11 @@ class NexusInfoService:
         self, _ctx: StartOperationContext, _input: None
     ) -> dict[str, str]:
         info = nexus.info()
-        return {"namespace": info.namespace, "task_queue": info.task_queue}
+        return {
+            "endpoint": info.endpoint,
+            "namespace": info.namespace,
+            "task_queue": info.task_queue,
+        }
 
 
 @workflow.defn
@@ -733,6 +737,9 @@ async def test_nexus_info_includes_namespace(client: Client, env: WorkflowEnviro
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
+        if not env.supports_time_skipping:
+            # Time-skipping server doesn't send the endpoint yet.
+            assert result["endpoint"] == endpoint_name
         assert result["namespace"] == client.namespace
         assert result["task_queue"] == task_queue
 

@@ -79,6 +79,9 @@ class Info:
     Retrieved inside a Nexus operation handler via :py:func:`info`.
     """
 
+    endpoint: str
+    """The endpoint this Nexus request was addressed to."""
+
     namespace: str
     """The namespace of the worker handling this Nexus operation."""
 

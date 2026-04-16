@@ -140,6 +140,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                                 headers=dict(task.request.header),
                                 task_cancellation=task_cancellation,
                                 request_deadline=request_deadline,
+                                endpoint=nexus_task.endpoint,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
@@ -154,6 +155,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                                 headers=dict(task.request.header),
                                 task_cancellation=task_cancellation,
                                 request_deadline=request_deadline,
+                                endpoint=nexus_task.endpoint,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
@@ -224,6 +226,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         headers: Mapping[str, str],
         task_cancellation: nexusrpc.handler.OperationTaskCancellation,
         request_deadline: datetime | None,
+        endpoint: str,
     ) -> None:
         """Handle a cancel operation task.
 
@@ -244,7 +247,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             request_deadline=request_deadline,
         )
         temporalio.nexus._operation_context._TemporalCancelOperationContext(
-            info=lambda: Info(namespace=self._namespace, task_queue=self._task_queue),
+            info=lambda: Info(
+                endpoint=endpoint,
+                namespace=self._namespace,
+                task_queue=self._task_queue,
+            ),
             nexus_context=ctx,
             client=self._client,
             _runtime_metric_meter=self._metric_meter,
@@ -293,6 +300,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         headers: Mapping[str, str],
         task_cancellation: nexusrpc.handler.OperationTaskCancellation,
         request_deadline: datetime | None,
+        endpoint: str,
     ) -> None:
         """Handle a start operation task.
 
@@ -302,7 +310,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         try:
             try:
                 start_response = await self._start_operation(
-                    start_request, headers, task_cancellation, request_deadline
+                    start_request,
+                    headers,
+                    task_cancellation,
+                    request_deadline,
+                    endpoint,
                 )
             except asyncio.CancelledError:
                 completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -346,6 +358,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         headers: Mapping[str, str],
         cancellation: nexusrpc.handler.OperationTaskCancellation,
         request_deadline: datetime | None,
+        endpoint: str,
     ) -> temporalio.api.nexus.v1.StartOperationResponse:
         """Invoke the Nexus handler's start_operation method and construct the StartOperationResponse.
 
@@ -375,7 +388,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         temporalio.nexus._operation_context._TemporalStartOperationContext(
             nexus_context=ctx,
             client=self._client,
-            info=lambda: Info(namespace=self._namespace, task_queue=self._task_queue),
+            info=lambda: Info(
+                endpoint=endpoint,
+                namespace=self._namespace,
+                task_queue=self._task_queue,
+            ),
             _runtime_metric_meter=self._metric_meter,
             _worker_shutdown_event=self._worker_shutdown_event,
         ).set()
