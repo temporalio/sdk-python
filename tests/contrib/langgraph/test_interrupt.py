@@ -3,6 +3,7 @@ from typing import Any
 from uuid import uuid4
 
 import langgraph.types
+import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.graph.state import (  # pyright: ignore[reportMissingTypeStubs]
@@ -37,17 +38,36 @@ class InterruptWorkflow:
         return await g.ainvoke(langgraph.types.Command(resume="yes"), config)
 
 
-async def test_interrupt(client: Client):
+@workflow.defn
+class InterruptV2Workflow:
+    @workflow.run
+    async def run(self, input: str) -> Any:
+        g = graph("my-graph").compile(checkpointer=InMemorySaver())
+        config = RunnableConfig({"configurable": {"thread_id": "1"}})
+
+        result = await g.ainvoke({"value": input}, config, version="v2")
+
+        assert result.value == {"value": ""}
+        assert len(result.interrupts) == 1
+        assert result.interrupts[0].value == "Continue?"
+
+        return await g.ainvoke(langgraph.types.Command(resume="yes"), config)
+
+
+@pytest.mark.parametrize(
+    "workflow_cls", [InterruptWorkflow, InterruptV2Workflow], ids=["v1", "v2"]
+)
+async def test_interrupt(client: Client, workflow_cls: Any) -> None:
     g = StateGraph(State)
     g.add_node("node", node)
     g.add_edge(START, "node")
 
-    task_queue = f"my-graph-{uuid4()}"
+    task_queue = f"interrupt-{uuid4()}"
 
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[InterruptWorkflow],
+        workflows=[workflow_cls],
         plugins=[
             LangGraphPlugin(
                 graphs={"my-graph": g},
@@ -58,7 +78,7 @@ async def test_interrupt(client: Client):
         ],
     ):
         result = await client.execute_workflow(
-            InterruptWorkflow.run,
+            workflow_cls.run,
             "",
             id=f"test-workflow-{uuid4()}",
             task_queue=task_queue,

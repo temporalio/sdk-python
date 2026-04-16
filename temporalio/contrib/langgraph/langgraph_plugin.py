@@ -79,7 +79,10 @@ class LangGraphPlugin(SimplePlugin):
         if tasks:
             for task in tasks:
                 name = task.func.__name__
-                opts = {**(default_activity_options or {}), **(activity_options or {}).get(name, {})}
+                opts = {
+                    **(default_activity_options or {}),
+                    **(activity_options or {}).get(name, {}),
+                }
 
                 task.func = self.execute(task_id(task.func), task.func, opts)
                 task.func.__name__ = name

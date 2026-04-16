@@ -5,6 +5,8 @@ These define @task and @entrypoint functions used in functional API E2E tests.
 
 from __future__ import annotations
 
+import asyncio
+
 import langgraph.types
 from langgraph.func import entrypoint, task  # pyright: ignore[reportMissingTypeStubs]
 
@@ -128,3 +130,15 @@ async def interrupt_entrypoint(value: str) -> dict:
     """Entrypoint that interrupts for human input, then returns the answer."""
     answer = await ask_human("Do you approve?")
     return {"input": value, "answer": answer}
+
+
+@task
+async def slow_task(x: int) -> int:
+    await asyncio.sleep(1)
+    return x
+
+
+@entrypoint()
+async def slow_entrypoint(value: int) -> dict:
+    result = await slow_task(value)
+    return {"result": result}

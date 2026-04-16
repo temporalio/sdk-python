@@ -16,6 +16,13 @@ class SimpleFunctionalE2EWorkflow:
         return await entrypoint("e2e_simple_functional").ainvoke(input_value)
 
 
+@workflow.defn
+class SlowFunctionalWorkflow:
+    @workflow.run
+    async def run(self, input_value: int) -> dict:
+        return await entrypoint("e2e_slow_functional").ainvoke(input_value)
+
+
 @dataclass
 class ContinueAsNewInput:
     value: int

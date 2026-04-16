@@ -1,4 +1,4 @@
-"""End-to-end tests for LangGraph Functional API integration.
+"""End-to-end tests for LangGraph Functional API integration (v1 and v2).
 
 Requires a running Temporal test server (started by conftest.py).
 """
@@ -6,22 +6,39 @@ Requires a running Temporal test server (started by conftest.py).
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 from uuid import uuid4
 
-from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
+import pytest
+from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.func import (  # pyright: ignore[reportMissingTypeStubs]
+    entrypoint as lg_entrypoint,
+)
+from langgraph.func import task  # pyright: ignore[reportMissingTypeStubs]
+from langgraph.types import Command
+from pytest import raises
+
+from temporalio import workflow
+from temporalio.client import Client, WorkflowFailureError
+from temporalio.common import RetryPolicy
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, entrypoint
 from temporalio.worker import Worker
 from tests.contrib.langgraph.e2e_functional_entrypoints import (
     add_ten,
+    ask_human,
     continue_as_new_entrypoint,
     double_value,
     expensive_task_a,
     expensive_task_b,
     expensive_task_c,
     get_task_execution_counts,
+    interrupt_entrypoint,
     partial_execution_entrypoint,
     reset_task_execution_counts,
     simple_functional_entrypoint,
+    slow_entrypoint,
+    slow_task,
     step_1,
     step_2,
     step_3,
@@ -34,38 +51,114 @@ from tests.contrib.langgraph.e2e_functional_workflows import (
     PartialExecutionInput,
     PartialExecutionWorkflow,
     SimpleFunctionalE2EWorkflow,
+    SlowFunctionalWorkflow,
 )
 
 _DEFAULT_ACTIVITY_OPTIONS = {"start_to_close_timeout": timedelta(seconds=30)}
 
 
+# V2-only tasks defined here to avoid sharing mutated _TaskFunction objects
+# (Plugin wraps task.func in-place).
+
+
+@task
+def triple_value(x: int) -> int:
+    return x * 3
+
+
+@task
+def add_five(x: int) -> int:
+    return x + 5
+
+
+@lg_entrypoint()
+async def simple_v2_entrypoint(value: int) -> dict:
+    tripled = await triple_value(value)
+    result = await add_five(tripled)
+    return {"result": result}
+
+
+@workflow.defn
+class SimpleV2Workflow:
+    @workflow.run
+    async def run(self, input_value: int) -> dict[str, Any]:
+        result = await entrypoint("v2_simple").ainvoke(input_value, version="v2")
+        return result.value
+
+
+@workflow.defn
+class InterruptV2FunctionalWorkflow:
+    @workflow.run
+    async def run(self, input_value: str) -> dict[str, Any]:
+        app = entrypoint("v2_interrupt")
+        app.checkpointer = InMemorySaver()
+        config = RunnableConfig(
+            {"configurable": {"thread_id": workflow.info().workflow_id}}
+        )
+
+        result = await app.ainvoke(input_value, config, version="v2")
+
+        assert result.value == {}
+        assert len(result.interrupts) == 1
+        assert result.interrupts[0].value == "Do you approve?"
+
+        resumed = await app.ainvoke(Command(resume="approved"), config, version="v2")
+        return resumed.value
+
+
 class TestFunctionalAPIBasicExecution:
-    async def test_simple_functional_entrypoint(self, client: Client) -> None:
-        """input 10 -> double (20) -> add 10 (30) -> result: 30"""
-        tasks = [double_value, add_ten]
+    @pytest.mark.parametrize(
+        "workflow_cls,entrypoint_func,entrypoint_name,tasks,expected_result",
+        [
+            (
+                SimpleFunctionalE2EWorkflow,
+                simple_functional_entrypoint,
+                "e2e_simple_functional",
+                [double_value, add_ten],
+                30,
+            ),
+            (
+                SimpleV2Workflow,
+                simple_v2_entrypoint,
+                "v2_simple",
+                [triple_value, add_five],
+                35,
+            ),
+        ],
+        ids=["v1", "v2"],
+    )
+    async def test_simple_entrypoint(
+        self,
+        client: Client,
+        workflow_cls: Any,
+        entrypoint_func: Any,
+        entrypoint_name: str,
+        tasks: list,
+        expected_result: int,
+    ) -> None:
         task_queue = f"e2e-functional-{uuid4()}"
 
         async with Worker(
             client,
             task_queue=task_queue,
-            workflows=[SimpleFunctionalE2EWorkflow],
+            workflows=[workflow_cls],
             plugins=[
                 LangGraphPlugin(
-                    entrypoints={"e2e_simple_functional": simple_functional_entrypoint},
+                    entrypoints={entrypoint_name: entrypoint_func},
                     tasks=tasks,
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
         ):
             result = await client.execute_workflow(
-                SimpleFunctionalE2EWorkflow.run,
+                workflow_cls.run,
                 10,
                 id=f"e2e-functional-{uuid4()}",
                 task_queue=task_queue,
                 execution_timeout=timedelta(seconds=30),
             )
 
-        assert result["result"] == 30
+        assert result["result"] == expected_result
 
 
 class TestFunctionalAPIContinueAsNew:
@@ -148,3 +241,66 @@ class TestFunctionalAPIPartialExecution:
             assert (
                 counts.get(f"step_{i}", 0) == 1
             ), f"step_{i} executed {counts.get(f'step_{i}', 0)} times, expected 1"
+
+
+class TestFunctionalAPIInterruptV2:
+    async def test_interrupt_v2_functional(self, client: Client) -> None:
+        """version='v2' separates interrupts from value in functional API."""
+        tasks = [ask_human]
+        task_queue = f"v2-interrupt-{uuid4()}"
+
+        async with Worker(
+            client,
+            task_queue=task_queue,
+            workflows=[InterruptV2FunctionalWorkflow],
+            plugins=[
+                LangGraphPlugin(
+                    entrypoints={"v2_interrupt": interrupt_entrypoint},
+                    tasks=tasks,
+                    default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
+                )
+            ],
+        ):
+            result = await client.execute_workflow(
+                InterruptV2FunctionalWorkflow.run,
+                "hello",
+                id=f"v2-interrupt-{uuid4()}",
+                task_queue=task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+        assert result["input"] == "hello"
+        assert result["answer"] == "approved"
+
+
+class TestFunctionalAPIPerTaskOptions:
+    async def test_per_task_activity_options_override(self, client: Client) -> None:
+        """activity_options[task_name] overrides default_activity_options for that task."""
+        task_queue = f"e2e-per-task-options-{uuid4()}"
+
+        async with Worker(
+            client,
+            task_queue=task_queue,
+            workflows=[SlowFunctionalWorkflow],
+            plugins=[
+                LangGraphPlugin(
+                    entrypoints={"e2e_slow_functional": slow_entrypoint},
+                    tasks=[slow_task],
+                    default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
+                    activity_options={
+                        "slow_task": {
+                            "start_to_close_timeout": timedelta(milliseconds=100),
+                            "retry_policy": RetryPolicy(maximum_attempts=1),
+                        }
+                    },
+                )
+            ],
+        ):
+            with raises(WorkflowFailureError):
+                await client.execute_workflow(
+                    SlowFunctionalWorkflow.run,
+                    1,
+                    id=f"e2e-per-task-options-{uuid4()}",
+                    task_queue=task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
