@@ -27,6 +27,13 @@ from agents import (
     UserError,
     WebSearchTool,
 )
+from agents.tool import (
+    ApplyPatchTool,
+    LocalShellTool,
+    ShellTool,
+    ShellToolEnvironment,
+    ToolSearchTool,
+)
 from openai import (
     APIStatusError,
     AsyncOpenAI,
@@ -73,6 +80,36 @@ class HostedMCPToolInput:
     tool_config: Mcp
 
 
+@dataclass
+class ShellToolInput:
+    """Data conversion friendly representation of a ShellTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
+
+    name: str = "shell"
+    environment: ShellToolEnvironment | None = None
+
+
+class _NoopApplyPatchEditor:
+    """Satisfies the ApplyPatchEditor protocol for tool reconstruction during model calls."""
+
+    def create_file(self, operation: Any) -> None:  # type: ignore[reportUnusedParameter]
+        return None
+
+    def update_file(self, operation: Any) -> None:  # type: ignore[reportUnusedParameter]
+        return None
+
+    def delete_file(self, operation: Any) -> None:  # type: ignore[reportUnusedParameter]
+        return None
+
+
+@dataclass
+class ApplyPatchToolInput:
+    """Data conversion friendly representation of an ApplyPatchTool."""
+
+    name: str = "apply_patch"
+
+
 ToolInput = (
     FunctionToolInput
     | FileSearchTool
@@ -80,6 +117,10 @@ ToolInput = (
     | ImageGenerationTool
     | CodeInterpreterTool
     | HostedMCPToolInput
+    | ShellToolInput
+    | LocalShellTool
+    | ApplyPatchToolInput
+    | ToolSearchTool
 )
 
 
@@ -181,9 +222,26 @@ class ModelActivity:
                     WebSearchTool,
                     ImageGenerationTool,
                     CodeInterpreterTool,
+                    LocalShellTool,
+                    ToolSearchTool,
                 ),
             ):
                 return tool
+            elif isinstance(tool, ShellToolInput):
+
+                async def _noop_executor(*a: Any, **kw: Any) -> str:  # type: ignore[reportUnusedParameter]
+                    return ""
+
+                return ShellTool(
+                    name=tool.name,
+                    environment=tool.environment,
+                    executor=_noop_executor,
+                )
+            elif isinstance(tool, ApplyPatchToolInput):
+                return ApplyPatchTool(
+                    name=tool.name,
+                    editor=_NoopApplyPatchEditor(),
+                )
             elif isinstance(tool, HostedMCPToolInput):
                 return HostedMCPTool(
                     tool_config=tool.tool_config,

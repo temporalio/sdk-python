@@ -22,6 +22,9 @@ from agents.tool import (
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_client import (
+    TemporalSandboxClient,
+)
 from temporalio.exceptions import ApplicationError, TemporalError
 from temporalio.workflow import (
     ActivityCancellationType,
@@ -239,6 +242,38 @@ def nexus_operation_as_tool(
         on_invoke_tool=run_operation,
         strict_json_schema=strict_json_schema,
     )
+
+
+def temporal_sandbox_client(
+    name: str,
+    config: ActivityConfig | None = None,
+) -> Any:
+    """Create a sandbox client reference for use in a Temporal workflow ``RunConfig``.
+
+    .. warning::
+        This is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This returns a ``BaseSandboxClient`` that dispatches all sandbox operations
+    as Temporal activities, targeting the ``SandboxClientProvider`` registered
+    on the worker with the matching ``name``.
+
+    Example::
+
+        run_config = RunConfig(
+            sandbox=SandboxRunConfig(
+                client=temporal_sandbox_client("daytona"),
+                options=DaytonaSandboxClientOptions(...),
+            ),
+        )
+
+    Args:
+        name: The name of the ``SandboxClientProvider`` registered on the
+            worker.  Must match exactly.
+        config: Optional activity configuration for controlling timeouts,
+            retries, etc.  Defaults to a 5-minute ``start_to_close_timeout``.
+    """
+    return TemporalSandboxClient(name=name, config=config)
 
 
 def stateless_mcp_server(

@@ -117,25 +117,31 @@ async def test_tracing(client: Client):
             == "Research manager"
         )
 
-        # Initial planner spans - There are only 3 because we don't make an actual model call
-        paired_span(processor.span_events[4], processor.span_events[9])
+        # Initial planner spans - task wraps agent, agent wraps turn, turn wraps activity
+        paired_span(processor.span_events[4], processor.span_events[13])
+        assert processor.span_events[4][0].span_data.export().get("name") == "task"
+
+        paired_span(processor.span_events[5], processor.span_events[12])
         assert (
-            processor.span_events[4][0].span_data.export().get("name") == "PlannerAgent"
+            processor.span_events[5][0].span_data.export().get("name") == "PlannerAgent"
         )
 
-        paired_span(processor.span_events[5], processor.span_events[8])
+        paired_span(processor.span_events[6], processor.span_events[11])
+        assert processor.span_events[6][0].span_data.export().get("name") == "turn"
+
+        paired_span(processor.span_events[7], processor.span_events[10])
         assert (
-            processor.span_events[5][0].span_data.export().get("name")
+            processor.span_events[7][0].span_data.export().get("name")
             == "temporal:startActivity"
         )
 
-        paired_span(processor.span_events[6], processor.span_events[7])
+        paired_span(processor.span_events[8], processor.span_events[9])
         assert (
-            processor.span_events[6][0].span_data.export().get("name")
+            processor.span_events[8][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
 
-        for span, start in processor.span_events[10:-8]:
+        for span, start in processor.span_events[14:-12]:
             span_data = span.span_data.export()
 
             # All spans should be closed
@@ -145,15 +151,26 @@ async def test_tracing(client: Client):
                     for (s, s_start) in processor.span_events
                 )
 
-            # Start activity is always parented to an agent
+            # Start activity is always parented to a turn span, which is parented to an agent
             if span_data.get("name") == "temporal:startActivity":
-                parents = [
+                turn_spans = [
                     s for (s, _) in processor.span_events if s.span_id == span.parent_id
                 ]
+                assert len(turn_spans) == 2
                 assert (
-                    len(parents) == 2
-                    and parents[0].span_data.export()["type"] == "agent"
+                    turn_spans[0]
+                    .span_data.export()
+                    .get("data", {})
+                    .get("sdk_span_type")
+                    == "turn"
                 )
+                agent_spans = [
+                    s
+                    for (s, _) in processor.span_events
+                    if s.span_id == turn_spans[0].parent_id
+                ]
+                assert len(agent_spans) == 2
+                assert agent_spans[0].span_data.export()["type"] == "agent"
 
             # Execute is parented to start
             if span_data.get("name") == "temporal:executeActivity":
@@ -166,21 +183,28 @@ async def test_tracing(client: Client):
                     == "temporal:startActivity"
                 )
 
-        # Final writer spans - There are only 3 because we don't make an actual model call
-        paired_span(processor.span_events[-8], processor.span_events[-3])
+        # Final writer spans - task wraps agent, agent wraps turn, turn wraps activity
+        paired_span(processor.span_events[-12], processor.span_events[-3])
+        assert processor.span_events[-12][0].span_data.export().get("name") == "task"
+
+        paired_span(processor.span_events[-11], processor.span_events[-4])
         assert (
-            processor.span_events[-8][0].span_data.export().get("name") == "WriterAgent"
+            processor.span_events[-11][0].span_data.export().get("name")
+            == "WriterAgent"
         )
 
-        paired_span(processor.span_events[-7], processor.span_events[-4])
+        paired_span(processor.span_events[-10], processor.span_events[-5])
+        assert processor.span_events[-10][0].span_data.export().get("name") == "turn"
+
+        paired_span(processor.span_events[-9], processor.span_events[-6])
         assert (
-            processor.span_events[-7][0].span_data.export().get("name")
+            processor.span_events[-9][0].span_data.export().get("name")
             == "temporal:startActivity"
         )
 
-        paired_span(processor.span_events[-6], processor.span_events[-5])
+        paired_span(processor.span_events[-8], processor.span_events[-7])
         assert (
-            processor.span_events[-6][0].span_data.export().get("name")
+            processor.span_events[-8][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
 
@@ -702,31 +726,43 @@ async def test_otel_tracing_in_runner(
         search_span.parent.span_id == research_span.context.span_id
     ), "Expected 'Search the web' to be child of 'Research manager' span"
 
-    # All search agent spans should be children of "Search the web"
+    # All search agent spans should be descendants of "Search the web"
+    # (the SDK now inserts a "task" span between "Search the web" and the agent)
+    span_by_id = {span.context.span_id: span for span in spans if span.context}
     search_agent_spans = [span for span in spans if "Search agent" in span.name]
+
+    def is_descendant_of(child: ReadableSpan, ancestor_span_id: int) -> bool:
+        """Check if child is a descendant of the span with ancestor_span_id."""
+        current: ReadableSpan | None = child
+        while current and current.parent:
+            if current.parent.span_id == ancestor_span_id:
+                return True
+            current = span_by_id.get(current.parent.span_id)
+        return False
+
     for search_agent_span in search_agent_spans:
         assert (
             search_agent_span.parent is not None
         ), f"Search agent span '{search_agent_span.name}' should have a parent"
-        assert (
-            search_agent_span.parent.span_id == search_span.context.span_id
-        ), f"Expected all 'Search agent' spans to be children of 'Search the web' span"
+        assert is_descendant_of(
+            search_agent_span, search_span.context.span_id
+        ), f"Expected all 'Search agent' spans to be descendants of 'Search the web' span"
 
-    # PlannerAgent and WriterAgent should be children of research manager
+    # PlannerAgent and WriterAgent should be descendants of research manager
     planner_spans = [span for span in spans if "PlannerAgent" in span.name]
     writer_spans = [span for span in spans if "WriterAgent" in span.name]
 
     for planner_span in planner_spans:
         assert planner_span.parent is not None, "PlannerAgent span should have a parent"
-        assert (
-            planner_span.parent.span_id == research_span.context.span_id
-        ), "Expected 'PlannerAgent' to be child of 'Research manager' span"
+        assert is_descendant_of(
+            planner_span, research_span.context.span_id
+        ), "Expected 'PlannerAgent' to be descendant of 'Research manager' span"
 
     for writer_span in writer_spans:
         assert writer_span.parent is not None, "WriterAgent span should have a parent"
-        assert (
-            writer_span.parent.span_id == research_span.context.span_id
-        ), "Expected 'WriterAgent' to be child of 'Research manager' span"
+        assert is_descendant_of(
+            writer_span, research_span.context.span_id
+        ), "Expected 'WriterAgent' to be descendant of 'Research manager' span"
 
 
 @workflow.defn
