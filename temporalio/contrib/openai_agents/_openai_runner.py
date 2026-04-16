@@ -10,15 +10,21 @@ from agents import (
     RunContextWrapper,
     RunResult,
     RunResultStreaming,
+    RunState,
     SQLiteSession,
     TContext,
     TResponseInputItem,
 )
-from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
+from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner, RunOptions
+from agents.sandbox import SandboxAgent
+from typing_extensions import Unpack
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
+from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_client import (
+    TemporalSandboxClient,
+)
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 
@@ -78,6 +84,21 @@ def _convert_agent(
     return new_agent
 
 
+def _has_sandbox_agent(agent: Agent[Any], seen: set[int] | None = None) -> bool:
+    """Check if any agent in the graph (following direct Agent handoffs) is a SandboxAgent."""
+    if seen is None:
+        seen = set()
+    if id(agent) in seen:
+        return False
+    seen.add(id(agent))
+    if isinstance(agent, SandboxAgent):
+        return True
+    for handoff in agent.handoffs:
+        if isinstance(handoff, Agent) and _has_sandbox_agent(handoff, seen):
+            return True
+    return False
+
+
 class TemporalOpenAIRunner(AgentRunner):
     """Temporal Runner for OpenAI agents.
 
@@ -85,7 +106,10 @@ class TemporalOpenAIRunner(AgentRunner):
 
     """
 
-    def __init__(self, model_params: ModelActivityParameters) -> None:
+    def __init__(
+        self,
+        model_params: ModelActivityParameters,
+    ) -> None:
         """Initialize the Temporal OpenAI Runner."""
         self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
         self.model_params = model_params
@@ -93,8 +117,8 @@ class TemporalOpenAIRunner(AgentRunner):
     async def run(
         self,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
-        **kwargs: Any,
+        input: str | list[TResponseInputItem] | RunState[TContext],
+        **kwargs: Unpack[RunOptions[TContext]],
     ) -> RunResult:
         """Run the agent in a Temporal workflow."""
         if not workflow.in_workflow():
@@ -141,7 +165,7 @@ class TemporalOpenAIRunner(AgentRunner):
         if run_config is None:
             run_config = RunConfig()
 
-        if run_config.model:
+        if run_config.model and not isinstance(run_config.model, _TemporalModelStub):
             if not isinstance(run_config.model, str):
                 raise ValueError(
                     "Temporal workflows require a model name to be a string in the run config."
@@ -152,6 +176,28 @@ class TemporalOpenAIRunner(AgentRunner):
                     run_config.model, model_params=self.model_params, agent=None
                 ),
             )
+        # run_config.sandbox is global for the entire run — configure it if any agent needs it.
+        if _has_sandbox_agent(starting_agent) or run_config.sandbox:
+            if run_config.sandbox is None:
+                raise ValueError(
+                    "A SandboxAgent was provided but run_config.sandbox is not configured. "
+                    "You must set run_config.sandbox to a SandboxRunConfig. "
+                    "For example:\n"
+                    "  from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client\n"
+                    "  run_config = RunConfig(sandbox=SandboxRunConfig(client=temporal_sandbox_client('my-backend')))"
+                )
+            elif run_config.sandbox.client is None:
+                raise ValueError(
+                    "run_config.sandbox.client must be set to a temporal sandbox client. "
+                    "Use temporalio.contrib.openai_agents.workflow.temporal_sandbox_client(name) "
+                    "to create one, where name matches a SandboxClientProvider registered on the plugin."
+                )
+            elif not isinstance(run_config.sandbox.client, TemporalSandboxClient):
+                raise ValueError(
+                    "run_config.sandbox.client must be created via "
+                    "temporalio.contrib.openai_agents.workflow.temporal_sandbox_client(name). "
+                    "Do not pass a raw sandbox client directly."
+                )
 
         try:
             return await self._runner.run(
@@ -179,7 +225,7 @@ class TemporalOpenAIRunner(AgentRunner):
     def run_sync(
         self,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[TResponseInputItem] | RunState[TContext],
         **kwargs: Any,
     ) -> RunResult:
         """Run the agent synchronously (not supported in Temporal workflows)."""
@@ -194,7 +240,7 @@ class TemporalOpenAIRunner(AgentRunner):
     def run_streamed(
         self,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[TResponseInputItem] | RunState[TContext],
         **kwargs: Any,
     ) -> RunResultStreaming:
         """Run the agent with streaming responses (not supported in Temporal workflows)."""

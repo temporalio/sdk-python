@@ -41,6 +41,7 @@ class _StatelessCallToolsArguments:
     tool_name: str
     arguments: dict[str, Any] | None
     factory_argument: Any | None
+    meta: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass
@@ -100,11 +101,16 @@ class _StatelessMCPServerReference(MCPServer):  # type:ignore[reportUnusedClass]
         return tools
 
     async def call_tool(
-        self, tool_name: str, arguments: dict[str, Any] | None
+        self,
+        tool_name: str,
+        arguments: dict[str, Any] | None,
+        meta: dict[str, Any] | None = None,
     ) -> CallToolResult:
         return await workflow.execute_activity(
             self.name + "-call-tool-v2",
-            _StatelessCallToolsArguments(tool_name, arguments, self._factory_argument),
+            _StatelessCallToolsArguments(
+                tool_name, arguments, self._factory_argument, meta
+            ),
             result_type=CallToolResult,
             **self._config,
         )
@@ -190,7 +196,7 @@ class StatelessMCPServerProvider:
             server = self._create_server(args.factory_argument)
             try:
                 await server.connect()
-                return await server.call_tool(args.tool_name, args.arguments)
+                return await server.call_tool(args.tool_name, args.arguments, args.meta)
             finally:
                 await server.cleanup()
 
@@ -275,6 +281,7 @@ def _handle_worker_failure(func: Callable) -> Callable:
 class _StatefulCallToolsArguments:
     tool_name: str
     arguments: dict[str, Any] | None
+    meta: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass
@@ -362,7 +369,10 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):  # ty
 
     @_handle_worker_failure
     async def call_tool(
-        self, tool_name: str, arguments: dict[str, Any] | None
+        self,
+        tool_name: str,
+        arguments: dict[str, Any] | None,
+        meta: dict[str, Any] | None = None,
     ) -> CallToolResult:
         if not self._connect_handle:
             raise ApplicationError(
@@ -370,7 +380,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):  # ty
             )
         return await workflow.execute_activity(
             self.name + "-call-tool-v2",
-            _StatefulCallToolsArguments(tool_name, arguments),
+            _StatefulCallToolsArguments(tool_name, arguments, meta),
             result_type=CallToolResult,
             **self._config,
         )
@@ -460,7 +470,7 @@ class StatefulMCPServerProvider:
         @activity.defn(name=self.name + "-call-tool-v2")
         async def call_tool(args: _StatefulCallToolsArguments) -> CallToolResult:
             return await self._servers[_server_id()].call_tool(
-                args.tool_name, args.arguments
+                args.tool_name, args.arguments, args.meta
             )
 
         @activity.defn(name=self.name + "-list-prompts")
