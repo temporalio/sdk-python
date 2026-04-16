@@ -9,7 +9,7 @@ from langgraph._internal._runnable import RunnableCallable
 from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 
-from temporalio import activity, workflow
+from temporalio import activity
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
 from temporalio.contrib.langgraph.task_cache import (
     get_task_cache,
@@ -17,13 +17,12 @@ from temporalio.contrib.langgraph.task_cache import (
     task_id,
 )
 from temporalio.plugin import SimplePlugin
-from temporalio.worker import WorkerConfig, WorkflowRunner
+from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 # Save registered graphs/entrypoints at the module level to avoid being refreshed by the sandbox.
-# Keyed by task queue to isolate concurrent Workers/Plugins in the same process.
-_graph_registry: dict[str, dict[str, StateGraph[Any]]] = {}
-_entrypoint_registry: dict[str, dict[str, Pregel[Any, Any, Any, Any]]] = {}
+_graph_registry: dict[str, StateGraph[Any]] = {}
+_entrypoint_registry: dict[str, Pregel[Any, Any, Any, Any]] = {}
 
 
 class LangGraphPlugin(SimplePlugin):
@@ -52,11 +51,10 @@ class LangGraphPlugin(SimplePlugin):
     ):
         """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
         self.activities: list = []
-        self._graphs: dict[str, StateGraph[Any]] = graphs or {}
-        self._entrypoints: dict[str, Pregel[Any, Any, Any, Any]] = entrypoints or {}
 
         # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
+            _graph_registry.update(graphs)
             for graph_name, graph in graphs.items():
                 for node_name, node in graph.nodes.items():
                     runnable = node.runnable
@@ -73,6 +71,9 @@ class LangGraphPlugin(SimplePlugin):
                     runnable.afunc = self.execute(
                         f"{graph_name}.{node_name}", runnable.afunc, opts
                     )
+
+        if entrypoints:
+            _entrypoint_registry.update(entrypoints)
 
         # Functional API: Wrap @task functions as Temporal Activities.
         if tasks:
@@ -105,19 +106,6 @@ class LangGraphPlugin(SimplePlugin):
             activities=self.activities,
             workflow_runner=workflow_runner,
         )
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        """Register graphs/entrypoints scoped to the worker's task queue."""
-        task_queue = config.get("task_queue")
-        if not task_queue:
-            raise ValueError(
-                "Worker config must include a task_queue for LangGraphPlugin"
-            )
-        if self._graphs:
-            _graph_registry.setdefault(task_queue, {}).update(self._graphs)
-        if self._entrypoints:
-            _entrypoint_registry.setdefault(task_queue, {}).update(self._entrypoints)
-        return super().configure_worker(config)
 
     def execute(
         self,
@@ -152,14 +140,12 @@ def graph(
     """
     _patch_event_loop()
     set_task_cache(cache or {})
-    task_queue = workflow.info().task_queue
-    registry = _graph_registry.get(task_queue, {})
-    if name not in registry:
+    if name not in _graph_registry:
         raise KeyError(
-            f"Graph {name!r} not found for task queue {task_queue!r}. "
-            f"Available graphs: {list(registry.keys())}"
+            f"Graph {name!r} not found. "
+            f"Available graphs: {list(_graph_registry.keys())}"
         )
-    return registry[name]
+    return _graph_registry[name]
 
 
 def entrypoint(
@@ -175,14 +161,12 @@ def entrypoint(
     """
     _patch_event_loop()
     set_task_cache(cache or {})
-    task_queue = workflow.info().task_queue
-    registry = _entrypoint_registry.get(task_queue, {})
-    if name not in registry:
+    if name not in _entrypoint_registry:
         raise KeyError(
-            f"Entrypoint {name!r} not found for task queue {task_queue!r}. "
-            f"Available entrypoints: {list(registry.keys())}"
+            f"Entrypoint {name!r} not found. "
+            f"Available entrypoints: {list(_entrypoint_registry.keys())}"
         )
-    return registry[name]
+    return _entrypoint_registry[name]
 
 
 def cache() -> dict[str, Any] | None:
