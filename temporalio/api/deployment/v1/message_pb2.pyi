@@ -13,6 +13,7 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.compute.v1.config_pb2
 import temporalio.api.enums.v1.deployment_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 
@@ -385,6 +386,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     TASK_QUEUE_INFOS_FIELD_NUMBER: builtins.int
     DRAINAGE_INFO_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    COMPUTE_CONFIG_FIELD_NUMBER: builtins.int
+    LAST_MODIFIER_IDENTITY_FIELD_NUMBER: builtins.int
     version: builtins.str
     """Deprecated. Use `deployment_version`."""
     status: (
@@ -395,6 +398,7 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     def deployment_version(self) -> global___WorkerDeploymentVersion:
         """Required."""
     deployment_name: builtins.str
+    """Deprecated. User deployment_version.deployment_name."""
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -457,6 +461,18 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     @property
     def metadata(self) -> global___VersionMetadata:
         """Arbitrary user-provided metadata attached to this version."""
+    @property
+    def compute_config(self) -> temporalio.api.compute.v1.config_pb2.ComputeConfig:
+        """Optional. Contains the new worker compute configuration for the Worker
+        Deployment. Used for worker scale management.
+        """
+    last_modifier_identity: builtins.str
+    """Identity of the last client who modified the configuration of this Version.
+    As of now, this field only covers changes through the following APIs:
+    - `CreateWorkerDeploymentVersion`
+    - `UpdateWorkerDeploymentVersionComputeConfig`
+    - `UpdateWorkerDeploymentVersionMetadata`
+    """
     def __init__(
         self,
         *,
@@ -478,10 +494,14 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
         | None = ...,
         drainage_info: global___VersionDrainageInfo | None = ...,
         metadata: global___VersionMetadata | None = ...,
+        compute_config: temporalio.api.compute.v1.config_pb2.ComputeConfig | None = ...,
+        last_modifier_identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "compute_config",
+            b"compute_config",
             "create_time",
             b"create_time",
             "current_since_time",
@@ -507,6 +527,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "compute_config",
+            b"compute_config",
             "create_time",
             b"create_time",
             "current_since_time",
@@ -523,6 +545,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
             b"last_current_time",
             "last_deactivation_time",
             b"last_deactivation_time",
+            "last_modifier_identity",
+            b"last_modifier_identity",
             "metadata",
             b"metadata",
             "ramp_percentage",
@@ -955,7 +979,7 @@ class RoutingConfig(google.protobuf.message.Message):
         If ramping version is changed, this is also updated, even if the percentage stays the same.
         """
     revision_number: builtins.int
-    """Monotonically increasing value which is incremented on every mutation 
+    """Monotonically increasing value which is incremented on every mutation
     to any field of this message to achieve eventual consistency between task queues and their partitions.
     """
     def __init__(

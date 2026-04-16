@@ -28,6 +28,8 @@ ProtocolParamType = TypeVar("ProtocolParamType", contravariant=True)
 ProtocolReturnType = TypeVar("ProtocolReturnType", covariant=True)
 ProtocolSelfType = TypeVar("ProtocolSelfType", contravariant=True)
 
+ServiceType = TypeVar("ServiceType")
+
 
 class CallableAsyncNoParam(Protocol[ProtocolReturnType]):
     """Generic callable type."""

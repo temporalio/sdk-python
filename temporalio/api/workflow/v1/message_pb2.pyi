@@ -1822,32 +1822,138 @@ class WorkflowExecutionOptions(google.protobuf.message.Message):
 
     VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     @property
     def versioning_override(self) -> global___VersioningOverride:
         """If set, takes precedence over the Versioning Behavior sent by the SDK on Workflow Task completion."""
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """If set, overrides the workflow's priority sent by the SDK."""
+    @property
+    def time_skipping_config(self) -> global___TimeSkippingConfig:
+        """Time-skipping configuration for this workflow execution.
+        If not set, the time-skipping conf will not get updated upon request,
+        i.e. the existing time-skipping conf will be preserved.
+        """
     def __init__(
         self,
         *,
         versioning_override: global___VersioningOverride | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        time_skipping_config: global___TimeSkippingConfig | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "priority", b"priority", "versioning_override", b"versioning_override"
+            "priority",
+            b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "versioning_override",
+            b"versioning_override",
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "priority", b"priority", "versioning_override", b"versioning_override"
+            "priority",
+            b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "versioning_override",
+            b"versioning_override",
         ],
     ) -> None: ...
 
 global___WorkflowExecutionOptions = WorkflowExecutionOptions
+
+class TimeSkippingConfig(google.protobuf.message.Message):
+    """Configuration for time skipping during a workflow execution.
+    When enabled, virtual time advances automatically whenever there is no in-flight work.
+    In-flight work includes activities, child workflows, Nexus operations, signal/cancel external workflow operations,
+    and possibly other features added in the future.
+    User timers are not classified as in-flight work and will be skipped over.
+    When time advances, it skips to the earlier of the next user timer or the configured bound, if either exists.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENABLED_FIELD_NUMBER: builtins.int
+    DISABLE_PROPAGATION_FIELD_NUMBER: builtins.int
+    MAX_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
+    MAX_ELAPSED_DURATION_FIELD_NUMBER: builtins.int
+    MAX_TARGET_TIME_FIELD_NUMBER: builtins.int
+    enabled: builtins.bool
+    """Enables or disables time skipping for this workflow execution.
+    By default, this field is propagated to transitively related workflows (child workflows/start-as-new/reset) 
+    at the time they are started.
+    Changes made after a transitively related workflow has started are not propagated.
+    """
+    disable_propagation: builtins.bool
+    """If set, the enabled field is not propagated to transitively related workflows."""
+    @property
+    def max_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Maximum total virtual time that can be skipped."""
+    @property
+    def max_elapsed_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Maximum elapsed time since time skipping was enabled.
+        This includes both skipped time and real time elapsing.
+        (-- api-linter: core::0142::time-field-names=disabled --)
+        """
+    @property
+    def max_target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Absolute virtual timestamp at which time skipping is disabled.
+        Time skipping will not advance beyond this point.
+        """
+    def __init__(
+        self,
+        *,
+        enabled: builtins.bool = ...,
+        disable_propagation: builtins.bool = ...,
+        max_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        max_elapsed_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        max_target_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "bound",
+            b"bound",
+            "max_elapsed_duration",
+            b"max_elapsed_duration",
+            "max_skipped_duration",
+            b"max_skipped_duration",
+            "max_target_time",
+            b"max_target_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "bound",
+            b"bound",
+            "disable_propagation",
+            b"disable_propagation",
+            "enabled",
+            b"enabled",
+            "max_elapsed_duration",
+            b"max_elapsed_duration",
+            "max_skipped_duration",
+            b"max_skipped_duration",
+            "max_target_time",
+            b"max_target_time",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["bound", b"bound"]
+    ) -> (
+        typing_extensions.Literal[
+            "max_skipped_duration", "max_elapsed_duration", "max_target_time"
+        ]
+        | None
+    ): ...
+
+global___TimeSkippingConfig = TimeSkippingConfig
 
 class VersioningOverride(google.protobuf.message.Message):
     """Used to override the versioning behavior (and pinned deployment version, if applicable) of a

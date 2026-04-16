@@ -36,7 +36,9 @@ from typing import (
 import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.timestamp_pb2
+import nexusrpc
 from google.protobuf.internal.containers import MessageMap
+from nexusrpc import InputT, OutputT
 from typing_extensions import Required, Self, TypedDict
 
 import temporalio.activity
@@ -46,6 +48,7 @@ import temporalio.api.enums.v1
 import temporalio.api.errordetails.v1
 import temporalio.api.failure.v1
 import temporalio.api.history.v1
+import temporalio.api.nexus.v1
 import temporalio.api.schedule.v1
 import temporalio.api.sdk.v1
 import temporalio.api.taskqueue.v1
@@ -58,6 +61,7 @@ import temporalio.converter._search_attributes
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.nexus._operation_context
+import temporalio.nexus._util
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -99,6 +103,7 @@ from .types import (
     ParamType,
     ReturnType,
     SelfType,
+    ServiceType,
 )
 
 
@@ -2470,6 +2475,159 @@ class Client:
             )
         )
 
+    def create_nexus_client(
+        self,
+        service: type[ServiceType] | str,
+        *,
+        endpoint: str,
+    ) -> NexusClient[ServiceType]:
+        """Create a client for starting standalone Nexus operations.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            service: The Nexus service type or service name string.
+            endpoint: Endpoint name, resolved to a URL via the cluster's
+                endpoint registry.
+
+        Returns:
+            A Nexus client for the given service and endpoint.
+        """
+        return _NexusClient(client=self, service=service, endpoint=endpoint)
+
+    def list_nexus_operations(
+        self,
+        query: str,
+        *,
+        limit: int | None = None,
+        page_size: int = 1000,
+        next_page_token: bytes | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationExecutionAsyncIterator:
+        """List standalone Nexus operations.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        This does not make a request until the first iteration is attempted.
+        Therefore any errors will not occur until then.
+
+        Args:
+            query: A Temporal visibility list filter for nexus operations. Required.
+            limit: Maximum number of operations to return. If unset, all
+                operations are returned. Only applies if using the
+                returned :py:class:`NexusOperationExecutionAsyncIterator`
+                as an async iterator.
+            page_size: Maximum number of results for each page.
+            next_page_token: A previously obtained next page token if doing
+                pagination. Usually not needed as the iterator automatically
+                starts from the beginning.
+            rpc_metadata: Headers used on each RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call.
+
+        Returns:
+            An async iterator that can be used with ``async for``.
+        """
+        return self._impl.list_nexus_operations(
+            ListNexusOperationsInput(
+                query=query,
+                page_size=page_size,
+                next_page_token=next_page_token,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                limit=limit,
+            )
+        )
+
+    async def count_nexus_operations(
+        self,
+        query: str | None = None,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationExecutionCount:
+        """Count standalone Nexus operations.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            query: A Temporal visibility filter for nexus operations.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            Count of nexus operations.
+        """
+        return await self._impl.count_nexus_operations(
+            CountNexusOperationsInput(
+                query=query, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            )
+        )
+
+    @overload
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        run_id: str | None = None,
+    ) -> NexusOperationHandle[Any]: ...
+
+    @overload
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        run_id: str | None = None,
+        result_type: type[ReturnType],
+    ) -> NexusOperationHandle[ReturnType]: ...
+
+    @overload
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        operation: nexusrpc.Operation[Any, OutputT],
+        run_id: str | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        operation: nexusrpc.Operation[Any, Any] | None = None,
+        run_id: str | None = None,
+        result_type: type | None = None,
+    ) -> NexusOperationHandle[Any]:
+        """Get a handle to an existing standalone Nexus operation.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            operation_id: The operation ID.
+            operation: A ``nexusrpc.Operation`` from which the result type
+                is extracted. If both ``operation`` and ``result_type`` are
+                provided, the operation's output type takes precedence.
+            run_id: The operation run ID. If not provided, targets the latest run.
+            result_type: The result type to deserialize into.
+
+        Returns:
+            A handle to the operation.
+        """
+        if operation is not None:
+            result_type = operation.output_type
+        return NexusOperationHandle(
+            self,
+            operation_id,
+            run_id=run_id,
+            result_type=result_type,
+        )
+
     @overload
     def get_activity_handle(
         self,
@@ -4469,6 +4627,304 @@ class ActivityExecutionCountAggregationGroup:
 
 
 @dataclass(frozen=True)
+class NexusOperationExecution:
+    """Info for a standalone Nexus operation execution, from list response.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation_id: str
+    """Unique identifier of this operation."""
+
+    run_id: str
+    """Run ID of the standalone Nexus operation."""
+
+    endpoint: str
+    """Endpoint name."""
+
+    service: str
+    """Service name."""
+
+    operation: str
+    """Operation name."""
+
+    schedule_time: datetime | None
+    """Time the operation was originally scheduled."""
+
+    close_time: datetime | None
+    """Time the operation reached a terminal status, if closed."""
+
+    status: temporalio.common.NexusOperationExecutionStatus
+    """Current status of the operation."""
+
+    search_attributes: temporalio.common.TypedSearchAttributes
+    """Current set of search attributes if any."""
+
+    state_transition_count: int
+    """Number of state transitions."""
+
+    execution_duration: timedelta | None
+    """Duration from scheduled to close time, only populated if closed."""
+
+    raw_info: (
+        temporalio.api.nexus.v1.NexusOperationExecutionListInfo
+        | temporalio.api.nexus.v1.NexusOperationExecutionInfo
+    )
+    """Underlying protobuf info."""
+
+    @classmethod
+    def _from_raw_info(
+        cls, info: temporalio.api.nexus.v1.NexusOperationExecutionListInfo
+    ) -> Self:
+        """Create from raw proto nexus operation list info."""
+        return cls(
+            operation_id=info.operation_id,
+            run_id=info.run_id,
+            endpoint=info.endpoint,
+            service=info.service,
+            operation=info.operation,
+            schedule_time=(
+                info.schedule_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("schedule_time")
+                else None
+            ),
+            close_time=(
+                info.close_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("close_time")
+                else None
+            ),
+            status=(
+                temporalio.common.NexusOperationExecutionStatus(info.status)
+                if info.status
+                else temporalio.common.NexusOperationExecutionStatus.UNSPECIFIED
+            ),
+            search_attributes=temporalio.converter.decode_typed_search_attributes(
+                info.search_attributes
+            ),
+            state_transition_count=info.state_transition_count,
+            execution_duration=(
+                info.execution_duration.ToTimedelta()
+                if info.HasField("execution_duration")
+                else None
+            ),
+            raw_info=info,
+        )
+
+
+@dataclass(frozen=True)
+class NexusOperationExecutionDescription(NexusOperationExecution):
+    """Detailed information about a standalone Nexus operation execution.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    raw_description: temporalio.api.nexus.v1.NexusOperationExecutionInfo
+    """Underlying protobuf description info."""
+
+    state: int
+    """More detailed breakdown if status is RUNNING (PendingNexusOperationState value)."""
+
+    schedule_to_close_timeout: timedelta | None
+    """Schedule-to-close timeout for this operation."""
+
+    schedule_to_start_timeout: timedelta | None
+    """Schedule-to-start timeout for this operation."""
+
+    start_to_close_timeout: timedelta | None
+    """Start-to-close timeout for this operation."""
+
+    attempt: int
+    """Current attempt number."""
+
+    expiration_time: datetime | None
+    """Scheduled time plus schedule_to_close_timeout."""
+
+    last_attempt_complete_time: datetime | None
+    """Time when the last attempt completed."""
+
+    last_attempt_failure: BaseException | None
+    """Failure from the last failed attempt, if any."""
+
+    next_attempt_schedule_time: datetime | None
+    """Time when the next attempt will be scheduled."""
+
+    blocked_reason: str
+    """Reason the operation is blocked, if any."""
+
+    cancellation_info: (
+        temporalio.api.nexus.v1.NexusOperationExecutionCancellationInfo | None
+    )
+    """Cancellation info if cancellation was requested."""
+
+    @classmethod
+    async def _from_execution_info(
+        cls,
+        info: temporalio.api.nexus.v1.NexusOperationExecutionInfo,
+        data_converter: temporalio.converter.DataConverter,
+    ) -> Self:
+        """Create from raw proto nexus operation execution info."""
+        return cls(
+            operation_id=info.operation_id,
+            run_id=info.run_id,
+            endpoint=info.endpoint,
+            service=info.service,
+            operation=info.operation,
+            schedule_time=(
+                info.schedule_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("schedule_time")
+                else None
+            ),
+            close_time=(
+                info.close_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("close_time")
+                else None
+            ),
+            status=(
+                temporalio.common.NexusOperationExecutionStatus(info.status)
+                if info.status
+                else temporalio.common.NexusOperationExecutionStatus.UNSPECIFIED
+            ),
+            search_attributes=temporalio.converter.decode_typed_search_attributes(
+                info.search_attributes
+            ),
+            state_transition_count=info.state_transition_count,
+            execution_duration=(
+                info.execution_duration.ToTimedelta()
+                if info.HasField("execution_duration")
+                else None
+            ),
+            raw_info=info,
+            raw_description=info,
+            state=info.state,
+            schedule_to_close_timeout=(
+                info.schedule_to_close_timeout.ToTimedelta()
+                if info.HasField("schedule_to_close_timeout")
+                else None
+            ),
+            schedule_to_start_timeout=(
+                info.schedule_to_start_timeout.ToTimedelta()
+                if info.HasField("schedule_to_start_timeout")
+                else None
+            ),
+            start_to_close_timeout=(
+                info.start_to_close_timeout.ToTimedelta()
+                if info.HasField("start_to_close_timeout")
+                else None
+            ),
+            attempt=info.attempt,
+            expiration_time=(
+                info.expiration_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("expiration_time")
+                else None
+            ),
+            last_attempt_complete_time=(
+                info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("last_attempt_complete_time")
+                else None
+            ),
+            last_attempt_failure=(
+                cast(
+                    BaseException | None,
+                    await data_converter.decode_failure(info.last_attempt_failure),
+                )
+                if info.HasField("last_attempt_failure")
+                else None
+            ),
+            next_attempt_schedule_time=(
+                info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("next_attempt_schedule_time")
+                else None
+            ),
+            blocked_reason=info.blocked_reason,
+            cancellation_info=(
+                info.cancellation_info if info.HasField("cancellation_info") else None
+            ),
+        )
+
+
+@dataclass
+class NexusOperationExecutionCount:
+    """Representation of a count from a count nexus operations call.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    count: int
+    """Approximate number of operations matching the original query.
+
+    If the query had a group-by clause, this is simply the sum of all the counts
+    in :py:attr:`groups`.
+    """
+
+    groups: Sequence[NexusOperationExecutionCountAggregationGroup]
+    """Groups if the query had a group-by clause, or empty if not."""
+
+    @staticmethod
+    def _from_raw(
+        resp: temporalio.api.workflowservice.v1.CountNexusOperationExecutionsResponse,
+    ) -> NexusOperationExecutionCount:
+        """Create from raw proto response."""
+        return NexusOperationExecutionCount(
+            count=resp.count,
+            groups=[
+                NexusOperationExecutionCountAggregationGroup._from_raw(g)
+                for g in resp.groups
+            ],
+        )
+
+
+@dataclass(frozen=True)
+class NexusOperationExecutionCountAggregationGroup:
+    """A single aggregation group from a count nexus operations call.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    count: int
+    """Count for this group."""
+
+    group_values: Sequence[temporalio.common.SearchAttributeValue]
+    """Values that define this group."""
+
+    @staticmethod
+    def _from_raw(
+        raw: temporalio.api.workflowservice.v1.CountNexusOperationExecutionsResponse.AggregationGroup,
+    ) -> NexusOperationExecutionCountAggregationGroup:
+        return NexusOperationExecutionCountAggregationGroup(
+            count=raw.count,
+            group_values=[
+                temporalio.converter._search_attributes._decode_search_attribute_value(
+                    v
+                )
+                for v in raw.group_values
+            ],
+        )
+
+
+class NexusOperationFailureError(temporalio.exceptions.TemporalError):
+    """Error that occurs when a Nexus operation is unsuccessful.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    def __init__(self, *, cause: BaseException) -> None:
+        """Create nexus operation failure error."""
+        super().__init__("Nexus operation execution failed")
+        self.__cause__ = cause
+
+    @property
+    def cause(self) -> BaseException:
+        """Cause of the nexus operation failure."""
+        assert self.__cause__
+        return self.__cause__
+
+
+@dataclass(frozen=True)
 class AsyncActivityIDReference:
     """Reference to an async activity by its qualified ID."""
 
@@ -4850,6 +5306,777 @@ class ActivityHandle(Generic[ReturnType]):
                 rpc_timeout=rpc_timeout,
             )
         )
+
+
+class NexusOperationHandle(Generic[ReturnType]):
+    """Handle representing a standalone Nexus operation execution.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    def __init__(
+        self,
+        client: Client,
+        operation_id: str,
+        *,
+        run_id: str | None = None,
+        result_type: type | None = None,
+        endpoint: str = "",
+        service: str = "",
+    ) -> None:
+        """Create nexus operation handle."""
+        self._client = client
+        self._operation_id = operation_id
+        self._run_id = run_id
+        self._result_type = result_type
+        self._endpoint = endpoint
+        self._service = service
+        self._known_outcome: (
+            temporalio.api.common.v1.Payload | temporalio.api.failure.v1.Failure | None
+        ) = None
+
+    @property
+    def operation_id(self) -> str:
+        """ID of the operation."""
+        return self._operation_id
+
+    @property
+    def run_id(self) -> str | None:
+        """Run ID of the operation."""
+        return self._run_id
+
+    @property
+    def endpoint(self) -> str:
+        """Endpoint name."""
+        return self._endpoint
+
+    @property
+    def service(self) -> str:
+        """Service name."""
+        return self._service
+
+    async def result(
+        self,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType:
+        """Wait for result of the Nexus operation.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        The result may already be known if this method has been called before,
+        in which case no network call is made. Otherwise the result will be
+        polled for until it is available.
+
+        Args:
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call. Note:
+                this is the timeout for each RPC call while polling, not a
+                timeout for the function as a whole. If an individual RPC
+                times out, it will be retried until the result is available.
+
+        Returns:
+            The result of the operation.
+
+        Raises:
+            NexusOperationFailureError: If the operation completed with a failure.
+            RPCError: Operation result could not be fetched for some reason.
+        """
+        if self._known_outcome is None:
+            self._known_outcome = await self._poll_until_outcome(
+                rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            )
+
+        # Convert outcome to error or value
+        match self._known_outcome:
+            case temporalio.api.failure.v1.Failure():
+                raise await self._client.data_converter.decode_failure(
+                    self._known_outcome
+                )
+            case temporalio.api.common.v1.Payload():
+                type_hints = [self._result_type] if self._result_type else None
+                [result] = await self._client.data_converter.decode(
+                    [self._known_outcome], type_hints
+                )
+                return result
+
+    async def _poll_until_outcome(
+        self,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> temporalio.api.common.v1.Payload | temporalio.api.failure.v1.Failure:
+        """Poll for nexus operation result until it's available."""
+        req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
+            namespace=self._client.namespace,
+            operation_id=self._operation_id,
+            run_id=self._run_id or "",
+            wait_stage=temporalio.api.enums.v1.NexusOperationWaitStage.NEXUS_OPERATION_WAIT_STAGE_CLOSED,
+        )
+
+        # Continue polling as long as we have no outcome
+        while True:
+            try:
+                res = (
+                    await self._client.workflow_service.poll_nexus_operation_execution(
+                        req,
+                        retry=True,
+                        metadata=rpc_metadata,
+                        timeout=rpc_timeout,
+                    )
+                )
+                match res.WhichOneof("outcome"):
+                    case "result":
+                        return res.result
+
+                    case "failure":
+                        return res.failure
+
+                    case None:
+                        # poll again
+                        pass
+            except RPCError as err:
+                match err.status:
+                    case RPCStatusCode.DEADLINE_EXCEEDED:
+                        # Deadline exceeded is expected with long polling; retry
+                        continue
+                    case RPCStatusCode.CANCELLED:
+                        raise asyncio.CancelledError() from err
+                    case _:
+                        raise
+
+    async def describe(
+        self,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationExecutionDescription:
+        """Describe the Nexus operation execution.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            Nexus operation execution description.
+        """
+        return await self._client._impl.describe_nexus_operation(
+            DescribeNexusOperationInput(
+                operation_id=self._operation_id,
+                run_id=self._run_id,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def cancel(
+        self,
+        *,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Request cancellation of the Nexus operation.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            reason: Reason for the cancellation.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.cancel_nexus_operation(
+            CancelNexusOperationInput(
+                operation_id=self._operation_id,
+                run_id=self._run_id,
+                reason=reason,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def terminate(
+        self,
+        *,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Terminate the Nexus operation execution immediately.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            reason: Reason for the termination.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.terminate_nexus_operation(
+            TerminateNexusOperationInput(
+                operation_id=self._operation_id,
+                run_id=self._run_id,
+                reason=reason,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+
+class NexusOperationExecutionAsyncIterator:
+    """Asynchronous iterator for Nexus operation execution values.
+
+    You should typically use ``async for`` on this iterator and not call any of its methods.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    def __init__(
+        self,
+        client: Client,
+        input: ListNexusOperationsInput,
+    ) -> None:
+        """Create an asynchronous iterator for the given input.
+
+        Users should not create this directly, but rather use
+        :py:meth:`Client.list_nexus_operations`.
+        """
+        self._client = client
+        self._input = input
+        self._next_page_token = input.next_page_token
+        self._current_page: Sequence[NexusOperationExecution] | None = None
+        self._current_page_index = 0
+        self._limit = input.limit
+        self._yielded = 0
+
+    @property
+    def current_page_index(self) -> int:
+        """Index of the entry in the current page that will be returned from
+        the next :py:meth:`__anext__` call.
+        """
+        return self._current_page_index
+
+    @property
+    def current_page(self) -> Sequence[NexusOperationExecution] | None:
+        """Current page, if it has been fetched yet."""
+        return self._current_page
+
+    @property
+    def next_page_token(self) -> bytes | None:
+        """Token for the next page request if any."""
+        return self._next_page_token
+
+    async def fetch_next_page(self, *, page_size: int | None = None) -> None:
+        """Fetch the next page of results.
+
+        Args:
+            page_size: Override the page size this iterator was originally
+                created with.
+        """
+        page_size = page_size or self._input.page_size
+        if self._limit is not None and self._limit - self._yielded < page_size:
+            page_size = self._limit - self._yielded
+
+        resp = await self._client.workflow_service.list_nexus_operation_executions(
+            temporalio.api.workflowservice.v1.ListNexusOperationExecutionsRequest(
+                namespace=self._client.namespace,
+                page_size=page_size,
+                next_page_token=self._next_page_token or b"",
+                query=self._input.query or "",
+            ),
+            retry=True,
+            metadata=self._input.rpc_metadata,
+            timeout=self._input.rpc_timeout,
+        )
+
+        self._current_page = [
+            NexusOperationExecution._from_raw_info(v) for v in resp.operations
+        ]
+        self._current_page_index = 0
+        self._next_page_token = resp.next_page_token or None
+
+    def __aiter__(self) -> NexusOperationExecutionAsyncIterator:
+        """Return self as the iterator."""
+        return self
+
+    async def __anext__(self) -> NexusOperationExecution:
+        """Get the next execution on this iterator, fetching next page if
+        necessary.
+        """
+        if self._limit is not None and self._yielded >= self._limit:
+            raise StopAsyncIteration
+        while True:
+            # No page? fetch and continue
+            if self._current_page is None:
+                await self.fetch_next_page()
+                continue
+            # No more left in page?
+            if self._current_page_index >= len(self._current_page):
+                # If there is a next page token, try to get another page and try
+                # again
+                if self._next_page_token is not None:
+                    await self.fetch_next_page()
+                    continue
+                # No more pages means we're done
+                raise StopAsyncIteration
+            # Get current, increment page index, and return
+            ret = self._current_page[self._current_page_index]
+            self._current_page_index += 1
+            self._yielded += 1
+            return ret
+
+
+class NexusClient(ABC, Generic[ServiceType]):
+    """Client for starting standalone Nexus operations.
+
+    .. warning::
+       This API is experimental and unstable.
+
+    Use :py:meth:`Client.create_nexus_client` to create a client.
+    """
+
+    # Overload for nexusrpc.Operation with input
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: nexusrpc.Operation[InputT, OutputT],
+        arg: InputT,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for nexusrpc.Operation with no input
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: nexusrpc.Operation[None, OutputT],
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for Callable with result_type
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type[OutputT],
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for Callable without result_type
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[Any]: ...
+
+    # Overload for str with result_type
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type[OutputT],
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for str without result_type
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[Any]: ...
+
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[Any]:
+        """Start a Nexus operation and return a handle.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            operation: The operation to start. Can be a ``nexusrpc.Operation``,
+                a callable operation method, or a string name.
+            arg: Input argument for the operation.
+            id: Unique identifier for this operation.
+            id_reuse_policy: Policy for reusing operation IDs.
+            id_conflict_policy: Policy for handling ID conflicts.
+            result_type: The result type to deserialize into.
+            schedule_to_close_timeout: Timeout for the operation.
+            search_attributes: Search attributes for the operation.
+            summary: Summary for the operation.
+            headers: Headers to attach to the Nexus request.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            A handle to the started operation.
+        """
+        ...
+
+    # Overload for nexusrpc.Operation with input
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: nexusrpc.Operation[InputT, OutputT],
+        arg: InputT,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> OutputT: ...
+
+    # Overload for nexusrpc.Operation with no input
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: nexusrpc.Operation[None, OutputT],
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> OutputT: ...
+
+    # Overload for Callable with result_type
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type[OutputT],
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> OutputT: ...
+
+    # Overload for Callable without result_type
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any: ...
+
+    # Overload for str with result_type
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type[OutputT],
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> OutputT: ...
+
+    # Overload for str without result_type
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any: ...
+
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any:
+        """Start a Nexus operation and wait for its result.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        This is a shortcut for ``await (await nexus_client.start_operation(...)).result()``.
+
+        Args:
+            operation: The operation to execute. Can be a ``nexusrpc.Operation``,
+                a callable operation method, or a string name.
+            arg: Input argument for the operation.
+            id: Unique identifier for this operation.
+            id_reuse_policy: Policy for reusing operation IDs.
+            id_conflict_policy: Policy for handling ID conflicts.
+            result_type: The result type to deserialize into.
+            schedule_to_close_timeout: Timeout for the operation.
+            search_attributes: Search attributes for the operation.
+            summary: Summary for the operation.
+            headers: Headers to attach to the Nexus request.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            The result of the operation.
+        """
+        ...
+
+
+class _NexusClient(NexusClient[ServiceType]):
+    """Concrete implementation of NexusClient."""
+
+    def __init__(
+        self,
+        client: Client,
+        service: type[ServiceType] | str,
+        endpoint: str,
+    ) -> None:
+        self._client = client
+        if isinstance(service, str):
+            self._service_name = service
+        else:
+            self._service_name = service.__name__
+        self._endpoint = endpoint
+
+    def _resolve_operation(
+        self,
+        operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
+    ) -> tuple[str, type | None]:
+        """Resolve an operation to its name and output type."""
+        if isinstance(operation, str):
+            return operation, None
+        elif isinstance(operation, nexusrpc.Operation):
+            return operation.name, operation.output_type
+        elif callable(operation):
+            _, op = temporalio.nexus._util.get_operation_factory(operation)
+            if isinstance(op, nexusrpc.Operation):
+                return op.name, op.output_type
+            else:
+                raise ValueError(
+                    f"Operation callable is not a Nexus operation: {operation}"
+                )
+        else:
+            raise ValueError(  # pyright: ignore[reportUnreachable]
+                f"Operation is not resolvable as a Nexus operation: {operation}"
+            )
+
+    async def start_operation(
+        self,
+        operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[Any]:
+        """Start a Nexus operation and return a handle.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        op_name, output_type = self._resolve_operation(operation)
+        final_result_type = result_type or output_type
+
+        return await self._client._impl.start_nexus_operation(
+            StartNexusOperationInput(
+                operation=op_name,
+                arg=arg,
+                id=id,
+                endpoint=self._endpoint,
+                service=self._service_name,
+                result_type=final_result_type,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
+                search_attributes=search_attributes,
+                summary=summary,
+                headers=dict(headers) if headers else {},
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def execute_operation(
+        self,
+        operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any:
+        """Start a Nexus operation and wait for its result.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        handle = await self.start_operation(
+            operation,
+            arg,
+            id=id,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            result_type=result_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            search_attributes=search_attributes,
+            summary=summary,
+            headers=headers,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+        return await handle.result()
 
 
 @dataclass
@@ -7521,6 +8748,103 @@ class CountActivitiesInput:
 
 
 @dataclass
+class StartNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.start_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation: str
+    arg: Any
+    id: str
+    endpoint: str
+    service: str
+    result_type: type | None
+    schedule_to_close_timeout: timedelta | None
+    id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy
+    id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy
+    search_attributes: temporalio.common.TypedSearchAttributes | None
+    summary: str | None
+    headers: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class DescribeNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.describe_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class CancelNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.cancel_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class TerminateNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.terminate_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class ListNexusOperationsInput:
+    """Input for :py:meth:`OutboundInterceptor.list_nexus_operations`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    query: str | None
+    page_size: int
+    next_page_token: bytes | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    limit: int | None
+
+
+@dataclass
+class CountNexusOperationsInput:
+    """Input for :py:meth:`OutboundInterceptor.count_nexus_operations`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    query: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
 class StartWorkflowUpdateInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow_update`."""
 
@@ -7909,6 +9233,66 @@ class OutboundInterceptor:
            This API is experimental.
         """
         return await self.next.count_activities(input)
+
+    ### Nexus operation calls
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> NexusOperationHandle[Any]:
+        """Called for every :py:meth:`NexusClient.start_operation` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.start_nexus_operation(input)
+
+    async def describe_nexus_operation(
+        self, input: DescribeNexusOperationInput
+    ) -> NexusOperationExecutionDescription:
+        """Called for every :py:meth:`NexusOperationHandle.describe` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.describe_nexus_operation(input)
+
+    async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
+        """Called for every :py:meth:`NexusOperationHandle.cancel` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        await self.next.cancel_nexus_operation(input)
+
+    async def terminate_nexus_operation(
+        self, input: TerminateNexusOperationInput
+    ) -> None:
+        """Called for every :py:meth:`NexusOperationHandle.terminate` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        await self.next.terminate_nexus_operation(input)
+
+    def list_nexus_operations(
+        self, input: ListNexusOperationsInput
+    ) -> NexusOperationExecutionAsyncIterator:
+        """Called for every :py:meth:`Client.list_nexus_operations` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return self.next.list_nexus_operations(input)
+
+    async def count_nexus_operations(
+        self, input: CountNexusOperationsInput
+    ) -> NexusOperationExecutionCount:
+        """Called for every :py:meth:`Client.count_nexus_operations` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.count_nexus_operations(input)
 
     async def start_workflow_update(
         self, input: StartWorkflowUpdateInput
@@ -8572,6 +9956,155 @@ class _ClientImpl(OutboundInterceptor):
         return ActivityExecutionCount._from_raw(
             await self._client.workflow_service.count_activity_executions(
                 temporalio.api.workflowservice.v1.CountActivityExecutionsRequest(
+                    namespace=self._client.namespace,
+                    query=input.query or "",
+                ),
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        )
+
+    ### Nexus operation calls
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> NexusOperationHandle[Any]:
+        """Start a nexus operation and return a handle to it."""
+        req = temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest(
+            namespace=self._client.namespace,
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+            operation_id=input.id,
+            endpoint=input.endpoint,
+            service=input.service,
+            operation=input.operation,
+            id_reuse_policy=cast(
+                "temporalio.api.enums.v1.NexusOperationIdReusePolicy.ValueType",
+                int(input.id_reuse_policy),
+            ),
+            id_conflict_policy=cast(
+                "temporalio.api.enums.v1.NexusOperationIdConflictPolicy.ValueType",
+                int(input.id_conflict_policy),
+            ),
+        )
+
+        if input.schedule_to_close_timeout is not None:
+            req.schedule_to_close_timeout.FromTimedelta(input.schedule_to_close_timeout)
+
+        # Set input payload
+        if input.arg is not temporalio.common._arg_unset:
+            encoded = await self._client.data_converter.encode([input.arg])
+            if encoded:
+                req.input.CopyFrom(encoded[0])
+
+        # Set search attributes
+        if input.search_attributes is not None:
+            temporalio.converter.encode_search_attributes(
+                input.search_attributes, req.search_attributes
+            )
+
+        # Set user metadata
+        metadata = await _encode_user_metadata(
+            self._client.data_converter, input.summary, None
+        )
+        if metadata is not None:
+            req.user_metadata.CopyFrom(metadata)
+
+        # Set nexus headers
+        if input.headers:
+            for k, v in input.headers.items():
+                req.nexus_header[k] = v
+
+        resp: temporalio.api.workflowservice.v1.StartNexusOperationExecutionResponse
+        try:
+            resp = await self._client.workflow_service.start_nexus_operation_execution(
+                req,
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        except RPCError as err:
+            if err.status == RPCStatusCode.ALREADY_EXISTS and err.grpc_status.details:
+                details = temporalio.api.errordetails.v1.NexusOperationExecutionAlreadyStartedFailure()
+                if err.grpc_status.details[0].Unpack(details):
+                    raise temporalio.exceptions.NexusOperationAlreadyStartedError(
+                        input.id, run_id=details.run_id
+                    )
+            raise
+        return NexusOperationHandle(
+            self._client,
+            input.id,
+            run_id=resp.run_id or None,
+            result_type=input.result_type,
+            endpoint=input.endpoint,
+            service=input.service,
+        )
+
+    async def describe_nexus_operation(
+        self, input: DescribeNexusOperationInput
+    ) -> NexusOperationExecutionDescription:
+        """Describe a nexus operation."""
+        resp = await self._client.workflow_service.describe_nexus_operation_execution(
+            temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionRequest(
+                namespace=self._client.namespace,
+                operation_id=input.operation_id,
+                run_id=input.run_id or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return await NexusOperationExecutionDescription._from_execution_info(
+            info=resp.info,
+            data_converter=self._client.data_converter,
+        )
+
+    async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
+        """Cancel a nexus operation."""
+        await self._client.workflow_service.request_cancel_nexus_operation_execution(
+            temporalio.api.workflowservice.v1.RequestCancelNexusOperationExecutionRequest(
+                namespace=self._client.namespace,
+                operation_id=input.operation_id,
+                run_id=input.run_id or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                reason=input.reason or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def terminate_nexus_operation(
+        self, input: TerminateNexusOperationInput
+    ) -> None:
+        """Terminate a nexus operation."""
+        await self._client.workflow_service.terminate_nexus_operation_execution(
+            temporalio.api.workflowservice.v1.TerminateNexusOperationExecutionRequest(
+                namespace=self._client.namespace,
+                operation_id=input.operation_id,
+                run_id=input.run_id or "",
+                reason=input.reason or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    def list_nexus_operations(
+        self, input: ListNexusOperationsInput
+    ) -> NexusOperationExecutionAsyncIterator:
+        return NexusOperationExecutionAsyncIterator(self._client, input)
+
+    async def count_nexus_operations(
+        self, input: CountNexusOperationsInput
+    ) -> NexusOperationExecutionCount:
+        return NexusOperationExecutionCount._from_raw(
+            await self._client.workflow_service.count_nexus_operation_executions(
+                temporalio.api.workflowservice.v1.CountNexusOperationExecutionsRequest(
                     namespace=self._client.namespace,
                     query=input.query or "",
                 ),

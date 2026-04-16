@@ -883,23 +883,59 @@ class Link(google.protobuf.message.Message):
             self, field_name: typing_extensions.Literal["job_id", b"job_id"]
         ) -> None: ...
 
+    class NexusOperation(google.protobuf.message.Message):
+        """A link to a standalone Nexus operation."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        OPERATION_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        operation_id: builtins.str
+        run_id: builtins.str
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            operation_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "namespace",
+                b"namespace",
+                "operation_id",
+                b"operation_id",
+                "run_id",
+                b"run_id",
+            ],
+        ) -> None: ...
+
     WORKFLOW_EVENT_FIELD_NUMBER: builtins.int
     BATCH_JOB_FIELD_NUMBER: builtins.int
+    NEXUS_OPERATION_FIELD_NUMBER: builtins.int
     @property
     def workflow_event(self) -> global___Link.WorkflowEvent: ...
     @property
     def batch_job(self) -> global___Link.BatchJob: ...
+    @property
+    def nexus_operation(self) -> global___Link.NexusOperation: ...
     def __init__(
         self,
         *,
         workflow_event: global___Link.WorkflowEvent | None = ...,
         batch_job: global___Link.BatchJob | None = ...,
+        nexus_operation: global___Link.NexusOperation | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "batch_job",
             b"batch_job",
+            "nexus_operation",
+            b"nexus_operation",
             "variant",
             b"variant",
             "workflow_event",
@@ -911,6 +947,8 @@ class Link(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "batch_job",
             b"batch_job",
+            "nexus_operation",
+            b"nexus_operation",
             "variant",
             b"variant",
             "workflow_event",
@@ -919,9 +957,37 @@ class Link(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["workflow_event", "batch_job"] | None: ...
+    ) -> (
+        typing_extensions.Literal["workflow_event", "batch_job", "nexus_operation"]
+        | None
+    ): ...
 
 global___Link = Link
+
+class Principal(google.protobuf.message.Message):
+    """Principal is an authenticated caller identity computed by the server from trusted
+    authentication context.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TYPE_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    type: builtins.str
+    """Low-cardinality category of the principal (e.g., "jwt", "users")."""
+    name: builtins.str
+    """Identifier within that category (e.g., sub JWT claim, email address)."""
+    def __init__(
+        self,
+        *,
+        type: builtins.str = ...,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["name", b"name", "type", b"type"]
+    ) -> None: ...
+
+global___Principal = Principal
 
 class Priority(google.protobuf.message.Message):
     """Priority contains metadata that controls relative ordering of task processing

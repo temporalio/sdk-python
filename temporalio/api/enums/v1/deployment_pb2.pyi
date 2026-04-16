@@ -234,6 +234,12 @@ class _WorkerDeploymentVersionStatusEnumTypeWrapper(
     not query closed workflows. If the user does query closed workflows for some time x after
     workflows are closed, they should decommission the version after it has been drained for that duration.
     """
+    WORKER_DEPLOYMENT_VERSION_STATUS_CREATED: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 6
+    """The Worker Deployment Version is created by user (via `CreateWorkerDeploymentVersion` API)
+    but server has not seen any poller for it yet.
+    """
 
 class WorkerDeploymentVersionStatus(
     _WorkerDeploymentVersionStatus,
@@ -270,5 +276,9 @@ WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED: WorkerDeploymentVersionStatus.ValueTyp
 Queries sent to closed workflows. The version can be decommissioned safely if user does
 not query closed workflows. If the user does query closed workflows for some time x after
 workflows are closed, they should decommission the version after it has been drained for that duration.
+"""
+WORKER_DEPLOYMENT_VERSION_STATUS_CREATED: WorkerDeploymentVersionStatus.ValueType  # 6
+"""The Worker Deployment Version is created by user (via `CreateWorkerDeploymentVersion` API)
+but server has not seen any poller for it yet.
 """
 global___WorkerDeploymentVersionStatus = WorkerDeploymentVersionStatus

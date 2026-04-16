@@ -90,6 +90,24 @@ class ActivityAlreadyStartedError(FailureError):
         self.run_id = run_id
 
 
+class NexusOperationAlreadyStartedError(FailureError):
+    """Thrown by a client when a Nexus operation execution has already started.
+
+    .. warning::
+       This API is experimental and unstable.
+
+    Attributes:
+        operation_id: ID of the already-started operation.
+        run_id: Run ID of the already-started operation if available.
+    """
+
+    def __init__(self, operation_id: str, *, run_id: str | None = None) -> None:
+        """Initialize a Nexus operation already started error."""
+        super().__init__("Nexus operation execution already started")
+        self.operation_id = operation_id
+        self.run_id = run_id
+
+
 class ApplicationErrorCategory(IntEnum):
     """Severity category for your application error. Maps to corresponding client-side logging/metrics behaviors"""
 

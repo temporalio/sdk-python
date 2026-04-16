@@ -3260,6 +3260,7 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     ATTACHED_COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     @property
     def versioning_override(
         self,
@@ -3287,6 +3288,11 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
         """Priority override upserted in this event. Represents the full priority; not just partial fields.
         Ignored if nil.
         """
+    @property
+    def time_skipping_config(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+        """If set, the time-skipping configuration was changed. Contains the full updated configuration."""
     def __init__(
         self,
         *,
@@ -3300,11 +3306,18 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
         | None = ...,
         identity: builtins.str = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "priority", b"priority", "versioning_override", b"versioning_override"
+            "priority",
+            b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "versioning_override",
+            b"versioning_override",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -3318,6 +3331,8 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
             b"identity",
             "priority",
             b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
             "unset_versioning_override",
             b"unset_versioning_override",
             "versioning_override",
@@ -3680,6 +3695,59 @@ global___WorkflowExecutionUnpausedEventAttributes = (
     WorkflowExecutionUnpausedEventAttributes
 )
 
+class WorkflowExecutionTimeSkippingTransitionedEventAttributes(
+    google.protobuf.message.Message
+):
+    """Attributes for an event indicating that time skipping state changed for a workflow execution,
+    either time was advanced or time skipping was disabled automatically due to a bound being reached.
+    The worker_may_ignore field in HistoryEvent should always be set true for this event.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_TIME_FIELD_NUMBER: builtins.int
+    DISABLED_AFTER_BOUND_FIELD_NUMBER: builtins.int
+    WALL_CLOCK_TIME_FIELD_NUMBER: builtins.int
+    @property
+    def target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The virtual time after time skipping was applied."""
+    disabled_after_bound: builtins.bool
+    """when true, time skipping was disabled automatically due to a bound being reached.
+    (-- api-linter: core::0140::prepositions=disabled
+        aip.dev/not-precedent: "after" is used to indicate temporal ordering. --)
+    """
+    @property
+    def wall_clock_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The wall-clock time when the time-skipping state changed event was generated."""
+    def __init__(
+        self,
+        *,
+        target_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        disabled_after_bound: builtins.bool = ...,
+        wall_clock_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "target_time", b"target_time", "wall_clock_time", b"wall_clock_time"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "disabled_after_bound",
+            b"disabled_after_bound",
+            "target_time",
+            b"target_time",
+            "wall_clock_time",
+            b"wall_clock_time",
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionTimeSkippingTransitionedEventAttributes = (
+    WorkflowExecutionTimeSkippingTransitionedEventAttributes
+)
+
 class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
     """Event marking that an operation was scheduled by a workflow via the ScheduleNexusOperation command."""
 
@@ -3733,6 +3801,8 @@ class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
         Calls are retried internally by the server.
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "to" is used to indicate interval. --)
+        (-- api-linter: core::0142::time-field-names=disabled
+            aip.dev/not-precedent: "timeout" is an acceptable suffix for duration fields in this API. --)
         """
     @property
     def nexus_header(
@@ -4166,6 +4236,7 @@ class HistoryEvent(google.protobuf.message.Message):
     WORKER_MAY_IGNORE_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
+    PRINCIPAL_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_STARTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -4233,6 +4304,9 @@ class HistoryEvent(google.protobuf.message.Message):
     NEXUS_OPERATION_CANCEL_REQUEST_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_PAUSED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_UNPAUSED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED_EVENT_ATTRIBUTES_FIELD_NUMBER: (
+        builtins.int
+    )
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
     @property
@@ -4270,6 +4344,9 @@ class HistoryEvent(google.protobuf.message.Message):
         temporalio.api.common.v1.message_pb2.Link
     ]:
         """Links associated with the event."""
+    @property
+    def principal(self) -> temporalio.api.common.v1.message_pb2.Principal:
+        """Server-computed authenticated caller identity associated with this event."""
     @property
     def workflow_execution_started_event_attributes(
         self,
@@ -4504,6 +4581,10 @@ class HistoryEvent(google.protobuf.message.Message):
     def workflow_execution_unpaused_event_attributes(
         self,
     ) -> global___WorkflowExecutionUnpausedEventAttributes: ...
+    @property
+    def workflow_execution_time_skipping_transitioned_event_attributes(
+        self,
+    ) -> global___WorkflowExecutionTimeSkippingTransitionedEventAttributes: ...
     def __init__(
         self,
         *,
@@ -4517,6 +4598,7 @@ class HistoryEvent(google.protobuf.message.Message):
         | None = ...,
         links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
+        principal: temporalio.api.common.v1.message_pb2.Principal | None = ...,
         workflow_execution_started_event_attributes: global___WorkflowExecutionStartedEventAttributes
         | None = ...,
         workflow_execution_completed_event_attributes: global___WorkflowExecutionCompletedEventAttributes
@@ -4634,6 +4716,8 @@ class HistoryEvent(google.protobuf.message.Message):
         | None = ...,
         workflow_execution_unpaused_event_attributes: global___WorkflowExecutionUnpausedEventAttributes
         | None = ...,
+        workflow_execution_time_skipping_transitioned_event_attributes: global___WorkflowExecutionTimeSkippingTransitionedEventAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4694,6 +4778,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"nexus_operation_started_event_attributes",
             "nexus_operation_timed_out_event_attributes",
             b"nexus_operation_timed_out_event_attributes",
+            "principal",
+            b"principal",
             "request_cancel_external_workflow_execution_failed_event_attributes",
             b"request_cancel_external_workflow_execution_failed_event_attributes",
             "request_cancel_external_workflow_execution_initiated_event_attributes",
@@ -4736,6 +4822,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_started_event_attributes",
             "workflow_execution_terminated_event_attributes",
             b"workflow_execution_terminated_event_attributes",
+            "workflow_execution_time_skipping_transitioned_event_attributes",
+            b"workflow_execution_time_skipping_transitioned_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
             "workflow_execution_unpaused_event_attributes",
@@ -4829,6 +4917,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"nexus_operation_started_event_attributes",
             "nexus_operation_timed_out_event_attributes",
             b"nexus_operation_timed_out_event_attributes",
+            "principal",
+            b"principal",
             "request_cancel_external_workflow_execution_failed_event_attributes",
             b"request_cancel_external_workflow_execution_failed_event_attributes",
             "request_cancel_external_workflow_execution_initiated_event_attributes",
@@ -4877,6 +4967,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_started_event_attributes",
             "workflow_execution_terminated_event_attributes",
             b"workflow_execution_terminated_event_attributes",
+            "workflow_execution_time_skipping_transitioned_event_attributes",
+            b"workflow_execution_time_skipping_transitioned_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
             "workflow_execution_unpaused_event_attributes",
@@ -4968,6 +5060,7 @@ class HistoryEvent(google.protobuf.message.Message):
             "nexus_operation_cancel_request_failed_event_attributes",
             "workflow_execution_paused_event_attributes",
             "workflow_execution_unpaused_event_attributes",
+            "workflow_execution_time_skipping_transitioned_event_attributes",
         ]
         | None
     ): ...

@@ -368,6 +368,26 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsResponse.FromString,
         )
+        self.CreateWorkerDeployment = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateWorkerDeployment",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentResponse.FromString,
+        )
+        self.CreateWorkerDeploymentVersion = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateWorkerDeploymentVersion",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentVersionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentVersionResponse.FromString,
+        )
+        self.UpdateWorkerDeploymentVersionComputeConfig = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerDeploymentVersionComputeConfig",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionComputeConfigRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionComputeConfigResponse.FromString,
+        )
+        self.ValidateWorkerDeploymentVersionComputeConfig = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ValidateWorkerDeploymentVersionComputeConfig",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ValidateWorkerDeploymentVersionComputeConfigRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ValidateWorkerDeploymentVersionComputeConfigResponse.FromString,
+        )
         self.UpdateWorkerDeploymentVersionMetadata = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerDeploymentVersionMetadata",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataRequest.SerializeToString,
@@ -518,30 +538,60 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartActivityExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartActivityExecutionResponse.FromString,
         )
+        self.StartNexusOperationExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/StartNexusOperationExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartNexusOperationExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartNexusOperationExecutionResponse.FromString,
+        )
         self.DescribeActivityExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/DescribeActivityExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeActivityExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeActivityExecutionResponse.FromString,
+        )
+        self.DescribeNexusOperationExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeNexusOperationExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeNexusOperationExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeNexusOperationExecutionResponse.FromString,
         )
         self.PollActivityExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/PollActivityExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollActivityExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollActivityExecutionResponse.FromString,
         )
+        self.PollNexusOperationExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/PollNexusOperationExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollNexusOperationExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollNexusOperationExecutionResponse.FromString,
+        )
         self.ListActivityExecutions = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/ListActivityExecutions",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListActivityExecutionsRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListActivityExecutionsResponse.FromString,
+        )
+        self.ListNexusOperationExecutions = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListNexusOperationExecutions",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListNexusOperationExecutionsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListNexusOperationExecutionsResponse.FromString,
         )
         self.CountActivityExecutions = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/CountActivityExecutions",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountActivityExecutionsRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountActivityExecutionsResponse.FromString,
         )
+        self.CountNexusOperationExecutions = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/CountNexusOperationExecutions",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountNexusOperationExecutionsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountNexusOperationExecutionsResponse.FromString,
+        )
         self.RequestCancelActivityExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/RequestCancelActivityExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelActivityExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelActivityExecutionResponse.FromString,
+        )
+        self.RequestCancelNexusOperationExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/RequestCancelNexusOperationExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelNexusOperationExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelNexusOperationExecutionResponse.FromString,
         )
         self.TerminateActivityExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/TerminateActivityExecution",
@@ -552,6 +602,16 @@ class WorkflowServiceStub(object):
             "/temporal.api.workflowservice.v1.WorkflowService/DeleteActivityExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionResponse.FromString,
+        )
+        self.TerminateNexusOperationExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/TerminateNexusOperationExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateNexusOperationExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateNexusOperationExecutionResponse.FromString,
+        )
+        self.DeleteNexusOperationExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteNexusOperationExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteNexusOperationExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteNexusOperationExecutionResponse.FromString,
         )
 
 
@@ -1306,6 +1366,42 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def CreateWorkerDeployment(self, request, context):
+        """Creates a new Worker Deployment.
+
+        Experimental. This API might significantly change or be removed in a
+        future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CreateWorkerDeploymentVersion(self, request, context):
+        """Creates a new Worker Deployment Version.
+
+        Experimental. This API might significantly change or be removed in a
+        future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateWorkerDeploymentVersionComputeConfig(self, request, context):
+        """Updates the compute config attached to a Worker Deployment Version.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ValidateWorkerDeploymentVersionComputeConfig(self, request, context):
+        """Validates the compute config without attaching it to a Worker Deployment Version.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def UpdateWorkerDeploymentVersionMetadata(self, request, context):
         """Updates the user-given metadata attached to a Worker Deployment Version.
         Experimental. This API might significantly change or be removed in a future release.
@@ -1597,12 +1693,33 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def StartNexusOperationExecution(self, request, context):
+        """StartNexusOperationExecution starts a new Nexus operation.
+
+        Returns a `NexusOperationExecutionAlreadyStarted` error if an instance already exists with same operation ID in this
+        namespace unless permitted by the specified ID conflict policy.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def DescribeActivityExecution(self, request, context):
         """DescribeActivityExecution returns information about an activity execution.
         It can be used to:
         - Get current activity info without waiting
         - Long-poll for next state change and return new activity info
         Response can optionally include activity input or outcome (if the activity has completed).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeNexusOperationExecution(self, request, context):
+        """DescribeNexusOperationExecution returns information about a Nexus operation.
+        Supported use cases include:
+        - Get current operation info without waiting
+        - Long-poll for next state change and return new operation info
+        Response can optionally include operation input or outcome (if the operation has completed).
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1616,14 +1733,34 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def PollNexusOperationExecution(self, request, context):
+        """PollNexusOperationExecution long-polls for a Nexus operation for a given wait stage to complete and returns
+        the outcome (result or failure).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def ListActivityExecutions(self, request, context):
         """ListActivityExecutions is a visibility API to list activity executions in a specific namespace."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def ListNexusOperationExecutions(self, request, context):
+        """ListNexusOperationExecutions is a visibility API to list Nexus operations in a specific namespace."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def CountActivityExecutions(self, request, context):
         """CountActivityExecutions is a visibility API to count activity executions in a specific namespace."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CountNexusOperationExecutions(self, request, context):
+        """CountNexusOperationExecutions is a visibility API to count Nexus operations in a specific namespace."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1635,6 +1772,17 @@ class WorkflowServiceServicer(object):
         acknowledge it for the activity to reach CANCELED status. The cancellation signal is
         delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
         language-idiomatic mechanisms (context cancellation, exceptions, abort signals).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def RequestCancelNexusOperationExecution(self, request, context):
+        """RequestCancelNexusOperationExecution requests cancellation of a Nexus operation.
+
+        Requesting to cancel an operation does not automatically transition the operation to canceled status.
+        The operation will only transition to canceled status if it supports cancellation and the handler
+        processes the cancellation request.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1658,6 +1806,28 @@ class WorkflowServiceServicer(object):
 
         (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def TerminateNexusOperationExecution(self, request, context):
+        """TerminateNexusOperationExecution terminates an existing Nexus operation immediately.
+
+        Termination happens immediately and the operation handler cannot react to it. A terminated operation will have
+        its outcome set to a failure with a termination reason.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteNexusOperationExecution(self, request, context):
+        """DeleteNexusOperationExecution asynchronously deletes a specific Nexus operation run (when
+        run_id is provided) or the latest run (when run_id is not provided). If the operation
+        is running, it will be terminated before deletion.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: Nexus operation deletion not exposed to HTTP, users should use cancel or terminate. --)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -2006,6 +2176,26 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkerDeploymentsResponse.SerializeToString,
         ),
+        "CreateWorkerDeployment": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateWorkerDeployment,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentResponse.SerializeToString,
+        ),
+        "CreateWorkerDeploymentVersion": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateWorkerDeploymentVersion,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentVersionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentVersionResponse.SerializeToString,
+        ),
+        "UpdateWorkerDeploymentVersionComputeConfig": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkerDeploymentVersionComputeConfig,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionComputeConfigRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionComputeConfigResponse.SerializeToString,
+        ),
+        "ValidateWorkerDeploymentVersionComputeConfig": grpc.unary_unary_rpc_method_handler(
+            servicer.ValidateWorkerDeploymentVersionComputeConfig,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ValidateWorkerDeploymentVersionComputeConfigRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ValidateWorkerDeploymentVersionComputeConfigResponse.SerializeToString,
+        ),
         "UpdateWorkerDeploymentVersionMetadata": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateWorkerDeploymentVersionMetadata,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataRequest.FromString,
@@ -2156,30 +2346,60 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartActivityExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartActivityExecutionResponse.SerializeToString,
         ),
+        "StartNexusOperationExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.StartNexusOperationExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartNexusOperationExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartNexusOperationExecutionResponse.SerializeToString,
+        ),
         "DescribeActivityExecution": grpc.unary_unary_rpc_method_handler(
             servicer.DescribeActivityExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeActivityExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeActivityExecutionResponse.SerializeToString,
+        ),
+        "DescribeNexusOperationExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeNexusOperationExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeNexusOperationExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeNexusOperationExecutionResponse.SerializeToString,
         ),
         "PollActivityExecution": grpc.unary_unary_rpc_method_handler(
             servicer.PollActivityExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollActivityExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollActivityExecutionResponse.SerializeToString,
         ),
+        "PollNexusOperationExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.PollNexusOperationExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollNexusOperationExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollNexusOperationExecutionResponse.SerializeToString,
+        ),
         "ListActivityExecutions": grpc.unary_unary_rpc_method_handler(
             servicer.ListActivityExecutions,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListActivityExecutionsRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListActivityExecutionsResponse.SerializeToString,
+        ),
+        "ListNexusOperationExecutions": grpc.unary_unary_rpc_method_handler(
+            servicer.ListNexusOperationExecutions,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListNexusOperationExecutionsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListNexusOperationExecutionsResponse.SerializeToString,
         ),
         "CountActivityExecutions": grpc.unary_unary_rpc_method_handler(
             servicer.CountActivityExecutions,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountActivityExecutionsRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountActivityExecutionsResponse.SerializeToString,
         ),
+        "CountNexusOperationExecutions": grpc.unary_unary_rpc_method_handler(
+            servicer.CountNexusOperationExecutions,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountNexusOperationExecutionsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountNexusOperationExecutionsResponse.SerializeToString,
+        ),
         "RequestCancelActivityExecution": grpc.unary_unary_rpc_method_handler(
             servicer.RequestCancelActivityExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelActivityExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelActivityExecutionResponse.SerializeToString,
+        ),
+        "RequestCancelNexusOperationExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.RequestCancelNexusOperationExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelNexusOperationExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelNexusOperationExecutionResponse.SerializeToString,
         ),
         "TerminateActivityExecution": grpc.unary_unary_rpc_method_handler(
             servicer.TerminateActivityExecution,
@@ -2190,6 +2410,16 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.DeleteActivityExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionResponse.SerializeToString,
+        ),
+        "TerminateNexusOperationExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.TerminateNexusOperationExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateNexusOperationExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateNexusOperationExecutionResponse.SerializeToString,
+        ),
+        "DeleteNexusOperationExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteNexusOperationExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteNexusOperationExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteNexusOperationExecutionResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -4186,6 +4416,122 @@ class WorkflowService(object):
         )
 
     @staticmethod
+    def CreateWorkerDeployment(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateWorkerDeployment",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CreateWorkerDeploymentVersion(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/CreateWorkerDeploymentVersion",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentVersionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CreateWorkerDeploymentVersionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateWorkerDeploymentVersionComputeConfig(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerDeploymentVersionComputeConfig",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionComputeConfigRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionComputeConfigResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ValidateWorkerDeploymentVersionComputeConfig(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ValidateWorkerDeploymentVersionComputeConfig",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ValidateWorkerDeploymentVersionComputeConfigRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ValidateWorkerDeploymentVersionComputeConfigResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def UpdateWorkerDeploymentVersionMetadata(
         request,
         target,
@@ -5056,6 +5402,35 @@ class WorkflowService(object):
         )
 
     @staticmethod
+    def StartNexusOperationExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/StartNexusOperationExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartNexusOperationExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartNexusOperationExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def DescribeActivityExecution(
         request,
         target,
@@ -5074,6 +5449,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/DescribeActivityExecution",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeActivityExecutionRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeActivityExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeNexusOperationExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeNexusOperationExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeNexusOperationExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeNexusOperationExecutionResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -5114,6 +5518,35 @@ class WorkflowService(object):
         )
 
     @staticmethod
+    def PollNexusOperationExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/PollNexusOperationExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollNexusOperationExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PollNexusOperationExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def ListActivityExecutions(
         request,
         target,
@@ -5132,6 +5565,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/ListActivityExecutions",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListActivityExecutionsRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListActivityExecutionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListNexusOperationExecutions(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListNexusOperationExecutions",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListNexusOperationExecutionsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListNexusOperationExecutionsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -5172,6 +5634,35 @@ class WorkflowService(object):
         )
 
     @staticmethod
+    def CountNexusOperationExecutions(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/CountNexusOperationExecutions",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountNexusOperationExecutionsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountNexusOperationExecutionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def RequestCancelActivityExecution(
         request,
         target,
@@ -5190,6 +5681,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/RequestCancelActivityExecution",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelActivityExecutionRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelActivityExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def RequestCancelNexusOperationExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/RequestCancelNexusOperationExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelNexusOperationExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RequestCancelNexusOperationExecutionResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -5248,6 +5768,64 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/DeleteActivityExecution",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def TerminateNexusOperationExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/TerminateNexusOperationExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateNexusOperationExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateNexusOperationExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteNexusOperationExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DeleteNexusOperationExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteNexusOperationExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteNexusOperationExecutionResponse.FromString,
             options,
             channel_credentials,
             insecure,

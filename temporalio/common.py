@@ -191,6 +191,81 @@ class ActivityIDConflictPolicy(IntEnum):
     )
 
 
+class NexusOperationIDReusePolicy(IntEnum):
+    """How already-closed Nexus operation IDs are handled on start.
+
+    .. warning::
+       This API is experimental and unstable.
+
+    See :py:class:`temporalio.api.enums.v1.NexusOperationIdReusePolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.NexusOperationIdReusePolicy.NEXUS_OPERATION_ID_REUSE_POLICY_UNSPECIFIED
+    )
+    ALLOW_DUPLICATE = int(
+        temporalio.api.enums.v1.NexusOperationIdReusePolicy.NEXUS_OPERATION_ID_REUSE_POLICY_ALLOW_DUPLICATE
+    )
+    ALLOW_DUPLICATE_FAILED_ONLY = int(
+        temporalio.api.enums.v1.NexusOperationIdReusePolicy.NEXUS_OPERATION_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
+    )
+    REJECT_DUPLICATE = int(
+        temporalio.api.enums.v1.NexusOperationIdReusePolicy.NEXUS_OPERATION_ID_REUSE_POLICY_REJECT_DUPLICATE
+    )
+
+
+class NexusOperationIDConflictPolicy(IntEnum):
+    """How already-running Nexus operation IDs are handled on start.
+
+    .. warning::
+       This API is experimental and unstable.
+
+    See :py:class:`temporalio.api.enums.v1.NexusOperationIdConflictPolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.NexusOperationIdConflictPolicy.NEXUS_OPERATION_ID_CONFLICT_POLICY_UNSPECIFIED
+    )
+    FAIL = int(
+        temporalio.api.enums.v1.NexusOperationIdConflictPolicy.NEXUS_OPERATION_ID_CONFLICT_POLICY_FAIL
+    )
+    USE_EXISTING = int(
+        temporalio.api.enums.v1.NexusOperationIdConflictPolicy.NEXUS_OPERATION_ID_CONFLICT_POLICY_USE_EXISTING
+    )
+
+
+class NexusOperationExecutionStatus(IntEnum):
+    """Status of a standalone Nexus operation execution.
+
+    .. warning::
+       This API is experimental and unstable.
+
+    See :py:class:`temporalio.api.enums.v1.NexusOperationExecutionStatus`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.NexusOperationExecutionStatus.NEXUS_OPERATION_EXECUTION_STATUS_UNSPECIFIED
+    )
+    RUNNING = int(
+        temporalio.api.enums.v1.NexusOperationExecutionStatus.NEXUS_OPERATION_EXECUTION_STATUS_RUNNING
+    )
+    COMPLETED = int(
+        temporalio.api.enums.v1.NexusOperationExecutionStatus.NEXUS_OPERATION_EXECUTION_STATUS_COMPLETED
+    )
+    FAILED = int(
+        temporalio.api.enums.v1.NexusOperationExecutionStatus.NEXUS_OPERATION_EXECUTION_STATUS_FAILED
+    )
+    CANCELED = int(
+        temporalio.api.enums.v1.NexusOperationExecutionStatus.NEXUS_OPERATION_EXECUTION_STATUS_CANCELED
+    )
+    TERMINATED = int(
+        temporalio.api.enums.v1.NexusOperationExecutionStatus.NEXUS_OPERATION_EXECUTION_STATUS_TERMINATED
+    )
+    TIMED_OUT = int(
+        temporalio.api.enums.v1.NexusOperationExecutionStatus.NEXUS_OPERATION_EXECUTION_STATUS_TIMED_OUT
+    )
+
+
 class QueryRejectCondition(IntEnum):
     """Whether a query should be rejected in certain conditions.
 
