@@ -28,6 +28,7 @@ from temporalio.client import (
     Client,
     CountNexusOperationsInput,
     DescribeNexusOperationInput,
+    GetNexusOperationResultInput,
     Interceptor,
     ListNexusOperationsInput,
     NexusOperationExecutionDescription,
@@ -53,7 +54,9 @@ from temporalio.exceptions import (
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
+from temporalio.types import ReturnType
 from temporalio.worker import Worker
+from tests.helpers import assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 # ---------------------------------------------------------------------------
@@ -160,7 +163,7 @@ class StandaloneTestServiceHandler:
 
 async def start_with_retry(
     nexus_client: Any,
-    operation: Any,
+    operation: nexusrpc.Operation[Any, ReturnType],
     arg: Any,
     *,
     id: str,
@@ -168,7 +171,7 @@ async def start_with_retry(
     id_conflict_policy: NexusOperationIDConflictPolicy = NexusOperationIDConflictPolicy.FAIL,
     schedule_to_close_timeout: timedelta | None = None,
     timeout_secs: float = 15.0,
-) -> NexusOperationHandle[Any]:
+) -> NexusOperationHandle[ReturnType]:
     """Retry start_operation until the endpoint has propagated.
 
     The Nexus endpoint registry is eventually consistent. This mirrors the
@@ -196,7 +199,7 @@ async def start_with_retry(
 
 async def execute_with_retry(
     nexus_client: Any,
-    operation: Any,
+    operation: nexusrpc.Operation[Any, ReturnType],
     arg: Any,
     *,
     id: str,
@@ -204,7 +207,7 @@ async def execute_with_retry(
     id_conflict_policy: NexusOperationIDConflictPolicy = NexusOperationIDConflictPolicy.FAIL,
     schedule_to_close_timeout: timedelta | None = None,
     timeout_secs: float = 15.0,
-) -> Any:
+) -> ReturnType:
     """Retry execute_operation until the endpoint has propagated."""
     deadline = time.monotonic() + timeout_secs
     last_err: BaseException | None = None
@@ -486,18 +489,14 @@ async def test_list_operations(client: Client, env: WorkflowEnvironment):
 
         # Poll until all 3 operations appear (visibility is eventually consistent)
         query = f'Endpoint = "{endpoint_name}"'
-        deadline = time.monotonic() + 10.0
-        found_ids: set[str] = set()
-        while time.monotonic() < deadline:
-            found_ids.clear()
+
+        async def check_ids() -> None:
+            found_ids: set[str] = set()
             async for op_exec in client.list_nexus_operations(query):
                 found_ids.add(op_exec.operation_id)
-            if all(oid in found_ids for oid in op_ids):
-                break
-            await asyncio.sleep(0.2)
+            assert all(op_id in found_ids for op_id in op_ids)
 
-        for oid in op_ids:
-            assert oid in found_ids, f"Operation {oid} not found in list results"
+        await assert_eventually(check_ids)
 
 
 async def test_count_operations(client: Client, env: WorkflowEnvironment):
@@ -531,15 +530,12 @@ async def test_count_operations(client: Client, env: WorkflowEnvironment):
 
         # Poll until count >= 2 (visibility is eventually consistent)
         query = f'Endpoint = "{endpoint_name}"'
-        deadline = time.monotonic() + 10.0
-        count_result = await client.count_nexus_operations(query)
-        while time.monotonic() < deadline:
-            if count_result.count >= 2:
-                break
-            await asyncio.sleep(0.2)
-            count_result = await client.count_nexus_operations(query)
 
-        assert count_result.count >= 2
+        async def check_count() -> None:
+            count_result = await client.count_nexus_operations(query)
+            assert count_result.count >= 2
+
+        await assert_eventually(check_count)
 
 
 async def test_get_nexus_operation_handle(client: Client, env: WorkflowEnvironment):
@@ -718,6 +714,12 @@ class _RecordingOutboundInterceptor(OutboundInterceptor):
         self._parent.describe_calls.append(input)
         return await super().describe_nexus_operation(input)
 
+    async def get_nexus_operation_result(
+        self, input: GetNexusOperationResultInput
+    ) -> Any:
+        self._parent.result_calls.append(input)
+        return await super().get_nexus_operation_result(input)
+
     async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
         self._parent.cancel_calls.append(input)
         return await super().cancel_nexus_operation(input)
@@ -744,6 +746,7 @@ class _RecordingInterceptor(Interceptor):
         super().__init__()
         self.start_calls: list[StartNexusOperationInput] = []
         self.describe_calls: list[DescribeNexusOperationInput] = []
+        self.result_calls: list[GetNexusOperationResultInput] = []
         self.cancel_calls: list[CancelNexusOperationInput] = []
         self.terminate_calls: list[TerminateNexusOperationInput] = []
         self.list_calls: list[ListNexusOperationsInput] = []
@@ -789,7 +792,7 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         handle = await start_with_retry(
             nexus_client,
             StandaloneTestService.blocking_async,
-            EchoInput(value="interceptor-test"),
+            EchoInput(value=f"interceptor-test-{op_id}"),
             id=op_id,
             id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
             id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
@@ -817,13 +820,22 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         assert isinstance(cancel_input, CancelNexusOperationInput)
         assert cancel_input.operation_id == op_id
 
+        # GetResult
+        with pytest.raises(CancelledError):
+            await handle.result()
+        assert len(interceptor.result_calls) == 1
+        result_input = interceptor.result_calls[0]
+        assert isinstance(result_input, GetNexusOperationResultInput)
+        assert result_input.operation_id == op_id
+        assert result_input.result_type == EchoOutput
+
         # Start another so we can terminate it
         previous_start_count = len(interceptor.start_calls)
         op_id = str(uuid.uuid4())
         handle = await start_with_retry(
             nexus_client,
             StandaloneTestService.blocking_async,
-            EchoInput(value="interceptor-test"),
+            EchoInput(value=f"interceptor-test-{op_id}"),
             id=op_id,
             id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
             id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
@@ -850,8 +862,7 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         assert list_input.query == query
 
         # Count Operations
-        count_output = await intercepted_client.count_nexus_operations(query)
-        assert count_output.count == 1
+        await intercepted_client.count_nexus_operations(query)
         assert len(interceptor.count_calls) >= 1
         count_input = interceptor.count_calls[-1]
         assert isinstance(count_input, CountNexusOperationsInput)

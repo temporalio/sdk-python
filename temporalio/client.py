@@ -5332,9 +5332,8 @@ class NexusOperationHandle(Generic[ReturnType]):
         self._result_type = result_type
         self._endpoint = endpoint
         self._service = service
-        self._known_outcome: (
-            temporalio.api.common.v1.Payload | temporalio.api.failure.v1.Failure | None
-        ) = None
+        # the default value is `_arg_unset` because ReturnType could be None
+        self._known_outcome: ReturnType | object = temporalio.common._arg_unset
 
     @property
     def operation_id(self) -> str:
@@ -5386,67 +5385,18 @@ class NexusOperationHandle(Generic[ReturnType]):
             NexusOperationFailureError: If the operation completed with a failure.
             RPCError: Operation result could not be fetched for some reason.
         """
-        if self._known_outcome is None:
-            self._known_outcome = await self._poll_until_outcome(
-                rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+        if self._known_outcome == temporalio.common._arg_unset:
+            self._known_outcome = await self._client._impl.get_nexus_operation_result(
+                GetNexusOperationResultInput(
+                    operation_id=self._operation_id,
+                    run_id=self._run_id,
+                    result_type=self._result_type,
+                    rpc_metadata=rpc_metadata,
+                    rpc_timeout=rpc_timeout,
+                )
             )
 
-        # Convert outcome to error or value
-        match self._known_outcome:
-            case temporalio.api.failure.v1.Failure():
-                raise await self._client.data_converter.decode_failure(
-                    self._known_outcome
-                )
-            case temporalio.api.common.v1.Payload():
-                type_hints = [self._result_type] if self._result_type else None
-                [result] = await self._client.data_converter.decode(
-                    [self._known_outcome], type_hints
-                )
-                return result
-
-    async def _poll_until_outcome(
-        self,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
-    ) -> temporalio.api.common.v1.Payload | temporalio.api.failure.v1.Failure:
-        """Poll for nexus operation result until it's available."""
-        req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
-            namespace=self._client.namespace,
-            operation_id=self._operation_id,
-            run_id=self._run_id or "",
-            wait_stage=temporalio.api.enums.v1.NexusOperationWaitStage.NEXUS_OPERATION_WAIT_STAGE_CLOSED,
-        )
-
-        # Continue polling as long as we have no outcome
-        while True:
-            try:
-                res = (
-                    await self._client.workflow_service.poll_nexus_operation_execution(
-                        req,
-                        retry=True,
-                        metadata=rpc_metadata,
-                        timeout=rpc_timeout,
-                    )
-                )
-                match res.WhichOneof("outcome"):
-                    case "result":
-                        return res.result
-
-                    case "failure":
-                        return res.failure
-
-                    case None:
-                        # poll again
-                        pass
-            except RPCError as err:
-                match err.status:
-                    case RPCStatusCode.DEADLINE_EXCEEDED:
-                        # Deadline exceeded is expected with long polling; retry
-                        continue
-                    case RPCStatusCode.CANCELLED:
-                        raise asyncio.CancelledError() from err
-                    case _:
-                        raise
+        return cast(ReturnType, self._known_outcome)
 
     async def describe(
         self,
@@ -5652,8 +5602,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: InputT,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5670,8 +5620,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         operation: nexusrpc.Operation[None, OutputT],
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5689,8 +5639,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type[OutputT],
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -5709,8 +5659,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5728,8 +5678,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type[OutputT],
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -5748,8 +5698,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5765,8 +5715,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -5809,8 +5759,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: InputT,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5827,8 +5777,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         operation: nexusrpc.Operation[None, OutputT],
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5846,8 +5796,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type[OutputT],
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -5866,8 +5816,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5885,8 +5835,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type[OutputT],
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -5905,8 +5855,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
@@ -5922,8 +5872,8 @@ class NexusClient(ABC, Generic[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -6004,8 +5954,8 @@ class _NexusClient(NexusClient[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -6047,8 +5997,8 @@ class _NexusClient(NexusClient[ServiceType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
         result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
@@ -8786,6 +8736,21 @@ class DescribeNexusOperationInput:
 
 
 @dataclass
+class GetNexusOperationResultInput:
+    """Input for :py:meth:`OutbountInterceptor.get_nexus_operation_result`.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    result_type: type[Any] | None
+
+
+@dataclass
 class CancelNexusOperationInput:
     """Input for :py:meth:`OutboundInterceptor.cancel_nexus_operation`.
 
@@ -9255,6 +9220,16 @@ class OutboundInterceptor:
            This API is experimental and unstable.
         """
         return await self.next.describe_nexus_operation(input)
+
+    async def get_nexus_operation_result(
+        self, input: GetNexusOperationResultInput
+    ) -> Any:
+        """Called for every :py:meth:`NexusOperationHandle.result` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.get_nexus_operation_result(input)
 
     async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
         """Called for every :py:meth:`NexusOperationHandle.cancel` call.
@@ -10059,6 +10034,54 @@ class _ClientImpl(OutboundInterceptor):
             info=resp.info,
             data_converter=self._client.data_converter,
         )
+
+    async def get_nexus_operation_result(
+        self, input: GetNexusOperationResultInput
+    ) -> Any:
+        """Poll for nexus operation result until it's available."""
+        req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
+            namespace=self._client.namespace,
+            operation_id=input.operation_id,
+            run_id=input.run_id or "",
+            wait_stage=temporalio.api.enums.v1.NexusOperationWaitStage.NEXUS_OPERATION_WAIT_STAGE_CLOSED,
+        )
+
+        # Continue polling as long as we have no outcome
+        while True:
+            try:
+                res = (
+                    await self._client.workflow_service.poll_nexus_operation_execution(
+                        req,
+                        retry=True,
+                        metadata=input.rpc_metadata,
+                        timeout=input.rpc_timeout,
+                    )
+                )
+                match res.WhichOneof("outcome"):
+                    case "result":
+                        type_hints = [input.result_type] if input.result_type else None
+                        [result] = await self._client.data_converter.decode(
+                            [res.result], type_hints
+                        )
+                        return result
+
+                    case "failure":
+                        raise await self._client.data_converter.decode_failure(
+                            res.failure
+                        )
+
+                    case None:
+                        # poll again
+                        pass
+            except RPCError as err:
+                match err.status:
+                    case RPCStatusCode.DEADLINE_EXCEEDED:
+                        # Deadline exceeded is expected with long polling; retry
+                        continue
+                    case RPCStatusCode.CANCELLED:
+                        raise asyncio.CancelledError() from err
+                    case _:
+                        raise
 
     async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
         """Cancel a nexus operation."""
