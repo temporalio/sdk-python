@@ -266,6 +266,7 @@ class SignalWithStartExternalWorkflowInput:
     static_summary: str | None
     static_details: str | None
     start_delay: timedelta | None
+    request_id: str | None
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None
     headers: Mapping[str, str] | None
@@ -484,7 +485,7 @@ class WorkflowOutboundInterceptor:
         self, input: SignalWithStartExternalWorkflowInput
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
         """Called for every
-        :py:meth:`temporalio.workflow.ExternalWorkflowHandle.signal_with_start_workflow`
+        :py:meth:`temporalio.workflow.ExternalWorkflowHandle.signal_with_start`
         call.
         """
         return await self.next.signal_with_start_external_workflow(input)

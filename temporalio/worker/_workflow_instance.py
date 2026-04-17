@@ -12,7 +12,6 @@ import random
 import sys
 import threading
 import traceback
-import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import deque
@@ -1972,6 +1971,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 signal=input.signal,
                 signal_args=input.signal_args,
                 task_queue=input.task_queue,
+                request_id=input.request_id,
                 payload_converter=payload_converter,
                 execution_timeout=input.execution_timeout,
                 run_timeout=input.run_timeout,
@@ -3348,15 +3348,13 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
             )
         )
 
-    async def signal_with_start_workflow(
+    async def signal_with_start(
         self,
         signal: str | Callable,
         workflow: str | Callable[..., Awaitable[Any]],
-        signal_arg: Any = temporalio.common._arg_unset,
-        workflow_arg: Any = temporalio.common._arg_unset,
         *,
-        signal_args: Sequence[Any] = [],
-        workflow_args: Sequence[Any] = [],
+        signal_args: Sequence[Any] = (),
+        workflow_args: Sequence[Any] = (),
         task_queue: str,
         execution_timeout: timedelta | None = None,
         run_timeout: timedelta | None = None,
@@ -3370,6 +3368,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         static_summary: str | None = None,
         static_details: str | None = None,
         start_delay: timedelta | None = None,
+        request_id: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
@@ -3382,13 +3381,11 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
                 signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
                     signal
                 ),
-                signal_args=temporalio.common._arg_or_args(signal_arg, signal_args),
+                signal_args=signal_args,
                 namespace=self._instance._info.namespace,
                 workflow_id=self._id,
                 workflow=workflow_name,
-                workflow_args=temporalio.common._arg_or_args(
-                    workflow_arg, workflow_args
-                ),
+                workflow_args=workflow_args,
                 task_queue=task_queue,
                 execution_timeout=execution_timeout,
                 run_timeout=run_timeout,
@@ -3402,6 +3399,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
                 static_summary=static_summary,
                 static_details=static_details,
                 start_delay=start_delay,
+                request_id=request_id,
                 priority=priority,
                 versioning_override=versioning_override,
                 headers=None,

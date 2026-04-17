@@ -19,9 +19,14 @@ def main() -> None:
     input_schema = (
         repo_root
         / "temporalio"
+        / "bridge"
+        / "sdk-core"
+        / "crates"
+        / "common"
+        / "protos"
+        / "api_upstream"
         / "nexus"
-        / "system"
-        / "_workflow_service.nexusrpc.yaml"
+        / "temporal-json-schema-models-nexusrpc.yaml"
     )
     output_file = (
         repo_root / "temporalio" / "nexus" / "system" / "_workflow_service_generated.py"
