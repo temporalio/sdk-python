@@ -844,7 +844,8 @@ async def test_adk_agent_name_label_fallback(client: Client):
 def test_summary_and_summary_fn_raises():
     """Cannot specify both summary and summary_fn."""
     with pytest.raises(
-        ValueError, match="Cannot specify both 'summary' and 'summary_fn'"
+        ValueError,
+        match="Cannot specify both ActivityConfig 'summary' and 'summary_fn'",
     ):
         TemporalModel(
             "m",

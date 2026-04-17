@@ -58,7 +58,7 @@ class TemporalModel(BaseLlm):
                 the workflow task.
 
         Raises:
-            ValueError: If both 'summary' and 'summary_fn' are set.
+            ValueError: If both ``ActivityConfig["summary"]`` and ``summary_fn`` are set.
         """
         super().__init__(model=model_name)
         self._model_name = model_name
@@ -68,7 +68,9 @@ class TemporalModel(BaseLlm):
         )
         if activity_config is not None:
             if summary_fn is not None and activity_config.get("summary") is not None:
-                raise ValueError("Cannot specify both 'summary' and 'summary_fn'")
+                raise ValueError(
+                    "Cannot specify both ActivityConfig 'summary' and 'summary_fn'"
+                )
             self._activity_config.update(activity_config)
 
     async def generate_content_async(
