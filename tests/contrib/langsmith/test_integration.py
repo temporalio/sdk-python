@@ -1222,14 +1222,15 @@ class QueryFilteringWorkflow:
 
 
 class TestBuiltinQueryFiltering:
-    """Verifies __temporal_ prefixed queries are not traced."""
+    """Verifies built-in queries (both __temporal-prefixed and SDK internal) are not traced."""
 
     async def test_temporal_prefixed_query_not_traced(
         self,
         client: Client,
     ) -> None:
-        """__temporal_workflow_metadata query should not produce a trace,
-        but user-defined queries should still be traced.
+        """Queries starting with __temporal (e.g., __temporal_workflow_metadata)
+        and SDK-internal queries (__stack_trace, __enhanced_stack_trace) should
+        not produce traces, but user-defined queries should still be traced.
 
         Uses add_temporal_runs=False on the query client to suppress
         client-side QueryWorkflow traces, isolating the test to
@@ -1249,7 +1250,6 @@ class TestBuiltinQueryFiltering:
             worker_client,
             QueryFilteringWorkflow,
             task_queue=task_queue,
-            max_cached_workflows=0,
         ) as worker:
             handle = await query_client.start_workflow(
                 QueryFilteringWorkflow.run,
