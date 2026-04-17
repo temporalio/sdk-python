@@ -7207,6 +7207,22 @@ async def test_in_workflow_util(client: Client):
         )
 
 
+@workflow.defn
+class LoopIsRunningWorkflow:
+    @workflow.run
+    async def run(self) -> bool:
+        return asyncio.get_running_loop().is_running()
+
+
+async def test_workflow_loop_is_running(client: Client):
+    async with new_worker(client, LoopIsRunningWorkflow) as worker:
+        assert await client.execute_workflow(
+            LoopIsRunningWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
 deadlock_interruptible_completed = 0
 
 
