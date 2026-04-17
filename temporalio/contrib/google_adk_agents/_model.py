@@ -10,18 +10,6 @@ from temporalio import activity, workflow
 from temporalio.workflow import ActivityConfig
 
 
-class AdkActivityConfig(ActivityConfig, total=False):
-    """Activity config with ADK-specific options.
-
-    Attributes:
-        summary_fn: Optional callable that receives the LlmRequest and returns
-            a summary string (or None). Must be deterministic as it is called
-            during workflow execution.
-    """
-
-    summary_fn: Callable[[LlmRequest], str | None] | None
-
-
 @activity.defn
 async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
     """Activity that invokes an LLM model.
@@ -54,27 +42,34 @@ class TemporalModel(BaseLlm):
     def __init__(
         self,
         model_name: str,
-        activity_config: AdkActivityConfig | ActivityConfig | None = None,
+        activity_config: ActivityConfig | None = None,
+        *,
+        summary_fn: Callable[[LlmRequest], str | None] | None = None,
     ) -> None:
         """Initialize the TemporalModel.
 
         Args:
             model_name: The name of the model to use.
             activity_config: Configuration options for the activity execution.
+            summary_fn: Optional callable that receives the LlmRequest and
+                returns a summary string (or None) for the activity. Must be
+                deterministic as it is called during workflow execution. If
+                the callable raises, the exception will propagate and fail
+                the workflow task.
 
         Raises:
             ValueError: If both 'summary' and 'summary_fn' are set.
         """
         super().__init__(model=model_name)
         self._model_name = model_name
-        raw = dict(activity_config) if activity_config else {}
-        self._summary_fn: Callable[[LlmRequest], str | None] | None = raw.pop(
-            "summary_fn", None
-        )  # type: ignore[assignment]
-        raw.setdefault("start_to_close_timeout", timedelta(seconds=60))
-        if raw.get("summary") is not None and self._summary_fn is not None:
-            raise ValueError("Cannot specify both 'summary' and 'summary_fn'")
-        self._activity_config = ActivityConfig(**raw)  # type: ignore[typeddict-item]
+        self._summary_fn = summary_fn
+        self._activity_config = ActivityConfig(
+            start_to_close_timeout=timedelta(seconds=60)
+        )
+        if activity_config is not None:
+            if summary_fn is not None and activity_config.get("summary") is not None:
+                raise ValueError("Cannot specify both 'summary' and 'summary_fn'")
+            self._activity_config.update(activity_config)
 
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False

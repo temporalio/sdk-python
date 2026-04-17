@@ -597,13 +597,11 @@ class SummaryFnModel(TestModel):
 class SummaryFnWorkflow:
     @workflow.run
     async def run(self, model_name: str) -> str | None:
-        from temporalio.contrib.google_adk_agents import AdkActivityConfig
-
         agent = Agent(
             name="summary_fn_agent",
             model=TemporalModel(
                 model_name,
-                AdkActivityConfig(summary_fn=lambda req: f"Invoking {req.model}"),
+                summary_fn=lambda req: f"Invoking {req.model}",
             ),
         )
         runner = InMemoryRunner(agent=agent, app_name="summary_fn_app")
@@ -627,7 +625,7 @@ class SummaryFnWorkflow:
 
 @pytest.mark.asyncio
 async def test_summary_fn_produces_dynamic_summary(client: Client):
-    """summary_fn in AdkActivityConfig sets summary on invoke_model activity."""
+    """summary_fn on TemporalModel sets summary on invoke_model activity."""
     new_config = client.config()
     new_config["plugins"] = [GoogleAdkPlugin()]
     client = Client(**new_config)
@@ -664,13 +662,11 @@ async def test_summary_fn_produces_dynamic_summary(client: Client):
 class SummaryFnNoneWorkflow:
     @workflow.run
     async def run(self, model_name: str) -> str | None:
-        from temporalio.contrib.google_adk_agents import AdkActivityConfig
-
         agent = Agent(
             name="none_summary_agent",
             model=TemporalModel(
                 model_name,
-                AdkActivityConfig(summary_fn=lambda req: None),
+                summary_fn=lambda req: None,
             ),
         )
         runner = InMemoryRunner(agent=agent, app_name="none_summary_app")
@@ -722,37 +718,138 @@ async def test_summary_fn_returning_none(client: Client):
                     assert not e.user_metadata.summary.data
 
 
-def test_adk_agent_name_label_fallback():
+@workflow.defn
+class SummaryFnEmptyStringWorkflow:
+    @workflow.run
+    async def run(self, model_name: str) -> str | None:
+        agent = Agent(
+            name="empty_summary_agent",
+            model=TemporalModel(
+                model_name,
+                summary_fn=lambda req: "",
+            ),
+        )
+        runner = InMemoryRunner(agent=agent, app_name="empty_summary_app")
+        session = await runner.session_service.create_session(
+            app_name="empty_summary_app", user_id="test"
+        )
+        last_event = None
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text="hi")]),
+            )
+        ) as agen:
+            async for event in agen:
+                last_event = event
+        if last_event and last_event.content and last_event.content.parts:
+            return last_event.content.parts[0].text
+        return None
+
+
+@pytest.mark.asyncio
+async def test_summary_fn_empty_string(client: Client):
+    """summary_fn returning empty string is a valid summary."""
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+    LLMRegistry.register(SummaryFnModel)
+
+    async with Worker(
+        client,
+        task_queue="adk-summary-fn-empty-test",
+        workflows=[SummaryFnEmptyStringWorkflow],
+        max_cached_workflows=0,
+    ):
+        handle = await client.start_workflow(
+            SummaryFnEmptyStringWorkflow.run,
+            "summary_fn_model",
+            id=f"summary-fn-empty-{uuid.uuid4()}",
+            task_queue="adk-summary-fn-empty-test",
+            execution_timeout=timedelta(seconds=60),
+        )
+        await handle.result()
+
+        found = False
+        async for e in handle.fetch_history_events():
+            if e.HasField("activity_task_scheduled_event_attributes"):
+                attrs = e.activity_task_scheduled_event_attributes
+                if attrs.activity_type.name == "invoke_model":
+                    assert e.user_metadata.summary.data == b""
+                    found = True
+        assert found, "No invoke_model activity found in history"
+
+
+@workflow.defn
+class LabelFallbackWorkflow:
+    @workflow.run
+    async def run(self, model_name: str) -> str | None:
+        agent = Agent(
+            name="label_fallback_agent",
+            model=TemporalModel(model_name),
+        )
+        runner = InMemoryRunner(agent=agent, app_name="label_fallback_app")
+        session = await runner.session_service.create_session(
+            app_name="label_fallback_app", user_id="test"
+        )
+        last_event = None
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text="hi")]),
+            )
+        ) as agen:
+            async for event in agen:
+                last_event = event
+        if last_event and last_event.content and last_event.content.parts:
+            return last_event.content.parts[0].text
+        return None
+
+
+@pytest.mark.asyncio
+async def test_adk_agent_name_label_fallback(client: Client):
     """When no summary or summary_fn, adk_agent_name label is used as summary."""
-    model = TemporalModel("m")
-    request = LlmRequest(
-        model="m",
-        config=types.GenerateContentConfig(labels={"adk_agent_name": "my_agent"}),
-    )
-    # Simulate what generate_content_async does
-    config = model._activity_config.copy()
-    if model._summary_fn is not None:
-        summary = model._summary_fn(request)
-        if summary is not None:
-            config["summary"] = summary
-    elif "summary" not in config:
-        if request.config and request.config.labels:
-            agent_name = request.config.labels.get("adk_agent_name")
-            if agent_name:
-                config["summary"] = agent_name
-    assert config.get("summary") == "my_agent"
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+    LLMRegistry.register(SummaryFnModel)
+
+    async with Worker(
+        client,
+        task_queue="adk-label-fallback-test",
+        workflows=[LabelFallbackWorkflow],
+        max_cached_workflows=0,
+    ):
+        handle = await client.start_workflow(
+            LabelFallbackWorkflow.run,
+            "summary_fn_model",
+            id=f"label-fallback-{uuid.uuid4()}",
+            task_queue="adk-label-fallback-test",
+            execution_timeout=timedelta(seconds=60),
+        )
+        await handle.result()
+
+        found = False
+        async for e in handle.fetch_history_events():
+            if e.HasField("activity_task_scheduled_event_attributes"):
+                attrs = e.activity_task_scheduled_event_attributes
+                if attrs.activity_type.name == "invoke_model":
+                    assert e.user_metadata.summary.data == b'"label_fallback_agent"'
+                    found = True
+        assert found, "No invoke_model activity found in history"
 
 
 def test_summary_and_summary_fn_raises():
     """Cannot specify both summary and summary_fn."""
-    from temporalio.contrib.google_adk_agents import AdkActivityConfig
-
     with pytest.raises(
         ValueError, match="Cannot specify both 'summary' and 'summary_fn'"
     ):
         TemporalModel(
             "m",
-            AdkActivityConfig(summary="static", summary_fn=lambda req: "dynamic"),
+            activity_config=ActivityConfig(summary="static"),
+            summary_fn=lambda req: "dynamic",
         )
 
 
