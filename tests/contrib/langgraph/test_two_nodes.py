@@ -25,9 +25,12 @@ async def node_b(state: State) -> dict[str, str]:
 
 @workflow.defn
 class TwoNodesWorkflow:
+    def __init__(self) -> None:
+        self.app = graph("my-graph").compile()
+
     @workflow.run
     async def run(self, input: str) -> Any:
-        return await graph("my-graph").compile().ainvoke({"value": input})
+        return await self.app.ainvoke({"value": input})
 
 
 async def test_two_nodes(client: Client):

@@ -25,10 +25,13 @@ async def node_b(state: State) -> dict[str, str]:
 
 @workflow.defn
 class StreamingWorkflow:
+    def __init__(self) -> None:
+        self.app = graph("streaming").compile()
+
     @workflow.run
     async def run(self, input: str) -> Any:
         chunks = []
-        async for chunk in graph("streaming").compile().astream({"value": input}):
+        async for chunk in self.app.astream({"value": input}):
             chunks.append(chunk)
         return chunks
 

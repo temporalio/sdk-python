@@ -11,16 +11,22 @@ from temporalio.contrib.langgraph.langgraph_plugin import cache, entrypoint
 
 @workflow.defn
 class SimpleFunctionalE2EWorkflow:
+    def __init__(self) -> None:
+        self.app = entrypoint("e2e_simple_functional")
+
     @workflow.run
     async def run(self, input_value: int) -> dict:
-        return await entrypoint("e2e_simple_functional").ainvoke(input_value)
+        return await self.app.ainvoke(input_value)
 
 
 @workflow.defn
 class SlowFunctionalWorkflow:
+    def __init__(self) -> None:
+        self.app = entrypoint("e2e_slow_functional")
+
     @workflow.run
     async def run(self, input_value: int) -> dict:
-        return await entrypoint("e2e_slow_functional").ainvoke(input_value)
+        return await self.app.ainvoke(input_value)
 
 
 @dataclass
@@ -37,9 +43,9 @@ class ContinueAsNewFunctionalWorkflow:
 
     @workflow.run
     async def run(self, input_data: ContinueAsNewInput) -> dict[str, Any]:
-        result = await entrypoint(
-            "e2e_continue_as_new_functional", cache=input_data.cache
-        ).ainvoke(input_data.value)
+        app = entrypoint("e2e_continue_as_new_functional", cache=input_data.cache)
+
+        result = await app.ainvoke(input_data.value)
 
         if not input_data.task_a_done:
             workflow.continue_as_new(

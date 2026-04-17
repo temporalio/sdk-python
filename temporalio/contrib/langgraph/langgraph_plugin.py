@@ -11,6 +11,7 @@ from langgraph.pregel import Pregel
 
 from temporalio import activity
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
+from temporalio.contrib.langgraph.langgraph_interceptor import LangGraphInterceptor
 from temporalio.contrib.langgraph.task_cache import (
     get_task_cache,
     set_task_cache,
@@ -108,6 +109,7 @@ class LangGraphPlugin(SimplePlugin):
             "temporalio.LangGraphPlugin",
             activities=self.activities,
             workflow_runner=workflow_runner,
+            interceptors=[LangGraphInterceptor()],
         )
 
     def execute(
@@ -141,7 +143,6 @@ def graph(
             Restores cached results so previously-completed nodes are
             not re-executed after continue-as-new.
     """
-    _patch_event_loop()
     set_task_cache(cache or {})
     if name not in _graph_registry:
         raise KeyError(
@@ -162,7 +163,6 @@ def entrypoint(
             Restores cached results so previously-completed tasks are
             not re-executed after continue-as-new.
     """
-    _patch_event_loop()
     set_task_cache(cache or {})
     if name not in _entrypoint_registry:
         raise KeyError(
@@ -180,11 +180,3 @@ def cache() -> dict[str, Any] | None:
     Returns None if the cache is empty.
     """
     return get_task_cache() or None
-
-
-def _patch_event_loop():
-    """Patch the event loop so LangGraph detects it as running inside Temporal's sandbox."""
-    from asyncio import get_event_loop
-
-    loop = get_event_loop()
-    setattr(loop, "is_running", lambda: True)

@@ -65,8 +65,8 @@ class GraphContinueAsNewWorkflow:
 
     @workflow.run
     async def run(self, input_data: GraphContinueAsNewInput) -> dict[str, int]:
-        g = graph("cached-graph", cache=input_data.cache).compile()
-        result = await g.ainvoke({"value": input_data.value})
+        app = graph("cached-graph", cache=input_data.cache).compile()
+        result = await app.ainvoke({"value": input_data.value})
 
         if input_data.phase < 3:
             workflow.continue_as_new(

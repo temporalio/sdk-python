@@ -25,16 +25,18 @@ async def node(state: State) -> dict[str, str]:
 
 @workflow.defn
 class ContinueAsNewWorkflow:
+    def __init__(self) -> None:
+        self.app = graph("my-graph").compile(checkpointer=InMemorySaver())
+
     @workflow.run
     async def run(self, values: dict[str, str]) -> Any:
-        g = graph("my-graph").compile(checkpointer=InMemorySaver())
         config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
-        await g.aupdate_state(config, values)
-        await g.ainvoke(values, config)
+        await self.app.aupdate_state(config, values)
+        await self.app.ainvoke(values, config)
 
         if len(values["value"]) < 3:
-            state = await g.aget_state(config)
+            state = await self.app.aget_state(config)
             workflow.continue_as_new(state.values)
 
         return values

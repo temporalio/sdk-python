@@ -27,31 +27,35 @@ async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedP
 
 @workflow.defn
 class InterruptWorkflow:
+    def __init__(self) -> None:
+        self.app = graph("my-graph").compile(checkpointer=InMemorySaver())
+
     @workflow.run
     async def run(self, input: str) -> Any:
-        g = graph("my-graph").compile(checkpointer=InMemorySaver())
         config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
-        result = await g.ainvoke({"value": input}, config)
+        result = await self.app.ainvoke({"value": input}, config)
         assert result["__interrupt__"][0].value == "Continue?"
 
-        return await g.ainvoke(langgraph.types.Command(resume="yes"), config)
+        return await self.app.ainvoke(langgraph.types.Command(resume="yes"), config)
 
 
 @workflow.defn
 class InterruptV2Workflow:
+    def __init__(self) -> None:
+        self.app = graph("my-graph").compile(checkpointer=InMemorySaver())
+
     @workflow.run
     async def run(self, input: str) -> Any:
-        g = graph("my-graph").compile(checkpointer=InMemorySaver())
         config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
-        result = await g.ainvoke({"value": input}, config, version="v2")
+        result = await self.app.ainvoke({"value": input}, config, version="v2")
 
         assert result.value == {"value": ""}
         assert len(result.interrupts) == 1
         assert result.interrupts[0].value == "Continue?"
 
-        return await g.ainvoke(langgraph.types.Command(resume="yes"), config)
+        return await self.app.ainvoke(langgraph.types.Command(resume="yes"), config)
 
 
 @pytest.mark.parametrize(

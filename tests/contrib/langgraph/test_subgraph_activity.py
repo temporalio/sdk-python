@@ -29,9 +29,12 @@ async def parent_node(state: State) -> dict[str, str]:
 
 @workflow.defn
 class ActivitySubgraphWorkflow:
+    def __init__(self) -> None:
+        self.app = graph("parent").compile()
+
     @workflow.run
     async def run(self, input: str) -> Any:
-        return await graph("parent").compile().ainvoke({"value": input})
+        return await self.app.ainvoke({"value": input})
 
 
 async def test_activity_subgraph(client: Client):

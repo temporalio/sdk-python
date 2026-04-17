@@ -20,9 +20,12 @@ async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedP
 
 @workflow.defn
 class ExecuteInWorkflowWorkflow:
+    def __init__(self) -> None:
+        self.app = graph("my-graph").compile()
+
     @workflow.run
     async def run(self, input: str) -> Any:
-        return await graph("my-graph").compile().ainvoke({"value": input})
+        return await self.app.ainvoke({"value": input})
 
 
 async def test_execute_in_workflow(client: Client):

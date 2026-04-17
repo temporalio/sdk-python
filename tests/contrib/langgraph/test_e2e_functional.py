@@ -80,29 +80,36 @@ async def simple_v2_entrypoint(value: int) -> dict:
 
 @workflow.defn
 class SimpleV2Workflow:
+    def __init__(self) -> None:
+        self.app = entrypoint("v2_simple")
+
     @workflow.run
     async def run(self, input_value: int) -> dict[str, Any]:
-        result = await entrypoint("v2_simple").ainvoke(input_value, version="v2")
+        result = await self.app.ainvoke(input_value, version="v2")
         return result.value
 
 
 @workflow.defn
 class InterruptV2FunctionalWorkflow:
+    def __init__(self) -> None:
+        self.app = entrypoint("v2_interrupt")
+        self.app.checkpointer = InMemorySaver()
+
     @workflow.run
     async def run(self, input_value: str) -> dict[str, Any]:
-        app = entrypoint("v2_interrupt")
-        app.checkpointer = InMemorySaver()
         config = RunnableConfig(
             {"configurable": {"thread_id": workflow.info().workflow_id}}
         )
 
-        result = await app.ainvoke(input_value, config, version="v2")
+        result = await self.app.ainvoke(input_value, config, version="v2")
 
         assert result.value == {}
         assert len(result.interrupts) == 1
         assert result.interrupts[0].value == "Do you approve?"
 
-        resumed = await app.ainvoke(Command(resume="approved"), config, version="v2")
+        resumed = await self.app.ainvoke(
+            Command(resume="approved"), config, version="v2"
+        )
         return resumed.value
 
 
