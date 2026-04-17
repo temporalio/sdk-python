@@ -38,6 +38,7 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 if typing.TYPE_CHECKING:
     from temporalio.contrib.openai_agents import (
+        SandboxClientProvider,
         StatefulMCPServerProvider,
         StatelessMCPServerProvider,
     )
@@ -144,6 +145,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         mcp_server_providers: Sequence[
             "StatelessMCPServerProvider | StatefulMCPServerProvider"
         ] = (),
+        sandbox_clients: Sequence["SandboxClientProvider"] = (),
         register_activities: bool = True,
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
@@ -159,6 +161,14 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 Each server will be wrapped in a TemporalMCPServer if not already wrapped,
                 and their activities will be automatically registered with the worker.
                 The plugin manages the connection lifecycle of these servers.
+            sandbox_clients: Sequence of named sandbox client providers to register
+                on the worker.  Each provider pairs a unique name with a real
+                ``BaseSandboxClient`` (e.g. ``DaytonaSandboxClient``,
+                ``UnixLocalSandboxClient``).  On the workflow side, use
+                ``temporal_sandbox_client``
+                with the matching name to target the correct backend.
+                Warning: sandbox_clients is experimental and behavior may change in future versions.
+                Use with caution in production environments.
             register_activities: Whether to register activities during the worker execution.
                 This can be disabled on some workers to allow a separation of workflows and activities
                 but should not be disabled on all workers, or agents will not be able to progress.
@@ -200,11 +210,21 @@ class OpenAIAgentsPlugin(SimplePlugin):
             server_names = [server.name for server in mcp_server_providers]
             if len(server_names) != len(set(server_names)):
                 raise ValueError(
-                    f"More than one mcp server registered with the same name. Please provide unique names."
+                    "More than one mcp server registered with the same name. Please provide unique names."
                 )
 
             for mcp_server in mcp_server_providers:
                 new_activities.extend(mcp_server._get_activities())
+
+            sandbox_names = [sc.name for sc in sandbox_clients]
+            if len(sandbox_names) != len(set(sandbox_names)):
+                raise ValueError(
+                    "More than one sandbox client registered with the same name. Please provide unique names."
+                )
+
+            for sandbox_provider in sandbox_clients:
+                new_activities.extend(sandbox_provider._get_activities())
+
             return list(activities or []) + new_activities
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
@@ -247,7 +267,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
         async def run_context() -> AsyncIterator[None]:
             with self.tracing_context():
                 with _set_open_ai_agent_temporal_overrides(
-                    model_params, start_spans_in_replay=use_otel_instrumentation
+                    model_params,
+                    start_spans_in_replay=use_otel_instrumentation,
                 ):
                     yield
 
