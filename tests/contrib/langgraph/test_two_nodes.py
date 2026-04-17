@@ -7,7 +7,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Worker
 
 
@@ -23,10 +23,17 @@ async def node_b(state: State) -> dict[str, str]:
     return {"value": state["value"] + "b"}
 
 
+my_graph: StateGraph[State, None, State, State] = StateGraph(State)
+my_graph.add_node("node_a", node_a)
+my_graph.add_node("node_b", node_b)
+my_graph.add_edge(START, "node_a")
+my_graph.add_edge("node_a", "node_b")
+
+
 @workflow.defn
 class TwoNodesWorkflow:
     def __init__(self) -> None:
-        self.app = graph("my-graph").compile()
+        self.app = my_graph.compile()
 
     @workflow.run
     async def run(self, input: str) -> Any:
@@ -34,12 +41,6 @@ class TwoNodesWorkflow:
 
 
 async def test_two_nodes(client: Client):
-    g = StateGraph(State)
-    g.add_node("node_a", node_a)
-    g.add_node("node_b", node_b)
-    g.add_edge(START, "node_a")
-    g.add_edge("node_a", "node_b")
-
     task_queue = f"my-graph-{uuid4()}"
 
     async with Worker(
@@ -48,7 +49,7 @@ async def test_two_nodes(client: Client):
         workflows=[TwoNodesWorkflow],
         plugins=[
             LangGraphPlugin(
-                graphs={"my-graph": g},
+                graphs=[my_graph],
                 default_activity_options={
                     "start_to_close_timeout": timedelta(seconds=10)
                 },

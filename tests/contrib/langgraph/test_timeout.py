@@ -10,7 +10,7 @@ from typing_extensions import TypedDict
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Worker
 
 
@@ -23,10 +23,15 @@ async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedP
     return {"value": "done"}
 
 
+timeout_graph: StateGraph[State, None, State, State] = StateGraph(State)
+timeout_graph.add_node("node", node)
+timeout_graph.add_edge(START, "node")
+
+
 @workflow.defn
 class TimeoutWorkflow:
     def __init__(self) -> None:
-        self.app = graph("my-graph").compile()
+        self.app = timeout_graph.compile()
 
     @workflow.run
     async def run(self, input: str) -> Any:
@@ -34,10 +39,6 @@ class TimeoutWorkflow:
 
 
 async def test_timeout(client: Client):
-    g = StateGraph(State)
-    g.add_node("node", node)
-    g.add_edge(START, "node")
-
     task_queue = f"my-graph-{uuid4()}"
 
     async with Worker(
@@ -46,7 +47,7 @@ async def test_timeout(client: Client):
         workflows=[TimeoutWorkflow],
         plugins=[
             LangGraphPlugin(
-                graphs={"my-graph": g},
+                graphs=[timeout_graph],
                 default_activity_options={
                     "start_to_close_timeout": timedelta(milliseconds=100),
                     "retry_policy": RetryPolicy(maximum_attempts=1),

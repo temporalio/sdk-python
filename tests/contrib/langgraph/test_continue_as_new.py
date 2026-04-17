@@ -11,7 +11,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Worker
 
 
@@ -23,13 +23,18 @@ async def node(state: State) -> dict[str, str]:
     return {"value": state["value"] + "a"}
 
 
+my_graph: StateGraph[State, None, State, State] = StateGraph(State)
+my_graph.add_node("node", node)
+my_graph.add_edge(START, "node")
+
+
 @workflow.defn
 class ContinueAsNewWorkflow:
     def __init__(self) -> None:
-        self.app = graph("my-graph").compile(checkpointer=InMemorySaver())
+        self.app = my_graph.compile(checkpointer=InMemorySaver())
 
     @workflow.run
-    async def run(self, values: dict[str, str]) -> Any:
+    async def run(self, values: State) -> Any:
         config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
         await self.app.aupdate_state(config, values)
@@ -43,10 +48,6 @@ class ContinueAsNewWorkflow:
 
 
 async def test_continue_as_new(client: Client):
-    g = StateGraph(State)
-    g.add_node("node", node)
-    g.add_edge(START, "node")
-
     task_queue = f"my-graph-{uuid4()}"
 
     async with Worker(
@@ -55,7 +56,7 @@ async def test_continue_as_new(client: Client):
         workflows=[ContinueAsNewWorkflow],
         plugins=[
             LangGraphPlugin(
-                graphs={"my-graph": g},
+                graphs=[my_graph],
                 default_activity_options={
                     "start_to_close_timeout": timedelta(seconds=10)
                 },

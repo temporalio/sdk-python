@@ -6,7 +6,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Worker
 
 
@@ -18,10 +18,15 @@ async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedP
     return {"value": "done"}
 
 
+inline_graph: StateGraph[State, None, State, State] = StateGraph(State)
+inline_graph.add_node("node", node, metadata={"execute_in": "workflow"})
+inline_graph.add_edge(START, "node")
+
+
 @workflow.defn
 class ExecuteInWorkflowWorkflow:
     def __init__(self) -> None:
-        self.app = graph("my-graph").compile()
+        self.app = inline_graph.compile()
 
     @workflow.run
     async def run(self, input: str) -> Any:
@@ -29,17 +34,13 @@ class ExecuteInWorkflowWorkflow:
 
 
 async def test_execute_in_workflow(client: Client):
-    g = StateGraph(State)
-    g.add_node("node", node, metadata={"execute_in": "workflow"})
-    g.add_edge(START, "node")
-
     task_queue = f"my-graph-{uuid4()}"
 
     async with Worker(
         client,
         task_queue=task_queue,
         workflows=[ExecuteInWorkflowWorkflow],
-        plugins=[LangGraphPlugin(graphs={"my-graph": g})],
+        plugins=[LangGraphPlugin(graphs=[inline_graph])],
     ):
         result = await client.execute_workflow(
             ExecuteInWorkflowWorkflow.run,

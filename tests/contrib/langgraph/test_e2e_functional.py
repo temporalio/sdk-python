@@ -22,22 +22,18 @@ from pytest import raises
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, entrypoint
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Worker
 from tests.contrib.langgraph.e2e_functional_entrypoints import (
     add_ten,
     ask_human,
-    continue_as_new_entrypoint,
     double_value,
     expensive_task_a,
     expensive_task_b,
     expensive_task_c,
     get_task_execution_counts,
     interrupt_entrypoint,
-    partial_execution_entrypoint,
     reset_task_execution_counts,
-    simple_functional_entrypoint,
-    slow_entrypoint,
     slow_task,
     step_1,
     step_2,
@@ -80,20 +76,16 @@ async def simple_v2_entrypoint(value: int) -> dict:
 
 @workflow.defn
 class SimpleV2Workflow:
-    def __init__(self) -> None:
-        self.app = entrypoint("v2_simple")
-
     @workflow.run
     async def run(self, input_value: int) -> dict[str, Any]:
-        result = await self.app.ainvoke(input_value, version="v2")
+        result = await simple_v2_entrypoint.ainvoke(input_value, version="v2")
         return result.value
 
 
 @workflow.defn
 class InterruptV2FunctionalWorkflow:
     def __init__(self) -> None:
-        self.app = entrypoint("v2_interrupt")
-        self.app.checkpointer = InMemorySaver()
+        interrupt_entrypoint.checkpointer = InMemorySaver()
 
     @workflow.run
     async def run(self, input_value: str) -> dict[str, Any]:
@@ -101,13 +93,13 @@ class InterruptV2FunctionalWorkflow:
             {"configurable": {"thread_id": workflow.info().workflow_id}}
         )
 
-        result = await self.app.ainvoke(input_value, config, version="v2")
+        result = await interrupt_entrypoint.ainvoke(input_value, config, version="v2")
 
         assert result.value == {}
         assert len(result.interrupts) == 1
         assert result.interrupts[0].value == "Do you approve?"
 
-        resumed = await self.app.ainvoke(
+        resumed = await interrupt_entrypoint.ainvoke(
             Command(resume="approved"), config, version="v2"
         )
         return resumed.value
@@ -115,22 +107,10 @@ class InterruptV2FunctionalWorkflow:
 
 class TestFunctionalAPIBasicExecution:
     @pytest.mark.parametrize(
-        "workflow_cls,entrypoint_func,entrypoint_name,tasks,expected_result",
+        "workflow_cls,tasks,expected_result",
         [
-            (
-                SimpleFunctionalE2EWorkflow,
-                simple_functional_entrypoint,
-                "e2e_simple_functional",
-                [double_value, add_ten],
-                30,
-            ),
-            (
-                SimpleV2Workflow,
-                simple_v2_entrypoint,
-                "v2_simple",
-                [triple_value, add_five],
-                35,
-            ),
+            (SimpleFunctionalE2EWorkflow, [double_value, add_ten], 30),
+            (SimpleV2Workflow, [triple_value, add_five], 35),
         ],
         ids=["v1", "v2"],
     )
@@ -138,8 +118,6 @@ class TestFunctionalAPIBasicExecution:
         self,
         client: Client,
         workflow_cls: Any,
-        entrypoint_func: Any,
-        entrypoint_name: str,
         tasks: list,
         expected_result: int,
     ) -> None:
@@ -151,7 +129,6 @@ class TestFunctionalAPIBasicExecution:
             workflows=[workflow_cls],
             plugins=[
                 LangGraphPlugin(
-                    entrypoints={entrypoint_name: entrypoint_func},
                     tasks=tasks,
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
@@ -182,9 +159,6 @@ class TestFunctionalAPIContinueAsNew:
             workflows=[ContinueAsNewFunctionalWorkflow],
             plugins=[
                 LangGraphPlugin(
-                    entrypoints={
-                        "e2e_continue_as_new_functional": continue_as_new_entrypoint
-                    },
                     tasks=tasks,
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
@@ -226,7 +200,6 @@ class TestFunctionalAPIPartialExecution:
             workflows=[PartialExecutionWorkflow],
             plugins=[
                 LangGraphPlugin(
-                    entrypoints={"e2e_partial_execution": partial_execution_entrypoint},
                     tasks=tasks,
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
@@ -253,7 +226,6 @@ class TestFunctionalAPIPartialExecution:
 class TestFunctionalAPIInterruptV2:
     async def test_interrupt_v2_functional(self, client: Client) -> None:
         """version='v2' separates interrupts from value in functional API."""
-        tasks = [ask_human]
         task_queue = f"v2-interrupt-{uuid4()}"
 
         async with Worker(
@@ -262,8 +234,7 @@ class TestFunctionalAPIInterruptV2:
             workflows=[InterruptV2FunctionalWorkflow],
             plugins=[
                 LangGraphPlugin(
-                    entrypoints={"v2_interrupt": interrupt_entrypoint},
-                    tasks=tasks,
+                    tasks=[ask_human],
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
@@ -291,7 +262,6 @@ class TestFunctionalAPIPerTaskOptions:
             workflows=[SlowFunctionalWorkflow],
             plugins=[
                 LangGraphPlugin(
-                    entrypoints={"e2e_slow_functional": slow_entrypoint},
                     tasks=[slow_task],
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                     activity_options={

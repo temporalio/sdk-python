@@ -2,12 +2,13 @@
 
 # pyright: reportMissingTypeStubs=false
 
+from __future__ import annotations
+
 from dataclasses import replace
-from typing import Any, Callable
+from typing import Any
 
 from langgraph._internal._runnable import RunnableCallable
 from langgraph.graph import StateGraph
-from langgraph.pregel import Pregel
 
 from temporalio import activity
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
@@ -21,10 +22,6 @@ from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
-# Save registered graphs/entrypoints at the module level to avoid being refreshed by the sandbox.
-_graph_registry: dict[str, StateGraph[Any]] = {}
-_entrypoint_registry: dict[str, Pregel[Any, Any, Any, Any]] = {}
-
 
 class LangGraphPlugin(SimplePlugin):
     """LangGraph plugin for Temporal SDK.
@@ -37,26 +34,28 @@ class LangGraphPlugin(SimplePlugin):
     and tasks as Temporal Activities, giving your AI agent workflows durable
     execution, automatic retries, and timeouts. It supports both the LangGraph Graph
     API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
+
+    Pass your graphs and tasks to the plugin; the plugin mutates them in place so
+    node/task invocations dispatch to Temporal activities. The modules those
+    graphs and tasks are defined in are automatically added to the workflow
+    sandbox's passthrough list, so the mutation is visible inside the sandbox.
+    Keep your ``@workflow.defn`` classes in a module separate from your graphs
+    and tasks (the standard Temporal convention).
     """
 
     def __init__(
         self,
-        # Graph API
-        graphs: dict[str, StateGraph] | None = None,
-        # Functional API
-        entrypoints: dict[str, Pregel[Any, Any, Any, Any]] | None = None,
+        graphs: list[StateGraph] | None = None,
         tasks: list | None = None,
-        # TODO: Remove activity_options when we have support for @task(metadata=...)
         activity_options: dict[str, dict] | None = None,
         default_activity_options: dict[str, Any] | None = None,
     ):
-        """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
+        """Register activities for graphs and tasks."""
         self.activities: list = []
+        passthrough_modules: set[str] = set()
 
-        # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
-            _graph_registry.update(graphs)
-            for graph_name, graph in graphs.items():
+            for graph in graphs:
                 for node_name, node in graph.nodes.items():
                     runnable = node.runnable
                     if (
@@ -66,28 +65,25 @@ class LangGraphPlugin(SimplePlugin):
                         raise ValueError(
                             f"Node {node_name} must have an async function"
                         )
-                    # Remove LangSmith-related callback functions that can't be serialized between the workflow and activity.
+                    # Remove LangSmith-related callback functions that can't be
+                    # serialized between the workflow and activity.
                     runnable.func_accepts = {}
                     opts = {**(default_activity_options or {}), **(node.metadata or {})}
-                    runnable.afunc = self.execute(
-                        f"{graph_name}.{node_name}", runnable.afunc, opts
+                    runnable.afunc = self._wrap(
+                        runnable.afunc, opts, passthrough_modules
                     )
 
-        if entrypoints:
-            _entrypoint_registry.update(entrypoints)
-
-        # Functional API: Wrap @task functions as Temporal Activities.
         if tasks:
-            for task in tasks:
-                name = task.func.__name__
+            for t in tasks:
+                name = t.func.__name__
+                qualname = getattr(t.func, "__qualname__", name)
                 opts = {
                     **(default_activity_options or {}),
                     **(activity_options or {}).get(name, {}),
                 }
-
-                task.func = self.execute(task_id(task.func), task.func, opts)
-                task.func.__name__ = name
-                task.func.__qualname__ = getattr(task.func, "__qualname__", name)
+                t.func = self._wrap(t.func, opts, passthrough_modules)
+                t.func.__name__ = name
+                t.func.__qualname__ = qualname
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
@@ -101,6 +97,7 @@ class LangGraphPlugin(SimplePlugin):
                         "langgraph",
                         "langsmith",
                         "numpy",  # LangSmith uses numpy
+                        *passthrough_modules,
                     ),
                 )
             return runner
@@ -112,71 +109,64 @@ class LangGraphPlugin(SimplePlugin):
             interceptors=[LangGraphInterceptor()],
         )
 
-    def execute(
+    def _wrap(
         self,
-        activity_name: str,
-        func: Callable,
-        kwargs: dict[str, Any] | None = None,
-    ) -> Callable:
-        """Prepare a node or task to execute as an activity or inline in the workflow."""
-        opts = kwargs or {}
-        execute_in = opts.pop("execute_in", "activity")
+        func: Any,
+        opts: dict[str, Any],
+        passthrough_modules: set[str],
+    ) -> Any:
+        """Wrap a node afunc or task func as an activity. Idempotent across plugins.
 
+        Records the activity defn on ``self.activities`` and the function's
+        origin module on ``passthrough_modules``. If ``func`` is already wrapped
+        (e.g., a second plugin sharing the same graph), reuses the cached
+        activity defn and module — no double-wrap.
+        """
+        meta = getattr(func, "_temporal_meta", None)
+        if meta is not None:
+            a, module = meta
+            if a is not None:
+                self.activities.append(a)
+            if module:
+                passthrough_modules.add(module)
+            return func
+
+        module = getattr(func, "__module__", None)
+        execute_in = opts.pop("execute_in", "activity")
         if execute_in == "activity":
+            activity_name = task_id(func)
             a = activity.defn(name=activity_name)(wrap_activity(func))
             self.activities.append(a)
-            return wrap_execute_activity(a, task_id=task_id(func), **opts)
+            wrapped = wrap_execute_activity(a, task_id=activity_name, **opts)
         elif execute_in == "workflow":
-            return func
+            a = None
+            wrapped = func
         else:
             raise ValueError(f"Invalid execute_in value: {execute_in}")
 
+        if module:
+            passthrough_modules.add(module)
+        try:
+            setattr(wrapped, "_temporal_meta", (a, module))
+        except (AttributeError, TypeError):
+            pass
+        return wrapped
 
-def graph(
-    name: str, cache: dict[str, Any] | None = None
-) -> StateGraph[Any, None, Any, Any]:
-    """Retrieve a registered graph by name.
 
-    Args:
-        name: Graph name as registered with LangGraphPlugin.
-        cache: Optional task result cache from a previous cache() call.
-            Restores cached results so previously-completed nodes are
-            not re-executed after continue-as-new.
+def set_cache(cache: dict[str, Any] | None) -> None:
+    """Restore a task result cache returned by a previous :func:`cache` call.
+
+    Use at the top of a workflow run that resumes from continue-as-new so
+    already-completed nodes/tasks are not re-executed.
     """
     set_task_cache(cache or {})
-    if name not in _graph_registry:
-        raise KeyError(
-            f"Graph {name!r} not found. "
-            f"Available graphs: {list(_graph_registry.keys())}"
-        )
-    return _graph_registry[name]
-
-
-def entrypoint(
-    name: str, cache: dict[str, Any] | None = None
-) -> Pregel[Any, Any, Any, Any]:
-    """Retrieve a registered entrypoint by name.
-
-    Args:
-        name: Entrypoint name as registered with Plugin.
-        cache: Optional task result cache from a previous cache() call.
-            Restores cached results so previously-completed tasks are
-            not re-executed after continue-as-new.
-    """
-    set_task_cache(cache or {})
-    if name not in _entrypoint_registry:
-        raise KeyError(
-            f"Entrypoint {name!r} not found. "
-            f"Available entrypoints: {list(_entrypoint_registry.keys())}"
-        )
-    return _entrypoint_registry[name]
 
 
 def cache() -> dict[str, Any] | None:
     """Return the task result cache as a serializable dict.
 
-    Returns a dict suitable for passing to entrypoint(name, cache=...) to
-    restore cached task results across continue-as-new boundaries.
-    Returns None if the cache is empty.
+    Returns a dict suitable for passing to :func:`set_cache` on the next
+    workflow run to restore cached task results across continue-as-new
+    boundaries. Returns None if the cache is empty.
     """
     return get_task_cache() or None

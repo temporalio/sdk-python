@@ -7,7 +7,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Worker
 
 
@@ -27,10 +27,15 @@ async def parent_node(state: State) -> dict[str, str]:
     return await child.compile().ainvoke(state)
 
 
+parent_graph: StateGraph[State, None, State, State] = StateGraph(State)
+parent_graph.add_node("parent_node", parent_node)
+parent_graph.add_edge(START, "parent_node")
+
+
 @workflow.defn
 class ActivitySubgraphWorkflow:
     def __init__(self) -> None:
-        self.app = graph("parent").compile()
+        self.app = parent_graph.compile()
 
     @workflow.run
     async def run(self, input: str) -> Any:
@@ -38,10 +43,6 @@ class ActivitySubgraphWorkflow:
 
 
 async def test_activity_subgraph(client: Client):
-    parent = StateGraph(State)
-    parent.add_node("parent_node", parent_node)
-    parent.add_edge(START, "parent_node")
-
     task_queue = f"subgraph-{uuid4()}"
 
     async with Worker(
@@ -50,7 +51,7 @@ async def test_activity_subgraph(client: Client):
         workflows=[ActivitySubgraphWorkflow],
         plugins=[
             LangGraphPlugin(
-                graphs={"parent": parent},
+                graphs=[parent_graph],
                 default_activity_options={
                     "start_to_close_timeout": timedelta(seconds=10)
                 },

@@ -7,7 +7,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Worker
 
 
@@ -23,10 +23,17 @@ async def node_b(state: State) -> dict[str, str]:
     return {"value": state["value"] + "b"}
 
 
+streaming_graph: StateGraph[State, None, State, State] = StateGraph(State)
+streaming_graph.add_node("node_a", node_a)
+streaming_graph.add_node("node_b", node_b)
+streaming_graph.add_edge(START, "node_a")
+streaming_graph.add_edge("node_a", "node_b")
+
+
 @workflow.defn
 class StreamingWorkflow:
     def __init__(self) -> None:
-        self.app = graph("streaming").compile()
+        self.app = streaming_graph.compile()
 
     @workflow.run
     async def run(self, input: str) -> Any:
@@ -37,12 +44,6 @@ class StreamingWorkflow:
 
 
 async def test_streaming(client: Client):
-    g = StateGraph(State)
-    g.add_node("node_a", node_a)
-    g.add_node("node_b", node_b)
-    g.add_edge(START, "node_a")
-    g.add_edge("node_a", "node_b")
-
     task_queue = f"streaming-{uuid4()}"
 
     async with Worker(
@@ -51,7 +52,7 @@ async def test_streaming(client: Client):
         workflows=[StreamingWorkflow],
         plugins=[
             LangGraphPlugin(
-                graphs={"streaming": g},
+                graphs=[streaming_graph],
                 default_activity_options={
                     "start_to_close_timeout": timedelta(seconds=10)
                 },
