@@ -12,7 +12,6 @@ from langgraph.graph import StateGraph
 
 from temporalio import activity
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
-from temporalio.contrib.langgraph.langgraph_interceptor import LangGraphInterceptor
 from temporalio.contrib.langgraph.task_cache import _task_cache, task_id
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
@@ -102,7 +101,6 @@ class LangGraphPlugin(SimplePlugin):
             "temporalio.LangGraphPlugin",
             activities=self.activities,
             workflow_runner=workflow_runner,
-            interceptors=[LangGraphInterceptor()],
         )
 
     def _wrap(
