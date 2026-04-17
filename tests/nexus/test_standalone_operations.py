@@ -12,7 +12,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal
 
 import nexusrpc
 import pytest
@@ -47,14 +47,16 @@ from temporalio.common import (
     WorkflowIDReusePolicy,
 )
 from temporalio.exceptions import (
+    ApplicationError,
     CancelledError,
     NexusOperationAlreadyStartedError,
+    NexusOperationError,
     TerminatedError,
 )
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.types import ReturnType
+from temporalio.types import ParamType, ReturnType
 from temporalio.worker import Worker
 from tests.helpers import assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
@@ -74,6 +76,11 @@ class EchoOutput:
     value: str
 
 
+@dataclass
+class RaiseErrInput:
+    err_type: Literal["handler_err", "application_err"]
+
+
 # ---------------------------------------------------------------------------
 # Service definition
 # ---------------------------------------------------------------------------
@@ -84,6 +91,7 @@ class StandaloneTestService:
     echo_sync: nexusrpc.Operation[EchoInput, EchoOutput]
     echo_async: nexusrpc.Operation[EchoInput, EchoOutput]
     blocking_async: nexusrpc.Operation[EchoInput, EchoOutput]
+    raise_err: nexusrpc.Operation[RaiseErrInput, None]
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +163,20 @@ class StandaloneTestServiceHandler:
         self.started_blocking.set()
         return handle
 
+    @sync_operation
+    async def raise_err(
+        self, _ctx: StartOperationContext, input: RaiseErrInput
+    ) -> None:
+        match input.err_type:
+            case "handler_err":
+                raise nexusrpc.HandlerError(
+                    "test handler error",
+                    type=nexusrpc.HandlerErrorType.INTERNAL,
+                    retryable_override=False,
+                )
+            case "application_err":
+                raise ApplicationError("test application error", non_retryable=True)
+
 
 # ---------------------------------------------------------------------------
 # Retry helper for endpoint propagation
@@ -163,8 +185,8 @@ class StandaloneTestServiceHandler:
 
 async def start_with_retry(
     nexus_client: Any,
-    operation: nexusrpc.Operation[Any, ReturnType],
-    arg: Any,
+    operation: nexusrpc.Operation[ParamType, ReturnType],
+    arg: ParamType,
     *,
     id: str,
     id_reuse_policy: NexusOperationIDReusePolicy = NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -199,8 +221,8 @@ async def start_with_retry(
 
 async def execute_with_retry(
     nexus_client: Any,
-    operation: nexusrpc.Operation[Any, ReturnType],
-    arg: Any,
+    operation: nexusrpc.Operation[ParamType, ReturnType],
+    arg: ParamType,
     *,
     id: str,
     id_reuse_policy: NexusOperationIDReusePolicy = NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -238,9 +260,6 @@ async def test_start_sync_operation_and_get_result(
     client: Client, env: WorkflowEnvironment
 ):
     """Start a sync nexus operation, call handle.result(), verify return value."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -273,9 +292,6 @@ async def test_start_async_operation_and_poll_result(
     client: Client, env: WorkflowEnvironment
 ):
     """Start a workflow_run operation, poll result, verify."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -304,9 +320,6 @@ async def test_start_async_operation_and_poll_result(
 
 async def test_execute_operation(client: Client, env: WorkflowEnvironment):
     """Use execute_operation convenience method, verify it returns result directly."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -334,11 +347,61 @@ async def test_execute_operation(client: Client, env: WorkflowEnvironment):
         assert result.value == "execute"
 
 
+async def test_errors(client: Client, env: WorkflowEnvironment):
+    """Execute operations that raise errors"""
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[StandaloneTestServiceHandler()],
+        workflows=[EchoHandlerWorkflow, BlockingHandlerWorkflow],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+        nexus_client = client.create_nexus_client(
+            service=StandaloneTestService, endpoint=endpoint_name
+        )
+
+        # Expect temporalio.exceptions.NexusOperationError
+        handle = await start_with_retry(
+            nexus_client,
+            StandaloneTestService.raise_err,
+            RaiseErrInput("handler_err"),
+            id=str(uuid.uuid4()),
+            id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
+            id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
+
+        with pytest.raises(NexusOperationFailureError) as err:
+            await handle.result()
+
+        assert err.value.__cause__
+        assert isinstance(err.value.__cause__, nexusrpc.HandlerError)
+
+        handle = await start_with_retry(
+            nexus_client,
+            StandaloneTestService.raise_err,
+            RaiseErrInput("application_err"),
+            id=str(uuid.uuid4()),
+            id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
+            id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
+
+        with pytest.raises(NexusOperationFailureError) as err:
+            await handle.result()
+
+        assert err.value.__cause__
+        assert isinstance(err.value.__cause__, nexusrpc.HandlerError)
+        assert err.value.__cause__.__cause__
+        assert isinstance(err.value.__cause__.__cause__, ApplicationError)
+
+
 async def test_describe_operation(client: Client, env: WorkflowEnvironment):
     """Start op, get result first, then describe, verify fields populated."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -384,10 +447,9 @@ async def test_describe_operation(client: Client, env: WorkflowEnvironment):
 
 
 async def test_cancel_operation(client: Client, env: WorkflowEnvironment):
-    """Start blocking async op, cancel it, verify awaiting result raises CancelledError."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
+    """Start blocking async op, cancel it, verify awaiting result raises NexusOperationFailureError
+    from a CancelledError.
+    """
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -415,12 +477,17 @@ async def test_cancel_operation(client: Client, env: WorkflowEnvironment):
         # Cancel the operation
         await handle.cancel()
 
-        with pytest.raises(CancelledError):
+        with pytest.raises(NexusOperationFailureError) as err:
             await handle.result()
+
+        assert err.value.__cause__
+        assert isinstance(err.value.__cause__, CancelledError)
 
 
 async def test_terminate_operation(client: Client, env: WorkflowEnvironment):
-    """Start blocking async op, terminate it, verify awaiting the result raises TerminatedError."""
+    """Start blocking async op, terminate it, verify awaiting the result raises NexusOperationFailureError
+    from a TerminatedError.
+    """
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -448,15 +515,15 @@ async def test_terminate_operation(client: Client, env: WorkflowEnvironment):
         # Terminate the operation
         await handle.terminate(reason="test termination")
 
-        with pytest.raises(TerminatedError):
+        with pytest.raises(NexusOperationFailureError) as err:
             await handle.result()
+
+        assert err.value.__cause__
+        assert isinstance(err.value.__cause__, TerminatedError)
 
 
 async def test_list_operations(client: Client, env: WorkflowEnvironment):
     """Start multiple ops, list them, verify iteration yields correct results."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -540,9 +607,6 @@ async def test_count_operations(client: Client, env: WorkflowEnvironment):
 
 async def test_get_nexus_operation_handle(client: Client, env: WorkflowEnvironment):
     """Start op, get result, then get handle by ID and get result again."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -761,9 +825,6 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
 
     Also verifies that result() does NOT trigger any interceptor call.
     """
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 
@@ -821,7 +882,7 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         assert cancel_input.operation_id == op_id
 
         # GetResult
-        with pytest.raises(CancelledError):
+        with pytest.raises(NexusOperationFailureError):
             await handle.result()
         assert len(interceptor.result_calls) == 1
         result_input = interceptor.result_calls[0]

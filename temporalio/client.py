@@ -10066,8 +10066,10 @@ class _ClientImpl(OutboundInterceptor):
                         return result
 
                     case "failure":
-                        raise await self._client.data_converter.decode_failure(
-                            res.failure
+                        raise NexusOperationFailureError(
+                            cause=await self._client.data_converter.decode_failure(
+                                res.failure
+                            )
                         )
 
                     case None:
