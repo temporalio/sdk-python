@@ -68,44 +68,44 @@ jobs:
           echo "=========================================="
 
       - name: Checkout SDK
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: recursive
 
       - name: Checkout OMES
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: ${{ env.OMES_REPO }}
           ref: ${{ env.OMES_REF }}
           path: omes
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: omes/go.mod
           cache-dependency-path: omes/go.sum
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           workspaces: temporalio/bridge -> target
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.13"
 
       - name: Install protoc
-        uses: arduino/setup-protoc@v3
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
         with:
           version: '23.x'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
 
       - name: Install poethepoet
         run: uv tool install poethepoet
@@ -117,7 +117,7 @@ jobs:
         run: poe build-develop
 
       - name: Install Temporal CLI
-        uses: temporalio/setup-temporal@v0
+        uses: temporalio/setup-temporal@1059a504f87e7fa2f385e3fa40d1aa7e62f1c6ca # v0
 
       - name: Install Prometheus
         run: |
@@ -172,7 +172,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: always()
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
         with:
           role-to-assume: ${{ env.AWS_S3_METRICS_UPLOAD_ROLE_ARN }}
           aws-region: us-west-2
@@ -192,7 +192,7 @@ jobs:
 
       - name: Upload logs on failure
         if: failure() || cancelled()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: throughput-stress-logs
           path: ${{ env.WORKER_LOG_DIR }}
@@ -200,7 +200,7 @@ jobs:
 
       - name: Notify Slack on failure
         if: failure() || cancelled()
-        uses: slackapi/slack-github-action@v2
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2
         with:
           webhook-type: incoming-webhook
           payload: |

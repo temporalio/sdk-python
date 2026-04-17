@@ -29,25 +29,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # Prepare
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
         with:
           workspaces: temporalio/bridge -> target
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.13"
-      - uses: arduino/setup-protoc@v3
+      - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
           version: "23.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
   
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
       # Build
       - run: uv tool install poethepoet
       - run: uv sync --all-extras
