@@ -12,12 +12,12 @@ API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
 
 from temporalio.contrib.langgraph.langgraph_plugin import (
     LangGraphPlugin,
-    cache,
+    get_cache,
     set_cache,
 )
 
 __all__ = [
     "LangGraphPlugin",
-    "cache",
+    "get_cache",
     "set_cache",
 ]

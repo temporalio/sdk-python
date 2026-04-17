@@ -17,16 +17,6 @@ _task_cache: ContextVar[dict[str, Any] | None] = ContextVar(
 )
 
 
-def set_task_cache(cache: dict[str, Any] | None) -> None:
-    """Set the task result cache for the current context."""
-    _task_cache.set(cache)
-
-
-def get_task_cache() -> dict[str, Any] | None:
-    """Get the task result cache for the current context."""
-    return _task_cache.get()
-
-
 def task_id(func: Any) -> str:
     """Return the fully-qualified module.qualname for a function.
 

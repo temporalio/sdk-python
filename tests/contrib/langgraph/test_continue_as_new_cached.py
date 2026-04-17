@@ -16,7 +16,7 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.langgraph.langgraph_plugin import (
     LangGraphPlugin,
-    cache,
+    get_cache,
     set_cache,
 )
 from temporalio.worker import Worker
@@ -87,7 +87,7 @@ class GraphContinueAsNewWorkflow:
             workflow.continue_as_new(
                 GraphContinueAsNewInput(
                     value=input_data.value,
-                    cache=cache(),
+                    cache=get_cache(),
                     phase=input_data.phase + 1,
                 )
             )
