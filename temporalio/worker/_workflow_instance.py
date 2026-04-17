@@ -2882,6 +2882,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def get_debug(self) -> bool:
         return False
 
+    def is_running(self) -> bool:
+        return True
+
 
 class _WorkflowInboundImpl(WorkflowInboundInterceptor):
     def __init__(  # type: ignore
