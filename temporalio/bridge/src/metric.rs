@@ -55,6 +55,11 @@ pub struct MetricGaugeFloatRef {
     gauge: metrics::GaugeF64,
 }
 
+#[pyclass]
+pub struct MetricUpDownCounterRef {
+    counter: metrics::UpDownCounter,
+}
+
 pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
     runtime_ref
         .runtime
@@ -153,6 +158,19 @@ impl MetricMeterRef {
                 .gauge_f64(build_metric_parameters(name, description, unit)),
         }
     }
+
+    fn new_up_down_counter(
+        &self,
+        name: String,
+        description: Option<String>,
+        unit: Option<String>,
+    ) -> MetricUpDownCounterRef {
+        MetricUpDownCounterRef {
+            counter: self
+                .meter
+                .up_down_counter(build_metric_parameters(name, description, unit)),
+        }
+    }
 }
 
 #[pymethods]
@@ -195,6 +213,13 @@ impl MetricGaugeRef {
 impl MetricGaugeFloatRef {
     fn set(&self, value: f64, attrs_ref: &MetricAttributesRef) {
         self.gauge.record(value, &attrs_ref.attrs);
+    }
+}
+
+#[pymethods]
+impl MetricUpDownCounterRef {
+    fn add(&self, value: i64, attrs_ref: &MetricAttributesRef) {
+        self.counter.add(value, &attrs_ref.attrs);
     }
 }
 
