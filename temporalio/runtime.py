@@ -518,6 +518,9 @@ BUFFERED_METRIC_KIND_GAUGE = BufferedMetricKind(1)
 BUFFERED_METRIC_KIND_HISTOGRAM = BufferedMetricKind(2)
 """Buffered metric is a histogram."""
 
+BUFFERED_METRIC_KIND_UP_DOWN_COUNTER = BufferedMetricKind(3)
+"""Buffered metric is an up-down counter which means values are signed deltas."""
+
 
 # WARNING: This must match Rust metric::BufferedMetric
 class BufferedMetric(Protocol):
@@ -548,8 +551,9 @@ class BufferedMetric(Protocol):
         """Get the metric kind.
 
         This is one of :py:const:`BUFFERED_METRIC_KIND_COUNTER`,
-        :py:const:`BUFFERED_METRIC_KIND_GAUGE`, or
-        :py:const:`BUFFERED_METRIC_KIND_HISTOGRAM`.
+        :py:const:`BUFFERED_METRIC_KIND_GAUGE`,
+        :py:const:`BUFFERED_METRIC_KIND_HISTOGRAM`, or
+        :py:const:`BUFFERED_METRIC_KIND_UP_DOWN_COUNTER`.
         """
         ...
 
@@ -674,6 +678,19 @@ class _MetricMeter(temporalio.common.MetricMeter):
             description,
             unit,
             temporalio.bridge.metric.MetricGaugeFloat(
+                self._core_meter, name, description, unit
+            ),
+            self._core_attrs,
+        )
+
+    def create_up_down_counter(
+        self, name: str, description: str | None = None, unit: str | None = None
+    ) -> temporalio.common.MetricUpDownCounter:
+        return _MetricUpDownCounter(
+            name,
+            description,
+            unit,
+            temporalio.bridge.metric.MetricUpDownCounter(
                 self._core_meter, name, description, unit
             ),
             self._core_attrs,
@@ -834,3 +851,18 @@ class _MetricGaugeFloat(
         if additional_attributes:
             core_attrs = core_attrs.with_additional_attributes(additional_attributes)
         self._core_metric.set(value, core_attrs)
+
+
+class _MetricUpDownCounter(
+    temporalio.common.MetricUpDownCounter,
+    _MetricCommon[temporalio.bridge.metric.MetricUpDownCounter],
+):
+    def add(
+        self,
+        value: int,
+        additional_attributes: temporalio.common.MetricAttributes | None = None,
+    ) -> None:
+        core_attrs = self._core_attrs
+        if additional_attributes:
+            core_attrs = core_attrs.with_additional_attributes(additional_attributes)
+        self._core_metric.add(value, core_attrs)
