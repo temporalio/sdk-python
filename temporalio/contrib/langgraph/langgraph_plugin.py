@@ -45,7 +45,7 @@ class LangGraphPlugin(SimplePlugin):
 
     def __init__(
         self,
-        graphs: list[StateGraph] | None = None,
+        graphs: list[StateGraph[Any, Any, Any, Any]] | None = None,
         tasks: list | None = None,
         activity_options: dict[str, dict] | None = None,
         default_activity_options: dict[str, Any] | None = None,

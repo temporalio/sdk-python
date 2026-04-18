@@ -65,7 +65,7 @@ async def test_continue_as_new(client: Client):
     ):
         result = await client.execute_workflow(
             ContinueAsNewWorkflow.run,
-            {"value": ""},
+            State(value=""),
             id=f"test-workflow-{uuid4()}",
             task_queue=task_queue,
         )
