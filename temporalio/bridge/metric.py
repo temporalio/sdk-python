@@ -55,6 +55,27 @@ class MetricCounter:
         self._ref.add(value, attrs._ref)
 
 
+class MetricUpDownCounter:
+    """Metric up-down counter using SDK Core."""
+
+    def __init__(
+        self,
+        meter: MetricMeter,
+        name: str,
+        description: str | None,
+        unit: str | None,
+    ) -> None:
+        """Initialize up-down counter metric."""
+        self._ref = meter._ref.new_up_down_counter(name, description, unit)
+
+    def add(self, value: int, attrs: MetricAttributes) -> None:
+        """Add value to up-down counter.
+
+        Value may be negative.
+        """
+        self._ref.add(value, attrs._ref)
+
+
 class MetricHistogram:
     """Metric histogram using SDK Core."""
 
