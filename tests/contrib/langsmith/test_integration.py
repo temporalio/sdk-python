@@ -318,9 +318,11 @@ async def _poll_query(
     query: Callable[..., Any],
     *,
     expected: Any = True,
+    timeout: float = 45,
 ) -> bool:
     """Poll a workflow query until it returns the expected value."""
-    while True:
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
         try:
             result = await handle.query(query)
             if result == expected:
@@ -328,6 +330,7 @@ async def _poll_query(
         except (WorkflowQueryFailedError, RPCError):
             pass  # Query not yet available (workflow hasn't started)
         await asyncio.sleep(1)
+    return False
 
 
 # ---------------------------------------------------------------------------
