@@ -2,7 +2,9 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
-from langchain_core.runnables import RunnableConfig  # pyright: ignore[reportMissingTypeStubs]
+from langchain_core.runnables import (
+    RunnableConfig,  # pyright: ignore[reportMissingTypeStubs]
+)
 from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from typing_extensions import TypedDict
 
