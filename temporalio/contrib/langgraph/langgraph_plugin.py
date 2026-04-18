@@ -71,9 +71,7 @@ class LangGraphPlugin(SimplePlugin):
                     # boundary. The wrapper serializes config down to its
                     # portable subset before handing off to the activity.
                     runnable.func_accepts = {
-                        k: v
-                        for k, v in runnable.func_accepts.items()
-                        if k == "config"
+                        k: v for k, v in runnable.func_accepts.items() if k == "config"
                     }
                     # Split node.metadata into activity options vs. user
                     # metadata. Activity-option keys (timeouts, retry policy,
