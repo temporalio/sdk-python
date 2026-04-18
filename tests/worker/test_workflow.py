@@ -103,6 +103,7 @@ from temporalio.exceptions import (
 from temporalio.runtime import (
     BUFFERED_METRIC_KIND_COUNTER,
     BUFFERED_METRIC_KIND_HISTOGRAM,
+    BUFFERED_METRIC_KIND_UP_DOWN_COUNTER,
     MetricBuffer,
     MetricBufferDurationFormat,
     PrometheusConfig,
@@ -4258,6 +4259,52 @@ async def test_workflow_buffered_metrics(client: Client):
         and update.value == 1
         for update in updates
     )
+
+
+async def test_runtime_buffered_metrics_up_down_counter() -> None:
+    # Create runtime with metric buffer
+    buffer = MetricBuffer(10000)
+    runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
+
+    # Confirm no updates yet
+    assert not buffer.retrieve_updates()
+
+    # Create an up-down counter and a sibling with extra attrs
+    up_down = runtime.metric_meter.create_up_down_counter(
+        "runtime-up-down-counter",
+        "runtime-up-down-counter-desc",
+        "runtime-up-down-counter-unit",
+    )
+    up_down_with_attrs = up_down.with_additional_attributes({"foo": "bar"})
+
+    # Emit a positive delta, a larger positive delta, and a negative delta
+    up_down.add(1)
+    up_down.add(5)
+    up_down_with_attrs.add(-3)
+
+    updates = buffer.retrieve_updates()
+    assert len(updates) == 3
+
+    # Metric metadata
+    assert updates[0].metric.name == "runtime-up-down-counter"
+    assert updates[0].metric.description == "runtime-up-down-counter-desc"
+    assert updates[0].metric.unit == "runtime-up-down-counter-unit"
+    assert updates[0].metric.kind == BUFFERED_METRIC_KIND_UP_DOWN_COUNTER
+    # Exact-same metric object across updates (performance invariant)
+    assert id(updates[0].metric) == id(updates[1].metric)
+    assert id(updates[0].metric) == id(updates[2].metric)
+
+    # Values include the negative delta
+    assert updates[0].value == 1
+    assert updates[1].value == 5
+    assert updates[2].value == -3
+
+    # Attributes match
+    assert updates[0].attributes == {"service_name": "temporal-core-sdk"}
+    assert updates[2].attributes == {
+        "service_name": "temporal-core-sdk",
+        "foo": "bar",
+    }
 
 
 async def test_workflow_metrics_other_types(client: Client):
