@@ -706,6 +706,29 @@ class MetricMeter(ABC):
         """
         ...
 
+    # FIXME: Make this abstract once up-down-counter support is complete
+    # on every MetricMeter implementation.
+    def create_up_down_counter(
+        self, name: str, description: str | None = None, unit: str | None = None
+    ) -> MetricUpDownCounter:
+        """Create an up-down counter metric that accepts signed values.
+
+        Args:
+            name: Name for the metric.
+            description: Optional description for the metric.
+            unit: Optional unit for the metric.
+
+        Returns:
+            Up-down counter metric.
+
+        Raises:
+            NotImplementedError: If this meter does not support up-down
+                counters (e.g. workflow or activity context meters).
+        """
+        raise NotImplementedError(
+            "create_up_down_counter is not supported by this MetricMeter"
+        )
+
     @abstractmethod
     def with_additional_attributes(
         self, additional_attributes: MetricAttributes
@@ -895,6 +918,28 @@ class MetricGaugeFloat(MetricCommon):
         ...
 
 
+class MetricUpDownCounter(MetricCommon):
+    """Up-down counter metric created by a metric meter."""
+
+    @abstractmethod
+    def add(
+        self, value: int, additional_attributes: MetricAttributes | None = None
+    ) -> None:
+        """Add a value to the up-down counter.
+
+        Value may be negative.
+
+        Args:
+            value: An integer to add (can be positive or negative).
+            additional_attributes: Additional attributes to append to the
+                current set.
+
+        Raises:
+            TypeError: Attribute values are not the expected type.
+        """
+        ...
+
+
 class _NoopMetricMeter(MetricMeter):
     def create_counter(
         self, name: str, description: str | None = None, unit: str | None = None
@@ -925,6 +970,11 @@ class _NoopMetricMeter(MetricMeter):
         self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGaugeFloat:
         return _NoopMetricGaugeFloat(name, description, unit)
+
+    def create_up_down_counter(
+        self, name: str, description: str | None = None, unit: str | None = None
+    ) -> MetricUpDownCounter:
+        return _NoopMetricUpDownCounter(name, description, unit)
 
     def with_additional_attributes(
         self, additional_attributes: MetricAttributes
@@ -994,6 +1044,13 @@ class _NoopMetricGauge(MetricGauge, _NoopMetric):
 class _NoopMetricGaugeFloat(MetricGaugeFloat, _NoopMetric):
     def set(
         self, value: float, additional_attributes: MetricAttributes | None = None
+    ) -> None:
+        pass
+
+
+class _NoopMetricUpDownCounter(MetricUpDownCounter, _NoopMetric):
+    def add(
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
