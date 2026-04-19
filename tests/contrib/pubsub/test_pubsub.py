@@ -12,7 +12,10 @@ from typing import Any
 
 from dataclasses import dataclass
 
-from temporalio import activity, workflow
+import nexusrpc
+import nexusrpc.handler
+
+from temporalio import activity, nexus, workflow
 from temporalio.client import Client
 from temporalio.contrib.pubsub import (
     PollInput,
@@ -25,7 +28,11 @@ from temporalio.contrib.pubsub import (
     PublishInput,
 )
 from temporalio.contrib.pubsub._types import encode_data
+from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually, new_worker
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 # ---------------------------------------------------------------------------
@@ -1331,3 +1338,285 @@ async def test_continue_as_new_any_typed_fails(client: Client) -> None:
 async def test_continue_as_new_properly_typed(client: Client) -> None:
     """CAN with PubSubState-typed pubsub_state field."""
     await _run_can_test(client, ContinueAsNewTypedWorkflow, CANWorkflowInputTyped)
+
+
+# ---------------------------------------------------------------------------
+# Cross-workflow pub/sub (Scenario 1)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CrossWorkflowInput:
+    broker_workflow_id: str
+    expected_count: int
+
+
+@workflow.defn
+class BrokerWorkflow(PubSubMixin):
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.init_pubsub()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.run
+    async def run(self, count: int) -> None:
+        for i in range(count):
+            self.publish("events", f"broker-{i}".encode())
+        await workflow.wait_condition(lambda: self._closed)
+
+
+@workflow.defn
+class SubscriberWorkflow:
+    @workflow.run
+    async def run(self, input: CrossWorkflowInput) -> list[str]:
+        return await workflow.execute_activity(
+            "subscribe_to_broker",
+            input,
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=10),
+        )
+
+
+@activity.defn(name="subscribe_to_broker")
+async def subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
+    client = PubSubClient.create(
+        client=activity.client(),
+        workflow_id=input.broker_workflow_id,
+    )
+    items: list[str] = []
+    async with asyncio.timeout(15.0):
+        async for item in client.subscribe(
+            topics=["events"], from_offset=0, poll_cooldown=0
+        ):
+            items.append(item.data.decode())
+            activity.heartbeat()
+            if len(items) >= input.expected_count:
+                break
+    return items
+
+
+@pytest.mark.asyncio
+async def test_cross_workflow_pubsub(client: Client) -> None:
+    """Workflow B's activity subscribes to events published by Workflow A."""
+    count = 5
+    task_queue = str(uuid.uuid4())
+
+    async with new_worker(
+        client,
+        BrokerWorkflow,
+        SubscriberWorkflow,
+        activities=[subscribe_to_broker],
+        task_queue=task_queue,
+    ):
+        broker_id = f"pubsub-broker-{uuid.uuid4()}"
+        broker_handle = await client.start_workflow(
+            BrokerWorkflow.run,
+            count,
+            id=broker_id,
+            task_queue=task_queue,
+        )
+
+        sub_handle = await client.start_workflow(
+            SubscriberWorkflow.run,
+            CrossWorkflowInput(
+                broker_workflow_id=broker_id,
+                expected_count=count,
+            ),
+            id=f"pubsub-subscriber-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        result = await sub_handle.result()
+        assert result == [f"broker-{i}" for i in range(count)]
+
+        # Also verify external subscription still works
+        external_items = await collect_items(broker_handle, ["events"], 0, count)
+        assert len(external_items) == count
+
+        await broker_handle.signal(BrokerWorkflow.close)
+
+
+# ---------------------------------------------------------------------------
+# Cross-namespace pub/sub via Nexus (Scenario 2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StartBrokerInput:
+    count: int
+    broker_id: str
+
+
+@dataclass
+class NexusCallerInput:
+    count: int
+    broker_id: str
+    endpoint: str
+
+
+@workflow.defn
+class NexusBrokerWorkflow(PubSubMixin):
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.init_pubsub()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.run
+    async def run(self, count: int) -> str:
+        for i in range(count):
+            self.publish("events", f"nexus-{i}".encode())
+        await workflow.wait_condition(lambda: self._closed)
+        return "done"
+
+
+@nexusrpc.service
+class PubSubNexusService:
+    start_broker: nexusrpc.Operation[StartBrokerInput, str]
+
+
+@nexusrpc.handler.service_handler(service=PubSubNexusService)
+class PubSubNexusHandler:
+    @workflow_run_operation
+    async def start_broker(
+        self, ctx: WorkflowRunOperationContext, input: StartBrokerInput
+    ) -> nexus.WorkflowHandle[str]:
+        return await ctx.start_workflow(
+            NexusBrokerWorkflow.run,
+            input.count,
+            id=input.broker_id,
+        )
+
+
+@workflow.defn
+class NexusCallerWorkflow:
+    @workflow.run
+    async def run(self, input: NexusCallerInput) -> str:
+        nc = workflow.create_nexus_client(
+            service=PubSubNexusService,
+            endpoint=input.endpoint,
+        )
+        return await nc.execute_operation(
+            PubSubNexusService.start_broker,
+            StartBrokerInput(count=input.count, broker_id=input.broker_id),
+        )
+
+
+async def create_cross_namespace_endpoint(
+    client: Client,
+    endpoint_name: str,
+    target_namespace: str,
+    task_queue: str,
+) -> None:
+    import temporalio.api.nexus.v1
+    import temporalio.api.operatorservice.v1
+
+    await client.operator_service.create_nexus_endpoint(
+        temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
+            spec=temporalio.api.nexus.v1.EndpointSpec(
+                name=endpoint_name,
+                target=temporalio.api.nexus.v1.EndpointTarget(
+                    worker=temporalio.api.nexus.v1.EndpointTarget.Worker(
+                        namespace=target_namespace,
+                        task_queue=task_queue,
+                    )
+                ),
+            )
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_cross_namespace_nexus_pubsub(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    """Nexus operation starts a pub/sub broker in another namespace; test subscribes."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus not supported with time-skipping server")
+
+    count = 5
+    handler_ns = f"handler-ns-{uuid.uuid4().hex[:8]}"
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    broker_id = f"nexus-broker-{uuid.uuid4()}"
+
+    # Register the handler namespace with the dev server
+    import google.protobuf.duration_pb2
+    import temporalio.api.workflowservice.v1
+
+    await client.workflow_service.register_namespace(
+        temporalio.api.workflowservice.v1.RegisterNamespaceRequest(
+            namespace=handler_ns,
+            workflow_execution_retention_period=google.protobuf.duration_pb2.Duration(
+                seconds=86400,
+            ),
+        )
+    )
+
+    handler_client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=handler_ns,
+    )
+
+    # Create endpoint targeting the handler namespace
+    await create_cross_namespace_endpoint(
+        client,
+        endpoint_name,
+        target_namespace=handler_ns,
+        task_queue=task_queue,
+    )
+
+    # Handler worker in handler namespace
+    async with Worker(
+        handler_client,
+        task_queue=task_queue,
+        workflows=[NexusBrokerWorkflow],
+        nexus_service_handlers=[PubSubNexusHandler()],
+    ):
+        # Caller worker in default namespace
+        caller_tq = str(uuid.uuid4())
+        async with new_worker(
+            client,
+            NexusCallerWorkflow,
+            task_queue=caller_tq,
+        ):
+            # Start caller — invokes Nexus op which starts broker in handler ns
+            caller_handle = await client.start_workflow(
+                NexusCallerWorkflow.run,
+                NexusCallerInput(
+                    count=count,
+                    broker_id=broker_id,
+                    endpoint=endpoint_name,
+                ),
+                id=f"nexus-caller-{uuid.uuid4()}",
+                task_queue=caller_tq,
+            )
+
+            # Wait for the broker workflow to be started by the Nexus operation
+            broker_handle = handler_client.get_workflow_handle(broker_id)
+            async with asyncio.timeout(15.0):
+                while True:
+                    try:
+                        await broker_handle.describe()
+                        break
+                    except Exception:
+                        await asyncio.sleep(0.1)
+
+            # Subscribe to broker events from the handler namespace
+            items = await collect_items(broker_handle, ["events"], 0, count)
+            assert len(items) == count
+            for i in range(count):
+                assert items[i].topic == "events"
+                assert items[i].data == f"nexus-{i}".encode()
+
+            # Clean up — signal broker to close so caller can complete
+            await broker_handle.signal("close")
+            result = await caller_handle.result()
+            assert result == "done"
