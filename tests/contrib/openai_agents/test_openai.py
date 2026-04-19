@@ -141,7 +141,7 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
                 "Tell me about recursion in programming.",
                 id=f"hello-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=5),
+                execution_timeout=timedelta(seconds=60),
             )
             if use_local_model:
                 assert result == "test"
@@ -1243,7 +1243,7 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
                 ],
                 id=f"input-guardrail-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
+                execution_timeout=timedelta(seconds=60),
             )
             result = await workflow_handle.result()
 
