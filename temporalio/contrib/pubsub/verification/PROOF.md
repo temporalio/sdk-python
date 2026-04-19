@@ -236,15 +236,81 @@ The base multi-publisher protocol (without pruning) also passes all
 properties: NoDuplicates, OrderPreservedPerPublisher, and AllItemsDelivered.
 5,143 states explored with 2 publishers and MaxItemsPerPub=2.
 
+## Retry Timeout (DropPending)
+
+### Problem
+
+The implementation drops pending batches after `max_retry_duration` to bound
+resource usage. This sacrifices `AllItemsDelivered` (liveness) for the dropped
+batch — an intentional design choice. However, the original implementation
+had a bug: it cleared `_pending` without advancing `_sequence` (confirmed_seq).
+
+### Bug: Sequence Reuse After Timeout
+
+`DropPendingBuggy` in `PubSubDedup.tla` models the buggy timeout path.
+TLC finds a `SequenceFreshness` violation in 7 states:
+
+```
+1. Publish item 1
+2. StartFlush: pending=[1], seq=1, buffer=[]
+3. Deliver (accepted): wf_log=[1], wf_last_seq=1
+4. FlushFail: client sees failure, pending=[1] retained
+5. Publish items 2, 3 during retry window
+6. DropPendingBuggy: pending cleared, confirmed_seq still 0
+7. SequenceFreshness VIOLATED: confirmed_seq=0 < wf_last_seq=1
+```
+
+The consequence: the next batch gets `seq = confirmed_seq + 1 = 1`, which
+the workflow has already accepted. The batch is silently rejected (dedup),
+and items 2, 3 are permanently lost.
+
+### SequenceFreshness Invariant
+
+The key safety property is:
+
+```
+SequenceFreshness ==
+    (pending = <<>>) => (confirmed_seq >= wf_last_seq)
+```
+
+This ensures the next batch's sequence (`confirmed_seq + 1`) is strictly
+greater than `wf_last_seq`, preventing silent dedup. It is a weakening of
+clause C9 from `IndInv` (which requires strict equality). The weakening is
+necessary because `DropPendingFixed` may leave `confirmed_seq > wf_last_seq`
+when the dropped signal was never delivered — this is harmless, as the next
+batch simply uses a higher-than-necessary sequence number.
+
+### Fix: Advance Sequence Before Clearing Pending
+
+`DropPendingFixed` advances `confirmed_seq` to `pending_seq` before clearing
+pending. TLC verifies all invariants (NoDuplicates, OrderPreserved,
+SequenceFreshness) across 489 distinct states with MaxItems=4.
+
+| Spec | States | Distinct | SequenceFreshness | NoDuplicates |
+|------|--------|----------|-------------------|--------------|
+| BuggyDropSpec | 241 | 162 | **FAIL** | Pass |
+| FixedDropSpec | 891 | 489 | Pass | Pass |
+
+Note: `NoDuplicates` passes for both — the bug causes data **loss**, not
+duplicates. Only a safety invariant about sequence freshness catches it.
+The original `AllItemsDelivered` liveness property (as formulated with `<>`)
+cannot detect this bug because `<>P` is satisfied at an intermediate state
+before the lost items are published.
+
+### Correspondence to Implementation
+
+| TLA+ | Python |
+|------|--------|
+| `DropPendingFixed` | `_flush()` timeout path: `self._sequence = self._pending_seq` before clearing |
+
 ## Scope and Limitations
 
 The TLA+ specs model the core dedup protocol. The following implementation
-paths are not modeled:
+paths are not modeled beyond what is covered above:
 
-- **`max_retry_duration` timeout**: The implementation drops pending batches
-  after a timeout. This sacrifices `AllItemsDelivered` (liveness) for bounded
-  resource usage. `NoDuplicates` (safety) is not affected — dropping a batch
-  cannot create duplicates.
+- **`max_retry_duration` timeout**: Modeled as `DropPendingFixed` (see above).
+  Dropping a batch sacrifices liveness for that batch only. `NoDuplicates`
+  (safety) and `SequenceFreshness` are preserved by the fix.
 
 - **Late delivery after client failure**: The model only allows `Deliver`
   while `flushing = TRUE`. In practice, a signal could be delivered after the

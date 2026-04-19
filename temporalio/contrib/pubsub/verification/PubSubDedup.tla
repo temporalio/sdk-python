@@ -137,6 +137,34 @@ FlushFail ==
                    item_counter, delivered, wf_log, wf_last_seq>>
 
 ------------------------------------------------------------------------
+(* Retry timeout: client drops pending batch after max_retry_duration *)
+
+\* BUGGY version: drops pending without advancing confirmed_seq.
+\* The next batch reuses the same sequence number, which the workflow
+\* may have already accepted — causing the new batch to be silently
+\* deduplicated (data loss).
+DropPendingBuggy ==
+    /\ pending /= <<>>
+    /\ ~flushing
+    /\ pending'     = <<>>
+    /\ pending_seq' = 0
+    \* BUG: confirmed_seq stays at old value, so next batch gets
+    \* confirmed_seq + 1 = the same seq as the dropped batch
+    /\ UNCHANGED <<buffer, confirmed_seq, flushing,
+                   delivered, wf_log, wf_last_seq, item_counter>>
+
+\* FIXED version: advances confirmed_seq before clearing pending.
+\* This ensures the next batch gets a fresh sequence number.
+DropPendingFixed ==
+    /\ pending /= <<>>
+    /\ ~flushing
+    /\ confirmed_seq' = pending_seq
+    /\ pending'       = <<>>
+    /\ pending_seq'   = 0
+    /\ UNCHANGED <<buffer, flushing,
+                   delivered, wf_log, wf_last_seq, item_counter>>
+
+------------------------------------------------------------------------
 (* State machine *)
 
 Next ==
@@ -146,7 +174,19 @@ Next ==
     \/ FlushSuccess
     \/ FlushFail
 
+\* Next with buggy drop — should FAIL AllItemsDelivered
+NextWithBuggyDrop ==
+    \/ Next
+    \/ DropPendingBuggy
+
+\* Next with fixed drop — should PASS all properties
+NextWithFixedDrop ==
+    \/ Next
+    \/ DropPendingFixed
+
 Spec == Init /\ [][Next]_vars
+BuggyDropSpec == Init /\ [][NextWithBuggyDrop]_vars
+FixedDropSpec == Init /\ [][NextWithFixedDrop]_vars
 
 \* Fairness: under weak fairness, every continuously enabled action
 \* eventually executes. This ensures the system makes progress.
@@ -157,6 +197,8 @@ Fairness ==
     /\ WF_vars(FlushFail)
 
 FairSpec == Spec /\ Fairness
+BuggyDropFairSpec == BuggyDropSpec /\ Fairness
+FixedDropFairSpec == FixedDropSpec /\ Fairness
 
 ------------------------------------------------------------------------
 (* Safety properties *)
@@ -201,5 +243,17 @@ NoDeadlock ==
     \/ buffer /= <<>>            \* Can flush
     \/ pending /= <<>>           \* Can retry
     \/ flushing                  \* Waiting for network result
+
+\* Sequence freshness: when there is no pending batch, the confirmed
+\* sequence must be >= the workflow's last accepted sequence. This
+\* ensures the next batch (confirmed_seq + 1) gets a sequence number
+\* strictly greater than wf_last_seq, preventing silent dedup.
+\*
+\* The base protocol maintains strict equality (C9 in IndInv). With
+\* DropPendingFixed, confirmed_seq may temporarily exceed wf_last_seq
+\* (when the dropped signal was never delivered). This is harmless:
+\* the next batch's fresh seq is accepted, and equality is restored.
+SequenceFreshness ==
+    (pending = <<>>) => (confirmed_seq >= wf_last_seq)
 
 ========================================================================

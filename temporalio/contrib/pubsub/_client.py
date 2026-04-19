@@ -182,6 +182,12 @@ class PubSubClient:
                     and time.monotonic() - self._pending_since
                     > self._max_retry_duration
                 ):
+                    # Advance confirmed sequence so the next batch gets
+                    # a fresh sequence number. Without this, the next batch
+                    # reuses pending_seq, which the workflow may have already
+                    # accepted — causing silent dedup (data loss).
+                    # See PubSubDedup.tla DropPendingFixed / SequenceFreshness.
+                    self._sequence = self._pending_seq
                     self._pending = None
                     self._pending_seq = 0
                     self._pending_since = None

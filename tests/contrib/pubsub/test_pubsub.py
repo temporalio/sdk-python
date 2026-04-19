@@ -947,7 +947,108 @@ async def test_max_retry_duration_expiry(client: Client) -> None:
     with pytest.raises(TimeoutError, match="max_retry_duration"):
         await pubsub._flush()
     assert pubsub._pending is None
-    assert pubsub._sequence == 0
+    # Sequence must advance past the dropped batch to prevent reuse
+    assert pubsub._sequence == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_timeout_sequence_reuse_causes_data_loss(
+    client: Client,
+) -> None:
+    """Verify the fix for sequence reuse after retry timeout.
+
+    Without the fix, after retry timeout the next batch reuses the same
+    sequence number. If the timed-out signal WAS delivered, the workflow
+    rejects the new batch as a duplicate — causing silent data loss.
+
+    The fix (advance _sequence to _pending_seq before clearing _pending)
+    ensures the next batch gets a fresh sequence number. This test verifies
+    both that the old sequence is rejected AND that a fresh sequence is
+    accepted.
+
+    See PubSubDedup.tla: DropPendingBuggy (fails SequenceFreshness) vs
+    DropPendingFixed (passes all invariants).
+    """
+    async with new_worker(
+        client,
+        BasicPubSubWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            BasicPubSubWorkflow.run,
+            id=f"pubsub-seq-reuse-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Step 1: Simulate the timed-out signal being delivered.
+        # Send batch-A with publisher_id="victim" and sequence=1.
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(b"batch-A"))
+                ],
+                publisher_id="victim",
+                sequence=1,
+            ),
+        )
+        await asyncio.sleep(0.3)
+
+        # Verify batch-A is in the log
+        items = await collect_items(handle, None, 0, 1)
+        assert len(items) == 1
+        assert items[0].data == b"batch-A"
+
+        # Step 2: Simulate the client-side state after retry timeout.
+        # The client dropped pending without advancing _sequence, so
+        # _sequence is still 0. The next batch will get seq = 0 + 1 = 1.
+        #
+        # Send batch-B (different items!) with the SAME sequence=1.
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(b"batch-B"))
+                ],
+                publisher_id="victim",
+                sequence=1,  # <-- reused sequence (the bug)
+            ),
+        )
+        await asyncio.sleep(0.3)
+
+        # Step 3: Verify the data loss.
+        # The workflow log should have both batches (2 items) if correct.
+        # But batch-B was rejected as a duplicate — only 1 item in the log.
+        pubsub_client = PubSubClient(handle)
+        offset = await pubsub_client.get_offset()
+
+        # BUG: offset is 1, not 2. batch-B was silently dropped.
+        assert offset == 1, (
+            f"Expected offset=1 (bug: batch-B silently deduped), got {offset}"
+        )
+
+        # Step 4: Verify the fix would work.
+        # If _sequence had been advanced to 1 (pending_seq), the next batch
+        # would use sequence=2, which the workflow hasn't seen.
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[
+                    PublishEntry(
+                        topic="events", data=encode_data(b"batch-B-fixed")
+                    )
+                ],
+                publisher_id="victim",
+                sequence=2,  # <-- fresh sequence (what the fix produces)
+            ),
+        )
+        await asyncio.sleep(0.3)
+
+        offset_after = await pubsub_client.get_offset()
+        assert offset_after == 2, (
+            f"Expected offset=2 (fresh sequence accepted), got {offset_after}"
+        )
+
+        await handle.signal(BasicPubSubWorkflow.close)
 
 
 @pytest.mark.asyncio
