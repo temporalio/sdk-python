@@ -489,7 +489,7 @@ class TestS3StorageDriverStoreRetrieve:
     async def test_retrieve_without_hash_in_claim(
         self, driver_client: S3StorageDriverClient
     ) -> None:
-        """Claims without hash fields still retrieve successfully (backward compat)."""
+        """Claims missing content hash fields raise ValueError on retrieve."""
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload("no-hash-claim")
         [claim] = await driver.store(make_store_context(), [payload])
@@ -500,10 +500,11 @@ class TestS3StorageDriverStoreRetrieve:
                 "key": claim.claim_data["key"],
             },
         )
-        [retrieved] = await driver.retrieve(
-            StorageDriverRetrieveContext(), [legacy_claim]
-        )
-        assert retrieved == payload
+        with pytest.raises(
+            ValueError,
+            match=r"S3StorageDriver claim is missing required content hash information",
+        ):
+            await driver.retrieve(StorageDriverRetrieveContext(), [legacy_claim])
 
 
 # ---------------------------------------------------------------------------

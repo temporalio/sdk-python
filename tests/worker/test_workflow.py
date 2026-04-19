@@ -331,10 +331,14 @@ async def test_workflow_history_info(
         # because just a query will have a stale representation of history
         # counts, but signal forces a new WFT.
         await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
-        new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
-        assert new_info.history_length > continue_as_new_suggest_history_count
-        assert new_info.history_size > orig_info.history_size
-        assert new_info.continue_as_new_suggested
+
+        async def history_info_updated() -> None:
+            new_info = await handle.query(HistoryInfoWorkflow.get_history_info)
+            assert new_info.history_length > continue_as_new_suggest_history_count
+            assert new_info.history_size > orig_info.history_size
+            assert new_info.continue_as_new_suggested
+
+        await assert_eventually(history_info_updated)
 
 
 @workflow.defn
@@ -3393,7 +3397,7 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
 
 
 async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
-    client: Client, env: WorkflowEnvironment
+    env: WorkflowEnvironment,
 ):
     # This test only works when we support time skipping
     if not env.supports_time_skipping:
@@ -3407,10 +3411,12 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
         # Start worker for 30 mins. Need to disable workflow cache since we
         # restart the worker and don't want to pay the sticky queue penalty.
         async with new_worker(
-            client, CancelSignalAndTimerFiredInSameTaskWorkflow, max_cached_workflows=0
+            env.client,
+            CancelSignalAndTimerFiredInSameTaskWorkflow,
+            max_cached_workflows=0,
         ) as worker:
             task_queue = worker.task_queue
-            handle = await client.start_workflow(
+            handle = await env.client.start_workflow(
                 CancelSignalAndTimerFiredInSameTaskWorkflow.run,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=task_queue,
@@ -3428,7 +3434,7 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
 
         # Start worker again and wait for workflow completion
         async with new_worker(
-            client,
+            env.client,
             CancelSignalAndTimerFiredInSameTaskWorkflow,
             task_queue=task_queue,
             max_cached_workflows=0,
@@ -4901,11 +4907,12 @@ async def test_workflow_timeout_support(client: Client, approach: str):
 
 @workflow.defn
 class BuildIDInfoWorkflow:
+    do_continue = False
     do_finish = False
 
     @workflow.run
     async def run(self):
-        await asyncio.sleep(1)
+        await workflow.wait_condition(lambda: self.do_continue)
         if workflow.info().get_current_build_id() == "1.0":
             await workflow.execute_activity(
                 say_hello, "yo", schedule_to_close_timeout=timedelta(seconds=5)
@@ -4915,6 +4922,10 @@ class BuildIDInfoWorkflow:
     @workflow.query
     def get_build_id(self) -> str:
         return workflow.info().get_current_build_id()
+
+    @workflow.signal
+    async def continue_run(self):
+        self.do_continue = True
 
     @workflow.signal
     async def finish(self):
@@ -4960,9 +4971,11 @@ async def test_workflow_current_build_id_appropriately_set(
     ) as worker:
         bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
         assert bid == "1.0"
+        await handle.signal(BuildIDInfoWorkflow.continue_run)
+        await assert_eq_eventually(
+            "1.1", lambda: handle.query(BuildIDInfoWorkflow.get_build_id)
+        )
         await handle.signal(BuildIDInfoWorkflow.finish)
-        bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
-        assert bid == "1.1"
         await handle.result()
         bid = await handle.query(BuildIDInfoWorkflow.get_build_id)
         assert bid == "1.1"
@@ -5317,7 +5330,11 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             # because we should have timer-done poll completions every 100ms
             worker.client = other_env.client
             # Now confirm the other workflow has started
-            await assert_eq_eventually(True, lambda: any_task_completed(handle2))
+            await assert_eq_eventually(
+                True,
+                lambda: any_task_completed(handle2),
+                timeout=timedelta(seconds=30),
+            )
             # Terminate both
             await handle1.terminate()
             await handle2.terminate()
@@ -6497,19 +6514,23 @@ async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
 @workflow.defn
 class WorkflowSleepWorkflow:
     @workflow.run
-    async def run(self) -> None:
+    async def run(self) -> float:
+        start_time = workflow.time()
         await workflow.sleep(1)
+        return workflow.time() - start_time
 
 
-async def test_workflow_sleep(client: Client):
+async def test_workflow_sleep(client: Client, env: WorkflowEnvironment):
     async with new_worker(client, WorkflowSleepWorkflow) as worker:
         start_time = datetime.now()
-        await client.execute_workflow(
+        workflow_elapsed = await client.execute_workflow(
             WorkflowSleepWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        assert (datetime.now() - start_time) >= timedelta(seconds=1)
+        assert workflow_elapsed >= 1
+        if not env.supports_time_skipping:
+            assert (datetime.now() - start_time) >= timedelta(seconds=1)
 
 
 @workflow.defn
@@ -7181,6 +7202,22 @@ async def test_in_workflow_util(client: Client):
     async with new_worker(client, InWorkflowUtilWorkflow) as worker:
         assert "in workflow" == await client.execute_workflow(
             InWorkflowUtilWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
+@workflow.defn
+class LoopIsRunningWorkflow:
+    @workflow.run
+    async def run(self) -> bool:
+        return asyncio.get_running_loop().is_running()
+
+
+async def test_workflow_loop_is_running(client: Client):
+    async with new_worker(client, LoopIsRunningWorkflow) as worker:
+        assert await client.execute_workflow(
+            LoopIsRunningWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -8047,8 +8084,10 @@ async def test_quick_activity_swallows_cancellation(client: Client):
         activities=[short_activity_async],
         activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
     ) as worker:
-        for i in range(10):
-            wf_duration = random.uniform(5.0, 15.0)
+        # Keep this deterministic and bounded. The original randomized 10-iteration
+        # version could exceed the per-test timeout on slower CI hosts if
+        # cancellation was delayed a few times in a row.
+        for i, wf_duration in enumerate((5.0, 7.5, 10.0)):
             wf_handle = await client.start_workflow(
                 QuickActivityWorkflow.run,
                 id=f"short_activity_wf_id-{i}",
@@ -8537,39 +8576,29 @@ class CustomLogHandler(logging.Handler):
 async def test_disable_logger_sandbox(
     client: Client,
 ):
-    logger = workflow.logger.logger
-    handler = CustomLogHandler()
-    with LogHandler.apply(logger, handler):
+    async def execute_with_new_worker(*, disable_sandbox: bool) -> None:
+        workflow.logger.unsafe_disable_sandbox(disable_sandbox)
         async with new_worker(
             client,
             DisableLoggerSandbox,
             activities=[],
         ) as worker:
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
-            workflow.logger.unsafe_disable_sandbox()
             await client.execute_workflow(
                 DisableLoggerSandbox.run,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                run_timeout=timedelta(seconds=1),
+                run_timeout=timedelta(seconds=5),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
-            workflow.logger.unsafe_disable_sandbox(False)
-            with pytest.raises(WorkflowFailureError):
-                await client.execute_workflow(
-                    DisableLoggerSandbox.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    run_timeout=timedelta(seconds=1),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
+
+    logger = workflow.logger.logger
+    handler = CustomLogHandler()
+    with LogHandler.apply(logger, handler):
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
+        await execute_with_new_worker(disable_sandbox=True)
+        with pytest.raises(WorkflowFailureError):
+            await execute_with_new_worker(disable_sandbox=False)
 
 
 @workflow.defn

@@ -696,6 +696,54 @@ async def test_sync_operation_happy_path(client: Client, env: WorkflowEnvironmen
         assert wf_output.op_output.value == "sync response"
 
 
+@service_handler
+class NexusInfoService:
+    @sync_operation
+    async def get_info(
+        self, _ctx: StartOperationContext, _input: None
+    ) -> dict[str, str]:
+        info = nexus.info()
+        return {
+            "endpoint": info.endpoint,
+            "namespace": info.namespace,
+            "task_queue": info.task_queue,
+        }
+
+
+@workflow.defn
+class NexusInfoCallerWorkflow:
+    @workflow.run
+    async def run(self, task_queue: str) -> dict[str, str]:
+        nexus_client = workflow.create_nexus_client(
+            service=NexusInfoService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        return await nexus_client.execute_operation(NexusInfoService.get_info, None)
+
+
+async def test_nexus_info_includes_namespace(client: Client, env: WorkflowEnvironment):
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[NexusInfoService()],
+        workflows=[NexusInfoCallerWorkflow],
+        task_queue=task_queue,
+    ):
+        endpoint_name = make_nexus_endpoint_name(task_queue)
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+        result = await client.execute_workflow(
+            NexusInfoCallerWorkflow.run,
+            task_queue,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        if not env.supports_time_skipping:
+            # Time-skipping server doesn't send the endpoint yet.
+            assert result["endpoint"] == endpoint_name
+        assert result["namespace"] == client.namespace
+        assert result["task_queue"] == task_queue
+
+
 async def test_workflow_run_operation_happy_path(
     client: Client, env: WorkflowEnvironment
 ):
@@ -1101,10 +1149,13 @@ async def test_async_response(
             return
 
         handler_wf_info = await handler_wf_handle.describe()
-        assert handler_wf_info.status in [
+        expected_statuses = [
             WorkflowExecutionStatus.RUNNING,
             WorkflowExecutionStatus.COMPLETED,
         ]
+        if request_cancel:
+            expected_statuses.append(WorkflowExecutionStatus.CANCELED)
+        assert handler_wf_info.status in expected_statuses
         await assert_handler_workflow_has_link_to_caller_workflow(
             caller_wf_handle, handler_wf_handle
         )
@@ -1508,6 +1559,9 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
     client: Client,
     env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,

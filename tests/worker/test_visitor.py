@@ -3,6 +3,7 @@ import dataclasses
 import time
 from collections.abc import MutableSequence
 
+import pytest
 from google.protobuf.duration_pb2 import Duration
 
 import temporalio.bridge.worker
@@ -271,6 +272,58 @@ async def test_concurrent_throughput():
 
     assert visitor_concurrent.visit_count == N_CMDS * N_ARGS
     assert visitor_concurrent.max_concurrent == 5
+
+
+async def test_cancel_drains_background_tasks():
+    """Cancelling visit() cancels in-flight tasks and awaits their cleanup."""
+    tasks_started = 0
+    tasks_cleaned_up = 0
+    background_running = asyncio.Event()
+
+    class SlowVisitor(VisitorFunctions):
+        async def visit_payload(self, payload: Payload) -> None:
+            pass
+
+        async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+            nonlocal tasks_started, tasks_cleaned_up
+            tasks_started += 1
+            background_running.set()
+            try:
+                await asyncio.sleep(10)
+            finally:
+                tasks_cleaned_up += 1
+
+    completion = WorkflowActivationCompletion(
+        run_id="1",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    schedule_activity=ScheduleActivity(
+                        seq=i,
+                        activity_id=str(i),
+                        activity_type="",
+                        task_queue="",
+                        arguments=[Payload(data=f"arg_{i}".encode())],
+                        priority=Priority(),
+                    )
+                )
+                for i in range(5)
+            ]
+        ),
+    )
+
+    task = asyncio.create_task(
+        PayloadVisitor(concurrency_limit=5).visit(SlowVisitor(), completion)
+    )
+    await background_running.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    # All started tasks ran their finally blocks before drain() returned.
+    assert tasks_started > 0
+    assert tasks_cleaned_up == tasks_started
 
 
 async def test_bridge_encoding():

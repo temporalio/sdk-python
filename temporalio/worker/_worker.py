@@ -485,6 +485,7 @@ class Worker:
             self._nexus_worker = _NexusWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 client=config["client"],  # type: ignore[reportTypedDictNotRequiredAccess]
+                namespace=client_config["namespace"],
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 service_handlers=nexus_service_handlers,
                 data_converter=client_config["data_converter"],

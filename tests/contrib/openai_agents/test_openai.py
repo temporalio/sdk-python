@@ -2286,7 +2286,10 @@ def get_tracking_server(name: str):
             ]
 
         async def call_tool(
-            self, tool_name: str, arguments: dict[str, Any] | None
+            self,
+            tool_name: str,
+            arguments: dict[str, Any] | None,
+            meta: dict[str, Any] | None = None,
         ) -> CallToolResult:
             self.calls.append("call_tool")
             name = (arguments or {}).get("name") or "John Doe"

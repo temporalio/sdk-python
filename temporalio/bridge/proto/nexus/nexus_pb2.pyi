@@ -240,6 +240,7 @@ class NexusTask(google.protobuf.message.Message):
     TASK_FIELD_NUMBER: builtins.int
     CANCEL_TASK_FIELD_NUMBER: builtins.int
     REQUEST_DEADLINE_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
     @property
     def task(
         self,
@@ -265,6 +266,10 @@ class NexusTask(google.protobuf.message.Message):
         Only set when variant is `task` and the header was present with a valid value.
         Represented as an absolute timestamp.
         """
+    endpoint: builtins.str
+    """The endpoint this request was addressed to. Extracted from the request for convenient access.
+    Only set when variant is `task`.
+    """
     def __init__(
         self,
         *,
@@ -272,6 +277,7 @@ class NexusTask(google.protobuf.message.Message):
         | None = ...,
         cancel_task: global___CancelNexusTask | None = ...,
         request_deadline: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -291,6 +297,8 @@ class NexusTask(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancel_task",
             b"cancel_task",
+            "endpoint",
+            b"endpoint",
             "request_deadline",
             b"request_deadline",
             "task",

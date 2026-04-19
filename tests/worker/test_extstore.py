@@ -1350,7 +1350,7 @@ async def test_store_metadata_standalone_activity(env: WorkflowEnvironment) -> N
     assert execute_ctx.target.namespace == client.namespace
     assert execute_ctx.target.id == activity_id
     assert execute_ctx.target.type == "echo_activity"
-    assert execute_ctx.target.run_id is None
+    assert execute_ctx.target.run_id is not None
 
 
 @workflow.defn
