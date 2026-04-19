@@ -14,7 +14,7 @@ import langsmith
 # workflow sandbox starts; otherwise the sandbox's __getattr__-triggered
 # import hits restrictions on concurrent.futures.ThreadPoolExecutor.
 try:
-    import langchain_core.runnables.config  # noqa: F401
+    import langchain_core.runnables.config  # noqa: F401  # pyright: ignore[reportUnusedImport]
 except ImportError:
     pass
 
