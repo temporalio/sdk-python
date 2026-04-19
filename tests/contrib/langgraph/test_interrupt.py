@@ -10,7 +10,6 @@ pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11),
     reason="langgraph.types.interrupt() requires Python >= 3.11 for async context propagation",
 )
-import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.graph.state import (  # pyright: ignore[reportMissingTypeStubs]
