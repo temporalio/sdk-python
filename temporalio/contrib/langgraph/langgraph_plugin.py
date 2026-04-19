@@ -54,7 +54,7 @@ class LangGraphPlugin(SimplePlugin):
     ):
         """Register activities for graphs and tasks."""
         if sys.version_info < (3, 11):
-            warnings.warn(
+            warnings.warn(  # type: ignore[reportUnreachable]
                 "LangGraphPlugin requires Python >= 3.11 for full async support. "
                 "On older versions, the Functional API (@task/@entrypoint) and "
                 "interrupt() will not work because LangGraph relies on "
