@@ -1,8 +1,15 @@
+import sys
 from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
 import langgraph.types
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="langgraph.types.interrupt() requires Python >= 3.11 for async context propagation",
+)
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]

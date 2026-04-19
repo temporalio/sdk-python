@@ -1,5 +1,8 @@
+import sys
 from datetime import timedelta
 from uuid import uuid4
+
+import pytest
 
 from temporalio.client import Client
 from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
@@ -40,6 +43,10 @@ async def test_replay(client: Client):
     ).replay_workflow(await handle.fetch_history())
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="langgraph.types.interrupt() requires Python >= 3.11 for async context propagation",
+)
 async def test_replay_interrupt(client: Client):
     task_queue = f"interrupt-replay-{uuid4()}"
     plugin = LangGraphPlugin(

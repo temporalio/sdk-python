@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import inspect
+import sys
+import warnings
 from dataclasses import replace
 from typing import Any
 
@@ -51,6 +53,17 @@ class LangGraphPlugin(SimplePlugin):
         default_activity_options: dict[str, Any] | None = None,
     ):
         """Register activities for graphs and tasks."""
+        if sys.version_info < (3, 11):
+            warnings.warn(
+                "LangGraphPlugin requires Python >= 3.11 for full async support. "
+                "On older versions, the Functional API (@task/@entrypoint) and "
+                "interrupt() will not work because LangGraph relies on "
+                "contextvars propagation through asyncio.create_task(), which is "
+                "only available in Python 3.11+. See "
+                "https://reference.langchain.com/python/langgraph/config/get_store/",
+                stacklevel=2,
+            )
+
         self.activities: list = []
         passthrough_modules: set[str] = set()
 

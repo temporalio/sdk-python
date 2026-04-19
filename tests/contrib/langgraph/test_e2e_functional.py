@@ -1,15 +1,23 @@
 """End-to-end tests for LangGraph Functional API integration (v1 and v2).
 
 Requires a running Temporal test server (started by conftest.py).
+LangGraph's Functional API requires Python >= 3.11 for async context
+variable propagation (see langgraph.config.get_config).
 """
 
 from __future__ import annotations
 
+import sys
 from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
 import pytest
+
+pytestmark = pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="LangGraph Functional API requires Python >= 3.11 for async context propagation",
+)
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.func import (  # pyright: ignore[reportMissingTypeStubs]
