@@ -1534,6 +1534,133 @@ async def create_cross_namespace_endpoint(
 
 
 @pytest.mark.asyncio
+async def test_poll_more_ready_when_response_exceeds_size_limit(
+    client: Client,
+) -> None:
+    """Poll response sets more_ready=True when items exceed ~1MB wire size."""
+    async with new_worker(
+        client,
+        BasicPubSubWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            BasicPubSubWorkflow.run,
+            id=f"pubsub-more-ready-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish items that total well over 1MB in the poll response.
+        # Send in separate signals to stay under the RPC size limit.
+        # Each item is ~200KB; 8 items = ~1.6MB wire (base64 inflates ~33%).
+        chunk = b"x" * 200_000
+        for _ in range(8):
+            await handle.signal(
+                "__pubsub_publish",
+                PublishInput(
+                    items=[
+                        PublishEntry(topic="big", data=encode_data(chunk))
+                    ]
+                ),
+            )
+        await asyncio.sleep(0.5)
+
+        # First poll from offset 0 — should get some items but not all
+        result1: PollResult = await handle.execute_update(
+            "__pubsub_poll",
+            PollInput(topics=[], from_offset=0),
+            result_type=PollResult,
+        )
+        assert result1.more_ready is True
+        assert len(result1.items) < 8
+        assert result1.next_offset < 8
+
+        # Continue polling until we have all items
+        all_items = list(result1.items)
+        offset = result1.next_offset
+        while len(all_items) < 8:
+            result: PollResult = await handle.execute_update(
+                "__pubsub_poll",
+                PollInput(topics=[], from_offset=offset),
+                result_type=PollResult,
+            )
+            all_items.extend(result.items)
+            offset = result.next_offset
+        assert len(all_items) == 8
+
+        await handle.signal(BasicPubSubWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
+    """Subscriber correctly yields all items when polls are size-truncated."""
+    async with new_worker(
+        client,
+        BasicPubSubWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            BasicPubSubWorkflow.run,
+            id=f"pubsub-more-ready-iter-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish 8 x 200KB items (~2MB+ wire, exceeds 1MB cap)
+        chunk = b"x" * 200_000
+        for _ in range(8):
+            await handle.signal(
+                "__pubsub_publish",
+                PublishInput(
+                    items=[
+                        PublishEntry(topic="big", data=encode_data(chunk))
+                    ]
+                ),
+            )
+
+        # subscribe() should seamlessly iterate through all 8 items
+        items = await collect_items(handle, None, 0, 8, timeout=10.0)
+        assert len(items) == 8
+        for item in items:
+            assert item.data == chunk
+
+        await handle.signal(BasicPubSubWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_small_response_more_ready_false(client: Client) -> None:
+    """Poll response has more_ready=False when all items fit within size limit."""
+    async with new_worker(
+        client,
+        BasicPubSubWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            BasicPubSubWorkflow.run,
+            id=f"pubsub-no-more-ready-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Publish small items that easily fit under 1MB
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[
+                    PublishEntry(topic="small", data=encode_data(b"tiny"))
+                    for _ in range(5)
+                ]
+            ),
+        )
+        await asyncio.sleep(0.5)
+
+        result: PollResult = await handle.execute_update(
+            "__pubsub_poll",
+            PollInput(topics=[], from_offset=0),
+            result_type=PollResult,
+        )
+        assert result.more_ready is False
+        assert len(result.items) == 5
+        assert result.next_offset == 5
+
+        await handle.signal(BasicPubSubWorkflow.close)
+
+
+@pytest.mark.asyncio
 async def test_cross_namespace_nexus_pubsub(
     client: Client, env: WorkflowEnvironment
 ) -> None:

@@ -77,10 +77,13 @@ class PollResult:
     """Update response: items matching the poll request.
 
     Items use base64-encoded data for cross-language wire compatibility.
+    When ``has_more`` is True, the response was truncated to stay within
+    size limits and the subscriber should poll again immediately.
     """
 
     items: list[_WireItem] = field(default_factory=list)
     next_offset: int = 0
+    more_ready: bool = False
 
 
 @dataclass

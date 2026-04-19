@@ -288,7 +288,7 @@ class PubSubClient:
                     offset=wire_item.offset,
                 )
             offset = result.next_offset
-            if poll_cooldown > 0:
+            if not result.more_ready and poll_cooldown > 0:
                 await asyncio.sleep(poll_cooldown)
 
     async def _follow_continue_as_new(self) -> bool:

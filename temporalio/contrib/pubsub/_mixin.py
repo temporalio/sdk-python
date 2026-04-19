@@ -24,6 +24,9 @@ from ._types import (
 )
 
 
+_MAX_POLL_RESPONSE_BYTES = 1_000_000
+
+
 class PubSubMixin:
     """Mixin that turns a workflow into a pub/sub broker.
 
@@ -206,25 +209,39 @@ class PubSubMixin:
             or self._pubsub_draining,
         )
         all_new = self._pubsub_log[log_offset:]
-        next_offset = self._pubsub_base_offset + len(self._pubsub_log)
         if input.topics:
             topic_set = set(input.topics)
-            filtered = [
+            candidates = [
                 (self._pubsub_base_offset + log_offset + i, item)
                 for i, item in enumerate(all_new)
                 if item.topic in topic_set
             ]
         else:
-            filtered = [
+            candidates = [
                 (self._pubsub_base_offset + log_offset + i, item)
                 for i, item in enumerate(all_new)
             ]
+        # Cap response size to ~1MB estimated wire bytes.
+        wire_items: list[_WireItem] = []
+        size = 0
+        more_ready = False
+        next_offset = self._pubsub_base_offset + len(self._pubsub_log)
+        for off, item in candidates:
+            encoded = encode_data(item.data)
+            item_size = len(encoded) + len(item.topic)
+            if size + item_size > _MAX_POLL_RESPONSE_BYTES and wire_items:
+                # Resume from this item on the next poll.
+                next_offset = off
+                more_ready = True
+                break
+            size += item_size
+            wire_items.append(
+                _WireItem(topic=item.topic, data=encoded, offset=off)
+            )
         return PollResult(
-            items=[
-                _WireItem(topic=item.topic, data=encode_data(item.data), offset=off)
-                for off, item in filtered
-            ],
+            items=wire_items,
             next_offset=next_offset,
+            more_ready=more_ready,
         )
 
     @_pubsub_poll.validator
