@@ -610,6 +610,73 @@ Double-underscore prefix on handler names avoids collisions with application
 signals/updates. The payload types are simple composites of strings, bytes,
 and ints — representable in every Temporal SDK's default data converter.
 
+## Compatibility
+
+The wire protocol evolves under four rules. These have been followed implicitly
+through four addenda (CAN, topics, dedup, item-offset) and are codified here to
+prevent accidental breakage by future contributors.
+
+### 1. Additive-only wire evolution
+
+New fields on `PublishInput`, `PollInput`, `PollResult`, and `PubSubState` must
+have defaults that preserve backward-compatible behavior. Existing field
+semantics must not change. Temporal's JSON data converter drops unknown fields on
+deserialization and uses defaults for missing fields, so:
+
+- **New client → old workflow:** New fields are silently ignored. Safe as long as
+  the new fields are additive (not a reinterpretation of existing ones).
+- **Old client → new workflow:** Missing fields get defaults. Safe as long as
+  defaults preserve pre-feature behavior (e.g., empty `publisher_id` skips
+  dedup, zero `offset` means "unknown").
+
+This is the same model as Protocol Buffers wire compatibility: never change the
+meaning of an existing field number; always provide defaults for new fields.
+
+### 2. Handler names are immutable
+
+`__pubsub_publish`, `__pubsub_poll`, and `__pubsub_offset` will never change
+meaning. If a future change is incompatible with additive evolution, the correct
+mechanism is a new handler name (e.g., `__pubsub_v2_poll`) — creating an
+entirely separate protocol surface so old and new code never interact.
+
+### 3. `PubSubState` must be forward-compatible
+
+New fields use `field(default_factory=...)` or scalar defaults. Old state loaded
+into new code works (new fields get defaults). New state loaded into old code
+works (unknown fields dropped by the JSON deserializer). This ensures seamless
+continue-as-new across mixed-version deployments.
+
+### 4. No application-level version negotiation
+
+We do not add version fields to payloads, and we do not negotiate protocol
+versions between client and workflow. The reasons:
+
+- **Signals cannot return errors.** A version field that the workflow checks on a
+  signal creates silent data loss: the workflow rejects the signal, but the
+  client (which used fire-and-forget delivery) never learns it was rejected.
+  This is strictly worse than the current behavior, where unknown fields are
+  harmlessly ignored.
+- **Temporal Worker Versioning handles the hard cases.** For a true breaking
+  change, deploy the new mixin on a new Build ID. Old running workflows continue
+  on old workers; new workflows start on new workers. This operates at the
+  infrastructure level — handling in-flight workflows, replay, and mixed-version
+  fleets — which message-level version fields cannot.
+- **`workflow.patched()` handles in-workflow transitions.** If a new mixin
+  version changes behavior (e.g., how it processes a signal), `patched()` gates
+  old vs. new logic within the same workflow code during the transition period.
+
+### Precedent
+
+Every protocol change to date has followed rule 1:
+
+| Change | New field | Default | Backward behavior |
+|---|---|---|---|
+| Dedup | `PublishInput.publisher_id` | `""` | Empty string skips dedup |
+| Dedup | `PublishInput.sequence` | `0` | Zero skips dedup |
+| Item offset | `_WireItem.offset` | `0` | Zero means "unknown" |
+| Poll truncation | `PollResult.more_ready` | `False` | Old clients poll normally |
+| TTL pruning | `PubSubState.publisher_last_seen` | `{}` | Empty dict, no pruning state |
+
 ## File Layout
 
 ```
