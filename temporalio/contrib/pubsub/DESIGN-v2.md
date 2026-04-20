@@ -18,29 +18,29 @@ the workflow does not interpret them.
 
 ```
                     ┌──────────────────────────────────┐
-                    │         Temporal Workflow         │
-                    │          (PubSubMixin)            │
-                    │                                   │
-                    │  ┌─────────────────────────────┐  │
-                    │  │   Append-only log            │  │
-                    │  │   [(topic, data), ...]       │  │
-                    │  │   base_offset: int           │  │
-                    │  │   publisher_sequences: {}    │  │
-                    │  └─────────────────────────────┘  │
-                    │                                   │
-  signal ──────────►│  __pubsub_publish (with dedup)    │
-  update ──────────►│  __pubsub_poll (long-poll)        │◄── subscribe()
-  query  ──────────►│  __pubsub_offset                  │
-                    │                                   │
-                    │  publish() ── workflow-side        │
+                    │         Temporal Workflow        │
+                    │          (PubSubMixin)           │
+                    │                                  │
+                    │  ┌────────────────────────────┐  │
+                    │  │   Append-only log          │  │
+                    │  │   [(topic, data), ...]     │  │
+                    │  │   base_offset: int         │  │
+                    │  │   publisher_sequences: {}  │  │
+                    │  └────────────────────────────┘  │
+                    │                                  │
+  signal ──────────►│  __pubsub_publish (with dedup)   │
+  update ──────────►│  __pubsub_poll (long-poll)       │◄── subscribe()
+  query  ──────────►│  __pubsub_offset                 │
+                    │                                  │
+                    │  publish() ── workflow-side      │
                     └──────────────────────────────────┘
                               │
                               │ continue-as-new
                               ▼
                     ┌──────────────────────────────────┐
-                    │  PubSubState carries:             │
-                    │    log, base_offset,              │
-                    │    publisher_sequences            │
+                    │  PubSubState carries:            │
+                    │    log, base_offset,             │
+                    │    publisher_sequences           │
                     └──────────────────────────────────┘
 ```
 

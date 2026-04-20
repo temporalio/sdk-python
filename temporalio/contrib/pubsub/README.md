@@ -1,16 +1,18 @@
 # Temporal Workflow Pub/Sub
 
 Reusable pub/sub for Temporal workflows. The workflow acts as a message broker
-with an append-only log. External clients (activities, starters, other services)
-publish and subscribe through the workflow handle using Temporal primitives.
+that maintains an append-only log. External clients (activities, starters, other
+workflows, other services) publish and subscribe through the workflow handle
+using Temporal primitives.
 
-Payloads are base64-encoded byte strings for cross-language compatibility.
+The Python API uses `bytes` for payloads. Base64 encoding is used internally
+on the wire for cross-language compatibility.
 
 ## Quick Start
 
 ### Workflow side
 
-Add `PubSubMixin` to your workflow and call `init_pubsub()`:
+Add `PubSubMixin` to your workflow and call `init_pubsub()` during initialization:
 
 ```python
 from temporalio import workflow
@@ -31,9 +33,8 @@ class MyWorkflow(PubSubMixin):
 
 ### Activity side (publishing)
 
-Use `PubSubClient.for_workflow()` with the async context manager for batched
-publishing. When called from within an activity, the client and workflow ID
-are inferred automatically:
+Use `PubSubClient.create()` with the async context manager for batched publishing.
+When called from within an activity, the client and workflow ID are inferred automatically:
 
 ```python
 from temporalio import activity
@@ -41,7 +42,7 @@ from temporalio.contrib.pubsub import PubSubClient
 
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.for_workflow(batch_interval=2.0)
+    client = PubSubClient.create(batch_interval=2.0)
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -49,7 +50,7 @@ async def stream_events() -> None:
         # Buffer is flushed automatically on context manager exit
 ```
 
-Use `priority=True` to flush immediately for latency-sensitive events:
+Use `priority=True` to trigger an immediate flush for latency-sensitive events:
 
 ```python
 client.publish("events", data, priority=True)
@@ -57,12 +58,12 @@ client.publish("events", data, priority=True)
 
 ### Subscribing
 
-Use `PubSubClient.for_workflow()` and the `subscribe()` async iterator:
+Use `PubSubClient.create()` and the `subscribe()` async iterator:
 
 ```python
 from temporalio.contrib.pubsub import PubSubClient
 
-client = PubSubClient.for_workflow(temporal_client, workflow_id)
+client = PubSubClient.create(temporal_client, workflow_id)
 async for item in client.subscribe(["events"], from_offset=0):
     print(item.topic, item.data)
     if is_done(item):
@@ -71,11 +72,9 @@ async for item in client.subscribe(["events"], from_offset=0):
 
 ## Topics
 
-Topics are plain strings with exact matching. No hierarchy or wildcards.
-
-- Publish to one topic at a time
-- Subscribe to a list of topics (empty list = all topics)
-- Publishing to a topic implicitly creates it
+Topics allow subscribers to receive a subset of the messages in the pub/sub system.
+Subscribers can request a list of specific topics, or provide an empty list to receive
+messages from all topics. Publishing to a topic implicitly creates it.
 
 ## Continue-as-new
 
@@ -89,7 +88,7 @@ from temporalio.contrib.pubsub import PubSubMixin, PubSubState
 @dataclass
 class WorkflowInput:
     pubsub_state: PubSubState | None = None
-
+#@AGENT: should clarify that you will also carry along your own application state in CAN
 @workflow.defn
 class MyWorkflow(PubSubMixin):
     @workflow.init
@@ -110,18 +109,7 @@ class MyWorkflow(PubSubMixin):
 
 `drain_pubsub()` unblocks waiting subscribers and rejects new polls so
 `all_handlers_finished` can stabilize. Subscribers created via
-`PubSubClient.for_workflow()` automatically follow continue-as-new chains.
-
-**Important:** Type the pubsub_state field as `PubSubState | None`, not `Any`.
-`Any`-typed fields deserialize as plain dicts, which breaks `init_pubsub()`.
-
-## Exactly-Once Delivery
-
-External publishers (via `PubSubClient`) get exactly-once delivery through
-publisher ID + sequence number deduplication. Each client instance generates
-a unique publisher ID and increments a monotonic sequence on each flush.
-The workflow tracks the highest seen sequence per publisher and rejects
-duplicates. See `DESIGN-v2.md` for details.
+`PubSubClient.create()` automatically follow continue-as-new chains.
 
 ## API Reference
 
@@ -131,26 +119,26 @@ duplicates. See `DESIGN-v2.md` for details.
 |---|---|
 | `init_pubsub(prior_state=None)` | Initialize state. Call in `__init__` for fresh workflows, or in `run()` when accepting CAN state. |
 | `publish(topic, data)` | Append to the log from workflow code. |
-| `get_pubsub_state()` | Snapshot for continue-as-new. |
+| `get_pubsub_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
 | `drain_pubsub()` | Unblock polls and reject new ones. |
+| `truncate_pubsub(up_to_offset)` | Discard log entries below the given offset. |
 
 Handlers added automatically:
 
-| Handler | Kind | Name |
+| Kind | Name | Description |
 |---|---|---|
-| Signal | `__pubsub_publish` | Receive external publications (with dedup) |
-| Update | `__pubsub_poll` | Long-poll subscription |
-| Query | `__pubsub_offset` | Current global offset |
+| Signal | `__pubsub_publish` | Receive external publications. |
+| Update | `__pubsub_poll` | Long-poll subscription. |
+| Query | `__pubsub_offset` | Current global offset. |
 
 ### PubSubClient
 
 | Method | Description |
 |---|---|
-| `PubSubClient.for_workflow(client, wf_id)` | Factory (preferred). Auto-detects activity context if args omitted. |
-| `PubSubClient(handle)` | From handle (no CAN follow). |
+| `PubSubClient.create(client, workflow_id, *, batch_interval, max_batch_size, max_retry_duration)` | Factory. Auto-detects activity context if args omitted. |
+| `PubSubClient(handle, *, batch_interval, max_batch_size, max_retry_duration)` | From handle (no CAN follow). |
 | `publish(topic, data, priority=False)` | Buffer a message. |
-| `flush()` | Send buffered messages (with dedup). |
-| `subscribe(topics, from_offset, poll_interval=0.1)` | Async iterator. Always follows CAN chains when created via `for_workflow`. |
+| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Always follows CAN chains when created via `create`. |
 | `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush.
