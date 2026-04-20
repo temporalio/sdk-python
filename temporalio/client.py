@@ -2619,8 +2619,7 @@ class Client:
         Returns:
             A handle to the operation.
         """
-        if operation is not None:
-            result_type = operation.output_type
+        result_type = result_type or (operation.output_type if operation else None)
         return NexusOperationHandle(
             self,
             operation_id,
@@ -5970,7 +5969,7 @@ class _NexusClient(NexusClient[ServiceType]):
            This API is experimental and unstable.
         """
         op_name, output_type = self._resolve_operation(operation)
-        final_result_type = result_type or output_type
+        final_result_type: type | None = result_type or output_type
 
         return await self._client._impl.start_nexus_operation(
             StartNexusOperationInput(

@@ -4,11 +4,15 @@ It doesn't contain any test functions.
 """
 
 from dataclasses import dataclass
+from typing import Any
+from unittest.mock import Mock
 
 import nexusrpc
 
 import temporalio.nexus
 from temporalio import workflow
+from temporalio.client import Client, NexusOperationHandle
+from temporalio.service import ServiceClient
 
 
 @dataclass
@@ -205,3 +209,109 @@ class MyWorkflow5:
             MyServiceHandler2.my_sync_operation,  # type: ignore
             MyInput(),
         )
+
+
+# ── Standalone Nexus Operation type tests ──
+async def standalone_operation_type_tests():
+    client = Client(service_client=Mock(spec=ServiceClient))
+    nexus_client = client.create_nexus_client(
+        MyService,
+        endpoint="fake-endpoint",
+    )
+
+    # execute with an operation definition infers output type
+    _op_defn_output: MyOutput = await nexus_client.execute_operation(
+        MyService.my_sync_operation, MyInput(), id="op-1"
+    )
+
+    # result_type overrides output type from operation definition
+    # conflicting result_type and annotation on variable cause type error
+    # assert-type-error-pyright: 'Type "str" is not assignable to declared type "MyOutput"'
+    _bad_result_type_output: MyOutput = await nexus_client.execute_operation(  # type: ignore
+        MyServiceHandler.my_sync_operation,
+        MyInput(),
+        id="op-1",
+        result_type=str,
+    )
+
+    # string operation name and result_type infers output type
+    _str_op_result_type_output: MyOutput = await nexus_client.execute_operation(
+        "my_sync_operation", MyInput(), id="op-1", result_type=MyOutput
+    )
+
+    # execute with an operation definition and a wrong input type produces a type error
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await nexus_client.execute_operation(  # type: ignore
+        MyService.my_sync_operation,
+        # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter "arg"'
+        "wrong-input-type",  # type: ignore
+        id="op-1",
+    )
+
+    # start with an operation definition and a wrong input type produces a type error
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await nexus_client.start_operation(  # type: ignore
+        MyService.my_sync_operation,
+        # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter "arg"'
+        "wrong-input-type",  # type: ignore
+        id="op-1",
+    )
+
+    # starting with an operation definition infers output type on the handle and
+    # result from handle
+    _defn_handle: NexusOperationHandle[MyOutput] = await nexus_client.start_operation(
+        MyService.my_sync_operation, MyInput(), id="op-1"
+    )
+    _defn_handle_output: MyOutput = await _defn_handle.result()
+
+    # result_type overrides output type from operation definition
+    # conflicting result_type and annotation on variable cause type error
+    # assert-type-error-pyright: 'Type "NexusOperationHandle\[str\]" is not assignable to declared type "NexusOperationHandle\[MyOutput\]"'
+    _result_type_handle: NexusOperationHandle[MyOutput] = await nexus_client.start_operation(  # type: ignore
+        MyServiceHandler.my_sync_operation,
+        MyInput(),
+        id="op-1",
+        result_type=str,
+    )
+    # handle still respects type declaration on the variable
+    _result_type_handle_output: MyOutput = await _result_type_handle.result()
+
+    # starting with string operation name and result_type infers output type on the handle
+    # and result from the handle
+    _str_op_result_type_handle: NexusOperationHandle[
+        MyOutput
+    ] = await nexus_client.start_operation(
+        "my_sync_operation", MyInput(), id="op-1", result_type=MyOutput
+    )
+    _str_op_result_type_handle_output: MyOutput = (
+        await _str_op_result_type_handle.result()
+    )
+
+    # getting a handle with a string produces a handle to Any
+    _str_op_handle: NexusOperationHandle[Any] = client.get_nexus_operation_handle(
+        "op-1"
+    )
+
+    # getting a handle with an explicit type produces handle of that type
+    _result_type_get_handle: NexusOperationHandle[MyOutput] = (
+        client.get_nexus_operation_handle("op-1", result_type=MyOutput)
+    )
+
+    # getting a handle with an operation defintion produces a handle of the operation
+    # output type
+    _op_defn_get_handle: NexusOperationHandle[MyOutput] = (
+        client.get_nexus_operation_handle("op-1", operation=MyService.my_sync_operation)
+    )
+
+    # providing both operation and result_type to get_nexus_operation_handle
+    # produces a no overload found error
+    # assert-type-error-pyright: 'No overloads for "get_nexus_operation_handle" match'
+    _result_type_op_defn_get_handle: NexusOperationHandle[MyOutput] = client.get_nexus_operation_handle(  # type: ignore
+        "op-1",
+        operation=MyService.my_sync_operation,
+        result_type=str,
+    )
+
+    # mismatched types on get_nexus_operation_handle produces type error
+    # assert-type-error-pyright: 'Type "NexusOperationHandle\[str\]" is not assignable to declared type "NexusOperationHandle\[MyOutput\]"'
+    _mismatch_handle: NexusOperationHandle[MyOutput] = client.get_nexus_operation_handle("op-1", result_type=str)  # type: ignore
