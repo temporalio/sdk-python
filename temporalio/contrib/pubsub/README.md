@@ -1,9 +1,19 @@
 # Temporal Workflow Pub/Sub
 
-Reusable pub/sub for Temporal workflows. The workflow acts as a message broker
-that maintains an append-only log. External clients (activities, starters, other
-workflows, other services) publish and subscribe through the workflow handle
-using Temporal primitives.
+Many workflows need to push incremental updates to external observers — sending
+order status changes to a customer-facing UI, streaming tokens from an AI agent
+to a chat interface, or reporting progress from a long-running data pipeline.
+Temporal's signals and updates already provide the building blocks, but wiring
+up batching, offset tracking, topic filtering, and continue-as-new hand-off is
+non-trivial boilerplate.
+
+This module packages that boilerplate into a reusable mixin and client. The
+workflow acts as a message broker that maintains an append-only log. External
+clients — activities, starters, other workflows, other services — publish and
+subscribe through the workflow handle. Under the hood, publishing uses signals
+(fire-and-forget) while subscribing uses updates (long-poll with backpressure).
+A client-side batcher coalesces high-frequency publishes into fewer signal
+calls, keeping event history compact without sacrificing throughput.
 
 The Python API uses `bytes` for payloads. Base64 encoding is used internally
 on the wire for cross-language compatibility.
