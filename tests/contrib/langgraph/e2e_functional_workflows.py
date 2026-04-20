@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from temporalio import workflow
-from temporalio.contrib.langgraph.langgraph_plugin import get_cache, set_cache
+from temporalio.contrib.langgraph.langgraph_plugin import cache, set_cache
 from tests.contrib.langgraph.e2e_functional_entrypoints import (
     continue_as_new_entrypoint,
     partial_execution_entrypoint,
@@ -51,7 +51,7 @@ class ContinueAsNewFunctionalWorkflow:
             workflow.continue_as_new(
                 ContinueAsNewInput(
                     value=input_data.value,
-                    cache=get_cache(),
+                    cache=cache(),
                     task_a_done=True,
                 )
             )
@@ -60,7 +60,7 @@ class ContinueAsNewFunctionalWorkflow:
             workflow.continue_as_new(
                 ContinueAsNewInput(
                     value=input_data.value,
-                    cache=get_cache(),
+                    cache=cache(),
                     task_a_done=True,
                     task_b_done=True,
                 )
@@ -91,7 +91,7 @@ class PartialExecutionWorkflow:
             workflow.continue_as_new(
                 PartialExecutionInput(
                     value=input_data.value,
-                    cache=get_cache(),
+                    cache=cache(),
                     phase=2,
                 )
             )

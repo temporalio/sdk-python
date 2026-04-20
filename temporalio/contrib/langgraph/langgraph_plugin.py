@@ -14,7 +14,11 @@ from langgraph.graph import StateGraph
 
 from temporalio import activity
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
-from temporalio.contrib.langgraph.task_cache import _task_cache, task_id
+from temporalio.contrib.langgraph.task_cache import (
+    get_task_cache,
+    set_task_cache,
+    task_id,
+)
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -161,19 +165,19 @@ class LangGraphPlugin(SimplePlugin):
 
 
 def set_cache(cache: dict[str, Any] | None) -> None:
-    """Restore a task result cache returned by a previous :func:`get_cache` call.
+    """Restore a task result cache returned by a previous :func:`cache` call.
 
     Use at the top of a workflow run that resumes from continue-as-new so
     already-completed nodes/tasks are not re-executed.
     """
-    _task_cache.set(cache or {})
+    set_task_cache(cache or {})
 
 
-def get_cache() -> dict[str, Any] | None:
+def cache() -> dict[str, Any] | None:
     """Return the task result cache as a serializable dict.
 
     Returns a dict suitable for passing to :func:`set_cache` on the next
     workflow run to restore cached task results across continue-as-new
     boundaries. Returns None if the cache is empty.
     """
-    return _task_cache.get() or None
+    return get_task_cache() or None

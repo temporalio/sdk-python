@@ -170,7 +170,7 @@ To carry cached task results across a continue-as-new boundary, pass the cache t
 
 ```python
 from temporalio import workflow
-from temporalio.contrib.langgraph import get_cache, set_cache
+from temporalio.contrib.langgraph import cache, set_cache
 from myapp.graphs import my_graph
 
 @workflow.defn
@@ -180,7 +180,7 @@ class MyWorkflow:
         set_cache(prev_cache)
         result = await my_graph.compile().ainvoke(input)
         if should_continue(result):
-            workflow.continue_as_new(next_input, get_cache())
+            workflow.continue_as_new(next_input, cache())
         return result
 ```
 
