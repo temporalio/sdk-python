@@ -78,7 +78,8 @@ messages from all topics. Publishing to a topic implicitly creates it.
 
 ## Continue-as-new
 
-Carry pub/sub state across continue-as-new boundaries:
+Carry both your application state and pub/sub state across continue-as-new
+boundaries:
 
 ```python
 from dataclasses import dataclass
@@ -87,22 +88,27 @@ from temporalio.contrib.pubsub import PubSubMixin, PubSubState
 
 @dataclass
 class WorkflowInput:
+    # Your application state
+    items_processed: int = 0
+    # Pub/sub state
     pubsub_state: PubSubState | None = None
-#@AGENT: should clarify that you will also carry along your own application state in CAN
+
 @workflow.defn
 class MyWorkflow(PubSubMixin):
     @workflow.init
     def __init__(self, input: WorkflowInput) -> None:
+        self.items_processed = input.items_processed
         self.init_pubsub(prior_state=input.pubsub_state)
 
     @workflow.run
     async def run(self, input: WorkflowInput) -> None:
-        # ... do work ...
+        # ... do work, updating self.items_processed ...
 
         if workflow.info().is_continue_as_new_suggested():
             self.drain_pubsub()
             await workflow.wait_condition(workflow.all_handlers_finished)
             workflow.continue_as_new(args=[WorkflowInput(
+                items_processed=self.items_processed,
                 pubsub_state=self.get_pubsub_state(),
             )])
 ```
