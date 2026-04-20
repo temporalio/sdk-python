@@ -254,15 +254,31 @@ importance ranking.
 ### 6. Session ordering
 
 Publications from a single client are ordered. This relies on two Temporal
-guarantees: (1) signals sent sequentially from the same client appear in
+guarantees:
+
+> "Signals are delivered in the order they are received by the Cluster and
+> written to History."
+> ([docs](https://docs.temporal.io/workflows#signal))
+
+Specifically: (1) signals sent sequentially from the same client appear in
 workflow history in send order, and (2) signal handlers are invoked in
-history order. The `PubSubClient` flush lock ensures signals are never in
-flight concurrently, so both guarantees apply.
+history order. The guarantee breaks down only for *concurrent* signals — if
+two signal RPCs are in flight simultaneously, their order in history is
+nondeterministic. The `PubSubClient` flush lock (`_flush_lock`) ensures
+signals are never in flight concurrently from a single client:
+
+1. Acquire lock
+2. `await handle.signal(...)` — blocks until server writes to history
+3. Release lock
+
+Combined with the workflow's single-threaded signal processing (the
+`__pubsub_publish` handler is synchronous — no `await`), items within and
+across batches from a single publisher preserve their publish order.
 
 Concurrent publishers get a total order in the log (the workflow serializes
 all signal processing), but the interleaving is nondeterministic — it depends
 on arrival order at the server. Per-publisher ordering is preserved. This is
-formally verified as `OrderPreservedPerPublisher` in `PubSubDedupTTL.tla`.
+formally verified as `OrderPreservedPerPublisher`.
 
 Once items are in the log, their order is stable — reads are repeatable.
 
@@ -336,6 +352,45 @@ forever" mechanism. This was removed because:
   poll handler is just an in-memory coroutine waiting on a condition. It
   consumes no Temporal actions and is cleaned up at the next CAN cycle.
 
+### 12. Signals for publish, updates for poll
+
+Publishing uses signals (fire-and-forget); subscription uses updates
+(request-response with `wait_condition`). These choices are deliberate.
+
+**Why signals for publish:**
+
+- **Non-blocking flush.** The activity can buffer tokens at whatever rate
+  the LLM produces them. `handle.signal(...)` enqueues at the server and
+  returns immediately — the publisher is never throttled by the workflow's
+  processing speed.
+- **Lower history cost.** Each signal adds 1 event (`WorkflowSignalReceived`).
+  An update adds 2 (`UpdateAccepted` + `UpdateCompleted`). For a streaming
+  session with hundreds of flushes, signals halve the history growth rate and
+  delay the CAN threshold.
+- **No concurrency limits.** Temporal Cloud enforces per-workflow update
+  limits. Signals have no equivalent limit, making them safer for
+  high-throughput publishing.
+
+**Why updates for poll:**
+
+- The caller needs a result (the items). Blocking is the desired behavior
+  (long-poll semantics). `wait_condition` inside an update handler is the
+  natural fit.
+
+**Why not updates for publish?** The main attraction would be platform-native
+exactly-once via Update ID, eliminating application-level dedup. However:
+
+1. Update ID dedup does not persist across continue-as-new. For CAN workflows,
+   application-level dedup is required regardless
+   ([temporal/temporal#6375](https://github.com/temporalio/temporal/issues/6375)).
+2. Each flush would block for a round-trip to the worker (~10-50ms), throttling
+   the publisher.
+3. The 2x history cost accelerates approach to the CAN threshold.
+
+If the cross-CAN dedup gap is fixed and backpressure becomes desirable,
+switching publish to updates is a mechanical change — the dedup protocol,
+TLA+ specs, and mixin handler logic are unchanged.
+
 ## Exactly-Once Publish Delivery
 
 External publishers get exactly-once delivery through publisher ID + sequence
@@ -370,11 +425,7 @@ Client                              Workflow
   │───────────────────────────────────►│ seq 2 > 1 → accept, record seq=2
 ```
 
-### Client-side flush (TLA+-verified algorithm)
-
-The flush algorithm has been formally verified using TLA+ model checking.
-See `verification/PROOF.md` for the full correctness proof and
-`verification/PubSubDedup.tla` for the spec.
+### Client-side flush
 
 ```python
 async def _flush(self) -> None:
@@ -433,9 +484,43 @@ are pruned to bound memory across long-lived workflow chains.
 **Safety constraint**: `publisher_ttl` must exceed the client's
 `max_retry_duration`. If a publisher's dedup entry is pruned while it still
 has a pending retry, the retry could be accepted as new, creating duplicates.
-This is formally verified in `verification/PubSubDedupTTL.tla` — TLC finds
-the counterexample for unsafe pruning and confirms safe pruning preserves
-NoDuplicates.
+
+### Scope: what pub/sub dedup does and does not handle
+
+Duplicates arise at three points in the pipeline. Each layer handles the
+duplicates it introduces — applying the end-to-end principle (Saltzer, Reed,
+Clark 1984).
+
+```
+LLM API  -->  Activity  -->  PubSubClient  -->  Workflow Log  -->  BFF/SSE  -->  Browser
+  (A)                            (B)                                (C)
+```
+
+| Type | Cause | Handled by |
+|---|---|---|
+| A: Duplicate LLM work | Activity retry produces a second, semantically equivalent but textually different response | Application layer (activity idempotency keys, workflow orchestration) |
+| B: Duplicate signal batches | Signal retry after ambiguous failure delivers the same `(publisher_id, sequence)` batch twice | **Pub/sub layer** (`sequence <= last_seen` rejection) |
+| C: Duplicate SSE events | Browser reconnects and BFF replays previously-delivered events | Delivery layer (SSE `Last-Event-ID`, idempotent frontend reducers) |
+
+**Why Type A doesn't belong here.** Data escapes to the subscriber during the
+first LLM call — tokens are consumed, forwarded to the browser, and rendered
+before any retry occurs. By the time a retry produces a duplicate response,
+the original is already consumed. The pub/sub layer has no opportunity to
+suppress it, and resolution requires application semantics (discard, replace,
+merge) that the transport layer has no knowledge of.
+
+**Why Type B must be here.** The consumer sees `PubSubItem(topic, data)` with
+no unique ID. If the workflow accepted a duplicate batch, the duplicates would
+get fresh offsets and be indistinguishable from originals. Content-based dedup
+has false positives (an LLM legitimately produces the same token twice; a
+status event like `{"type":"THINKING_START"}` repeats across turns). The
+`(publisher_id, sequence)` check is the only correct implementation — it
+preserves transport encapsulation and uses context only the transport layer
+has.
+
+**Why Type C doesn't belong here.** SSE reconnection is below the pub/sub
+layer. The BFF assigns gapless event IDs and maps `Last-Event-ID` back to
+global offsets (see [Information Leakage and the BFF](#information-leakage-and-the-bff)).
 
 ## Continue-as-New
 
@@ -672,12 +757,5 @@ temporalio/contrib/pubsub/
 ├── _client.py                   # PubSubClient (external-side)
 ├── _types.py                    # Shared data types
 ├── README.md                    # Usage documentation
-├── DESIGN-v2.md                 # This document
-└── verification/                # TLA+ formal verification
-    ├── README.md                # Overview and running instructions
-    ├── PROOF.md                 # Full correctness proof
-    ├── PubSubDedup.tla          # Correct single-publisher protocol
-    ├── PubSubDedupInductive.tla # Inductive invariant (unbounded proof)
-    ├── PubSubDedupTTL.tla       # Multi-publisher + TTL pruning
-    └── PubSubDedupBroken.tla    # Old (broken) algorithm — counterexample
+└── DESIGN-v2.md                 # This document
 ```
