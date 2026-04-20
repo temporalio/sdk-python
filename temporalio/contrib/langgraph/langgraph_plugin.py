@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import inspect
 import sys
 import warnings
 from dataclasses import replace
@@ -13,7 +14,7 @@ from langgraph._internal._runnable import RunnableCallable
 from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 
-from temporalio import activity
+from temporalio import activity, workflow
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
 from temporalio.contrib.langgraph.task_cache import (
     get_task_cache,
@@ -23,6 +24,10 @@ from temporalio.contrib.langgraph.task_cache import (
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+_ACTIVITY_OPTION_KEYS: frozenset[str] = frozenset(
+    {"execute_in", *inspect.signature(workflow.execute_activity).parameters}
+)
 
 # Save registered graphs/entrypoints at the module level to avoid being refreshed by the sandbox.
 _graph_registry: dict[str, StateGraph[Any]] = {}
@@ -80,9 +85,31 @@ class LangGraphPlugin(SimplePlugin):
                         raise ValueError(
                             f"Node {node_name} must have an async function"
                         )
-                    # Remove LangSmith-related callback functions that can't be serialized between the workflow and activity.
-                    runnable.func_accepts = {}
-                    opts = {**(default_activity_options or {}), **(node.metadata or {})}
+                    # Keep only 'config' injection so node functions can read
+                    # metadata/tags. Drop writer/store/runtime/etc., which hold
+                    # non-serializable objects that can't cross the activity
+                    # boundary. The wrapper serializes config down to its
+                    # portable subset before handing off to the activity.
+                    runnable.func_accepts = {
+                        k: v
+                        for k, v in runnable.func_accepts.items()
+                        if k == "config"
+                    }
+                    # Split node.metadata into activity options vs. user
+                    # metadata. Activity-option keys (timeouts, retry policy,
+                    # etc.) become kwargs to workflow.execute_activity; user
+                    # keys stay on node.metadata so LangGraph exposes them to
+                    # the node function via config["metadata"].
+                    node_meta = node.metadata or {}
+                    node_opts = {
+                        k: v for k, v in node_meta.items() if k in _ACTIVITY_OPTION_KEYS
+                    }
+                    node.metadata = {
+                        k: v
+                        for k, v in node_meta.items()
+                        if k not in _ACTIVITY_OPTION_KEYS
+                    }
+                    opts = {**(default_activity_options or {}), **node_opts}
                     runnable.afunc = self.execute(
                         f"{graph_name}.{node_name}", runnable.afunc, opts
                     )

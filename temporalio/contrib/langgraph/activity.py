@@ -64,6 +64,16 @@ def wrap_execute_activity(
     """Wrap an activity function to be called via workflow.execute_activity with caching."""
 
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # LangGraph may inject a RunnableConfig as the 'config' kwarg. Strip it
+        # down to a serializable subset (metadata + tags) so it can cross the
+        # activity boundary; callbacks, stores, etc. aren't serializable.
+        if "config" in kwargs:
+            orig = kwargs["config"] or {}
+            kwargs["config"] = {
+                "metadata": dict(orig.get("metadata") or {}),
+                "tags": list(orig.get("tags") or []),
+            }
+
         # Check task result cache (for continue-as-new deduplication).
         key = cache_key(task_id, args, kwargs) if task_id else ""
         if task_id:
