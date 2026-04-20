@@ -88,18 +88,14 @@ class PubSubMixin:
         self._check_initialized()
         now = workflow.time()
 
-        # Determine which publishers to retain. Publishers with timestamps
-        # are pruned by TTL. Publishers without timestamps (legacy state
-        # from before publisher_last_seen was added) are always retained
-        # to avoid silently dropping dedup entries on upgrade.
+        # Prune publishers whose last activity exceeds the TTL.
         active_sequences: dict[str, int] = {}
         active_last_seen: dict[str, float] = {}
         for pid, seq in self._pubsub_publisher_sequences.items():
-            ts = self._pubsub_publisher_last_seen.get(pid)
-            if ts is None or now - ts < publisher_ttl:
+            ts = self._pubsub_publisher_last_seen.get(pid, 0.0)
+            if now - ts < publisher_ttl:
                 active_sequences[pid] = seq
-                if ts is not None:
-                    active_last_seen[pid] = ts
+                active_last_seen[pid] = ts
 
         return PubSubState(
             log=[

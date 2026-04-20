@@ -1,10 +1,6 @@
 # Temporal Workflow Pub/Sub — Design Document v2
 
 Consolidated design document reflecting the current implementation.
-Supersedes [DESIGN.md](./DESIGN.md) and its addenda
-([CAN](./DESIGN-ADDENDUM-CAN.md), [Topics](./DESIGN-ADDENDUM-TOPICS.md),
-[Dedup](./DESIGN-ADDENDUM-DEDUP.md)), which are preserved as historical
-records of the design exploration.
 
 ## Overview
 
@@ -210,15 +206,13 @@ a true global offset across independent topics. The two closest:
 We evaluated six alternatives for handling the information leakage that global
 offsets create (a single-topic subscriber can infer other-topic activity from
 gaps): per-topic counts, opaque cursors, encrypted cursors, per-topic lists,
-per-topic offsets with cursor hints, and accepting the leakage. See
-[DESIGN-ADDENDUM-TOPICS.md](./DESIGN-ADDENDUM-TOPICS.md) for the full
-analysis.
+per-topic offsets with cursor hints, and accepting the leakage.
 
 **Decision:** Global offsets are the right choice for workflow-scoped pub/sub.
 
 **Why not per-topic offsets?** The most sophisticated alternative — per-topic
-offsets with opaque cursors carrying global position hints (Option F in the
-addendum) — was rejected for three reasons:
+offsets with opaque cursors carrying global position hints — was rejected
+for three reasons:
 
 1. **The threat model doesn't apply.** Information leakage assumes untrusted
    multi-tenant subscribers who shouldn't learn about each other's traffic
@@ -429,8 +423,8 @@ async def _flush(self) -> None:
 
 `publisher_sequences` is `dict[str, int]` — bounded by number of publishers
 (typically 1-2), not number of flushes. Carried through continue-as-new in
-`PubSubState`. If `publisher_id` is empty (workflow-internal publish or legacy
-client), dedup is skipped.
+`PubSubState`. If `publisher_id` is empty (workflow-internal publish),
+dedup is skipped.
 
 `publisher_last_seen` tracks the last `workflow.time()` each publisher was
 seen. During `get_pubsub_state(publisher_ttl=900)`, entries older than TTL
@@ -612,25 +606,17 @@ and ints — representable in every Temporal SDK's default data converter.
 
 ## Compatibility
 
-The wire protocol evolves under four rules. These have been followed implicitly
-through four addenda (CAN, topics, dedup, item-offset) and are codified here to
-prevent accidental breakage by future contributors.
+The wire protocol evolves under four rules to prevent accidental breakage by
+future contributors.
 
 ### 1. Additive-only wire evolution
 
 New fields on `PublishInput`, `PollInput`, `PollResult`, and `PubSubState` must
-have defaults that preserve backward-compatible behavior. Existing field
-semantics must not change. Temporal's JSON data converter drops unknown fields on
-deserialization and uses defaults for missing fields, so:
-
-- **New client → old workflow:** New fields are silently ignored. Safe as long as
-  the new fields are additive (not a reinterpretation of existing ones).
-- **Old client → new workflow:** Missing fields get defaults. Safe as long as
-  defaults preserve pre-feature behavior (e.g., empty `publisher_id` skips
-  dedup, zero `offset` means "unknown").
-
-This is the same model as Protocol Buffers wire compatibility: never change the
-meaning of an existing field number; always provide defaults for new fields.
+have defaults. Existing field semantics must not change. Temporal's JSON data
+converter drops unknown fields on deserialization and uses defaults for missing
+fields, so additive changes are safe in both directions (new client → old
+workflow, and vice versa). This is the same model as Protocol Buffers wire
+compatibility.
 
 ### 2. Handler names are immutable
 
@@ -665,17 +651,17 @@ versions between client and workflow. The reasons:
   version changes behavior (e.g., how it processes a signal), `patched()` gates
   old vs. new logic within the same workflow code during the transition period.
 
-### Precedent
+### Field defaults
 
-Every protocol change to date has followed rule 1:
+All fields follow rule 1:
 
-| Change | New field | Default | Backward behavior |
-|---|---|---|---|
-| Dedup | `PublishInput.publisher_id` | `""` | Empty string skips dedup |
-| Dedup | `PublishInput.sequence` | `0` | Zero skips dedup |
-| Item offset | `_WireItem.offset` | `0` | Zero means "unknown" |
-| Poll truncation | `PollResult.more_ready` | `False` | Old clients poll normally |
-| TTL pruning | `PubSubState.publisher_last_seen` | `{}` | Empty dict, no pruning state |
+| Field | Default | Behavior when absent |
+|---|---|---|
+| `PublishInput.publisher_id` | `""` | Empty string skips dedup |
+| `PublishInput.sequence` | `0` | Zero skips dedup |
+| `_WireItem.offset` | `0` | Zero means "unknown" |
+| `PollResult.more_ready` | `False` | No truncation signaled |
+| `PubSubState.publisher_last_seen` | `{}` | No TTL pruning state |
 
 ## File Layout
 
@@ -687,10 +673,6 @@ temporalio/contrib/pubsub/
 ├── _types.py                    # Shared data types
 ├── README.md                    # Usage documentation
 ├── DESIGN-v2.md                 # This document
-├── DESIGN.md                    # Historical: original design
-├── DESIGN-ADDENDUM-CAN.md       # Historical: CAN exploration
-├── DESIGN-ADDENDUM-TOPICS.md    # Historical: offset model exploration
-├── DESIGN-ADDENDUM-DEDUP.md     # Historical: dedup exploration
 └── verification/                # TLA+ formal verification
     ├── README.md                # Overview and running instructions
     ├── PROOF.md                 # Full correctness proof

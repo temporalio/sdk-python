@@ -320,9 +320,9 @@ paths are not modeled beyond what is covered above:
   sees `pending_seq <= wf_last_seq` and rejects (dedup). If the signal was
   already delivered before FlushFail, the retry is also rejected.
 
-- **Legacy `publisher_id = ""` (dedup bypass)**: When `publisher_id` is empty,
+- **Empty `publisher_id` (dedup bypass)**: When `publisher_id` is empty,
   the workflow skips dedup entirely. This path is not modeled — it's
-  intentionally at-least-once for backward compatibility.
+  intentionally at-least-once for workflow-internal publishes.
 
 - **Workflow-internal `publish()`**: Deterministic, no signal involved, no
   dedup needed. Not modeled because there's no concurrency to verify.

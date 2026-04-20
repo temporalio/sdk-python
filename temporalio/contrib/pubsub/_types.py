@@ -21,8 +21,7 @@ class PubSubItem:
     """A single item in the pub/sub log.
 
     The ``offset`` field is populated at poll time from the item's position
-    in the global log. It defaults to 0 ("unknown") for backward compatibility.
-    See DESIGN-ADDENDUM-ITEM-OFFSET.md.
+    in the global log.
     """
 
     topic: str
@@ -46,8 +45,7 @@ class PublishEntry:
 class PublishInput:
     """Signal payload: batch of entries to publish.
 
-    Includes publisher_id and sequence for exactly-once deduplication.
-    See DESIGN-ADDENDUM-DEDUP.md.
+    Includes publisher_id and sequence to ensure exactly-once delivery.
     """
 
     items: list[PublishEntry] = field(default_factory=list)
@@ -78,7 +76,8 @@ class PollResult:
 
     Items use base64-encoded data for cross-language wire compatibility.
     When ``has_more`` is True, the response was truncated to stay within
-    size limits and the subscriber should poll again immediately.
+    size limits and the subscriber should poll again immediately rather
+    than applying a cooldown delay.
     """
 
     items: list[_WireItem] = field(default_factory=list)

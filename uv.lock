@@ -9,8 +9,11 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-03-30T03:37:56.787253Z"
-exclude-newer-span = "P7D"
+exclude-newer = "2026-04-12T04:20:59.693938Z"
+exclude-newer-span = "P1W"
+
+[options.exclude-newer-package]
+openai-agents = false
 
 [[package]]
 name = "aioboto3"

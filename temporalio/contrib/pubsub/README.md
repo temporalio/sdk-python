@@ -121,7 +121,7 @@ External publishers (via `PubSubClient`) get exactly-once delivery through
 publisher ID + sequence number deduplication. Each client instance generates
 a unique publisher ID and increments a monotonic sequence on each flush.
 The workflow tracks the highest seen sequence per publisher and rejects
-duplicates. See `DESIGN-ADDENDUM-DEDUP.md` for details.
+duplicates. See `DESIGN-v2.md` for details.
 
 ## API Reference
 
