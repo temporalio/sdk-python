@@ -165,4 +165,6 @@ fixed handler names:
 3. **Offset:** Query `__pubsub_offset` -> `int`
 
 The Python API uses `bytes` for payloads. Base64 encoding is used internally
-on the wire for cross-language compatibility.
+on the wire for cross-language compatibility. The wire protocol requires the
+default (JSON) data converter — custom converters will break cross-language
+interop.

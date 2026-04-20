@@ -889,8 +889,8 @@ async def test_replay_safety(client: Client) -> None:
 async def test_flush_keeps_pending_on_signal_failure(client: Client) -> None:
     """If flush signal fails, items stay in _pending for retry with same sequence.
 
-    This matches the TLA+-verified algorithm (PubSubDedup.tla): on failure,
-    the pending batch and sequence are kept so the next _flush() retries with
+    On failure, the pending batch and sequence are kept so the next
+    _flush() retries with
     the SAME sequence number. The confirmed sequence (_sequence) does NOT
     advance until delivery is confirmed.
     """
@@ -966,8 +966,6 @@ async def test_retry_timeout_sequence_reuse_causes_data_loss(
     both that the old sequence is rejected AND that a fresh sequence is
     accepted.
 
-    See PubSubDedup.tla: DropPendingBuggy (fails SequenceFreshness) vs
-    DropPendingFixed (passes all invariants).
     """
     async with new_worker(
         client,

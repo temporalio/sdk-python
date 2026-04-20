@@ -190,6 +190,21 @@ The workflow does not interpret payloads. This enables cross-language
 compatibility. The pub/sub layer is transport; application semantics belong
 in the application.
 
+The alternative is typed payloads — the pub/sub layer accepts
+application-defined types and uses Temporal's data converter for
+serialization. We chose opaque bytes because:
+
+1. **Decoupling.** Different publishers on the same workflow may publish
+   different types to different topics. Opaque bytes let each publisher
+   choose its own serialization.
+2. **Layering.** The data converter already handles the wire format of
+   `PublishInput` and `PollResult` (the signal/update envelopes). Using it
+   for payload data would mean the converter runs at two levels.
+3. **Type hints.** `DataConverter.decode()` requires a target type. The
+   pub/sub layer does not know the application's types, so subscribers would
+   need to declare expected types per topic — complexity the application
+   handles trivially with `json.loads()`.
+
 ### 3. Global offsets, NATS JetStream model
 
 Every entry gets a global offset from a single counter. Subscribers filter by
@@ -389,7 +404,7 @@ exactly-once via Update ID, eliminating application-level dedup. However:
 
 If the cross-CAN dedup gap is fixed and backpressure becomes desirable,
 switching publish to updates is a mechanical change — the dedup protocol,
-TLA+ specs, and mixin handler logic are unchanged.
+dedup protocol, and mixin handler logic are unchanged.
 
 ## Exactly-Once Publish Delivery
 
@@ -686,8 +701,16 @@ Any Temporal client in any language can interact with a pub/sub workflow by:
 3. **Checking offset**: Query `__pubsub_offset`
 
 Double-underscore prefix on handler names avoids collisions with application
-signals/updates. The payload types are simple composites of strings, bytes,
+signals/updates. The envelope types are simple composites of strings, bytes,
 and ints — representable in every Temporal SDK's default data converter.
+
+**Requires the default (JSON) data converter.** The wire protocol depends on
+all participants — workflow, publishers, and subscribers — using the default
+JSON data converter. A custom converter (protobuf, encryption codecs) would
+change how the envelope types serialize, breaking cross-language interop.
+This is also why payload data is opaque bytes: the pub/sub layer controls the
+envelope format (guaranteed JSON-safe), while the application controls payload
+serialization independently.
 
 ## Compatibility
 

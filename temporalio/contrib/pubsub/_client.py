@@ -186,7 +186,7 @@ class PubSubClient:
                     # a fresh sequence number. Without this, the next batch
                     # reuses pending_seq, which the workflow may have already
                     # accepted — causing silent dedup (data loss).
-                    # See PubSubDedup.tla DropPendingFixed / SequenceFreshness.
+                    # See DropPendingFixed / SequenceFreshness in the design doc.
                     self._sequence = self._pending_seq
                     self._pending = None
                     self._pending_seq = 0
