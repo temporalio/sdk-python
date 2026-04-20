@@ -14,11 +14,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import (
-    LangGraphPlugin,
-    cache,
-    set_cache,
-)
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, cache, graph
 from temporalio.worker import Worker
 
 # Track execution counts to verify caching
@@ -48,16 +44,6 @@ async def double(state: State) -> dict[str, int]:
     return {"value": state["value"] * 2}
 
 
-_timeout = {"start_to_close_timeout": timedelta(seconds=10)}
-cached_graph: StateGraph[State, None, State, State] = StateGraph(State)
-cached_graph.add_node("multiply_by_3", multiply_by_3, metadata=_timeout)
-cached_graph.add_node("add_100", add_100, metadata=_timeout)
-cached_graph.add_node("double", double, metadata=_timeout)
-cached_graph.add_edge(START, "multiply_by_3")
-cached_graph.add_edge("multiply_by_3", "add_100")
-cached_graph.add_edge("add_100", "double")
-
-
 @dataclass
 class GraphContinueAsNewInput:
     value: int
@@ -79,8 +65,7 @@ class GraphContinueAsNewWorkflow:
 
     @workflow.run
     async def run(self, input_data: GraphContinueAsNewInput) -> dict[str, int]:
-        set_cache(input_data.cache)
-        app = cached_graph.compile()
+        app = graph("cached-graph", cache=input_data.cache).compile()
         result = await app.ainvoke({"value": input_data.value})
 
         if input_data.phase < 3:
@@ -103,13 +88,22 @@ async def test_graph_continue_as_new_cached(client: Client):
     """
     _reset()
 
+    timeout = {"start_to_close_timeout": timedelta(seconds=10)}
+    g = StateGraph(State)
+    g.add_node("multiply_by_3", multiply_by_3, metadata=timeout)
+    g.add_node("add_100", add_100, metadata=timeout)
+    g.add_node("double", double, metadata=timeout)
+    g.add_edge(START, "multiply_by_3")
+    g.add_edge("multiply_by_3", "add_100")
+    g.add_edge("add_100", "double")
+
     task_queue = f"graph-cached-{uuid4()}"
 
     async with Worker(
         client,
         task_queue=task_queue,
         workflows=[GraphContinueAsNewWorkflow],
-        plugins=[LangGraphPlugin(graphs=[cached_graph])],
+        plugins=[LangGraphPlugin(graphs={"cached-graph": g})],
     ):
         result = await client.execute_workflow(
             GraphContinueAsNewWorkflow.run,

@@ -3,25 +3,40 @@ from datetime import timedelta
 from uuid import uuid4
 
 import pytest
+from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 
 from temporalio.client import Client
 from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
 from temporalio.worker import Replayer, Worker
 from tests.contrib.langgraph.test_interrupt import (
     InterruptWorkflow,
-    interrupt_graph,
+)
+from tests.contrib.langgraph.test_interrupt import (
+    State as InterruptState,
+)
+from tests.contrib.langgraph.test_interrupt import (
+    node as interrupt_node,
 )
 from tests.contrib.langgraph.test_two_nodes import (
+    State,
     TwoNodesWorkflow,
-    my_graph,
+    node_a,
+    node_b,
 )
-
-_DEFAULTS = {"start_to_close_timeout": timedelta(seconds=10)}
 
 
 async def test_replay(client: Client):
+    g = StateGraph(State)
+    g.add_node("node_a", node_a)
+    g.add_node("node_b", node_b)
+    g.add_edge(START, "node_a")
+    g.add_edge("node_a", "node_b")
+
     task_queue = f"my-graph-{uuid4()}"
-    plugin = LangGraphPlugin(graphs=[my_graph], default_activity_options=_DEFAULTS)
+    plugin = LangGraphPlugin(
+        graphs={"my-graph": g},
+        default_activity_options={"start_to_close_timeout": timedelta(seconds=10)},
+    )
 
     async with Worker(
         client,
@@ -48,9 +63,14 @@ async def test_replay(client: Client):
     reason="langgraph.types.interrupt() requires Python >= 3.11 for async context propagation",
 )
 async def test_replay_interrupt(client: Client):
+    g = StateGraph(InterruptState)
+    g.add_node("node", interrupt_node)
+    g.add_edge(START, "node")
+
     task_queue = f"interrupt-replay-{uuid4()}"
     plugin = LangGraphPlugin(
-        graphs=[interrupt_graph], default_activity_options=_DEFAULTS
+        graphs={"my-graph": g},
+        default_activity_options={"start_to_close_timeout": timedelta(seconds=10)},
     )
 
     async with Worker(

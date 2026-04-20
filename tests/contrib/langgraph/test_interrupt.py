@@ -19,7 +19,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
+from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin, graph
 from temporalio.worker import Worker
 
 
@@ -31,15 +31,10 @@ async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedP
     return {"value": langgraph.types.interrupt("Continue?")}
 
 
-interrupt_graph: StateGraph[State, None, State, State] = StateGraph(State)
-interrupt_graph.add_node("node", node)
-interrupt_graph.add_edge(START, "node")
-
-
 @workflow.defn
 class InterruptWorkflow:
     def __init__(self) -> None:
-        self.app = interrupt_graph.compile(checkpointer=InMemorySaver())
+        self.app = graph("my-graph").compile(checkpointer=InMemorySaver())
 
     @workflow.run
     async def run(self, input: str) -> Any:
@@ -54,7 +49,7 @@ class InterruptWorkflow:
 @workflow.defn
 class InterruptV2Workflow:
     def __init__(self) -> None:
-        self.app = interrupt_graph.compile(checkpointer=InMemorySaver())
+        self.app = graph("my-graph").compile(checkpointer=InMemorySaver())
 
     @workflow.run
     async def run(self, input: str) -> Any:
@@ -73,6 +68,10 @@ class InterruptV2Workflow:
     "workflow_cls", [InterruptWorkflow, InterruptV2Workflow], ids=["v1", "v2"]
 )
 async def test_interrupt(client: Client, workflow_cls: Any) -> None:
+    g = StateGraph(State)
+    g.add_node("node", node)
+    g.add_edge(START, "node")
+
     task_queue = f"interrupt-{uuid4()}"
 
     async with Worker(
@@ -81,7 +80,7 @@ async def test_interrupt(client: Client, workflow_cls: Any) -> None:
         workflows=[workflow_cls],
         plugins=[
             LangGraphPlugin(
-                graphs=[interrupt_graph],
+                graphs={"my-graph": g},
                 default_activity_options={
                     "start_to_close_timeout": timedelta(seconds=10)
                 },
