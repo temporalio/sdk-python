@@ -6,7 +6,7 @@ import pytest
 from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
+from temporalio.contrib.langgraph.plugin import LangGraphPlugin
 from temporalio.worker import Replayer, Worker
 from tests.contrib.langgraph.test_interrupt import (
     InterruptWorkflow,

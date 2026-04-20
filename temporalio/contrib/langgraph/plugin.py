@@ -16,6 +16,11 @@ from langgraph.pregel import Pregel
 
 from temporalio import activity, workflow
 from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
+from temporalio.contrib.langgraph.interceptor import (
+    LangGraphInterceptor,
+    _workflow_entrypoints,
+    _workflow_graphs,
+)
 from temporalio.contrib.langgraph.task_cache import (
     get_task_cache,
     set_task_cache,
@@ -28,10 +33,6 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 _ACTIVITY_OPTION_KEYS: frozenset[str] = frozenset(
     {"execute_in", *inspect.signature(workflow.execute_activity).parameters}
 )
-
-# Save registered graphs/entrypoints at the module level to avoid being refreshed by the sandbox.
-_graph_registry: dict[str, StateGraph[Any]] = {}
-_entrypoint_registry: dict[str, Pregel[Any, Any, Any, Any]] = {}
 
 
 class LangGraphPlugin(SimplePlugin):
@@ -74,7 +75,6 @@ class LangGraphPlugin(SimplePlugin):
 
         # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
-            _graph_registry.update(graphs)
             for graph_name, graph in graphs.items():
                 for node_name, node in graph.nodes.items():
                     runnable = node.runnable
@@ -91,9 +91,7 @@ class LangGraphPlugin(SimplePlugin):
                     # boundary. The wrapper serializes config down to its
                     # portable subset before handing off to the activity.
                     runnable.func_accepts = {
-                        k: v
-                        for k, v in runnable.func_accepts.items()
-                        if k == "config"
+                        k: v for k, v in runnable.func_accepts.items() if k == "config"
                     }
                     # Split node.metadata into activity options vs. user
                     # metadata. Activity-option keys (timeouts, retry policy,
@@ -113,9 +111,6 @@ class LangGraphPlugin(SimplePlugin):
                     runnable.afunc = self.execute(
                         f"{graph_name}.{node_name}", runnable.afunc, opts
                     )
-
-        if entrypoints:
-            _entrypoint_registry.update(entrypoints)
 
         # Functional API: Wrap @task functions as Temporal Activities.
         if tasks:
@@ -150,6 +145,7 @@ class LangGraphPlugin(SimplePlugin):
             "temporalio.LangGraphPlugin",
             activities=self.activities,
             workflow_runner=workflow_runner,
+            interceptors=[LangGraphInterceptor(graphs or {}, entrypoints or {})],
         )
 
     def execute(
@@ -184,12 +180,14 @@ def graph(
             not re-executed after continue-as-new.
     """
     set_task_cache(cache or {})
-    if name not in _graph_registry:
-        raise KeyError(
-            f"Graph {name!r} not found. "
-            f"Available graphs: {list(_graph_registry.keys())}"
+    graphs = _workflow_graphs.get(workflow.info().run_id)
+    if graphs is None:
+        raise RuntimeError(
+            "graph() must be called from inside a workflow running under LangGraphPlugin"
         )
-    return _graph_registry[name]
+    if name not in graphs:
+        raise KeyError(f"Graph {name!r} not found. Available graphs: {list(graphs)}")
+    return graphs[name]
 
 
 def entrypoint(
@@ -204,12 +202,16 @@ def entrypoint(
             not re-executed after continue-as-new.
     """
     set_task_cache(cache or {})
-    if name not in _entrypoint_registry:
-        raise KeyError(
-            f"Entrypoint {name!r} not found. "
-            f"Available entrypoints: {list(_entrypoint_registry.keys())}"
+    entrypoints = _workflow_entrypoints.get(workflow.info().run_id)
+    if entrypoints is None:
+        raise RuntimeError(
+            "entrypoint() must be called from inside a workflow running under LangGraphPlugin"
         )
-    return _entrypoint_registry[name]
+    if name not in entrypoints:
+        raise KeyError(
+            f"Entrypoint {name!r} not found. Available entrypoints: {list(entrypoints)}"
+        )
+    return entrypoints[name]
 
 
 def cache() -> dict[str, Any] | None:

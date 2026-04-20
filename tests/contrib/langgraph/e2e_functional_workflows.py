@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from temporalio import workflow
-from temporalio.contrib.langgraph.langgraph_plugin import cache, entrypoint
+from temporalio.contrib.langgraph.plugin import cache, entrypoint
 
 
 @workflow.defn

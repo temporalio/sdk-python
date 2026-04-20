@@ -8,7 +8,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.langgraph_plugin import LangGraphPlugin
+from temporalio.contrib.langgraph.plugin import LangGraphPlugin
 from temporalio.worker import Worker
 
 

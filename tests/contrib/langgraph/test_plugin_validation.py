@@ -1,4 +1,4 @@
-"""Tests for LangGraphPlugin validation and registry lookup error paths."""
+"""Tests for LangGraphPlugin validation."""
 
 from __future__ import annotations
 
@@ -9,11 +9,7 @@ from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTy
 from pytest import raises
 from typing_extensions import TypedDict
 
-from temporalio.contrib.langgraph.langgraph_plugin import (
-    LangGraphPlugin,
-    entrypoint,
-    graph,
-)
+from temporalio.contrib.langgraph.plugin import LangGraphPlugin
 
 
 class State(TypedDict):
@@ -45,13 +41,3 @@ def test_invalid_execute_in_raises() -> None:
 
     with raises(ValueError, match="Invalid execute_in value"):
         LangGraphPlugin(graphs={f"validation-{uuid4()}": g})
-
-
-async def test_unknown_graph_raises() -> None:
-    with raises(KeyError, match="not found"):
-        graph(f"not-registered-{uuid4()}")
-
-
-async def test_unknown_entrypoint_raises() -> None:
-    with raises(KeyError, match="not found"):
-        entrypoint(f"not-registered-{uuid4()}")
