@@ -6,7 +6,7 @@ from inspect import iscoroutinefunction
 from typing import Any, Callable
 
 from langgraph.errors import GraphInterrupt
-from langgraph.types import Interrupt
+from langgraph.types import Command, Interrupt
 
 from temporalio import workflow
 from temporalio.contrib.langgraph.langgraph_config import (
@@ -31,9 +31,10 @@ class ActivityInput:
 
 @dataclass
 class ActivityOutput:
-    """Output from a LangGraph activity, containing result or interrupts."""
+    """Output from an Activity, containing result, command, or interrupts."""
 
     result: Any = None
+    langgraph_command: Any = None
     langgraph_interrupts: tuple[Interrupt] | None = None
 
 
@@ -49,6 +50,8 @@ def wrap_activity(
                 result = await func(*input.args, **input.kwargs)
             else:
                 result = func(*input.args, **input.kwargs)
+            if isinstance(result, Command):
+                return ActivityOutput(langgraph_command=result)
             return ActivityOutput(result=result)
         except GraphInterrupt as e:
             return ActivityOutput(langgraph_interrupts=e.args[0])
@@ -90,10 +93,20 @@ def wrap_execute_activity(
         if output.langgraph_interrupts is not None:
             raise GraphInterrupt(output.langgraph_interrupts)
 
+        result = output.result
+        if output.langgraph_command is not None:
+            cmd = output.langgraph_command
+            result = Command(
+                graph=cmd["graph"],
+                update=cmd["update"],
+                resume=cmd["resume"],
+                goto=cmd["goto"],
+            )
+
         # Store in cache for future continue-as-new cycles.
         if task_id:
-            cache_put(key, output.result)
+            cache_put(key, result)
 
-        return output.result
+        return result
 
     return wrapper

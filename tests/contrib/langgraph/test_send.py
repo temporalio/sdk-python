@@ -26,7 +26,7 @@ def worker(state: WorkerState) -> dict[str, list[str]]:
     return {"results": [state["item"].upper()]}
 
 
-def fan_out(state: State) -> list[Send]:
+async def fan_out(state: State) -> list[Send]:
     return [Send("worker", {"item": item}) for item in state["items"]]
 
 
