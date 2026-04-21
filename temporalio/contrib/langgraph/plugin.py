@@ -78,13 +78,11 @@ class LangGraphPlugin(SimplePlugin):
             for graph_name, graph in graphs.items():
                 for node_name, node in graph.nodes.items():
                     runnable = node.runnable
-                    if (
-                        not isinstance(runnable, RunnableCallable)
-                        or runnable.afunc is None
-                    ):
-                        raise ValueError(
-                            f"Node {node_name} must have an async function"
-                        )
+                    if not isinstance(runnable, RunnableCallable):
+                        raise ValueError(f"Node {node_name} must be a RunnableCallable")
+                    user_func = runnable.afunc or runnable.func
+                    if user_func is None:
+                        raise ValueError(f"Node {node_name} must have a function")
                     # Keep only 'config' injection so node functions can read
                     # metadata/tags. Drop writer/store/runtime/etc., which hold
                     # non-serializable objects that can't cross the activity
@@ -108,9 +106,13 @@ class LangGraphPlugin(SimplePlugin):
                         if k not in _ACTIVITY_OPTION_KEYS
                     }
                     opts = {**(default_activity_options or {}), **node_opts}
+                    # Route all LangGraph node calls through afunc so the async
+                    # activity wrapper is always used. wrap_activity handles
+                    # sync vs. async user functions inside the activity itself.
                     runnable.afunc = self.execute(
-                        f"{graph_name}.{node_name}", runnable.afunc, opts
+                        f"{graph_name}.{node_name}", user_func, opts
                     )
+                    runnable.func = None
 
         # Functional API: Wrap @task functions as Temporal Activities.
         if tasks:

@@ -30,7 +30,7 @@ def test_non_runnable_callable_node_raises() -> None:
     g.add_node("node", RunnableLambda(sync_node))
     g.add_edge(START, "node")
 
-    with raises(ValueError, match="must have an async function"):
+    with raises(ValueError, match="must be a RunnableCallable"):
         LangGraphPlugin(graphs={f"validation-{uuid4()}": g})
 
 
