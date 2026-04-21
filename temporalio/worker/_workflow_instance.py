@@ -62,6 +62,7 @@ import temporalio.workflow
 from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
+from ..converter import PayloadConverter
 from . import _command_aware_visitor
 from ._interceptor import (
     ContinueAsNewInput,
@@ -1993,7 +1994,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             StartNexusOperationInput(
                 endpoint=temporalio.workflow._SYSTEM_NEXUS_ENDPOINT,
                 service=temporalio.nexus.system.generated.WorkflowService.__name__,
-                operation=temporalio.nexus.system.generated.WorkflowService.signal_with_start_workflow_execution,
+                operation=temporalio.nexus.system.generated.WorkflowService.signal_with_start_workflow_execution.name,
                 input=request,
                 schedule_to_close_timeout=None,
                 schedule_to_start_timeout=None,
@@ -2001,11 +2002,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 cancellation_type=temporalio.workflow.NexusOperationCancellationType.WAIT_COMPLETED,
                 headers=input.headers,
                 summary=None,
+                output_type=temporalio.nexus.system.generated.SignalWithStartWorkflowExecutionResponse,
             )
         )
         result = await handle
         return self.workflow_get_external_workflow_handle(
-            input.workflow_id, run_id=result.runId
+            input.workflow_id, run_id=result.run_id
         )
 
     async def _outbound_start_child_workflow(
@@ -2086,8 +2088,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     cancel_command = self._add_command()
                     handle._apply_cancel_command(cancel_command)
 
+        is_system_operation = temporalio.nexus.system.is_system_operation(
+            input.service, input.operation_name
+        )
+        payload_converter = (
+            temporalio.nexus.system.get_payload_converter()
+            if is_system_operation
+            else self._context_free_payload_converter
+        )
         handle = _NexusOperationHandle(
-            self, self._next_seq("nexus_operation"), input, operation_handle_fn()
+            self,
+            self._next_seq("nexus_operation"),
+            input,
+            operation_handle_fn(),
+            payload_converter,
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
@@ -3424,6 +3438,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         seq: int,
         input: StartNexusOperationInput[Any, OutputT],
         fn: Coroutine[Any, Any, OutputT],
+        payload_converter: PayloadConverter,
     ):
         self._instance = instance
         self._seq = seq
@@ -3431,7 +3446,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._task = asyncio.Task(fn)
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
-        self._payload_converter = self._instance._context_free_payload_converter
+        self._payload_converter = payload_converter
         self._failure_converter = self._instance._context_free_failure_converter
 
     @property
@@ -3471,12 +3486,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         v.endpoint = self._input.endpoint
         v.service = self._input.service
         v.operation = self._input.operation_name
-        payload_converter = (
-            temporalio.nexus.system.get_payload_converter()
-            if temporalio.nexus.system.is_system_operation(v.service, v.operation)
-            else self._payload_converter
-        )
-        v.input.CopyFrom(payload_converter.to_payload(self._input.input))
+        v.input.CopyFrom(self._payload_converter.to_payload(self._input.input))
         if self._input.schedule_to_close_timeout is not None:
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout

@@ -8,23 +8,24 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import ClassVar, Dict, List, Optional
 
 from google.protobuf.json_format import MessageToDict, ParseDict
 from nexusrpc import Operation, service
 
 import temporalio.api.common.v1
+import temporalio.api.workflowservice.v1
 
 
 @dataclass
 class PayloadExternalPayloadDetails:
-    sizeBytes: Optional[str] = None
+    size_bytes: Optional[str] = None
 
 
 @dataclass
 class Payload:
     data: Optional[str] = None
-    externalPayloads: Optional[List[PayloadExternalPayloadDetails]] = None
+    external_payloads: Optional[List[PayloadExternalPayloadDetails]] = None
     metadata: Optional[Dict[str, str]] = None
 
 
@@ -40,14 +41,14 @@ class Payloads:
 
 @dataclass
 class LinkActivity:
-    activityId: Optional[str] = None
+    activity_id: Optional[str] = None
     namespace: Optional[str] = None
-    runId: Optional[str] = None
+    run_id: Optional[str] = None
 
 
 @dataclass
 class LinkBatchJob:
-    jobId: Optional[str] = None
+    job_id: Optional[str] = None
 
 
 class EventType(str, Enum):
@@ -176,30 +177,30 @@ class EventType(str, Enum):
 
 @dataclass
 class WorkflowEventEventReference:
-    eventId: Optional[str] = None
-    eventType: Optional["EventType"] = None
+    event_id: Optional[str] = None
+    event_type: Optional["EventType"] = None
 
 
 @dataclass
 class WorkflowEventRequestIDReference:
-    eventType: Optional["EventType"] = None
-    requestId: Optional[str] = None
+    event_type: Optional["EventType"] = None
+    request_id: Optional[str] = None
 
 
 @dataclass
 class LinkWorkflowEvent:
-    eventRef: Optional[WorkflowEventEventReference] = None
+    event_ref: Optional[WorkflowEventEventReference] = None
     namespace: Optional[str] = None
-    requestIdRef: Optional[WorkflowEventRequestIDReference] = None
-    runId: Optional[str] = None
-    workflowId: Optional[str] = None
+    request_id_ref: Optional[WorkflowEventRequestIDReference] = None
+    run_id: Optional[str] = None
+    workflow_id: Optional[str] = None
 
 
 @dataclass
 class Link:
     activity: Optional[LinkActivity] = None
-    batchJob: Optional[LinkBatchJob] = None
-    workflowEvent: Optional[LinkWorkflowEvent] = None
+    batch_job: Optional[LinkBatchJob] = None
+    workflow_event: Optional[LinkWorkflowEvent] = None
 
 
 @dataclass
@@ -209,23 +210,23 @@ class Memo:
 
 @dataclass
 class Priority:
-    fairnessKey: Optional[str] = None
-    fairnessWeight: Optional[float] = None
-    priorityKey: Optional[int] = None
+    fairness_key: Optional[str] = None
+    fairness_weight: Optional[float] = None
+    priority_key: Optional[int] = None
 
 
 @dataclass
 class RetryPolicy:
-    backoffCoefficient: Optional[float] = None
-    initialInterval: Optional[str] = None
-    maximumAttempts: Optional[int] = None
-    maximumInterval: Optional[str] = None
-    nonRetryableErrorTypes: Optional[List[str]] = None
+    backoff_coefficient: Optional[float] = None
+    initial_interval: Optional[str] = None
+    maximum_attempts: Optional[int] = None
+    maximum_interval: Optional[str] = None
+    non_retryable_error_types: Optional[List[str]] = None
 
 
 @dataclass
 class SearchAttributes:
-    indexedFields: Optional[Dict[str, Payload]] = None
+    indexed_fields: Optional[Dict[str, Payload]] = None
 
 
 class Kind(str, Enum):
@@ -239,16 +240,16 @@ class Kind(str, Enum):
 class TaskQueue:
     kind: Optional["Kind"] = None
     name: Optional[str] = None
-    normalName: Optional[str] = None
+    normal_name: Optional[str] = None
 
 
 @dataclass
 class TimeSkippingConfig:
-    disablePropagation: Optional[bool] = None
+    disable_propagation: Optional[bool] = None
     enabled: Optional[bool] = None
-    maxElapsedDuration: Optional[str] = None
-    maxSkippedDuration: Optional[str] = None
-    maxTargetTime: Optional[datetime] = None
+    max_elapsed_duration: Optional[str] = None
+    max_skipped_duration: Optional[str] = None
+    max_target_time: Optional[datetime] = None
 
 
 @dataclass
@@ -265,8 +266,8 @@ class VersioningOverrideBehavior(str, Enum):
 
 @dataclass
 class Deployment:
-    buildId: Optional[str] = None
-    seriesName: Optional[str] = None
+    build_id: Optional[str] = None
+    series_name: Optional[str] = None
 
 
 class VersioningOverridePinnedOverrideBehavior(str, Enum):
@@ -276,8 +277,8 @@ class VersioningOverridePinnedOverrideBehavior(str, Enum):
 
 @dataclass
 class WorkerDeploymentVersion:
-    buildId: Optional[str] = None
-    deploymentName: Optional[str] = None
+    build_id: Optional[str] = None
+    deployment_name: Optional[str] = None
 
 
 @dataclass
@@ -288,11 +289,11 @@ class VersioningOverridePinnedOverride:
 
 @dataclass
 class VersioningOverride:
-    autoUpgrade: Optional[bool] = None
+    auto_upgrade: Optional[bool] = None
     behavior: Optional["VersioningOverrideBehavior"] = None
     deployment: Optional[Deployment] = None
     pinned: Optional[VersioningOverridePinnedOverride] = None
-    pinnedVersion: Optional[str] = None
+    pinned_version: Optional[str] = None
 
 
 class WorkflowIDConflictPolicy(str, Enum):
@@ -330,7 +331,7 @@ class WorkflowType:
 @dataclass
 class SignalWithStartWorkflowExecutionRequest:
     control: Optional[str] = None
-    cronSchedule: Optional[str] = None
+    cron_schedule: Optional[str] = None
     header: Optional[Header] = None
     identity: Optional[str] = None
     input: Optional[Payloads] = None
@@ -338,30 +339,54 @@ class SignalWithStartWorkflowExecutionRequest:
     memo: Optional[Memo] = None
     namespace: Optional[str] = None
     priority: Optional[Priority] = None
-    requestId: Optional[str] = None
-    retryPolicy: Optional[RetryPolicy] = None
-    searchAttributes: Optional[SearchAttributes] = None
-    signalInput: Optional[Payloads] = None
-    signalName: Optional[str] = None
-    taskQueue: Optional[TaskQueue] = None
-    timeSkippingConfig: Optional[TimeSkippingConfig] = None
-    userMetadata: Optional[UserMetadata] = None
-    versioningOverride: Optional[VersioningOverride] = None
-    workflowExecutionTimeout: Optional[str] = None
-    workflowId: Optional[str] = None
-    workflowIdConflictPolicy: Optional["WorkflowIDConflictPolicy"] = None
-    workflowIdReusePolicy: Optional["WorkflowIDReusePolicy"] = None
-    workflowRunTimeout: Optional[str] = None
-    workflowStartDelay: Optional[str] = None
-    workflowTaskTimeout: Optional[str] = None
-    workflowType: Optional[WorkflowType] = None
+    request_id: Optional[str] = None
+    retry_policy: Optional[RetryPolicy] = None
+    search_attributes: Optional[SearchAttributes] = None
+    signal_input: Optional[Payloads] = None
+    signal_name: Optional[str] = None
+    task_queue: Optional[TaskQueue] = None
+    time_skipping_config: Optional[TimeSkippingConfig] = None
+    user_metadata: Optional[UserMetadata] = None
+    versioning_override: Optional[VersioningOverride] = None
+    workflow_execution_timeout: Optional[str] = None
+    workflow_id: Optional[str] = None
+    workflow_id_conflict_policy: Optional["WorkflowIDConflictPolicy"] = None
+    workflow_id_reuse_policy: Optional["WorkflowIDReusePolicy"] = None
+    workflow_run_timeout: Optional[str] = None
+    workflow_start_delay: Optional[str] = None
+    workflow_task_timeout: Optional[str] = None
+    workflow_type: Optional[WorkflowType] = None
+
+    __temporal_nexus_proto_type__: ClassVar[
+        type[temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest]
+    ] = temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest
+
+    @property
+    def proto_type(
+        self,
+    ) -> type[
+        temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest
+    ]:
+        return self.__temporal_nexus_proto_type__
 
 
 @dataclass
 class SignalWithStartWorkflowExecutionResponse:
-    runId: Optional[str] = None
-    signalLink: Optional[Link] = None
+    run_id: Optional[str] = None
+    signal_link: Optional[Link] = None
     started: Optional[bool] = None
+
+    __temporal_nexus_proto_type__: ClassVar[
+        type[temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse]
+    ] = temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse
+
+    @property
+    def proto_type(
+        self,
+    ) -> type[
+        temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse
+    ]:
+        return self.__temporal_nexus_proto_type__
 
 
 @service

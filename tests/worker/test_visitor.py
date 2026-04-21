@@ -261,8 +261,8 @@ async def test_bridge_encoding():
 async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
     envelope = nexus_system.generated.SignalWithStartWorkflowExecutionRequest(
         namespace="default",
-        workflowId="workflow-id",
-        signalName="signal-name",
+        workflow_id="workflow-id",
+        signal_name="signal-name",
         input=nexus_system.generated.Payloads(
             payloads=[
                 nexus_system.generated.Payload(
@@ -271,7 +271,7 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
                 )
             ]
         ),
-        signalInput=nexus_system.generated.Payloads(
+        signal_input=nexus_system.generated.Payloads(
             payloads=[
                 nexus_system.generated.Payload(
                     data="InNpZ25hbC12YWx1ZSI=",
@@ -287,8 +287,8 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
                 )
             }
         ),
-        searchAttributes=nexus_system.generated.SearchAttributes(
-            indexedFields={
+        search_attributes=nexus_system.generated.SearchAttributes(
+            indexed_fields={
                 "search-key": nexus_system.generated.Payload(
                     data="InNlYXJjaC12YWx1ZSI=",
                     metadata={"encoding": "anNvbi9wbGFpbg=="},
@@ -338,9 +338,9 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
 async def test_bridge_encoding_checks_system_nexus_envelope_size():
     envelope = nexus_system.generated.SignalWithStartWorkflowExecutionRequest(
         namespace="default",
-        workflowId="workflow-id",
-        signalName="signal-name",
-        requestId="x" * 2048,
+        workflow_id="workflow-id",
+        signal_name="signal-name",
+        request_id="x" * 2048,
         input=nexus_system.generated.Payloads(
             payloads=[
                 nexus_system.generated.Payload(
