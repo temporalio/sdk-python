@@ -77,6 +77,14 @@ class LangGraphPlugin(SimplePlugin):
         if graphs:
             for graph_name, graph in graphs.items():
                 for node_name, node in graph.nodes.items():
+                    if node.retry_policy:
+                        raise ValueError(
+                            f"Node {graph_name}.{node_name} has a LangGraph "
+                            f"retry_policy set. Use Temporal activity options "
+                            f"instead, e.g. pass retry_policy=RetryPolicy(...) "
+                            f"via default_activity_options or in the node's "
+                            f"metadata dict."
+                        )
                     runnable = node.runnable
                     if not isinstance(runnable, RunnableCallable):
                         raise ValueError(f"Node {node_name} must be a RunnableCallable")
@@ -118,6 +126,13 @@ class LangGraphPlugin(SimplePlugin):
         if tasks:
             for task in tasks:
                 name = task.func.__name__
+                if task.retry_policy:
+                    raise ValueError(
+                        f"Task {name} has a LangGraph retry_policy set. "
+                        f"Use Temporal activity options instead, e.g. pass "
+                        f"retry_policy=RetryPolicy(...) via "
+                        f"default_activity_options or activity_options[{name!r}]."
+                    )
                 opts = {
                     **(default_activity_options or {}),
                     **(activity_options or {}).get(name, {}),
