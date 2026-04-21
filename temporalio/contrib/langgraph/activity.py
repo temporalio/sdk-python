@@ -2,7 +2,7 @@
 
 from collections.abc import Awaitable
 from dataclasses import dataclass
-from inspect import iscoroutinefunction
+from inspect import iscoroutinefunction, signature
 from typing import Any, Callable
 
 from langgraph.errors import GraphInterrupt
@@ -18,6 +18,17 @@ from temporalio.contrib.langgraph.task_cache import (
     cache_lookup,
     cache_put,
 )
+
+
+# Per-run dedupe so we only warn once when a user passes a Store via
+# graph.compile(store=...) / @entrypoint(store=...). Cleared by
+# LangGraphInterceptor.execute_workflow on workflow exit.
+_warned_store_runs: set[str] = set()
+
+
+def clear_store_warning(run_id: str) -> None:
+    """Drop the store-warning dedupe entry for a workflow run."""
+    _warned_store_runs.discard(run_id)
 
 
 @dataclass
@@ -42,14 +53,21 @@ def wrap_activity(
     func: Callable,
 ) -> Callable[[ActivityInput], Awaitable[ActivityOutput]]:
     """Wrap a function as a Temporal activity that handles LangGraph config and interrupts."""
+    # Graph nodes declare `runtime: Runtime[Ctx]` in their signature; tasks
+    # don't and instead reach for Runtime via get_runtime(). We re-inject the
+    # reconstructed Runtime only when the user function asks.
+    accepts_runtime = "runtime" in signature(func).parameters
 
     async def wrapper(input: ActivityInput) -> ActivityOutput:
-        set_langgraph_config(input.langgraph_config)
+        runtime = set_langgraph_config(input.langgraph_config)
+        kwargs = dict(input.kwargs)
+        if accepts_runtime:
+            kwargs["runtime"] = runtime
         try:
             if iscoroutinefunction(func):
-                result = await func(*input.args, **input.kwargs)
+                result = await func(*input.args, **kwargs)
             else:
-                result = func(*input.args, **input.kwargs)
+                result = func(*input.args, **kwargs)
             if isinstance(result, Command):
                 return ActivityOutput(langgraph_command=result)
             return ActivityOutput(result=result)
@@ -77,15 +95,41 @@ def wrap_execute_activity(
                 "tags": list(orig.get("tags") or []),
             }
 
+        # LangGraph may inject a Runtime as the 'runtime' kwarg. It's
+        # reconstructed on the activity side from the serialized langgraph
+        # config, so drop the live Runtime from the kwargs that cross the
+        # activity boundary (it holds non-serializable stream_writer, store).
+        runtime = kwargs.pop("runtime", None)
+        run_id = workflow.info().run_id
+        if (
+            getattr(runtime, "store", None) is not None
+            and run_id not in _warned_store_runs
+        ):
+            _warned_store_runs.add(run_id)
+            workflow.logger.warning(
+                "LangGraph Store passed via compile(store=...) / @entrypoint(store=...) "
+                "is not accessible inside activity-wrapped nodes and tasks: the Store "
+                "object isn't serializable across the activity boundary, and activities "
+                "may run on a different worker than the workflow. Use a backend-backed "
+                "store (Postgres/Redis) configured on each worker if you need shared "
+                "memory, or use workflow state for per-run memory."
+            )
+
+        langgraph_config = get_langgraph_config()
+
         # Check task result cache (for continue-as-new deduplication).
-        key = cache_key(task_id, args, kwargs) if task_id else ""
+        key = (
+            cache_key(task_id, args, kwargs, langgraph_config.get("context"))
+            if task_id
+            else ""
+        )
         if task_id:
             found, cached = cache_lookup(key)
             if found:
                 return cached
 
         input = ActivityInput(
-            args=args, kwargs=kwargs, langgraph_config=get_langgraph_config()
+            args=args, kwargs=kwargs, langgraph_config=langgraph_config
         )
         output = await workflow.execute_activity(
             afunc, input, **execute_activity_kwargs

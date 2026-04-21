@@ -91,13 +91,14 @@ class LangGraphPlugin(SimplePlugin):
                     user_func = runnable.afunc or runnable.func
                     if user_func is None:
                         raise ValueError(f"Node {node_name} must have a function")
-                    # Keep only 'config' injection so node functions can read
-                    # metadata/tags. Drop writer/store/runtime/etc., which hold
-                    # non-serializable objects that can't cross the activity
-                    # boundary. The wrapper serializes config down to its
-                    # portable subset before handing off to the activity.
+                    # Keep 'config' (for metadata/tags) and 'runtime' (for
+                    # context + store — reconstructed on the activity side).
+                    # Drop writer/etc., which hold non-serializable objects
+                    # that can't cross the activity boundary.
                     runnable.func_accepts = {
-                        k: v for k, v in runnable.func_accepts.items() if k == "config"
+                        k: v
+                        for k, v in runnable.func_accepts.items()
+                        if k in ("config", "runtime")
                     }
                     # Split node.metadata into activity options vs. user
                     # metadata. Activity-option keys (timeouts, retry policy,
@@ -187,7 +188,7 @@ class LangGraphPlugin(SimplePlugin):
 
 def graph(
     name: str, cache: dict[str, Any] | None = None
-) -> StateGraph[Any, None, Any, Any]:
+) -> StateGraph[Any, Any, Any, Any]:
     """Retrieve a registered graph by name.
 
     Args:

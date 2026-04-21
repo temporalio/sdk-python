@@ -54,12 +54,17 @@ def task_id(func: Any) -> str:
     return f"{module}.{qualname}"
 
 
-def cache_key(task_id: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
-    """Build a cache key from the full task identifier and arguments."""
+def cache_key(
+    task_id: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    context: Any = None,
+) -> str:
+    """Build a cache key from the full task identifier, arguments, and runtime context."""
     try:
-        key_str = dumps([task_id, args, kwargs], sort_keys=True, default=str)
+        key_str = dumps([task_id, args, kwargs, context], sort_keys=True, default=str)
     except (TypeError, ValueError):
-        key_str = repr([task_id, args, kwargs])
+        key_str = repr([task_id, args, kwargs, context])
     return sha256(key_str.encode()).hexdigest()[:32]
 
 

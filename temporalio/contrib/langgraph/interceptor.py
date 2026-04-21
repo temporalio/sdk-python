@@ -10,6 +10,7 @@ from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 
 from temporalio import workflow
+from temporalio.contrib.langgraph.activity import clear_store_warning
 from temporalio.worker import (
     ExecuteWorkflowInput,
     Interceptor,
@@ -51,5 +52,6 @@ class LangGraphInterceptor(Interceptor):
                     run_id = workflow.info().run_id
                     _workflow_graphs.pop(run_id, None)
                     _workflow_entrypoints.pop(run_id, None)
+                    clear_store_warning(run_id)
 
         return Inbound

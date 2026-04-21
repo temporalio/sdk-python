@@ -7,11 +7,13 @@ from typing import Any
 from langchain_core.runnables.config import var_child_runnable_config
 from langgraph._internal._constants import (
     CONFIG_KEY_CHECKPOINT_NS,
+    CONFIG_KEY_RUNTIME,
     CONFIG_KEY_SCRATCHPAD,
     CONFIG_KEY_SEND,
 )
 from langgraph.graph.state import RunnableConfig
 from langgraph.pregel._algo import LazyAtomicCounter, PregelScratchpad
+from langgraph.runtime import Runtime
 
 
 def get_langgraph_config() -> dict[str, Any]:
@@ -19,6 +21,7 @@ def get_langgraph_config() -> dict[str, Any]:
     config = var_child_runnable_config.get() or {}
     configurable = config.get("configurable") or {}
     scratchpad = configurable.get(CONFIG_KEY_SCRATCHPAD)
+    runtime = configurable.get(CONFIG_KEY_RUNTIME)
 
     return {
         "configurable": {
@@ -29,12 +32,17 @@ def get_langgraph_config() -> dict[str, Any]:
                 "resume": list(getattr(scratchpad, "resume", [])),
                 "null_resume": scratchpad.get_null_resume() if scratchpad else None,
             },
-        }
+        },
+        "context": getattr(runtime, "context", None),
     }
 
 
-def set_langgraph_config(config: dict[str, Any]) -> None:
-    """Restore a LangGraph runnable config from a serialized dict."""
+def set_langgraph_config(config: dict[str, Any]) -> Runtime:
+    """Restore a LangGraph runnable config from a serialized dict.
+
+    Returns the reconstructed Runtime so callers can re-inject it into the
+    user function's kwargs without needing to know the configurable layout.
+    """
     configurable = config.get("configurable") or {}
     scratchpad = configurable.get(CONFIG_KEY_SCRATCHPAD) or {}
     null_resume_box = [scratchpad.get("null_resume")]
@@ -44,6 +52,11 @@ def set_langgraph_config(config: dict[str, Any]) -> None:
         if consume and val is not None:
             null_resume_box[0] = None
         return val
+
+    runtime = Runtime(
+        context=config.get("context"),
+        stream_writer=lambda _: None,
+    )
 
     var_child_runnable_config.set(
         RunnableConfig(
@@ -62,7 +75,9 @@ def set_langgraph_config(config: dict[str, Any]) -> None:
                         subgraph_counter=LazyAtomicCounter(),
                     ),
                     CONFIG_KEY_SEND: lambda _: None,
+                    CONFIG_KEY_RUNTIME: runtime,
                 },
             }
         )
     )
+    return runtime
