@@ -589,9 +589,6 @@ async def test_otel_standalone_activity_tracing(
         new_client,
         activities=[simple_no_context_activity],
     ) as worker:
-        # Start and complete an activity — verifies end-to-end context propagation
-        # through headers so RunActivity (and its child user span) are descendants
-        # of StartActivity.
         handle = await new_client.start_activity(
             simple_no_context_activity,
             id=f"activity_{uuid.uuid4()}",

@@ -965,8 +965,6 @@ async def test_opentelemetry_standalone_activity_tracing(
         task_queue=task_queue,
         activities=[tracing_activity],
     ):
-        # Start and complete an activity — verifies end-to-end context propagation
-        # through headers so RunActivity is a child of StartActivity.
         handle = await client.start_activity(
             tracing_activity,
             TracingActivityParam(heartbeat=False),
