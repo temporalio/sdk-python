@@ -29,7 +29,7 @@ class ContinueAsNewWorkflow:
         self.app = graph("my-graph").compile(checkpointer=InMemorySaver())
 
     @workflow.run
-    async def run(self, values: dict[str, str]) -> Any:
+    async def run(self, values: State) -> Any:
         config = RunnableConfig({"configurable": {"thread_id": "1"}})
 
         await self.app.aupdate_state(config, values)

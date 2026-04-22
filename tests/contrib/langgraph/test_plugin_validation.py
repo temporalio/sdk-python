@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import uuid4
 
 from langchain_core.runnables import RunnableLambda
@@ -55,9 +56,11 @@ def test_node_retry_policy_raises() -> None:
 
 
 def test_task_retry_policy_raises() -> None:
-    @task(retry_policy=RetryPolicy(max_attempts=3))
-    def my_task() -> str:
-        return "done"
+    decorator: Any = task(retry_policy=RetryPolicy(max_attempts=3))
+
+    @decorator
+    def my_task(x: int) -> int:
+        return x + 1
 
     with raises(ValueError, match="retry_policy"):
         LangGraphPlugin(tasks=[my_task])

@@ -24,17 +24,21 @@ _workflow_entrypoints: dict[str, dict[str, Pregel[Any, Any, Any, Any]]] = {}
 
 
 class LangGraphInterceptor(Interceptor):
+    """Interceptor that registers a workflow's graphs and entrypoints for the run."""
+
     def __init__(
         self,
         graphs: dict[str, StateGraph[Any, Any, Any, Any]],
         entrypoints: dict[str, Pregel[Any, Any, Any, Any]],
     ) -> None:
+        """Initialize with the graphs and entrypoints to scope to each workflow run."""
         self._graphs = graphs
         self._entrypoints = entrypoints
 
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
     ) -> type[WorkflowInboundInterceptor]:
+        """Return the inbound interceptor class used to scope graphs per run."""
         graphs = self._graphs
         entrypoints = self._entrypoints
 

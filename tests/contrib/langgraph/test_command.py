@@ -2,7 +2,10 @@ from datetime import timedelta
 from typing import Any, Literal
 from uuid import uuid4
 
-from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
+from langgraph.graph import (  # pyright: ignore[reportMissingTypeStubs]
+    START,
+    StateGraph,
+)
 from langgraph.types import Command
 from typing_extensions import TypedDict
 
@@ -21,7 +24,7 @@ def node_a(state: State) -> Command[Literal["node_b"]]:
 
 
 def node_b(state: State) -> Command[Literal["__end__"]]:
-    return Command(update={"value": state["value"] + "b"}, goto=END)
+    return Command(update={"value": state["value"] + "b"}, goto="__end__")
 
 
 @workflow.defn
