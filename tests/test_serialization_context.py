@@ -924,11 +924,11 @@ async def test_update_payload_conversion(
             ),
             TraceItem(
                 method="to_payload",
-                context=workflow_context,  # Outbound update result or rejection detail
+                context=workflow_context,  # Outbound update result or error detail
             ),
             TraceItem(
                 method="from_payload",
-                context=workflow_context,  # Inbound update result or rejection detail
+                context=workflow_context,  # Inbound update result or error detail
             ),
         ]
 
