@@ -1191,10 +1191,10 @@ async def test_async_response(
             handler_wf_info = await handler_wf_handle.describe()
             assert handler_wf_info.status == WorkflowExecutionStatus.CANCELED
         else:
-            handler_wf_info = await handler_wf_handle.describe()
-            assert handler_wf_info.status == WorkflowExecutionStatus.COMPLETED
             result = await caller_wf_handle.result()
             assert result.op_output.value == "workflow result"
+            handler_wf_info = await handler_wf_handle.describe()
+            assert handler_wf_info.status == WorkflowExecutionStatus.COMPLETED
 
 
 async def _start_wf_and_nexus_op(
