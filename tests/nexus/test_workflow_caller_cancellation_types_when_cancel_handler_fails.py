@@ -298,6 +298,12 @@ async def check_behavior_for_try_cancel(
     handler_wf: WorkflowHandle[Any, None],
 ) -> None:
     await handler_wf.result()
+
+    cancel_request_failed = EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED
+    async for event in caller_wf.fetch_history_events(wait_new_event=True):
+        if event.event_type == cancel_request_failed:
+            break
+
     await caller_wf.signal(CallerWorkflow.release)
     result = await caller_wf.result()
     assert result.error_type == "NexusOperationError"
