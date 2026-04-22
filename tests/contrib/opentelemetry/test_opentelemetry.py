@@ -944,6 +944,70 @@ async def test_opentelemetry_interceptor_works_if_no_context(
 # * signal failure and wft failure from signal
 
 
+async def test_opentelemetry_standalone_activity_tracing(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[tracing_activity],
+    ):
+        handle = await client.start_activity(
+            tracing_activity,
+            TracingActivityParam(heartbeat=False),
+            id=f"activity_{uuid.uuid4()}",
+            task_queue=task_queue,
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        await handle.result()
+
+    # Use a queue with no worker so activities stay in SCHEDULED state,
+    # allowing describe/cancel/terminate to be called without a race.
+    no_worker_queue = f"task_queue_{uuid.uuid4()}"
+
+    cancel_handle = await client.start_activity(
+        tracing_activity,
+        TracingActivityParam(heartbeat=False),
+        id=f"activity_{uuid.uuid4()}",
+        task_queue=no_worker_queue,
+        schedule_to_close_timeout=timedelta(seconds=30),
+    )
+    await cancel_handle.describe()
+    await cancel_handle.cancel()
+
+    terminate_handle = await client.start_activity(
+        tracing_activity,
+        TracingActivityParam(heartbeat=False),
+        id=f"activity_{uuid.uuid4()}",
+        task_queue=no_worker_queue,
+        schedule_to_close_timeout=timedelta(seconds=30),
+    )
+    await terminate_handle.terminate()
+
+    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+        "StartActivity:tracing_activity",
+        "  RunActivity:tracing_activity",
+        "StartActivity:tracing_activity",
+        "DescribeActivity",
+        "CancelActivity",
+        "StartActivity:tracing_activity",
+        "TerminateActivity",
+    ]
+
+
 def test_opentelemetry_safe_detach():
     class _fake_self:
         def _load_workflow_context_carrier(*_args):
