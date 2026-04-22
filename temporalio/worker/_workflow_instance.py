@@ -72,7 +72,7 @@ from ._interceptor import (
     HandleUpdateInput,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
-    SignalWithStartExternalWorkflowInput,
+    SignalWithStartWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
@@ -1549,6 +1549,65 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
 
+    async def workflow_signal_with_start_workflow(
+        self,
+        workflow_id: str,
+        signal: str | Callable,
+        workflow: Any,
+        *,
+        signal_args: Sequence[Any],
+        workflow_args: Sequence[Any],
+        task_queue: str,
+        execution_timeout: timedelta | None,
+        run_timeout: timedelta | None,
+        task_timeout: timedelta | None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
+        retry_policy: temporalio.common.RetryPolicy | None,
+        cron_schedule: str,
+        memo: Mapping[str, Any] | None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None,
+        static_summary: str | None,
+        static_details: str | None,
+        start_delay: timedelta | None,
+        request_id: str | None,
+        priority: temporalio.common.Priority,
+        versioning_override: temporalio.common.VersioningOverride | None,
+    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
+        self._assert_not_read_only("signal with start workflow")
+        workflow_name, _ = temporalio.workflow._Definition.get_name_and_result_type(
+            workflow
+        )
+        return await self._outbound.signal_with_start_workflow(
+            SignalWithStartWorkflowInput(
+                signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
+                    signal
+                ),
+                signal_args=signal_args,
+                namespace=self._info.namespace,
+                workflow_id=workflow_id,
+                workflow=workflow_name,
+                workflow_args=workflow_args,
+                task_queue=task_queue,
+                execution_timeout=execution_timeout,
+                run_timeout=run_timeout,
+                task_timeout=task_timeout,
+                id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
+                retry_policy=retry_policy,
+                cron_schedule=cron_schedule,
+                memo=memo,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                start_delay=start_delay,
+                request_id=request_id,
+                priority=priority,
+                versioning_override=versioning_override,
+                headers=None,
+            )
+        )
+
     def workflow_start_local_activity(
         self,
         activity: Any,
@@ -1954,8 +2013,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             temporalio.common._apply_headers(input.headers, v.headers)
         await self._signal_external_workflow(command)
 
-    async def _outbound_signal_with_start_external_workflow(
-        self, input: SignalWithStartExternalWorkflowInput
+    async def _outbound_signal_with_start_workflow(
+        self, input: SignalWithStartWorkflowInput
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
         payload_converter = self._payload_converter_with_context(
             temporalio.converter.WorkflowSerializationContext(
@@ -2948,10 +3007,10 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
     ) -> None:
         await self._instance._outbound_signal_external_workflow(input)
 
-    async def signal_with_start_external_workflow(
-        self, input: SignalWithStartExternalWorkflowInput
+    async def signal_with_start_workflow(
+        self, input: SignalWithStartWorkflowInput
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        return await self._instance._outbound_signal_with_start_external_workflow(input)
+        return await self._instance._outbound_signal_with_start_workflow(input)
 
     def start_activity(
         self, input: StartActivityInput
@@ -3359,64 +3418,6 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
                 workflow_id=self._id,
                 workflow_run_id=self._run_id,
                 headers={},
-            )
-        )
-
-    async def signal_with_start(
-        self,
-        signal: str | Callable,
-        workflow: str | Callable[..., Awaitable[Any]],
-        *,
-        signal_args: Sequence[Any] = (),
-        workflow_args: Sequence[Any] = (),
-        task_queue: str,
-        execution_timeout: timedelta | None = None,
-        run_timeout: timedelta | None = None,
-        task_timeout: timedelta | None = None,
-        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: temporalio.common.RetryPolicy | None = None,
-        cron_schedule: str = "",
-        memo: Mapping[str, Any] | None = None,
-        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
-        static_summary: str | None = None,
-        static_details: str | None = None,
-        start_delay: timedelta | None = None,
-        request_id: str | None = None,
-        priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: temporalio.common.VersioningOverride | None = None,
-    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        self._instance._assert_not_read_only("signal with start external handle")
-        workflow_name, _ = temporalio.workflow._Definition.get_name_and_result_type(
-            workflow
-        )
-        return await self._instance._outbound.signal_with_start_external_workflow(
-            SignalWithStartExternalWorkflowInput(
-                signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
-                    signal
-                ),
-                signal_args=signal_args,
-                namespace=self._instance._info.namespace,
-                workflow_id=self._id,
-                workflow=workflow_name,
-                workflow_args=workflow_args,
-                task_queue=task_queue,
-                execution_timeout=execution_timeout,
-                run_timeout=run_timeout,
-                task_timeout=task_timeout,
-                id_reuse_policy=id_reuse_policy,
-                id_conflict_policy=id_conflict_policy,
-                retry_policy=retry_policy,
-                cron_schedule=cron_schedule,
-                memo=memo,
-                search_attributes=search_attributes,
-                static_summary=static_summary,
-                static_details=static_details,
-                start_delay=start_delay,
-                request_id=request_id,
-                priority=priority,
-                versioning_override=versioning_override,
-                headers=None,
             )
         )
 

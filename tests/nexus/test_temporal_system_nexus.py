@@ -22,7 +22,7 @@ from temporalio.nexus.system import generated
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
-    SignalWithStartExternalWorkflowInput,
+    SignalWithStartWorkflowInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
@@ -63,8 +63,8 @@ class WorkflowServicePayloadHandler:
 class ExternalHandleSignalWithStartWorkflowCaller:
     @workflow.run
     async def run(self, task_queue: str) -> str:
-        handle = workflow.get_external_workflow_handle("system-nexus-workflow-id")
-        started_handle = await handle.signal_with_start(
+        started_handle = await workflow.signal_with_start_workflow(
+            "system-nexus-workflow-id",
             "test-signal",
             "test-workflow",
             signal_args=["signal-input"],
@@ -159,13 +159,11 @@ class _TracingWorkflowInboundInterceptor(WorkflowInboundInterceptor):
 
 
 class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
-    async def signal_with_start_external_workflow(
-        self, input: SignalWithStartExternalWorkflowInput
+    async def signal_with_start_workflow(
+        self, input: SignalWithStartWorkflowInput
     ) -> workflow.ExternalWorkflowHandle[object]:
-        interceptor_traces.append(
-            ("workflow.signal_with_start_external_workflow", input)
-        )
-        return await super().signal_with_start_external_workflow(input)
+        interceptor_traces.append(("workflow.signal_with_start_workflow", input))
+        return await super().signal_with_start_workflow(input)
 
 
 def _pop_received_request() -> dict[str, Any]:
@@ -209,8 +207,8 @@ def _assert_stored_payloads_include(
 def _assert_signal_with_start_interceptor_trace() -> None:
     assert len(interceptor_traces) == 1
     trace_name, trace_value = interceptor_traces.pop()
-    assert trace_name == "workflow.signal_with_start_external_workflow"
-    trace_input = cast(SignalWithStartExternalWorkflowInput, trace_value)
+    assert trace_name == "workflow.signal_with_start_workflow"
+    trace_input = cast(SignalWithStartWorkflowInput, trace_value)
     assert trace_input.workflow_id == "system-nexus-workflow-id"
     assert trace_input.signal == "test-signal"
     assert trace_input.workflow == "test-workflow"
