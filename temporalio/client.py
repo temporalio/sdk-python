@@ -5332,7 +5332,9 @@ class NexusOperationHandle(Generic[ReturnType]):
         self._endpoint = endpoint
         self._service = service
         # the default value is `_arg_unset` because ReturnType could be None
-        self._known_outcome: ReturnType | object = temporalio.common._arg_unset
+        self._known_outcome: ReturnType | NexusOperationFailureError | object = (
+            temporalio.common._arg_unset
+        )
 
     @property
     def operation_id(self) -> str:
@@ -5385,17 +5387,26 @@ class NexusOperationHandle(Generic[ReturnType]):
             RPCError: Operation result could not be fetched for some reason.
         """
         if self._known_outcome == temporalio.common._arg_unset:
-            self._known_outcome = await self._client._impl.get_nexus_operation_result(
-                GetNexusOperationResultInput(
-                    operation_id=self._operation_id,
-                    run_id=self._run_id,
-                    result_type=self._result_type,
-                    rpc_metadata=rpc_metadata,
-                    rpc_timeout=rpc_timeout,
+            try:
+                self._known_outcome = (
+                    await self._client._impl.get_nexus_operation_result(
+                        GetNexusOperationResultInput(
+                            operation_id=self._operation_id,
+                            run_id=self._run_id,
+                            result_type=self._result_type,
+                            rpc_metadata=rpc_metadata,
+                            rpc_timeout=rpc_timeout,
+                        )
+                    )
                 )
-            )
-
-        return cast(ReturnType, self._known_outcome)
+                return cast(ReturnType, self._known_outcome)
+            except NexusOperationFailureError as failure:
+                self._known_outcome = failure
+                raise
+        elif isinstance(self._known_outcome, NexusOperationFailureError):
+            raise self._known_outcome
+        else:
+            return cast(ReturnType, self._known_outcome)
 
     async def describe(
         self,

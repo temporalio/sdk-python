@@ -50,7 +50,6 @@ from temporalio.exceptions import (
     ApplicationError,
     CancelledError,
     NexusOperationAlreadyStartedError,
-    NexusOperationError,
     TerminatedError,
 )
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
@@ -287,6 +286,10 @@ async def test_start_sync_operation_and_get_result(
         assert isinstance(result, EchoOutput)
         assert result.value == "hello"
 
+        # test value is cached
+        second_result = await handle.result()
+        assert result is second_result
+
 
 async def test_start_async_operation_and_poll_result(
     client: Client, env: WorkflowEnvironment
@@ -364,7 +367,6 @@ async def test_errors(client: Client, env: WorkflowEnvironment):
             service=StandaloneTestService, endpoint=endpoint_name
         )
 
-        # Expect temporalio.exceptions.NexusOperationError
         handle = await start_with_retry(
             nexus_client,
             StandaloneTestService.raise_err,
@@ -380,6 +382,11 @@ async def test_errors(client: Client, env: WorkflowEnvironment):
 
         assert err.value.__cause__
         assert isinstance(err.value.__cause__, nexusrpc.HandlerError)
+
+        # test that the error is cached
+        with pytest.raises(NexusOperationFailureError) as second_err:
+            await handle.result()
+        assert err.value is second_err.value
 
         handle = await start_with_retry(
             nexus_client,
