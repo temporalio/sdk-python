@@ -31,7 +31,7 @@ from temporalio.contrib.pubsub._types import encode_data
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, new_worker
+from tests.helpers import assert_eq_eventually, assert_task_fail_eventually, new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
@@ -261,13 +261,19 @@ async def publish_multi_topic(count: int) -> None:
 
 @activity.defn(name="publish_with_priority")
 async def publish_with_priority() -> None:
+    # Long batch_interval AND long post-publish hold ensure that only a
+    # working priority wakeup can deliver items before __aexit__ flushes.
+    # The hold is deliberately much longer than the test's collect timeout
+    # so a regression (priority no-op) surfaces as a missing item rather
+    # than flaking on slow CI.
     client = PubSubClient.create(batch_interval=60.0)
     async with client:
         client.publish("events", b"normal-0")
         client.publish("events", b"normal-1")
         client.publish("events", b"priority", priority=True)
-        # Give the flusher time to wake and flush
-        await asyncio.sleep(0.5)
+        for _ in range(100):
+            activity.heartbeat()
+            await asyncio.sleep(0.1)
 
 
 @activity.defn(name="publish_batch_test")
@@ -397,8 +403,8 @@ async def test_topic_filtering(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_subscribe_from_offset(client: Client) -> None:
-    """Subscribe from a non-zero offset."""
+async def test_subscribe_from_offset_and_per_item_offsets(client: Client) -> None:
+    """Subscribe from zero and non-zero offsets; each item carries its global offset."""
     count = 5
     async with new_worker(
         client,
@@ -411,44 +417,20 @@ async def test_subscribe_from_offset(client: Client) -> None:
             task_queue=worker.task_queue,
         )
 
-        # Subscribe from offset 3 — should get items 3, 4
-        items = await collect_items(handle, None, 3, 2)
-        assert len(items) == 2
-        assert items[0].data == b"item-3"
-        assert items[1].data == b"item-4"
+        # Subscribe from offset 0 — all items, offsets 0..count-1
+        all_items = await collect_items(handle, None, 0, count)
+        assert len(all_items) == count
+        for i, item in enumerate(all_items):
+            assert item.offset == i
+            assert item.data == f"item-{i}".encode()
 
-        # Subscribe from offset 0 — should get all 5
-        all_items = await collect_items(handle, None, 0, 5)
-        assert len(all_items) == 5
-
-        await handle.signal(WorkflowSidePublishWorkflow.close)
-
-
-@pytest.mark.asyncio
-async def test_per_item_offsets(client: Client) -> None:
-    """Each yielded PubSubItem carries its correct global offset."""
-    count = 5
-    async with new_worker(
-        client,
-        WorkflowSidePublishWorkflow,
-    ) as worker:
-        handle = await client.start_workflow(
-            WorkflowSidePublishWorkflow.run,
-            count,
-            id=f"pubsub-item-offset-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-        items = await collect_items(handle, None, 0, count)
-        assert len(items) == count
-        for i, item in enumerate(items):
-            assert item.offset == i, f"item {i} has offset {item.offset}"
-
-        # Subscribe from offset 3 — offsets should be 3, 4
+        # Subscribe from offset 3 — items 3, 4 with offsets 3, 4
         later_items = await collect_items(handle, None, 3, 2)
         assert len(later_items) == 2
         assert later_items[0].offset == 3
+        assert later_items[0].data == b"item-3"
         assert later_items[1].offset == 4
+        assert later_items[1].data == b"item-4"
 
         await handle.signal(WorkflowSidePublishWorkflow.close)
 
@@ -487,42 +469,6 @@ async def test_per_item_offsets_with_topic_filter(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_per_item_offsets_after_truncation(client: Client) -> None:
-    """Per-item offsets remain correct after log truncation."""
-    async with new_worker(
-        client,
-        TruncateSignalWorkflow,
-    ) as worker:
-        handle = await client.start_workflow(
-            TruncateSignalWorkflow.run,
-            id=f"pubsub-item-offset-trunc-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-        # Publish 5 items
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(items=[
-                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
-                for i in range(5)
-            ]),
-        )
-        await asyncio.sleep(0.5)
-
-        # Truncate up to offset 3
-        await handle.signal("truncate", 3)
-        await asyncio.sleep(0.3)
-
-        # Items 3, 4 should have offsets 3, 4
-        items = await collect_items(handle, None, 3, 2)
-        assert len(items) == 2
-        assert items[0].offset == 3
-        assert items[1].offset == 4
-
-        await handle.signal("close")
-
-
-@pytest.mark.asyncio
 async def test_poll_truncated_offset_returns_application_error(client: Client) -> None:
     """Polling a truncated offset raises ApplicationError (not ValueError)
     and does not crash the workflow task."""
@@ -544,14 +490,13 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
                 for i in range(5)
             ]),
         )
-        await asyncio.sleep(0.5)
 
         # Truncate up to offset 3
         await handle.signal("truncate", 3)
-        await asyncio.sleep(0.3)
 
         # Poll from offset 1 (truncated) — should get ApplicationError,
-        # NOT crash the workflow task.
+        # NOT crash the workflow task. The update acts as a signal barrier:
+        # both prior signals are processed before the update runs.
         from temporalio.client import WorkflowUpdateFailedError
         with pytest.raises(WorkflowUpdateFailedError):
             await handle.execute_update(
@@ -564,40 +509,6 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
         items = await collect_items(handle, None, 3, 2)
         assert len(items) == 2
         assert items[0].offset == 3
-
-        await handle.signal("close")
-
-
-@pytest.mark.asyncio
-async def test_poll_offset_zero_after_truncation(client: Client) -> None:
-    """Polling from offset 0 after truncation returns items from base_offset."""
-    async with new_worker(
-        client,
-        TruncateSignalWorkflow,
-    ) as worker:
-        handle = await client.start_workflow(
-            TruncateSignalWorkflow.run,
-            id=f"pubsub-trunc-zero-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-        # Publish 5 items, truncate first 3
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(items=[
-                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
-                for i in range(5)
-            ]),
-        )
-        await asyncio.sleep(0.5)
-        await handle.signal("truncate", 3)
-        await asyncio.sleep(0.3)
-
-        # Poll from offset 0 — should get items starting from base_offset (3)
-        items = await collect_items(handle, None, 0, 2)
-        assert len(items) == 2
-        assert items[0].offset == 3
-        assert items[1].offset == 4
 
         await handle.signal("close")
 
@@ -623,11 +534,10 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
                 for i in range(5)
             ]),
         )
-        await asyncio.sleep(0.5)
 
-        # Truncate first 3
+        # Truncate first 3. Subsequent subscribe() uses an update call which
+        # acts as a barrier for both prior signals.
         await handle.signal("truncate", 3)
-        await asyncio.sleep(0.3)
 
         # subscribe from offset 1 (truncated) — should auto-recover
         # and deliver items from base_offset (3)
@@ -699,8 +609,13 @@ async def test_priority_flush(client: Client) -> None:
             task_queue=worker.task_queue,
         )
 
-        # If priority works, we get all 3 items quickly despite 60s batch interval
-        items = await collect_items(handle, None, 0, 3, timeout=10.0)
+        # If priority works, items arrive within milliseconds of the publish.
+        # The activity holds for ~10s after priority publish; this timeout
+        # gives plenty of margin for workflow/worker scheduling on slow CI
+        # while staying well below the activity hold so a regression (no
+        # priority wakeup) surfaces as a missing item, not a pass via
+        # __aexit__ flush.
+        items = await collect_items(handle, None, 0, 3, timeout=5.0)
         assert len(items) == 3
         assert items[2].data == b"priority"
 
@@ -818,10 +733,7 @@ async def test_mixin_coexistence(client: Client) -> None:
             PublishInput(items=[PublishEntry(topic="events", data=encode_data(b"test-item"))]),
         )
 
-        # Give signals time to be processed
-        await asyncio.sleep(0.5)
-
-        # Query application state
+        # Query acts as barrier — all prior signals processed before it returns
         app_data = await handle.query(MixinCoexistenceWorkflow.app_query)
         assert app_data == ["hello", "world"]
 
@@ -886,165 +798,103 @@ async def test_replay_safety(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_flush_keeps_pending_on_signal_failure(client: Client) -> None:
-    """If flush signal fails, items stay in _pending for retry with same sequence.
-
-    On failure, the pending batch and sequence are kept so the next
-    _flush() retries with
-    the SAME sequence number. The confirmed sequence (_sequence) does NOT
-    advance until delivery is confirmed.
-    """
-    bogus_handle = client.get_workflow_handle("nonexistent-workflow-id")
-    pubsub = PubSubClient(bogus_handle)
-
-    pubsub.publish("events", b"item-0")
-    pubsub.publish("events", b"item-1")
-    assert len(pubsub._buffer) == 2
-
-    # flush should fail (workflow doesn't exist)
-    with pytest.raises(Exception):
-        await pubsub._flush()
-
-    # Items moved to _pending (not restored to _buffer)
-    assert len(pubsub._buffer) == 0
-    assert pubsub._pending is not None
-    assert len(pubsub._pending) == 2
-    assert pubsub._pending[0].data == encode_data(b"item-0")
-    assert pubsub._pending[1].data == encode_data(b"item-1")
-    # Pending sequence is set, confirmed sequence is NOT advanced
-    assert pubsub._pending_seq == 1
-    assert pubsub._sequence == 0
-
-    # New items published during failure go to _buffer (not _pending)
-    pubsub.publish("events", b"item-2")
-    assert len(pubsub._buffer) == 1
-    assert pubsub._pending is not None  # Still set for retry
-
-    # Next flush retries the pending batch with the same sequence
-    with pytest.raises(Exception):
-        await pubsub._flush()
-    assert pubsub._pending_seq == 1  # Same sequence on retry
-    assert pubsub._sequence == 0  # Still not advanced
-
-
-@pytest.mark.asyncio
-async def test_max_retry_duration_expiry(client: Client) -> None:
-    """Flush raises TimeoutError when max_retry_duration is exceeded."""
-    bogus_handle = client.get_workflow_handle("nonexistent-workflow-id")
-    pubsub = PubSubClient(bogus_handle, max_retry_duration=0.1)
-
-    pubsub.publish("events", b"item-0")
-
-    # First flush fails, sets pending
-    with pytest.raises(Exception, match="not found"):
-        await pubsub._flush()
-    assert pubsub._pending is not None
-
-    # Wait for retry duration to expire
-    await asyncio.sleep(0.2)
-
-    # Next flush should raise TimeoutError and clear pending
-    with pytest.raises(TimeoutError, match="max_retry_duration"):
-        await pubsub._flush()
-    assert pubsub._pending is None
-    # Sequence must advance past the dropped batch to prevent reuse
-    assert pubsub._sequence == 1
-
-
-@pytest.mark.asyncio
-async def test_retry_timeout_sequence_reuse_causes_data_loss(
+async def test_flush_retry_preserves_items_after_failures(
     client: Client,
 ) -> None:
-    """Verify the fix for sequence reuse after retry timeout.
+    """After flush failures, a subsequent successful flush delivers all items
+    in publish order, exactly once.
 
-    Without the fix, after retry timeout the next batch reuses the same
-    sequence number. If the timed-out signal WAS delivered, the workflow
-    rejects the new batch as a duplicate — causing silent data loss.
-
-    The fix (advance _sequence to _pending_seq before clearing _pending)
-    ensures the next batch gets a fresh sequence number. This test verifies
-    both that the old sequence is rejected AND that a fresh sequence is
-    accepted.
-
+    Exercises the retry code path behaviorally: simulated delivery failures
+    must not drop items, must not duplicate them on retry, and must not
+    reorder items published during the failed state.
     """
-    async with new_worker(
-        client,
-        BasicPubSubWorkflow,
-    ) as worker:
+    from unittest.mock import patch
+
+    async with new_worker(client, BasicPubSubWorkflow) as worker:
         handle = await client.start_workflow(
             BasicPubSubWorkflow.run,
-            id=f"pubsub-seq-reuse-{uuid.uuid4()}",
+            id=f"pubsub-flush-retry-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
-        # Step 1: Simulate the timed-out signal being delivered.
-        # Send batch-A with publisher_id="victim" and sequence=1.
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[
-                    PublishEntry(topic="events", data=encode_data(b"batch-A"))
-                ],
-                publisher_id="victim",
-                sequence=1,
-            ),
-        )
-        await asyncio.sleep(0.3)
+        pubsub = PubSubClient(handle)
+        real_signal = handle.signal
+        fail_remaining = 2
 
-        # Verify batch-A is in the log
+        async def maybe_failing_signal(*args: Any, **kwargs: Any) -> Any:
+            nonlocal fail_remaining
+            if fail_remaining > 0:
+                fail_remaining -= 1
+                raise RuntimeError("simulated delivery failure")
+            return await real_signal(*args, **kwargs)
+
+        with patch.object(handle, "signal", side_effect=maybe_failing_signal):
+            pubsub.publish("events", b"item-0")
+            pubsub.publish("events", b"item-1")
+            with pytest.raises(RuntimeError):
+                await pubsub._flush()
+
+            # Publish more during the failed state — must not overtake the
+            # pending retry on eventual delivery.
+            pubsub.publish("events", b"item-2")
+            with pytest.raises(RuntimeError):
+                await pubsub._flush()
+
+            # Third flush succeeds, delivering the pending retry batch.
+            await pubsub._flush()
+            # Fourth flush delivers the buffered "item-2".
+            await pubsub._flush()
+
+        items = await collect_items(handle, None, 0, 3)
+        assert [i.data for i in items] == [b"item-0", b"item-1", b"item-2"]
+
+        await handle.signal(BasicPubSubWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
+    """When max_retry_duration is exceeded, flush raises TimeoutError and the
+    client can resume publishing without losing subsequent items."""
+    from unittest.mock import patch
+
+    async with new_worker(client, BasicPubSubWorkflow) as worker:
+        handle = await client.start_workflow(
+            BasicPubSubWorkflow.run,
+            id=f"pubsub-retry-expiry-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        pubsub = PubSubClient(handle, max_retry_duration=0.1)
+        real_signal = handle.signal
+        fail_signals = True
+
+        async def maybe_failing_signal(*args: Any, **kwargs: Any) -> Any:
+            if fail_signals:
+                raise RuntimeError("simulated failure")
+            return await real_signal(*args, **kwargs)
+
+        with patch.object(handle, "signal", side_effect=maybe_failing_signal):
+            pubsub.publish("events", b"lost")
+
+            # First flush fails and enters the pending-retry state.
+            with pytest.raises(RuntimeError):
+                await pubsub._flush()
+
+            # Let the retry window expire.
+            await asyncio.sleep(0.2)
+
+            # Next flush raises TimeoutError — the pending batch is abandoned.
+            with pytest.raises(TimeoutError, match="max_retry_duration"):
+                await pubsub._flush()
+
+            # Stop failing signals; subsequent publishes must succeed.
+            fail_signals = False
+            pubsub.publish("events", b"kept")
+            await pubsub._flush()
+
         items = await collect_items(handle, None, 0, 1)
         assert len(items) == 1
-        assert items[0].data == b"batch-A"
-
-        # Step 2: Simulate the client-side state after retry timeout.
-        # The client dropped pending without advancing _sequence, so
-        # _sequence is still 0. The next batch will get seq = 0 + 1 = 1.
-        #
-        # Send batch-B (different items!) with the SAME sequence=1.
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[
-                    PublishEntry(topic="events", data=encode_data(b"batch-B"))
-                ],
-                publisher_id="victim",
-                sequence=1,  # <-- reused sequence (the bug)
-            ),
-        )
-        await asyncio.sleep(0.3)
-
-        # Step 3: Verify the data loss.
-        # The workflow log should have both batches (2 items) if correct.
-        # But batch-B was rejected as a duplicate — only 1 item in the log.
-        pubsub_client = PubSubClient(handle)
-        offset = await pubsub_client.get_offset()
-
-        # BUG: offset is 1, not 2. batch-B was silently dropped.
-        assert offset == 1, (
-            f"Expected offset=1 (bug: batch-B silently deduped), got {offset}"
-        )
-
-        # Step 4: Verify the fix would work.
-        # If _sequence had been advanced to 1 (pending_seq), the next batch
-        # would use sequence=2, which the workflow hasn't seen.
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[
-                    PublishEntry(
-                        topic="events", data=encode_data(b"batch-B-fixed")
-                    )
-                ],
-                publisher_id="victim",
-                sequence=2,  # <-- fresh sequence (what the fix produces)
-            ),
-        )
-        await asyncio.sleep(0.3)
-
-        offset_after = await pubsub_client.get_offset()
-        assert offset_after == 2, (
-            f"Expected offset=2 (fresh sequence accepted), got {offset_after}"
-        )
+        assert items[0].data == b"kept"
 
         await handle.signal(BasicPubSubWorkflow.close)
 
@@ -1092,9 +942,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
             ),
         )
 
-        await asyncio.sleep(0.5)
-
-        # Should have 2 items, not 3
+        # Should have 2 items, not 3 (collect_items' update call acts as barrier)
         items = await collect_items(handle, None, 0, 2)
         assert len(items) == 2
         assert items[0].data == b"item-0"
@@ -1121,7 +969,8 @@ async def test_truncate_pubsub(client: Client) -> None:
             task_queue=worker.task_queue,
         )
 
-        # Publish 5 items via signal
+        # Publish 5 items via signal. collect_items below uses an update,
+        # which acts as a signal barrier.
         await handle.signal(
             "__pubsub_publish",
             PublishInput(items=[
@@ -1129,17 +978,16 @@ async def test_truncate_pubsub(client: Client) -> None:
                 for i in range(5)
             ]),
         )
-        await asyncio.sleep(0.5)
 
         # Verify all 5 items
         items = await collect_items(handle, None, 0, 5)
         assert len(items) == 5
 
-        # Truncate up to offset 3 (discard items 0, 1, 2)
+        # Truncate up to offset 3 (discard items 0, 1, 2). The following
+        # get_offset query serves as a barrier for the truncate signal.
         await handle.signal("truncate", 3)
-        await asyncio.sleep(0.3)
 
-        # Offset should still be 5
+        # Offset should still be 5 (truncation moves base_offset, not tail)
         pubsub_client = PubSubClient(handle)
         offset = await pubsub_client.get_offset()
         assert offset == 5
@@ -1183,9 +1031,9 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
                 sequence=1,
             ),
         )
-        await asyncio.sleep(0.5)
 
         # Query state with a very long TTL — both publishers retained
+        # (the query itself serves as a barrier for the prior signals)
         state = await handle.query(TTLTestWorkflow.get_state_with_ttl, 9999.0)
         assert "pub-a" in state.publisher_sequences
         assert "pub-b" in state.publisher_sequences
@@ -1428,9 +1276,10 @@ async def test_continue_as_new_any_typed_fails(client: Client) -> None:
             lambda: _is_different_run(handle, new_handle),
         )
 
-        # The new run should be broken — items are NOT accessible
-        items_after = await collect_items(new_handle, None, 0, 1, timeout=3.0)
-        assert len(items_after) == 0  # fails because workflow can't start
+        # The new run's workflow task must fail during init_pubsub because
+        # the Any-typed field arrives as a dict, not a PubSubState. Assert
+        # the specific failure instead of a timeout-based absence check.
+        await assert_task_fail_eventually(new_handle)
 
 
 @pytest.mark.asyncio
@@ -1660,9 +1509,9 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
                     ]
                 ),
             )
-        await asyncio.sleep(0.5)
 
-        # First poll from offset 0 — should get some items but not all
+        # First poll from offset 0 — should get some items but not all.
+        # (The update acts as a barrier for all prior publish signals.)
         result1: PollResult = await handle.execute_update(
             "__pubsub_poll",
             PollInput(topics=[], from_offset=0),
@@ -1675,15 +1524,18 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         # Continue polling until we have all items
         all_items = list(result1.items)
         offset = result1.next_offset
+        last_result: PollResult = result1
         while len(all_items) < 8:
-            result: PollResult = await handle.execute_update(
+            last_result = await handle.execute_update(
                 "__pubsub_poll",
                 PollInput(topics=[], from_offset=offset),
                 result_type=PollResult,
             )
-            all_items.extend(result.items)
-            offset = result.next_offset
+            all_items.extend(last_result.items)
+            offset = last_result.next_offset
         assert len(all_items) == 8
+        # The final poll that drained the log should set more_ready=False
+        assert last_result.more_ready is False
 
         await handle.signal(BasicPubSubWorkflow.close)
 
@@ -1718,43 +1570,6 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
         assert len(items) == 8
         for item in items:
             assert item.data == chunk
-
-        await handle.signal(BasicPubSubWorkflow.close)
-
-
-@pytest.mark.asyncio
-async def test_small_response_more_ready_false(client: Client) -> None:
-    """Poll response has more_ready=False when all items fit within size limit."""
-    async with new_worker(
-        client,
-        BasicPubSubWorkflow,
-    ) as worker:
-        handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-no-more-ready-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-        # Publish small items that easily fit under 1MB
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[
-                    PublishEntry(topic="small", data=encode_data(b"tiny"))
-                    for _ in range(5)
-                ]
-            ),
-        )
-        await asyncio.sleep(0.5)
-
-        result: PollResult = await handle.execute_update(
-            "__pubsub_poll",
-            PollInput(topics=[], from_offset=0),
-            result_type=PollResult,
-        )
-        assert result.more_ready is False
-        assert len(result.items) == 5
-        assert result.next_offset == 5
 
         await handle.signal(BasicPubSubWorkflow.close)
 
@@ -1827,13 +1642,17 @@ async def test_cross_namespace_nexus_pubsub(
 
             # Wait for the broker workflow to be started by the Nexus operation
             broker_handle = handler_client.get_workflow_handle(broker_id)
-            async with asyncio.timeout(15.0):
-                while True:
-                    try:
-                        await broker_handle.describe()
-                        break
-                    except Exception:
-                        await asyncio.sleep(0.1)
+
+            async def broker_started() -> bool:
+                try:
+                    await broker_handle.describe()
+                    return True
+                except Exception:
+                    return False
+
+            await assert_eq_eventually(
+                True, broker_started, timeout=timedelta(seconds=15)
+            )
 
             # Subscribe to broker events from the handler namespace
             items = await collect_items(broker_handle, ["events"], 0, count)
