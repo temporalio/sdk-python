@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import re
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -665,8 +666,9 @@ async def test_tmprl1104_no_extstore(env: WorkflowEnvironment) -> None:
     records = _tmprl1104_records(capturer)
     assert len(records) == 1
     record = records[0]
-    assert record.getMessage().startswith(
-        "[TMPRL1104] Workflow task duration information ("
+    assert re.match(
+        r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task duration information \(",
+        record.getMessage(),
     )
     assert hasattr(record, "workflow_task_duration")
     assert hasattr(record, "event_id")
@@ -719,10 +721,9 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
     assert len(records) == 2
 
     # WFT 1: retrieves the externalized workflow input
-    assert (
-        records[0]
-        .getMessage()
-        .startswith("[TMPRL1104] Workflow task duration information (")
+    assert re.match(
+        r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task duration information \(",
+        records[0].getMessage(),
     )
     assert getattr(records[0], "payload_download_count") == 1
     assert getattr(records[0], "payload_download_size") == expected_input_size
@@ -730,10 +731,9 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: activity result is small — no external storage
-    assert (
-        records[1]
-        .getMessage()
-        .startswith("[TMPRL1104] Workflow task duration information (")
+    assert re.match(
+        r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task duration information \(",
+        records[1].getMessage(),
     )
     assert not hasattr(records[1], "payload_download_count")
     assert not hasattr(records[1], "payload_upload_count")
@@ -779,19 +779,17 @@ async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
     assert len(records) == 2
 
     # WFT 1: small input — no external storage
-    assert (
-        records[0]
-        .getMessage()
-        .startswith("[TMPRL1104] Workflow task duration information (")
+    assert re.match(
+        r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task duration information \(",
+        records[0].getMessage(),
     )
     assert not hasattr(records[0], "payload_download_count")
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: workflow returns large result → uploaded
-    assert (
-        records[1]
-        .getMessage()
-        .startswith("[TMPRL1104] Workflow task duration information (")
+    assert re.match(
+        r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task duration information \(",
+        records[1].getMessage(),
     )
     assert not hasattr(records[1], "payload_download_count")
     assert getattr(records[1], "payload_upload_count") == 1
@@ -843,10 +841,9 @@ async def test_tmprl1104_with_extstore_download_and_upload(
     assert len(records) == 2
 
     # WFT 1: retrieves externalized workflow input
-    assert (
-        records[0]
-        .getMessage()
-        .startswith("[TMPRL1104] Workflow task duration information (")
+    assert re.match(
+        r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task duration information \(",
+        records[0].getMessage(),
     )
     assert getattr(records[0], "payload_download_count") == 1
     assert getattr(records[0], "payload_download_size") == expected_input_size
@@ -854,10 +851,9 @@ async def test_tmprl1104_with_extstore_download_and_upload(
     assert not hasattr(records[0], "payload_upload_count")
 
     # WFT 2: uploads externalized workflow result
-    assert (
-        records[1]
-        .getMessage()
-        .startswith("[TMPRL1104] Workflow task duration information (")
+    assert re.match(
+        r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task duration information \(",
+        records[1].getMessage(),
     )
     assert not hasattr(records[1], "payload_download_count")
     assert getattr(records[1], "payload_upload_count") == 1

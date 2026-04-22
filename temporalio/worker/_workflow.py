@@ -302,7 +302,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                         id=workflow_id,
                         run_id=act.run_id,
                         type=(
-                            workflow.workflow_type
+                            workflow.get_info().workflow_type
                             if workflow
                             else (init_job.workflow_type if init_job else None)
                         ),
@@ -326,9 +326,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             if not workflow:
                 assert init_job
                 workflow = _RunningWorkflow(
-                    self._create_workflow_instance(act, init_job),
-                    workflow_id,
-                    workflow_type=init_job.workflow_type,
+                    self._create_workflow_instance(act, init_job), workflow_id
                 )
                 self._running_workflows[act.run_id] = workflow
 
@@ -461,8 +459,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             act, task_start_time, download_metrics, upload_metrics
         )
 
-    @staticmethod
     def _log_workflow_task_duration(
+        self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
         task_start_time: float,
         download_metrics: temporalio.converter._extstore.StorageOperationMetrics,
@@ -476,47 +474,60 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 return f"{secs:.3f}s"
             return f"{secs * 1000:.3f}ms"
 
-        msg_details: dict[str, object] = {
-            "event_id": act.history_length,
-            "workflow_task_duration": _fmt_duration(task_duration),
-        }
-        extra: dict[str, object] = {
-            "event_id": act.history_length,
-            "workflow_task_duration": task_duration,
-        }
+        completed_event_id = act.history_length + 1
+        _running = self._running_workflows.get(act.run_id)
+        _info = _running.get_info() if _running is not None else None
+        attempt = _info.attempt if _info is not None else "unknown"
+        log_id = f"{act.run_id}:{completed_event_id}:{attempt}"
+        msg_details, extra = temporalio.workflow._build_log_context(
+            _info._logger_details() if _info is not None else None,
+            full_workflow_info=_info,
+        )
+        msg_details["event_id"] = completed_event_id
+        msg_details["workflow_task_duration"] = _fmt_duration(task_duration)
+        msg_details["workflow_history_size"] = act.history_size_bytes
+        extra["event_id"] = completed_event_id
+        extra["workflow_task_duration"] = task_duration
+        extra["workflow_history_size"] = act.history_size_bytes
         if download_metrics.payload_count > 0:
             msg_details["payload_download_count"] = download_metrics.payload_count
             msg_details["payload_download_size"] = download_metrics.total_size
             msg_details["payload_download_duration"] = _fmt_duration(
                 download_metrics.total_duration
             )
+            msg_details["payload_download_drivers"] = sorted(
+                download_metrics.driver_names
+            )
             extra["payload_download_count"] = download_metrics.payload_count
             extra["payload_download_size"] = download_metrics.total_size
             extra["payload_download_duration"] = download_metrics.total_duration
+            extra["payload_download_drivers"] = sorted(download_metrics.driver_names)
         if upload_metrics.payload_count > 0:
             msg_details["payload_upload_count"] = upload_metrics.payload_count
             msg_details["payload_upload_size"] = upload_metrics.total_size
             msg_details["payload_upload_duration"] = _fmt_duration(
                 upload_metrics.total_duration
             )
+            msg_details["payload_upload_drivers"] = sorted(upload_metrics.driver_names)
             extra["payload_upload_count"] = upload_metrics.payload_count
             extra["payload_upload_size"] = upload_metrics.total_size
             extra["payload_upload_duration"] = upload_metrics.total_duration
+            extra["payload_upload_drivers"] = sorted(upload_metrics.driver_names)
         if task_duration.total_seconds() > 10:
             logger.warning(
-                "[TMPRL1104] Workflow task exceeded 10 seconds (%s)",
+                f"[TMPRL1104] {log_id} Workflow task exceeded 10 seconds (%s)",
                 msg_details,
                 extra=extra,
             )
         elif task_duration.total_seconds() > 5:
             logger.info(
-                "[TMPRL1104] Workflow task exceeded 5 seconds (%s)",
+                f"[TMPRL1104] {log_id} Workflow task exceeded 5 seconds (%s)",
                 msg_details,
                 extra=extra,
             )
         else:
             logger.debug(
-                "[TMPRL1104] Workflow task duration information (%s)",
+                f"[TMPRL1104] {log_id} Workflow task duration information (%s)",
                 msg_details,
                 extra=extra,
             )
@@ -822,14 +833,15 @@ class _RunningWorkflow:
         self,
         instance: WorkflowInstance,
         workflow_id: str,
-        workflow_type: str | None = None,
     ):
         self.instance = instance
         self.workflow_id = workflow_id
-        self.workflow_type = workflow_type
         self.deadlocked_activation_task: Awaitable | None = None
         self._deadlock_can_be_interrupted_lock = threading.Lock()
         self._deadlock_can_be_interrupted = False
+
+    def get_info(self) -> temporalio.workflow.Info:
+        return self.instance.get_info()
 
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
