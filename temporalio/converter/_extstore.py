@@ -38,11 +38,17 @@ class StorageOperationMetrics:
     total_duration: timedelta = dataclasses.field(default_factory=timedelta)
     """Wall-clock time spent on external storage operations."""
 
-    def record_batch(self, count: int, size: int, duration: timedelta) -> None:
+    driver_names: set[str] = dataclasses.field(default_factory=set)
+    """Names of the drivers that participated in the operations."""
+
+    def record_batch(
+        self, count: int, size: int, duration: timedelta, driver_names: set[str]
+    ) -> None:
         """Record metrics from a batch of storage operations."""
         self.payload_count += count
         self.total_size += size
         self.total_duration += duration
+        self.driver_names.update(driver_names)
 
     @contextlib.contextmanager
     def track(self) -> Generator[Self, None, None]:
@@ -362,7 +368,7 @@ class ExternalStorage:
             )
         reference_payload.external_payloads.add().size_bytes = external_size
 
-        ExternalStorage._record_metrics(1, external_size, start_time)
+        ExternalStorage._record_metrics(1, external_size, start_time, {driver.name()})
 
         return reference_payload
 
@@ -407,6 +413,7 @@ class ExternalStorage:
 
         external_count = 0
         external_size = 0
+        driver_names: set[str] = set()
         for (driver, indexed_payloads), claims in zip(driver_group_list, all_claims):
             indices = [idx for idx, _ in indexed_payloads]
             sizes = [p.ByteSize() for _, p in indexed_payloads]
@@ -428,8 +435,11 @@ class ExternalStorage:
                 external_size += sizes[i]
 
             external_count += len(claims)
+            driver_names.add(driver.name())
 
-        ExternalStorage._record_metrics(external_count, external_size, start_time)
+        ExternalStorage._record_metrics(
+            external_count, external_size, start_time, driver_names
+        )
 
         return results
 
@@ -452,7 +462,9 @@ class ExternalStorage:
 
         stored_payload = stored_payloads[0]
 
-        ExternalStorage._record_metrics(1, stored_payload.ByteSize(), start_time)
+        ExternalStorage._record_metrics(
+            1, stored_payload.ByteSize(), start_time, {driver.name()}
+        )
 
         return stored_payload
 
@@ -501,6 +513,7 @@ class ExternalStorage:
 
         external_count = 0
         external_size = 0
+        driver_names: set[str] = set()
         for (driver, indexed_claims), stored_payloads in zip(
             driver_claim_list, all_stored
         ):
@@ -517,6 +530,7 @@ class ExternalStorage:
                 external_size += stored_payload.ByteSize()
 
             external_count += len(stored_payloads)
+            driver_names.add(driver.name())
 
         retrieve_indices = sorted(stored_by_index.keys())
         stored_list = [stored_by_index[idx] for idx in retrieve_indices]
@@ -524,7 +538,9 @@ class ExternalStorage:
         for i, retrieved_payload in enumerate(stored_list):
             results[retrieve_indices[i]] = retrieved_payload
 
-        ExternalStorage._record_metrics(external_count, external_size, start_time)
+        ExternalStorage._record_metrics(
+            external_count, external_size, start_time, driver_names
+        )
 
         return results
 
@@ -545,9 +561,14 @@ class ExternalStorage:
             )
 
     @staticmethod
-    def _record_metrics(count: int, size: int, start_time: float):
+    def _record_metrics(
+        count: int, size: int, start_time: float, driver_names: set[str]
+    ):
         metrics = _current_storage_metrics.get()
         if metrics is not None:
             metrics.record_batch(
-                count, size, timedelta(seconds=time.monotonic() - start_time)
+                count,
+                size,
+                timedelta(seconds=time.monotonic() - start_time),
+                driver_names,
             )

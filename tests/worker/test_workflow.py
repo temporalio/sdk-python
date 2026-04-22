@@ -1637,6 +1637,9 @@ class CustomWorkflowInstance(WorkflowInstance):
     ) -> temporalio.converter._extstore.StorageDriverStoreContext:
         return self._unsandboxed.get_external_store_context(command_info)
 
+    def get_info(self) -> temporalio.workflow.Info:
+        return self._unsandboxed.get_info()
+
 
 async def test_workflow_with_custom_runner(client: Client):
     runner = CustomWorkflowRunner()
