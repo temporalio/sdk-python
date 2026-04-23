@@ -51,14 +51,19 @@ the workflow does not interpret them.
 A mixin class that adds signal, update, and query handlers to any workflow.
 
 ```python
+from dataclasses import dataclass
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSubMixin
+from temporalio.contrib.pubsub import PubSubMixin, PubSubState
+
+@dataclass
+class MyInput:
+    pubsub_state: PubSubState | None = None
 
 @workflow.defn
 class MyWorkflow(PubSubMixin):
     @workflow.init
     def __init__(self, input: MyInput) -> None:
-        self.init_pubsub()
+        self.init_pubsub(prior_state=input.pubsub_state)
 
     @workflow.run
     async def run(self, input: MyInput) -> None:
@@ -67,9 +72,12 @@ class MyWorkflow(PubSubMixin):
         self.publish("status", b"done")
 ```
 
-Call `init_pubsub()` in `__init__` for fresh workflows. When accepting
-continue-as-new state, call it in `run()` with the `prior_state` argument
-(see [Continue-as-New](#continue-as-new)).
+Call `init_pubsub()` once from `@workflow.init`. Include a
+`PubSubState | None` field on your workflow input and always pass it as
+`prior_state`: it is `None` on fresh starts and carries accumulated
+state across continue-as-new (see [Continue-as-New](#continue-as-new)).
+Workflows that will never continue-as-new may call `init_pubsub()` with
+no argument.
 
 | Method / Handler | Kind | Description |
 |---|---|---|
@@ -96,7 +104,7 @@ client = PubSubClient.create(temporal_client, workflow_id)
 async with client:
     client.publish("events", b'{"type":"TEXT_DELTA","delta":"hello"}')
     client.publish("events", b'{"type":"TEXT_DELTA","delta":" world"}')
-    client.publish("events", b'{"type":"TEXT_COMPLETE"}', priority=True)
+    client.publish("events", b'{"type":"TEXT_COMPLETE"}', force_flush=True)
 
 # --- Subscribing ---
 async for item in client.subscribe(["events"], from_offset=0):
@@ -107,31 +115,38 @@ async for item in client.subscribe(["events"], from_offset=0):
 
 | Method | Description |
 |---|---|
-| `PubSubClient.create(client?, wf_id?)` | Factory (preferred). Auto-detects activity context if args omitted. |
+| `PubSubClient.create(client, wf_id)` | Factory with explicit Temporal client and workflow id. Follows CAN in `subscribe()`. |
+| `PubSubClient.from_activity()` | Factory that pulls client and workflow id from the current activity context. Follows CAN in `subscribe()`. |
 | `PubSubClient(handle)` | From handle directly (no CAN following). |
-| `publish(topic, data, priority=False)` | Buffer a message. Priority triggers immediate flush (fire-and-forget). |
-| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Always follows CAN chains when created via `create`. |
+| `publish(topic, data, force_flush=False)` | Buffer a message. `force_flush` triggers immediate flush (fire-and-forget). |
+| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Always follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush on exit.
-There is no public `flush()` method — use `priority=True` on `publish()`
+There is no public `flush()` method — use `force_flush=True` on `publish()`
 for immediate delivery, or rely on the background flusher and context
 manager exit flush.
 
 #### Activity convenience
 
-When called from within an activity, `client` and `workflow_id` can be
-omitted from `create()` — they are inferred from the activity context:
+Inside an activity, use `PubSubClient.from_activity()` — the Temporal
+client and target workflow id come from the activity context, so the
+caller doesn't have to thread them through:
 
 ```python
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.create(batch_interval=2.0)
+    client = PubSubClient.from_activity(batch_interval=2.0)
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
             activity.heartbeat()
 ```
+
+`from_activity()` is a separate factory rather than an overload of
+`create()` because silently inferring arguments outside an activity
+masks a configuration bug as a runtime error in an unrelated code
+path.
 
 ## Data Types
 
@@ -259,12 +274,12 @@ full mechanism.
 Topics are implicit. Publishing to a topic creates it. Subscribing to a
 nonexistent topic returns no items and waits for new ones.
 
-### 5. Priority forces flush, does not reorder
+### 5. `force_flush` forces a flush, does not reorder
 
-`priority=True` causes the client to immediately flush its buffer. It does NOT
-reorder items — the priority item appears in its natural position after any
-previously-buffered items. The purpose is latency-sensitive delivery, not
-importance ranking.
+`force_flush=True` causes the client to immediately flush its buffer. It
+does NOT reorder items — the flushed item appears in its natural
+position after any previously-buffered items. The purpose is
+latency-sensitive delivery, not importance ranking.
 
 ### 6. Session ordering
 
@@ -332,16 +347,24 @@ failure-free abstraction because external publishers send data via signals
 (non-deterministic inputs), and branching on signal content creates
 replay-sensitive code paths.
 
-### 10. `base_offset` for future truncation
+### 10. `base_offset` for truncation
 
-The log carries a `base_offset` (0 today). All offset arithmetic uses
-`offset - base_offset` to index into the log. This supports future log
-truncation: discard a prefix of consumed entries, advance `base_offset`,
-and global offsets remain monotonic. If `offset < base_offset`, the
-subscriber has fallen behind truncation — the poll raises an error.
+The log carries a `base_offset`. All offset arithmetic uses
+`offset - base_offset` to index into the log, so discarding a prefix of
+consumed entries and advancing `base_offset` keeps global offsets
+monotonic. If a poll's `from_offset` is below `base_offset`, the
+subscriber has fallen behind truncation and the poll fails with a
+non-retryable `TruncatedOffset` error.
 
-Truncation is deferred to a future iteration. Until then, the log grows
-without bound within a run and is compacted only through continue-as-new.
+Because the module targets continue-as-new as the standard pattern for
+long-running workflows, workflow history size is not the binding
+constraint — CAN rolls history forward indefinitely. The binding
+constraint is the in-memory log growing between CAN boundaries. Voice
+streaming workflows have shown this matters in practice: a session can
+accumulate tens of thousands of small audio/text events long before CAN
+is triggered, and the workflow needs a way to release entries the
+subscriber has already consumed without waiting for a CAN cycle.
+`truncate_pubsub(up_to_offset)` exposes this.
 
 ### 11. No timeout on long-poll
 

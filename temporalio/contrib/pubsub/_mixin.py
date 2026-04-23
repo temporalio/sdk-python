@@ -3,8 +3,10 @@
 Add PubSubMixin as a base class to any workflow to get pub/sub signal, update,
 and query handlers.
 
-Call ``init_pubsub()`` in ``__init__`` for fresh workflows, or in ``run()``
-when accepting ``prior_state`` from continue-as-new arguments.
+Call ``init_pubsub(prior_state=...)`` once from ``@workflow.init``. For
+workflows that support continue-as-new, include a ``PubSubState | None``
+field on the workflow input and pass it as ``prior_state``; it is ``None``
+on fresh starts and harmless to pass.
 """
 
 from __future__ import annotations
@@ -45,12 +47,19 @@ class PubSubMixin:
     _pubsub_draining: bool
 
     def init_pubsub(self, prior_state: PubSubState | None = None) -> None:
-        """Initialize pub/sub state.
+        """Initialize pub/sub state. Call once from ``@workflow.init``.
+
+        The recommended pattern is to include a ``PubSubState | None``
+        field on the workflow input and always pass it as ``prior_state``
+        — it is ``None`` on fresh starts and carries accumulated state on
+        continue-as-new. Calling with no argument is equivalent to a
+        fresh start and is acceptable for workflows that will never
+        continue-as-new.
 
         Args:
             prior_state: State carried from a previous run via
-                ``get_pubsub_state()`` through continue-as-new. Pass None
-                on the first run.
+                ``get_pubsub_state()`` through continue-as-new, or
+                ``None`` on first start.
 
         Note:
             When carrying state across continue-as-new, type the carrying
@@ -144,8 +153,8 @@ class PubSubMixin:
     def _check_initialized(self) -> None:
         if not hasattr(self, "_pubsub_log"):
             raise RuntimeError(
-                "PubSubMixin not initialized. Call self.init_pubsub() in "
-                "your workflow's __init__ or at the start of run()."
+                "PubSubMixin not initialized. Call self.init_pubsub() "
+                "from your workflow's @workflow.init method."
             )
 
     def publish(self, topic: str, data: bytes) -> None:

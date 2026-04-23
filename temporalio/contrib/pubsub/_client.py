@@ -35,15 +35,16 @@ from ._types import (
 class PubSubClient:
     """Client for publishing to and subscribing from a pub/sub workflow.
 
-    Create via :py:meth:`create` (preferred) or by passing a handle
-    directly to the constructor.
+    Create via :py:meth:`create` (explicit client + workflow id),
+    :py:meth:`from_activity` (infer both from the current activity
+    context), or by passing a handle directly to the constructor.
 
     For publishing, use as an async context manager to get automatic batching::
 
         client = PubSubClient.create(temporal_client, workflow_id)
         async with client:
             client.publish("events", b"hello")
-            client.publish("events", b"world", priority=True)
+            client.publish("events", b"world", force_flush=True)
 
     For subscribing::
 
@@ -94,8 +95,8 @@ class PubSubClient:
     @classmethod
     def create(
         cls,
-        client: Client | None = None,
-        workflow_id: str | None = None,
+        client: Client,
+        workflow_id: str,
         *,
         batch_interval: float = 2.0,
         max_batch_size: int | None = None,
@@ -103,32 +104,22 @@ class PubSubClient:
     ) -> PubSubClient:
         """Create a pub/sub client from a Temporal client and workflow ID.
 
-        This is the preferred constructor. It enables continue-as-new
-        following in ``subscribe()``.
+        Use this when the caller has an explicit ``Client`` and
+        ``workflow_id`` in hand (starters, BFFs, other workflows'
+        activities). For code running inside an activity that targets its
+        own parent workflow, see :py:meth:`from_activity`.
 
-        If called from within an activity, ``client`` and ``workflow_id``
-        can be omitted — they are inferred from the activity context.
+        A client created through this method follows continue-as-new
+        chains in ``subscribe()``.
 
         Args:
-            client: Temporal client. If None and in an activity, uses
-                ``activity.client()``.
-            workflow_id: ID of the pub/sub workflow. If None and in an
-                activity, uses the activity's parent workflow ID.
+            client: Temporal client.
+            workflow_id: ID of the pub/sub workflow.
             batch_interval: Seconds between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
             max_retry_duration: Maximum seconds to retry a failed flush
                 before raising TimeoutError. Default: 600s.
         """
-        if client is None or workflow_id is None:
-            info = activity.info()
-            if client is None:
-                client = activity.client()
-            if workflow_id is None:
-                wf_id = info.workflow_id
-                assert (
-                    wf_id is not None
-                ), "activity must be called from within a workflow"
-                workflow_id = wf_id
         handle = client.get_workflow_handle(workflow_id)
         instance = cls(
             handle,
@@ -138,6 +129,38 @@ class PubSubClient:
         )
         instance._client = client
         return instance
+
+    @classmethod
+    def from_activity(
+        cls,
+        *,
+        batch_interval: float = 2.0,
+        max_batch_size: int | None = None,
+        max_retry_duration: float = 600.0,
+    ) -> PubSubClient:
+        """Create a pub/sub client targeting the current activity's parent workflow.
+
+        Must be called from within an activity. The Temporal client and
+        parent workflow id are taken from the activity context.
+
+        Args:
+            batch_interval: Seconds between automatic flushes.
+            max_batch_size: Auto-flush when buffer reaches this size.
+            max_retry_duration: Maximum seconds to retry a failed flush
+                before raising TimeoutError. Default: 600s.
+        """
+        info = activity.info()
+        workflow_id = info.workflow_id
+        assert (
+            workflow_id is not None
+        ), "from_activity requires an activity with a parent workflow"
+        return cls.create(
+            activity.client(),
+            workflow_id,
+            batch_interval=batch_interval,
+            max_batch_size=max_batch_size,
+            max_retry_duration=max_retry_duration,
+        )
 
     async def __aenter__(self) -> Self:
         self._flush_task = asyncio.create_task(self._run_flusher())
@@ -158,17 +181,17 @@ class PubSubClient:
         while self._pending is not None or self._buffer:
             await self._flush()
 
-    def publish(self, topic: str, data: bytes, priority: bool = False) -> None:
+    def publish(self, topic: str, data: bytes, force_flush: bool = False) -> None:
         """Buffer a message for publishing.
 
         Args:
             topic: Topic string.
             data: Opaque byte payload.
-            priority: If True, wake the flusher to send immediately
+            force_flush: If True, wake the flusher to send immediately
                 (fire-and-forget — does not block the caller).
         """
         self._buffer.append(PublishEntry(topic=topic, data=encode_data(data)))
-        if priority or (
+        if force_flush or (
             self._max_batch_size is not None
             and len(self._buffer) >= self._max_batch_size
         ):
@@ -235,7 +258,7 @@ class PubSubClient:
                 raise
 
     async def _run_flusher(self) -> None:
-        """Background task: wait for timer OR priority wakeup, then flush."""
+        """Background task: wait for timer OR force_flush wakeup, then flush."""
         while True:
             try:
                 await asyncio.wait_for(

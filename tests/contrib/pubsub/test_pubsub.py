@@ -221,7 +221,7 @@ class MaxBatchWorkflow(PubSubMixin):
 
 @activity.defn(name="publish_items")
 async def publish_items(count: int) -> None:
-    client = PubSubClient.create(batch_interval=0.5)
+    client = PubSubClient.from_activity(batch_interval=0.5)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -231,7 +231,7 @@ async def publish_items(count: int) -> None:
 @activity.defn(name="publish_multi_topic")
 async def publish_multi_topic(count: int) -> None:
     topics = ["a", "b", "c"]
-    client = PubSubClient.create(batch_interval=0.5)
+    client = PubSubClient.from_activity(batch_interval=0.5)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -242,15 +242,15 @@ async def publish_multi_topic(count: int) -> None:
 @activity.defn(name="publish_with_priority")
 async def publish_with_priority() -> None:
     # Long batch_interval AND long post-publish hold ensure that only a
-    # working priority wakeup can deliver items before __aexit__ flushes.
+    # working force_flush wakeup can deliver items before __aexit__ flushes.
     # The hold is deliberately much longer than the test's collect timeout
-    # so a regression (priority no-op) surfaces as a missing item rather
+    # so a regression (force_flush no-op) surfaces as a missing item rather
     # than flaking on slow CI.
-    client = PubSubClient.create(batch_interval=60.0)
+    client = PubSubClient.from_activity(batch_interval=60.0)
     async with client:
         client.publish("events", b"normal-0")
         client.publish("events", b"normal-1")
-        client.publish("events", b"priority", priority=True)
+        client.publish("events", b"priority", force_flush=True)
         for _ in range(100):
             activity.heartbeat()
             await asyncio.sleep(0.1)
@@ -258,7 +258,7 @@ async def publish_with_priority() -> None:
 
 @activity.defn(name="publish_batch_test")
 async def publish_batch_test(count: int) -> None:
-    client = PubSubClient.create(batch_interval=60.0)
+    client = PubSubClient.from_activity(batch_interval=60.0)
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -267,7 +267,7 @@ async def publish_batch_test(count: int) -> None:
 
 @activity.defn(name="publish_with_max_batch")
 async def publish_with_max_batch(count: int) -> None:
-    client = PubSubClient.create(batch_interval=60.0, max_batch_size=3)
+    client = PubSubClient.from_activity(batch_interval=60.0, max_batch_size=3)
     async with client:
         for i in range(count):
             activity.heartbeat()

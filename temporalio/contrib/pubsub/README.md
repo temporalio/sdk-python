@@ -18,17 +18,25 @@ configurable batching coalesces high-frequency events, improving efficiency.
 
 ### Workflow side
 
-Add `PubSubMixin` to your workflow and call `init_pubsub()` during initialization:
+Add `PubSubMixin` to your workflow and call `init_pubsub()` from
+`@workflow.init`. If you want the workflow to support continue-as-new,
+include a `PubSubState | None` field on the input and pass it through —
+it's `None` on fresh starts and carries state across CAN otherwise:
 
 ```python
+from dataclasses import dataclass
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSubMixin
+from temporalio.contrib.pubsub import PubSubMixin, PubSubState
+
+@dataclass
+class MyInput:
+    pubsub_state: PubSubState | None = None
 
 @workflow.defn
 class MyWorkflow(PubSubMixin):
     @workflow.init
     def __init__(self, input: MyInput) -> None:
-        self.init_pubsub()
+        self.init_pubsub(prior_state=input.pubsub_state)
 
     @workflow.run
     async def run(self, input: MyInput) -> None:
@@ -39,8 +47,9 @@ class MyWorkflow(PubSubMixin):
 
 ### Activity side (publishing)
 
-Use `PubSubClient.create()` with the async context manager for batched publishing.
-When called from within an activity, the client and workflow ID are inferred automatically:
+Use `PubSubClient.from_activity()` with the async context manager for
+batched publishing. The Temporal client and target workflow ID are taken
+from the activity context:
 
 ```python
 from temporalio import activity
@@ -48,7 +57,7 @@ from temporalio.contrib.pubsub import PubSubClient
 
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.create(batch_interval=2.0)
+    client = PubSubClient.from_activity(batch_interval=2.0)
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -56,10 +65,10 @@ async def stream_events() -> None:
         # Buffer is flushed automatically on context manager exit
 ```
 
-Use `priority=True` to trigger an immediate flush for latency-sensitive events:
+Use `force_flush=True` to trigger an immediate flush for latency-sensitive events:
 
 ```python
-client.publish("events", data, priority=True)
+client.publish("events", data, force_flush=True)
 ```
 
 ### Subscribing
@@ -121,7 +130,8 @@ class MyWorkflow(PubSubMixin):
 
 `drain_pubsub()` unblocks waiting subscribers and rejects new polls so
 `all_handlers_finished` can stabilize. Subscribers created via
-`PubSubClient.create()` automatically follow continue-as-new chains.
+`PubSubClient.create()` or `PubSubClient.from_activity()` automatically
+follow continue-as-new chains.
 
 ## API Reference
 
@@ -129,7 +139,7 @@ class MyWorkflow(PubSubMixin):
 
 | Method | Description |
 |---|---|
-| `init_pubsub(prior_state=None)` | Initialize state. Call in `__init__` for fresh workflows, or in `run()` when accepting CAN state. |
+| `init_pubsub(prior_state=None)` | Initialize state. Call from `@workflow.init`, passing `prior_state` if the input declares one (`None` on fresh starts). |
 | `publish(topic, data)` | Append to the log from workflow code. |
 | `get_pubsub_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
 | `drain_pubsub()` | Unblock polls and reject new ones. |
@@ -147,10 +157,11 @@ Handlers added automatically:
 
 | Method | Description |
 |---|---|
-| `PubSubClient.create(client, workflow_id, *, batch_interval, max_batch_size, max_retry_duration)` | Factory. Auto-detects activity context if args omitted. |
+| `PubSubClient.create(client, workflow_id, *, batch_interval, max_batch_size, max_retry_duration)` | Factory with an explicit Temporal client and workflow id. Follows CAN. |
+| `PubSubClient.from_activity(*, batch_interval, max_batch_size, max_retry_duration)` | Factory that takes client and workflow id from the current activity context. Follows CAN. |
 | `PubSubClient(handle, *, batch_interval, max_batch_size, max_retry_duration)` | From handle (no CAN follow). |
-| `publish(topic, data, priority=False)` | Buffer a message. |
-| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Always follows CAN chains when created via `create`. |
+| `publish(topic, data, force_flush=False)` | Buffer a message. |
+| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush.
