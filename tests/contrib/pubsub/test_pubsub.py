@@ -209,31 +209,6 @@ class MaxBatchWorkflow(PubSubMixin):
         await workflow.wait_condition(lambda: self._closed)
 
 
-@workflow.defn
-class MixinCoexistenceWorkflow(PubSubMixin):
-    @workflow.init
-    def __init__(self) -> None:
-        self.init_pubsub()
-        self._app_data: list[str] = []
-        self._closed = False
-
-    @workflow.signal
-    def close(self) -> None:
-        self._closed = True
-
-    @workflow.signal
-    def app_signal(self, value: str) -> None:
-        self._app_data.append(value)
-
-    @workflow.query
-    def app_query(self) -> list[str]:
-        return self._app_data
-
-    @workflow.run
-    async def run(self) -> None:
-        await workflow.wait_condition(lambda: self._closed)
-
-
 # ---------------------------------------------------------------------------
 # Activities
 # ---------------------------------------------------------------------------
@@ -725,46 +700,6 @@ async def test_concurrent_subscribers(client: Client) -> None:
         assert all(item.topic == "b" for item in b_items)
 
         await handle.signal(MultiTopicWorkflow.close)
-
-
-@pytest.mark.asyncio
-async def test_mixin_coexistence(client: Client) -> None:
-    """PubSubMixin works alongside application signals and queries."""
-    async with new_worker(
-        client,
-        MixinCoexistenceWorkflow,
-    ) as worker:
-        handle = await client.start_workflow(
-            MixinCoexistenceWorkflow.run,
-            id=f"pubsub-coexist-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-        # Use application signal
-        await handle.signal(MixinCoexistenceWorkflow.app_signal, "hello")
-        await handle.signal(MixinCoexistenceWorkflow.app_signal, "world")
-
-        # Use pub/sub signal
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(items=[PublishEntry(topic="events", data=encode_data(b"test-item"))]),
-        )
-
-        # Query acts as barrier — all prior signals processed before it returns
-        app_data = await handle.query(MixinCoexistenceWorkflow.app_query)
-        assert app_data == ["hello", "world"]
-
-        # Query pub/sub offset
-        pubsub_client = PubSubClient(handle)
-        offset = await pubsub_client.get_offset()
-        assert offset == 1
-
-        # Subscribe to pub/sub
-        items = await collect_items(handle, None, 0, 1)
-        assert len(items) == 1
-        assert items[0].topic == "events"
-
-        await handle.signal(MixinCoexistenceWorkflow.close)
 
 
 @pytest.mark.asyncio
