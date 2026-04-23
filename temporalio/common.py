@@ -266,6 +266,77 @@ class NexusOperationExecutionStatus(IntEnum):
     )
 
 
+class PendingNexusOperationExecutionState(IntEnum):
+    """More detailed breakdown of :py:attr:`NexusOperationExecutionStatus.RUNNING`.
+
+    .. warning::
+       This API is experimental and unstable.
+
+    See :py:class:`temporalio.api.enums.v1.PendingNexusOperationState`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.PendingNexusOperationState.PENDING_NEXUS_OPERATION_STATE_UNSPECIFIED
+    )
+    SCHEDULED = int(
+        temporalio.api.enums.v1.PendingNexusOperationState.PENDING_NEXUS_OPERATION_STATE_SCHEDULED
+    )
+    BACKING_OFF = int(
+        temporalio.api.enums.v1.PendingNexusOperationState.PENDING_NEXUS_OPERATION_STATE_BACKING_OFF
+    )
+    STARTED = int(
+        temporalio.api.enums.v1.PendingNexusOperationState.PENDING_NEXUS_OPERATION_STATE_STARTED
+    )
+    BLOCKED = int(
+        temporalio.api.enums.v1.PendingNexusOperationState.PENDING_NEXUS_OPERATION_STATE_BLOCKED
+    )
+
+
+class NexusOperationCancellationState(IntEnum):
+    """More detailed breakdown of :py:attr:`NexusOperationExecutionStatus.RUNNING`.
+
+    .. warning::
+       This API is experimental and unstable.
+
+    See :py:class:`temporalio.api.enums.v1.PendingNexusOperationState`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED
+    )
+    """Default value, unspecified state."""
+
+    SCHEDULED = int(
+        temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_SCHEDULED
+    )
+    """Cancellation request is in the queue waiting to be executed or is currently executing."""
+
+    BACKING_OFF = int(
+        temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_BACKING_OFF
+    )
+    """Cancellation request has failed with a retryable error and is backing off before the next attempt."""
+
+    SUCCEEDED = int(
+        temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_SUCCEEDED
+    )
+    """Cancellation request succeeded."""
+
+    FAILED = int(
+        temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_FAILED
+    )
+    """Cancellation request failed with a non-retryable error."""
+
+    TIMED_OUT = int(
+        temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_TIMED_OUT
+    )
+    """The associated operation timed out - exceeded the user supplied schedule-to-close timeout."""
+
+    BLOCKED = int(
+        temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_BLOCKED
+    )
+    """Cancellation request is blocked (eg: by circuit breaker)."""
+
+
 class QueryRejectCondition(IntEnum):
     """Whether a query should be rejected in certain conditions.
 

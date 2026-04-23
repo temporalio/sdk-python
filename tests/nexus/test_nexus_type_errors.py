@@ -231,7 +231,7 @@ async def standalone_operation_type_tests():
         MyServiceHandler.my_sync_operation,
         MyInput(),
         id="op-1",
-        result_type=str,
+        result_type=str,  # type: ignore
     )
 
     # string operation name and result_type infers output type
@@ -266,12 +266,14 @@ async def standalone_operation_type_tests():
 
     # result_type overrides output type from operation definition
     # conflicting result_type and annotation on variable cause type error
-    # assert-type-error-pyright: 'Type "NexusOperationHandle\[str\]" is not assignable to declared type "NexusOperationHandle\[MyOutput\]"'
-    _result_type_handle: NexusOperationHandle[MyOutput] = await nexus_client.start_operation(  # type: ignore
+    _result_type_handle: NexusOperationHandle[
+        MyOutput
+        # assert-type-error-pyright: 'Type "NexusOperationHandle\[str\]" is not assignable to declared type "NexusOperationHandle\[MyOutput\]"'
+    ] = await nexus_client.start_operation(  # type: ignore
         MyServiceHandler.my_sync_operation,
         MyInput(),
         id="op-1",
-        result_type=str,
+        result_type=str,  # type: ignore
     )
     # handle still respects type declaration on the variable
     _result_type_handle_output: MyOutput = await _result_type_handle.result()
@@ -306,12 +308,19 @@ async def standalone_operation_type_tests():
     # providing both operation and result_type to get_nexus_operation_handle
     # produces a no overload found error
     # assert-type-error-pyright: 'No overloads for "get_nexus_operation_handle" match'
-    _result_type_op_defn_get_handle: NexusOperationHandle[MyOutput] = client.get_nexus_operation_handle(  # type: ignore
-        "op-1",
-        operation=MyService.my_sync_operation,
-        result_type=str,
+    _result_type_op_defn_get_handle: NexusOperationHandle[MyOutput] = (
+        client.get_nexus_operation_handle(  # type: ignore
+            "op-1",
+            operation=MyService.my_sync_operation,
+            result_type=str,
+        )
     )
 
     # mismatched types on get_nexus_operation_handle produces type error
     # assert-type-error-pyright: 'Type "NexusOperationHandle\[str\]" is not assignable to declared type "NexusOperationHandle\[MyOutput\]"'
-    _mismatch_handle: NexusOperationHandle[MyOutput] = client.get_nexus_operation_handle("op-1", result_type=str)  # type: ignore
+    _mismatch_handle: NexusOperationHandle[MyOutput] = (
+        client.get_nexus_operation_handle(  # type: ignore
+            "op-1",
+            result_type=str,  # type: ignore
+        )
+    )

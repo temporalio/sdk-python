@@ -4722,7 +4722,7 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     raw_description: temporalio.api.nexus.v1.NexusOperationExecutionInfo
     """Underlying protobuf description info."""
 
-    state: int
+    state: temporalio.common.PendingNexusOperationExecutionState
     """More detailed breakdown if status is RUNNING (PendingNexusOperationState value)."""
 
     schedule_to_close_timeout: timedelta | None
@@ -4743,25 +4743,34 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     last_attempt_complete_time: datetime | None
     """Time when the last attempt completed."""
 
-    last_attempt_failure: BaseException | None
-    """Failure from the last failed attempt, if any."""
-
     next_attempt_schedule_time: datetime | None
     """Time when the next attempt will be scheduled."""
+
+    last_attempt_failure: BaseException | None
+    """Failure from the last failed attempt, if any."""
 
     blocked_reason: str
     """Reason the operation is blocked, if any."""
 
-    cancellation_info: (
-        temporalio.api.nexus.v1.NexusOperationExecutionCancellationInfo | None
-    )
+    operation_token: str
+    """operation_token is only set for asynchronous operations after a successful start_operation call."""
+
+    identity: str
+    """Identity of the client that started this operation."""
+
+    cancellation_info: NexusOperationCancellationInfo | None
     """Cancellation info if cancellation was requested."""
+
+    long_poll_token: bytes | None
+    """Token for follow-on long-poll requests. None if the operation is complete."""
 
     @classmethod
     async def _from_execution_info(
         cls,
         info: temporalio.api.nexus.v1.NexusOperationExecutionInfo,
         data_converter: temporalio.converter.DataConverter,
+        *,
+        long_poll_token: bytes | None,
     ) -> Self:
         """Create from raw proto nexus operation execution info."""
         return cls(
@@ -4796,7 +4805,11 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
             ),
             raw_info=info,
             raw_description=info,
-            state=info.state,
+            state=(
+                temporalio.common.PendingNexusOperationExecutionState(info.state)
+                if info.state
+                else temporalio.common.PendingNexusOperationExecutionState.UNSPECIFIED
+            ),
             schedule_to_close_timeout=(
                 info.schedule_to_close_timeout.ToTimedelta()
                 if info.HasField("schedule_to_close_timeout")
@@ -4837,9 +4850,93 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
                 else None
             ),
             blocked_reason=info.blocked_reason,
+            operation_token=info.operation_token,
+            identity=info.identity,
             cancellation_info=(
-                info.cancellation_info if info.HasField("cancellation_info") else None
+                await NexusOperationCancellationInfo._from_cancellation_info(
+                    info.cancellation_info, data_converter
+                )
+                if info.HasField("cancellation_info")
+                else None
             ),
+            long_poll_token=long_poll_token,
+        )
+
+
+@dataclass
+class NexusOperationCancellationInfo:
+    """Cancellation information for a Nexus Operation.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    raw: temporalio.api.nexus.v1.NexusOperationExecutionCancellationInfo
+    """Underlying protobuf cancellation info."""
+
+    requested_time: datetime | None
+    """The time when cancellation was requested."""
+
+    state: temporalio.common.NexusOperationCancellationState
+    """The current state of the cancellation request."""
+
+    attempt: int
+    """The number of attempts made to deliver the cancel operation request."""
+
+    last_attempt_complete_time: datetime | None
+
+    next_attempt_schedule_time: datetime | None
+    """The time when the next attempt is scheduled."""
+
+    last_attempt_failure: BaseException | None
+    """The last attempt's failure, if any."""
+
+    blocked_reason: str
+    """Blocked reason provides additional information if the cancellation state is BLOCKED."""
+
+    reason: str
+    """The reason specified in the cancellation request."""
+
+    @classmethod
+    async def _from_cancellation_info(
+        cls,
+        info: temporalio.api.nexus.v1.NexusOperationExecutionCancellationInfo,
+        data_converter: DataConverter,
+    ) -> Self:
+        """Create from raw proto nexus operation cancellation info."""
+        return cls(
+            raw=info,
+            requested_time=(
+                info.requested_time.ToDatetime(tzinfo=timezone.utc)
+                if info.requested_time
+                else None
+            ),
+            state=(
+                temporalio.common.NexusOperationCancellationState(info.state)
+                if info.state
+                else temporalio.common.NexusOperationCancellationState.UNSPECIFIED
+            ),
+            attempt=info.attempt,
+            last_attempt_complete_time=(
+                info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
+                if info.last_attempt_complete_time
+                else None
+            ),
+            next_attempt_schedule_time=(
+                info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
+                if info.next_attempt_schedule_time
+                else None
+            ),
+            last_attempt_failure=(
+                cast(
+                    BaseException | None,
+                    await data_converter.decode_failure(info.last_attempt_failure),
+                )
+                if info.HasField("last_attempt_failure")
+                else None
+            ),
+            blocked_reason=info.blocked_reason,
+            reason=info.reason,
         )
 
 
@@ -5411,6 +5508,7 @@ class NexusOperationHandle(Generic[ReturnType]):
     async def describe(
         self,
         *,
+        long_poll_token: bytes | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationExecutionDescription:
@@ -5430,6 +5528,7 @@ class NexusOperationHandle(Generic[ReturnType]):
             DescribeNexusOperationInput(
                 operation_id=self._operation_id,
                 run_id=self._run_id,
+                long_poll_token=long_poll_token,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
@@ -8741,6 +8840,7 @@ class DescribeNexusOperationInput:
 
     operation_id: str
     run_id: str | None
+    long_poll_token: bytes | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -10043,6 +10143,7 @@ class _ClientImpl(OutboundInterceptor):
         return await NexusOperationExecutionDescription._from_execution_info(
             info=resp.info,
             data_converter=self._client.data_converter,
+            long_poll_token=resp.long_poll_token or None,
         )
 
     async def get_nexus_operation_result(
