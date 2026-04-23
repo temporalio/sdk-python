@@ -199,6 +199,10 @@ class MaxBatchWorkflow(PubSubMixin):
     def close(self) -> None:
         self._closed = True
 
+    @workflow.query
+    def publisher_sequences(self) -> dict[str, int]:
+        return dict(self._pubsub_publisher_sequences)
+
     @workflow.run
     async def run(self, count: int) -> None:
         await workflow.execute_activity(
@@ -269,8 +273,13 @@ async def publish_with_max_batch(count: int) -> None:
         for i in range(count):
             activity.heartbeat()
             client.publish("events", f"item-{i}".encode())
-        # Long batch_interval ensures only max_batch_size triggers flushes
-        # Context manager exit flushes any remainder
+            # Yield so the flusher task can run when max_batch_size triggers
+            # _flush_event. Real workloads (e.g. agents awaiting LLM streams)
+            # yield constantly; a tight loop with no awaits would never let
+            # the flusher fire and would collapse back to exit-only flushing.
+            await asyncio.sleep(0)
+        # Long batch_interval ensures only max_batch_size triggers flushes.
+        # Context manager exit flushes any remainder.
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +484,13 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
         await handle.execute_update("truncate", 3)
 
         # Poll from offset 1 (truncated) — should get ApplicationError,
-        # NOT crash the workflow task.
+        # NOT crash the workflow task. Catching WorkflowUpdateFailedError is
+        # sufficient to prove the handler raised ApplicationError: Temporal's
+        # update protocol completes the update with this error only when the
+        # handler raises ApplicationError. A bare ValueError (or any other
+        # exception) would fail the workflow task instead, causing
+        # execute_update to hang — not raise. The follow-up collect_items
+        # below proves the workflow task wasn't poisoned.
         with pytest.raises(WorkflowUpdateFailedError):
             await handle.execute_update(
                 "__pubsub_poll",
@@ -771,6 +786,24 @@ async def test_max_batch_size(client: Client) -> None:
         assert len(items) == count + 1
         for i in range(count):
             assert items[i].data == f"item-{i}".encode()
+
+        # max_batch_size actually engages: at least one flush fires during
+        # the publish loop, so 7 items ship as >=2 signals. Without this
+        # assertion the test would pass even if max_batch_size were ignored
+        # and all 7 items went out in a single exit-time flush (batch_count
+        # == 1). Note: max_batch_size is a *trigger* threshold, not a cap —
+        # the flusher may take more items from the buffer than max_batch_size
+        # if more were added while a prior signal was in flight, so the exact
+        # batch count depends on interleaving. Asserting >= 2 is the
+        # non-flaky way to verify the mechanism is live.
+        seqs = await handle.query(MaxBatchWorkflow.publisher_sequences)
+        assert len(seqs) == 1, f"expected one publisher, got {seqs}"
+        (batch_count,) = seqs.values()
+        assert batch_count >= 2, (
+            f"expected >=2 batches with max_batch_size=3 and 7 items, got "
+            f"{batch_count} — max_batch_size did not trigger a mid-loop flush"
+        )
+
         await handle.signal(MaxBatchWorkflow.close)
 
 
@@ -791,9 +824,18 @@ async def test_replay_safety(client: Client) -> None:
         )
         # 1 (started) + 5 (activity) + 1 (done) = 7
         items = await collect_items(handle, None, 0, 7)
-        assert len(items) == 7
-        assert items[0].data == b"started"
-        assert items[6].data == b"done"
+        # Full ordered sequence — endpoint-only checks would miss mid-stream
+        # replay corruption (reordering, duplication, dropped items).
+        assert [i.data for i in items] == [
+            b"started",
+            b"item-0",
+            b"item-1",
+            b"item-2",
+            b"item-3",
+            b"item-4",
+            b"done",
+        ]
+        assert [i.offset for i in items] == list(range(7))
         await handle.signal(InterleavedWorkflow.close)
 
 

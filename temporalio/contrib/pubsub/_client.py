@@ -150,7 +150,12 @@ class PubSubClient:
             except asyncio.CancelledError:
                 pass
             self._flush_task = None
-        await self._flush()
+        # Drain both pending and buffer. A single _flush() processes either
+        # pending OR buffer, not both — so if the flusher was cancelled
+        # mid-signal (pending set) while the producer added more items
+        # (buffer non-empty), a single final flush would orphan the buffer.
+        while self._pending is not None or self._buffer:
+            await self._flush()
 
     def publish(self, topic: str, data: bytes, priority: bool = False) -> None:
         """Buffer a message for publishing.
