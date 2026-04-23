@@ -75,7 +75,7 @@ class PollResult:
     """Update response: items matching the poll request.
 
     Items use base64-encoded data for cross-language wire compatibility.
-    When ``has_more`` is True, the response was truncated to stay within
+    When ``more_ready`` is True, the response was truncated to stay within
     size limits and the subscriber should poll again immediately rather
     than applying a cooldown delay.
     """

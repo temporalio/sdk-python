@@ -15,14 +15,13 @@ from temporalio.exceptions import ApplicationError
 from ._types import (
     PollInput,
     PollResult,
+    PublishInput,
     PubSubItem,
     PubSubState,
-    PublishInput,
     _WireItem,
     decode_data,
     encode_data,
 )
-
 
 _MAX_POLL_RESPONSE_BYTES = 1_000_000
 
@@ -66,12 +65,8 @@ class PubSubMixin:
                 for item in prior_state.log
             ]
             self._pubsub_base_offset = prior_state.base_offset
-            self._pubsub_publisher_sequences = dict(
-                prior_state.publisher_sequences
-            )
-            self._pubsub_publisher_last_seen = dict(
-                prior_state.publisher_last_seen
-            )
+            self._pubsub_publisher_sequences = dict(prior_state.publisher_sequences)
+            self._pubsub_publisher_last_seen = dict(prior_state.publisher_last_seen)
         else:
             self._pubsub_log = []
             self._pubsub_base_offset = 0
@@ -79,9 +74,7 @@ class PubSubMixin:
             self._pubsub_publisher_last_seen = {}
         self._pubsub_draining = False
 
-    def get_pubsub_state(
-        self, *, publisher_ttl: float = 900.0
-    ) -> PubSubState:
+    def get_pubsub_state(self, *, publisher_ttl: float = 900.0) -> PubSubState:
         """Return a serializable snapshot of pub/sub state for continue-as-new.
 
         Prunes publisher dedup entries older than ``publisher_ttl`` seconds.
@@ -161,7 +154,7 @@ class PubSubMixin:
         self._pubsub_log.append(PubSubItem(topic=topic, data=data))
 
     @workflow.signal(name="__pubsub_publish")
-    def _pubsub_publish(self, input: PublishInput) -> None:
+    def _pubsub_publish(self, payload: PublishInput) -> None:
         """Receive publications from external clients (activities, starters).
 
         Deduplicates using (publisher_id, sequence). If publisher_id is set
@@ -170,30 +163,24 @@ class PubSubMixin:
         the dedup decision applies to the whole batch, not individual items.
         """
         self._check_initialized()
-        if input.publisher_id:
-            last_seq = self._pubsub_publisher_sequences.get(
-                input.publisher_id, 0
-            )
-            if input.sequence <= last_seq:
+        if payload.publisher_id:
+            last_seq = self._pubsub_publisher_sequences.get(payload.publisher_id, 0)
+            if payload.sequence <= last_seq:
                 return
-            self._pubsub_publisher_sequences[input.publisher_id] = (
-                input.sequence
-            )
-            self._pubsub_publisher_last_seen[input.publisher_id] = (
-                workflow.time()
-            )
-        for entry in input.items:
+            self._pubsub_publisher_sequences[payload.publisher_id] = payload.sequence
+            self._pubsub_publisher_last_seen[payload.publisher_id] = workflow.time()
+        for entry in payload.items:
             self._pubsub_log.append(
                 PubSubItem(topic=entry.topic, data=decode_data(entry.data))
             )
 
     @workflow.update(name="__pubsub_poll")
-    async def _pubsub_poll(self, input: PollInput) -> PollResult:
+    async def _pubsub_poll(self, payload: PollInput) -> PollResult:
         """Long-poll: block until new items available or draining, then return."""
         self._check_initialized()
-        log_offset = input.from_offset - self._pubsub_base_offset
+        log_offset = payload.from_offset - self._pubsub_base_offset
         if log_offset < 0:
-            if input.from_offset == 0:
+            if payload.from_offset == 0:
                 # "From the beginning" — start at whatever is available.
                 log_offset = 0
             else:
@@ -202,18 +189,17 @@ class PubSubMixin:
                 # without crashing the workflow task — avoids a poison pill
                 # during replay.
                 raise ApplicationError(
-                    f"Requested offset {input.from_offset} has been truncated. "
+                    f"Requested offset {payload.from_offset} has been truncated. "
                     f"Current base offset is {self._pubsub_base_offset}.",
                     type="TruncatedOffset",
                     non_retryable=True,
                 )
         await workflow.wait_condition(
-            lambda: len(self._pubsub_log) > log_offset
-            or self._pubsub_draining,
+            lambda: len(self._pubsub_log) > log_offset or self._pubsub_draining,
         )
         all_new = self._pubsub_log[log_offset:]
-        if input.topics:
-            topic_set = set(input.topics)
+        if payload.topics:
+            topic_set = set(payload.topics)
             candidates = [
                 (self._pubsub_base_offset + log_offset + i, item)
                 for i, item in enumerate(all_new)
@@ -238,9 +224,7 @@ class PubSubMixin:
                 more_ready = True
                 break
             size += item_size
-            wire_items.append(
-                _WireItem(topic=item.topic, data=encoded, offset=off)
-            )
+            wire_items.append(_WireItem(topic=item.topic, data=encoded, offset=off))
         return PollResult(
             items=wire_items,
             next_offset=next_offset,
@@ -248,7 +232,7 @@ class PubSubMixin:
         )
 
     @_pubsub_poll.validator
-    def _validate_pubsub_poll(self, input: PollInput) -> None:  # noqa: A002
+    def _validate_pubsub_poll(self, payload: PollInput) -> None:
         """Reject new polls when draining for continue-as-new."""
         self._check_initialized()
         if self._pubsub_draining:

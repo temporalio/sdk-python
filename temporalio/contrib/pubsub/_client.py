@@ -10,7 +10,7 @@ import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator
-from typing import Self
+from typing import Any, Self
 
 from temporalio import activity
 from temporalio.client import (
@@ -24,9 +24,9 @@ from temporalio.client import (
 from ._types import (
     PollInput,
     PollResult,
-    PubSubItem,
     PublishEntry,
     PublishInput,
+    PubSubItem,
     decode_data,
     encode_data,
 )
@@ -54,7 +54,7 @@ class PubSubClient:
 
     def __init__(
         self,
-        handle: WorkflowHandle,
+        handle: WorkflowHandle[Any, Any],
         *,
         batch_interval: float = 2.0,
         max_batch_size: int | None = None,
@@ -62,8 +62,9 @@ class PubSubClient:
     ) -> None:
         """Create a pub/sub client from a workflow handle.
 
-        Prefer :py:meth:`create` when you need continue-as-new
-        following in ``subscribe()``.
+        Prefer :py:meth:`create` — it enables continue-as-new following in
+        ``subscribe()``. The direct-handle form used here does not follow
+        CAN and will stop yielding once the original run ends.
 
         Args:
             handle: Workflow handle to the pub/sub workflow.
@@ -74,7 +75,7 @@ class PubSubClient:
                 workflow's ``publisher_ttl`` (default 900s) to preserve
                 exactly-once delivery. Default: 600s.
         """
-        self._handle = handle
+        self._handle: WorkflowHandle[Any, Any] = handle
         self._client: Client | None = None
         self._workflow_id = handle.id
         self._batch_interval = batch_interval
@@ -124,9 +125,9 @@ class PubSubClient:
                 client = activity.client()
             if workflow_id is None:
                 wf_id = info.workflow_id
-                assert wf_id is not None, (
-                    "activity must be called from within a workflow"
-                )
+                assert (
+                    wf_id is not None
+                ), "activity must be called from within a workflow"
                 workflow_id = wf_id
         handle = client.get_workflow_handle(workflow_id)
         instance = cls(
@@ -278,10 +279,7 @@ class PubSubClient:
             except asyncio.CancelledError:
                 return
             except WorkflowUpdateFailedError as e:
-                if (
-                    e.cause
-                    and getattr(e.cause, "type", None) == "TruncatedOffset"
-                ):
+                if e.cause and getattr(e.cause, "type", None) == "TruncatedOffset":
                     # Subscriber fell behind truncation. Retry from offset 0
                     # which the mixin treats as "from the beginning of
                     # whatever exists" (i.e., from base_offset).

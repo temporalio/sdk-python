@@ -13,10 +13,10 @@ from temporalio.contrib.pubsub._mixin import PubSubMixin
 from temporalio.contrib.pubsub._types import (
     PollInput,
     PollResult,
-    PubSubItem,
-    PubSubState,
     PublishEntry,
     PublishInput,
+    PubSubItem,
+    PubSubState,
 )
 
 __all__ = [

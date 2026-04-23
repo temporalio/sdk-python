@@ -22,12 +22,12 @@ from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
 from temporalio.contrib.pubsub import (
     PollInput,
     PollResult,
+    PublishEntry,
+    PublishInput,
     PubSubClient,
     PubSubItem,
     PubSubMixin,
     PubSubState,
-    PublishEntry,
-    PublishInput,
 )
 from temporalio.contrib.pubsub._types import encode_data
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
@@ -35,7 +35,6 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually, new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
-
 
 # ---------------------------------------------------------------------------
 # Test workflows (must be module-level, not local classes)
@@ -474,10 +473,12 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
         # Publish 5 items
         await handle.signal(
             "__pubsub_publish",
-            PublishInput(items=[
-                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
-                for i in range(5)
-            ]),
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                    for i in range(5)
+                ]
+            ),
         )
 
         # Truncate up to offset 3 via update — completion is explicit.
@@ -522,10 +523,12 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
         # Publish 5 items
         await handle.signal(
             "__pubsub_publish",
-            PublishInput(items=[
-                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
-                for i in range(5)
-            ]),
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                    for i in range(5)
+                ]
+            ),
         )
 
         # Truncate first 3. The update returns after the handler completes.
@@ -537,9 +540,7 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
         items: list[PubSubItem] = []
         try:
             async with asyncio.timeout(5):
-                async for item in pubsub.subscribe(
-                    from_offset=1, poll_cooldown=0
-                ):
+                async for item in pubsub.subscribe(from_offset=1, poll_cooldown=0):
                     items.append(item)
                     if len(items) >= 2:
                         break
@@ -642,9 +643,7 @@ async def test_iterator_cancellation(client: Client) -> None:
         items: list[PubSubItem] = []
 
         async def subscribe_and_collect() -> None:
-            async for item in pubsub_client.subscribe(
-                from_offset=0, poll_cooldown=0
-            ):
+            async for item in pubsub_client.subscribe(from_offset=0, poll_cooldown=0):
                 items.append(item)
                 first_item.set()
 
@@ -736,9 +735,7 @@ async def test_concurrent_subscribers(client: Client) -> None:
         async def publish(topic: str, data: bytes) -> None:
             await handle.signal(
                 "__pubsub_publish",
-                PublishInput(
-                    items=[PublishEntry(topic=topic, data=encode_data(data))]
-                ),
+                PublishInput(items=[PublishEntry(topic=topic, data=encode_data(data))]),
             )
 
         try:
@@ -917,10 +914,13 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
             return await real_signal(*args, **kwargs)
 
         clock = [0.0]
-        with patch(
-            "temporalio.contrib.pubsub._client.time.monotonic",
-            side_effect=lambda: clock[0],
-        ), patch.object(handle, "signal", side_effect=maybe_failing_signal):
+        with (
+            patch(
+                "temporalio.contrib.pubsub._client.time.monotonic",
+                side_effect=lambda: clock[0],
+            ),
+            patch.object(handle, "signal", side_effect=maybe_failing_signal),
+        ):
             pubsub.publish("events", b"lost")
 
             # First flush fails and enters the pending-retry state.
@@ -1020,10 +1020,12 @@ async def test_truncate_pubsub(client: Client) -> None:
         # which acts as a signal barrier.
         await handle.signal(
             "__pubsub_publish",
-            PublishInput(items=[
-                PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
-                for i in range(5)
-            ]),
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                    for i in range(5)
+                ]
+            ),
         )
 
         # Verify all 5 items
@@ -1078,9 +1080,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
         )
 
         # Sanity: pub-old is recorded (generous TTL retains it).
-        state_before = await handle.query(
-            TTLTestWorkflow.get_state_with_ttl, 9999.0
-        )
+        state_before = await handle.query(TTLTestWorkflow.get_state_with_ttl, 9999.0)
         assert "pub-old" in state_before.publisher_sequences
 
         # Let workflow.time() advance by real wall-clock time. Use a
@@ -1174,6 +1174,7 @@ class TTLTestWorkflow(PubSubMixin):
 @dataclass
 class CANWorkflowInputTyped:
     """Uses proper typing."""
+
     pubsub_state: PubSubState | None = None
 
 
@@ -1202,18 +1203,20 @@ class ContinueAsNewTypedWorkflow(PubSubMixin):
     @workflow.run
     async def run(self, input: CANWorkflowInputTyped) -> None:
         while True:
-            await workflow.wait_condition(
-                lambda: self._should_continue or self._closed
-            )
+            await workflow.wait_condition(lambda: self._should_continue or self._closed)
             if self._closed:
                 return
             if self._should_continue:
                 self._should_continue = False
                 self.drain_pubsub()
                 await workflow.wait_condition(workflow.all_handlers_finished)
-                workflow.continue_as_new(args=[CANWorkflowInputTyped(
-                    pubsub_state=self.get_pubsub_state(),
-                )])
+                workflow.continue_as_new(
+                    args=[
+                        CANWorkflowInputTyped(
+                            pubsub_state=self.get_pubsub_state(),
+                        )
+                    ]
+                )
 
 
 @pytest.mark.asyncio
@@ -1527,9 +1530,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
             await handle.signal(
                 "__pubsub_publish",
                 PublishInput(
-                    items=[
-                        PublishEntry(topic="big", data=encode_data(chunk))
-                    ]
+                    items=[PublishEntry(topic="big", data=encode_data(chunk))]
                 ),
             )
 
@@ -1582,9 +1583,7 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
             await handle.signal(
                 "__pubsub_publish",
                 PublishInput(
-                    items=[
-                        PublishEntry(topic="big", data=encode_data(chunk))
-                    ]
+                    items=[PublishEntry(topic="big", data=encode_data(chunk))]
                 ),
             )
 
