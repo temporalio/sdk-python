@@ -1,31 +1,56 @@
-"""Shared data types for the pub/sub contrib module."""
+"""Shared data types for the pub/sub contrib module.
+
+The user-facing ``data`` fields on :class:`PubSubItem` are
+:class:`temporalio.api.common.v1.Payload` so that user codec chains
+(encryption, PII-redaction, compression) apply per item. See
+``DESIGN-v2.md`` §5 and ``docs/pubsub-payload-migration.md``.
+
+The wire representation (``PublishEntry``, ``_WireItem``) uses
+base64-encoded ``Payload.SerializeToString()`` bytes because the default
+JSON payload converter cannot serialize a ``Payload`` embedded inside a
+dataclass (it only special-cases top-level Payloads on signal/update
+args). Round-trip validated in
+``tests/contrib/pubsub/test_payload_roundtrip_prototype.py``.
+"""
 
 from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
+from typing import Any
+
+from temporalio.api.common.v1 import Payload
 
 
-def encode_data(data: bytes) -> str:
-    """Encode bytes to base64 string for wire format."""
-    return base64.b64encode(data).decode("ascii")
+def _encode_payload(payload: Payload) -> str:
+    """Wire format: base64(Payload.SerializeToString())."""
+    return base64.b64encode(payload.SerializeToString()).decode("ascii")
 
 
-def decode_data(data: str) -> bytes:
-    """Decode base64 string from wire format to bytes."""
-    return base64.b64decode(data)
+def _decode_payload(wire: str) -> Payload:
+    """Inverse of :func:`_encode_payload`."""
+    payload = Payload()
+    payload.ParseFromString(base64.b64decode(wire))
+    return payload
 
 
 @dataclass
 class PubSubItem:
     """A single item in the pub/sub log.
 
-    The ``offset`` field is populated at poll time from the item's position
-    in the global log.
+    The ``data`` field is a :class:`temporalio.api.common.v1.Payload`
+    as stored by the mixin and yielded by
+    :meth:`PubSubClient.subscribe` when no ``result_type`` is given.
+    When ``result_type`` is passed to ``subscribe``, ``data`` holds the
+    decoded value of that type instead — the dataclass is typed as
+    ``Any`` to accommodate both.
+
+    The ``offset`` field is populated at poll time from the item's
+    position in the global log.
     """
 
     topic: str
-    data: bytes
+    data: Any
     offset: int = 0
 
 
@@ -33,12 +58,13 @@ class PubSubItem:
 class PublishEntry:
     """A single entry to publish via signal (wire type).
 
-    The ``data`` field is a base64-encoded string for cross-language
-    compatibility over Temporal's JSON payload converter.
+    ``data`` is base64-encoded ``Payload.SerializeToString()`` output —
+    see module docstring for why a nested ``Payload`` cannot be used
+    directly.
     """
 
     topic: str
-    data: str  # base64-encoded bytes
+    data: str
 
 
 @dataclass
@@ -63,10 +89,10 @@ class PollInput:
 
 @dataclass
 class _WireItem:
-    """Wire representation of a PubSubItem (base64 data)."""
+    """Wire representation of a PubSubItem (base64 of serialized Payload)."""
 
     topic: str
-    data: str  # base64-encoded bytes
+    data: str
     offset: int = 0
 
 
@@ -74,10 +100,10 @@ class _WireItem:
 class PollResult:
     """Update response: items matching the poll request.
 
-    Items use base64-encoded data for cross-language wire compatibility.
-    When ``more_ready`` is True, the response was truncated to stay within
-    size limits and the subscriber should poll again immediately rather
-    than applying a cooldown delay.
+    ``items`` use the wire representation. When ``more_ready`` is True,
+    the response was truncated to stay within size limits and the
+    subscriber should poll again immediately rather than applying a
+    cooldown delay.
     """
 
     items: list[_WireItem] = field(default_factory=list)
@@ -90,10 +116,10 @@ class PubSubState:
     """Serializable snapshot of pub/sub state for continue-as-new.
 
     The containing workflow input must type the field as
-    ``PubSubState | None``, not ``Any``, so that the default data converter
+    ``PubSubState | None``, not ``Any``, so the default data converter
     can reconstruct the dataclass from JSON.
 
-    The log items use base64-encoded data for serialization stability.
+    Log items use the wire representation for serialization stability.
     """
 
     log: list[_WireItem] = field(default_factory=list)

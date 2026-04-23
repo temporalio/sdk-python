@@ -1,7 +1,17 @@
 """External-side pub/sub client.
 
-Used by activities, starters, and any code with a workflow handle to publish
-messages and subscribe to topics on a pub/sub workflow.
+Used by activities, starters, and any code with a workflow handle to
+publish messages and subscribe to topics on a pub/sub workflow.
+
+Each published value is turned into a :class:`Payload` via the client's
+sync payload converter. The **codec chain** (encryption, PII-redaction,
+compression) is **not** run per item — it runs once at the envelope
+level when Temporal's SDK encodes the ``__pubsub_publish`` signal args
+and the ``__pubsub_poll`` update result. Running the codec per item as
+well would double-encrypt / double-compress, because the envelope path
+covers the items again. The per-item ``Payload`` still carries the
+encoding metadata (``encoding: json/plain``, ``messageType``, etc.)
+required by ``subscribe(result_type=T)`` on the consumer side.
 """
 
 from __future__ import annotations
@@ -13,6 +23,7 @@ from collections.abc import AsyncIterator
 from typing import Any, Self
 
 from temporalio import activity
+from temporalio.api.common.v1 import Payload
 from temporalio.client import (
     Client,
     WorkflowExecutionStatus,
@@ -20,6 +31,7 @@ from temporalio.client import (
     WorkflowUpdateFailedError,
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
+from temporalio.converter import DataConverter, PayloadConverter
 
 from ._types import (
     PollInput,
@@ -27,8 +39,8 @@ from ._types import (
     PublishEntry,
     PublishInput,
     PubSubItem,
-    decode_data,
-    encode_data,
+    _decode_payload,
+    _encode_payload,
 )
 
 
@@ -39,36 +51,44 @@ class PubSubClient:
     :py:meth:`from_activity` (infer both from the current activity
     context), or by passing a handle directly to the constructor.
 
-    For publishing, use as an async context manager to get automatic batching::
+    For publishing, use as an async context manager to get automatic
+    batching::
 
         client = PubSubClient.create(temporal_client, workflow_id)
         async with client:
-            client.publish("events", b"hello")
-            client.publish("events", b"world", force_flush=True)
+            client.publish("events", my_event)
+            client.publish("events", another_event, force_flush=True)
 
     For subscribing::
 
         client = PubSubClient.create(temporal_client, workflow_id)
-        async for item in client.subscribe(["events"], from_offset=0):
-            process(item)
+        async for item in client.subscribe(["events"], result_type=MyEvent):
+            process(item.data)
     """
 
     def __init__(
         self,
         handle: WorkflowHandle[Any, Any],
         *,
+        client: Client | None = None,
         batch_interval: float = 2.0,
         max_batch_size: int | None = None,
         max_retry_duration: float = 600.0,
     ) -> None:
         """Create a pub/sub client from a workflow handle.
 
-        Prefer :py:meth:`create` — it enables continue-as-new following in
-        ``subscribe()``. The direct-handle form used here does not follow
-        CAN and will stop yielding once the original run ends.
+        Prefer :py:meth:`create` — it enables continue-as-new following
+        in ``subscribe()`` and supplies the :class:`Client` needed to
+        reach the data converter chain.
 
         Args:
             handle: Workflow handle to the pub/sub workflow.
+            client: Temporal client whose payload converter will be used
+                to turn published values into ``Payload`` objects and to
+                decode subscriptions when ``result_type`` is set. The
+                codec chain is **not** applied per item (doing so would
+                double-encrypt — see module docstring). If ``None``, the
+                default payload converter is used.
             batch_interval: Seconds between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
             max_retry_duration: Maximum seconds to retry a failed flush
@@ -77,12 +97,12 @@ class PubSubClient:
                 exactly-once delivery. Default: 600s.
         """
         self._handle: WorkflowHandle[Any, Any] = handle
-        self._client: Client | None = None
+        self._client: Client | None = client
         self._workflow_id = handle.id
         self._batch_interval = batch_interval
         self._max_batch_size = max_batch_size
         self._max_retry_duration = max_retry_duration
-        self._buffer: list[PublishEntry] = []
+        self._buffer: list[tuple[str, Any]] = []
         self._flush_event = asyncio.Event()
         self._flush_task: asyncio.Task[None] | None = None
         self._flush_lock = asyncio.Lock()
@@ -106,11 +126,12 @@ class PubSubClient:
 
         Use this when the caller has an explicit ``Client`` and
         ``workflow_id`` in hand (starters, BFFs, other workflows'
-        activities). For code running inside an activity that targets its
-        own parent workflow, see :py:meth:`from_activity`.
+        activities). For code running inside an activity that targets
+        its own parent workflow, see :py:meth:`from_activity`.
 
         A client created through this method follows continue-as-new
-        chains in ``subscribe()``.
+        chains in ``subscribe()`` and uses the client's payload
+        converter for per-item ``Payload`` construction.
 
         Args:
             client: Temporal client.
@@ -121,14 +142,13 @@ class PubSubClient:
                 before raising TimeoutError. Default: 600s.
         """
         handle = client.get_workflow_handle(workflow_id)
-        instance = cls(
+        return cls(
             handle,
+            client=client,
             batch_interval=batch_interval,
             max_batch_size=max_batch_size,
             max_retry_duration=max_retry_duration,
         )
-        instance._client = client
-        return instance
 
     @classmethod
     def from_activity(
@@ -174,28 +194,68 @@ class PubSubClient:
             except asyncio.CancelledError:
                 pass
             self._flush_task = None
-        # Drain both pending and buffer. A single _flush() processes either
-        # pending OR buffer, not both — so if the flusher was cancelled
-        # mid-signal (pending set) while the producer added more items
-        # (buffer non-empty), a single final flush would orphan the buffer.
+        # Drain both pending and buffer. A single _flush() processes
+        # either pending OR buffer, not both — so if the flusher was
+        # cancelled mid-signal (pending set) while the producer added
+        # more items (buffer non-empty), a single final flush would
+        # orphan the buffer.
         while self._pending is not None or self._buffer:
             await self._flush()
 
-    def publish(self, topic: str, data: bytes, force_flush: bool = False) -> None:
+    def publish(self, topic: str, value: Any, force_flush: bool = False) -> None:
         """Buffer a message for publishing.
+
+        ``value`` may be any Python value the client's payload
+        converter can handle, or a pre-built
+        :class:`temporalio.api.common.v1.Payload` for zero-copy. The
+        codec chain is not applied per item — it runs once on the
+        signal envelope that delivers the batch.
 
         Args:
             topic: Topic string.
-            data: Opaque byte payload.
+            value: Value to publish. Converted to a ``Payload`` via
+                the client's sync payload converter at flush time.
+                Pre-built ``Payload`` instances bypass conversion.
             force_flush: If True, wake the flusher to send immediately
                 (fire-and-forget — does not block the caller).
         """
-        self._buffer.append(PublishEntry(topic=topic, data=encode_data(data)))
+        self._buffer.append((topic, value))
         if force_flush or (
             self._max_batch_size is not None
             and len(self._buffer) >= self._max_batch_size
         ):
             self._flush_event.set()
+
+    def _payload_converter(self) -> PayloadConverter:
+        """Return the sync payload converter for per-item encode/decode.
+
+        Uses the configured client's payload converter when available;
+        otherwise falls back to the default. The codec chain
+        (encryption, compression, PII-redaction) is intentionally not
+        invoked here — it runs once at the envelope level when the
+        signal/update goes over the wire. See module docstring.
+        """
+        if self._client is not None:
+            return self._client.data_converter.payload_converter
+        return DataConverter.default.payload_converter
+
+    def _encode_buffer(self, entries: list[tuple[str, Any]]) -> list[PublishEntry]:
+        """Convert buffered (topic, value) pairs to wire entries.
+
+        Non-Payload values go through the sync payload converter so the
+        resulting ``Payload`` carries encoding metadata for
+        ``result_type=`` decode on the consumer side. Pre-built
+        Payloads bypass conversion.
+        """
+        converter = self._payload_converter()
+        out: list[PublishEntry] = []
+        for topic, value in entries:
+            if isinstance(value, Payload):
+                payload = value
+            else:
+                payload = converter.to_payloads([value])[0]
+            out.append(PublishEntry(topic=topic, data=_encode_payload(payload)))
+        return out
 
     async def _flush(self) -> None:
         """Send buffered or pending messages to the workflow via signal.
@@ -212,10 +272,11 @@ class PubSubClient:
                     > self._max_retry_duration
                 ):
                     # Advance confirmed sequence so the next batch gets
-                    # a fresh sequence number. Without this, the next batch
-                    # reuses pending_seq, which the workflow may have already
-                    # accepted — causing silent dedup (data loss).
-                    # See DropPendingFixed / SequenceFreshness in the design doc.
+                    # a fresh sequence number. Without this, the next
+                    # batch reuses pending_seq, which the workflow may
+                    # have already accepted — causing silent dedup
+                    # (data loss). See DropPendingFixed /
+                    # SequenceFreshness in the design doc.
                     self._sequence = self._pending_seq
                     self._pending = None
                     self._pending_seq = 0
@@ -230,9 +291,10 @@ class PubSubClient:
                 seq = self._pending_seq
             elif self._buffer:
                 # New batch path
-                seq = self._sequence + 1
-                batch = self._buffer
+                raw = self._buffer
                 self._buffer = []
+                batch = self._encode_buffer(raw)
+                seq = self._sequence + 1
                 self._pending = batch
                 self._pending_seq = seq
                 self._pending_since = time.monotonic()
@@ -274,6 +336,7 @@ class PubSubClient:
         topics: list[str] | None = None,
         from_offset: int = 0,
         *,
+        result_type: type | None = None,
         poll_cooldown: float = 0.1,
     ) -> AsyncIterator[PubSubItem]:
         """Async iterator that polls for new items.
@@ -284,12 +347,19 @@ class PubSubClient:
         Args:
             topics: Topic filter. None or empty list means all topics.
             from_offset: Global offset to start reading from.
+            result_type: Optional target type. When provided, each
+                yielded :class:`PubSubItem` has its ``data`` decoded
+                via the client's sync payload converter to the
+                specified type. When omitted, ``data`` is the raw
+                :class:`~temporalio.api.common.v1.Payload` — useful
+                for heterogeneous topics where the caller dispatches
+                on ``Payload.metadata``.
             poll_cooldown: Minimum seconds between polls to avoid
-                overwhelming the workflow when items arrive faster than
-                the poll round-trip. Defaults to 0.1.
+                overwhelming the workflow when items arrive faster
+                than the poll round-trip. Defaults to 0.1.
 
         Yields:
-            PubSubItem for each matching item.
+            :class:`PubSubItem` for each matching item.
         """
         offset = from_offset
         while True:
@@ -303,9 +373,10 @@ class PubSubClient:
                 return
             except WorkflowUpdateFailedError as e:
                 if e.cause and getattr(e.cause, "type", None) == "TruncatedOffset":
-                    # Subscriber fell behind truncation. Retry from offset 0
-                    # which the mixin treats as "from the beginning of
-                    # whatever exists" (i.e., from base_offset).
+                    # Subscriber fell behind truncation. Retry from
+                    # offset 0 which the mixin treats as "from the
+                    # beginning of whatever exists" (i.e., from
+                    # base_offset).
                     offset = 0
                     continue
                 raise
@@ -313,10 +384,16 @@ class PubSubClient:
                 if await self._follow_continue_as_new():
                     continue
                 return
+            converter = self._payload_converter()
             for wire_item in result.items:
+                payload = _decode_payload(wire_item.data)
+                if result_type is not None:
+                    data: Any = converter.from_payload(payload, result_type)
+                else:
+                    data = payload
                 yield PubSubItem(
                     topic=wire_item.topic,
-                    data=decode_data(wire_item.data),
+                    data=data,
                     offset=wire_item.offset,
                 )
             offset = result.next_offset

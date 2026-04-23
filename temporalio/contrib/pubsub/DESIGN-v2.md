@@ -82,7 +82,7 @@ no argument.
 | Method / Handler | Kind | Description |
 |---|---|---|
 | `init_pubsub(prior_state=None)` | instance method | Initialize internal state. Must be called before use. |
-| `publish(topic, data)` | instance method | Append to the log from workflow code. |
+| `publish(topic, value)` | instance method | Append to the log from workflow code. `value` is converted via the workflow's sync payload converter (no codec). |
 | `get_pubsub_state(publisher_ttl=900)` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
 | `drain_pubsub()` | instance method | Unblock polls and reject new ones for CAN. |
 | `truncate_pubsub(up_to_offset)` | instance method | Discard log entries before offset. |
@@ -101,13 +101,19 @@ from temporalio.contrib.pubsub import PubSubClient
 client = PubSubClient.create(temporal_client, workflow_id)
 
 # --- Publishing (with batching) ---
+# Values go through the client's data converter — including the codec
+# chain (encryption, PII-redaction, compression) — per item.
 async with client:
-    client.publish("events", b'{"type":"TEXT_DELTA","delta":"hello"}')
-    client.publish("events", b'{"type":"TEXT_DELTA","delta":" world"}')
-    client.publish("events", b'{"type":"TEXT_COMPLETE"}', force_flush=True)
+    client.publish("events", TextDelta(delta="hello"))
+    client.publish("events", TextDelta(delta=" world"))
+    client.publish("events", TextComplete(), force_flush=True)
+    client.publish("raw", my_prebuilt_payload)  # zero-copy fast path
 
 # --- Subscribing ---
-async for item in client.subscribe(["events"], from_offset=0):
+# Pass result_type=T to have item.data decoded to T via the same codec
+# chain. Without result_type, item.data is the raw Payload and the
+# caller dispatches on metadata.
+async for item in client.subscribe(["events"], result_type=EventUnion):
     print(item.topic, item.data)
     if is_done(item):
         break
@@ -117,9 +123,9 @@ async for item in client.subscribe(["events"], from_offset=0):
 |---|---|
 | `PubSubClient.create(client, wf_id)` | Factory with explicit Temporal client and workflow id. Follows CAN in `subscribe()`. |
 | `PubSubClient.from_activity()` | Factory that pulls client and workflow id from the current activity context. Follows CAN in `subscribe()`. |
-| `PubSubClient(handle)` | From handle directly (no CAN following). |
-| `publish(topic, data, force_flush=False)` | Buffer a message. `force_flush` triggers immediate flush (fire-and-forget). |
-| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Always follows CAN chains when created via `create` or `from_activity`. |
+| `PubSubClient(handle)` | From handle directly (no CAN following; no codec chain — falls back to the default converter). |
+| `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. `force_flush` triggers immediate flush (fire-and-forget). |
+| `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=0.1)` | Async iterator. `result_type` decodes `item.data` to the given type; omit for raw `Payload`. Always follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush on exit.
@@ -151,15 +157,19 @@ path.
 ## Data Types
 
 ```python
+from temporalio.api.common.v1 import Payload
+
 @dataclass
 class PubSubItem:
-    topic: str        # Topic string
-    data: bytes       # Opaque payload
+    topic: str
+    data: Any          # Payload by default; decoded value when
+                       # subscribe is called with result_type=T
+    offset: int = 0    # Populated at poll time
 
 @dataclass
 class PublishEntry:
     topic: str
-    data: bytes
+    data: str          # Wire: base64(Payload.SerializeToString())
 
 @dataclass
 class PublishInput:
@@ -174,23 +184,40 @@ class PollInput:
 
 @dataclass
 class PollResult:
-    items: list[PubSubItem]
+    items: list[_WireItem]     # Wire-format items
     next_offset: int = 0       # Offset for next poll
+    more_ready: bool = False   # Truncated response; poll again
 
 @dataclass
 class PubSubState:
-    log: list[PubSubItem] = field(default_factory=list)
+    log: list[_WireItem] = field(default_factory=list)
     base_offset: int = 0
     publisher_sequences: dict[str, int] = field(default_factory=dict)
-    publisher_last_seen: dict[str, float] = field(default_factory=dict)  # For TTL pruning
+    publisher_last_seen: dict[str, float] = field(default_factory=dict)
 ```
-
-`PubSubItem` does not carry an offset field. The global offset is derived
-from the item's position in the log plus `base_offset`. It is exposed only
-through `PollResult.next_offset` and the `__pubsub_offset` query.
 
 The containing workflow input must type the field as `PubSubState | None`,
 not `Any` — `Any`-typed fields deserialize as plain dicts, losing the type.
+
+### Wire format for payloads
+
+The user-facing `data` on `PubSubItem` is a
+`temporalio.api.common.v1.Payload`, which carries both the data bytes
+and the encoding metadata written by the client's data converter and
+codec chain. Subscribers can either decode by passing `result_type=T`
+to `subscribe()` (runs the async converter chain, including the codec)
+or inspect `Payload.metadata` directly for heterogeneous topics.
+
+On the wire, every `data` string is
+`base64(Payload.SerializeToString())`. This is because the default
+JSON payload converter can serialize a top-level `Payload` as a
+signal argument but **cannot** serialize a `Payload` embedded inside
+a dataclass (it raises `TypeError: Object of type Payload is not JSON
+serializable`). Embedding the proto-serialized bytes keeps the wire
+format JSON-compatible while preserving the full `Payload` — metadata
+and all — across the signal and update round-trips. Round-trip is
+guarded by
+`tests/contrib/pubsub/test_payload_roundtrip_prototype.py`.
 
 ## Design Decisions
 
@@ -199,26 +226,53 @@ not `Any` — `Any`-typed fields deserialize as plain dicts, losing the type.
 Topics are exact-match strings. No prefix matching, no wildcards. A subscriber
 provides a list of topic strings to filter on; an empty list means "all topics."
 
-### 2. Items are opaque byte strings
+### 2. Items are Temporal `Payload`s, not opaque bytes
 
-The workflow does not interpret payloads. This enables cross-language
-compatibility. The pub/sub layer is transport; application semantics belong
-in the application.
+The workflow stores each item as a
+`temporalio.api.common.v1.Payload` — the same type signals, updates,
+and activities use. Publishers pass any value the client's data
+converter accepts (or a pre-built `Payload` for zero-copy);
+subscribers either receive the raw `Payload` (for heterogeneous
+topics) or pass `result_type=T` to have it decoded.
 
-The alternative is typed payloads — the pub/sub layer accepts
-application-defined types and uses Temporal's data converter for
-serialization. We chose opaque bytes because:
+This replaces an earlier "opaque byte strings" design. We switched
+because the opaque-bytes path **skipped the user's codec chain** —
+encryption, PII-redaction, and compression codecs saw only the
+outer `PublishInput` envelope, not the individual items. For users
+who expect their codec chain to cover every piece of data flowing
+through Temporal, that is a silent compliance/correctness gap.
 
-1. **Decoupling.** Different publishers on the same workflow may publish
-   different types to different topics. Opaque bytes let each publisher
-   choose its own serialization.
-2. **Layering.** The data converter already handles the wire format of
-   `PublishInput` and `PollResult` (the signal/update envelopes). Using it
-   for payload data would mean the converter runs at two levels.
-3. **Type hints.** `DataConverter.decode()` requires a target type. The
-   pub/sub layer does not know the application's types, so subscribers would
-   need to declare expected types per topic — complexity the application
-   handles trivially with `json.loads()`.
+The three original arguments for opaque bytes don't hold up:
+
+1. **Decoupling from the data converter.** Signals and updates
+   accept `Any` without making handlers generic; `Payload.metadata`
+   carries per-value encoding info. Pub/sub can do the same.
+2. **Layering — transport vs. application.** Every other Temporal
+   API surface (signals, updates, activity args, workflow args)
+   uses `Payload`. Pub/sub was the outlier.
+3. **Type hints at decode time.** Subscribers pass `result_type` at
+   the subscribe boundary — the same pattern as
+   `execute_update(result_type=...)`.
+
+**Codec runs once, at the envelope level.** Both
+`PubSubClient.publish` and `PubSubMixin.publish` turn values into
+`Payload` via the **sync** payload converter. The codec chain is
+not applied per item. It runs once — on the `__pubsub_publish`
+signal envelope (client → workflow path) and on the
+`__pubsub_poll` update envelope (workflow → subscriber path) —
+because Temporal's SDK already runs `DataConverter.encode` on
+signal and update args. Running the codec per item *as well*
+would double-encrypt / double-compress, and compressing
+already-encrypted data is pointless. The per-item `Payload` still
+carries the encoding metadata (`encoding: json/plain`,
+`messageType`, etc.), so `subscribe(result_type=T)` works
+without needing the codec to have run per item.
+
+**Wire format.** `PublishEntry.data` and `_WireItem.data` are
+base64-encoded `Payload.SerializeToString()` bytes, not nested
+`Payload` protos, because the default JSON converter cannot
+serialize a `Payload` embedded inside a dataclass. See [Data
+Types — Wire format for payloads](#wire-format-for-payloads).
 
 ### 3. Global offsets, NATS JetStream model
 

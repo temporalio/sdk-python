@@ -29,12 +29,24 @@ from temporalio.contrib.pubsub import (
     PubSubMixin,
     PubSubState,
 )
-from temporalio.contrib.pubsub._types import encode_data
+from temporalio.contrib.pubsub._types import _encode_payload
+from temporalio.converter import DataConverter
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually, new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
+
+
+def _wire_bytes(data: bytes) -> str:
+    """Build a PublishEntry.data string from raw bytes.
+
+    Mirrors what :class:`PubSubClient` produces on the encode path:
+    default payload converter turns the bytes into a ``Payload``, which
+    is then proto-serialized and base64-encoded for the wire.
+    """
+    payload = DataConverter.default.payload_converter.to_payloads([data])[0]
+    return _encode_payload(payload)
 
 # ---------------------------------------------------------------------------
 # Test workflows (must be module-level, not local classes)
@@ -77,6 +89,30 @@ class ActivityPublishWorkflow(PubSubMixin):
             heartbeat_timeout=timedelta(seconds=10),
         )
         self.publish("status", b"activity_done")
+        await workflow.wait_condition(lambda: self._closed)
+
+
+@dataclass
+class AgentEvent:
+    kind: str
+    payload: dict[str, Any]
+
+
+@workflow.defn
+class StructuredPublishWorkflow(PubSubMixin):
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.init_pubsub()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.run
+    async def run(self, count: int) -> None:
+        for i in range(count):
+            self.publish("events", AgentEvent(kind="tick", payload={"i": i}))
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -299,19 +335,30 @@ async def _is_different_run(
 
 
 async def collect_items(
+    client: Client,
     handle: WorkflowHandle[Any, Any],
     topics: list[str] | None,
     from_offset: int,
     expected_count: int,
     timeout: float = 15.0,
+    *,
+    result_type: type | None = bytes,
 ) -> list[PubSubItem]:
-    """Subscribe and collect exactly expected_count items, with timeout."""
-    client = PubSubClient(handle)
+    """Subscribe and collect exactly expected_count items, with timeout.
+
+    Default ``result_type=bytes`` matches the bytes-oriented tests that
+    compare ``item.data`` against literal byte strings. Pass
+    ``result_type=None`` to receive raw ``Payload`` objects.
+    """
+    pubsub = PubSubClient.create(client, handle.id)
     items: list[PubSubItem] = []
     try:
         async with asyncio.timeout(timeout):
-            async for item in client.subscribe(
-                topics=topics, from_offset=from_offset, poll_cooldown=0
+            async for item in pubsub.subscribe(
+                topics=topics,
+                from_offset=from_offset,
+                poll_cooldown=0,
+                result_type=result_type,
             ):
                 items.append(item)
                 if len(items) >= expected_count:
@@ -342,7 +389,7 @@ async def test_activity_publish_and_subscribe(client: Client) -> None:
             task_queue=worker.task_queue,
         )
         # Collect activity items + the "activity_done" status item
-        items = await collect_items(handle, None, 0, count + 1)
+        items = await collect_items(client, handle, None, 0, count + 1)
         assert len(items) == count + 1
 
         # Check activity items
@@ -355,6 +402,29 @@ async def test_activity_publish_and_subscribe(client: Client) -> None:
         assert items[count].data == b"activity_done"
 
         await handle.signal(ActivityPublishWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_structured_type_round_trip(client: Client) -> None:
+    """Workflow publishes dataclass values; subscriber decodes via result_type."""
+    count = 4
+    async with new_worker(client, StructuredPublishWorkflow) as worker:
+        handle = await client.start_workflow(
+            StructuredPublishWorkflow.run,
+            count,
+            id=f"pubsub-structured-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        items = await collect_items(
+            client, handle, None, 0, count, result_type=AgentEvent
+        )
+        assert len(items) == count
+        for i, item in enumerate(items):
+            assert isinstance(item.data, AgentEvent)
+            assert item.data == AgentEvent(kind="tick", payload={"i": i})
+
+        await handle.signal(StructuredPublishWorkflow.close)
 
 
 @pytest.mark.asyncio
@@ -374,17 +444,17 @@ async def test_topic_filtering(client: Client) -> None:
         )
 
         # Subscribe to topic "a" only — should get 3 items
-        a_items = await collect_items(handle, ["a"], 0, 3)
+        a_items = await collect_items(client, handle, ["a"], 0, 3)
         assert len(a_items) == 3
         assert all(item.topic == "a" for item in a_items)
 
         # Subscribe to ["a", "c"] — should get 6 items
-        ac_items = await collect_items(handle, ["a", "c"], 0, 6)
+        ac_items = await collect_items(client, handle, ["a", "c"], 0, 6)
         assert len(ac_items) == 6
         assert all(item.topic in ("a", "c") for item in ac_items)
 
         # Subscribe to all (None) — should get all 9
-        all_items = await collect_items(handle, None, 0, 9)
+        all_items = await collect_items(client, handle, None, 0, 9)
         assert len(all_items) == 9
 
         await handle.signal(MultiTopicWorkflow.close)
@@ -406,14 +476,14 @@ async def test_subscribe_from_offset_and_per_item_offsets(client: Client) -> Non
         )
 
         # Subscribe from offset 0 — all items, offsets 0..count-1
-        all_items = await collect_items(handle, None, 0, count)
+        all_items = await collect_items(client, handle, None, 0, count)
         assert len(all_items) == count
         for i, item in enumerate(all_items):
             assert item.offset == i
             assert item.data == f"item-{i}".encode()
 
         # Subscribe from offset 3 — items 3, 4 with offsets 3, 4
-        later_items = await collect_items(handle, None, 3, 2)
+        later_items = await collect_items(client, handle, None, 3, 2)
         assert len(later_items) == 2
         assert later_items[0].offset == 3
         assert later_items[0].data == b"item-3"
@@ -440,14 +510,14 @@ async def test_per_item_offsets_with_topic_filter(client: Client) -> None:
         )
 
         # Subscribe to topic "a" only — items are at global offsets 0, 3, 6
-        a_items = await collect_items(handle, ["a"], 0, 3)
+        a_items = await collect_items(client, handle, ["a"], 0, 3)
         assert len(a_items) == 3
         assert a_items[0].offset == 0
         assert a_items[1].offset == 3
         assert a_items[2].offset == 6
 
         # Subscribe to topic "b" — items are at global offsets 1, 4, 7
-        b_items = await collect_items(handle, ["b"], 0, 3)
+        b_items = await collect_items(client, handle, ["b"], 0, 3)
         assert len(b_items) == 3
         assert b_items[0].offset == 1
         assert b_items[1].offset == 4
@@ -475,7 +545,7 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
             "__pubsub_publish",
             PublishInput(
                 items=[
-                    PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                    PublishEntry(topic="events", data=_wire_bytes(f"item-{i}".encode()))
                     for i in range(5)
                 ]
             ),
@@ -500,7 +570,7 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
             )
 
         # Workflow should still be usable — poll from valid offset 3
-        items = await collect_items(handle, None, 3, 2)
+        items = await collect_items(client, handle, None, 3, 2)
         assert len(items) == 2
         assert items[0].offset == 3
 
@@ -525,7 +595,7 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
             "__pubsub_publish",
             PublishInput(
                 items=[
-                    PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                    PublishEntry(topic="events", data=_wire_bytes(f"item-{i}".encode()))
                     for i in range(5)
                 ]
             ),
@@ -540,7 +610,9 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
         items: list[PubSubItem] = []
         try:
             async with asyncio.timeout(5):
-                async for item in pubsub.subscribe(from_offset=1, poll_cooldown=0):
+                async for item in pubsub.subscribe(
+                    from_offset=1, poll_cooldown=0, result_type=bytes
+                ):
                     items.append(item)
                     if len(items) >= 2:
                         break
@@ -569,7 +641,7 @@ async def test_workflow_and_activity_publish_interleaved(client: Client) -> None
         )
 
         # Total: 1 (started) + count (activity) + 1 (done) = count + 2
-        items = await collect_items(handle, None, 0, count + 2)
+        items = await collect_items(client, handle, None, 0, count + 2)
         assert len(items) == count + 2
 
         # First item is workflow-side "started"
@@ -608,7 +680,7 @@ async def test_priority_flush(client: Client) -> None:
         # while staying well below the activity hold so a regression (no
         # priority wakeup) surfaces as a missing item, not a pass via
         # __aexit__ flush.
-        items = await collect_items(handle, None, 0, 3, timeout=5.0)
+        items = await collect_items(client, handle, None, 0, 3, timeout=5.0)
         assert len(items) == 3
         assert items[2].data == b"priority"
 
@@ -634,16 +706,18 @@ async def test_iterator_cancellation(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"seed"))]
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"seed"))]
             ),
         )
 
-        pubsub_client = PubSubClient(handle)
+        pubsub_client = PubSubClient.create(client, handle.id)
         first_item = asyncio.Event()
         items: list[PubSubItem] = []
 
         async def subscribe_and_collect() -> None:
-            async for item in pubsub_client.subscribe(from_offset=0, poll_cooldown=0):
+            async for item in pubsub_client.subscribe(
+                from_offset=0, poll_cooldown=0, result_type=bytes
+            ):
                 items.append(item)
                 first_item.set()
 
@@ -680,7 +754,7 @@ async def test_context_manager_flushes_on_exit(client: Client) -> None:
         )
 
         # Despite 60s batch interval, all items arrive because __aexit__ flushes
-        items = await collect_items(handle, None, 0, count, timeout=15.0)
+        items = await collect_items(client, handle, None, 0, count, timeout=15.0)
         assert len(items) == count
         for i in range(count):
             assert items[i].data == f"item-{i}".encode()
@@ -722,7 +796,7 @@ async def test_concurrent_subscribers(client: Client) -> None:
             events: list[asyncio.Event],
         ) -> None:
             async for item in pubsub.subscribe(
-                topics=[topic], from_offset=0, poll_cooldown=0
+                topics=[topic], from_offset=0, poll_cooldown=0, result_type=bytes
             ):
                 collected.append(item)
                 events[len(collected) - 1].set()
@@ -735,7 +809,7 @@ async def test_concurrent_subscribers(client: Client) -> None:
         async def publish(topic: str, data: bytes) -> None:
             await handle.signal(
                 "__pubsub_publish",
-                PublishInput(items=[PublishEntry(topic=topic, data=encode_data(data))]),
+                PublishInput(items=[PublishEntry(topic=topic, data=_wire_bytes(data))]),
             )
 
         try:
@@ -779,7 +853,7 @@ async def test_max_batch_size(client: Client) -> None:
             task_queue=worker.task_queue,
         )
         # count items from activity + 1 "activity_done" from workflow
-        items = await collect_items(handle, None, 0, count + 1, timeout=15.0)
+        items = await collect_items(client, handle, None, 0, count + 1, timeout=15.0)
         assert len(items) == count + 1
         for i in range(count):
             assert items[i].data == f"item-{i}".encode()
@@ -820,7 +894,7 @@ async def test_replay_safety(client: Client) -> None:
             task_queue=worker.task_queue,
         )
         # 1 (started) + 5 (activity) + 1 (done) = 7
-        items = await collect_items(handle, None, 0, 7)
+        items = await collect_items(client, handle, None, 0, 7)
         # Full ordered sequence — endpoint-only checks would miss mid-stream
         # replay corruption (reordering, duplication, dropped items).
         assert [i.data for i in items] == [
@@ -882,7 +956,7 @@ async def test_flush_retry_preserves_items_after_failures(
             # Fourth flush delivers the buffered "item-2".
             await pubsub._flush()
 
-        items = await collect_items(handle, None, 0, 3)
+        items = await collect_items(client, handle, None, 0, 3)
         assert [i.data for i in items] == [b"item-0", b"item-1", b"item-2"]
 
         await handle.signal(BasicPubSubWorkflow.close)
@@ -939,7 +1013,7 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
             pubsub.publish("events", b"kept")
             await pubsub._flush()
 
-        items = await collect_items(handle, None, 0, 1)
+        items = await collect_items(client, handle, None, 0, 1)
         assert len(items) == 1
         assert items[0].data == b"kept"
 
@@ -963,7 +1037,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"item-0"))],
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"item-0"))],
                 publisher_id="test-pub",
                 sequence=1,
             ),
@@ -973,7 +1047,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"duplicate"))],
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"duplicate"))],
                 publisher_id="test-pub",
                 sequence=1,
             ),
@@ -983,14 +1057,14 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"item-1"))],
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"item-1"))],
                 publisher_id="test-pub",
                 sequence=2,
             ),
         )
 
         # Should have 2 items, not 3 (collect_items' update call acts as barrier)
-        items = await collect_items(handle, None, 0, 2)
+        items = await collect_items(client, handle, None, 0, 2)
         assert len(items) == 2
         assert items[0].data == b"item-0"
         assert items[1].data == b"item-1"
@@ -1022,14 +1096,14 @@ async def test_truncate_pubsub(client: Client) -> None:
             "__pubsub_publish",
             PublishInput(
                 items=[
-                    PublishEntry(topic="events", data=encode_data(f"item-{i}".encode()))
+                    PublishEntry(topic="events", data=_wire_bytes(f"item-{i}".encode()))
                     for i in range(5)
                 ]
             ),
         )
 
         # Verify all 5 items
-        items = await collect_items(handle, None, 0, 5)
+        items = await collect_items(client, handle, None, 0, 5)
         assert len(items) == 5
 
         # Truncate up to offset 3 (discard items 0, 1, 2). The update
@@ -1042,7 +1116,7 @@ async def test_truncate_pubsub(client: Client) -> None:
         assert offset == 5
 
         # Reading from offset 3 should work (items 3, 4)
-        items_after = await collect_items(handle, None, 3, 2)
+        items_after = await collect_items(client, handle, None, 3, 2)
         assert len(items_after) == 2
         assert items_after[0].data == b"item-3"
         assert items_after[1].data == b"item-4"
@@ -1073,7 +1147,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"old"))],
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"old"))],
                 publisher_id="pub-old",
                 sequence=1,
             ),
@@ -1093,7 +1167,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"new"))],
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"new"))],
                 publisher_id="pub-new",
                 sequence=1,
             ),
@@ -1240,16 +1314,16 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
             "__pubsub_publish",
             PublishInput(
                 items=[
-                    PublishEntry(topic="events", data=encode_data(b"item-0")),
-                    PublishEntry(topic="events", data=encode_data(b"item-1")),
-                    PublishEntry(topic="events", data=encode_data(b"item-2")),
+                    PublishEntry(topic="events", data=_wire_bytes(b"item-0")),
+                    PublishEntry(topic="events", data=_wire_bytes(b"item-1")),
+                    PublishEntry(topic="events", data=_wire_bytes(b"item-2")),
                 ],
                 publisher_id="pub",
                 sequence=1,
             ),
         )
 
-        items_before = await collect_items(handle, None, 0, 3)
+        items_before = await collect_items(client, handle, None, 0, 3)
         assert len(items_before) == 3
 
         await handle.signal(ContinueAsNewTypedWorkflow.trigger_continue)
@@ -1261,7 +1335,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         )
 
         # Log contents and offsets preserved across CAN.
-        items_after = await collect_items(new_handle, None, 0, 3)
+        items_after = await collect_items(client, new_handle, None, 0, 3)
         assert [i.data for i in items_after] == [b"item-0", b"item-1", b"item-2"]
         assert [i.offset for i in items_after] == [0, 1, 2]
 
@@ -1278,7 +1352,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
             "__pubsub_publish",
             PublishInput(
                 items=[
-                    PublishEntry(topic="events", data=encode_data(b"dup")),
+                    PublishEntry(topic="events", data=_wire_bytes(b"dup")),
                 ],
                 publisher_id="pub",
                 sequence=1,
@@ -1295,7 +1369,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
             "__pubsub_publish",
             PublishInput(
                 items=[
-                    PublishEntry(topic="events", data=encode_data(b"item-3")),
+                    PublishEntry(topic="events", data=_wire_bytes(b"item-3")),
                 ],
                 publisher_id="pub",
                 sequence=2,
@@ -1305,7 +1379,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
             ContinueAsNewTypedWorkflow.publisher_sequences
         )
         assert seqs_after_accept == {"pub": 2}
-        items_all = await collect_items(new_handle, None, 0, 4)
+        items_all = await collect_items(client, new_handle, None, 0, 4)
         assert [i.data for i in items_all] == [
             b"item-0",
             b"item-1",
@@ -1367,7 +1441,7 @@ async def subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
     items: list[str] = []
     async with asyncio.timeout(15.0):
         async for item in client.subscribe(
-            topics=["events"], from_offset=0, poll_cooldown=0
+            topics=["events"], from_offset=0, poll_cooldown=0, result_type=bytes
         ):
             items.append(item.data.decode())
             activity.heartbeat()
@@ -1411,7 +1485,7 @@ async def test_cross_workflow_pubsub(client: Client) -> None:
         assert result == [f"broker-{i}" for i in range(count)]
 
         # Also verify external subscription still works
-        external_items = await collect_items(broker_handle, ["events"], 0, count)
+        external_items = await collect_items(client, broker_handle, ["events"], 0, count)
         assert len(external_items) == count
 
         await broker_handle.signal(BrokerWorkflow.close)
@@ -1530,7 +1604,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
             await handle.signal(
                 "__pubsub_publish",
                 PublishInput(
-                    items=[PublishEntry(topic="big", data=encode_data(chunk))]
+                    items=[PublishEntry(topic="big", data=_wire_bytes(chunk))]
                 ),
             )
 
@@ -1583,12 +1657,12 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
             await handle.signal(
                 "__pubsub_publish",
                 PublishInput(
-                    items=[PublishEntry(topic="big", data=encode_data(chunk))]
+                    items=[PublishEntry(topic="big", data=_wire_bytes(chunk))]
                 ),
             )
 
         # subscribe() should seamlessly iterate through all 8 items
-        items = await collect_items(handle, None, 0, 8, timeout=10.0)
+        items = await collect_items(client, handle, None, 0, 8, timeout=10.0)
         assert len(items) == 8
         for item in items:
             assert item.data == chunk
@@ -1674,7 +1748,9 @@ async def test_cross_namespace_nexus_pubsub(
             )
 
             # Subscribe to broker events from the handler namespace
-            items = await collect_items(broker_handle, ["events"], 0, count)
+            items = await collect_items(
+                handler_client, broker_handle, ["events"], 0, count
+            )
             assert len(items) == count
             for i in range(count):
                 assert items[i].topic == "events"

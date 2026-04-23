@@ -1,17 +1,29 @@
 """Workflow-side pub/sub mixin.
 
-Add PubSubMixin as a base class to any workflow to get pub/sub signal, update,
-and query handlers.
+Add PubSubMixin as a base class to any workflow to get pub/sub signal,
+update, and query handlers.
 
 Call ``init_pubsub(prior_state=...)`` once from ``@workflow.init``. For
 workflows that support continue-as-new, include a ``PubSubState | None``
-field on the workflow input and pass it as ``prior_state``; it is ``None``
-on fresh starts and harmless to pass.
+field on the workflow input and pass it as ``prior_state``; it is
+``None`` on fresh starts and harmless to pass.
+
+Both workflow-side :meth:`PubSubMixin.publish` and client-side
+:meth:`PubSubClient.publish` use the synchronous payload converter for
+per-item ``Payload`` construction. The codec chain (encryption,
+PII-redaction, compression) is **not** run per item on either side —
+it runs once at the envelope level when Temporal's SDK encodes the
+signal/update that carries the batch. Running it per item as well
+would double-encrypt, because every signal arg already goes through
+the client's ``DataConverter.encode`` at dispatch time.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from temporalio import workflow
+from temporalio.api.common.v1 import Payload
 from temporalio.exceptions import ApplicationError
 
 from ._types import (
@@ -20,19 +32,29 @@ from ._types import (
     PublishInput,
     PubSubItem,
     PubSubState,
+    _decode_payload,
+    _encode_payload,
     _WireItem,
-    decode_data,
-    encode_data,
 )
 
 _MAX_POLL_RESPONSE_BYTES = 1_000_000
+
+
+def _payload_wire_size(payload: Payload, topic: str) -> int:
+    """Approximate poll-response contribution of a single item.
+
+    Wire form is ``_WireItem(topic, base64(proto(Payload)), offset)``.
+    Base64 inflates by ~4/3; we use the exact serialized length as a
+    close-enough proxy.
+    """
+    return (payload.ByteSize() * 4 + 2) // 3 + len(topic)
 
 
 class PubSubMixin:
     """Mixin that turns a workflow into a pub/sub broker.
 
     Provides:
-    - ``publish(topic, data)`` for workflow-side publishing
+    - ``publish(topic, value)`` for workflow-side publishing
     - ``__pubsub_publish`` signal for external publishing (with dedup)
     - ``__pubsub_poll`` update for long-poll subscription
     - ``__pubsub_offset`` query for current log length
@@ -50,11 +72,11 @@ class PubSubMixin:
         """Initialize pub/sub state. Call once from ``@workflow.init``.
 
         The recommended pattern is to include a ``PubSubState | None``
-        field on the workflow input and always pass it as ``prior_state``
-        — it is ``None`` on fresh starts and carries accumulated state on
-        continue-as-new. Calling with no argument is equivalent to a
-        fresh start and is acceptable for workflows that will never
-        continue-as-new.
+        field on the workflow input and always pass it as
+        ``prior_state`` — it is ``None`` on fresh starts and carries
+        accumulated state on continue-as-new. Calling with no argument
+        is equivalent to a fresh start and is acceptable for workflows
+        that will never continue-as-new.
 
         Args:
             prior_state: State carried from a previous run via
@@ -62,15 +84,15 @@ class PubSubMixin:
                 ``None`` on first start.
 
         Note:
-            When carrying state across continue-as-new, type the carrying
-            field as ``PubSubState | None`` — not ``Any``. The default data
-            converter deserializes ``Any`` fields as plain dicts, which
-            silently strips the ``PubSubState`` type and breaks the new
-            run.
+            When carrying state across continue-as-new, type the
+            carrying field as ``PubSubState | None`` — not ``Any``. The
+            default data converter deserializes ``Any`` fields as plain
+            dicts, which silently strips the ``PubSubState`` type and
+            breaks the new run.
         """
         if prior_state is not None:
             self._pubsub_log = [
-                PubSubItem(topic=item.topic, data=decode_data(item.data))
+                PubSubItem(topic=item.topic, data=_decode_payload(item.data))
                 for item in prior_state.log
             ]
             self._pubsub_base_offset = prior_state.base_offset
@@ -86,18 +108,17 @@ class PubSubMixin:
     def get_pubsub_state(self, *, publisher_ttl: float = 900.0) -> PubSubState:
         """Return a serializable snapshot of pub/sub state for continue-as-new.
 
-        Prunes publisher dedup entries older than ``publisher_ttl`` seconds.
-        The TTL must exceed the ``max_retry_duration`` of any client that
-        may still be retrying a failed flush.
+        Prunes publisher dedup entries older than ``publisher_ttl``
+        seconds. The TTL must exceed the ``max_retry_duration`` of any
+        client that may still be retrying a failed flush.
 
         Args:
-            publisher_ttl: Seconds after which a publisher's dedup entry
-                is pruned. Default 900 (15 minutes).
+            publisher_ttl: Seconds after which a publisher's dedup
+                entry is pruned. Default 900 (15 minutes).
         """
         self._check_initialized()
         now = workflow.time()
 
-        # Prune publishers whose last activity exceeds the TTL.
         active_sequences: dict[str, int] = {}
         active_last_seen: dict[str, float] = {}
         for pid, seq in self._pubsub_publisher_sequences.items():
@@ -108,7 +129,7 @@ class PubSubMixin:
 
         return PubSubState(
             log=[
-                _WireItem(topic=item.topic, data=encode_data(item.data))
+                _WireItem(topic=item.topic, data=_encode_payload(item.data))
                 for item in self._pubsub_log
             ],
             base_offset=self._pubsub_base_offset,
@@ -119,7 +140,8 @@ class PubSubMixin:
     def drain_pubsub(self) -> None:
         """Unblock all waiting poll handlers and reject new polls.
 
-        Call this before ``await workflow.wait_condition(workflow.all_handlers_finished)``
+        Call this before
+        ``await workflow.wait_condition(workflow.all_handlers_finished)``
         and ``workflow.continue_as_new()``.
         """
         self._check_initialized()
@@ -133,9 +155,9 @@ class PubSubMixin:
         monotonic.
 
         Args:
-            up_to_offset: The global offset to truncate up to (exclusive).
-                Entries at offsets ``[base_offset, up_to_offset)`` are
-                discarded.
+            up_to_offset: The global offset to truncate up to
+                (exclusive). Entries at offsets
+                ``[base_offset, up_to_offset)`` are discarded.
         """
         self._check_initialized()
         log_index = up_to_offset - self._pubsub_base_offset
@@ -157,19 +179,33 @@ class PubSubMixin:
                 "from your workflow's @workflow.init method."
             )
 
-    def publish(self, topic: str, data: bytes) -> None:
-        """Publish an item from within workflow code. Deterministic — just appends."""
+    def publish(self, topic: str, value: Any) -> None:
+        """Publish an item from within workflow code.
+
+        ``value`` may be any Python value the workflow's payload
+        converter can handle, or a pre-built
+        :class:`temporalio.api.common.v1.Payload` for zero-copy.
+
+        The codec chain is not applied here (it runs on the
+        ``__pubsub_poll`` update envelope that later delivers the
+        item to a subscriber).
+        """
         self._check_initialized()
-        self._pubsub_log.append(PubSubItem(topic=topic, data=data))
+        if isinstance(value, Payload):
+            payload = value
+        else:
+            payload = workflow.payload_converter().to_payloads([value])[0]
+        self._pubsub_log.append(PubSubItem(topic=topic, data=payload))
 
     @workflow.signal(name="__pubsub_publish")
     def _pubsub_publish(self, payload: PublishInput) -> None:
         """Receive publications from external clients (activities, starters).
 
-        Deduplicates using (publisher_id, sequence). If publisher_id is set
-        and the sequence is <= the last seen sequence for that publisher,
-        the entire batch is dropped as a duplicate. Batches are atomic:
-        the dedup decision applies to the whole batch, not individual items.
+        Deduplicates using (publisher_id, sequence). If publisher_id is
+        set and the sequence is <= the last seen sequence for that
+        publisher, the entire batch is dropped as a duplicate. Batches
+        are atomic: the dedup decision applies to the whole batch, not
+        individual items.
         """
         self._check_initialized()
         if payload.publisher_id:
@@ -180,7 +216,7 @@ class PubSubMixin:
             self._pubsub_publisher_last_seen[payload.publisher_id] = workflow.time()
         for entry in payload.items:
             self._pubsub_log.append(
-                PubSubItem(topic=entry.topic, data=decode_data(entry.data))
+                PubSubItem(topic=entry.topic, data=_decode_payload(entry.data))
             )
 
     @workflow.update(name="__pubsub_poll")
@@ -193,10 +229,10 @@ class PubSubMixin:
                 # "From the beginning" — start at whatever is available.
                 log_offset = 0
             else:
-                # Subscriber had a specific position that's been truncated.
-                # ApplicationError fails this update (client gets the error)
-                # without crashing the workflow task — avoids a poison pill
-                # during replay.
+                # Subscriber had a specific position that's been
+                # truncated. ApplicationError fails this update (client
+                # gets the error) without crashing the workflow task —
+                # avoids a poison pill during replay.
                 raise ApplicationError(
                     f"Requested offset {payload.from_offset} has been truncated. "
                     f"Current base offset is {self._pubsub_base_offset}.",
@@ -219,21 +255,22 @@ class PubSubMixin:
                 (self._pubsub_base_offset + log_offset + i, item)
                 for i, item in enumerate(all_new)
             ]
-        # Cap response size to ~1MB estimated wire bytes.
+        # Cap response size to ~1MB wire bytes.
         wire_items: list[_WireItem] = []
         size = 0
         more_ready = False
         next_offset = self._pubsub_base_offset + len(self._pubsub_log)
         for off, item in candidates:
-            encoded = encode_data(item.data)
-            item_size = len(encoded) + len(item.topic)
+            item_size = _payload_wire_size(item.data, item.topic)
             if size + item_size > _MAX_POLL_RESPONSE_BYTES and wire_items:
                 # Resume from this item on the next poll.
                 next_offset = off
                 more_ready = True
                 break
             size += item_size
-            wire_items.append(_WireItem(topic=item.topic, data=encoded, offset=off))
+            wire_items.append(
+                _WireItem(topic=item.topic, data=_encode_payload(item.data), offset=off)
+            )
         return PollResult(
             items=wire_items,
             next_offset=next_offset,

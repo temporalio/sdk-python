@@ -14,6 +14,13 @@ such as activities, starters, and other workflows. Under the hood, publishing
 uses signals (fire-and-forget) while subscribing uses updates (long-poll). A
 configurable batching coalesces high-frequency events, improving efficiency.
 
+Payloads are Temporal `Payload`s carrying the encoding metadata needed for
+typed decode (`subscribe(result_type=T)`) and heterogeneous-topic dispatch
+(`Payload.metadata`). The codec chain (encryption, PII-redaction,
+compression) runs once on the signal/update envelope that carries each
+batch — **not** per item — so there is no double-encryption, and codec
+behavior is symmetric between workflow-side and client-side publishing.
+
 ## Quick Start
 
 ### Workflow side
@@ -40,10 +47,16 @@ class MyWorkflow(PubSubMixin):
 
     @workflow.run
     async def run(self, input: MyInput) -> None:
-        self.publish("status", b"started")
+        self.publish("status", StatusEvent(state="started"))
         await do_work()
-        self.publish("status", b"done")
+        self.publish("status", StatusEvent(state="done"))
 ```
+
+Both workflow-side and client-side `publish()` use the sync payload
+converter for per-item `Payload` construction. The codec chain runs
+once at the envelope level (`__pubsub_publish` signal,
+`__pubsub_poll` update) — never per item — so encryption,
+PII-redaction, and compression are applied once each way.
 
 ### Activity side (publishing)
 
@@ -79,11 +92,15 @@ Use `PubSubClient.create()` and the `subscribe()` async iterator:
 from temporalio.contrib.pubsub import PubSubClient
 
 client = PubSubClient.create(temporal_client, workflow_id)
-async for item in client.subscribe(["events"], from_offset=0):
+async for item in client.subscribe(["events"], result_type=MyEvent):
     print(item.topic, item.data)
     if is_done(item):
         break
 ```
+
+`item.data` is a `temporalio.api.common.v1.Payload` when no
+`result_type` is given; passing `result_type=T` decodes each item to
+`T` via the client's data converter (including the codec chain).
 
 ## Topics
 
@@ -140,7 +157,7 @@ follow continue-as-new chains.
 | Method | Description |
 |---|---|
 | `init_pubsub(prior_state=None)` | Initialize state. Call from `@workflow.init`, passing `prior_state` if the input declares one (`None` on fresh starts). |
-| `publish(topic, data)` | Append to the log from workflow code. |
+| `publish(topic, value)` | Append to the log from workflow code. `value` is converted via the sync workflow payload converter (no codec). |
 | `get_pubsub_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
 | `drain_pubsub()` | Unblock polls and reject new ones. |
 | `truncate_pubsub(up_to_offset)` | Discard log entries below the given offset. Workflow-side only — no external API; wire up your own signal or update if external control is needed. |
@@ -160,8 +177,8 @@ Handlers added automatically:
 | `PubSubClient.create(client, workflow_id, *, batch_interval, max_batch_size, max_retry_duration)` | Factory with an explicit Temporal client and workflow id. Follows CAN. |
 | `PubSubClient.from_activity(*, batch_interval, max_batch_size, max_retry_duration)` | Factory that takes client and workflow id from the current activity context. Follows CAN. |
 | `PubSubClient(handle, *, batch_interval, max_batch_size, max_retry_duration)` | From handle (no CAN follow). |
-| `publish(topic, data, force_flush=False)` | Buffer a message. |
-| `subscribe(topics, from_offset, poll_cooldown=0.1)` | Async iterator. Follows CAN chains when created via `create` or `from_activity`. |
+| `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. Per-item conversion uses the sync payload converter; the codec chain runs once on the signal envelope. |
+| `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=0.1)` | Async iterator. With `result_type=T`, `item.data` is decoded to `T`; otherwise it is a raw `Payload`. Follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush.
@@ -175,7 +192,12 @@ fixed handler names:
 2. **Subscribe:** Update `__pubsub_poll` with `PollInput` -> `PollResult`
 3. **Offset:** Query `__pubsub_offset` -> `int`
 
-The Python API uses `bytes` for payloads. Base64 encoding is used internally
-on the wire for cross-language compatibility. The wire protocol requires the
-default (JSON) data converter — custom converters will break cross-language
-interop.
+The Python API exposes Temporal `Payload`s and decodes via the client's
+data converter. On the wire, each `PublishEntry.data` / `_WireItem.data`
+is a base64-encoded `Payload.SerializeToString()` so the transport
+remains JSON-serializable while preserving `Payload.metadata` (used by
+codecs and by the decode path). Cross-language clients can publish and
+subscribe by following the same base64-of-serialized-`Payload` shape.
+The signal/update envelopes (`PublishInput`, `PollResult`, `PubSubState`)
+require the default (JSON) data converter; custom converters on the
+envelope layer will break cross-language interop.
