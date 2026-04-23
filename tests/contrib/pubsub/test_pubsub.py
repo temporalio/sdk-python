@@ -4,19 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import timedelta
-
-import pytest
-
-from typing import Any
-
 from dataclasses import dataclass
+from datetime import timedelta
+from typing import Any
+from unittest.mock import patch
 
+import google.protobuf.duration_pb2
 import nexusrpc
 import nexusrpc.handler
+import pytest
 
+import temporalio.api.nexus.v1
+import temporalio.api.operatorservice.v1
+import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
-from temporalio.client import Client, WorkflowHandle
+from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
 from temporalio.contrib.pubsub import (
     PollInput,
     PollResult,
@@ -474,7 +476,6 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
 
         # Poll from offset 1 (truncated) — should get ApplicationError,
         # NOT crash the workflow task.
-        from temporalio.client import WorkflowUpdateFailedError
         with pytest.raises(WorkflowUpdateFailedError):
             await handle.execute_update(
                 "__pubsub_poll",
@@ -807,8 +808,6 @@ async def test_flush_retry_preserves_items_after_failures(
     must not drop items, must not duplicate them on retry, and must not
     reorder items published during the failed state.
     """
-    from unittest.mock import patch
-
     async with new_worker(client, BasicPubSubWorkflow) as worker:
         handle = await client.start_workflow(
             BasicPubSubWorkflow.run,
@@ -854,8 +853,6 @@ async def test_flush_retry_preserves_items_after_failures(
 async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
     """When max_retry_duration is exceeded, flush raises TimeoutError and the
     client can resume publishing without losing subsequent items."""
-    from unittest.mock import patch
-
     async with new_worker(client, BasicPubSubWorkflow) as worker:
         handle = await client.start_workflow(
             BasicPubSubWorkflow.run,
@@ -1450,9 +1447,6 @@ async def create_cross_namespace_endpoint(
     target_namespace: str,
     task_queue: str,
 ) -> None:
-    import temporalio.api.nexus.v1
-    import temporalio.api.operatorservice.v1
-
     await client.operator_service.create_nexus_endpoint(
         temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
             spec=temporalio.api.nexus.v1.EndpointSpec(
@@ -1576,9 +1570,6 @@ async def test_cross_namespace_nexus_pubsub(
     broker_id = f"nexus-broker-{uuid.uuid4()}"
 
     # Register the handler namespace with the dev server
-    import google.protobuf.duration_pb2
-    import temporalio.api.workflowservice.v1
-
     await client.workflow_service.register_namespace(
         temporalio.api.workflowservice.v1.RegisterNamespaceRequest(
             namespace=handler_ns,
