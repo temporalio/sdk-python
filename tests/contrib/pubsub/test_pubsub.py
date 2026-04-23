@@ -675,31 +675,78 @@ async def test_context_manager_flushes_on_exit(client: Client) -> None:
 
 @pytest.mark.asyncio
 async def test_concurrent_subscribers(client: Client) -> None:
-    """Two subscribers on different topics receive correct items concurrently."""
-    count = 6  # 2 per topic
+    """Two subscribers on different topics make interleaved progress.
+
+    Publishes A-0, waits for subscriber A to observe it; publishes B-0,
+    waits for subscriber B to observe it. At this point both subscribers
+    have received exactly one item and are polling for their second,
+    so both subscriptions are provably in flight at the same time.
+    Then publishes A-1, B-1 the same way. A sequential execution (A drains
+    then B starts) cannot satisfy the ordering because B's first item
+    isn't published until after A has already received its first.
+    """
     async with new_worker(
         client,
-        MultiTopicWorkflow,
-        activities=[publish_multi_topic],
+        BasicPubSubWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            MultiTopicWorkflow.run,
-            count,
+            BasicPubSubWorkflow.run,
             id=f"pubsub-concurrent-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
-        a_task = asyncio.create_task(collect_items(handle, ["a"], 0, 2))
-        b_task = asyncio.create_task(collect_items(handle, ["b"], 0, 2))
+        pubsub = PubSubClient(handle)
+        a_items: list[PubSubItem] = []
+        b_items: list[PubSubItem] = []
+        a_got = [asyncio.Event(), asyncio.Event()]
+        b_got = [asyncio.Event(), asyncio.Event()]
 
-        a_items, b_items = await asyncio.gather(a_task, b_task)
+        async def collect(
+            topic: str,
+            collected: list[PubSubItem],
+            events: list[asyncio.Event],
+        ) -> None:
+            async for item in pubsub.subscribe(
+                topics=[topic], from_offset=0, poll_cooldown=0
+            ):
+                collected.append(item)
+                events[len(collected) - 1].set()
+                if len(collected) >= len(events):
+                    break
 
-        assert len(a_items) == 2
-        assert all(item.topic == "a" for item in a_items)
-        assert len(b_items) == 2
-        assert all(item.topic == "b" for item in b_items)
+        a_task = asyncio.create_task(collect("a", a_items, a_got))
+        b_task = asyncio.create_task(collect("b", b_items, b_got))
 
-        await handle.signal(MultiTopicWorkflow.close)
+        async def publish(topic: str, data: bytes) -> None:
+            await handle.signal(
+                "__pubsub_publish",
+                PublishInput(
+                    items=[PublishEntry(topic=topic, data=encode_data(data))]
+                ),
+            )
+
+        try:
+            async with asyncio.timeout(10):
+                await publish("a", b"a-0")
+                await a_got[0].wait()
+                await publish("b", b"b-0")
+                await b_got[0].wait()
+                # Both subscribers are now mid-subscription, each having
+                # seen one item and polling for the next.
+                await publish("a", b"a-1")
+                await a_got[1].wait()
+                await publish("b", b"b-1")
+                await b_got[1].wait()
+
+            await asyncio.gather(a_task, b_task)
+        finally:
+            a_task.cancel()
+            b_task.cancel()
+
+        assert [i.data for i in a_items] == [b"a-0", b"a-1"]
+        assert [i.data for i in b_items] == [b"b-0", b"b-1"]
+
+        await handle.signal(BasicPubSubWorkflow.close)
 
 
 @pytest.mark.asyncio
