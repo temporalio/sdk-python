@@ -31,7 +31,7 @@ from temporalio.contrib.pubsub._types import encode_data
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, assert_task_fail_eventually, new_worker
+from tests.helpers import assert_eq_eventually, new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
@@ -1011,7 +1011,13 @@ async def test_truncate_pubsub(client: Client) -> None:
 
 @pytest.mark.asyncio
 async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
-    """get_pubsub_state prunes stale publisher entries based on TTL."""
+    """get_pubsub_state prunes publishers whose last-seen time exceeds the
+    TTL while retaining newer publishers. The log itself is unaffected.
+
+    Uses a wall-clock gap between publishes so that workflow.time()
+    advances between the two publishers' tasks. workflow.time() can't be
+    cleanly injected from outside, so a short real sleep is the mechanism.
+    """
     async with new_worker(
         client,
         TTLTestWorkflow,
@@ -1022,37 +1028,44 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
             task_queue=worker.task_queue,
         )
 
-        # Publish from two different publishers
+        # pub-old arrives first.
         await handle.signal(
             "__pubsub_publish",
             PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"from-a"))],
-                publisher_id="pub-a",
-                sequence=1,
-            ),
-        )
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[PublishEntry(topic="events", data=encode_data(b"from-b"))],
-                publisher_id="pub-b",
+                items=[PublishEntry(topic="events", data=encode_data(b"old"))],
+                publisher_id="pub-old",
                 sequence=1,
             ),
         )
 
-        # Query state with a very long TTL — both publishers retained
-        # (the query itself serves as a barrier for the prior signals)
-        state = await handle.query(TTLTestWorkflow.get_state_with_ttl, 9999.0)
-        assert "pub-a" in state.publisher_sequences
-        assert "pub-b" in state.publisher_sequences
+        # Sanity: pub-old is recorded (generous TTL retains it).
+        state_before = await handle.query(
+            TTLTestWorkflow.get_state_with_ttl, 9999.0
+        )
+        assert "pub-old" in state_before.publisher_sequences
 
-        # Query state with TTL=0 — both publishers pruned
-        state_pruned = await handle.query(TTLTestWorkflow.get_state_with_ttl, 0.0)
-        assert "pub-a" not in state_pruned.publisher_sequences
-        assert "pub-b" not in state_pruned.publisher_sequences
+        # Let workflow.time() advance by real wall-clock time. Use a
+        # generous gap (1.0s) relative to the TTL (0.5s) so the test
+        # tolerates CI scheduling delays — pub-old must be >=0.5s past,
+        # pub-new must be <0.5s past, at the moment of the query.
+        await asyncio.sleep(1.0)
 
-        # Items are still in the log regardless of pruning
-        assert len(state_pruned.log) == 2
+        # pub-new arrives after the gap.
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=encode_data(b"new"))],
+                publisher_id="pub-new",
+                sequence=1,
+            ),
+        )
+
+        # TTL=0.5s prunes pub-old (~1.0s old) but keeps pub-new (~0s).
+        state = await handle.query(TTLTestWorkflow.get_state_with_ttl, 0.5)
+        assert "pub-old" not in state.publisher_sequences
+        assert "pub-new" in state.publisher_sequences
+        # Log contents are not touched by publisher pruning.
+        assert len(state.log) == 2
 
         await handle.signal("close")
 
@@ -1120,50 +1133,9 @@ class TTLTestWorkflow(PubSubMixin):
 
 
 @dataclass
-class CANWorkflowInputAny:
-    """Uses Any typing — reproduces the pitfall."""
-    pubsub_state: Any = None
-
-
-@dataclass
 class CANWorkflowInputTyped:
     """Uses proper typing."""
     pubsub_state: PubSubState | None = None
-
-
-@workflow.defn
-class ContinueAsNewAnyWorkflow(PubSubMixin):
-    """CAN workflow using Any-typed pubsub_state (reproduces samples pattern)."""
-
-    @workflow.init
-    def __init__(self, input: CANWorkflowInputAny) -> None:
-        self.init_pubsub(prior_state=input.pubsub_state)
-        self._should_continue = False
-        self._closed = False
-
-    @workflow.signal
-    def close(self) -> None:
-        self._closed = True
-
-    @workflow.signal
-    def trigger_continue(self) -> None:
-        self._should_continue = True
-
-    @workflow.run
-    async def run(self, input: CANWorkflowInputAny) -> None:
-        while True:
-            await workflow.wait_condition(
-                lambda: self._should_continue or self._closed
-            )
-            if self._closed:
-                return
-            if self._should_continue:
-                self._should_continue = False
-                self.drain_pubsub()
-                await workflow.wait_condition(workflow.all_handlers_finished)
-                workflow.continue_as_new(args=[CANWorkflowInputAny(
-                    pubsub_state=self.get_pubsub_state(),
-                )])
 
 
 @workflow.defn
@@ -1184,6 +1156,10 @@ class ContinueAsNewTypedWorkflow(PubSubMixin):
     def trigger_continue(self) -> None:
         self._should_continue = True
 
+    @workflow.query
+    def publisher_sequences(self) -> dict[str, int]:
+        return dict(self._pubsub_publisher_sequences)
+
     @workflow.run
     async def run(self, input: CANWorkflowInputTyped) -> None:
         while True:
@@ -1201,107 +1177,102 @@ class ContinueAsNewTypedWorkflow(PubSubMixin):
                 )])
 
 
-async def _run_can_test(can_client: Client, workflow_cls, input_cls) -> None:
-    """Shared CAN test logic: publish, CAN, verify items survive."""
+@pytest.mark.asyncio
+async def test_continue_as_new_properly_typed(client: Client) -> None:
+    """CAN preserves the log, global offsets, AND publisher dedup state
+    when pubsub_state is properly typed as ``PubSubState | None``."""
     async with new_worker(
-        can_client,
-        workflow_cls,
+        client,
+        ContinueAsNewTypedWorkflow,
     ) as worker:
-        handle = await can_client.start_workflow(
-            workflow_cls.run,
-            input_cls(),
+        handle = await client.start_workflow(
+            ContinueAsNewTypedWorkflow.run,
+            CANWorkflowInputTyped(),
             id=f"pubsub-can-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
-        # Publish 3 items via signal
+        # Publish 3 items with an explicit publisher_id/sequence so dedup
+        # state is seeded and we can verify it survives CAN.
         await handle.signal(
             "__pubsub_publish",
-            PublishInput(items=[
-                PublishEntry(topic="events", data=encode_data(b"item-0")),
-                PublishEntry(topic="events", data=encode_data(b"item-1")),
-                PublishEntry(topic="events", data=encode_data(b"item-2")),
-            ]),
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(b"item-0")),
+                    PublishEntry(topic="events", data=encode_data(b"item-1")),
+                    PublishEntry(topic="events", data=encode_data(b"item-2")),
+                ],
+                publisher_id="pub",
+                sequence=1,
+            ),
         )
 
-        # Verify items are there
         items_before = await collect_items(handle, None, 0, 3)
         assert len(items_before) == 3
 
-        # Trigger continue-as-new
-        await handle.signal(workflow_cls.trigger_continue)
+        await handle.signal(ContinueAsNewTypedWorkflow.trigger_continue)
 
-        # Wait for new run to start (poll, don't sleep)
-        new_handle = can_client.get_workflow_handle(handle.id)
-        await assert_eq_eventually(
-            True,
-            lambda: _is_different_run(handle, new_handle),
-        )
-
-        # The 3 items from before CAN should still be readable
-        items_after = await collect_items(new_handle, None, 0, 3)
-        assert len(items_after) == 3
-        assert items_after[0].data == b"item-0"
-        assert items_after[1].data == b"item-1"
-        assert items_after[2].data == b"item-2"
-
-        # New items should get offset 3+
-        await new_handle.signal(
-            "__pubsub_publish",
-            PublishInput(items=[PublishEntry(topic="events", data=encode_data(b"item-3"))]),
-        )
-        items_all = await collect_items(new_handle, None, 0, 4)
-        assert len(items_all) == 4
-        assert items_all[3].data == b"item-3"
-
-        await new_handle.signal(workflow_cls.close)
-
-
-@pytest.mark.asyncio
-async def test_continue_as_new_any_typed_fails(client: Client) -> None:
-    """Any-typed pubsub_state does NOT survive CAN — documents the pitfall.
-
-    The default data converter deserializes Any fields as plain dicts, losing
-    the PubSubState type. Use ``PubSubState | None`` instead.
-    """
-    async with new_worker(
-        client,
-        ContinueAsNewAnyWorkflow,
-    ) as worker:
-        handle = await client.start_workflow(
-            ContinueAsNewAnyWorkflow.run,
-            CANWorkflowInputAny(),
-            id=f"pubsub-can-any-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(items=[PublishEntry(topic="events", data=encode_data(b"item-0"))]),
-        )
-        items = await collect_items(handle, None, 0, 1)
-        assert len(items) == 1
-
-        # Trigger CAN — the new run will fail to deserialize pubsub_state
-        await handle.signal(ContinueAsNewAnyWorkflow.trigger_continue)
-
-        # Wait for CAN to happen
         new_handle = client.get_workflow_handle(handle.id)
         await assert_eq_eventually(
             True,
             lambda: _is_different_run(handle, new_handle),
         )
 
-        # The new run's workflow task must fail during init_pubsub because
-        # the Any-typed field arrives as a dict, not a PubSubState. Assert
-        # the specific failure instead of a timeout-based absence check.
-        await assert_task_fail_eventually(new_handle)
+        # Log contents and offsets preserved across CAN.
+        items_after = await collect_items(new_handle, None, 0, 3)
+        assert [i.data for i in items_after] == [b"item-0", b"item-1", b"item-2"]
+        assert [i.offset for i in items_after] == [0, 1, 2]
 
+        # Dedup state preserved: the carried publisher_sequences dict has
+        # pub -> 1 after CAN.
+        seqs_after_can = await new_handle.query(
+            ContinueAsNewTypedWorkflow.publisher_sequences
+        )
+        assert seqs_after_can == {"pub": 1}
 
-@pytest.mark.asyncio
-async def test_continue_as_new_properly_typed(client: Client) -> None:
-    """CAN with PubSubState-typed pubsub_state field."""
-    await _run_can_test(client, ContinueAsNewTypedWorkflow, CANWorkflowInputTyped)
+        # Re-sending publisher_id="pub", sequence=1 must be rejected by
+        # dedup — both the log and the publisher_sequences entry stay put.
+        await new_handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(b"dup")),
+                ],
+                publisher_id="pub",
+                sequence=1,
+            ),
+        )
+        seqs_after_dup = await new_handle.query(
+            ContinueAsNewTypedWorkflow.publisher_sequences
+        )
+        assert seqs_after_dup == {"pub": 1}
+
+        # A fresh sequence from the same publisher is accepted, advances
+        # publisher_sequences to 2, and the new item gets offset 3.
+        await new_handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=encode_data(b"item-3")),
+                ],
+                publisher_id="pub",
+                sequence=2,
+            ),
+        )
+        seqs_after_accept = await new_handle.query(
+            ContinueAsNewTypedWorkflow.publisher_sequences
+        )
+        assert seqs_after_accept == {"pub": 2}
+        items_all = await collect_items(new_handle, None, 0, 4)
+        assert [i.data for i in items_all] == [
+            b"item-0",
+            b"item-1",
+            b"item-2",
+            b"item-3",
+        ]
+        assert items_all[3].offset == 3
+
+        await new_handle.signal(ContinueAsNewTypedWorkflow.close)
 
 
 # ---------------------------------------------------------------------------

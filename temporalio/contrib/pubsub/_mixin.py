@@ -52,6 +52,13 @@ class PubSubMixin:
             prior_state: State carried from a previous run via
                 ``get_pubsub_state()`` through continue-as-new. Pass None
                 on the first run.
+
+        Note:
+            When carrying state across continue-as-new, type the carrying
+            field as ``PubSubState | None`` — not ``Any``. The default data
+            converter deserializes ``Any`` fields as plain dicts, which
+            silently strips the ``PubSubState`` type and breaks the new
+            run.
         """
         if prior_state is not None:
             self._pubsub_log = [
