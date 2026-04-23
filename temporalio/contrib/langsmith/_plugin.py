@@ -72,6 +72,7 @@ class LangSmithPlugin(SimplePlugin):
                     runner,
                     restrictions=runner.restrictions.with_passthrough_modules(
                         "langsmith",
+                        "langchain_core",
                     ),
                 )
             return runner
