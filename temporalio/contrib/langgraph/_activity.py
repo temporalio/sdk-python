@@ -9,11 +9,11 @@ from langgraph.errors import GraphInterrupt
 from langgraph.types import Command, Interrupt
 
 from temporalio import workflow
-from temporalio.contrib.langgraph.langgraph_config import (
+from temporalio.contrib.langgraph._langgraph_config import (
     get_langgraph_config,
     set_langgraph_config,
 )
-from temporalio.contrib.langgraph.task_cache import (
+from temporalio.contrib.langgraph._task_cache import (
     cache_key,
     cache_lookup,
     cache_put,

@@ -12,7 +12,7 @@ from langgraph.types import RetryPolicy  # pyright: ignore[reportMissingTypeStub
 from pytest import raises
 from typing_extensions import TypedDict
 
-from temporalio.contrib.langgraph.plugin import LangGraphPlugin
+from temporalio.contrib.langgraph import LangGraphPlugin
 
 
 class State(TypedDict):

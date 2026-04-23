@@ -10,7 +10,7 @@ execution, automatic retries, and timeouts. It supports both the LangGraph Graph
 API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
 """
 
-from temporalio.contrib.langgraph.plugin import (
+from temporalio.contrib.langgraph._plugin import (
     LangGraphPlugin,
     cache,
     entrypoint,

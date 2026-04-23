@@ -16,7 +16,7 @@ from langgraph.func import task  # pyright: ignore[reportMissingTypeStubs]
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.plugin import LangGraphPlugin, entrypoint
+from temporalio.contrib.langgraph import LangGraphPlugin, entrypoint
 from temporalio.worker import Worker
 
 

@@ -14,7 +14,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph.plugin import LangGraphPlugin, cache, graph
+from temporalio.contrib.langgraph import LangGraphPlugin, cache, graph
 from temporalio.worker import Worker
 
 # Track execution counts to verify caching

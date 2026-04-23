@@ -15,13 +15,13 @@ from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 
 from temporalio import activity, workflow
-from temporalio.contrib.langgraph.activity import wrap_activity, wrap_execute_activity
-from temporalio.contrib.langgraph.interceptor import (
+from temporalio.contrib.langgraph._activity import wrap_activity, wrap_execute_activity
+from temporalio.contrib.langgraph._interceptor import (
     LangGraphInterceptor,
     _workflow_entrypoints,
     _workflow_graphs,
 )
-from temporalio.contrib.langgraph.task_cache import (
+from temporalio.contrib.langgraph._task_cache import (
     get_task_cache,
     set_task_cache,
     task_id,

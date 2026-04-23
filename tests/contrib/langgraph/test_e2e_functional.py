@@ -30,7 +30,7 @@ from pytest import raises
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
-from temporalio.contrib.langgraph.plugin import LangGraphPlugin, entrypoint
+from temporalio.contrib.langgraph import LangGraphPlugin, entrypoint
 from temporalio.worker import Worker
 from tests.contrib.langgraph.e2e_functional_entrypoints import (
     add_ten,

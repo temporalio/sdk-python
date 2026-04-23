@@ -10,7 +10,7 @@ from langgraph.graph import StateGraph
 from langgraph.pregel import Pregel
 
 from temporalio import workflow
-from temporalio.contrib.langgraph.activity import clear_store_warning
+from temporalio.contrib.langgraph._activity import clear_store_warning
 from temporalio.worker import (
     ExecuteWorkflowInput,
     Interceptor,
