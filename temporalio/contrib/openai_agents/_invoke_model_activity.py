@@ -401,7 +401,7 @@ class ModelActivity:
             for x in input.get("handoffs", [])
         ]
 
-        pubsub = PubSubClient.create(batch_interval=0.1)
+        pubsub = PubSubClient.from_activity(batch_interval=0.1)
         final_response = None
         text_buffer = ""
         thinking_buffer = ""
@@ -410,7 +410,7 @@ class ModelActivity:
         try:
             async with pubsub:
                 pubsub.publish(
-                    EVENTS_TOPIC, _make_event("LLM_CALL_START"), priority=True
+                    EVENTS_TOPIC, _make_event("LLM_CALL_START"), force_flush=True
                 )
 
                 async for event in model.stream_response(
@@ -453,7 +453,7 @@ class ModelActivity:
                                     "THINKING_COMPLETE",
                                     content=thinking_buffer,
                                 ),
-                                priority=True,
+                                force_flush=True,
                             )
                             thinking_buffer = ""
                             thinking_active = False
@@ -473,12 +473,12 @@ class ModelActivity:
                     pubsub.publish(
                         EVENTS_TOPIC,
                         _make_event("TEXT_COMPLETE", text=text_buffer),
-                        priority=True,
+                        force_flush=True,
                     )
                 pubsub.publish(
                     EVENTS_TOPIC,
                     _make_event("LLM_CALL_COMPLETE"),
-                    priority=True,
+                    force_flush=True,
                 )
 
         except APIStatusError as e:

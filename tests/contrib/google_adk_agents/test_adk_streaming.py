@@ -145,7 +145,7 @@ async def test_streaming_publishes_events(client: Client):
 
         async def collect_events() -> None:
             async for item in pubsub.subscribe(
-                ["events"], from_offset=0, poll_cooldown=0.05
+                ["events"], from_offset=0, result_type=bytes, poll_cooldown=0.05
             ):
                 event = json.loads(item.data)
                 events.append(event)

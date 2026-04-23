@@ -76,12 +76,12 @@ async def invoke_model_streaming(llm_request: LlmRequest) -> list[LlmResponse]:
     if not llm:
         raise ValueError(f"Failed to create LLM for model: {llm_request.model}")
 
-    pubsub = PubSubClient.create(batch_interval=0.1)
+    pubsub = PubSubClient.from_activity(batch_interval=0.1)
     responses: list[LlmResponse] = []
     text_buffer = ""
 
     async with pubsub:
-        pubsub.publish(EVENTS_TOPIC, _make_event("LLM_CALL_START"), priority=True)
+        pubsub.publish(EVENTS_TOPIC, _make_event("LLM_CALL_START"), force_flush=True)
 
         async for response in llm.generate_content_async(
             llm_request=llm_request, stream=True
@@ -110,10 +110,10 @@ async def invoke_model_streaming(llm_request: LlmRequest) -> list[LlmResponse]:
             pubsub.publish(
                 EVENTS_TOPIC,
                 _make_event("TEXT_COMPLETE", text=text_buffer),
-                priority=True,
+                force_flush=True,
             )
         pubsub.publish(
-            EVENTS_TOPIC, _make_event("LLM_CALL_COMPLETE"), priority=True
+            EVENTS_TOPIC, _make_event("LLM_CALL_COMPLETE"), force_flush=True
         )
 
     return responses
