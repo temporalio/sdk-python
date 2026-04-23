@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from datetime import datetime, timedelta, timezone
 
 from google.adk.models import BaseLlm, LLMRegistry
@@ -127,6 +127,8 @@ class TemporalModel(BaseLlm):
         model_name: str,
         activity_config: ActivityConfig | None = None,
         streaming: bool = False,
+        *,
+        summary_fn: Callable[[LlmRequest], str | None] | None = None,
     ) -> None:
         """Initialize the TemporalModel.
 
@@ -136,14 +138,27 @@ class TemporalModel(BaseLlm):
             streaming: When True, the model activity uses the streaming LLM
                 endpoint and publishes token events via PubSubClient. The
                 workflow is unaffected -- it still receives complete responses.
+            summary_fn: Optional callable that receives the LlmRequest and
+                returns a summary string (or None) for the activity. Must be
+                deterministic as it is called during workflow execution. If
+                the callable raises, the exception will propagate and fail
+                the workflow task.
+
+        Raises:
+            ValueError: If both ``ActivityConfig["summary"]`` and ``summary_fn`` are set.
         """
         super().__init__(model=model_name)
         self._model_name = model_name
         self._streaming = streaming
+        self._summary_fn = summary_fn
         self._activity_config = ActivityConfig(
             start_to_close_timeout=timedelta(seconds=60)
         )
-        if activity_config:
+        if activity_config is not None:
+            if summary_fn is not None and activity_config.get("summary") is not None:
+                raise ValueError(
+                    "Cannot specify both ActivityConfig 'summary' and 'summary_fn'"
+                )
             self._activity_config.update(activity_config)
 
     async def generate_content_async(
@@ -167,17 +182,21 @@ class TemporalModel(BaseLlm):
                 yield response
             return
 
-        if self._streaming:
-            responses = await workflow.execute_activity(
-                invoke_model_streaming,
-                args=[llm_request],
-                **self._activity_config,
-            )
-        else:
-            responses = await workflow.execute_activity(
-                invoke_model,
-                args=[llm_request],
-                **self._activity_config,
-            )
+        config = self._activity_config.copy()
+        if self._summary_fn is not None:
+            summary = self._summary_fn(llm_request)
+            if summary is not None:
+                config["summary"] = summary
+        elif "summary" not in config:
+            if llm_request.config and llm_request.config.labels:
+                agent_name = llm_request.config.labels.get("adk_agent_name")
+                if agent_name:
+                    config["summary"] = agent_name
+        activity_fn = invoke_model_streaming if self._streaming else invoke_model
+        responses = await workflow.execute_activity(
+            activity_fn,
+            args=[llm_request],
+            **config,
+        )
         for response in responses:
             yield response
