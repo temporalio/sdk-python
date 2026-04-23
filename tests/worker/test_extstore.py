@@ -1353,15 +1353,23 @@ async def test_store_metadata_standalone_activity(env: WorkflowEnvironment) -> N
 class ContinueAsNewExtStoreWorkflow:
     """Workflow that continues-as-new once with a large payload.
 
-    Run 1: called with large_payload, calls continue_as_new with same payload.
+    Run 1: called with large_payload, waits for signal, calls continue_as_new with same payload.
     Run 2: called with large_payload again (from CaN), returns immediately.
     """
+
+    def __init__(self) -> None:
+        self._proceed = False
 
     @workflow.run
     async def run(self, large_payload: str) -> str:
         if workflow.info().continued_run_id is None:
+            await workflow.wait_condition(lambda: self._proceed)
             workflow.continue_as_new(large_payload)
         return "done"
+
+    @workflow.signal
+    def proceed(self) -> None:
+        self._proceed = True
 
 
 async def test_extstore_continue_as_new_result_stored_under_current_run(
@@ -1379,7 +1387,9 @@ async def test_extstore_continue_as_new_result_stored_under_current_run(
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+        # Capture the first run_id before signalling the workflow to proceed.
         first_run_id = (await handle.describe()).run_id
+        await handle.signal(ContinueAsNewExtStoreWorkflow.proceed)
         await handle.result()
         last_run_id = (await handle.describe()).run_id
     assert len(driver.store_contexts) == 3
