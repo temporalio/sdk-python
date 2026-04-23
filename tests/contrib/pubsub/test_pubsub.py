@@ -16,7 +16,7 @@ import nexusrpc
 import nexusrpc.handler
 
 from temporalio import activity, nexus, workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowHandle
 from temporalio.contrib.pubsub import (
     PollInput,
     PollResult,
@@ -301,7 +301,10 @@ async def publish_with_max_batch(count: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _is_different_run(old_handle, new_handle) -> bool:
+async def _is_different_run(
+    old_handle: WorkflowHandle[Any, Any],
+    new_handle: WorkflowHandle[Any, Any],
+) -> bool:
     """Check if new_handle points to a different run than old_handle."""
     try:
         desc = await new_handle.describe()
@@ -311,7 +314,7 @@ async def _is_different_run(old_handle, new_handle) -> bool:
 
 
 async def collect_items(
-    handle,
+    handle: WorkflowHandle[Any, Any],
     topics: list[str] | None,
     from_offset: int,
     expected_count: int,
@@ -624,7 +627,8 @@ async def test_priority_flush(client: Client) -> None:
 
 @pytest.mark.asyncio
 async def test_iterator_cancellation(client: Client) -> None:
-    """Cancelling a subscription iterator completes cleanly."""
+    """Cancelling a subscription iterator after it has yielded an item
+    completes cleanly."""
     async with new_worker(
         client,
         BasicPubSubWorkflow,
@@ -635,23 +639,38 @@ async def test_iterator_cancellation(client: Client) -> None:
             task_queue=worker.task_queue,
         )
 
-        pubsub_client = PubSubClient(handle)
+        # Seed one item so the iterator provably reaches an active state
+        # before we cancel — no sleep-based wait.
+        await handle.signal(
+            "__pubsub_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=encode_data(b"seed"))]
+            ),
+        )
 
-        async def subscribe_and_collect():
-            items = []
+        pubsub_client = PubSubClient(handle)
+        first_item = asyncio.Event()
+        items: list[PubSubItem] = []
+
+        async def subscribe_and_collect() -> None:
             async for item in pubsub_client.subscribe(
                 from_offset=0, poll_cooldown=0
             ):
                 items.append(item)
-            return items
+                first_item.set()
 
         task = asyncio.create_task(subscribe_and_collect())
-        await asyncio.sleep(0.5)
+        # Bounded wait so a subscribe regression fails fast instead of hanging.
+        async with asyncio.timeout(5):
+            await first_item.wait()
         task.cancel()
         try:
             await task
         except asyncio.CancelledError:
             pass
+
+        assert len(items) == 1
+        assert items[0].data == b"seed"
 
         await handle.signal(BasicPubSubWorkflow.close)
 
@@ -864,6 +883,11 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
             task_queue=worker.task_queue,
         )
 
+        # Inject a controllable clock into the client module. The client's
+        # retry check compares `time.monotonic() - _pending_since` against
+        # `max_retry_duration`, so advancing the clock between flushes makes
+        # the timeout fire deterministically regardless of wall-clock speed
+        # or clock resolution.
         pubsub = PubSubClient(handle, max_retry_duration=0.1)
         real_signal = handle.signal
         fail_signals = True
@@ -873,15 +897,19 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
                 raise RuntimeError("simulated failure")
             return await real_signal(*args, **kwargs)
 
-        with patch.object(handle, "signal", side_effect=maybe_failing_signal):
+        clock = [0.0]
+        with patch(
+            "temporalio.contrib.pubsub._client.time.monotonic",
+            side_effect=lambda: clock[0],
+        ), patch.object(handle, "signal", side_effect=maybe_failing_signal):
             pubsub.publish("events", b"lost")
 
             # First flush fails and enters the pending-retry state.
             with pytest.raises(RuntimeError):
                 await pubsub._flush()
 
-            # Let the retry window expire.
-            await asyncio.sleep(0.2)
+            # Advance the clock well past max_retry_duration.
+            clock[0] = 10.0
 
             # Next flush raises TimeoutError — the pending batch is abandoned.
             with pytest.raises(TimeoutError, match="max_retry_duration"):
