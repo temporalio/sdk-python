@@ -2,6 +2,14 @@
 
 Consolidated design document reflecting the current implementation.
 
+> The Python code in `sdk-python/temporalio/contrib/pubsub/` is authoritative.
+> Both this document and the Notion page
+> ["Streaming API Design Considerations"](https://www.notion.so/3478fc567738803d9c22eeb64a296e21)
+> track it. When API or wire-format facts change in code, update this doc in
+> the same commit and mirror to Notion. When new narrative (a decision, a
+> comparison) lands in either doc, port it to the other before the next
+> review cycle.
+
 ## Overview
 
 A reusable pub/sub module for Temporal workflows. The workflow acts as the
@@ -221,12 +229,42 @@ guarded by
 
 ## Design Decisions
 
-### 1. Topics are plain strings, no hierarchy
+### 1. Durable streams
+
+All stream events flow through the workflow's append-only log, backed by
+Temporal's persistence layer. There is no ephemeral streaming option.
+
+**Trade-off.** Ephemeral streams that skip the Temporal server, or transit it
+with lower durability, would be less resource-intensive. We chose durable
+streams because:
+
+1. **Simpler programming model.** One event path, one source of truth. The
+   application does not need merge logic, reconnection handling for a second
+   channel, or fallback behavior when the ephemeral path fails.
+2. **Reliability.** Events survive worker crashes, workflow restarts, and
+   continue-as-new. A subscriber that connects after a failure sees the
+   complete history, not a gap where the ephemeral channel lost events.
+3. **Correctness.** With a single path, subscriber code is the same whether
+   processing events live or replaying them after a reconnect. A separate
+   ephemeral path for latency-sensitive events (e.g., token deltas) would
+   create a second code path through the frontend — additional complexity
+   that is difficult to test.
+
+The cost is latency: events round-trip through the Temporal server before
+reaching the subscriber. Batching (see [Batching is built into the
+client](#7-batching-is-built-into-the-client)) manages this — a 0.1-second
+interval for token streaming keeps latency acceptable while amortizing
+per-signal overhead.
+
+Durability is Temporal's core value proposition. Making the stream durable by
+default aligns with the platform.
+
+### 2. Topics are plain strings, no hierarchy
 
 Topics are exact-match strings. No prefix matching, no wildcards. A subscriber
 provides a list of topic strings to filter on; an empty list means "all topics."
 
-### 2. Items are Temporal `Payload`s, not opaque bytes
+### 3. Items are Temporal `Payload`s, not opaque bytes
 
 The workflow stores each item as a
 `temporalio.api.common.v1.Payload` — the same type signals, updates,
@@ -274,7 +312,15 @@ base64-encoded `Payload.SerializeToString()` bytes, not nested
 serialize a `Payload` embedded inside a dataclass. See [Data
 Types — Wire format for payloads](#wire-format-for-payloads).
 
-### 3. Global offsets, NATS JetStream model
+### 4. Global offsets, NATS JetStream model
+
+> 🚪 **One-way door.** Once subscribers persist and resume from global integer
+> offsets — stored in SSE `Last-Event-ID`, BFF reconnection state, and
+> client-side cursor logic — the offset semantics are baked into the wire
+> protocol. Switching to per-topic offsets later would break every existing
+> subscriber's resume path. This is the right choice (cursor portability and
+> cross-topic ordering are valuable), but recognize that every consumer built
+> against this API will assume a single integer is a complete stream position.
 
 Every entry gets a global offset from a single counter. Subscribers filter by
 topic but advance through the global offset space.
@@ -291,6 +337,15 @@ We evaluated six alternatives for handling the information leakage that global
 offsets create (a single-topic subscriber can infer other-topic activity from
 gaps): per-topic counts, opaque cursors, encrypted cursors, per-topic lists,
 per-topic offsets with cursor hints, and accepting the leakage.
+
+| Option | Systems | Leakage | Cross-topic ordering | Resume cost | Cursor portability |
+|---|---|---|---|---|---|
+| Per-topic count as cursor | *(theoretical)* | None | Preserved | O(n) or extra state | Coupled to filter |
+| Opaque cursor wrapping global offset | *(theoretical)* | Observable | Preserved | O(1) | Filter-independent |
+| Encrypted global offset | *(theoretical)* | None | Preserved | O(1) | Filter-independent |
+| Per-topic / per-partition lists | Kafka, Redis Streams, RabbitMQ Streams, Google Pub/Sub, SQS/SNS | None | **Lost** | O(1) | N/A |
+| **Global offsets (chosen)** | NATS JetStream, PubNub (timestamp variant) | Contained at BFF | Preserved | O(new items) | Filter-independent |
+| Per-topic offsets with cursor hints | *(theoretical)* | None | Preserved | O(new items) | Per-topic only |
 
 **Decision:** Global offsets are the right choice for workflow-scoped pub/sub.
 
@@ -323,19 +378,19 @@ browser. The global offset never reaches the end client. See
 [Information Leakage and the BFF](#information-leakage-and-the-bff) for the
 full mechanism.
 
-### 4. No topic creation
+### 5. No topic creation
 
 Topics are implicit. Publishing to a topic creates it. Subscribing to a
 nonexistent topic returns no items and waits for new ones.
 
-### 5. `force_flush` forces a flush, does not reorder
+### 6. `force_flush` forces a flush, does not reorder
 
 `force_flush=True` causes the client to immediately flush its buffer. It
 does NOT reorder items — the flushed item appears in its natural
 position after any previously-buffered items. The purpose is
 latency-sensitive delivery, not importance ranking.
 
-### 6. Session ordering
+### 7. Session ordering
 
 Publications from a single client are ordered. This relies on two Temporal
 guarantees:
@@ -366,7 +421,7 @@ formally verified as `OrderPreservedPerPublisher`.
 
 Once items are in the log, their order is stable — reads are repeatable.
 
-### 7. Batching is built into the client
+### 8. Batching is built into the client
 
 `PubSubClient` includes a Nagle-like batcher (buffer + timer). The async
 context manager starts a background flush task; exiting cancels it and does a
@@ -376,14 +431,40 @@ Parameters:
 - `batch_interval` (default 2.0s): timer between automatic flushes.
 - `max_batch_size` (optional): auto-flush when buffer reaches this size.
 
-### 8. Subscription is poll-based, exposed as async iterator
+### 9. Subscription is poll-based, exposed as async iterator
 
-The primitive is `__pubsub_poll` (a Temporal update with `wait_condition`).
-`subscribe()` wraps this in an `AsyncIterator` with a configurable
-`poll_interval` (default 0.1s) to rate-limit polls.
+The fundamental primitive is an offset-based long-poll: the subscriber sends
+`from_offset` and gets back items plus `next_offset`. `__pubsub_poll` is a
+Temporal update with `wait_condition`. `subscribe()` wraps this in an
+`AsyncIterator` with a configurable `poll_cooldown` (default 0.1s) to
+rate-limit polls.
 
-Temporal has no server-push to external clients. Updates with `wait_condition`
-are the closest thing — the workflow blocks until data is available.
+**Trade-off.** The alternative is server-push — the pub/sub system executes
+a callback on the subscriber. Pull is better aligned with durable streams:
+
+1. **Back-pressure is natural.** A slow subscriber just polls less
+   frequently. Push requires the server to implement flow control to avoid
+   overwhelming subscribers — or risk dropping messages, defeating the
+   durable-stream purpose.
+2. **The subscriber controls its own read position.** It can replay from an
+   earlier offset, skip ahead, or resume from exactly where it left off.
+   Push requires the server to track per-subscriber delivery state.
+3. **Durable streams are data at rest.** The log exists regardless of
+   whether anyone is reading it. Pull treats the log as something to read
+   from; push treats it as a pipe to deliver through, which fights the
+   durability model.
+
+Temporal's architecture reinforces this — there is no server-push mechanism
+for external clients. Updates with `wait_condition` are the closest
+approximation: the workflow blocks until data is available, making it
+behave like push from the subscriber's perspective while remaining pull on
+the wire.
+
+**Both layers are exposed.** The offset-based poll is a first-class part
+of the API, not hidden behind the iterator. The BFF uses offsets directly
+to map SSE event IDs to global offsets for reconnection. Application code
+that just wants to process items in order uses the iterator. Different
+consumers use different layers.
 
 **Poll efficiency.** The poll slices `self._pubsub_log[from_offset - base_offset:]`
 and filters by topic. The common case — single topic, continuing from last
@@ -393,7 +474,7 @@ are the same cost: one slice, one filter pass. The worst case is a poll from
 offset 0 (full log scan), which only happens on first connection or after the
 subscriber falls behind.
 
-### 9. Workflow can publish but should not subscribe
+### 10. Workflow can publish but should not subscribe
 
 Workflow code can call `self.publish()` directly — this is deterministic.
 Reading from the log within workflow code is possible but breaks the
@@ -401,7 +482,7 @@ failure-free abstraction because external publishers send data via signals
 (non-deterministic inputs), and branching on signal content creates
 replay-sensitive code paths.
 
-### 10. `base_offset` for truncation
+### 11. `base_offset` for truncation
 
 The log carries a `base_offset`. All offset arithmetic uses
 `offset - base_offset` to index into the log, so discarding a prefix of
@@ -420,7 +501,7 @@ is triggered, and the workflow needs a way to release entries the
 subscriber has already consumed without waiting for a CAN cycle.
 `truncate_pubsub(up_to_offset)` exposes this.
 
-### 11. No timeout on long-poll
+### 12. No timeout on long-poll
 
 `wait_condition` in the poll handler has no timeout. The poll blocks
 indefinitely until one of three things happens:
@@ -444,7 +525,7 @@ forever" mechanism. This was removed because:
   poll handler is just an in-memory coroutine waiting on a condition. It
   consumes no Temporal actions and is cleaned up at the next CAN cycle.
 
-### 12. Signals for publish, updates for poll
+### 13. Signals for publish, updates for poll
 
 Publishing uses signals (fire-and-forget); subscription uses updates
 (request-response with `wait_condition`). These choices are deliberate.
@@ -482,6 +563,72 @@ exactly-once via Update ID, eliminating application-level dedup. However:
 If the cross-CAN dedup gap is fixed and backpressure becomes desirable,
 switching publish to updates is a mechanical change — the dedup protocol,
 dedup protocol, and mixin handler logic are unchanged.
+
+## Design Principles
+
+### Deduplication follows the end-to-end principle
+
+**The end-to-end principle** (Saltzer, Reed, Clark, "End-to-End Arguments in
+System Design," 1984): a function can be correctly and completely
+implemented only with the knowledge available at the endpoints of a
+communication system. Implementing it at intermediate layers may be
+redundant or of little value, because the endpoints must handle it
+regardless. The corollary: implement a function at the lowest layer that
+can implement it *completely*. Don't partially implement it at an
+intermediate layer.
+
+> 🚪 **One-way door.** The contract that the stream is an append-only log of
+> *all* attempts — including failed ones — is irreversible once subscribers
+> build reducers around it. Every frontend reducer expects to see interleaved
+> retries and uses application-level events (e.g., `AGENT_START` resetting the
+> text accumulator) to reconcile. If the transport later started filtering
+> retries, existing reducers would break — they would miss the state
+> transitions they depend on, and there would be two different behaviors
+> depending on whether the subscriber was connected live (saw the failed
+> attempt) or replayed after reconnect (didn't). This is the correct design,
+> but it is a permanent commitment.
+
+**Our design decision.** We do not filter out events from failed activity
+attempts. When an activity retries — for example, an LLM call that times
+out, or a tool call that fails because a worker crashes — its previous
+attempt's streaming events remain in the log. The new attempt publishes
+fresh events. The subscriber sees both.
+
+**Why the pub/sub layer cannot handle this completely.** When an LLM
+activity retries, the model runs again and produces different output —
+different tokens, different wording, a different response. The pub/sub
+layer sees two different message sequences. It has no way to know these
+represent the same logical operation. Only the application knows that the
+second response supersedes the first.
+
+We could have added retry semantics to the pub/sub protocol — for example,
+tagging messages with attempt numbers and letting the transport filter
+superseded attempts, similar to signal-level dedup. But this would be
+incomplete, and the incompleteness creates a real problem: if the
+transport scrubs failed-attempt events, but the subscriber already saw
+them in real time (before the retry happened), the subscriber now has two
+code paths — one for the live stream (which included the failed attempt)
+and one for replay after reconnect (which doesn't). Two paths through the
+frontend for the same logical scenario is a source of bugs and is
+difficult to test. The transport's filtering doesn't save the subscriber
+any work; the subscriber needs robust reconciliation logic regardless.
+
+**The contract: an append-only log of attempts.** The stream records what
+happened, including failed attempts. The subscriber decides how to present
+this to the user. In our frontend, the application-layer reducer handles
+reconciliation: a new `TEXT_COMPLETE` event overwrites the previous one
+(set semantics), and an `AGENT_START` event resets the text accumulator so
+the retry's tokens replace the failed attempt's partial output. This
+reducer produces the same state whether it processes events live or
+replays them on reconnect — there is only one code path.
+
+**The pub/sub layer handles what it can handle completely.** Signal-level
+dedup (same publisher ID + same sequence number) is fully resolvable at the
+transport layer — the layer has all the information it needs, so it
+deduplicates there. Activity-level dedup cannot be fully resolved at the
+transport layer — it requires application context — so the pub/sub layer
+does not attempt it. Each layer handles the duplicates it can completely
+resolve.
 
 ## Exactly-Once Publish Delivery
 
@@ -791,8 +938,84 @@ serialization independently.
 
 ## Compatibility
 
+> 🚪 **One-way door (two parts).**
+>
+> **Immutable handler names.** `__pubsub_publish`, `__pubsub_poll`, and
+> `__pubsub_offset` are permanent wire-level entry points. The escape hatch —
+> versioned handler names like `__pubsub_v2_poll` — gets more expensive over
+> time: the mixin must register all supported versions, with no discovery
+> mechanism for which versions a workflow supports.
+>
+> **No version field.** Committing to additive-only evolution means the *only*
+> path for a true breaking change is versioned handler names. If the
+> additive-only discipline ever fails — an existing field's semantics need to
+> change, not just a new field added — there is no graceful migration path
+> within a single handler. The argument against a version field is sound
+> (signals are fire-and-forget, so version rejection equals silent data loss),
+> but it means the protocol's evolvability hinges entirely on never needing to
+> change existing field semantics.
+
 The wire protocol evolves under four rules to prevent accidental breakage by
 future contributors.
+
+### Alternatives considered
+
+We evaluated and rejected five approaches to protocol evolution in favor of
+additive-only.
+
+**Version field in payloads.** Add `version: int` to each wire type and have
+the receiver check it. Fatal flaw: signals are fire-and-forget. If a v1
+workflow receives a v2 signal and rejects it based on version, the publisher
+never learns the signal was rejected — silent data loss. Strictly worse than
+the current behavior, where unknown fields are harmlessly dropped by
+Temporal's JSON deserializer. For updates (poll), a version mismatch could
+return an error, but this only helps if you change the semantics of an
+existing field — which you should not do (that is a new handler, not a
+version bump).
+
+**Versioned handler names** (e.g., `__pubsub_v2_poll`). The most robust
+option — creates entirely separate protocol surfaces so old and new code
+never interact. But premature: the mixin must register handlers for all
+supported versions, the client must probe which versions exist (Temporal
+has no "does this handler exist?" primitive), and dead code accumulates.
+Reserved as the escape hatch for a future true breaking change.
+
+**Protocol negotiation.** Client declares version in poll, workflow
+responds with what it supports. Turns the mixin into a version-dispatching
+router. Disproportionate complexity. Temporal's Worker Versioning (Build ID
+routing) solves this better at the infrastructure level — route tasks to
+compatible workers rather than negotiating at the message level.
+
+**SDK version embedding.** Couples the protocol to the SDK release cadence.
+SDK version 2.0 might change zero protocol fields; SDK version 1.7 might
+change three. The version number becomes meaningless noise.
+
+**Accepting silent incompatibility.** Letting version drift just break
+silently. Unacceptable for a durable-stream contract: a v2 subscriber
+hitting a v1 workflow should see older fields default, not corrupt state.
+
+**Why additive-only works.** Every protocol change to date has followed
+the same pattern: new field with a default that preserves pre-feature
+behavior. This matches Protocol Buffers wire compatibility rules (never
+change the meaning of an existing field number; always provide defaults
+for new fields) and Avro's schema evolution model. Temporal's own
+mechanisms cover the hard cases:
+
+- **Worker Versioning (Build IDs):** For true breaking changes, deploy v2
+  mixin on a new Build ID. Old workflows continue on old workers; new
+  workflows start on new workers. Strictly more powerful than
+  message-level versioning because it operates at the workflow execution
+  level.
+- **`workflow.patched()`:** For in-workflow behavior branching during
+  replay. Gates old vs. new logic within the same workflow code during
+  transition periods.
+
+**Ecosystem parallel.** Kafka's inter-broker protocol uses explicit version
+numbers because brokers in a cluster must negotiate capabilities at
+connection time — a fundamentally different topology from our
+single-workflow-instance model. Our pattern is closer to protobuf wire
+evolution: the schema is the contract, defaults handle absence, and
+breaking changes get a new message type (handler name).
 
 ### 1. Additive-only wire evolution
 
@@ -847,6 +1070,27 @@ All fields follow rule 1:
 | `_WireItem.offset` | `0` | Zero means "unknown" |
 | `PollResult.more_ready` | `False` | No truncation signaled |
 | `PubSubState.publisher_last_seen` | `{}` | No TTL pruning state |
+
+## Ecosystem analogs
+
+The closest analogs in established messaging systems, for orientation:
+
+- **Offset model** — NATS JetStream: one stream, multiple subjects, a
+  single monotonic sequence number. Subscribers filter by subject but
+  advance through the global sequence space. This is our model.
+- **Idempotent producer** — Kafka's producer ID + monotonic sequence
+  number, scoped to the broker. Our `publisher_id` + `sequence` at the
+  workflow does the same job, scoped to signal delivery into one workflow.
+- **Blocking pull** — Redis Streams `XREAD BLOCK`. Our `__pubsub_poll`
+  update with `wait_condition` is the Temporal-native equivalent.
+- **Durable-execution peer** — the Workflow SDK ([workflow-sdk.dev](https://workflow-sdk.dev))
+  has a first-class streaming model with indexed resumption and buffered
+  writes, but uses external storage (Redis/filesystem) as the broker
+  rather than the workflow itself.
+
+Full comparison tables (same/different with Kafka, NATS JetStream, Redis
+Streams, and Workflow SDK) live on the
+[Streaming API Design Considerations Notion page](https://www.notion.so/3478fc567738803d9c22eeb64a296e21).
 
 ## File Layout
 
