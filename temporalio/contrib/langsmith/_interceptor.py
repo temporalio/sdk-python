@@ -154,48 +154,46 @@ def _get_current_run_for_propagation() -> RunTree | None:
 
 
 # ---------------------------------------------------------------------------
-# Workflow event loop safety: patch @traceable's aio_to_thread
+# Workflow event loop safety: override @traceable's aio_to_thread
 # ---------------------------------------------------------------------------
 
-_aio_to_thread_patched = False
+_aio_to_thread_override_installed = False
 
 
-def _patch_aio_to_thread() -> None:
-    """Patch langsmith's ``aio_to_thread`` to run synchronously in workflows.
+async def _temporal_aio_to_thread(
+    default_aio_to_thread: Callable[..., Any],
+    ctx: Any,
+    func: Callable[..., Any],
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    """Run LangSmith's ``aio_to_thread`` synchronously inside Temporal workflows.
 
     The ``@traceable`` decorator on async functions uses ``aio_to_thread()`` →
     ``loop.run_in_executor()`` for run setup/teardown.  The Temporal workflow
-    event loop does not support ``run_in_executor``.  This patch runs those
-    functions synchronously on the workflow thread when inside a workflow.
-    Functions passed here must not perform blocking I/O.
+    event loop does not support ``run_in_executor``.  This override runs those
+    functions synchronously on the workflow thread when inside a workflow,
+    and delegates to the default implementation outside workflows.
 
+    Registered via ``langsmith.set_runtime_overrides(aio_to_thread=...)``.
     """
-    global _aio_to_thread_patched  # noqa: PLW0603
-    if _aio_to_thread_patched:
+    if not temporalio.workflow.in_workflow():
+        return await default_aio_to_thread(ctx, func, *args, **kwargs)
+    with temporalio.workflow.unsafe.sandbox_unrestricted():
+        return ctx.run(func, *args, **kwargs)
+
+
+def _install_aio_to_thread_override() -> None:
+    """Install the ``aio_to_thread`` override via LangSmith's official API.
+
+    Safe to call multiple times; the override is only installed once.
+    """
+    global _aio_to_thread_override_installed  # noqa: PLW0603
+    if _aio_to_thread_override_installed:
         return
-
-    import langsmith._internal._aiter as _aiter
-
-    _original = _aiter.aio_to_thread
-
-    import contextvars
-
-    async def _safe_aio_to_thread(
-        func: Callable[..., Any],
-        /,
-        *args: Any,
-        __ctx: contextvars.Context | None = None,
-        **kwargs: Any,
-    ) -> Any:
-        if not temporalio.workflow.in_workflow():
-            return await _original(func, *args, __ctx=__ctx, **kwargs)
-        with temporalio.workflow.unsafe.sandbox_unrestricted():
-            # Run without ctx.run() so context var changes propagate
-            # to the caller. Safe because workflows are single-threaded.
-            return func(*args, **kwargs)
-
-    _aiter.aio_to_thread = _safe_aio_to_thread  # type: ignore[assignment]
-    _aio_to_thread_patched = True
+    langsmith.set_runtime_overrides(aio_to_thread=_temporal_aio_to_thread)
+    _aio_to_thread_override_installed = True
 
 
 # ---------------------------------------------------------------------------
@@ -611,7 +609,7 @@ class LangSmithInterceptor(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
     ) -> type[_LangSmithWorkflowInboundInterceptor]:
         """Return the workflow interceptor class with config bound."""
-        _patch_aio_to_thread()
+        _install_aio_to_thread_override()
         config = self
 
         class InterceptorWithConfig(_LangSmithWorkflowInboundInterceptor):
