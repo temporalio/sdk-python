@@ -10,12 +10,6 @@ This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows yo
 uv add temporalio[langgraph]
 ```
 
-or with pip:
-
-```sh
-pip install temporalio[langgraph]
-```
-
 ## Plugin Initialization
 
 ### Graph API
@@ -35,17 +29,13 @@ from temporalio.contrib.langgraph import LangGraphPlugin
 plugin = LangGraphPlugin(
     entrypoints={"my_entrypoint": my_entrypoint},
     tasks=[my_task],
-    activity_options={
-        "my_task": {
-            "start_to_close_timeout": datetime.timedelta(seconds=30),
-        },
-    },
 )
 ```
 
 ## Checkpointer
 
-Use `InMemorySaver` as your checkpointer. Temporal handles durability, so third-party checkpointers (like PostgreSQL or Redis) are not needed.
+If your LangGraph code requires a checkpointer (for example, if you're using interrupts), use `InMemorySaver`.
+Temporal handles durability, so third-party checkpointers (like PostgreSQL or Redis) are not needed.
 
 ```python
 import langgraph.checkpoint.memory
@@ -71,25 +61,25 @@ Options are passed through to [`workflow.execute_activity()`](https://python.tem
 
 ### Graph API
 
-Pass activity options as node `metadata` when calling `add_node`:
+Pass Activity options as node `metadata` when calling `add_node`:
 
 ```python
-import datetime
+from datetime import timedelta
 from temporalio.common import RetryPolicy
 
 g = StateGraph(State)
 g.add_node("my_node", my_node, metadata={
-    "start_to_close_timeout": datetime.timedelta(seconds=30),
+    "start_to_close_timeout": timedelta(seconds=30),
     "retry_policy": RetryPolicy(maximum_attempts=3),
 })
 ```
 
 ### Functional API
 
-Pass activity options to the `Plugin` constructor, keyed by task function name:
+Pass Activity options to the `LangGraphPlugin` constructor, keyed by task function name:
 
 ```python
-import datetime
+from datetime import timedelta
 from temporalio.common import RetryPolicy
 from temporalio.contrib.langgraph import LangGraphPlugin
 
@@ -98,7 +88,7 @@ plugin = LangGraphPlugin(
     tasks=[my_task],
     activity_options={
         "my_task": {
-            "start_to_close_timeout": datetime.timedelta(seconds=30),
+            "start_to_close_timeout": timedelta(seconds=30),
             "retry_policy": RetryPolicy(maximum_attempts=3),
         },
     },
@@ -107,7 +97,7 @@ plugin = LangGraphPlugin(
 
 ### Runtime Context
 
-LangGraph's run-scoped context (`context_schema`) is reconstructed on the activity side, so nodes and tasks can read `runtime.context` (or call `get_runtime()`) without changing anything at the call site:
+LangGraph's run-scoped context (`context_schema`) is reconstructed on the Activity side, so nodes and tasks can read from and write to `runtime.context`:
 
 ```python
 from langgraph.runtime import Runtime
@@ -121,22 +111,22 @@ class Context(TypedDict):
 async def my_node(state: State, runtime: Runtime[Context]) -> dict:
     return {"user": runtime.context["user_id"]}
 
-# In the workflow:
+# In the Workflow:
 g = graph("my-graph").compile()
 await g.ainvoke({...}, context=Context(user_id="alice"))
 ```
 
-Your `context` object must be serializable by the configured Temporal payload converter, since it crosses the activity boundary.
+Your `context` object must be serializable by the configured Temporal payload converter, since it crosses the Activity boundary.
 
 ## Stores are not supported
 
-LangGraph's `Store` (e.g. `InMemoryStore` passed via `graph.compile(store=...)` or `@entrypoint(store=...)`) isn't accessible inside activity-wrapped nodes: the Store holds live state that can't cross the activity boundary, and activities may run on a different worker than the workflow. If you pass a store, the plugin logs a warning on first use and `runtime.store` is `None` inside nodes.
+LangGraph's `Store` (e.g. `InMemoryStore` passed via `graph.compile(store=...)` or `@entrypoint(store=...)`) isn't accessible inside Activity-wrapped nodes: the Store holds live state that can't cross the Activity boundary, and Activities may run on a different worker than the Workflow. If you pass a store, the plugin logs a warning on first use and `runtime.store` is `None` inside nodes.
 
-Use workflow state for per-run memory, or a backend-backed store (Postgres/Redis/etc.) configured on each worker if you need shared memory across runs.
+Use Workflow state for per-run memory, or an external database (Postgres/Redis/etc.) configured on each worker if you need shared memory across runs.
 
 ## Running in the Workflow
 
-To skip the Activity wrapper and run a node or task directly in the Workflow, set `execute_in` to `"workflow"`:
+To run a node or task directly in the Workflow, set `execute_in` to `"workflow"`:
 
 ```python
 # Graph API
@@ -154,13 +144,13 @@ plugin = LangGraphPlugin(
 Install dependencies:
 
 ```sh
-uv sync
+uv sync --all-extras
 ```
 
 Run the test suite:
 
 ```sh
-uv run pytest
+uv run pytest tests/contrib/langgraph
 ```
 
 Tests start a local Temporal dev server automatically — no external server needed.

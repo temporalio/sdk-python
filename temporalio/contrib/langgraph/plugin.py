@@ -56,7 +56,7 @@ class LangGraphPlugin(SimplePlugin):
         entrypoints: dict[str, Pregel[Any, Any, Any, Any]] | None = None,
         tasks: list | None = None,
         # TODO: Remove activity_options when we have support for @task(metadata=...)
-        activity_options: dict[str, dict] | None = None,
+        activity_options: dict[str, dict[str, Any]] | None = None,
         default_activity_options: dict[str, Any] | None = None,
     ):
         """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
@@ -160,7 +160,7 @@ class LangGraphPlugin(SimplePlugin):
             return runner
 
         super().__init__(
-            "temporalio.LangGraphPlugin",
+            "langchain.LangGraphPlugin",
             activities=self.activities,
             workflow_runner=workflow_runner,
             interceptors=[LangGraphInterceptor(graphs or {}, entrypoints or {})],
