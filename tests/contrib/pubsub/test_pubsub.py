@@ -477,10 +477,10 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
     and does not crash the workflow task."""
     async with new_worker(
         client,
-        TruncateSignalWorkflow,
+        TruncateWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            TruncateSignalWorkflow.run,
+            TruncateWorkflow.run,
             id=f"pubsub-trunc-error-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -494,12 +494,11 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
             ]),
         )
 
-        # Truncate up to offset 3
-        await handle.signal("truncate", 3)
+        # Truncate up to offset 3 via update — completion is explicit.
+        await handle.execute_update("truncate", 3)
 
         # Poll from offset 1 (truncated) — should get ApplicationError,
-        # NOT crash the workflow task. The update acts as a signal barrier:
-        # both prior signals are processed before the update runs.
+        # NOT crash the workflow task.
         from temporalio.client import WorkflowUpdateFailedError
         with pytest.raises(WorkflowUpdateFailedError):
             await handle.execute_update(
@@ -521,10 +520,10 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
     """subscribe() auto-recovers when offset falls behind truncation."""
     async with new_worker(
         client,
-        TruncateSignalWorkflow,
+        TruncateWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            TruncateSignalWorkflow.run,
+            TruncateWorkflow.run,
             id=f"pubsub-trunc-recover-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -538,9 +537,8 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
             ]),
         )
 
-        # Truncate first 3. Subsequent subscribe() uses an update call which
-        # acts as a barrier for both prior signals.
-        await handle.signal("truncate", 3)
+        # Truncate first 3. The update returns after the handler completes.
+        await handle.execute_update("truncate", 3)
 
         # subscribe from offset 1 (truncated) — should auto-recover
         # and deliver items from base_offset (3)
@@ -989,10 +987,10 @@ async def test_truncate_pubsub(client: Client) -> None:
     """truncate_pubsub discards prefix and adjusts base_offset."""
     async with new_worker(
         client,
-        TruncateSignalWorkflow,
+        TruncateWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            TruncateSignalWorkflow.run,
+            TruncateWorkflow.run,
             id=f"pubsub-truncate-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -1011,9 +1009,9 @@ async def test_truncate_pubsub(client: Client) -> None:
         items = await collect_items(handle, None, 0, 5)
         assert len(items) == 5
 
-        # Truncate up to offset 3 (discard items 0, 1, 2). The following
-        # get_offset query serves as a barrier for the truncate signal.
-        await handle.signal("truncate", 3)
+        # Truncate up to offset 3 (discard items 0, 1, 2). The update
+        # returns after the handler completes.
+        await handle.execute_update("truncate", 3)
 
         # Offset should still be 5 (truncation moves base_offset, not tail)
         pubsub_client = PubSubClient(handle)
@@ -1083,14 +1081,15 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
 
 @workflow.defn
-class TruncateSignalWorkflow(PubSubMixin):
+class TruncateWorkflow(PubSubMixin):
     """Test scaffolding that exposes truncate_pubsub via a user-authored
-    signal.
+    update.
 
     The contrib module does not define a built-in external truncate API —
     truncation is a workflow-internal decision (typically driven by
     consumer progress or a retention policy). Workflows that want external
-    control wire up their own signal or update, exactly as done here.
+    control wire up their own signal or update. We use an update here so
+    callers get explicit completion (signals are fire-and-forget).
     """
 
     @workflow.init
@@ -1102,7 +1101,7 @@ class TruncateSignalWorkflow(PubSubMixin):
     def close(self) -> None:
         self._closed = True
 
-    @workflow.signal
+    @workflow.update
     def truncate(self, up_to_offset: int) -> None:
         self.truncate_pubsub(up_to_offset)
 
