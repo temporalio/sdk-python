@@ -47,6 +47,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.sdk.v1
+import temporalio.api.workflowservice.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
@@ -2061,7 +2062,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 cancellation_type=temporalio.workflow.NexusOperationCancellationType.WAIT_COMPLETED,
                 headers=input.headers,
                 summary=None,
-                output_type=temporalio.nexus.system.generated.SignalWithStartWorkflowExecutionResponse,
+                output_type=temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
             )
         )
         result = await handle

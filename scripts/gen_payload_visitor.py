@@ -1,11 +1,18 @@
 import subprocess
 import sys
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import Optional
+from types import ModuleType
+from typing import cast
 
+import google.protobuf.message
 from google.protobuf.descriptor import Descriptor, FieldDescriptor
 
 from temporalio.api.common.v1.message_pb2 import Payload, Payloads, SearchAttributes
+from temporalio.api.workflowservice.v1.request_response_pb2 import (
+    SignalWithStartWorkflowExecutionRequest,
+    SignalWithStartWorkflowExecutionResponse,
+)
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     WorkflowActivation,
 )
@@ -17,28 +24,63 @@ base_dir = Path(__file__).parent.parent
 
 
 def name_for(desc: Descriptor) -> str:
-    # Use fully-qualified name to avoid collisions; replace dots with underscores
     return desc.full_name.replace(".", "_")
 
 
-def emit_loop(
-    field_name: str,
-    iter_expr: str,
-    child_method: str,
-) -> str:
-    # Helper to emit a for-loop over a collection with optional headers guard
+def python_type_for(desc: Descriptor) -> str:
+    module = desc.file.package
+    if module.startswith("temporal.api."):
+        module = "temporalio.api." + module[len("temporal.api.") :]
+        return f"{module}.{desc.name}"
+    return "object"
+
+
+def load_generated_system_module() -> ModuleType:
+    module_path = (
+        base_dir / "temporalio" / "nexus" / "system" / "_workflow_service_generated.py"
+    )
+    module_name = "temporalio_nexus_system_generated"
+    spec = spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load generated system module from {module_path}")
+    module = module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def discover_system_nexus_roots() -> list[Descriptor]:
+    module = load_generated_system_module()
+    roots: list[Descriptor] = []
+    for operation in getattr(module, "__nexus_operation_registry__", {}).values():
+        for proto_type in (operation.input_type, operation.output_type):
+            if (
+                isinstance(proto_type, type)
+                and issubclass(proto_type, google.protobuf.message.Message)
+                and proto_type.DESCRIPTOR is not None
+            ):
+                roots.append(cast(Descriptor, proto_type.DESCRIPTOR))
+    deduped: list[Descriptor] = []
+    seen: set[str] = set()
+    for root in roots:
+        if root.full_name not in seen:
+            seen.add(root.full_name)
+            deduped.append(root)
+    return deduped
+
+
+def emit_loop(field_name: str, iter_expr: str, child_method: str) -> str:
     if field_name == "headers":
         return f"""\
         if not self.skip_headers:
             for v in {iter_expr}:
                 await self._visit_{child_method}(fs, v)"""
-    elif field_name == "search_attributes":
+    if field_name == "search_attributes":
         return f"""\
         if not self.skip_search_attributes:
             for v in {iter_expr}:
                 await self._visit_{child_method}(fs, v)"""
-    else:
-        return f"""\
+    return f"""\
         for v in {iter_expr}:
             await self._visit_{child_method}(fs, v)"""
 
@@ -46,54 +88,68 @@ def emit_loop(
 def emit_singular(
     field_name: str, access_expr: str, child_method: str, presence_word: str | None
 ) -> str:
-    # Helper to emit a singular field visit with presence check and optional headers guard
     if presence_word:
         if field_name == "headers":
             return f"""\
         if not self.skip_headers:
             {presence_word} o.HasField("{field_name}"):
                 await self._visit_{child_method}(fs, {access_expr})"""
-        else:
-            return f"""\
+        return f"""\
         {presence_word} o.HasField("{field_name}"):
             await self._visit_{child_method}(fs, {access_expr})"""
-    else:
-        if field_name == "headers":
-            return f"""\
+    if field_name == "headers":
+        return f"""\
         if not self.skip_headers:
             await self._visit_{child_method}(fs, {access_expr})"""
-        else:
-            return f"""\
+    return f"""\
         await self._visit_{child_method}(fs, {access_expr})"""
 
 
-class VisitorGenerator:
+class PayloadVisitorGenerator:
+    def __init__(self) -> None:
+        self.generated: dict[str, bool] = {
+            Payload.DESCRIPTOR.full_name: True,
+            Payloads.DESCRIPTOR.full_name: True,
+        }
+        self.in_progress: set[str] = set()
+        self.methods: list[str] = [
+            """\
+    async def _visit_temporal_api_common_v1_Payload(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        await fs.visit_payload(o)
+    """,
+            """\
+    async def _visit_temporal_api_common_v1_Payloads(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        await fs.visit_payloads(o.payloads)
+    """,
+            """\
+    async def _visit_payload_container(self, fs: VisitorFunctions, o: Any):
+        await fs.visit_payloads(o)
+    """,
+        ]
+
     def generate(self, roots: list[Descriptor]) -> str:
-        """
-        Generate Python source code that, given a function f(Payload) -> Payload,
-        applies it to every Payload contained within a WorkflowActivation tree.
-
-        The generated code defines async visitor functions for each reachable
-        protobuf message type starting from WorkflowActivation, including support
-        for repeated fields and map entries, and a convenience entrypoint
-        function `visit`.
-        """
-
-        for r in roots:
-            self.walk(r)
+        for root in roots:
+            self.walk(root)
 
         header = """
 # This file is generated by gen_payload_visitor.py. Changes should be made there.
 import abc
-from typing import Any, MutableSequence
+from collections.abc import MutableSequence
+from typing import Any
 
+import temporalio.nexus.system
 from temporalio.api.common.v1.message_pb2 import Payload
 
 
 class VisitorFunctions(abc.ABC):
-    \"\"\"Set of functions which can be called by the visitor. 
+    \"\"\"Set of functions which can be called by the visitor.
     Allows handling payloads as a sequence.
     \"\"\"
+
     @abc.abstractmethod
     async def visit_payload(self, payload: Payload) -> None:
         \"\"\"Called when encountering a single payload.\"\"\"
@@ -109,21 +165,21 @@ class VisitorFunctions(abc.ABC):
         \"\"\"Called when encountering a recognized system Nexus envelope payload.\"\"\"
         raise NotImplementedError()
 
+
 class PayloadVisitor:
-    \"\"\"A visitor for payloads. 
+    \"\"\"A visitor for payloads.
     Applies a function to every payload in a tree of messages.
     \"\"\"
+
     def __init__(
         self, *, skip_search_attributes: bool = False, skip_headers: bool = False
     ):
-        \"\"\"Creates a new payload visitor.\"\"\"
+        \"\"\"Create a new payload visitor.\"\"\"
         self.skip_search_attributes = skip_search_attributes
         self.skip_headers = skip_headers
 
-    async def visit(
-        self, fs: VisitorFunctions, root: Any
-    ) -> None:
-        \"\"\"Visits the given root message with the given function.\"\"\"
+    async def visit(self, fs: VisitorFunctions, root: Any) -> None:
+        \"\"\"Visit the given root message with the given function set.\"\"\"
         method_name = "_visit_" + root.DESCRIPTOR.full_name.replace(".", "_")
         method = getattr(self, method_name, None)
         if method is not None:
@@ -131,101 +187,70 @@ class PayloadVisitor:
         else:
             raise ValueError(f"Unknown root message type: {root.DESCRIPTOR.full_name}")
 
-    async def _visit_system_nexus_payload(self, fs, service, operation, payload) -> None:
-        import temporalio.nexus.system
-
-        visitor = temporalio.nexus.system.get_payload_visitor(service, operation)
-        if visitor is None:
+    async def _visit_system_nexus_payload(
+        self,
+        fs: VisitorFunctions,
+        service: str,
+        operation: str,
+        payload: Payload,
+    ) -> None:
+        new_payload = await temporalio.nexus.system.visit_payload(
+            service,
+            operation,
+            payload,
+            fs,
+            self.skip_search_attributes,
+        )
+        if new_payload is None:
             await self._visit_temporal_api_common_v1_Payload(fs, payload)
             return
 
-        async def payload_visitor(payloads):
-            new_payloads = list(payloads)
-            await fs.visit_payloads(new_payloads)
-            return new_payloads
-
-        new_payload = await visitor(
-            payload, payload_visitor, not self.skip_search_attributes
-        )
         if new_payload is not payload:
             payload.CopyFrom(new_payload)
         await fs.visit_system_nexus_envelope(payload)
 
 """
-
         return header + "\n".join(self.methods)
 
-    def __init__(self):
-        # Track which message descriptors have visitor methods generated
-        self.generated: dict[str, bool] = {
-            Payload.DESCRIPTOR.full_name: True,
-            Payloads.DESCRIPTOR.full_name: True,
-        }
-        self.in_progress: set[str] = set()
-        self.methods: list[str] = [
-            """\
-    async def _visit_temporal_api_common_v1_Payload(self, fs, o):
-        await fs.visit_payload(o)
-    """,
-            """\
-    async def _visit_temporal_api_common_v1_Payloads(self, fs, o):
-        await fs.visit_payloads(o.payloads)
-    """,
-            """\
-    async def _visit_payload_container(self, fs, o):
-        await fs.visit_payloads(o)
-    """,
-        ]
-
-    def check_repeated(self, child_desc, field, iter_expr) -> str | None:
-        # Special case for repeated payloads, handle them directly
+    def check_repeated(
+        self, child_desc: Descriptor, field: FieldDescriptor, iter_expr: str
+    ) -> str | None:
         if child_desc.full_name == Payload.DESCRIPTOR.full_name:
             return emit_singular(field.name, iter_expr, "payload_container", None)
-        else:
-            child_needed = self.walk(child_desc)
-            if child_needed:
-                return emit_loop(
-                    field.name,
-                    iter_expr,
-                    name_for(child_desc),
-                )
-            else:
-                return None
+        child_needed = self.walk(child_desc)
+        if child_needed:
+            return emit_loop(field.name, iter_expr, name_for(child_desc))
+        return None
 
     def walk(self, desc: Descriptor) -> bool:
         key = desc.full_name
         if key in self.generated:
             return self.generated[key]
         if key in self.in_progress:
-            # Break cycles; Assume the child will be needed (Used by Failure -> Cause)
             return True
 
         has_payload = False
         self.in_progress.add(key)
-        lines: list[str] = [f"    async def _visit_{name_for(desc)}(self, fs, o):"]
-        # If this is the SearchAttributes message, allow skipping
+        lines: list[str] = [
+            f"    async def _visit_{name_for(desc)}("
+            "self, fs: VisitorFunctions, o: Any"
+            "):"
+        ]
         if desc.full_name == SearchAttributes.DESCRIPTOR.full_name:
             lines.append("        if self.skip_search_attributes:")
             lines.append("            return")
 
-        # Group fields by oneof to generate if/elif chains
         oneof_fields: dict[int, list[FieldDescriptor]] = {}
         regular_fields: list[FieldDescriptor] = []
 
         for field in desc.fields:
             if field.type != FieldDescriptor.TYPE_MESSAGE:
                 continue
-
-            # Skip synthetic oneofs (proto3 optional fields)
             if field.containing_oneof is not None:
-                oneof_idx = field.containing_oneof.index
-                if oneof_idx not in oneof_fields:
-                    oneof_fields[oneof_idx] = []
-                oneof_fields[oneof_idx].append(field)
+                oneof_fields.setdefault(field.containing_oneof.index, []).append(field)
             else:
                 regular_fields.append(field)
 
-        # Process regular fields first
         for field in regular_fields:
             if (
                 desc.full_name == "coresdk.workflow_commands.ScheduleNexusOperation"
@@ -238,7 +263,7 @@ class PayloadVisitor:
             await self._visit_system_nexus_payload(fs, o.service, o.operation, o.input)"""
                 )
                 continue
-            # Repeated fields (including maps which are represented as repeated messages)
+
             if field.label == FieldDescriptor.LABEL_REPEATED:
                 if (
                     field.message_type is not None
@@ -295,8 +320,7 @@ class PayloadVisitor:
                         )
                     )
 
-        # Process oneof fields as if/elif chains
-        for oneof_idx, fields in oneof_fields.items():
+        for fields in oneof_fields.values():
             oneof_lines = []
             first = True
             for field in fields:
@@ -304,12 +328,15 @@ class PayloadVisitor:
                 child_has_payload = self.walk(child_desc)
                 has_payload |= child_has_payload
                 if child_has_payload:
-                    if_word = "if" if first else "elif"
-                    first = False
-                    line = emit_singular(
-                        field.name, f"o.{field.name}", name_for(child_desc), if_word
+                    oneof_lines.append(
+                        emit_singular(
+                            field.name,
+                            f"o.{field.name}",
+                            name_for(child_desc),
+                            "if" if first else "elif",
+                        )
                     )
-                    oneof_lines.append(line)
+                    first = False
             if oneof_lines:
                 lines.extend(oneof_lines)
 
@@ -320,22 +347,50 @@ class PayloadVisitor:
         return has_payload
 
 
-def write_generated_visitors_into_visitor_generated_py() -> None:
-    """Write the generated visitor code into _visitor.py."""
+def write_bridge_visitors() -> None:
     out_path = base_dir / "temporalio" / "bridge" / "_visitor.py"
-
-    # Build root descriptors: WorkflowActivation, WorkflowActivationCompletion,
-    # and all messages from selected API modules
-    roots: list[Descriptor] = [
+    roots = [
         WorkflowActivation.DESCRIPTOR,
         WorkflowActivationCompletion.DESCRIPTOR,
     ]
+    out_path.write_text(PayloadVisitorGenerator().generate(roots))
 
-    code = VisitorGenerator().generate(roots)
-    out_path.write_text(code)
+
+def write_system_nexus_payload_visitors() -> None:
+    out_path = base_dir / "temporalio" / "nexus" / "system" / "_payload_visitor.py"
+    roots = discover_system_nexus_roots()
+    out_path.write_text(PayloadVisitorGenerator().generate(roots))
 
 
 if __name__ == "__main__":
     print("Generating temporalio/bridge/_visitor.py...", file=sys.stderr)
-    write_generated_visitors_into_visitor_generated_py()
-    subprocess.run(["uv", "run", "ruff", "format", "temporalio/bridge/_visitor.py"])
+    write_bridge_visitors()
+    print("Generating temporalio/nexus/system/_payload_visitor.py...", file=sys.stderr)
+    write_system_nexus_payload_visitors()
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            "--select",
+            "I",
+            "--fix",
+            "temporalio/bridge/_visitor.py",
+            "temporalio/nexus/system/_payload_visitor.py",
+        ],
+        cwd=base_dir,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "ruff",
+            "format",
+            "temporalio/bridge/_visitor.py",
+            "temporalio/nexus/system/_payload_visitor.py",
+        ],
+        cwd=base_dir,
+        check=True,
+    )

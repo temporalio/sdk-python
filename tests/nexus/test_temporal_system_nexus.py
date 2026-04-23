@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import uuid
 from collections.abc import Sequence
 from datetime import timedelta
-from typing import Any, ClassVar, Protocol, cast
+from typing import Any, cast
 
 import nexusrpc.handler
 import pytest
@@ -13,11 +12,12 @@ from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
 
 import temporalio.api.common.v1
+import temporalio.api.workflowservice.v1
 import temporalio.converter
 import temporalio.nexus.system as nexus_system
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.converter import DefaultPayloadConverter, ExternalStorage, PayloadCodec
+from temporalio.converter import ExternalStorage, PayloadCodec
 from temporalio.nexus.system import generated
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -33,14 +33,9 @@ from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.test_extstore import InMemoryTestDriver
 
 interceptor_traces: list[tuple[str, object]] = []
-received_requests: list[dict[str, Any]] = []
-
-
-class _AnnotatedSystemNexusMessage(Protocol):
-    __temporal_nexus_proto_type__: ClassVar[type[Message]]
-
-    @property
-    def proto_type(self) -> type[Message]: ...
+received_requests: list[
+    temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest
+] = []
 
 
 @nexusrpc.handler.service_handler(service=generated.WorkflowService)
@@ -49,13 +44,19 @@ class WorkflowServicePayloadHandler:
     async def signal_with_start_workflow_execution(
         self,
         _ctx: nexusrpc.handler.StartOperationContext,
-        request: generated.SignalWithStartWorkflowExecutionRequest,
-    ) -> generated.SignalWithStartWorkflowExecutionResponse:
+        request: temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
+    ) -> temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse:
         assert request.workflow_id == "system-nexus-workflow-id"
         assert request.signal_name == "test-signal"
-        received_requests.append(dataclasses.asdict(request))
-        return generated.SignalWithStartWorkflowExecutionResponse(
-            run_id=f"{request.workflow_id}-run"
+        received_request = (
+            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest()
+        )
+        received_request.CopyFrom(request)
+        received_requests.append(received_request)
+        return (
+            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse(
+                run_id=f"{request.workflow_id}-run"
+            )
         )
 
 
@@ -86,15 +87,11 @@ class RejectOuterSystemNexusCodec(PayloadCodec):
     ) -> list[temporalio.api.common.v1.Payload]:
         encoded: list[temporalio.api.common.v1.Payload] = []
         for payload in payloads:
-            try:
-                body = json.loads(payload.data)
-            except json.JSONDecodeError:
-                body = None
-            if isinstance(body, dict) and {
-                "namespace",
-                "workflowId",
-                "signalName",
-            }.issubset(body):
+            if (
+                payload.metadata.get("encoding") == b"binary/protobuf"
+                and payload.metadata.get("messageType")
+                == b"temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+            ):
                 raise RuntimeError(
                     "outer system nexus envelope should not be codec encoded"
                 )
@@ -112,38 +109,16 @@ class RejectOuterSystemNexusCodec(PayloadCodec):
     ) -> list[temporalio.api.common.v1.Payload]:
         decoded: list[temporalio.api.common.v1.Payload] = []
         for payload in payloads:
-            try:
-                body = json.loads(payload.data)
-            except json.JSONDecodeError:
-                body = None
-            if isinstance(body, dict) and {
-                "namespace",
-                "workflowId",
-                "signalName",
-            }.issubset(body):
+            if (
+                payload.metadata.get("encoding") == b"binary/protobuf"
+                and payload.metadata.get("messageType")
+                == b"temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+            ):
                 raise RuntimeError(
                     "outer system nexus envelope should not be codec decoded"
                 )
             decoded.append(payload)
         return decoded
-
-
-class BadSystemNexusEnvelopePayloadConverter(DefaultPayloadConverter):
-    def to_payloads(
-        self, values: Sequence[object]
-    ) -> list[temporalio.api.common.v1.Payload]:
-        payloads: list[temporalio.api.common.v1.Payload] = []
-        for value in values:
-            if isinstance(value, generated.SignalWithStartWorkflowExecutionRequest):
-                payloads.append(
-                    temporalio.api.common.v1.Payload(
-                        metadata={"encoding": b"json/plain"},
-                        data=b'{"workflow_id":"bad-envelope"}',
-                    )
-                )
-            else:
-                payloads.extend(super().to_payloads([value]))
-        return payloads
 
 
 class TracingWorkflowInterceptor(Interceptor):
@@ -166,30 +141,28 @@ class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         return await super().signal_with_start_workflow(input)
 
 
-def _pop_received_request() -> dict[str, Any]:
+def _pop_received_request() -> (
+    temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest
+):
     assert len(received_requests) == 1
     return received_requests.pop()
 
 
 def _assert_request_payload_was_externally_stored(
-    request_dict: dict[str, Any], field_name: str
+    request: temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
+    field_name: str,
 ) -> None:
-    payloads = cast("dict[str, list[dict[str, object]]]", request_dict[field_name])[
-        "payloads"
-    ]
+    payloads = getattr(request, field_name).payloads
     assert len(payloads) == 1
-    assert payloads[0]["external_payloads"]
+    assert payloads[0].external_payloads
 
 
 def _assert_request_user_metadata_was_externally_stored(
-    request_dict: dict[str, Any],
+    request: temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
 ) -> None:
-    user_metadata = cast(
-        "dict[str, dict[str, object]] | None", request_dict.get("user_metadata")
-    )
-    assert user_metadata is not None
-    assert user_metadata["summary"]["external_payloads"]
-    assert user_metadata["details"]["external_payloads"]
+    assert request.HasField("user_metadata")
+    assert request.user_metadata.summary.external_payloads
+    assert request.user_metadata.details.external_payloads
 
 
 def _assert_stored_payloads_include(
@@ -304,40 +277,23 @@ def _proto_scalar_sample(field: FieldDescriptor, *, path: str) -> Any:
     raise TypeError(f"Unhandled proto scalar sample at {path}: {field!r}")
 
 
-def test_generated_system_nexus_proto_roundtrip() -> None:
+@pytest.mark.parametrize(
+    "message_type",
+    [
+        temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
+    ],
+)
+def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
     payload_converter = nexus_system.get_payload_converter()
-    annotated_types = sorted(
-        (
-            value
-            for value in vars(generated).values()
-            if isinstance(value, type)
-            and dataclasses.is_dataclass(value)
-            and hasattr(value, "__temporal_nexus_proto_type__")
-        ),
-        key=lambda value: value.__name__,
-    )
-    assert annotated_types
-
-    for annotated_type in annotated_types:
-        annotated_message_type = cast(
-            type[_AnnotatedSystemNexusMessage], annotated_type
-        )
-        proto_type = annotated_message_type.__temporal_nexus_proto_type__
-        proto_value = _build_proto_sample(proto_type)
-        payload = payload_converter.to_payload(proto_value)
-        assert payload is not None
-        assert (
-            payload.metadata["messageType"] == proto_type.DESCRIPTOR.full_name.encode()
-        )
-        value = payload_converter.from_payload(payload, annotated_message_type)
-        assert dataclasses.is_dataclass(value)
-        assert value.proto_type is proto_type
-        roundtripped_payload = payload_converter.to_payload(value)
-        assert roundtripped_payload is not None
-        roundtripped = payload_converter.from_payload(
-            roundtripped_payload, annotated_message_type
-        )
-        assert roundtripped == value
+    proto_value = _build_proto_sample(message_type)
+    payload = payload_converter.to_payload(proto_value)
+    assert payload is not None
+    assert payload.metadata["encoding"] == b"binary/protobuf"
+    assert payload.metadata["messageType"] == message_type.DESCRIPTOR.full_name.encode()
+    roundtripped = payload_converter.from_payload(payload, message_type)
+    assert isinstance(roundtripped, message_type)
+    assert roundtripped == proto_value
 
 
 async def test_external_workflow_handle_signal_with_start_workflow_uses_system_nexus(
@@ -396,10 +352,10 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
         )
 
     assert result == "system-nexus-workflow-id-run"
-    request_dict = _pop_received_request()
-    _assert_request_payload_was_externally_stored(request_dict, "input")
-    _assert_request_payload_was_externally_stored(request_dict, "signal_input")
-    _assert_request_user_metadata_was_externally_stored(request_dict)
+    request = _pop_received_request()
+    _assert_request_payload_was_externally_stored(request, "input")
+    _assert_request_payload_was_externally_stored(request, "signal_input")
+    _assert_request_user_metadata_was_externally_stored(request)
     assert codec.encode_count >= 5
     _assert_stored_payloads_include(
         driver,

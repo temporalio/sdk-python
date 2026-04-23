@@ -1,6 +1,4 @@
-import base64
 import dataclasses
-import json
 from collections.abc import MutableSequence
 
 import pytest
@@ -16,6 +14,9 @@ from temporalio.api.common.v1.message_pb2 import (
     SearchAttributes,
 )
 from temporalio.api.sdk.v1.user_metadata_pb2 import UserMetadata
+from temporalio.api.workflowservice.v1.request_response_pb2 import (
+    SignalWithStartWorkflowExecutionRequest,
+)
 from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     InitializeWorkflow,
@@ -53,6 +54,10 @@ class Visitor(VisitorFunctions):
 
     async def visit_system_nexus_envelope(self, payload: Payload) -> None:
         payload.metadata["visited"] = b"True"
+
+
+def _json_plain_payload(value: object) -> Payload:
+    return temporalio.converter.default().payload_converter.to_payload(value)
 
 
 async def test_workflow_activation_completion():
@@ -259,42 +264,16 @@ async def test_bridge_encoding():
 
 
 async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
-    envelope = nexus_system.generated.SignalWithStartWorkflowExecutionRequest(
+    envelope = SignalWithStartWorkflowExecutionRequest(
         namespace="default",
         workflow_id="workflow-id",
         signal_name="signal-name",
-        input=nexus_system.generated.Payloads(
-            payloads=[
-                nexus_system.generated.Payload(
-                    data="ImlucHV0LXZhbHVlIg==",
-                    metadata={"encoding": "anNvbi9wbGFpbg=="},
-                )
-            ]
-        ),
-        signal_input=nexus_system.generated.Payloads(
-            payloads=[
-                nexus_system.generated.Payload(
-                    data="InNpZ25hbC12YWx1ZSI=",
-                    metadata={"encoding": "anNvbi9wbGFpbg=="},
-                )
-            ]
-        ),
-        memo=nexus_system.generated.Memo(
-            fields={
-                "memo-key": nexus_system.generated.Payload(
-                    data="Im1lbW8tdmFsdWUi",
-                    metadata={"encoding": "anNvbi9wbGFpbg=="},
-                )
-            }
-        ),
-        search_attributes=nexus_system.generated.SearchAttributes(
-            indexed_fields={
-                "search-key": nexus_system.generated.Payload(
-                    data="InNlYXJjaC12YWx1ZSI=",
-                    metadata={"encoding": "anNvbi9wbGFpbg=="},
-                )
-            }
-        ),
+    )
+    envelope.input.payloads.extend([_json_plain_payload("input-value")])
+    envelope.signal_input.payloads.extend([_json_plain_payload("signal-value")])
+    envelope.memo.fields["memo-key"].CopyFrom(_json_plain_payload("memo-value"))
+    envelope.search_attributes.indexed_fields["search-key"].CopyFrom(
+        _json_plain_payload("search-value")
     )
     comp = WorkflowActivationCompletion(
         run_id="1",
@@ -316,40 +295,26 @@ async def test_visit_system_nexus_payloads_on_schedule_nexus_operation():
 
     input_payload = comp.successful.commands[0].schedule_nexus_operation.input
     assert input_payload.metadata["visited"]
-    rewritten = json.loads(input_payload.data)
-    assert (
-        base64.b64decode(rewritten["input"]["payloads"][0]["metadata"]["visited"])
-        == b"True"
+    rewritten = nexus_system.get_payload_converter().from_payload(
+        input_payload, SignalWithStartWorkflowExecutionRequest
     )
-    assert (
-        base64.b64decode(rewritten["signalInput"]["payloads"][0]["metadata"]["visited"])
-        == b"True"
-    )
-    assert (
-        base64.b64decode(rewritten["memo"]["fields"]["memo-key"]["metadata"]["visited"])
-        == b"True"
-    )
+    assert rewritten.input.payloads[0].metadata["visited"] == b"True"
+    assert rewritten.signal_input.payloads[0].metadata["visited"] == b"True"
+    assert rewritten.memo.fields["memo-key"].metadata["visited"] == b"True"
     assert (
         "visited"
-        not in rewritten["searchAttributes"]["indexedFields"]["search-key"]["metadata"]
+        not in rewritten.search_attributes.indexed_fields["search-key"].metadata
     )
 
 
 async def test_bridge_encoding_checks_system_nexus_envelope_size():
-    envelope = nexus_system.generated.SignalWithStartWorkflowExecutionRequest(
+    envelope = SignalWithStartWorkflowExecutionRequest(
         namespace="default",
         workflow_id="workflow-id",
         signal_name="signal-name",
         request_id="x" * 2048,
-        input=nexus_system.generated.Payloads(
-            payloads=[
-                nexus_system.generated.Payload(
-                    data="ImlucHV0LXZhbHVlIg==",
-                    metadata={"encoding": "anNvbi9wbGFpbg=="},
-                )
-            ]
-        ),
     )
+    envelope.input.payloads.extend([_json_plain_payload("input-value")])
     comp = WorkflowActivationCompletion(
         run_id="1",
         successful=Success(

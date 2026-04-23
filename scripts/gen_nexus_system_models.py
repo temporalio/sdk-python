@@ -26,7 +26,7 @@ def main() -> None:
         / "protos"
         / "api_upstream"
         / "nexus"
-        / "temporal-json-schema-models-nexusrpc.yaml"
+        / "temporal-proto-models-nexusrpc.yaml"
     )
     output_file = (
         repo_root / "temporalio" / "nexus" / "system" / "_workflow_service_generated.py"
@@ -75,7 +75,6 @@ def run_nexus_rpc_gen(
         "py",
         "--out-file",
         str(output_file),
-        "--temporal-nexus-payload-codec-support",
         str(input_schema),
     ]
     if override_root is None:
