@@ -133,7 +133,7 @@ class MyWorkflow(PubSubMixin):
 | `publish(topic, data)` | Append to the log from workflow code. |
 | `get_pubsub_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
 | `drain_pubsub()` | Unblock polls and reject new ones. |
-| `truncate_pubsub(up_to_offset)` | Discard log entries below the given offset. |
+| `truncate_pubsub(up_to_offset)` | Discard log entries below the given offset. Workflow-side only — no external API; wire up your own signal or update if external control is needed. |
 
 Handlers added automatically:
 

@@ -1084,7 +1084,14 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
 @workflow.defn
 class TruncateSignalWorkflow(PubSubMixin):
-    """Workflow that accepts a truncate signal for testing."""
+    """Test scaffolding that exposes truncate_pubsub via a user-authored
+    signal.
+
+    The contrib module does not define a built-in external truncate API —
+    truncation is a workflow-internal decision (typically driven by
+    consumer progress or a retention policy). Workflows that want external
+    control wire up their own signal or update, exactly as done here.
+    """
 
     @workflow.init
     def __init__(self) -> None:
