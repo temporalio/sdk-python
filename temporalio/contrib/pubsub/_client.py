@@ -183,10 +183,12 @@ class PubSubClient:
         )
 
     async def __aenter__(self) -> Self:
+        """Start the background flusher task."""
         self._flush_task = asyncio.create_task(self._run_flusher())
         return self
 
     async def __aexit__(self, *_exc: object) -> None:
+        """Stop the flusher and flush any remaining buffered entries."""
         if self._flush_task:
             self._flush_task.cancel()
             try:

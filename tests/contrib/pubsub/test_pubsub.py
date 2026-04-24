@@ -22,9 +22,9 @@ from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
 from temporalio.contrib.pubsub import (
     PollInput,
     PollResult,
-    PubSub,
     PublishEntry,
     PublishInput,
+    PubSub,
     PubSubClient,
     PubSubItem,
     PubSubState,
@@ -47,6 +47,7 @@ def _wire_bytes(data: bytes) -> str:
     """
     payload = DataConverter.default.payload_converter.to_payloads([data])[0]
     return _encode_payload(payload)
+
 
 # ---------------------------------------------------------------------------
 # Test workflows (must be module-level, not local classes)
@@ -1365,7 +1366,10 @@ class ContinueAsNewTypedWorkflow:
         return dict(self.pubsub._publisher_sequences)
 
     @workflow.run
-    async def run(self, input: CANWorkflowInputTyped) -> None:
+    async def run(
+        self,
+        input: CANWorkflowInputTyped,  # type:ignore[reportUnusedParameter]
+    ) -> None:
         while True:
             await workflow.wait_condition(lambda: self._should_continue or self._closed)
             if self._closed:
@@ -1575,7 +1579,9 @@ async def test_cross_workflow_pubsub(client: Client) -> None:
         assert result == [f"broker-{i}" for i in range(count)]
 
         # Also verify external subscription still works
-        external_items = await collect_items(client, broker_handle, ["events"], 0, count)
+        external_items = await collect_items(
+            client, broker_handle, ["events"], 0, count
+        )
         assert len(external_items) == count
 
         await broker_handle.signal(BrokerWorkflow.close)

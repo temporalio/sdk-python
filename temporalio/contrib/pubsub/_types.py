@@ -22,12 +22,12 @@ from typing import Any
 from temporalio.api.common.v1 import Payload
 
 
-def _encode_payload(payload: Payload) -> str:
+def _encode_payload(payload: Payload) -> str:  # pyright: ignore[reportUnusedFunction]
     """Wire format: base64(Payload.SerializeToString())."""
     return base64.b64encode(payload.SerializeToString()).decode("ascii")
 
 
-def _decode_payload(wire: str) -> Payload:
+def _decode_payload(wire: str) -> Payload:  # pyright: ignore[reportUnusedFunction]
     """Inverse of :func:`_encode_payload`."""
     payload = Payload()
     payload.ParseFromString(base64.b64decode(wire))

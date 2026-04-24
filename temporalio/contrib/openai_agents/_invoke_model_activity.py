@@ -195,15 +195,11 @@ class ActivityModelInput(TypedDict, total=False):
     prompt: Any | None
 
 
-async def _empty_on_invoke_tool(
-    _ctx: RunContextWrapper[Any], _input: str
-) -> str:
+async def _empty_on_invoke_tool(_ctx: RunContextWrapper[Any], _input: str) -> str:
     return ""
 
 
-async def _empty_on_invoke_handoff(
-    _ctx: RunContextWrapper[Any], _input: str
-) -> Any:
+async def _empty_on_invoke_handoff(_ctx: RunContextWrapper[Any], _input: str) -> Any:
     return None
 
 

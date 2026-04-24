@@ -38,12 +38,8 @@ class StreamingTestModel(BaseLlm):
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
-        yield LlmResponse(
-            content=Content(role="model", parts=[Part(text="Hello ")])
-        )
-        yield LlmResponse(
-            content=Content(role="model", parts=[Part(text="world!")])
-        )
+        yield LlmResponse(content=Content(role="model", parts=[Part(text="Hello ")]))
+        yield LlmResponse(content=Content(role="model", parts=[Part(text="world!")]))
 
 
 @workflow.defn
@@ -161,11 +157,13 @@ async def test_streaming_publishes_events(client: Client):
     assert result is not None
 
     event_types = [e["type"] for e in events]
-    assert "LLM_CALL_START" in event_types, f"Expected LLM_CALL_START, got: {event_types}"
+    assert (
+        "LLM_CALL_START" in event_types
+    ), f"Expected LLM_CALL_START, got: {event_types}"
     assert "TEXT_DELTA" in event_types, f"Expected TEXT_DELTA, got: {event_types}"
-    assert "LLM_CALL_COMPLETE" in event_types, (
-        f"Expected LLM_CALL_COMPLETE, got: {event_types}"
-    )
+    assert (
+        "LLM_CALL_COMPLETE" in event_types
+    ), f"Expected LLM_CALL_COMPLETE, got: {event_types}"
 
     text_deltas = [e["data"]["delta"] for e in events if e["type"] == "TEXT_DELTA"]
     assert len(text_deltas) >= 1, f"Expected at least 1 TEXT_DELTA, got: {text_deltas}"

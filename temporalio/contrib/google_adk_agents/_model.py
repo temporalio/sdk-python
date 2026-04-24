@@ -112,9 +112,7 @@ async def invoke_model_streaming(llm_request: LlmRequest) -> list[LlmResponse]:
                 _make_event("TEXT_COMPLETE", text=text_buffer),
                 force_flush=True,
             )
-        pubsub.publish(
-            EVENTS_TOPIC, _make_event("LLM_CALL_COMPLETE"), force_flush=True
-        )
+        pubsub.publish(EVENTS_TOPIC, _make_event("LLM_CALL_COMPLETE"), force_flush=True)
 
     return responses
 

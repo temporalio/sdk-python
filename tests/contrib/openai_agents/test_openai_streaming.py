@@ -34,8 +34,15 @@ from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseOutputMessage,
     ResponseOutputText,
+    ResponseTextConfig,
     ResponseTextDeltaEvent,
+    ResponseUsage,
 )
+from openai.types.responses.response_usage import (
+    InputTokensDetails,
+    OutputTokensDetails,
+)
+from openai.types.shared.response_format_text import ResponseFormatText
 
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
@@ -148,15 +155,15 @@ class StreamingTestModel(Model):
             tools=[],
             top_p=1.0,
             status="completed",
-            text={"format": {"type": "text"}},
+            text=ResponseTextConfig(format=ResponseFormatText(type="text")),
             truncation="disabled",
-            usage={
-                "input_tokens": 10,
-                "output_tokens": 5,
-                "total_tokens": 15,
-                "input_tokens_details": {"cached_tokens": 0},
-                "output_tokens_details": {"reasoning_tokens": 0},
-            },
+            usage=ResponseUsage(
+                input_tokens=10,
+                output_tokens=5,
+                total_tokens=15,
+                input_tokens_details=InputTokensDetails(cached_tokens=0),
+                output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
+            ),
         )
         yield ResponseCompletedEvent(
             response=response, sequence_number=2, type="response.completed"
@@ -331,8 +338,8 @@ async def test_streaming_raises_when_no_completed_event(client: Client):
     cause = exc_info.value.__cause__
     while cause is not None and not isinstance(cause, ApplicationError):
         cause = cause.__cause__
-    assert isinstance(cause, ApplicationError), (
-        f"Expected ApplicationError cause, got {exc_info.value!r}"
-    )
+    assert isinstance(
+        cause, ApplicationError
+    ), f"Expected ApplicationError cause, got {exc_info.value!r}"
     assert "Stream ended without ResponseCompletedEvent" in str(cause)
     assert cause.non_retryable is True
