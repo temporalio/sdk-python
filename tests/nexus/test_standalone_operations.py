@@ -833,10 +833,7 @@ class _RecordingInterceptor(Interceptor):
 
 
 async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironment):
-    """Custom OutboundInterceptor records calls, verify correct input types.
-
-    Also verifies that result() does NOT trigger any interceptor call.
-    """
+    """Custom OutboundInterceptor records calls, verify correct input types."""
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
 

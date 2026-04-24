@@ -2612,7 +2612,7 @@ class Client:
             operation_id: The operation ID.
             operation: A ``nexusrpc.Operation`` from which the result type
                 is extracted. If both ``operation`` and ``result_type`` are
-                provided, the operation's output type takes precedence.
+                provided, the ``result_type`` takes precedence.
             run_id: The operation run ID. If not provided, targets the latest run.
             result_type: The result type to deserialize into.
 
@@ -4942,7 +4942,7 @@ class NexusOperationExecutionCancellationInfo:
             raw=info,
             requested_time=(
                 info.requested_time.ToDatetime(tzinfo=timezone.utc)
-                if info.requested_time
+                if info.HasField("requested_time")
                 else None
             ),
             state=(
@@ -4953,12 +4953,12 @@ class NexusOperationExecutionCancellationInfo:
             attempt=info.attempt,
             last_attempt_complete_time=(
                 info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
-                if info.last_attempt_complete_time
+                if info.HasField("last_attempt_complete_time")
                 else None
             ),
             next_attempt_schedule_time=(
                 info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
-                if info.next_attempt_schedule_time
+                if info.HasField("next_attempt_schedule_time")
                 else None
             ),
             last_attempt_failure=(
@@ -5517,7 +5517,7 @@ class NexusOperationHandle(Generic[ReturnType]):
             NexusOperationFailureError: If the operation completed with a failure.
             RPCError: Operation result could not be fetched for some reason.
         """
-        if self._known_outcome == temporalio.common._arg_unset:
+        if self._known_outcome is temporalio.common._arg_unset:
             try:
                 self._known_outcome = (
                     await self._client._impl.get_nexus_operation_result(

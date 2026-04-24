@@ -293,12 +293,10 @@ class PendingNexusOperationExecutionState(IntEnum):
 
 
 class NexusOperationCancellationState(IntEnum):
-    """More detailed breakdown of :py:attr:`NexusOperationExecutionStatus.RUNNING`.
+    """State of a Nexus operation cancellation.
 
     .. warning::
        This API is experimental and unstable.
-
-    See :py:class:`temporalio.api.enums.v1.PendingNexusOperationState`.
     """
 
     UNSPECIFIED = int(
