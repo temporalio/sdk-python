@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 
 
 class S3StorageDriverClient(ABC):
@@ -30,3 +31,11 @@ class S3StorageDriverClient(ABC):
     @abstractmethod
     async def get_object(self, *, bucket: str, key: str) -> bytes:
         """Download and return the bytes stored at the given S3 *bucket* and *key*."""
+
+    def describe(self) -> Mapping[str, str]:
+        """Return client-specific diagnostic metadata (e.g. region, credentials
+        source) that the driver appends to error messages. Implementations may
+        override this to surface configuration that is useful for debugging
+        common misconfigurations. Returns an empty mapping by default.
+        """
+        return {}
