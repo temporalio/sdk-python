@@ -152,6 +152,70 @@ class MyWorkflow:
 `PubSubClient.create()` or `PubSubClient.from_activity()` automatically
 follow continue-as-new chains.
 
+## Gotcha: sync handlers racing `__pubsub_publish`
+
+If you add a **custom synchronous** `@workflow.update` or
+`@workflow.signal` handler that reads `PubSub` state, and an
+external client calls `handle.signal("__pubsub_publish", ...)`
+immediately followed by that handler, the handler may observe
+pre-publish state when both land in the same workflow activation.
+Root cause: `PubSub` installs `__pubsub_publish` *dynamically* from
+`@workflow.init`, so in the first activation the signal is buffered
+until after your class-level handler has already been scheduled.
+
+Two framings for when you need to care:
+
+- If your producer and your update caller are **independent
+  services** (the common shape for `PubSub`), the handler already
+  has to be robust to "update arrived before publish" for reasons
+  unrelated to this race — network timing, missing publishes, bad
+  offsets. Whatever policy you have for those covers this race too.
+- If your code does **sequential same-client** ordering — await
+  `handle.signal(...)`, then await `handle.execute_update(...)` on
+  the same handle, and expect the signal's effects to be visible —
+  use the recipe below.
+
+### Recipe
+
+Make the handler `async` and yield once before touching `PubSub`
+state:
+
+```python
+import asyncio
+from temporalio import workflow
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.init
+    def __init__(self) -> None:
+        self.pubsub = PubSub()
+
+    @workflow.update
+    async def truncate_at(self, offset: int) -> None:
+        await asyncio.sleep(0)               # let pending publishes apply
+        self.pubsub.truncate(offset)         # now sees post-signal state
+```
+
+`asyncio.sleep(0)` is a pure asyncio-level yield — one event-loop
+tick, no Temporal timer, no history events, no server round trip.
+Do **not** substitute `workflow.sleep(0)`; that schedules a Temporal
+timer and adds history events on every call.
+
+Already-safe patterns, no recipe needed:
+
+- The module's own `__pubsub_poll` update (it is already `async` and
+  `await`s `workflow.wait_condition` internally).
+- Any `async` handler that `await`s something before reading
+  `PubSub` state.
+- Handlers whose semantics are naturally "wait for the state I'm
+  asking about" — use `await workflow.wait_condition(lambda: ...)`
+  with a meaningful predicate instead of `asyncio.sleep(0)`.
+- Workflow-internal publishes (`self.pubsub.publish(...)` from
+  `run()` or from an activity); these do not race.
+
+See `SIGNAL-UPDATE-RACE.md` in this directory for the full
+activation-ordering mechanics.
+
 ## API Reference
 
 ### PubSub

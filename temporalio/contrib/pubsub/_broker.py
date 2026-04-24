@@ -72,6 +72,15 @@ class PubSub:
     - ``__pubsub_publish`` signal — external publish with dedup
     - ``__pubsub_poll`` update — long-poll subscription
     - ``__pubsub_offset`` query — current log length
+
+    Note:
+        Because ``__pubsub_publish`` is registered *dynamically* from
+        ``__init__``, custom **synchronous** update/signal handlers
+        that read ``PubSub`` state can observe pre-publish state when
+        both land in the same activation. Make such handlers ``async``
+        and ``await asyncio.sleep(0)`` before reading state. See the
+        "Gotcha" section of this module's ``README.md`` for the
+        full explanation and recipe.
     """
 
     def __init__(self, prior_state: PubSubState | None = None) -> None:
