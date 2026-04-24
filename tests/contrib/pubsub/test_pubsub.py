@@ -11,10 +11,12 @@ from typing import Any
 from unittest.mock import patch
 
 if sys.version_info >= (3, 11):
-    from asyncio import timeout as _async_timeout
+    from asyncio import (
+        timeout as _async_timeout,  # pyright: ignore[reportUnreachable]
+    )
 else:
-    from async_timeout import (
-        timeout as _async_timeout,  # pyright: ignore[reportUnreachable, reportMissingImports]
+    from async_timeout import (  # pyright: ignore[reportMissingImports]
+        timeout as _async_timeout,  # pyright: ignore[reportUnreachable]
     )
 
 import google.protobuf.duration_pb2
