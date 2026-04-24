@@ -12,6 +12,7 @@ from temporalio import workflow
 from temporalio.contrib.langgraph._langgraph_config import (
     get_langgraph_config,
     set_langgraph_config,
+    strip_runnable_config,
 )
 from temporalio.contrib.langgraph._task_cache import (
     cache_key,
@@ -85,14 +86,10 @@ def wrap_execute_activity(
 
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         # LangGraph may inject a RunnableConfig as the 'config' kwarg. Strip it
-        # down to a serializable subset (metadata + tags) so it can cross the
-        # activity boundary; callbacks, stores, etc. aren't serializable.
+        # down to a serializable subset so it can cross the activity boundary;
+        # callbacks, stores, etc. aren't serializable.
         if "config" in kwargs:
-            orig = kwargs["config"] or {}
-            kwargs["config"] = {
-                "metadata": dict(orig.get("metadata") or {}),
-                "tags": list(orig.get("tags") or []),
-            }
+            kwargs["config"] = strip_runnable_config(kwargs["config"])
 
         # LangGraph may inject a Runtime as the 'runtime' kwarg. It's
         # reconstructed on the activity side from the serialized langgraph
