@@ -31,6 +31,7 @@ from temporalio.client import (
     GetNexusOperationResultInput,
     Interceptor,
     ListNexusOperationsInput,
+    NexusClient,
     NexusOperationExecutionDescription,
     NexusOperationFailureError,
     NexusOperationHandle,
@@ -183,7 +184,7 @@ class StandaloneTestServiceHandler:
 
 
 async def start_with_retry(
-    nexus_client: Any,
+    nexus_client: NexusClient[StandaloneTestService],
     operation: nexusrpc.Operation[ParamType, ReturnType],
     arg: ParamType,
     *,
@@ -209,6 +210,7 @@ async def start_with_retry(
                 id_reuse_policy=id_reuse_policy,
                 id_conflict_policy=id_conflict_policy,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                summary=operation.name,
             )
         except (RPCError, NexusOperationFailureError) as err:
             last_err = err
@@ -219,7 +221,7 @@ async def start_with_retry(
 
 
 async def execute_with_retry(
-    nexus_client: Any,
+    nexus_client: NexusClient[StandaloneTestService],
     operation: nexusrpc.Operation[ParamType, ReturnType],
     arg: ParamType,
     *,
@@ -241,6 +243,7 @@ async def execute_with_retry(
                 id_reuse_policy=id_reuse_policy,
                 id_conflict_policy=id_conflict_policy,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                summary=operation.name,
             )
         except (RPCError, NexusOperationFailureError) as err:
             last_err = err
@@ -447,10 +450,12 @@ async def test_describe_operation(client: Client, env: WorkflowEnvironment):
         )
         assert isinstance(desc.state, int)
         assert isinstance(desc.attempt, int)
-        assert isinstance(desc.blocked_reason, str)
+        assert desc.blocked_reason is None or isinstance(desc.blocked_reason, str)
         assert desc.last_attempt_failure is None or isinstance(
             desc.last_attempt_failure, BaseException
         )
+        summary = await desc.static_summary()
+        assert summary == StandaloneTestService.echo_async.name
 
 
 async def test_cancel_operation(client: Client, env: WorkflowEnvironment):

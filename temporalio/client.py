@@ -22,7 +22,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from typing import (
@@ -4625,7 +4625,7 @@ class ActivityExecutionCountAggregationGroup:
         )
 
 
-@dataclass(frozen=True)
+@dataclass
 class NexusOperationExecution:
     """Info for a standalone Nexus operation execution, from list response.
 
@@ -4711,7 +4711,7 @@ class NexusOperationExecution:
         )
 
 
-@dataclass(frozen=True)
+@dataclass
 class NexusOperationExecutionDescription(NexusOperationExecution):
     """Detailed information about a standalone Nexus operation execution.
 
@@ -4723,7 +4723,7 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     """Underlying protobuf description info."""
 
     state: temporalio.common.PendingNexusOperationExecutionState
-    """More detailed breakdown if status is RUNNING (PendingNexusOperationState value)."""
+    """More detailed breakdown if status is :py:attr:`NexusOperationExecutionStatus.RUNNING`."""
 
     schedule_to_close_timeout: timedelta | None
     """Schedule-to-close timeout for this operation."""
@@ -4749,20 +4749,51 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     last_attempt_failure: BaseException | None
     """Failure from the last failed attempt, if any."""
 
-    blocked_reason: str
+    blocked_reason: str | None
     """Reason the operation is blocked, if any."""
 
-    operation_token: str
+    request_id: str
+    """Server-generated request ID used as an idempotency token."""
+
+    operation_token: str | None
     """operation_token is only set for asynchronous operations after a successful start_operation call."""
 
     identity: str
     """Identity of the client that started this operation."""
 
-    cancellation_info: NexusOperationCancellationInfo | None
+    cancellation_info: NexusOperationExecutionCancellationInfo | None
     """Cancellation info if cancellation was requested."""
 
     long_poll_token: bytes | None
     """Token for follow-on long-poll requests. None if the operation is complete."""
+
+    _data_converter: DataConverter = field(kw_only=True, compare=False, repr=False)
+    _static_summary: str | None = field(
+        kw_only=True, default=None, compare=False, repr=False
+    )
+    _static_details: str | None = field(
+        kw_only=True, default=None, compare=False, repr=False
+    )
+    _metadata_decoded: bool = field(
+        kw_only=True, default=False, compare=False, repr=False
+    )
+
+    async def static_summary(self) -> str | None:
+        if not self._metadata_decoded:
+            await self._decode_metadata()
+        return self._static_summary
+
+    async def static_details(self) -> str | None:
+        if not self._metadata_decoded:
+            await self._decode_metadata()
+        return self._static_details
+
+    async def _decode_metadata(self) -> None:
+        """Internal method to decode metadata lazily."""
+        self._static_summary, self._static_details = await _decode_user_metadata(
+            self._data_converter, self.raw_description.user_metadata
+        )
+        self._metadata_decoded = True
 
     @classmethod
     async def _from_execution_info(
@@ -4774,6 +4805,7 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     ) -> Self:
         """Create from raw proto nexus operation execution info."""
         return cls(
+            _data_converter=data_converter,
             operation_id=info.operation_id,
             run_id=info.run_id,
             endpoint=info.endpoint,
@@ -4849,11 +4881,12 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
                 if info.HasField("next_attempt_schedule_time")
                 else None
             ),
-            blocked_reason=info.blocked_reason,
-            operation_token=info.operation_token,
+            blocked_reason=info.blocked_reason if info.blocked_reason else None,
+            request_id=info.request_id,
+            operation_token=info.operation_token if info.operation_token else None,
             identity=info.identity,
             cancellation_info=(
-                await NexusOperationCancellationInfo._from_cancellation_info(
+                await NexusOperationExecutionCancellationInfo._from_cancellation_info(
                     info.cancellation_info, data_converter
                 )
                 if info.HasField("cancellation_info")
@@ -4864,7 +4897,7 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
 
 
 @dataclass
-class NexusOperationCancellationInfo:
+class NexusOperationExecutionCancellationInfo:
     """Cancellation information for a Nexus Operation.
 
     .. warning::
@@ -4884,6 +4917,7 @@ class NexusOperationCancellationInfo:
     """The number of attempts made to deliver the cancel operation request."""
 
     last_attempt_complete_time: datetime | None
+    """The time when the last attempt completed."""
 
     next_attempt_schedule_time: datetime | None
     """The time when the next attempt is scheduled."""
@@ -5518,6 +5552,8 @@ class NexusOperationHandle(Generic[ReturnType]):
            This API is experimental and unstable.
 
         Args:
+            long_poll_token: Token from a previous describe response. If provided,
+                the request will long-poll until the Nexus Operation state changes.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
