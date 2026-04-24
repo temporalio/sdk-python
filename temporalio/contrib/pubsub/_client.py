@@ -20,7 +20,9 @@ import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator
-from typing import Any, Self
+from typing import Any
+
+from typing_extensions import Self
 
 from temporalio import activity
 from temporalio.api.common.v1 import Payload

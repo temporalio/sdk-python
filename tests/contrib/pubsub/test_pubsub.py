@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 from unittest.mock import patch
+
+if sys.version_info >= (3, 11):
+    from asyncio import timeout as _async_timeout
+else:
+    from async_timeout import (
+        timeout as _async_timeout,  # pyright: ignore[reportUnreachable, reportMissingImports]
+    )
 
 import google.protobuf.duration_pb2
 import nexusrpc
@@ -406,7 +414,7 @@ async def collect_items(
     pubsub = PubSubClient.create(client, handle.id)
     items: list[PubSubItem] = []
     try:
-        async with asyncio.timeout(timeout):
+        async with _async_timeout(timeout):
             async for item in pubsub.subscribe(
                 topics=topics,
                 from_offset=from_offset,
@@ -662,7 +670,7 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
         pubsub = PubSubClient(handle)
         items: list[PubSubItem] = []
         try:
-            async with asyncio.timeout(5):
+            async with _async_timeout(5):
                 async for item in pubsub.subscribe(
                     from_offset=1, poll_cooldown=0, result_type=bytes
                 ):
@@ -776,7 +784,7 @@ async def test_iterator_cancellation(client: Client) -> None:
 
         task = asyncio.create_task(subscribe_and_collect())
         # Bounded wait so a subscribe regression fails fast instead of hanging.
-        async with asyncio.timeout(5):
+        async with _async_timeout(5):
             await first_item.wait()
         task.cancel()
         try:
@@ -866,7 +874,7 @@ async def test_concurrent_subscribers(client: Client) -> None:
             )
 
         try:
-            async with asyncio.timeout(10):
+            async with _async_timeout(10):
                 await publish("a", b"a-0")
                 await a_got[0].wait()
                 await publish("b", b"b-0")
@@ -1533,7 +1541,7 @@ async def subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
         workflow_id=input.broker_workflow_id,
     )
     items: list[str] = []
-    async with asyncio.timeout(15.0):
+    async with _async_timeout(15.0):
         async for item in client.subscribe(
             topics=["events"], from_offset=0, poll_cooldown=0, result_type=bytes
         ):
