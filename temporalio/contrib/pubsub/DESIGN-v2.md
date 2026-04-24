@@ -480,6 +480,34 @@ are the same cost: one slice, one filter pass. The worst case is a poll from
 offset 0 (full log scan), which only happens on first connection or after the
 subscriber falls behind.
 
+**Fan-out is per-poll, not shared.** Each `__pubsub_poll` update is an
+independent Temporal update RPC. The handler has no registry of active
+subscribers; every call executes `_on_poll` from scratch with its own
+`from_offset` closure and topic set. When a publish grows the log,
+Temporal's `wait_condition` machinery re-evaluates every pending predicate
+and wakes each one whose condition is now true. Each then slices the same
+shared log independently, applies its own topic filter, and returns its own
+`PollResult` on its own update response.
+
+The consequences:
+
+- Two subscribers on the same topics from the same offset both receive the
+  items — each item travels the wire **twice**, once per update response.
+- Two subscribers from different offsets each see their own slice; the
+  overlapping range is serialized into both responses.
+- Two subscribers with disjoint topics each see a filtered subset; no items
+  are duplicated across their responses, but the log is walked twice.
+
+This is deliberate. Temporal updates are 1:1 RPCs, not a shared delivery
+fabric. There is no intra-workflow subscriber registry, no cross-poll
+dedup, no broadcast. Fan-out cost scales linearly with subscriber count,
+but there's no shared state between polls to get wrong and no delivery-order
+ambiguity between them. Applications that need to multiplex a single
+subscription across many local consumers should do so on the client side,
+below the `subscribe()` iterator — one poll stream feeding N in-process
+consumers. A workflow-side shared fan-out is listed under
+[Future Work](#future-work).
+
 ### 10. Workflow can publish but should not subscribe
 
 Workflow code can call `self.publish()` directly — this is deterministic.
@@ -1097,6 +1125,62 @@ The closest analogs in established messaging systems, for orientation:
 Full comparison tables (same/different with Kafka, NATS JetStream, Redis
 Streams, and Workflow SDK) live on the
 [Streaming API Design Considerations Notion page](https://www.notion.so/3478fc567738803d9c22eeb64a296e21).
+
+## Future Work
+
+### Shared workflow-side fan-out
+
+Each `__pubsub_poll` update today is serviced independently, and an item
+published to N interested subscribers crosses the wire N times (see
+[Design Decision 9](#9-subscription-is-poll-based-exposed-as-async-iterator)).
+For low fan-out (1–2 consumers) this is fine; for workloads with many
+concurrent subscribers on overlapping topics the duplication becomes the
+dominant cost.
+
+A shared fan-out would keep a registry of active polls inside the
+workflow, coalesce them by `(from_offset, topics)` key, and have one
+poll wake-up build a shared response that the handler returns to every
+matching caller. The tricky parts are: (a) offsets and topic filters
+usually differ per subscriber, limiting coalescing; (b) the registry is
+workflow state that must survive continue-as-new; (c) cancelled polls
+must be reaped cleanly so the registry doesn't leak across replays.
+Until a concrete workload shows the linear-in-subscribers cost matters,
+the simpler per-poll model is the right default — applications that need
+local fan-out can share one `subscribe()` iterator across N in-process
+consumers on the client side, where state is trivial.
+
+### Workflow-defined filters and transforms
+
+Today the only filter is "topic in topics". A richer model would let
+the workflow register named filters or transforms — e.g., `filter="high_priority"`
+or `transform="redact_pii"` — that run inside the poll handler before
+items are returned. This keeps computation close to the log, avoids
+shipping items the subscriber will discard, and lets workflows enforce
+access control per subscriber rather than delegating it to clients.
+
+Design questions left open: filter/transform registration API (at
+`PubSub` construction, or later?), whether transforms may change the
+item count (e.g., aggregation), how filter state interacts with
+continue-as-new, and how filter identity is named on the wire for
+cross-language clients.
+
+### Workflow-side subscription
+
+[Design Decision 10](#10-workflow-can-publish-but-should-not-subscribe)
+explains why workflow code shouldn't read the log directly today — the
+log contains data from non-deterministic signal inputs, and branching on
+it creates replay-sensitive code paths. There are workflow-side use
+cases (aggregator workflows, workflows that fan events out to child
+workflows, workflows that trigger activities based on stream content)
+where a proper subscription API would be useful.
+
+A safe workflow-side `subscribe()` would need to tag reads so they go
+through the same determinism machinery as other non-deterministic
+inputs — likely surfaced as an async iterator that yields at
+deterministic checkpoints. The simplest cut is probably a pull-based
+iterator over `self._log` slices that integrates with `wait_condition`
+for the "no data yet" case, mirroring the external poll API but
+bypassing the update RPC layer.
 
 ## File Layout
 
