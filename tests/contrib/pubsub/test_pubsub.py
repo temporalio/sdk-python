@@ -1301,25 +1301,24 @@ class TruncateWorkflow:
     control wire up their own signal or update. We use an update here so
     callers get explicit completion (signals are fire-and-forget).
 
-    ``prepub_count`` seeds the log with N byte-payload items before the
-    workflow starts serving requests, so a subsequent ``truncate`` update
-    is guaranteed to see a populated log. This is more deterministic than
-    publishing from the client via ``__pubsub_publish`` and then issuing
-    an update in the same activation: when ``__pubsub_publish`` is a
-    dynamically-registered signal, its handler is not set until
-    ``PubSub.__init__`` runs in ``_run_once``, so a class-level
-    ``@workflow.update`` scheduled in the same activation can race ahead
-    of the dispatched-from-buffer signal task.
+    The ``truncate`` update is ``async`` and opens with
+    ``await asyncio.sleep(0)`` — the documented recipe from the
+    contrib/pubsub README for sync-shaped handlers that read ``PubSub``
+    state. The yield lets any buffered ``__pubsub_publish`` signal in
+    the same activation apply before the handler inspects ``self._log``.
+    This keeps the test workflow aligned with the pattern users are
+    directed to follow.
+
+    ``prepub_count`` seeds the log with N byte-payload items during
+    ``@workflow.init`` as test convenience, so the error-path tests
+    have deterministic log content without an extra round trip to
+    publish from the client.
     """
 
     @workflow.init
     def __init__(self, prepub_count: int = 0) -> None:
         self.pubsub = PubSub()
         self._closed = False
-        # Publish from __init__ (not run()) so the log is populated
-        # before any update task runs: lazy instantiation happens inside
-        # _run_once, and the __init__ body finishes before the event
-        # loop dispatches tasks scheduled during _apply.
         for i in range(prepub_count):
             self.pubsub.publish("events", f"item-{i}".encode())
 
@@ -1328,7 +1327,12 @@ class TruncateWorkflow:
         self._closed = True
 
     @workflow.update
-    def truncate(self, up_to_offset: int) -> None:
+    async def truncate(self, up_to_offset: int) -> None:
+        # Recipe from README.md "Gotcha" section: yield once so any
+        # buffered __pubsub_publish in the same activation applies
+        # before we read self._log. asyncio.sleep(0) is a pure asyncio
+        # yield — no Temporal timer, no history event.
+        await asyncio.sleep(0)
         self.pubsub.truncate(up_to_offset)
 
     @workflow.run
