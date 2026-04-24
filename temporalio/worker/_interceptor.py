@@ -267,7 +267,7 @@ class SignalWithStartWorkflowInput:
     request_id: str | None
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None
-    headers: Mapping[str, str] | None
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass

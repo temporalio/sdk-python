@@ -326,7 +326,7 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
     caller_task_queue = str(uuid.uuid4())
     handler_task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(handler_task_queue)
-    monkeypatch.setattr(workflow, "_SYSTEM_NEXUS_ENDPOINT", endpoint_name)
+    monkeypatch.setattr(nexus_system, "_SYSTEM_NEXUS_ENDPOINT", endpoint_name)
 
     caller_worker = Worker(
         caller_client,

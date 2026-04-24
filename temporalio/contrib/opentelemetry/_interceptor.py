@@ -777,7 +777,7 @@ class _TracingWorkflowOutboundInterceptor(
     ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
         self.root._completed_span(
             f"SignalWithStartWorkflow:{input.signal}",
-            add_to_outbound_str=input,
+            add_to_outbound=input,
             kind=opentelemetry.trace.SpanKind.CLIENT,
         )
         return await super().signal_with_start_workflow(input)

@@ -1605,7 +1605,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 request_id=request_id,
                 priority=priority,
                 versioning_override=versioning_override,
-                headers=None,
+                headers={},
             )
         )
 
@@ -2048,11 +2048,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 start_delay=input.start_delay,
                 priority=input.priority,
                 versioning_override=input.versioning_override,
+                headers=input.headers,
             )
         )
         handle = await self._outbound_start_nexus_operation(
             StartNexusOperationInput(
-                endpoint=temporalio.workflow._SYSTEM_NEXUS_ENDPOINT,
+                endpoint=temporalio.nexus.system._SYSTEM_NEXUS_ENDPOINT,
                 service=temporalio.nexus.system.generated.WorkflowService.__name__,
                 operation=temporalio.nexus.system.generated.WorkflowService.signal_with_start_workflow_execution.name,
                 input=request,
@@ -2060,7 +2061,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 schedule_to_start_timeout=None,
                 start_to_close_timeout=None,
                 cancellation_type=temporalio.workflow.NexusOperationCancellationType.WAIT_COMPLETED,
-                headers=input.headers,
+                headers=None,
                 summary=None,
                 output_type=temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
             )

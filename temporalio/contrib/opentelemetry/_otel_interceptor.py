@@ -552,7 +552,7 @@ class _TracingWorkflowOutboundInterceptor(
             f"SignalWithStartWorkflow:{input.signal}",
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
-            input.headers = _context_to_nexus_headers(input.headers or {})
+            input.headers = _context_to_headers(input.headers)
             return await super().signal_with_start_workflow(input)
 
     def start_activity(

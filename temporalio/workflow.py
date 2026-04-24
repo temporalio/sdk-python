@@ -2067,10 +2067,10 @@ def _assert_dynamic_handler_args(
     if (
         not arg_types
         or len(arg_types) != 2
-        or arg_types[0] != str
+        or arg_types[0] is not str
         or (
-            arg_types[1] != Sequence[temporalio.common.RawValue]
-            and arg_types[1] != typing.Sequence[temporalio.common.RawValue]  # type: ignore[reportDeprecated]
+            arg_types[1] is not Sequence[temporalio.common.RawValue]
+            and arg_types[1] is not typing.Sequence[temporalio.common.RawValue]  # type: ignore[reportDeprecated]
         )
     ):
         raise RuntimeError(
@@ -4308,10 +4308,6 @@ class ChildWorkflowConfig(TypedDict, total=False):
     static_details: str | None
     priority: temporalio.common.Priority
 
-
-_SYSTEM_NEXUS_ENDPOINT = "__temporal_system"
-
-
 # Overload for no-param workflow
 @overload
 async def start_child_workflow(
@@ -4962,7 +4958,7 @@ class ContinueAsNewError(BaseException):
 
     def __init__(self, *args: object) -> None:
         """Direct instantiation is disabled. Use :py:func:`continue_as_new`."""
-        if type(self) == ContinueAsNewError:
+        if type(self) is ContinueAsNewError:
             raise RuntimeError("Cannot instantiate ContinueAsNewError directly")
         super().__init__(*args)
 

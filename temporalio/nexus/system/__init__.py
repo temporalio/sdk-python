@@ -16,6 +16,8 @@ from ...converter import BinaryProtoPayloadConverter, CompositePayloadConverter
 from . import _workflow_service_generated as generated
 from ._payload_visitor import PayloadVisitor
 
+_SYSTEM_NEXUS_ENDPOINT = "__temporal_system"
+
 
 class SystemNexusPayloadConverter(CompositePayloadConverter):
     """Payload converter for system Nexus outer envelopes."""
@@ -23,15 +25,6 @@ class SystemNexusPayloadConverter(CompositePayloadConverter):
     def __init__(self) -> None:
         """Create a payload converter for system Nexus outer envelopes."""
         super().__init__(BinaryProtoPayloadConverter())
-
-
-def _set_payload_map(
-    target: Any,
-    values: Mapping[str, Any],
-    payload_converter: temporalio.converter.PayloadConverter,
-) -> None:
-    for key, value in values.items():
-        target[key].CopyFrom(payload_converter.to_payload(value))
 
 
 def _build_user_metadata(
@@ -60,6 +53,7 @@ def build_signal_with_start_workflow_execution_input(
     task_queue: str,
     request_id: str | None,
     payload_converter: temporalio.converter.PayloadConverter,
+    headers: Mapping[str, temporalio.api.common.v1.Payload],
     execution_timeout: timedelta | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,
@@ -79,13 +73,18 @@ def build_signal_with_start_workflow_execution_input(
     request_memo = None
     if memo is not None:
         request_memo = temporalio.api.common.v1.Memo()
-        _set_payload_map(request_memo.fields, memo, payload_converter)
+        for key, value in memo.items():
+            request_memo.fields[key].CopyFrom(payload_converter.to_payload(value))
     request_search_attributes = None
     if search_attributes is not None:
         request_search_attributes = temporalio.api.common.v1.SearchAttributes()
         temporalio.converter.encode_search_attributes(
             search_attributes, request_search_attributes
         )
+    request_header = None
+    if headers:
+        request_header = temporalio.api.common.v1.Header()
+        temporalio.common._apply_headers(headers, request_header.fields)
     return _workflow_requests.build_signal_with_start_workflow_execution_request(
         namespace=namespace,
         workflow_id=workflow_id,
@@ -108,6 +107,7 @@ def build_signal_with_start_workflow_execution_input(
         cron_schedule=cron_schedule,
         memo=request_memo,
         search_attributes=request_search_attributes,
+        header=request_header,
         user_metadata=_build_user_metadata(
             payload_converter, static_summary, static_details
         ),

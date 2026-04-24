@@ -19,8 +19,9 @@ class WorkflowService:
 
 __nexus_operation_registry__: dict[
     tuple[str, str], Operation[typing.Any, typing.Any]
-] = {}
-
-__nexus_operation_registry__[
-    ("WorkflowService", "SignalWithStartWorkflowExecution")
-] = WorkflowService.signal_with_start_workflow_execution
+] = {
+    (
+        "WorkflowService",
+        "SignalWithStartWorkflowExecution",
+    ): WorkflowService.signal_with_start_workflow_execution,
+}
