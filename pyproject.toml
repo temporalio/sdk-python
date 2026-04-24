@@ -217,7 +217,6 @@ exclude = [
   # Exclude auto generated files
   "temporalio/api",
   "temporalio/bridge/proto",
-  "temporalio/bridge/_visitor.py",
   "tests/worker/workflow_sandbox/testmodules/proto",
 ]
 

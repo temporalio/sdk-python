@@ -5,11 +5,9 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, MutableSequence, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from typing import (
-    TypeAlias,
-)
+from typing import TypeAlias
 
 import temporalio.bridge.client
 import temporalio.bridge.proto
@@ -21,7 +19,7 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 from temporalio.api.common.v1.message_pb2 import Payload
-from temporalio.bridge._visitor import VisitorFunctions
+from temporalio.bridge._visitor_functions import PayloadSequence, VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
@@ -292,7 +290,7 @@ class _Visitor(VisitorFunctions):
         if new_payload is not payload:
             payload.CopyFrom(new_payload)
 
-    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+    async def visit_payloads(self, payloads: PayloadSequence) -> None:
         if len(payloads) == 0:
             return
         new_payloads = await self._f(payloads)

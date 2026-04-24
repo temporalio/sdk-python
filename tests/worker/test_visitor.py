@@ -1,8 +1,9 @@
 import dataclasses
-from collections.abc import MutableSequence
+from typing import get_type_hints
 
 import pytest
 from google.protobuf.duration_pb2 import Duration
+from google.protobuf.message import Message
 
 import temporalio.bridge.worker
 import temporalio.converter
@@ -17,7 +18,10 @@ from temporalio.api.sdk.v1.user_metadata_pb2 import UserMetadata
 from temporalio.api.workflowservice.v1.request_response_pb2 import (
     SignalWithStartWorkflowExecutionRequest,
 )
-from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
+from temporalio.bridge._visitor import (
+    PayloadVisitor,
+)
+from temporalio.bridge._visitor_functions import PayloadSequence, VisitorFunctions
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     InitializeWorkflow,
     WorkflowActivation,
@@ -41,6 +45,9 @@ from temporalio.converter._payload_limits import (
     _PayloadSizeError,
     _ServerPayloadErrorLimits,
 )
+from temporalio.nexus.system._payload_visitor import (
+    PayloadVisitor as SystemPayloadVisitor,
+)
 from tests.worker.test_workflow import SimpleCodec
 
 
@@ -48,7 +55,7 @@ class Visitor(VisitorFunctions):
     async def visit_payload(self, payload: Payload) -> None:
         payload.metadata["visited"] = b"True"
 
-    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+    async def visit_payloads(self, payloads: PayloadSequence) -> None:
         for payload in payloads:
             payload.metadata["visited"] = b"True"
 
@@ -58,6 +65,30 @@ class Visitor(VisitorFunctions):
 
 def _json_plain_payload(value: object) -> Payload:
     return temporalio.converter.default().payload_converter.to_payload(value)
+
+
+def test_generated_payload_visitor_type_annotations():
+    assert get_type_hints(PayloadVisitor.visit)["root"] is Message
+    assert (
+        get_type_hints(PayloadVisitor._visit_temporal_api_common_v1_Payload)["o"]
+        is Payload
+    )
+    assert (
+        get_type_hints(PayloadVisitor._visit_temporal_api_common_v1_Payloads)["o"]
+        is Payloads
+    )
+    assert (
+        get_type_hints(
+            PayloadVisitor._visit_coresdk_workflow_activation_WorkflowActivation
+        )["o"]
+        is WorkflowActivation
+    )
+    assert (
+        get_type_hints(
+            SystemPayloadVisitor._visit_temporal_api_workflowservice_v1_SignalWithStartWorkflowExecutionRequest
+        )["o"]
+        is SignalWithStartWorkflowExecutionRequest
+    )
 
 
 async def test_workflow_activation_completion():

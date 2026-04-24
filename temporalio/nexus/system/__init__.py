@@ -1,8 +1,8 @@
 """Generated system Nexus service models."""
 
-from collections.abc import Mapping, MutableSequence, Sequence
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
-from typing import Any, Protocol, cast
+from typing import Any, cast
 
 import temporalio.api.common.v1
 import temporalio.api.sdk.v1
@@ -11,23 +11,10 @@ import temporalio.common
 import temporalio.converter
 
 from ... import _workflow_requests
+from ...bridge._visitor_functions import VisitorFunctions
 from ...converter import BinaryProtoPayloadConverter, CompositePayloadConverter
 from . import _workflow_service_generated as generated
 from ._payload_visitor import PayloadVisitor
-
-
-class PayloadVisitorFunctions(Protocol):
-    async def visit_payload(
-        self, payload: temporalio.api.common.v1.Payload
-    ) -> None: ...
-
-    async def visit_payloads(
-        self, payloads: MutableSequence[temporalio.api.common.v1.Payload]
-    ) -> None: ...
-
-    async def visit_system_nexus_envelope(
-        self, payload: temporalio.api.common.v1.Payload
-    ) -> None: ...
 
 
 class SystemNexusPayloadConverter(CompositePayloadConverter):
@@ -134,7 +121,7 @@ async def visit_payload(
     service: str,
     operation: str,
     payload: temporalio.api.common.v1.Payload,
-    visitor_functions: PayloadVisitorFunctions,
+    visitor_functions: VisitorFunctions,
     skip_search_attributes: bool,
 ) -> temporalio.api.common.v1.Payload | None:
     """Visit nested payloads inside a recognized system Nexus envelope."""
