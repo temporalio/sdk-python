@@ -169,9 +169,16 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
 
         if self.model_params.enable_streaming:
             if self.model_params.use_local_activity:
+                # The streaming activity relies on heartbeats to detect a
+                # stuck LLM call and on PubSubClient.from_activity() to
+                # signal partial results back to the workflow. Local
+                # activities support neither: their result commits with
+                # the workflow task, so there is no independent task to
+                # heartbeat against or to send signals from.
                 raise ValueError(
                     "Streaming is incompatible with local activities "
-                    "(local activities do not support heartbeats)."
+                    "(local activities do not support heartbeats or the "
+                    "pubsub signal channel)."
                 )
             return await workflow.execute_activity_method(
                 ModelActivity.invoke_model_activity_streaming,

@@ -1,7 +1,9 @@
 """Integration tests for OpenAI Agents streaming support.
 
-Verifies that the streaming model activity publishes TEXT_DELTA events via
-the PubSub broker and that the workflow returns the correct final result.
+The streaming activity publishes raw OpenAI stream events to the pubsub
+side channel; consumers parse them directly. These tests verify that the
+events arrive intact and that the workflow still returns the right final
+result from the ResponseCompletedEvent.
 """
 
 import asyncio
@@ -36,10 +38,11 @@ from openai.types.responses import (
 )
 
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.openai_agents import ModelActivityParameters
 from temporalio.contrib.openai_agents.testing import AgentEnvironment
 from temporalio.contrib.pubsub import PubSub, PubSubClient
+from temporalio.exceptions import ApplicationError
 from tests.helpers import new_worker
 
 logger = logging.getLogger(__name__)
@@ -193,24 +196,22 @@ class NonStreamingOpenAIWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_streaming_publishes_events(client: Client):
-    """Verify that streaming activity publishes TEXT_DELTA events via pubsub."""
-    model = StreamingTestModel()
+async def test_streaming_publishes_raw_events(client: Client):
+    """Every event from model.stream_response() lands on the pubsub topic
+    as its native OpenAI Pydantic JSON, and the workflow gets the final
+    text from the ResponseCompletedEvent."""
     async with AgentEnvironment(
-        model=model,
+        model=StreamingTestModel(),
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
             enable_streaming=True,
         ),
     ) as env:
         client = env.applied_on_client(client)
-
         workflow_id = f"openai-streaming-test-{uuid.uuid4()}"
 
         async with new_worker(
-            client,
-            StreamingOpenAIWorkflow,
-            max_cached_workflows=0,
+            client, StreamingOpenAIWorkflow, max_cached_workflows=0
         ) as worker:
             handle = await client.start_workflow(
                 StreamingOpenAIWorkflow.run,
@@ -220,7 +221,6 @@ async def test_streaming_publishes_events(client: Client):
                 execution_timeout=timedelta(seconds=30),
             )
 
-            # Subscribe concurrently while the workflow is running
             pubsub = PubSubClient.create(client, workflow_id)
             events: list[dict] = []
 
@@ -230,32 +230,26 @@ async def test_streaming_publishes_events(client: Client):
                 ):
                     event = json.loads(item.data)
                     events.append(event)
-                    if event["type"] == "LLM_CALL_COMPLETE":
+                    if event["type"] == "response.completed":
                         break
 
             collect_task = asyncio.create_task(collect_events())
             result = await handle.result()
-
-            # Wait for event collection with a timeout
             await asyncio.wait_for(collect_task, timeout=10.0)
 
-    assert result is not None
+    assert result == "Hello world!"
 
-    event_types = [e["type"] for e in events]
-    assert "LLM_CALL_START" in event_types, (
-        f"Expected LLM_CALL_START, got: {event_types}"
-    )
-    assert "TEXT_DELTA" in event_types, (
-        f"Expected TEXT_DELTA, got: {event_types}"
-    )
-    assert "LLM_CALL_COMPLETE" in event_types, (
-        f"Expected LLM_CALL_COMPLETE, got: {event_types}"
-    )
+    # Exact event sequence matches what StreamingTestModel yields — no
+    # normalization, no synthesized brackets.
+    types_in_order = [e["type"] for e in events]
+    assert types_in_order == [
+        "response.output_text.delta",
+        "response.output_text.delta",
+        "response.completed",
+    ], f"Unexpected event sequence: {types_in_order}"
 
-    text_deltas = [e["data"]["delta"] for e in events if e["type"] == "TEXT_DELTA"]
-    assert len(text_deltas) >= 1, f"Expected at least 1 TEXT_DELTA, got: {text_deltas}"
-    assert "Hello " in text_deltas
-    assert "world!" in text_deltas
+    deltas = [e["delta"] for e in events if e["type"] == "response.output_text.delta"]
+    assert deltas == ["Hello ", "world!"]
 
 
 @pytest.mark.asyncio
@@ -285,3 +279,60 @@ async def test_non_streaming_backward_compatible(client: Client):
             )
 
     assert result == "Hello world!"
+
+
+class TruncatedStreamingTestModel(Model):
+    """Fake model whose stream ends without a ResponseCompletedEvent."""
+
+    __test__ = False
+
+    async def get_response(self, *a: Any, **kw: Any) -> ModelResponse:
+        raise NotImplementedError
+
+    async def stream_response(
+        self, *a: Any, **kw: Any
+    ) -> AsyncIterator[TResponseStreamEvent]:
+        yield ResponseTextDeltaEvent(
+            content_index=0,
+            delta="partial",
+            item_id="item1",
+            output_index=0,
+            sequence_number=0,
+            type="response.output_text.delta",
+            logprobs=[],
+        )
+
+
+@pytest.mark.asyncio
+async def test_streaming_raises_when_no_completed_event(client: Client):
+    """A stream that ends without ResponseCompletedEvent surfaces as a
+    non-retryable ApplicationError on the workflow."""
+    async with AgentEnvironment(
+        model=TruncatedStreamingTestModel(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+            enable_streaming=True,
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client, StreamingOpenAIWorkflow, max_cached_workflows=0
+        ) as worker:
+            with pytest.raises(WorkflowFailureError) as exc_info:
+                await client.execute_workflow(
+                    StreamingOpenAIWorkflow.run,
+                    "Hi",
+                    id=f"openai-streaming-truncated-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
+
+    # Unwrap: WorkflowFailureError -> ActivityError -> ApplicationError
+    cause = exc_info.value.__cause__
+    while cause is not None and not isinstance(cause, ApplicationError):
+        cause = cause.__cause__
+    assert isinstance(cause, ApplicationError), (
+        f"Expected ApplicationError cause, got {exc_info.value!r}"
+    )
+    assert "Stream ended without ResponseCompletedEvent" in str(cause)
+    assert cause.non_retryable is True
