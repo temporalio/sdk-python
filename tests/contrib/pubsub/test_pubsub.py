@@ -39,6 +39,7 @@ from temporalio.contrib.pubsub import (
 )
 from temporalio.contrib.pubsub._types import _encode_payload
 from temporalio.converter import DataConverter
+from temporalio.exceptions import ApplicationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -597,19 +598,9 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
     ) as worker:
         handle = await client.start_workflow(
             TruncateWorkflow.run,
+            5,
             id=f"pubsub-trunc-error-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-        )
-
-        # Publish 5 items
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[
-                    PublishEntry(topic="events", data=_wire_bytes(f"item-{i}".encode()))
-                    for i in range(5)
-                ]
-            ),
         )
 
         # Truncate up to offset 3 via update — completion is explicit.
@@ -623,17 +614,50 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
         # exception) would fail the workflow task instead, causing
         # execute_update to hang — not raise. The follow-up collect_items
         # below proves the workflow task wasn't poisoned.
-        with pytest.raises(WorkflowUpdateFailedError):
+        with pytest.raises(WorkflowUpdateFailedError) as exc_info:
             await handle.execute_update(
                 "__pubsub_poll",
                 PollInput(topics=[], from_offset=1),
                 result_type=PollResult,
             )
+        cause = exc_info.value.cause
+        assert isinstance(cause, ApplicationError)
+        assert cause.type == "TruncatedOffset"
 
         # Workflow should still be usable — poll from valid offset 3
         items = await collect_items(client, handle, None, 3, 2)
         assert len(items) == 2
         assert items[0].offset == 3
+
+        await handle.signal("close")
+
+
+@pytest.mark.asyncio
+async def test_truncate_past_end_raises_application_error(client: Client) -> None:
+    """truncate() with an offset past the log end raises ApplicationError
+    (type=TruncateOutOfRange) — the update surfaces as a clean failure
+    without poisoning the workflow task."""
+    async with new_worker(
+        client,
+        TruncateWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            TruncateWorkflow.run,
+            2,
+            id=f"pubsub-trunc-oor-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Only 2 items exist; asking to truncate to offset 5 is out of range.
+        with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+            await handle.execute_update("truncate", 5)
+        cause = exc_info.value.cause
+        assert isinstance(cause, ApplicationError)
+        assert cause.type == "TruncateOutOfRange"
+
+        # Workflow task wasn't poisoned — a valid poll still completes.
+        items = await collect_items(client, handle, None, 0, 2)
+        assert len(items) == 2
 
         await handle.signal("close")
 
@@ -647,19 +671,9 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
     ) as worker:
         handle = await client.start_workflow(
             TruncateWorkflow.run,
+            5,
             id=f"pubsub-trunc-recover-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-        )
-
-        # Publish 5 items
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[
-                    PublishEntry(topic="events", data=_wire_bytes(f"item-{i}".encode()))
-                    for i in range(5)
-                ]
-            ),
         )
 
         # Truncate first 3. The update returns after the handler completes.
@@ -1185,20 +1199,9 @@ async def test_truncate_pubsub(client: Client) -> None:
     ) as worker:
         handle = await client.start_workflow(
             TruncateWorkflow.run,
+            5,
             id=f"pubsub-truncate-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-        )
-
-        # Publish 5 items via signal. collect_items below uses an update,
-        # which acts as a signal barrier.
-        await handle.signal(
-            "__pubsub_publish",
-            PublishInput(
-                items=[
-                    PublishEntry(topic="events", data=_wire_bytes(f"item-{i}".encode()))
-                    for i in range(5)
-                ]
-            ),
         )
 
         # Verify all 5 items
@@ -1297,12 +1300,28 @@ class TruncateWorkflow:
     consumer progress or a retention policy). Workflows that want external
     control wire up their own signal or update. We use an update here so
     callers get explicit completion (signals are fire-and-forget).
+
+    ``prepub_count`` seeds the log with N byte-payload items before the
+    workflow starts serving requests, so a subsequent ``truncate`` update
+    is guaranteed to see a populated log. This is more deterministic than
+    publishing from the client via ``__pubsub_publish`` and then issuing
+    an update in the same activation: when ``__pubsub_publish`` is a
+    dynamically-registered signal, its handler is not set until
+    ``PubSub.__init__`` runs in ``_run_once``, so a class-level
+    ``@workflow.update`` scheduled in the same activation can race ahead
+    of the dispatched-from-buffer signal task.
     """
 
     @workflow.init
-    def __init__(self) -> None:
+    def __init__(self, prepub_count: int = 0) -> None:
         self.pubsub = PubSub()
         self._closed = False
+        # Publish from __init__ (not run()) so the log is populated
+        # before any update task runs: lazy instantiation happens inside
+        # _run_once, and the __init__ body finishes before the event
+        # loop dispatches tasks scheduled during _apply.
+        for i in range(prepub_count):
+            self.pubsub.publish("events", f"item-{i}".encode())
 
     @workflow.signal
     def close(self) -> None:
@@ -1313,7 +1332,11 @@ class TruncateWorkflow:
         self.pubsub.truncate(up_to_offset)
 
     @workflow.run
-    async def run(self) -> None:
+    async def run(self, _prepub_count: int = 0) -> None:
+        # _prepub_count is consumed in @workflow.init above. @workflow.run
+        # must accept the same positional args, but the names are free
+        # to differ.
+        del _prepub_count
         await workflow.wait_condition(lambda: self._closed)
 
 

@@ -355,9 +355,9 @@ class PubSubClient:
                 yielded :class:`PubSubItem` has its ``data`` decoded
                 via the client's sync payload converter to the
                 specified type. When omitted, ``data`` is the raw
-                :class:`~temporalio.api.common.v1.Payload` — useful
-                for heterogeneous topics where the caller dispatches
-                on ``Payload.metadata``.
+                ``temporalio.api.common.v1.Payload`` — useful for
+                heterogeneous topics where the caller dispatches on
+                ``Payload.metadata``.
             poll_cooldown: Minimum seconds between polls to avoid
                 overwhelming the workflow when items arrive faster
                 than the poll round-trip. Defaults to 0.1.

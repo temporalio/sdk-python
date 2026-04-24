@@ -204,8 +204,13 @@ class PubSub:
         """Discard log entries before ``up_to_offset``.
 
         After truncation, polls requesting an offset before the new
-        base will receive a ValueError. All global offsets remain
-        monotonic.
+        base will receive an ApplicationError. All global offsets
+        remain monotonic.
+
+        Raises ApplicationError (not ValueError) when ``up_to_offset``
+        is past the end of the log so that callers invoking this from
+        an update handler surface it as an update failure rather than
+        a workflow-task poison pill.
 
         Args:
             up_to_offset: The global offset to truncate up to
@@ -216,10 +221,11 @@ class PubSub:
         if log_index <= 0:
             return
         if log_index > len(self._log):
-            raise ValueError(
-                f"Cannot truncate to offset {up_to_offset}: "
-                f"only {self._base_offset + len(self._log)} "
-                f"items exist"
+            raise ApplicationError(
+                f"Cannot truncate to offset {up_to_offset}: only "
+                f"{self._base_offset + len(self._log)} items exist",
+                type="TruncateOutOfRange",
+                non_retryable=True,
             )
         self._log = self._log[log_index:]
         self._base_offset = up_to_offset
