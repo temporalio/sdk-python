@@ -1,7 +1,7 @@
 """Integration tests for OpenAI Agents streaming support.
 
 Verifies that the streaming model activity publishes TEXT_DELTA events via
-PubSubMixin and that the workflow returns the correct final result.
+the PubSub broker and that the workflow returns the correct final result.
 """
 
 import asyncio
@@ -39,7 +39,7 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.openai_agents import ModelActivityParameters
 from temporalio.contrib.openai_agents.testing import AgentEnvironment
-from temporalio.contrib.pubsub import PubSubClient, PubSubMixin
+from temporalio.contrib.pubsub import PubSub, PubSubClient
 from tests.helpers import new_worker
 
 logger = logging.getLogger(__name__)
@@ -161,12 +161,12 @@ class StreamingTestModel(Model):
 
 
 @workflow.defn
-class StreamingOpenAIWorkflow(PubSubMixin):
-    """Test workflow that uses streaming model activity with PubSubMixin."""
+class StreamingOpenAIWorkflow:
+    """Test workflow that uses streaming model activity with PubSub."""
 
     @workflow.init
     def __init__(self, prompt: str) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
 
     @workflow.run
     async def run(self, prompt: str) -> str:

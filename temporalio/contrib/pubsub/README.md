@@ -7,7 +7,7 @@ long-running data pipeline. Temporal's core primitives (workflows, signals, and
 updates) already provide the building blocks, but wiring up batching, offset
 tracking, topic filtering, and continue-as-new hand-off is non-trivial.
 
-This module packages that boilerplate into a reusable mixin and client. The
+This module packages that boilerplate into a reusable broker and client. The
 workflow acts as a message broker that maintains an append-only log.
 Applications can interact directly from the workflow, or from external clients
 such as activities, starters, and other workflows. Under the hood, publishing
@@ -25,31 +25,33 @@ behavior is symmetric between workflow-side and client-side publishing.
 
 ### Workflow side
 
-Add `PubSubMixin` to your workflow and call `init_pubsub()` from
-`@workflow.init`. If you want the workflow to support continue-as-new,
-include a `PubSubState | None` field on the input and pass it through —
-it's `None` on fresh starts and carries state across CAN otherwise:
+Construct a `PubSub` from your `@workflow.init`. The constructor
+dynamically registers the pub/sub signal, update, and query handlers on
+the current workflow, and raises `RuntimeError` if called twice. If you
+want the workflow to support continue-as-new, include a
+`PubSubState | None` field on the input and pass it through — it's
+`None` on fresh starts and carries state across CAN otherwise:
 
 ```python
 from dataclasses import dataclass
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSubMixin, PubSubState
+from temporalio.contrib.pubsub import PubSub, PubSubState
 
 @dataclass
 class MyInput:
     pubsub_state: PubSubState | None = None
 
 @workflow.defn
-class MyWorkflow(PubSubMixin):
+class MyWorkflow:
     @workflow.init
     def __init__(self, input: MyInput) -> None:
-        self.init_pubsub(prior_state=input.pubsub_state)
+        self.pubsub = PubSub(prior_state=input.pubsub_state)
 
     @workflow.run
     async def run(self, input: MyInput) -> None:
-        self.publish("status", StatusEvent(state="started"))
+        self.pubsub.publish("status", StatusEvent(state="started"))
         await do_work()
-        self.publish("status", StatusEvent(state="done"))
+        self.pubsub.publish("status", StatusEvent(state="done"))
 ```
 
 Both workflow-side and client-side `publish()` use the sync payload
@@ -116,7 +118,7 @@ boundaries:
 ```python
 from dataclasses import dataclass
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSubMixin, PubSubState
+from temporalio.contrib.pubsub import PubSub, PubSubState
 
 @dataclass
 class WorkflowInput:
@@ -126,43 +128,43 @@ class WorkflowInput:
     pubsub_state: PubSubState | None = None
 
 @workflow.defn
-class MyWorkflow(PubSubMixin):
+class MyWorkflow:
     @workflow.init
     def __init__(self, input: WorkflowInput) -> None:
         self.items_processed = input.items_processed
-        self.init_pubsub(prior_state=input.pubsub_state)
+        self.pubsub = PubSub(prior_state=input.pubsub_state)
 
     @workflow.run
     async def run(self, input: WorkflowInput) -> None:
         # ... do work, updating self.items_processed ...
 
         if workflow.info().is_continue_as_new_suggested():
-            self.drain_pubsub()
+            self.pubsub.drain()
             await workflow.wait_condition(workflow.all_handlers_finished)
             workflow.continue_as_new(args=[WorkflowInput(
                 items_processed=self.items_processed,
-                pubsub_state=self.get_pubsub_state(),
+                pubsub_state=self.pubsub.get_state(),
             )])
 ```
 
-`drain_pubsub()` unblocks waiting subscribers and rejects new polls so
+`pubsub.drain()` unblocks waiting subscribers and rejects new polls so
 `all_handlers_finished` can stabilize. Subscribers created via
 `PubSubClient.create()` or `PubSubClient.from_activity()` automatically
 follow continue-as-new chains.
 
 ## API Reference
 
-### PubSubMixin
+### PubSub
 
 | Method | Description |
 |---|---|
-| `init_pubsub(prior_state=None)` | Initialize state. Call from `@workflow.init`, passing `prior_state` if the input declares one (`None` on fresh starts). |
+| `PubSub(prior_state=None)` | Constructor. Call once from `@workflow.init`; registers handlers on the current workflow. Raises `RuntimeError` if a `PubSub` is already registered. Pass `prior_state` if the input declares one (`None` on fresh starts). |
 | `publish(topic, value)` | Append to the log from workflow code. `value` is converted via the sync workflow payload converter (no codec). |
-| `get_pubsub_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
-| `drain_pubsub()` | Unblock polls and reject new ones. |
-| `truncate_pubsub(up_to_offset)` | Discard log entries below the given offset. Workflow-side only — no external API; wire up your own signal or update if external control is needed. |
+| `get_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
+| `drain()` | Unblock polls and reject new ones. |
+| `truncate(up_to_offset)` | Discard log entries below the given offset. Workflow-side only — no external API; wire up your own signal or update if external control is needed. |
 
-Handlers added automatically:
+Handlers registered by the constructor:
 
 | Kind | Name | Description |
 |---|---|---|

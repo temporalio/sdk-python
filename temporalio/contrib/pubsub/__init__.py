@@ -10,8 +10,8 @@ subscribers can yield raw ``Payload`` or request a concrete type via
 ``subscribe(result_type=T)``.
 """
 
+from temporalio.contrib.pubsub._broker import PubSub
 from temporalio.contrib.pubsub._client import PubSubClient
-from temporalio.contrib.pubsub._mixin import PubSubMixin
 from temporalio.contrib.pubsub._types import (
     PollInput,
     PollResult,
@@ -24,9 +24,9 @@ from temporalio.contrib.pubsub._types import (
 __all__ = [
     "PollInput",
     "PollResult",
+    "PubSub",
     "PubSubClient",
     "PubSubItem",
-    "PubSubMixin",
     "PubSubState",
     "PublishEntry",
     "PublishInput",

@@ -27,7 +27,7 @@ the workflow does not interpret them.
 ```
                     ┌──────────────────────────────────┐
                     │         Temporal Workflow        │
-                    │          (PubSubMixin)           │
+                    │         (PubSub broker)          │
                     │                                  │
                     │  ┌────────────────────────────┐  │
                     │  │   Append-only log          │  │
@@ -54,49 +54,55 @@ the workflow does not interpret them.
 
 ## API Surface
 
-### Workflow side — `PubSubMixin`
+### Workflow side — `PubSub`
 
-A mixin class that adds signal, update, and query handlers to any workflow.
+A helper class instantiated from `@workflow.init`. Its constructor
+registers the pub/sub signal, update, and query handlers on the current
+workflow via `workflow.set_signal_handler`, `workflow.set_update_handler`,
+and `workflow.set_query_handler` — there is no base class to inherit.
+This matches how other-language SDKs will express the same pattern
+(imperative handler registration from inside the workflow body).
 
 ```python
 from dataclasses import dataclass
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSubMixin, PubSubState
+from temporalio.contrib.pubsub import PubSub, PubSubState
 
 @dataclass
 class MyInput:
     pubsub_state: PubSubState | None = None
 
 @workflow.defn
-class MyWorkflow(PubSubMixin):
+class MyWorkflow:
     @workflow.init
     def __init__(self, input: MyInput) -> None:
-        self.init_pubsub(prior_state=input.pubsub_state)
+        self.pubsub = PubSub(prior_state=input.pubsub_state)
 
     @workflow.run
     async def run(self, input: MyInput) -> None:
-        self.publish("status", b"started")
+        self.pubsub.publish("status", b"started")
         await do_work()
-        self.publish("status", b"done")
+        self.pubsub.publish("status", b"done")
 ```
 
-Call `init_pubsub()` once from `@workflow.init`. Include a
+Construct `PubSub(...)` once from `@workflow.init`. Include a
 `PubSubState | None` field on your workflow input and always pass it as
 `prior_state`: it is `None` on fresh starts and carries accumulated
 state across continue-as-new (see [Continue-as-New](#continue-as-new)).
-Workflows that will never continue-as-new may call `init_pubsub()` with
-no argument.
+Workflows that will never continue-as-new may call `PubSub()` with no
+argument. Instantiating `PubSub` twice on the same workflow raises
+`RuntimeError`, detected via `workflow.get_signal_handler("__pubsub_publish")`.
 
 | Method / Handler | Kind | Description |
 |---|---|---|
-| `init_pubsub(prior_state=None)` | instance method | Initialize internal state. Must be called before use. |
+| `PubSub(prior_state=None)` | constructor | Initialize internal state and register handlers on the current workflow. Must be called from `@workflow.init`. |
 | `publish(topic, value)` | instance method | Append to the log from workflow code. `value` is converted via the workflow's sync payload converter (no codec). |
-| `get_pubsub_state(publisher_ttl=900)` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
-| `drain_pubsub()` | instance method | Unblock polls and reject new ones for CAN. |
-| `truncate_pubsub(up_to_offset)` | instance method | Discard log entries before offset. |
-| `__pubsub_publish` | `@workflow.signal` | Receives publications from external clients (with dedup). |
-| `__pubsub_poll` | `@workflow.update` | Long-poll subscription: blocks until new items or drain. |
-| `__pubsub_offset` | `@workflow.query` | Returns the current global offset. |
+| `get_state(publisher_ttl=900)` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
+| `drain()` | instance method | Unblock polls and reject new ones for CAN. |
+| `truncate(up_to_offset)` | instance method | Discard log entries before offset. |
+| `__pubsub_publish` | signal handler | Receives publications from external clients (with dedup). |
+| `__pubsub_poll` | update handler | Long-poll subscription: blocks until new items or drain. |
+| `__pubsub_offset` | query handler | Returns the current global offset. |
 
 ### Client side — `PubSubClient`
 
@@ -293,7 +299,7 @@ The three original arguments for opaque bytes don't hold up:
    `execute_update(result_type=...)`.
 
 **Codec runs once, at the envelope level.** Both
-`PubSubClient.publish` and `PubSubMixin.publish` turn values into
+`PubSubClient.publish` and `PubSub.publish` turn values into
 `Payload` via the **sync** payload converter. The codec chain is
 not applied per item. It runs once — on the `__pubsub_publish`
 signal envelope (client → workflow path) and on the
@@ -466,7 +472,7 @@ to map SSE event IDs to global offsets for reconnection. Application code
 that just wants to process items in order uses the iterator. Different
 consumers use different layers.
 
-**Poll efficiency.** The poll slices `self._pubsub_log[from_offset - base_offset:]`
+**Poll efficiency.** The poll slices `self._log[from_offset - base_offset:]`
 and filters by topic. The common case — single topic, continuing from last
 poll — is O(new items since last poll). The global offset points directly to
 the resume position with no scanning or cursor alignment. Multi-topic polls
@@ -499,7 +505,7 @@ streaming workflows have shown this matters in practice: a session can
 accumulate tens of thousands of small audio/text events long before CAN
 is triggered, and the workflow needs a way to release entries the
 subscriber has already consumed without waiting for a CAN cycle.
-`truncate_pubsub(up_to_offset)` exposes this.
+`PubSub.truncate(up_to_offset)` exposes this.
 
 ### 12. No timeout on long-poll
 
@@ -507,7 +513,7 @@ subscriber has already consumed without waiting for a CAN cycle.
 indefinitely until one of three things happens:
 
 1. **New data arrives** — the `len(log) > offset` condition fires.
-2. **Draining for continue-as-new** — `drain_pubsub()` sets the flag.
+2. **Draining for continue-as-new** — `PubSub.drain()` sets the flag.
 3. **Client disconnects** — the BFF drops the SSE connection, cancels the
    update RPC, and the handler becomes an inert coroutine cleaned up at
    the next drain cycle.
@@ -518,7 +524,7 @@ forever" mechanism. This was removed because:
 - **It adds unnecessary history events.** Every poll creates a `TimerStarted`
   event. For a streaming session doing hundreds of polls, this doubles the
   history event count and accelerates approach to the ~50K event CAN threshold.
-- **The drain mechanism already handles cleanup.** `drain_pubsub()` unblocks
+- **The drain mechanism already handles cleanup.** `PubSub.drain()` unblocks
   all waiting polls, and the update validator rejects new polls, so
   `all_handlers_finished()` converges without timers.
 - **Zombie polls are harmless.** If a client crashes without cancelling, its
@@ -717,7 +723,7 @@ async def _flush(self) -> None:
 dedup is skipped.
 
 `publisher_last_seen` tracks the last `workflow.time()` each publisher was
-seen. During `get_pubsub_state(publisher_ttl=900)`, entries older than TTL
+seen. During `PubSub.get_state(publisher_ttl=900)`, entries older than TTL
 are pruned to bound memory across long-lived workflow chains.
 
 **Safety constraint**: `publisher_ttl` must exceed the client's
@@ -781,7 +787,7 @@ class PubSubState:
     publisher_last_seen: dict[str, float] = field(default_factory=dict)
 ```
 
-`init_pubsub(prior_state)` restores all four fields. `get_pubsub_state()`
+`PubSub(prior_state=...)` restores all four fields. `PubSub.get_state()`
 snapshots them.
 
 ### Draining
@@ -789,17 +795,17 @@ snapshots them.
 A long-poll `__pubsub_poll` blocks indefinitely until new data arrives. To
 allow CAN to proceed, draining uses two mechanisms:
 
-1. **`drain_pubsub()`** sets a flag that unblocks all waiting poll handlers
-   (the `or self._pubsub_draining` clause in `wait_condition`).
+1. **`PubSub.drain()`** sets a flag that unblocks all waiting poll handlers
+   (the `or self._draining` clause in `wait_condition`).
 2. **Update validator** rejects new polls when draining, so no new handlers
    start and `all_handlers_finished()` stabilizes.
 
 ```python
 # CAN sequence in the parent workflow:
-self.drain_pubsub()
+self.pubsub.drain()
 await workflow.wait_condition(workflow.all_handlers_finished)
 workflow.continue_as_new(args=[WorkflowInput(
-    pubsub_state=self.get_pubsub_state(),
+    pubsub_state=self.pubsub.get_state(),
 )])
 ```
 
@@ -834,7 +840,7 @@ failed (not CAN), the subscriber stops instead of retrying.
 Since the full log is carried forward:
 
 - Pre-CAN: offsets `0..N-1`, log length N.
-- Post-CAN: `init_pubsub(prior_state)` restores N items. New appends start
+- Post-CAN: `PubSub(prior_state=...)` restores N items. New appends start
   at offset N.
 - A subscriber at offset K resumes seamlessly against the new run.
 
@@ -1097,7 +1103,7 @@ Streams, and Workflow SDK) live on the
 ```
 temporalio/contrib/pubsub/
 ├── __init__.py                  # Public API exports
-├── _mixin.py                    # PubSubMixin (workflow-side)
+├── _broker.py                   # PubSub (workflow-side)
 ├── _client.py                   # PubSubClient (external-side)
 ├── _types.py                    # Shared data types
 ├── README.md                    # Usage documentation

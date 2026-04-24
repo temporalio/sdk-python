@@ -1,7 +1,7 @@
 """Integration tests for ADK streaming support.
 
 Verifies that the streaming model activity publishes TEXT_DELTA events via
-PubSubMixin and that non-streaming mode remains backward-compatible.
+the PubSub broker and that non-streaming mode remains backward-compatible.
 """
 
 import asyncio
@@ -22,7 +22,7 @@ from google.genai.types import Content, Part
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
-from temporalio.contrib.pubsub import PubSubClient, PubSubMixin
+from temporalio.contrib.pubsub import PubSub, PubSubClient
 from temporalio.worker import Worker
 
 logger = logging.getLogger(__name__)
@@ -47,12 +47,12 @@ class StreamingTestModel(BaseLlm):
 
 
 @workflow.defn
-class StreamingAdkWorkflow(PubSubMixin):
-    """Test workflow that uses streaming TemporalModel with PubSubMixin."""
+class StreamingAdkWorkflow:
+    """Test workflow that uses streaming TemporalModel with PubSub."""
 
     @workflow.init
     def __init__(self, prompt: str) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
 
     @workflow.run
     async def run(self, prompt: str) -> str:

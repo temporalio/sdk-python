@@ -22,11 +22,11 @@ from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
 from temporalio.contrib.pubsub import (
     PollInput,
     PollResult,
+    PubSub,
     PublishEntry,
     PublishInput,
     PubSubClient,
     PubSubItem,
-    PubSubMixin,
     PubSubState,
 )
 from temporalio.contrib.pubsub._types import _encode_payload
@@ -54,10 +54,10 @@ def _wire_bytes(data: bytes) -> str:
 
 
 @workflow.defn
-class BasicPubSubWorkflow(PubSubMixin):
+class BasicPubSubWorkflow:
     @workflow.init
     def __init__(self) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -70,10 +70,10 @@ class BasicPubSubWorkflow(PubSubMixin):
 
 
 @workflow.defn
-class ActivityPublishWorkflow(PubSubMixin):
+class ActivityPublishWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -88,7 +88,7 @@ class ActivityPublishWorkflow(PubSubMixin):
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.publish("status", b"activity_done")
+        self.pubsub.publish("status", b"activity_done")
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -99,10 +99,10 @@ class AgentEvent:
 
 
 @workflow.defn
-class StructuredPublishWorkflow(PubSubMixin):
+class StructuredPublishWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -112,15 +112,15 @@ class StructuredPublishWorkflow(PubSubMixin):
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.publish("events", AgentEvent(kind="tick", payload={"i": i}))
+            self.pubsub.publish("events", AgentEvent(kind="tick", payload={"i": i}))
         await workflow.wait_condition(lambda: self._closed)
 
 
 @workflow.defn
-class WorkflowSidePublishWorkflow(PubSubMixin):
+class WorkflowSidePublishWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -130,15 +130,15 @@ class WorkflowSidePublishWorkflow(PubSubMixin):
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.publish("events", f"item-{i}".encode())
+            self.pubsub.publish("events", f"item-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
 
 
 @workflow.defn
-class MultiTopicWorkflow(PubSubMixin):
+class MultiTopicWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -157,10 +157,10 @@ class MultiTopicWorkflow(PubSubMixin):
 
 
 @workflow.defn
-class InterleavedWorkflow(PubSubMixin):
+class InterleavedWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -169,22 +169,22 @@ class InterleavedWorkflow(PubSubMixin):
 
     @workflow.run
     async def run(self, count: int) -> None:
-        self.publish("status", b"started")
+        self.pubsub.publish("status", b"started")
         await workflow.execute_activity(
             "publish_items",
             count,
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.publish("status", b"done")
+        self.pubsub.publish("status", b"done")
         await workflow.wait_condition(lambda: self._closed)
 
 
 @workflow.defn
-class PriorityWorkflow(PubSubMixin):
+class PriorityWorkflow:
     @workflow.init
     def __init__(self) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -202,10 +202,10 @@ class PriorityWorkflow(PubSubMixin):
 
 
 @workflow.defn
-class FlushOnExitWorkflow(PubSubMixin):
+class FlushOnExitWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -224,10 +224,10 @@ class FlushOnExitWorkflow(PubSubMixin):
 
 
 @workflow.defn
-class MaxBatchWorkflow(PubSubMixin):
+class MaxBatchWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -236,7 +236,7 @@ class MaxBatchWorkflow(PubSubMixin):
 
     @workflow.query
     def publisher_sequences(self) -> dict[str, int]:
-        return dict(self._pubsub_publisher_sequences)
+        return dict(self.pubsub._publisher_sequences)
 
     @workflow.run
     async def run(self, count: int) -> None:
@@ -246,7 +246,59 @@ class MaxBatchWorkflow(PubSubMixin):
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.publish("status", b"activity_done")
+        self.pubsub.publish("status", b"activity_done")
+        await workflow.wait_condition(lambda: self._closed)
+
+
+@workflow.defn
+class LatePubSubWorkflow:
+    """Calls PubSub() from @workflow.run, not from @workflow.init.
+
+    The constructor inspects the caller's frame and requires the
+    function name to be ``__init__``; called from ``run``, it must
+    raise ``RuntimeError``. The workflow returns the error message so
+    the test can assert on it without forcing a workflow task failure.
+    """
+
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            PubSub()
+        except RuntimeError as e:
+            return str(e)
+        return "no error raised"
+
+
+@workflow.defn
+class DoubleInitWorkflow:
+    """Calls PubSub() twice from @workflow.init.
+
+    The first call succeeds; the second must raise RuntimeError because
+    the pub/sub signal handler is already registered. The workflow
+    stashes the error message so the test can assert on it without
+    forcing a workflow task failure.
+    """
+
+    @workflow.init
+    def __init__(self) -> None:
+        self.pubsub = PubSub()
+        self._closed = False
+        self.double_init_error: str | None = None
+        try:
+            PubSub()
+        except RuntimeError as e:
+            self.double_init_error = str(e)
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.query
+    def get_double_init_error(self) -> str | None:
+        return self.double_init_error
+
+    @workflow.run
+    async def run(self) -> None:
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -880,7 +932,7 @@ async def test_max_batch_size(client: Client) -> None:
 
 @pytest.mark.asyncio
 async def test_replay_safety(client: Client) -> None:
-    """Pub/sub mixin survives workflow replay (max_cached_workflows=0)."""
+    """Pub/sub broker survives workflow replay (max_cached_workflows=0)."""
     async with new_worker(
         client,
         InterleavedWorkflow,
@@ -1078,8 +1130,46 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_double_init_raises(client: Client) -> None:
+    """Instantiating PubSub twice from @workflow.init raises RuntimeError.
+
+    The first PubSub() registers the __pubsub_publish signal handler; the
+    second call detects the existing handler and raises rather than
+    silently overwriting it.
+    """
+    async with new_worker(client, DoubleInitWorkflow) as worker:
+        handle = await client.start_workflow(
+            DoubleInitWorkflow.run,
+            id=f"pubsub-double-init-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        err = await handle.query(DoubleInitWorkflow.get_double_init_error)
+        assert err is not None
+        assert "already registered" in err
+        await handle.signal(DoubleInitWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_pubsub_outside_init_raises(client: Client) -> None:
+    """Constructing PubSub outside @workflow.init raises RuntimeError.
+
+    The workflow calls PubSub() from @workflow.run; the caller-frame
+    guard must reject the call because the caller's function name is
+    ``run``, not ``__init__``.
+    """
+    async with new_worker(client, LatePubSubWorkflow) as worker:
+        result = await client.execute_workflow(
+            LatePubSubWorkflow.run,
+            id=f"pubsub-late-init-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert "must be constructed directly from the workflow's" in result
+        assert "'run'" in result
+
+
+@pytest.mark.asyncio
 async def test_truncate_pubsub(client: Client) -> None:
-    """truncate_pubsub discards prefix and adjusts base_offset."""
+    """PubSub.truncate discards prefix and adjusts base_offset."""
     async with new_worker(
         client,
         TruncateWorkflow,
@@ -1126,7 +1216,7 @@ async def test_truncate_pubsub(client: Client) -> None:
 
 @pytest.mark.asyncio
 async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
-    """get_pubsub_state prunes publishers whose last-seen time exceeds the
+    """PubSub.get_state prunes publishers whose last-seen time exceeds the
     TTL while retaining newer publishers. The log itself is unaffected.
 
     Uses a wall-clock gap between publishes so that workflow.time()
@@ -1189,8 +1279,8 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
 
 @workflow.defn
-class TruncateWorkflow(PubSubMixin):
-    """Test scaffolding that exposes truncate_pubsub via a user-authored
+class TruncateWorkflow:
+    """Test scaffolding that exposes PubSub.truncate via a user-authored
     update.
 
     The contrib module does not define a built-in external truncate API —
@@ -1202,7 +1292,7 @@ class TruncateWorkflow(PubSubMixin):
 
     @workflow.init
     def __init__(self) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -1211,7 +1301,7 @@ class TruncateWorkflow(PubSubMixin):
 
     @workflow.update
     def truncate(self, up_to_offset: int) -> None:
-        self.truncate_pubsub(up_to_offset)
+        self.pubsub.truncate(up_to_offset)
 
     @workflow.run
     async def run(self) -> None:
@@ -1219,12 +1309,12 @@ class TruncateWorkflow(PubSubMixin):
 
 
 @workflow.defn
-class TTLTestWorkflow(PubSubMixin):
-    """Workflow that exposes get_pubsub_state via query for TTL testing."""
+class TTLTestWorkflow:
+    """Workflow that exposes PubSub.get_state via query for TTL testing."""
 
     @workflow.init
     def __init__(self) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -1233,7 +1323,7 @@ class TTLTestWorkflow(PubSubMixin):
 
     @workflow.query
     def get_state_with_ttl(self, ttl: float) -> PubSubState:
-        return self.get_pubsub_state(publisher_ttl=ttl)
+        return self.pubsub.get_state(publisher_ttl=ttl)
 
     @workflow.run
     async def run(self) -> None:
@@ -1253,12 +1343,12 @@ class CANWorkflowInputTyped:
 
 
 @workflow.defn
-class ContinueAsNewTypedWorkflow(PubSubMixin):
+class ContinueAsNewTypedWorkflow:
     """CAN workflow using properly-typed pubsub_state."""
 
     @workflow.init
     def __init__(self, input: CANWorkflowInputTyped) -> None:
-        self.init_pubsub(prior_state=input.pubsub_state)
+        self.pubsub = PubSub(prior_state=input.pubsub_state)
         self._should_continue = False
         self._closed = False
 
@@ -1272,7 +1362,7 @@ class ContinueAsNewTypedWorkflow(PubSubMixin):
 
     @workflow.query
     def publisher_sequences(self) -> dict[str, int]:
-        return dict(self._pubsub_publisher_sequences)
+        return dict(self.pubsub._publisher_sequences)
 
     @workflow.run
     async def run(self, input: CANWorkflowInputTyped) -> None:
@@ -1282,12 +1372,12 @@ class ContinueAsNewTypedWorkflow(PubSubMixin):
                 return
             if self._should_continue:
                 self._should_continue = False
-                self.drain_pubsub()
+                self.pubsub.drain()
                 await workflow.wait_condition(workflow.all_handlers_finished)
                 workflow.continue_as_new(
                     args=[
                         CANWorkflowInputTyped(
-                            pubsub_state=self.get_pubsub_state(),
+                            pubsub_state=self.pubsub.get_state(),
                         )
                     ]
                 )
@@ -1403,10 +1493,10 @@ class CrossWorkflowInput:
 
 
 @workflow.defn
-class BrokerWorkflow(PubSubMixin):
+class BrokerWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -1416,7 +1506,7 @@ class BrokerWorkflow(PubSubMixin):
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.publish("events", f"broker-{i}".encode())
+            self.pubsub.publish("events", f"broker-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -1510,10 +1600,10 @@ class NexusCallerInput:
 
 
 @workflow.defn
-class NexusBrokerWorkflow(PubSubMixin):
+class NexusBrokerWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.init_pubsub()
+        self.pubsub = PubSub()
         self._closed = False
 
     @workflow.signal
@@ -1523,7 +1613,7 @@ class NexusBrokerWorkflow(PubSubMixin):
     @workflow.run
     async def run(self, count: int) -> str:
         for i in range(count):
-            self.publish("events", f"nexus-{i}".encode())
+            self.pubsub.publish("events", f"nexus-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
         return "done"
 
