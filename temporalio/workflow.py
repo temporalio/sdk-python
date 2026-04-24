@@ -4308,6 +4308,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
     static_details: str | None
     priority: temporalio.common.Priority
 
+
 # Overload for no-param workflow
 @overload
 async def start_child_workflow(

@@ -142,10 +142,9 @@ environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = 
 ignore_missing_imports = true
 exclude = [
   # Ignore generated code
-  'build',
+  'build/tool-cache',
   'temporalio/api',
   'temporalio/bridge/proto',
-  'temporalio/nexus/system/_workflow_service_generated.py',
 ]
 
 [tool.pydocstyle]
