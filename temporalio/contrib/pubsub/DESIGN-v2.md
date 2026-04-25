@@ -139,13 +139,23 @@ async for item in client.subscribe(["events"], result_type=EventUnion):
 | `PubSubClient.from_activity()` | Factory that pulls client and workflow id from the current activity context. Follows CAN in `subscribe()`. |
 | `PubSubClient(handle)` | From handle directly (no CAN following; no codec chain — falls back to the default converter). |
 | `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. `force_flush` triggers immediate flush (fire-and-forget). |
+| `flush()` | Async. Block until items buffered at call time are confirmed by the server. No-op if nothing is buffered. |
 | `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=0.1)` | Async iterator. `result_type` decodes `item.data` to the given type; omit for raw `Payload`. Always follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
-Use as `async with` for batched publishing with automatic flush on exit.
-There is no public `flush()` method — use `force_flush=True` on `publish()`
-for immediate delivery, or rely on the background flusher and context
-manager exit flush.
+The client offers three complementary ways to flush:
+
+1. **Context manager exit** — drains and flushes on `__aexit__`. Best
+   when the publisher's lifetime maps cleanly to a scope.
+2. **`force_flush=True` on `publish()`** — declarative, fire-and-forget.
+   Best when the *event being published* is itself the signal to flush
+   (e.g. a "stream complete" sentinel).
+3. **`await client.flush()`** — explicit synchronization point that
+   returns once buffered items have been acknowledged by the server.
+   Best when the caller needs proof that prior publications landed but
+   the moment does not correspond to any particular event — e.g.
+   "before returning from this activity, make sure everything I have
+   published is durable."
 
 #### Activity convenience
 

@@ -838,6 +838,54 @@ async def test_context_manager_flushes_on_exit(client: Client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_explicit_flush_barrier(client: Client) -> None:
+    """``await client.flush()`` is a synchronization point.
+
+    Verifies the documented contract:
+      1. Returns immediately when the buffer is empty.
+      2. After it returns, items published before the call are durable
+         on the workflow side (observable via ``get_offset()``) — even
+         when the timer-driven flush would not yet have fired.
+      3. Calling it again after a successful flush is a no-op.
+
+    Uses a 60s ``batch_interval`` so a regression where ``flush()``
+    silently relies on the background timer surfaces as a hang
+    against the test's 5s timeout, not a slow pass.
+    """
+    async with new_worker(
+        client,
+        BasicPubSubWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            BasicPubSubWorkflow.run,
+            id=f"pubsub-flush-barrier-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        pubsub = PubSubClient.create(client, handle.id, batch_interval=60.0)
+
+        async with _async_timeout(5):
+            # 1. Empty-buffer flush is a no-op (must not block).
+            assert await pubsub.get_offset() == 0
+            await pubsub.flush()
+            assert await pubsub.get_offset() == 0
+
+            # 2. Flush makes prior publishes visible without waiting on
+            # the 60s batch timer.
+            pubsub.publish("events", b"a")
+            pubsub.publish("events", b"b")
+            pubsub.publish("events", b"c")
+            await pubsub.flush()
+            assert await pubsub.get_offset() == 3
+
+            # 3. Second flush with no new items is a no-op.
+            await pubsub.flush()
+            assert await pubsub.get_offset() == 3
+
+        await handle.signal(BasicPubSubWorkflow.close)
+
+
+@pytest.mark.asyncio
 async def test_concurrent_subscribers(client: Client) -> None:
     """Two subscribers on different topics make interleaved progress.
 

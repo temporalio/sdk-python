@@ -60,6 +60,9 @@ class PubSubClient:
         async with client:
             client.publish("events", my_event)
             client.publish("events", another_event, force_flush=True)
+            # Optional synchronization point — wait until everything
+            # buffered so far has been confirmed by the server.
+            await client.flush()
 
     For subscribing::
 
@@ -229,6 +232,32 @@ class PubSubClient:
             and len(self._buffer) >= self._max_batch_size
         ):
             self._flush_event.set()
+
+    async def flush(self) -> None:
+        """Flush buffered (and pending) items and wait for server confirmation.
+
+        Returns once the items buffered at call time have been signaled to
+        the workflow and acknowledged by the server. Returns immediately
+        if there is nothing to send.
+
+        This is in addition to the declarative ``force_flush=True`` on
+        :py:meth:`publish` and to the automatic flush on context-manager
+        exit. Use this when you need a synchronization point — proof
+        that prior publications have reached the server — at a moment
+        that does not naturally correspond to a specific event.
+
+        Safe to call concurrently with ``publish()`` and with the
+        background flusher: the flush lock serializes signal sends.
+        Items added concurrently after entry may piggyback on this
+        flush or be deferred to a subsequent one.
+
+        Raises:
+            TimeoutError: If a pending batch from a prior failure cannot
+                be sent within ``max_retry_duration``. The pending batch
+                is dropped; subsequent publications use a fresh sequence.
+        """
+        while self._pending is not None or self._buffer:
+            await self._flush()
 
     def _payload_converter(self) -> PayloadConverter:
         """Return the sync payload converter for per-item encode/decode.
