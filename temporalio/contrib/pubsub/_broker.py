@@ -247,6 +247,14 @@ class PubSub:
         publisher, the entire batch is dropped as a duplicate. Batches
         are atomic: the dedup decision applies to the whole batch, not
         individual items.
+
+        This block is a polyfill for missing server-side ``request_id``
+        dedup across continue-as-new. If the SDK ever exposes
+        ``request_id`` on signals and the server dedups it across CAN,
+        this branch and the ``_publisher_sequences`` /
+        ``_publisher_last_seen`` state become redundant. See DESIGN-v2
+        §"Replace workflow-side dedup with server-side request_id" for
+        the migration plan.
         """
         if payload.publisher_id:
             last_seq = self._publisher_sequences.get(payload.publisher_id, 0)

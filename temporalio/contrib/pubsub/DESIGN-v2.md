@@ -1174,6 +1174,108 @@ item count (e.g., aggregation), how filter state interacts with
 continue-as-new, and how filter identity is named on the wire for
 cross-language clients.
 
+### Replace workflow-side dedup with server-side `request_id`
+
+Workflow-side `(publisher_id, sequence)` dedup
+([Exactly-Once Publish Delivery](#exactly-once-publish-delivery))
+exists because Temporal's built-in signal `request_id` dedup does not
+cover the cases the contrib needs:
+
+1. **Within a single `_flush()` call**, sdk-core's retry layer reuses the
+   same `request_id` across attempts, so the server already dedups
+   transient RPC failures. We get this for free.
+2. **Across `_flush()` calls** (the `_pending` retry loop), each call
+   to `await handle.signal(...)` allocates a fresh `request_id` —
+   `temporalio/client.py:8357` hardcodes `request_id=str(uuid.uuid4())`,
+   with no way to override. The server cannot recognize that two such
+   calls are the same logical batch, so the workflow-side check is
+   what guarantees exactly-once.
+3. **Across continue-as-new**, even if (1) and (2) were perfect,
+   `pendingSignalRequestedIDs` is per-run mutable state and is not
+   carried by `addWorkflowExecutionStartedEventForContinueAsNew`. A
+   retry whose first attempt landed on run N and whose retry lands on
+   run N+1 is accepted as fresh. Verified empirically on the Temporal
+   dev server and Temporal Cloud (see
+   `experiments/can-signal-dup/README.md` in the repo root for the
+   reproduction). [temporalio/temporal#4021](https://github.com/temporalio/temporal/issues/4021)
+   tracks the related state-growth concern that has historically
+   discouraged extending the dedup set across CAN.
+
+If both (a) the SDK exposes `request_id` on
+`WorkflowHandle.signal()` and (b) the server dedups by `request_id`
+across continue-as-new, the workflow-side check becomes redundant and
+can be removed. The migration is mechanical because the dedup keys at
+both layers are already aligned.
+
+**What changes:**
+
+```python
+# In _client.py, _flush() — pin a deterministic request_id:
+await self._handle.signal(
+    "__pubsub_publish",
+    PublishInput(
+        items=batch,
+        publisher_id=self._publisher_id,
+        sequence=seq,
+    ),
+    request_id=f"{self._publisher_id}:{seq}",   # NEW
+)
+```
+
+```python
+# In _mixin.py, __pubsub_publish handler — drop the dedup branch:
+def _pubsub_publish(self, input: PublishInput) -> None:
+    # remove: if input.publisher_id and input.sequence ...
+    self._log.extend(input.items)
+```
+
+```python
+# In PubSubState — these fields become unused and can be removed in a
+# follow-up wire migration (see Compatibility):
+# publisher_sequences: dict[str, int]
+# publisher_last_seen: dict[str, float]
+```
+
+**What stays:**
+
+- The client-side `_pending` retry loop and `_flush_lock`. Server-side
+  `request_id` dedup makes retries safe; it does not eliminate the
+  reasons we retry (long outages, worker restarts).
+- The `(publisher_id, sequence)` shape on the wire. We continue to
+  send them — they are the inputs we'd derive `request_id` from, and
+  keeping them on the wire preserves observability and lets older
+  workflow versions that still maintain the dedup table interoperate
+  with newer clients during rollout.
+- `force_flush=True`, `flush()`, `__aexit__` flush — orthogonal.
+
+**What goes away:**
+
+- `publisher_sequences` and `publisher_last_seen` in `PubSubState`.
+- `publisher_ttl` and the `publisher_ttl > max_retry_duration` safety
+  constraint — there is no longer a per-publisher map to expire.
+- The TLA+ retry-algorithm verification (`PubSubDedupTTL.tla`); the
+  on-workflow check it models has been removed. The
+  ordering/correctness specs that don't mention dedup still apply.
+
+**Migration path:**
+
+1. Land the SDK change to expose `request_id` on signals.
+2. Confirm server `request_id` dedup spans CAN (re-run
+   `experiments/can-signal-dup` against a server build that includes
+   the fix).
+3. Bump the contrib protocol minor version. Newer clients send the
+   pinned `request_id`; older clients still send fresh UUIDs. Both
+   continue to set `(publisher_id, sequence)` so a workflow that has
+   not yet been re-deployed remains correct.
+4. After all clients are upgraded, deploy a workflow version that
+   ignores `(publisher_id, sequence)` and relies on the server. Drop
+   the dedup fields from `PubSubState` in a subsequent wire-format
+   pass once the old fields are no longer read by any deployed
+   version.
+
+Until both prerequisites are real, the workflow-side dedup is
+load-bearing and must stay.
+
 ### Workflow-side subscription
 
 [Design Decision 10](#10-workflow-can-publish-but-should-not-subscribe)
