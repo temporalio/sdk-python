@@ -371,7 +371,7 @@ class PubSubClient:
 
     async def subscribe(
         self,
-        topics: list[str] | None = None,
+        topics: str | list[str] | None = None,
         from_offset: int = 0,
         *,
         result_type: type | None = None,
@@ -383,7 +383,8 @@ class PubSubClient:
         was created via :py:meth:`create`.
 
         Args:
-            topics: Topic filter. None or empty list means all topics.
+            topics: Topic filter. A single topic name, a list of topic
+                names, or None. None or empty list means all topics.
             from_offset: Global offset to start reading from.
             result_type: Optional target type. When provided, each
                 yielded :class:`PubSubItem` has its ``data`` decoded
@@ -399,12 +400,19 @@ class PubSubClient:
         Yields:
             :class:`PubSubItem` for each matching item.
         """
+        topic_filter: list[str]
+        if topics is None:
+            topic_filter = []
+        elif isinstance(topics, str):
+            topic_filter = [topics]
+        else:
+            topic_filter = topics
         offset = from_offset
         while True:
             try:
                 result: PollResult = await self._handle.execute_update(
                     "__pubsub_poll",
-                    PollInput(topics=topics or [], from_offset=offset),
+                    PollInput(topics=topic_filter, from_offset=offset),
                     result_type=PollResult,
                 )
             except asyncio.CancelledError:
