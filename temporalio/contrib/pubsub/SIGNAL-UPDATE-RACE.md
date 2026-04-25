@@ -7,11 +7,11 @@ deterministically under parallel load before being patched around.
 
 ## TL;DR
 
-`PubSub` registers `__pubsub_publish` as a **dynamic** signal handler
+`PubSub` registers `__temporal_pubsub_publish` as a **dynamic** signal handler
 (via `workflow.set_signal_handler` inside `PubSub.__init__`). Any
 **class-level, synchronous** `@workflow.update` that reads `PubSub`
 state and fires in the **same activation** as a just-arrived
-`__pubsub_publish` signal will observe pre-signal state — zero items
+`__temporal_pubsub_publish` signal will observe pre-signal state — zero items
 in the log — and raise from the handler before the buffered signal
 task gets a chance to run.
 
@@ -47,12 +47,12 @@ And a client that publishes then immediately truncates:
 
 ```python
 handle = await client.start_workflow(MyWorkflow.run, ...)
-await handle.signal("__pubsub_publish", PublishInput(items=[...5 items...]))
+await handle.signal("__temporal_pubsub_publish", PublishInput(items=[...5 items...]))
 await handle.execute_update("truncate", 3)
 ```
 
 Under parallel test load (or just bad luck on the server), all three
-events — `InitializeWorkflow`, `SignalWorkflow(__pubsub_publish)`,
+events — `InitializeWorkflow`, `SignalWorkflow(__temporal_pubsub_publish)`,
 `DoUpdate(truncate)` — can arrive at the worker in a **single**
 `WorkflowActivation`.
 
@@ -67,8 +67,8 @@ From `temporalio/worker/_workflow_instance.py`:
 
 2. Process `job_sets[1]` (signals + updates) **first**
    (`_workflow_instance.py:461–466`):
-   - `_apply(Signal(__pubsub_publish))` → looks up `self._signals`.
-     `__pubsub_publish` is registered **dynamically inside
+   - `_apply(Signal(__temporal_pubsub_publish))` → looks up `self._signals`.
+     `__temporal_pubsub_publish` is registered **dynamically inside
      `PubSub.__init__`**, which has not run yet. No handler → signal
      goes into `_buffered_signals`
      (`_workflow_instance.py:1061–1063`).
@@ -85,7 +85,7 @@ From `temporalio/worker/_workflow_instance.py`:
    - Lazy-instantiate the workflow object
      (`_workflow_instance.py:2485–2486`). This runs `__init__`
      **synchronously**. `PubSub.__init__` calls
-     `workflow.set_signal_handler("__pubsub_publish", self._on_publish)`.
+     `workflow.set_signal_handler("__temporal_pubsub_publish", self._on_publish)`.
    - `workflow_set_signal_handler` (`_workflow_instance.py:1401–1424`)
      installs the handler **and immediately drains the buffer** —
      dispatching each buffered signal job through
@@ -102,10 +102,10 @@ From `temporalio/worker/_workflow_instance.py`:
 4. Before this PR, the update handler raised `ValueError` on the
    empty-log check. That is not an `ApplicationError`, so it fails
    the **entire workflow task**, not just the update. Subsequent
-   `execute_update("__pubsub_poll", …)` then returns
+   `execute_update("__temporal_pubsub_poll", …)` then returns
    `WorkflowNotReadyFailure` and the test aborts.
 
-### Why `__pubsub_poll` is not affected
+### Why `__temporal_pubsub_poll` is not affected
 
 `_on_poll` is `async` and contains
 
@@ -123,15 +123,15 @@ items. The race is invisible for async handlers that yield.
 ## Who is affected
 
 A user workflow hits this iff **all** are true:
-- The workflow uses `PubSub` (so `__pubsub_publish` is dynamic).
+- The workflow uses `PubSub` (so `__temporal_pubsub_publish` is dynamic).
 - The workflow defines a class-level `@workflow.update` or
   `@workflow.signal` that reads `PubSub` state synchronously (no
   `await`).
-- A client issues `handle.signal("__pubsub_publish", …)` immediately
+- A client issues `handle.signal("__temporal_pubsub_publish", …)` immediately
   followed by a call to that sync update, and the server batches
   init + signal + update into one activation.
 
-The module's own `__pubsub_poll` avoids it (async). Workflow-internal
+The module's own `__temporal_pubsub_poll` avoids it (async). Workflow-internal
 publishes (`self.pubsub.publish(...)` from `run()` or an activity)
 avoid it (no client-initiated signal race). The failure mode is a
 narrow slice but very real: it reproduced deterministically under
@@ -164,7 +164,7 @@ The case where "application robustness is enough" breaks down is
 **sequential same-client ordering**:
 
 ```python
-await handle.signal("__pubsub_publish", items)     # awaited
+await handle.signal("__temporal_pubsub_publish", items)     # awaited
 await handle.execute_update("custom_op", ...)      # expects items visible
 ```
 
@@ -192,7 +192,7 @@ ticket.
 with the specific fix:
 
 > Custom synchronous `@workflow.update` or `@workflow.signal`
-> handlers that read `PubSub` state seeded by `__pubsub_publish`
+> handlers that read `PubSub` state seeded by `__temporal_pubsub_publish`
 > may observe stale state when the external signal and the custom
 > handler arrive in the same workflow activation. To close the
 > window, make the handler `async` and yield once before touching
@@ -203,7 +203,7 @@ with the specific fix:
 >
 > @workflow.update
 > async def my_update(self, ...) -> None:
->     await asyncio.sleep(0)       # let pending __pubsub_publish apply
+>     await asyncio.sleep(0)       # let pending __temporal_pubsub_publish apply
 >     self.pubsub.truncate(...)    # now sees post-signal state
 > ```
 >
@@ -213,7 +213,7 @@ with the specific fix:
 >
 > Already-safe patterns: async handlers that `await` anything
 > (including `workflow.wait_condition`); the module's own
-> `__pubsub_poll`; any handler whose semantics already include
+> `__temporal_pubsub_poll`; any handler whose semantics already include
 > "wait for the state I'm asking about" (use `wait_condition` on a
 > meaningful predicate).
 
@@ -225,10 +225,10 @@ the same out-of-order arrival for reasons unrelated to this race,
 so the recipe is only needed when users rely on strict sequential
 same-client ordering.
 
-### 3. Make `__pubsub_publish` class-level (revert to a mixin)
+### 3. Make `__temporal_pubsub_publish` class-level (revert to a mixin)
 
 **What:** undo 72d296ea — expose `PubSubMixin` with
-`@workflow.signal def __pubsub_publish(...)`. Users opt in by
+`@workflow.signal def __temporal_pubsub_publish(...)`. Users opt in by
 inheritance. Class-level signals are present in `self._signals` from
 instance-context construction, so `_apply(Signal)` schedules a
 **signal** task, not buffers, and FIFO dispatch runs signal before
@@ -328,7 +328,7 @@ class TruncateWorkflow:
 
 # client
 handle = await client.start_workflow(TruncateWorkflow.run, ...)
-await handle.signal("__pubsub_publish", PublishInput(items=[...5 items...]))
+await handle.signal("__temporal_pubsub_publish", PublishInput(items=[...5 items...]))
 await handle.execute_update("truncate", 3)   # racy
 ```
 

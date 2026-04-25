@@ -56,8 +56,8 @@ class MyWorkflow:
 
 Both workflow-side and client-side `publish()` use the sync payload
 converter for per-item `Payload` construction. The codec chain runs
-once at the envelope level (`__pubsub_publish` signal,
-`__pubsub_poll` update) — never per item — so encryption,
+once at the envelope level (`__temporal_pubsub_publish` signal,
+`__temporal_pubsub_poll` update) — never per item — so encryption,
 PII-redaction, and compression are applied once each way.
 
 ### Activity side (publishing)
@@ -152,14 +152,14 @@ class MyWorkflow:
 `PubSubClient.create()` or `PubSubClient.from_activity()` automatically
 follow continue-as-new chains.
 
-## Gotcha: sync handlers racing `__pubsub_publish`
+## Gotcha: sync handlers racing `__temporal_pubsub_publish`
 
 If you add a **custom synchronous** `@workflow.update` or
 `@workflow.signal` handler that reads `PubSub` state, and an
-external client calls `handle.signal("__pubsub_publish", ...)`
+external client calls `handle.signal("__temporal_pubsub_publish", ...)`
 immediately followed by that handler, the handler may observe
 pre-publish state when both land in the same workflow activation.
-Root cause: `PubSub` installs `__pubsub_publish` *dynamically* from
+Root cause: `PubSub` installs `__temporal_pubsub_publish` *dynamically* from
 `@workflow.init`, so in the first activation the signal is buffered
 until after your class-level handler has already been scheduled.
 
@@ -203,7 +203,7 @@ timer and adds history events on every call.
 
 Already-safe patterns, no recipe needed:
 
-- The module's own `__pubsub_poll` update (it is already `async` and
+- The module's own `__temporal_pubsub_poll` update (it is already `async` and
   `await`s `workflow.wait_condition` internally).
 - Any `async` handler that `await`s something before reading
   `PubSub` state.
@@ -232,9 +232,9 @@ Handlers registered by the constructor:
 
 | Kind | Name | Description |
 |---|---|---|
-| Signal | `__pubsub_publish` | Receive external publications. |
-| Update | `__pubsub_poll` | Long-poll subscription. |
-| Query | `__pubsub_offset` | Current global offset. |
+| Signal | `__temporal_pubsub_publish` | Receive external publications. |
+| Update | `__temporal_pubsub_poll` | Long-poll subscription. |
+| Query | `__temporal_pubsub_offset` | Current global offset. |
 
 ### PubSubClient
 
@@ -254,9 +254,9 @@ Use as `async with` for batched publishing with automatic flush.
 Any Temporal client can interact with a pub/sub workflow using these
 fixed handler names:
 
-1. **Publish:** Signal `__pubsub_publish` with `PublishInput`
-2. **Subscribe:** Update `__pubsub_poll` with `PollInput` -> `PollResult`
-3. **Offset:** Query `__pubsub_offset` -> `int`
+1. **Publish:** Signal `__temporal_pubsub_publish` with `PublishInput`
+2. **Subscribe:** Update `__temporal_pubsub_poll` with `PollInput` -> `PollResult`
+3. **Offset:** Query `__temporal_pubsub_offset` -> `int`
 
 The Python API exposes Temporal `Payload`s and decodes via the client's
 data converter. On the wire, each `PublishEntry.data` / `_WireItem.data`

@@ -36,9 +36,9 @@ the workflow does not interpret them.
                     │  │   publisher_sequences: {}  │  │
                     │  └────────────────────────────┘  │
                     │                                  │
-  signal ──────────►│  __pubsub_publish (with dedup)   │
-  update ──────────►│  __pubsub_poll (long-poll)       │◄── subscribe()
-  query  ──────────►│  __pubsub_offset                 │
+  signal ──────────►│  __temporal_pubsub_publish (with dedup)   │
+  update ──────────►│  __temporal_pubsub_poll (long-poll)       │◄── subscribe()
+  query  ──────────►│  __temporal_pubsub_offset                 │
                     │                                  │
                     │  publish() ── workflow-side      │
                     └──────────────────────────────────┘
@@ -91,7 +91,7 @@ Construct `PubSub(...)` once from `@workflow.init`. Include a
 state across continue-as-new (see [Continue-as-New](#continue-as-new)).
 Workflows that will never continue-as-new may call `PubSub()` with no
 argument. Instantiating `PubSub` twice on the same workflow raises
-`RuntimeError`, detected via `workflow.get_signal_handler("__pubsub_publish")`.
+`RuntimeError`, detected via `workflow.get_signal_handler("__temporal_pubsub_publish")`.
 
 | Method / Handler | Kind | Description |
 |---|---|---|
@@ -100,9 +100,9 @@ argument. Instantiating `PubSub` twice on the same workflow raises
 | `get_state(publisher_ttl=900)` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
 | `drain()` | instance method | Unblock polls and reject new ones for CAN. |
 | `truncate(up_to_offset)` | instance method | Discard log entries before offset. |
-| `__pubsub_publish` | signal handler | Receives publications from external clients (with dedup). |
-| `__pubsub_poll` | update handler | Long-poll subscription: blocks until new items or drain. |
-| `__pubsub_offset` | query handler | Returns the current global offset. |
+| `__temporal_pubsub_publish` | signal handler | Receives publications from external clients (with dedup). |
+| `__temporal_pubsub_poll` | update handler | Long-poll subscription: blocks until new items or drain. |
+| `__temporal_pubsub_offset` | query handler | Returns the current global offset. |
 
 ### Client side — `PubSubClient`
 
@@ -311,9 +311,9 @@ The three original arguments for opaque bytes don't hold up:
 **Codec runs once, at the envelope level.** Both
 `PubSubClient.publish` and `PubSub.publish` turn values into
 `Payload` via the **sync** payload converter. The codec chain is
-not applied per item. It runs once — on the `__pubsub_publish`
+not applied per item. It runs once — on the `__temporal_pubsub_publish`
 signal envelope (client → workflow path) and on the
-`__pubsub_poll` update envelope (workflow → subscriber path) —
+`__temporal_pubsub_poll` update envelope (workflow → subscriber path) —
 because Temporal's SDK already runs `DataConverter.encode` on
 signal and update args. Running the codec per item *as well*
 would double-encrypt / double-compress, and compressing
@@ -427,7 +427,7 @@ signals are never in flight concurrently from a single client:
 3. Release lock
 
 Combined with the workflow's single-threaded signal processing (the
-`__pubsub_publish` handler is synchronous — no `await`), items within and
+`__temporal_pubsub_publish` handler is synchronous — no `await`), items within and
 across batches from a single publisher preserve their publish order.
 
 Concurrent publishers get a total order in the log (the workflow serializes
@@ -450,7 +450,7 @@ Parameters:
 ### 9. Subscription is poll-based, exposed as async iterator
 
 The fundamental primitive is an offset-based long-poll: the subscriber sends
-`from_offset` and gets back items plus `next_offset`. `__pubsub_poll` is a
+`from_offset` and gets back items plus `next_offset`. `__temporal_pubsub_poll` is a
 Temporal update with `wait_condition`. `subscribe()` wraps this in an
 `AsyncIterator` with a configurable `poll_cooldown` (default 0.1s) to
 rate-limit polls.
@@ -490,7 +490,7 @@ are the same cost: one slice, one filter pass. The worst case is a poll from
 offset 0 (full log scan), which only happens on first connection or after the
 subscriber falls behind.
 
-**Fan-out is per-poll, not shared.** Each `__pubsub_poll` update is an
+**Fan-out is per-poll, not shared.** Each `__temporal_pubsub_poll` update is an
 independent Temporal update RPC. The handler has no registry of active
 subscribers; every call executes `_on_poll` from scratch with its own
 `from_offset` closure and topic set. When a publish grows the log,
@@ -728,7 +728,7 @@ async def _flush(self) -> None:
             return
         try:
             await self._handle.signal(
-                "__pubsub_publish",
+                "__temporal_pubsub_publish",
                 PublishInput(items=batch, publisher_id=self._publisher_id,
                              sequence=seq),
             )
@@ -810,7 +810,7 @@ global offsets (see [Information Leakage and the BFF](#information-leakage-and-t
 ### Problem
 
 The pub/sub mixin accumulates workflow history through signals (each
-`__pubsub_publish`) and updates (each `__pubsub_poll` response). Over a
+`__temporal_pubsub_publish`) and updates (each `__temporal_pubsub_poll` response). Over a
 streaming session, history grows toward the ~50K event threshold. CAN resets
 the history while carrying the canonical log copy forward.
 
@@ -830,7 +830,7 @@ snapshots them.
 
 ### Draining
 
-A long-poll `__pubsub_poll` blocks indefinitely until new data arrives. To
+A long-poll `__temporal_pubsub_poll` blocks indefinitely until new data arrives. To
 allow CAN to proceed, draining uses two mechanisms:
 
 1. **`PubSub.drain()`** sets a flag that unblocks all waiting poll handlers
@@ -964,9 +964,9 @@ reconnection pattern.
 
 Any Temporal client in any language can interact with a pub/sub workflow by:
 
-1. **Publishing**: Signal `__pubsub_publish` with `PublishInput` payload
-2. **Subscribing**: Execute update `__pubsub_poll` with `PollInput`, loop
-3. **Checking offset**: Query `__pubsub_offset`
+1. **Publishing**: Signal `__temporal_pubsub_publish` with `PublishInput` payload
+2. **Subscribing**: Execute update `__temporal_pubsub_poll` with `PollInput`, loop
+3. **Checking offset**: Query `__temporal_pubsub_offset`
 
 Double-underscore prefix on handler names avoids collisions with application
 signals/updates. The envelope types are simple composites of strings, bytes,
@@ -984,9 +984,9 @@ serialization independently.
 
 > 🚪 **One-way door (two parts).**
 >
-> **Immutable handler names.** `__pubsub_publish`, `__pubsub_poll`, and
-> `__pubsub_offset` are permanent wire-level entry points. The escape hatch —
-> versioned handler names like `__pubsub_v2_poll` — gets more expensive over
+> **Immutable handler names.** `__temporal_pubsub_publish`, `__temporal_pubsub_poll`, and
+> `__temporal_pubsub_offset` are permanent wire-level entry points. The escape hatch —
+> versioned handler names like `__temporal_pubsub_v2_poll` — gets more expensive over
 > time: the mixin must register all supported versions, with no discovery
 > mechanism for which versions a workflow supports.
 >
@@ -1017,7 +1017,7 @@ return an error, but this only helps if you change the semantics of an
 existing field — which you should not do (that is a new handler, not a
 version bump).
 
-**Versioned handler names** (e.g., `__pubsub_v2_poll`). The most robust
+**Versioned handler names** (e.g., `__temporal_pubsub_v2_poll`). The most robust
 option — creates entirely separate protocol surfaces so old and new code
 never interact. But premature: the mixin must register handlers for all
 supported versions, the client must probe which versions exist (Temporal
@@ -1072,9 +1072,9 @@ compatibility.
 
 ### 2. Handler names are immutable
 
-`__pubsub_publish`, `__pubsub_poll`, and `__pubsub_offset` will never change
+`__temporal_pubsub_publish`, `__temporal_pubsub_poll`, and `__temporal_pubsub_offset` will never change
 meaning. If a future change is incompatible with additive evolution, the correct
-mechanism is a new handler name (e.g., `__pubsub_v2_poll`) — creating an
+mechanism is a new handler name (e.g., `__temporal_pubsub_v2_poll`) — creating an
 entirely separate protocol surface so old and new code never interact.
 
 ### 3. `PubSubState` must be forward-compatible
@@ -1125,7 +1125,7 @@ The closest analogs in established messaging systems, for orientation:
 - **Idempotent producer** — Kafka's producer ID + monotonic sequence
   number, scoped to the broker. Our `publisher_id` + `sequence` at the
   workflow does the same job, scoped to signal delivery into one workflow.
-- **Blocking pull** — Redis Streams `XREAD BLOCK`. Our `__pubsub_poll`
+- **Blocking pull** — Redis Streams `XREAD BLOCK`. Our `__temporal_pubsub_poll`
   update with `wait_condition` is the Temporal-native equivalent.
 - **Durable-execution peer** — the Workflow SDK ([workflow-sdk.dev](https://workflow-sdk.dev))
   has a first-class streaming model with indexed resumption and buffered
@@ -1140,7 +1140,7 @@ Streams, and Workflow SDK) live on the
 
 ### Shared workflow-side fan-out
 
-Each `__pubsub_poll` update today is serviced independently, and an item
+Each `__temporal_pubsub_poll` update today is serviced independently, and an item
 published to N interested subscribers crosses the wire N times (see
 [Design Decision 9](#9-subscription-is-poll-based-exposed-as-async-iterator)).
 For low fan-out (1–2 consumers) this is fine; for workloads with many
@@ -1212,7 +1212,7 @@ both layers are already aligned.
 ```python
 # In _client.py, _flush() — pin a deterministic request_id:
 await self._handle.signal(
-    "__pubsub_publish",
+    "__temporal_pubsub_publish",
     PublishInput(
         items=batch,
         publisher_id=self._publisher_id,
@@ -1223,7 +1223,7 @@ await self._handle.signal(
 ```
 
 ```python
-# In _mixin.py, __pubsub_publish handler — drop the dedup branch:
+# In _mixin.py, __temporal_pubsub_publish handler — drop the dedup branch:
 def _pubsub_publish(self, input: PublishInput) -> None:
     # remove: if input.publisher_id and input.sequence ...
     self._log.extend(input.items)
@@ -1293,6 +1293,41 @@ deterministic checkpoints. The simplest cut is probably a pull-based
 iterator over `self._log` slices that integrates with `wait_condition`
 for the "no data yet" case, mirroring the external poll API but
 bypassing the update RPC layer.
+
+### Packaged `continue_as_new` helper
+
+Today the documented continue-as-new recipe is three lines that the
+caller writes verbatim:
+
+```python
+self.pubsub.drain()
+await workflow.wait_condition(workflow.all_handlers_finished)
+workflow.continue_as_new(args=[WorkflowInput(
+    pubsub_state=self.pubsub.get_state(),
+    ...
+)])
+```
+
+A natural-looking shortcut is `await self.pubsub.continue_as_new(...)`
+that performs the drain + wait + CAN in one call. Two reasons we have
+not added it:
+
+1. To stay general it would mirror the full `workflow.continue_as_new`
+   signature (12 parameters today), so the contrib's surface area —
+   and its forward-compat burden as new CAN options land — grows in
+   exchange for collapsing two boilerplate lines.
+2. Python evaluates call-site arguments before the method body runs,
+   so `pubsub_state=self.get_state()` would snapshot state *before*
+   `drain()` and `all_handlers_finished` — the opposite of the
+   recipe's intent. The fix is to widen `args` to also accept a
+   zero-arg callable (`args=lambda: [...]`), but that introduces a
+   second footgun in place of the one removed.
+
+If the recipe ever picks up additional steps (e.g., a flush
+coordination with in-flight publishers, or a state-versioning bump),
+the helper becomes more attractive because it would absorb logic that
+no longer fits in three readable lines. Until then the explicit
+recipe is the better default.
 
 ## File Layout
 

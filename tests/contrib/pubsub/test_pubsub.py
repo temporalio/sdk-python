@@ -616,7 +616,7 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
         # below proves the workflow task wasn't poisoned.
         with pytest.raises(WorkflowUpdateFailedError) as exc_info:
             await handle.execute_update(
-                "__pubsub_poll",
+                "__temporal_pubsub_poll",
                 PollInput(topics=[], from_offset=1),
                 result_type=PollResult,
             )
@@ -779,7 +779,7 @@ async def test_iterator_cancellation(client: Client) -> None:
         # Seed one item so the iterator provably reaches an active state
         # before we cancel — no sleep-based wait.
         await handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"seed"))]
             ),
@@ -931,7 +931,7 @@ async def test_concurrent_subscribers(client: Client) -> None:
 
         async def publish(topic: str, data: bytes) -> None:
             await handle.signal(
-                "__pubsub_publish",
+                "__temporal_pubsub_publish",
                 PublishInput(items=[PublishEntry(topic=topic, data=_wire_bytes(data))]),
             )
 
@@ -1158,7 +1158,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
 
         # Send a batch with publisher_id and sequence
         await handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"item-0"))],
                 publisher_id="test-pub",
@@ -1168,7 +1168,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
 
         # Send the same sequence again — should be deduped
         await handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"duplicate"))],
                 publisher_id="test-pub",
@@ -1178,7 +1178,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
 
         # Send a new sequence — should go through
         await handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"item-1"))],
                 publisher_id="test-pub",
@@ -1204,7 +1204,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
 async def test_double_init_raises(client: Client) -> None:
     """Instantiating PubSub twice from @workflow.init raises RuntimeError.
 
-    The first PubSub() registers the __pubsub_publish signal handler; the
+    The first PubSub() registers the __temporal_pubsub_publish signal handler; the
     second call detects the existing handler and raises rather than
     silently overwriting it.
     """
@@ -1295,7 +1295,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
         # pub-old arrives first.
         await handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"old"))],
                 publisher_id="pub-old",
@@ -1315,7 +1315,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
         # pub-new arrives after the gap.
         await handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"new"))],
                 publisher_id="pub-new",
@@ -1352,7 +1352,7 @@ class TruncateWorkflow:
     The ``truncate`` update is ``async`` and opens with
     ``await asyncio.sleep(0)`` — the documented recipe from the
     contrib/pubsub README for sync-shaped handlers that read ``PubSub``
-    state. The yield lets any buffered ``__pubsub_publish`` signal in
+    state. The yield lets any buffered ``__temporal_pubsub_publish`` signal in
     the same activation apply before the handler inspects ``self._log``.
     This keeps the test workflow aligned with the pattern users are
     directed to follow.
@@ -1377,7 +1377,7 @@ class TruncateWorkflow:
     @workflow.update
     async def truncate(self, up_to_offset: int) -> None:
         # Recipe from README.md "Gotcha" section: yield once so any
-        # buffered __pubsub_publish in the same activation applies
+        # buffered __temporal_pubsub_publish in the same activation applies
         # before we read self._log. asyncio.sleep(0) is a pure asyncio
         # yield — no Temporal timer, no history event.
         await asyncio.sleep(0)
@@ -1488,7 +1488,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         # Publish 3 items with an explicit publisher_id/sequence so dedup
         # state is seeded and we can verify it survives CAN.
         await handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[
                     PublishEntry(topic="events", data=_wire_bytes(b"item-0")),
@@ -1526,7 +1526,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         # Re-sending publisher_id="pub", sequence=1 must be rejected by
         # dedup — both the log and the publisher_sequences entry stay put.
         await new_handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[
                     PublishEntry(topic="events", data=_wire_bytes(b"dup")),
@@ -1543,7 +1543,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         # A fresh sequence from the same publisher is accepted, advances
         # publisher_sequences to 2, and the new item gets offset 3.
         await new_handle.signal(
-            "__pubsub_publish",
+            "__temporal_pubsub_publish",
             PublishInput(
                 items=[
                     PublishEntry(topic="events", data=_wire_bytes(b"item-3")),
@@ -1781,7 +1781,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         chunk = b"x" * 200_000
         for _ in range(8):
             await handle.signal(
-                "__pubsub_publish",
+                "__temporal_pubsub_publish",
                 PublishInput(
                     items=[PublishEntry(topic="big", data=_wire_bytes(chunk))]
                 ),
@@ -1790,7 +1790,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         # First poll from offset 0 — should get some items but not all.
         # (The update acts as a barrier for all prior publish signals.)
         result1: PollResult = await handle.execute_update(
-            "__pubsub_poll",
+            "__temporal_pubsub_poll",
             PollInput(topics=[], from_offset=0),
             result_type=PollResult,
         )
@@ -1804,7 +1804,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         last_result: PollResult = result1
         while len(all_items) < 8:
             last_result = await handle.execute_update(
-                "__pubsub_poll",
+                "__temporal_pubsub_poll",
                 PollInput(topics=[], from_offset=offset),
                 result_type=PollResult,
             )
@@ -1834,7 +1834,7 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
         chunk = b"x" * 200_000
         for _ in range(8):
             await handle.signal(
-                "__pubsub_publish",
+                "__temporal_pubsub_publish",
                 PublishInput(
                     items=[PublishEntry(topic="big", data=_wire_bytes(chunk))]
                 ),

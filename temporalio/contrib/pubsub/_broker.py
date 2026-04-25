@@ -42,9 +42,9 @@ from ._types import (
     _WireItem,
 )
 
-_PUBLISH_SIGNAL = "__pubsub_publish"
-_POLL_UPDATE = "__pubsub_poll"
-_OFFSET_QUERY = "__pubsub_offset"
+_PUBLISH_SIGNAL = "__temporal_pubsub_publish"
+_POLL_UPDATE = "__temporal_pubsub_poll"
+_OFFSET_QUERY = "__temporal_pubsub_offset"
 
 _MAX_POLL_RESPONSE_BYTES = 1_000_000
 
@@ -69,12 +69,12 @@ class PubSub:
 
     Registered handlers:
 
-    - ``__pubsub_publish`` signal — external publish with dedup
-    - ``__pubsub_poll`` update — long-poll subscription
-    - ``__pubsub_offset`` query — current log length
+    - ``__temporal_pubsub_publish`` signal — external publish with dedup
+    - ``__temporal_pubsub_poll`` update — long-poll subscription
+    - ``__temporal_pubsub_offset`` query — current log length
 
     Note:
-        Because ``__pubsub_publish`` is registered *dynamically* from
+        Because ``__temporal_pubsub_publish`` is registered *dynamically* from
         ``__init__``, custom **synchronous** update/signal handlers
         that read ``PubSub`` state can observe pre-publish state when
         both land in the same activation. Make such handlers ``async``
@@ -160,7 +160,7 @@ class PubSub:
         :class:`temporalio.api.common.v1.Payload` for zero-copy.
 
         The codec chain is not applied here (it runs on the
-        ``__pubsub_poll`` update envelope that later delivers the
+        ``__temporal_pubsub_poll`` update envelope that later delivers the
         item to a subscriber).
         """
         if isinstance(value, Payload):

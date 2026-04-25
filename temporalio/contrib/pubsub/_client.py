@@ -6,8 +6,8 @@ publish messages and subscribe to topics on a pub/sub workflow.
 Each published value is turned into a :class:`Payload` via the client's
 sync payload converter. The **codec chain** (encryption, PII-redaction,
 compression) is **not** run per item — it runs once at the envelope
-level when Temporal's SDK encodes the ``__pubsub_publish`` signal args
-and the ``__pubsub_poll`` update result. Running the codec per item as
+level when Temporal's SDK encodes the ``__temporal_pubsub_publish`` signal args
+and the ``__temporal_pubsub_poll`` update result. Running the codec per item as
 well would double-encrypt / double-compress, because the envelope path
 covers the items again. The per-item ``Payload`` still carries the
 encoding metadata (``encoding: json/plain``, ``messageType``, etc.)
@@ -341,7 +341,7 @@ class PubSubClient:
                 # workflow-side dedup go away. See DESIGN-v2 §"Replace
                 # workflow-side dedup with server-side request_id".
                 await self._handle.signal(
-                    "__pubsub_publish",
+                    "__temporal_pubsub_publish",
                     PublishInput(
                         items=batch,
                         publisher_id=self._publisher_id,
@@ -411,7 +411,7 @@ class PubSubClient:
         while True:
             try:
                 result: PollResult = await self._handle.execute_update(
-                    "__pubsub_poll",
+                    "__temporal_pubsub_poll",
                     PollInput(topics=topic_filter, from_offset=offset),
                     result_type=PollResult,
                 )
@@ -464,4 +464,4 @@ class PubSubClient:
 
     async def get_offset(self) -> int:
         """Query the current global offset (base_offset + log length)."""
-        return await self._handle.query("__pubsub_offset", result_type=int)
+        return await self._handle.query("__temporal_pubsub_offset", result_type=int)
