@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-12T04:20:59.693938Z"
+exclude-newer = "2026-04-18T05:37:33.920196Z"
 exclude-newer-span = "P1W"
 
 [options.exclude-newer-package]
@@ -5057,6 +5057,7 @@ pydantic = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "async-timeout", marker = "python_full_version < '3.11'" },
     { name = "basedpyright" },
     { name = "cibuildwheel" },
     { name = "googleapis-common-protos" },
@@ -5119,6 +5120,7 @@ provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "async-timeout", marker = "python_full_version < '3.11'", specifier = ">=4.0,<6" },
     { name = "basedpyright", specifier = "==1.34.0" },
     { name = "cibuildwheel", specifier = ">=2.22.0,<3" },
     { name = "googleapis-common-protos", specifier = "==1.70.0" },

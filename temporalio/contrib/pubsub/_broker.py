@@ -323,9 +323,8 @@ class PubSub:
             more_ready=more_ready,
         )
 
-    def _validate_poll(self, payload: PollInput) -> None:  # noqa: ARG002
+    def _validate_poll(self, _payload: PollInput) -> None:
         """Reject new polls when draining for continue-as-new."""
-        del payload
         if self._draining:
             raise RuntimeError("Workflow is draining for continue-as-new")
 

@@ -13,7 +13,7 @@ from unittest.mock import patch
 if sys.version_info >= (3, 11):
     from asyncio import timeout as _async_timeout  # pyright: ignore[reportUnreachable]
 else:
-    from async_timeout import (  # pyright: ignore[reportMissingImports, reportUnreachable]
+    from async_timeout import (  # pyright: ignore[reportUnreachable]
         timeout as _async_timeout,
     )
 
@@ -1449,10 +1449,10 @@ class ContinueAsNewTypedWorkflow:
         return dict(self.pubsub._publisher_sequences)
 
     @workflow.run
-    async def run(
-        self,
-        input: CANWorkflowInputTyped,  # type:ignore[reportUnusedParameter]
-    ) -> None:
+    async def run(self, _input: CANWorkflowInputTyped) -> None:
+        # _input is consumed in @workflow.init above. @workflow.run must
+        # accept the same positional args, but the names are free to differ.
+        del _input
         while True:
             await workflow.wait_condition(lambda: self._should_continue or self._closed)
             if self._closed:
