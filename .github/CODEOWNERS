@@ -13,8 +13,6 @@
 /temporalio/contrib/google_adk_agents/      @temporalio/ai-sdk     @temporalio/sdk
 /temporalio/contrib/langsmith/              @temporalio/ai-sdk     @temporalio/sdk
 /temporalio/contrib/openai_agents/          @temporalio/ai-sdk     @temporalio/sdk
-/temporalio/contrib/pydantic.py             @temporalio/ai-sdk     @temporalio/sdk
 /tests/contrib/google_adk_agents/           @temporalio/ai-sdk     @temporalio/sdk
 /tests/contrib/langsmith/                   @temporalio/ai-sdk     @temporalio/sdk
 /tests/contrib/openai_agents/               @temporalio/ai-sdk     @temporalio/sdk
-/tests/contrib/pydantic/                    @temporalio/ai-sdk     @temporalio/sdk
