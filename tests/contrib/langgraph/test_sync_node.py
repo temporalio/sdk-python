@@ -31,7 +31,7 @@ class SyncNodeWorkflow:
 
 async def test_sync_node(client: Client):
     g = StateGraph(State)
-    g.add_node("sync_node", sync_node)
+    g.add_node("sync_node", sync_node, metadata={"execute_in": "activity"})
     g.add_edge(START, "sync_node")
 
     task_queue = f"sync-node-{uuid4()}"

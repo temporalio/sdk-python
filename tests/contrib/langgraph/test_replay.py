@@ -27,8 +27,8 @@ from tests.contrib.langgraph.test_two_nodes import (
 
 async def test_replay(client: Client):
     g = StateGraph(State)
-    g.add_node("node_a", node_a)
-    g.add_node("node_b", node_b)
+    g.add_node("node_a", node_a, metadata={"execute_in": "activity"})
+    g.add_node("node_b", node_b, metadata={"execute_in": "activity"})
     g.add_edge(START, "node_a")
     g.add_edge("node_a", "node_b")
 
@@ -64,7 +64,7 @@ async def test_replay(client: Client):
 )
 async def test_replay_interrupt(client: Client):
     g = StateGraph(InterruptState)
-    g.add_node("node", interrupt_node)
+    g.add_node("node", interrupt_node, metadata={"execute_in": "activity"})
     g.add_edge(START, "node")
 
     task_queue = f"interrupt-replay-{uuid4()}"

@@ -39,7 +39,7 @@ class ActivitySubgraphWorkflow:
 
 async def test_activity_subgraph(client: Client):
     parent = StateGraph(State)
-    parent.add_node("parent_node", parent_node)
+    parent.add_node("parent_node", parent_node, metadata={"execute_in": "activity"})
     parent.add_edge(START, "parent_node")
 
     task_queue = f"subgraph-{uuid4()}"

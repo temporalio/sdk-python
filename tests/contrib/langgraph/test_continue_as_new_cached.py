@@ -88,11 +88,14 @@ async def test_graph_continue_as_new_cached(client: Client):
     """
     _reset()
 
-    timeout = {"start_to_close_timeout": timedelta(seconds=10)}
+    metadata = {
+        "execute_in": "activity",
+        "start_to_close_timeout": timedelta(seconds=10),
+    }
     g = StateGraph(State)
-    g.add_node("multiply_by_3", multiply_by_3, metadata=timeout)
-    g.add_node("add_100", add_100, metadata=timeout)
-    g.add_node("double", double, metadata=timeout)
+    g.add_node("multiply_by_3", multiply_by_3, metadata=metadata)
+    g.add_node("add_100", add_100, metadata=metadata)
+    g.add_node("double", double, metadata=metadata)
     g.add_edge(START, "multiply_by_3")
     g.add_edge("multiply_by_3", "add_100")
     g.add_edge("add_100", "double")

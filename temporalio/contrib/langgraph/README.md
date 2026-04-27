@@ -15,20 +15,24 @@ uv add temporalio[langgraph]
 ### Graph API
 
 ```python
+from langgraph.graph import StateGraph
 from temporalio.contrib.langgraph import LangGraphPlugin
 
-plugin = LangGraphPlugin(graphs={"my-graph": graph})
+g = StateGraph(State)
+g.add_node("my_node", my_node, metadata={"execute_in": "activity"})
+
+plugin = LangGraphPlugin(graphs={"my-graph": g})
 ```
 
 ### Functional API
 
 ```python
-import datetime
 from temporalio.contrib.langgraph import LangGraphPlugin
 
 plugin = LangGraphPlugin(
     entrypoints={"my_entrypoint": my_entrypoint},
     tasks=[my_task],
+    activity_options={"my_task": {"execute_in": "activity"}},
 )
 ```
 
@@ -55,6 +59,25 @@ class MyWorkflow:
         ...
 ```
 
+## Execution Location
+
+Every node (Graph API) and task (Functional API) must be labeled with `execute_in`, set to either `"activity"` or `"workflow"`. This is required per node/task; it cannot be set in `default_activity_options`.
+
+```python
+# Graph API
+graph.add_node("my_node", my_node, metadata={"execute_in": "activity"})
+graph.add_node("tool_node", tool_node, metadata={"execute_in": "workflow"})
+
+# Functional API
+plugin = LangGraphPlugin(
+    tasks=[my_task, tool_task],
+    activity_options={
+        "my_task": {"execute_in": "activity"},
+        "tool_task": {"execute_in": "workflow"},
+    },
+)
+```
+
 ## Activity Options
 
 Options are passed through to [`workflow.execute_activity()`](https://python.temporal.io/temporalio.workflow.html#execute_activity), which supports parameters like `start_to_close_timeout`, `retry_policy`, `schedule_to_close_timeout`, `heartbeat_timeout`, and more.
@@ -69,6 +92,7 @@ from temporalio.common import RetryPolicy
 
 g = StateGraph(State)
 g.add_node("my_node", my_node, metadata={
+    "execute_in": "activity",
     "start_to_close_timeout": timedelta(seconds=30),
     "retry_policy": RetryPolicy(maximum_attempts=3),
 })
@@ -88,25 +112,11 @@ plugin = LangGraphPlugin(
     tasks=[my_task],
     activity_options={
         "my_task": {
+            "execute_in": "activity",
             "start_to_close_timeout": timedelta(seconds=30),
             "retry_policy": RetryPolicy(maximum_attempts=3),
         },
     },
-)
-```
-
-### Running in the Workflow
-
-To run a node or task directly in the Workflow, set `execute_in` to `"workflow"`:
-
-```python
-# Graph API
-graph.add_node("my_node", my_node, metadata={"execute_in": "workflow"})
-
-# Functional API
-plugin = LangGraphPlugin(
-    tasks=[my_task],
-    activity_options={"my_task": {"execute_in": "workflow"}},
 )
 ```
 

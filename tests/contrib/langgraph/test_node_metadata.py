@@ -28,6 +28,7 @@ metadata_graph.add_node(
     "node",
     node,
     metadata={
+        "execute_in": "activity",
         "start_to_close_timeout": timedelta(seconds=10),
         "my_key": "my_value",
     },

@@ -46,6 +46,29 @@ def test_invalid_execute_in_raises() -> None:
         LangGraphPlugin(graphs={f"validation-{uuid4()}": g})
 
 
+def test_graph_node_missing_execute_in_raises() -> None:
+    g = StateGraph(State)
+    g.add_node("node", async_node)
+    g.add_edge(START, "node")
+
+    with raises(ValueError, match="missing required 'execute_in'"):
+        LangGraphPlugin(graphs={f"validation-{uuid4()}": g})
+
+
+def test_functional_task_missing_execute_in_raises() -> None:
+    @task
+    def my_task(x: int) -> int:
+        return x + 1
+
+    with raises(ValueError, match="missing required 'execute_in'"):
+        LangGraphPlugin(tasks=[my_task])
+
+
+def test_execute_in_in_default_activity_options_raises() -> None:
+    with raises(ValueError, match="cannot be set in default_activity_options"):
+        LangGraphPlugin(default_activity_options={"execute_in": "activity"})
+
+
 def test_node_retry_policy_raises() -> None:
     g = StateGraph(State)
     g.add_node("node", async_node, retry_policy=RetryPolicy(max_attempts=3))

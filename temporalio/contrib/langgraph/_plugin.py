@@ -71,6 +71,13 @@ class LangGraphPlugin(SimplePlugin):
                 stacklevel=2,
             )
 
+        if default_activity_options and "execute_in" in default_activity_options:
+            raise ValueError(
+                "execute_in cannot be set in default_activity_options. "
+                "Set it on each node's metadata (Graph API) or in "
+                "activity_options[task_name] (Functional API)."
+            )
+
         self.activities: list = []
 
         # Graph API: Wrap graph nodes as Temporal Activities.
@@ -114,6 +121,12 @@ class LangGraphPlugin(SimplePlugin):
                         for k, v in node_meta.items()
                         if k not in _ACTIVITY_OPTION_KEYS
                     }
+                    if "execute_in" not in node_opts:
+                        raise ValueError(
+                            f"Node {graph_name}.{node_name} is missing required "
+                            f"'execute_in' in metadata. Set it to 'activity' or "
+                            f"'workflow'."
+                        )
                     opts = {**(default_activity_options or {}), **node_opts}
                     # Route all LangGraph node calls through afunc so the async
                     # activity wrapper is always used. wrap_activity handles
@@ -134,9 +147,16 @@ class LangGraphPlugin(SimplePlugin):
                         f"retry_policy=RetryPolicy(...) via "
                         f"default_activity_options or activity_options[{name!r}]."
                     )
+                task_opts = (activity_options or {}).get(name, {})
+                if "execute_in" not in task_opts:
+                    raise ValueError(
+                        f"Task {name} is missing required 'execute_in' in "
+                        f"activity_options[{name!r}]. Set it to 'activity' or "
+                        f"'workflow'."
+                    )
                 opts = {
                     **(default_activity_options or {}),
-                    **(activity_options or {}).get(name, {}),
+                    **task_opts,
                 }
 
                 task.func = self.execute(task_id(task.func), task.func, opts)
@@ -174,7 +194,7 @@ class LangGraphPlugin(SimplePlugin):
     ) -> Callable:
         """Prepare a node or task to execute as an activity or inline in the workflow."""
         opts = kwargs or {}
-        execute_in = opts.pop("execute_in", "activity")
+        execute_in = opts.pop("execute_in")
 
         if execute_in == "activity":
             a = activity.defn(name=activity_name)(wrap_activity(func))

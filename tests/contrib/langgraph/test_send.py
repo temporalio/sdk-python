@@ -46,7 +46,7 @@ class SendWorkflow:
 
 async def test_send(client: Client):
     g = StateGraph(State)
-    g.add_node("worker", worker)
+    g.add_node("worker", worker, metadata={"execute_in": "activity"})
     g.add_conditional_edges(START, fan_out, ["worker"])
     g.add_edge("worker", END)
 

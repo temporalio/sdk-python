@@ -52,6 +52,7 @@ async def test_sync_task(client: Client):
             LangGraphPlugin(
                 entrypoints={"sync-task": sync_task_entrypoint},
                 tasks=[sync_task],
+                activity_options={"sync_task": {"execute_in": "activity"}},
                 default_activity_options={
                     "start_to_close_timeout": timedelta(seconds=10)
                 },

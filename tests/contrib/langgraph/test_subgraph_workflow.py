@@ -38,7 +38,10 @@ async def test_workflow_subgraph(client: Client):
     child.add_node(
         "child_node",
         child_node,
-        metadata={"start_to_close_timeout": timedelta(seconds=10)},
+        metadata={
+            "execute_in": "activity",
+            "start_to_close_timeout": timedelta(seconds=10),
+        },
     )
     child.add_edge(START, "child_node")
 

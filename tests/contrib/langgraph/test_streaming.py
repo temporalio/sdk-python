@@ -38,8 +38,8 @@ class StreamingWorkflow:
 
 async def test_streaming(client: Client):
     g = StateGraph(State)
-    g.add_node("node_a", node_a)
-    g.add_node("node_b", node_b)
+    g.add_node("node_a", node_a, metadata={"execute_in": "activity"})
+    g.add_node("node_b", node_b, metadata={"execute_in": "activity"})
     g.add_edge(START, "node_a")
     g.add_edge("node_a", "node_b")
 

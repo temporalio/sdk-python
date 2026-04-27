@@ -69,7 +69,7 @@ class InterruptV2Workflow:
 )
 async def test_interrupt(client: Client, workflow_cls: Any) -> None:
     g = StateGraph(State)
-    g.add_node("node", node)
+    g.add_node("node", node, metadata={"execute_in": "activity"})
     g.add_edge(START, "node")
 
     task_queue = f"interrupt-{uuid4()}"

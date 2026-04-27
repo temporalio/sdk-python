@@ -65,6 +65,10 @@ from tests.contrib.langgraph.e2e_functional_workflows import (
 _DEFAULT_ACTIVITY_OPTIONS = {"start_to_close_timeout": timedelta(seconds=30)}
 
 
+def _execute_in_activity(*task_names: str) -> dict[str, dict[str, Any]]:
+    return {name: {"execute_in": "activity"} for name in task_names}
+
+
 # V2-only tasks defined here to avoid sharing mutated _TaskFunction objects
 # (Plugin wraps task.func in-place).
 
@@ -161,6 +165,9 @@ class TestFunctionalAPIBasicExecution:
                 LangGraphPlugin(
                     entrypoints={entrypoint_name: entrypoint_func},
                     tasks=tasks,
+                    activity_options=_execute_in_activity(
+                        *(t.func.__name__ for t in tasks)
+                    ),
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
@@ -194,6 +201,9 @@ class TestFunctionalAPIContinueAsNew:
                         "e2e_continue_as_new_functional": continue_as_new_entrypoint
                     },
                     tasks=tasks,
+                    activity_options=_execute_in_activity(
+                        *(t.func.__name__ for t in tasks)
+                    ),
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
@@ -236,6 +246,9 @@ class TestFunctionalAPIPartialExecution:
                 LangGraphPlugin(
                     entrypoints={"e2e_partial_execution": partial_execution_entrypoint},
                     tasks=tasks,
+                    activity_options=_execute_in_activity(
+                        *(t.func.__name__ for t in tasks)
+                    ),
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
@@ -272,6 +285,9 @@ class TestFunctionalAPIInterruptV2:
                 LangGraphPlugin(
                     entrypoints={"v2_interrupt": interrupt_entrypoint},
                     tasks=tasks,
+                    activity_options=_execute_in_activity(
+                        *(t.func.__name__ for t in tasks)
+                    ),
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
             ],
@@ -304,6 +320,7 @@ class TestFunctionalAPIPerTaskOptions:
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                     activity_options={
                         "slow_task": {
+                            "execute_in": "activity",
                             "start_to_close_timeout": timedelta(milliseconds=100),
                             "retry_policy": RetryPolicy(maximum_attempts=1),
                         }

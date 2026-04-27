@@ -35,7 +35,7 @@ class TimeoutWorkflow:
 
 async def test_timeout(client: Client):
     g = StateGraph(State)
-    g.add_node("node", node)
+    g.add_node("node", node, metadata={"execute_in": "activity"})
     g.add_edge(START, "node")
 
     task_queue = f"my-graph-{uuid4()}"
