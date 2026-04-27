@@ -95,6 +95,21 @@ plugin = LangGraphPlugin(
 )
 ```
 
+### Running in the Workflow
+
+To run a node or task directly in the Workflow, set `execute_in` to `"workflow"`:
+
+```python
+# Graph API
+graph.add_node("my_node", my_node, metadata={"execute_in": "workflow"})
+
+# Functional API
+plugin = LangGraphPlugin(
+    tasks=[my_task],
+    activity_options={"my_task": {"execute_in": "workflow"}},
+)
+```
+
 ### Runtime Context
 
 LangGraph's run-scoped context (`context_schema`) is reconstructed on the Activity side, so nodes and tasks can read from and write to `runtime.context`:
@@ -118,26 +133,15 @@ await g.ainvoke({...}, context=Context(user_id="alice"))
 
 Your `context` object must be serializable by the configured Temporal payload converter, since it crosses the Activity boundary.
 
+## Tracing
+
+We recommend the [Temporal LangSmith Plugin](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/langsmith) to trace your LangGraph Workflows and Activities.
+
 ## Stores are not supported
 
 LangGraph's `Store` (e.g. `InMemoryStore` passed via `graph.compile(store=...)` or `@entrypoint(store=...)`) isn't accessible inside Activity-wrapped nodes: the Store holds live state that can't cross the Activity boundary, and Activities may run on a different worker than the Workflow. If you pass a store, the plugin logs a warning on first use and `runtime.store` is `None` inside nodes.
 
 Use Workflow state for per-run memory, or an external database (Postgres/Redis/etc.) configured on each worker if you need shared memory across runs.
-
-## Running in the Workflow
-
-To run a node or task directly in the Workflow, set `execute_in` to `"workflow"`:
-
-```python
-# Graph API
-graph.add_node("my_node", my_node, metadata={"execute_in": "workflow"})
-
-# Functional API
-plugin = LangGraphPlugin(
-    tasks=[my_task],
-    activity_options={"my_task": {"execute_in": "workflow"}},
-)
-```
 
 ## Running Tests
 
