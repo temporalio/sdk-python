@@ -2,5 +2,7 @@
 # the repo. Unless a later match takes precedence,
 # @temporalio/sdk will be requested for review when
 # someone opens a pull request.
-* @temporalio/sdk
-/temporalio/contrib/ @temporalio/ai-sdk
+*                                     @temporalio/sdk
+/temporalio/contrib/google_adk_agents @temporalio/sdk @temporalio/ai-sdk
+/temporalio/contrib/langsmith         @temporalio/sdk @temporalio/ai-sdk
+/temporalio/contrib/openai_agents     @temporalio/sdk @temporalio/ai-sdk
