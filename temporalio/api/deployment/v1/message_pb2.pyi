@@ -13,8 +13,10 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.compute.v1.config_pb2
 import temporalio.api.enums.v1.deployment_pb2
 import temporalio.api.enums.v1.task_queue_pb2
+import temporalio.api.enums.v1.workflow_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -24,9 +26,7 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 class WorkerDeploymentOptions(google.protobuf.message.Message):
-    """Worker Deployment options set in SDK that need to be sent to server in every poll.
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
-    """
+    """Worker Deployment options set in SDK that need to be sent to server in every poll."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -347,7 +347,6 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     non-determinism issues.
     Worker Deployment Versions are created in Temporal server automatically when
     their first poller arrives to the server.
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -385,6 +384,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     TASK_QUEUE_INFOS_FIELD_NUMBER: builtins.int
     DRAINAGE_INFO_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
+    COMPUTE_CONFIG_FIELD_NUMBER: builtins.int
+    LAST_MODIFIER_IDENTITY_FIELD_NUMBER: builtins.int
     version: builtins.str
     """Deprecated. Use `deployment_version`."""
     status: (
@@ -395,6 +396,7 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     def deployment_version(self) -> global___WorkerDeploymentVersion:
         """Required."""
     deployment_name: builtins.str
+    """Deprecated. User deployment_version.deployment_name."""
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
@@ -457,6 +459,18 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     @property
     def metadata(self) -> global___VersionMetadata:
         """Arbitrary user-provided metadata attached to this version."""
+    @property
+    def compute_config(self) -> temporalio.api.compute.v1.config_pb2.ComputeConfig:
+        """Optional. Contains the new worker compute configuration for the Worker
+        Deployment. Used for worker scale management.
+        """
+    last_modifier_identity: builtins.str
+    """Identity of the last client who modified the configuration of this Version.
+    As of now, this field only covers changes through the following APIs:
+    - `CreateWorkerDeploymentVersion`
+    - `UpdateWorkerDeploymentVersionComputeConfig`
+    - `UpdateWorkerDeploymentVersionMetadata`
+    """
     def __init__(
         self,
         *,
@@ -478,10 +492,14 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
         | None = ...,
         drainage_info: global___VersionDrainageInfo | None = ...,
         metadata: global___VersionMetadata | None = ...,
+        compute_config: temporalio.api.compute.v1.config_pb2.ComputeConfig | None = ...,
+        last_modifier_identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "compute_config",
+            b"compute_config",
             "create_time",
             b"create_time",
             "current_since_time",
@@ -507,6 +525,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "compute_config",
+            b"compute_config",
             "create_time",
             b"create_time",
             "current_since_time",
@@ -523,6 +543,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
             b"last_current_time",
             "last_deactivation_time",
             b"last_deactivation_time",
+            "last_modifier_identity",
+            b"last_modifier_identity",
             "metadata",
             b"metadata",
             "ramp_percentage",
@@ -545,7 +567,6 @@ global___WorkerDeploymentVersionInfo = WorkerDeploymentVersionInfo
 class VersionDrainageInfo(google.protobuf.message.Message):
     """Information about workflow drainage to help the user determine when it is safe
     to decommission a Version. Not present while version is current or ramping.
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -601,7 +622,6 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
     version of workers. (see documentation of WorkerDeploymentVersionInfo)
     Deployment records are created in Temporal server automatically when their
     first poller arrives to the server.
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -621,6 +641,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         FIRST_ACTIVATION_TIME_FIELD_NUMBER: builtins.int
         LAST_CURRENT_TIME_FIELD_NUMBER: builtins.int
         LAST_DEACTIVATION_TIME_FIELD_NUMBER: builtins.int
+        COMPUTE_CONFIG_FIELD_NUMBER: builtins.int
         version: builtins.str
         """Deprecated. Use `deployment_version`."""
         status: temporalio.api.enums.v1.deployment_pb2.WorkerDeploymentVersionStatus.ValueType
@@ -667,6 +688,10 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             """Timestamp when this version last stopped being current or ramping.
             Cleared if the version becomes current or ramping again.
             """
+        @property
+        def compute_config(
+            self,
+        ) -> temporalio.api.compute.v1.config_pb2.ComputeConfigSummary: ...
         def __init__(
             self,
             *,
@@ -683,10 +708,14 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             last_current_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             last_deactivation_time: google.protobuf.timestamp_pb2.Timestamp
             | None = ...,
+            compute_config: temporalio.api.compute.v1.config_pb2.ComputeConfigSummary
+            | None = ...,
         ) -> None: ...
         def HasField(
             self,
             field_name: typing_extensions.Literal[
+                "compute_config",
+                b"compute_config",
                 "create_time",
                 b"create_time",
                 "current_since_time",
@@ -710,6 +739,8 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         def ClearField(
             self,
             field_name: typing_extensions.Literal[
+                "compute_config",
+                b"compute_config",
                 "create_time",
                 b"create_time",
                 "current_since_time",
@@ -955,7 +986,7 @@ class RoutingConfig(google.protobuf.message.Message):
         If ramping version is changed, this is also updated, even if the percentage stays the same.
         """
     revision_number: builtins.int
-    """Monotonically increasing value which is incremented on every mutation 
+    """Monotonically increasing value which is incremented on every mutation
     to any field of this message to achieve eventual consistency between task queues and their partitions.
     """
     def __init__(
@@ -1018,22 +1049,39 @@ global___RoutingConfig = RoutingConfig
 class InheritedAutoUpgradeInfo(google.protobuf.message.Message):
     """Used as part of WorkflowExecutionStartedEventAttributes to pass down the AutoUpgrade behavior and source deployment version
     to a workflow execution whose parent/previous workflow has an AutoUpgrade behavior.
+    Also used for Upgrade-on-CaN behaviors AutoUpgrade and UseRampingVersion.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SOURCE_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
     SOURCE_DEPLOYMENT_REVISION_NUMBER_FIELD_NUMBER: builtins.int
+    CONTINUE_AS_NEW_INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
     @property
     def source_deployment_version(self) -> global___WorkerDeploymentVersion:
         """The source deployment version of the parent/previous workflow."""
     source_deployment_revision_number: builtins.int
     """The revision number of the source deployment version of the parent/previous workflow."""
+    continue_as_new_initial_versioning_behavior: (
+        temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType
+    )
+    """Experimental.
+    If this workflow is the result of a continue-as-new, this field is set to the initial_versioning_behavior
+    specified in that command.
+    Only used for the initial task of this run and the initial task of any retries of this run.
+    Not passed to children or to future continue-as-new.
+
+    Note: In the first release of Upgrade-on-CaN, when the only ContinueAsNewVersioningBehavior was AutoUpgrade,
+    a non-empty InheritedAutoUpgradeInfo meant that the workflow should start as AutoUpgrade. So for compatibility
+    with history events generated during that time, know that an UNSPECIFIED value here is equivalent to AutoUpgrade
+    value if the InheritedAutoUpgradeInfo is non-empty.
+    """
     def __init__(
         self,
         *,
         source_deployment_version: global___WorkerDeploymentVersion | None = ...,
         source_deployment_revision_number: builtins.int = ...,
+        continue_as_new_initial_versioning_behavior: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1044,6 +1092,8 @@ class InheritedAutoUpgradeInfo(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "continue_as_new_initial_versioning_behavior",
+            b"continue_as_new_initial_versioning_behavior",
             "source_deployment_revision_number",
             b"source_deployment_revision_number",
             "source_deployment_version",
