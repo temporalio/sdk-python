@@ -9,7 +9,7 @@ use temporalio_client::tonic::{
 };
 use temporalio_client::{
     ClientKeepAliveOptions as CoreClientKeepAliveConfig, Connection, ConnectionOptions,
-    HttpConnectProxyOptions, RetryOptions,
+    DnsLoadBalancingOptions, HttpConnectProxyOptions, RetryOptions,
 };
 use url::Url;
 
@@ -235,6 +235,7 @@ impl ClientConfig {
         metrics_meter: Option<temporalio_common::telemetry::metrics::TemporalMeter>,
     ) -> PyResult<ConnectionOptions> {
         let (ascii_headers, binary_headers) = partition_headers(self.metadata);
+        let has_proxy = self.http_connect_proxy_config.is_some();
         let conn_opts = ConnectionOptions::new(
             Url::parse(&self.target_url)
                 .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
@@ -248,6 +249,11 @@ impl ClientConfig {
         )
         .keep_alive(self.keep_alive_config.map(Into::into))
         .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
+        .dns_load_balancing(if has_proxy {
+            None
+        } else {
+            Some(DnsLoadBalancingOptions::default())
+        })
         .headers(ascii_headers)
         .binary_headers(binary_headers)
         .maybe_api_key(self.api_key)

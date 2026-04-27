@@ -86,8 +86,6 @@ class TaskQueueMetadata(google.protobuf.message.Message):
 global___TaskQueueMetadata = TaskQueueMetadata
 
 class TaskQueueVersioningInfo(google.protobuf.message.Message):
-    """Experimental. Worker Deployments are experimental and might significantly change in the future."""
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CURRENT_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
@@ -896,6 +894,25 @@ class TimestampedCompatibleBuildIdRedirectRule(google.protobuf.message.Message):
 global___TimestampedCompatibleBuildIdRedirectRule = (
     TimestampedCompatibleBuildIdRedirectRule
 )
+
+class PollerGroupInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    WEIGHT_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    weight: builtins.float
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        weight: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["id", b"id", "weight", b"weight"]
+    ) -> None: ...
+
+global___PollerGroupInfo = PollerGroupInfo
 
 class PollerScalingDecision(google.protobuf.message.Message):
     """Attached to task responses to give hints to the SDK about how it may adjust its number of

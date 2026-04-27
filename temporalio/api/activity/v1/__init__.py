@@ -3,6 +3,7 @@ from .message_pb2 import (
     ActivityExecutionListInfo,
     ActivityExecutionOutcome,
     ActivityOptions,
+    CallbackInfo,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "ActivityExecutionListInfo",
     "ActivityExecutionOutcome",
     "ActivityOptions",
+    "CallbackInfo",
 ]
