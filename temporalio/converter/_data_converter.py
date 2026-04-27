@@ -14,11 +14,11 @@ from typing_extensions import Self
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
 import temporalio.common
+from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.converter._extstore import (
     _REFERENCE_ENCODING,
     ExternalStorage,
     StorageDriverStoreContext,
-    StorageWarning,
 )
 from temporalio.converter._failure_converter import (
     FailureConverter,
@@ -40,6 +40,17 @@ from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
 )
+
+_REFERENCE_MESSAGE_TYPE = ExternalStorageReference.DESCRIPTOR.full_name.encode()
+
+
+def _is_reference_payload(p: temporalio.api.common.v1.Payload) -> bool:
+    """Return True if *p* is an external-storage reference payload."""
+    return p.metadata.get("encoding") == _REFERENCE_ENCODING or (
+        p.metadata.get("encoding") == b"json/protobuf"
+        and p.metadata.get("messageType") == _REFERENCE_MESSAGE_TYPE
+    )
+
 
 # Import defaults from public API to avoid pydoctor cross-reference issues
 if TYPE_CHECKING:
@@ -307,13 +318,9 @@ class DataConverter(WithSerializationContext):
         if self.external_storage:
             await self.external_storage._retrieve_payloads(payloads)
         else:
-            if any(
-                p.metadata.get("encoding") == _REFERENCE_ENCODING
-                for p in payloads.payloads
-            ):
-                warnings.warn(
-                    "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
-                    StorageWarning,
+            if any(_is_reference_payload(p) for p in payloads.payloads):
+                raise RuntimeError(
+                    "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured."
                 )
         if self.payload_codec:
             await self.payload_codec.decode_wrapper(payloads)
@@ -348,13 +355,9 @@ class DataConverter(WithSerializationContext):
                 retrieved_payloads
             )
         else:
-            if any(
-                p.metadata.get("encoding") == _REFERENCE_ENCODING
-                for p in retrieved_payloads
-            ):
-                warnings.warn(
-                    "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured.",
-                    StorageWarning,
+            if any(_is_reference_payload(p) for p in retrieved_payloads):
+                raise RuntimeError(
+                    "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured."
                 )
         return retrieved_payloads
 
