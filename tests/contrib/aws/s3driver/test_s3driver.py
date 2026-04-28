@@ -46,7 +46,6 @@ _CONVERTER = JSONPlainPayloadConverter()
 # ---------------------------------------------------------------------------
 
 
-
 def make_payload(value: str = "hello") -> Payload:
     p = _CONVERTER.to_payload(value)
     assert p is not None

@@ -25,8 +25,8 @@ from temporalio.converter import DataConverter, ExternalStorage
 session = aioboto3.Session()
 # Credentials are resolved automatically from the standard AWS credential chain
 # (environment variables, ~/.aws/config, IAM instance profile, and so on).
-# Region must be set explicitly -- either via `AWS_REGION` in the environment
-# or `region = ...` under the profile in ~/.aws/config. See Notes below.
+# Region is obtained either via `AWS_REGION` in the environment
+# or `region = ...` under the profile in ~/.aws/config.
 async with session.client("s3") as s3_client:
     driver = S3StorageDriver(
         client=new_aioboto3_client(s3_client),
@@ -67,7 +67,6 @@ Payloads are stored under content-addressable keys derived from a SHA-256 hash o
 
 * Any driver used to store payloads must also be configured on the component that retrieves them. If the client stores workflow inputs using this driver, the worker must include it in its `ExternalStorage.drivers` list to retrieve them.
 * The target S3 bucket must already exist; the driver will not create it.
-* The aioboto3 client does not auto-detect the bucket's region. Unlike the `aws` CLI, boto3 does not fall back to a `HeadBucket` redirect — it signs the first request to whatever region it resolves and fails with `403 Forbidden` on a cross-region call. Set `region = ...` in the profile in `~/.aws/config` or export `AWS_REGION`. `sso_region` in an SSO session block does not count; it governs only the SSO token endpoint.
 * Identical serialized bytes within the same namespace and workflow (or activity) share the same S3 object — the key is content-addressable within that scope. The same bytes used across different workflows or namespaces produce distinct S3 objects because the key includes the namespace and workflow/activity identifiers.
 * Only payloads at or above `ExternalStorage.payload_size_threshold` (default: 256 KiB) are offloaded; smaller payloads are stored inline. Set `ExternalStorage.payload_size_threshold` to `0` to offload every payload regardless of size.
 * `S3StorageDriver.max_payload_size` (default: 50 MiB) sets a hard upper limit on the serialized size of any single payload. A `ValueError` is raised at store time if a payload exceeds this limit. Increase it if your workflows produce payloads larger than 50 MiB.
