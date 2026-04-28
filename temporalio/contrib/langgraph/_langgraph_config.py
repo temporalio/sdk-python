@@ -28,10 +28,10 @@ def strip_runnable_config(config: RunnableConfig | None) -> RunnableConfig:
     """Return a serializable subset of a RunnableConfig.
 
     LangGraph injects the active RunnableConfig into user functions as a
-    `config` kwarg. The full object holds non-serializable things (callbacks,
+    config kwarg. The full object holds non-serializable things (callbacks,
     checkpointer/store/cache handles, pregel send/read callables) that can't
     cross an activity boundary, so we keep only primitive fields and the
-    serializable subset of `configurable`.
+    serializable subset of configurable.
     """
     orig = config or {}
     configurable = orig.get("configurable") or {}
