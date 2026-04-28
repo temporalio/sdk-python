@@ -21,6 +21,14 @@ from ._handlers import (
     _UpdateDefinition,
 )
 
+__all__ = [
+    "DynamicWorkflowConfig",
+    "defn",
+    "dynamic_config",
+    "init",
+    "run",
+]
+
 
 @overload
 def defn(cls: ClassType) -> ClassType: ...

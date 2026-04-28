@@ -6,6 +6,13 @@ import temporalio.api.enums.v1
 import temporalio.bridge.proto.common
 import temporalio.exceptions
 
+__all__ = [
+    "NondeterminismError",
+    "ReadOnlyContextError",
+    "VersioningIntent",
+    "ContinueAsNewVersioningBehavior",
+]
+
 
 class NondeterminismError(temporalio.exceptions.TemporalError):
     """Error that can be thrown during replay for non-deterministic workflow."""
@@ -27,7 +34,9 @@ class ReadOnlyContextError(temporalio.exceptions.TemporalError):
         self.message = message
 
 
-class _NotInWorkflowEventLoopError(temporalio.exceptions.TemporalError):
+class _NotInWorkflowEventLoopError(  # pyright: ignore[reportUnusedClass]
+    temporalio.exceptions.TemporalError
+):
     def __init__(self, *args: object) -> None:
         super().__init__("Not in workflow event loop")
         self.message = "Not in workflow event loop"

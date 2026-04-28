@@ -23,13 +23,49 @@ from ._exceptions import _NotInWorkflowEventLoopError
 if TYPE_CHECKING:
     from ._activities import ActivityCancellationType, ActivityHandle
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
-    from ._nexus import NexusOperationHandle
+    from ._nexus import NexusOperationCancellationType, NexusOperationHandle
     from ._workflow_ops import (
         ChildWorkflowCancellationType,
         ChildWorkflowHandle,
         ExternalWorkflowHandle,
         ParentClosePolicy,
     )
+
+__all__ = [
+    "Info",
+    "ParentInfo",
+    "RootInfo",
+    "UpdateInfo",
+    "current_update_info",
+    "deprecate_patch",
+    "extern_functions",
+    "get_current_details",
+    "get_last_completion_result",
+    "get_last_failure",
+    "has_last_completion_result",
+    "in_workflow",
+    "info",
+    "instance",
+    "is_failure_exception",
+    "memo",
+    "memo_value",
+    "metric_meter",
+    "new_random",
+    "now",
+    "patched",
+    "payload_converter",
+    "random",
+    "random_seed",
+    "register_random_seed_callback",
+    "set_current_details",
+    "sleep",
+    "time",
+    "time_ns",
+    "upsert_memo",
+    "upsert_search_attributes",
+    "uuid4",
+    "wait_condition",
+]
 
 
 @dataclass(frozen=True)
@@ -428,7 +464,7 @@ class _Runtime(ABC):
         schedule_to_close_timeout: timedelta | None,
         schedule_to_start_timeout: timedelta | None,
         start_to_close_timeout: timedelta | None,
-        cancellation_type: temporalio.workflow.NexusOperationCancellationType,
+        cancellation_type: NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
     ) -> NexusOperationHandle[OutputT]: ...

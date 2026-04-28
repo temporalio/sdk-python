@@ -14,6 +14,16 @@ import temporalio.bridge.proto.nexus
 import temporalio.nexus
 from temporalio.nexus._util import ServiceHandlerT
 
+from ._context import _Runtime
+
+__all__ = [
+    "NexusClient",
+    "NexusOperationCancellationType",
+    "NexusOperationHandle",
+    "ServiceT",
+    "create_nexus_client",
+]
+
 
 class NexusOperationHandle(Generic[OutputT]):
     """Handle for interacting with a Nexus operation."""
@@ -422,20 +432,18 @@ class _NexusClient(NexusClient[ServiceT]):
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
     ) -> Any:
-        return (
-            await temporalio.workflow._Runtime.current().workflow_start_nexus_operation(
-                endpoint=self.endpoint,
-                service=self.service_name,
-                operation=operation,
-                input=input,
-                output_type=output_type,
-                schedule_to_close_timeout=schedule_to_close_timeout,
-                schedule_to_start_timeout=schedule_to_start_timeout,
-                start_to_close_timeout=start_to_close_timeout,
-                cancellation_type=cancellation_type,
-                headers=headers,
-                summary=summary,
-            )
+        return await _Runtime.current().workflow_start_nexus_operation(
+            endpoint=self.endpoint,
+            service=self.service_name,
+            operation=operation,
+            input=input,
+            output_type=output_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            cancellation_type=cancellation_type,
+            headers=headers,
+            summary=summary,
         )
 
     async def execute_operation(

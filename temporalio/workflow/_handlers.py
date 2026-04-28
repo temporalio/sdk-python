@@ -9,8 +9,9 @@ from enum import Enum
 from functools import partial
 from typing import Any, Literal, cast, overload
 
-import temporalio.common
 from typing_extensions import Protocol, runtime_checkable
+
+import temporalio.common
 
 from ..types import (
     CallableSyncOrAsyncReturnNoneType,
@@ -20,6 +21,16 @@ from ..types import (
     ProtocolReturnType,
     ReturnType,
 )
+
+__all__ = [
+    "HandlerUnfinishedPolicy",
+    "UnfinishedSignalHandlersWarning",
+    "UnfinishedUpdateHandlersWarning",
+    "UpdateMethodMultiParam",
+    "query",
+    "signal",
+    "update",
+]
 
 
 class HandlerUnfinishedPolicy(Enum):

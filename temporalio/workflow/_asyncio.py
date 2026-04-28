@@ -6,6 +6,11 @@ from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from ..types import AnyType
 
+__all__ = [
+    "as_completed",
+    "wait",
+]
+
 
 def as_completed(
     fs: Iterable[Awaitable[AnyType]], *, timeout: float | None = None

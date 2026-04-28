@@ -22,6 +22,33 @@ from ._activities import _AsyncioTask
 from ._context import _Runtime, uuid4
 from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
 
+__all__ = [
+    "ChildWorkflowCancellationType",
+    "ChildWorkflowConfig",
+    "ChildWorkflowHandle",
+    "ContinueAsNewError",
+    "ExternalWorkflowHandle",
+    "ParentClosePolicy",
+    "all_handlers_finished",
+    "continue_as_new",
+    "execute_child_workflow",
+    "get_dynamic_query_handler",
+    "get_dynamic_signal_handler",
+    "get_dynamic_update_handler",
+    "get_external_workflow_handle",
+    "get_external_workflow_handle_for",
+    "get_query_handler",
+    "get_signal_handler",
+    "get_update_handler",
+    "set_dynamic_query_handler",
+    "set_dynamic_signal_handler",
+    "set_dynamic_update_handler",
+    "set_query_handler",
+    "set_signal_handler",
+    "set_update_handler",
+    "start_child_workflow",
+]
+
 
 class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType]):  # type: ignore[type-var]
     """Handle for interacting with a child workflow.

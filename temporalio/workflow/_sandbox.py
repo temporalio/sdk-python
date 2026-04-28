@@ -10,6 +10,13 @@ from typing import Any
 
 from ._context import Info, _Runtime, current_update_info
 
+__all__ = [
+    "LoggerAdapter",
+    "SandboxImportNotificationPolicy",
+    "logger",
+    "unsafe",
+]
+
 _sandbox_unrestricted = threading.local()
 _in_sandbox = threading.local()
 _imports_passed_through = threading.local()

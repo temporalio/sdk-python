@@ -27,6 +27,25 @@ from ..types import (
 from ._context import _Runtime
 from ._exceptions import VersioningIntent
 
+__all__ = [
+    "ActivityCancellationType",
+    "ActivityConfig",
+    "ActivityHandle",
+    "LocalActivityConfig",
+    "execute_activity",
+    "execute_activity_class",
+    "execute_activity_method",
+    "execute_local_activity",
+    "execute_local_activity_class",
+    "execute_local_activity_method",
+    "start_activity",
+    "start_activity_class",
+    "start_activity_method",
+    "start_local_activity",
+    "start_local_activity_class",
+    "start_local_activity_method",
+]
+
 # See https://mypy.readthedocs.io/en/latest/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
 if TYPE_CHECKING:
 
