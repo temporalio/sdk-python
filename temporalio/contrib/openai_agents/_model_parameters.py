@@ -69,7 +69,7 @@ class ModelActivityParameters:
     use_local_activity: bool = False
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
 
-    streaming_event_topic: str | None = "events"
+    streaming_event_topic: str | None = None
     """Pub/sub topic to publish raw model stream events to when the workflow
     calls ``Runner.run_streamed``. Set to ``None`` to skip publishing
     entirely (workflow-side iteration via ``stream_events()`` still works,

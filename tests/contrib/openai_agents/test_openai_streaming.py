@@ -241,6 +241,7 @@ async def test_streaming_publishes_raw_events(client: Client):
         model=StreamingTestModel(),
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
+            streaming_event_topic="events",
         ),
     ) as env:
         client = env.applied_on_client(client)

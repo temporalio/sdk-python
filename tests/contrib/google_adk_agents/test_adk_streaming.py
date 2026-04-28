@@ -53,7 +53,7 @@ class StreamingAdkWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        model = TemporalModel("streaming_test_model")
+        model = TemporalModel("streaming_test_model", streaming_event_topic="events")
         agent = Agent(
             name="test_agent",
             model=model,

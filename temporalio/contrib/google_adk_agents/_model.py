@@ -98,7 +98,7 @@ class TemporalModel(BaseLlm):
         activity_config: ActivityConfig | None = None,
         *,
         summary_fn: Callable[[LlmRequest], str | None] | None = None,
-        streaming_event_topic: str | None = "events",
+        streaming_event_topic: str | None = None,
         streaming_event_batch_interval: timedelta = timedelta(milliseconds=100),
     ) -> None:
         """Initialize the TemporalModel.

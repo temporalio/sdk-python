@@ -593,22 +593,20 @@ External consumers (UIs, tracing pipelines, etc.) can observe events as
 they arrive by hosting a [`PubSub`](../pubsub/README.md) broker in the
 workflow and subscribing with `PubSubClient`. The streaming activity
 publishes each event to the topic configured on
-`ModelActivityParameters.streaming_event_topic` (defaults to `"events"`;
-set to `None` to disable publishing).
+`ModelActivityParameters.streaming_event_topic` (defaults to `None`,
+which disables publishing; set it to a topic string such as `"events"`
+to publish).
+
+Workflow-side iteration via `stream_events()` requires no broker:
 
 ```python
 from agents import Agent, Runner
 from agents.stream_events import RawResponsesStreamEvent
 
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSub
 
 @workflow.defn
 class MyAgent:
-    @workflow.init
-    def __init__(self, prompt: str) -> None:
-        self.pubsub = PubSub()
-
     @workflow.run
     async def run(self, prompt: str) -> str:
         agent = Agent(name="Assistant", instructions="...")
@@ -619,6 +617,11 @@ class MyAgent:
                 ...
         return result.final_output
 ```
+
+To publish raw model events to external subscribers, host a
+`PubSub` broker in the workflow and configure
+`OpenAIAgentsPlugin(model_params=ModelActivityParameters(streaming_event_topic="events"))`. See [`temporalio.contrib.pubsub`](../pubsub/README.md) for the
+broker and subscriber API.
 
 `RunResultStreaming.stream_events()` yields the agents-SDK
 `StreamEvent` union (`RawResponsesStreamEvent`, `RunItemStreamEvent`,
