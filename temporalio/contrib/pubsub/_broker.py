@@ -65,6 +65,9 @@ def _payload_wire_size(payload: Payload, topic: str) -> int:
 class PubSub:
     """Workflow-side pub/sub broker.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+
     Construct once from ``@workflow.init``; the constructor registers
     the pub/sub signal, update, and query handlers on the current
     workflow. Raises :class:`RuntimeError` if a ``PubSub`` has already

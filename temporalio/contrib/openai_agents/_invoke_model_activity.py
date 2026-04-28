@@ -338,6 +338,10 @@ class ModelActivity:
     ) -> list[TResponseStreamEvent]:
         """Streaming-aware model activity.
 
+        .. warning::
+            Streaming support is experimental and may change in future
+            versions.
+
         Calls ``model.stream_response()`` and returns the collected list
         of native OpenAI stream events. The workflow's
         ``Model.stream_response`` stub yields these to the agents

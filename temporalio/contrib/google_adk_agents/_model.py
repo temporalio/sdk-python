@@ -45,6 +45,10 @@ async def invoke_model_streaming(
 ) -> list[LlmResponse]:
     """Streaming-aware model activity.
 
+    .. warning::
+        Streaming support is experimental and may change in future
+        versions.
+
     Calls the LLM with ``stream=True`` and returns the collected list of
     raw ``LlmResponse`` chunks. The workflow's ``TemporalModel.generate_content_async``
     yields these to the caller.
@@ -118,11 +122,13 @@ class TemporalModel(BaseLlm):
                 set, the workflow must host a
                 :class:`temporalio.contrib.pubsub.PubSub` broker to
                 receive the publishes; otherwise the signals are
-                unhandled and dropped.
+                unhandled and dropped. Streaming support is
+                experimental and may change in future versions.
             streaming_event_batch_interval: Interval between automatic
                 flushes for the pub/sub publisher used by the streaming
                 activity. Ignored when ``streaming_event_topic`` is
-                ``None``.
+                ``None``. Streaming support is experimental and may
+                change in future versions.
 
         Raises:
             ValueError: If both ``ActivityConfig["summary"]`` and ``summary_fn`` are set.
@@ -151,7 +157,8 @@ class TemporalModel(BaseLlm):
             llm_request: The LLM request containing model parameters and content.
             stream: Whether to use the streaming activity. When ``True``,
                 each chunk is also published to ``streaming_event_topic``
-                (if set) for external consumers.
+                (if set) for external consumers. Streaming support is
+                experimental and may change in future versions.
 
         Yields:
             The responses from the model.

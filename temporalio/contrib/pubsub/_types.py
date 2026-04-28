@@ -45,6 +45,9 @@ def _decode_payload(wire: str) -> Payload:  # pyright: ignore[reportUnusedFuncti
 class PubSubItem:
     """A single item in the pub/sub log.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+
     The ``data`` field is a :class:`temporalio.api.common.v1.Payload`
     as stored by the mixin and yielded by
     :meth:`PubSubClient.subscribe` when no ``result_type`` is given.
@@ -65,6 +68,9 @@ class PubSubItem:
 class PublishEntry:
     """A single entry to publish via signal (wire type).
 
+    .. warning::
+        This class is experimental and may change in future versions.
+
     ``data`` is base64-encoded ``Payload.SerializeToString()`` output —
     see module docstring for why a nested ``Payload`` cannot be used
     directly.
@@ -78,6 +84,9 @@ class PublishEntry:
 class PublishInput:
     """Signal payload: batch of entries to publish.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+
     Includes publisher_id and sequence to ensure exactly-once delivery.
     """
 
@@ -88,7 +97,11 @@ class PublishInput:
 
 @dataclass
 class PollInput:
-    """Update payload: request to poll for new items."""
+    """Update payload: request to poll for new items.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+    """
 
     topics: list[str] = field(default_factory=list)
     from_offset: int = 0
@@ -107,6 +120,9 @@ class _WireItem:
 class PollResult:
     """Update response: items matching the poll request.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+
     ``items`` use the wire representation. When ``more_ready`` is True,
     the response was truncated to stay within size limits and the
     subscriber should poll again immediately rather than applying a
@@ -122,6 +138,9 @@ class PollResult:
 class PublisherState:
     """Per-publisher dedup state.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+
     Tracks the last accepted ``sequence`` and the ``workflow.now()`` at
     which it was accepted, used together for at-least-once dedup and
     TTL-based pruning at continue-as-new time.
@@ -134,6 +153,9 @@ class PublisherState:
 @dataclass
 class PubSubState:
     """Serializable snapshot of pub/sub state for continue-as-new.
+
+    .. warning::
+        This class is experimental and may change in future versions.
 
     The containing workflow input must type the field as
     ``PubSubState | None``, not ``Any``, so the default data converter

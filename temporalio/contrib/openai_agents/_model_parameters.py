@@ -78,9 +78,17 @@ class ModelActivityParameters:
     publishes; otherwise the signals are unhandled and dropped.
 
     Streaming is incompatible with ``use_local_activity`` (local activities
-    do not support heartbeats or the pubsub signal channel)."""
+    do not support heartbeats or the pubsub signal channel).
+
+    .. warning::
+        Streaming support is experimental and may change in future
+        versions."""
 
     streaming_event_batch_interval: timedelta = timedelta(milliseconds=100)
     """Interval between automatic flushes for the pub/sub publisher used
     by the streaming activity. Ignored when ``streaming_event_topic`` is
-    ``None``."""
+    ``None``.
+
+    .. warning::
+        Streaming support is experimental and may change in future
+        versions."""

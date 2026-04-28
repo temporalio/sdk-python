@@ -50,6 +50,9 @@ from ._types import (
 class PubSubClient:
     """Client for publishing to and subscribing from a pub/sub workflow.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+
     Create via :py:meth:`create` (explicit client + workflow id),
     :py:meth:`from_activity` (infer both from the current activity
     context), or by passing a handle directly to the constructor.

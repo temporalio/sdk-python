@@ -246,6 +246,10 @@ class TemporalOpenAIRunner(AgentRunner):
     ) -> RunResultStreaming:
         """Run the agent with streaming responses.
 
+        .. warning::
+            Streaming inside Temporal workflows is experimental and may
+            change in future versions.
+
         Inside a workflow, model calls execute as the streaming model
         activity. The workflow consumes events via
         ``RunResultStreaming.stream_events()`` after each activity

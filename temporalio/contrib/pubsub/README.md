@@ -1,5 +1,7 @@
 # Temporal Workflow Pub/Sub
 
+> ⚠️ **This package is currently at an experimental release stage.** ⚠️
+
 Workflows sometimes need to push incremental updates to external observers.
 Examples include providing customer updates during order processing, creating
 interactive experiences with AI agents, or reporting progress from a

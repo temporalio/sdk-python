@@ -1,5 +1,8 @@
 """Pub/sub support for Temporal workflows.
 
+.. warning::
+    This package is experimental and may change in future versions.
+
 This module provides a reusable pub/sub pattern where a workflow acts as a
 message broker, using Temporal's native messaging primitives — signals for
 publishing and updates for long-poll subscription — to implement the broker
