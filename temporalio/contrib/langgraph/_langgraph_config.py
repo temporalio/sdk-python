@@ -119,28 +119,32 @@ def set_langgraph_config(config: dict[str, Any]) -> Runtime:
         ),
     )
 
-    runnable_config: RunnableConfig = {
-        "configurable": {
-            CONFIG_KEY_CHECKPOINT_NS: configurable.get(CONFIG_KEY_CHECKPOINT_NS),
-            CONFIG_KEY_CHECKPOINT_ID: configurable.get(CONFIG_KEY_CHECKPOINT_ID),
-            CONFIG_KEY_CHECKPOINT_MAP: configurable.get(CONFIG_KEY_CHECKPOINT_MAP),
-            CONFIG_KEY_THREAD_ID: configurable.get(CONFIG_KEY_THREAD_ID),
-            CONFIG_KEY_TASK_ID: configurable.get(CONFIG_KEY_TASK_ID),
-            CONFIG_KEY_RESUMING: configurable.get(CONFIG_KEY_RESUMING),
-            CONFIG_KEY_DURABILITY: configurable.get(CONFIG_KEY_DURABILITY),
-            CONFIG_KEY_SCRATCHPAD: PregelScratchpad(
-                step=scratchpad.get("step", 0),
-                stop=scratchpad.get("stop", 0),
-                call_counter=LazyAtomicCounter(),
-                interrupt_counter=LazyAtomicCounter(),
-                get_null_resume=get_null_resume,
-                resume=list(scratchpad.get("resume", [])),
-                subgraph_counter=LazyAtomicCounter(),
-            ),
-            CONFIG_KEY_SEND: lambda _: None,
-            CONFIG_KEY_RUNTIME: runtime,
-        },
+    restored_configurable: dict[str, Any] = {
+        key: configurable[key]
+        for key in (
+            CONFIG_KEY_CHECKPOINT_NS,
+            CONFIG_KEY_CHECKPOINT_ID,
+            CONFIG_KEY_CHECKPOINT_MAP,
+            CONFIG_KEY_THREAD_ID,
+            CONFIG_KEY_TASK_ID,
+            CONFIG_KEY_RESUMING,
+            CONFIG_KEY_DURABILITY,
+        )
+        if key in configurable
     }
+    restored_configurable[CONFIG_KEY_SCRATCHPAD] = PregelScratchpad(
+        step=scratchpad.get("step", 0),
+        stop=scratchpad.get("stop", 0),
+        call_counter=LazyAtomicCounter(),
+        interrupt_counter=LazyAtomicCounter(),
+        get_null_resume=get_null_resume,
+        resume=list(scratchpad.get("resume", [])),
+        subgraph_counter=LazyAtomicCounter(),
+    )
+    restored_configurable[CONFIG_KEY_SEND] = lambda _: None
+    restored_configurable[CONFIG_KEY_RUNTIME] = runtime
+
+    runnable_config: RunnableConfig = {"configurable": restored_configurable}
     if tags := config.get("tags"):
         runnable_config["tags"] = tags
     if metadata := config.get("metadata"):
