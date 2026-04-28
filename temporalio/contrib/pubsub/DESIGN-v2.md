@@ -97,9 +97,9 @@ argument. Instantiating `PubSub` twice on the same workflow raises
 |---|---|---|
 | `PubSub(prior_state=None)` | constructor | Initialize internal state and register handlers on the current workflow. Must be called from `@workflow.init`. |
 | `publish(topic, value)` | instance method | Append to the log from workflow code. `value` is converted via the workflow's sync payload converter (no codec). |
-| `get_state(publisher_ttl=900)` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
+| `get_state(publisher_ttl=timedelta(seconds=900))` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
 | `drain()` | instance method | Unblock polls and reject new ones for CAN. |
-| `continue_as_new(build_args, *, publisher_ttl=900)` | async instance method | Drain, wait for handlers, then `workflow.continue_as_new` with `build_args(post_drain_state)`. |
+| `continue_as_new(build_args, *, publisher_ttl=timedelta(seconds=900))` | async instance method | Drain, wait for handlers, then `workflow.continue_as_new` with `build_args(post_drain_state)`. |
 | `truncate(up_to_offset)` | instance method | Discard log entries before offset. |
 | `__temporal_pubsub_publish` | signal handler | Receives publications from external clients (with dedup). |
 | `__temporal_pubsub_poll` | update handler | Long-poll subscription: blocks until new items or drain. |
@@ -141,7 +141,7 @@ async for item in client.subscribe(["events"], result_type=EventUnion):
 | `PubSubClient(handle)` | From handle directly (no CAN following; no codec chain — falls back to the default converter). |
 | `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. `force_flush` triggers immediate flush (fire-and-forget). |
 | `flush()` | Async. Block until items buffered at call time are confirmed by the server. No-op if nothing is buffered. |
-| `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=0.1)` | Async iterator. `result_type` decodes `item.data` to the given type; omit for raw `Payload`. Always follows CAN chains when created via `create` or `from_activity`. |
+| `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=timedelta(milliseconds=100))` | Async iterator. `result_type` decodes `item.data` to the given type; omit for raw `Payload`. Always follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
 The client offers three complementary ways to flush:
@@ -167,7 +167,7 @@ caller doesn't have to thread them through:
 ```python
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.from_activity(batch_interval=2.0)
+    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=2))
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -445,7 +445,7 @@ context manager starts a background flush task; exiting cancels it and does a
 final flush. Batching amortizes Temporal signal overhead.
 
 Parameters:
-- `batch_interval` (default 2.0s): timer between automatic flushes.
+- `batch_interval` (`timedelta`, default 2 seconds): timer between automatic flushes.
 - `max_batch_size` (optional): auto-flush when buffer reaches this size.
 
 ### 9. Subscription is poll-based, exposed as async iterator
@@ -453,8 +453,8 @@ Parameters:
 The fundamental primitive is an offset-based long-poll: the subscriber sends
 `from_offset` and gets back items plus `next_offset`. `__temporal_pubsub_poll` is a
 Temporal update with `wait_condition`. `subscribe()` wraps this in an
-`AsyncIterator` with a configurable `poll_cooldown` (default 0.1s) to
-rate-limit polls.
+`AsyncIterator` with a configurable `poll_cooldown` (`timedelta`, default
+100ms) to rate-limit polls.
 
 **Trade-off.** The alternative is server-push — the pub/sub system executes
 a callback on the subscriber. Pull is better aligned with durable streams:
@@ -762,8 +762,9 @@ async def _flush(self) -> None:
 dedup is skipped.
 
 `publisher_last_seen` tracks the last `workflow.time()` each publisher was
-seen. During `PubSub.get_state(publisher_ttl=900)`, entries older than TTL
-are pruned to bound memory across long-lived workflow chains.
+seen. During `PubSub.get_state(publisher_ttl=timedelta(seconds=900))`,
+entries older than TTL are pruned to bound memory across long-lived
+workflow chains.
 
 **Safety constraint**: `publisher_ttl` must exceed the client's
 `max_retry_duration`. If a publisher's dedup entry is pruned while it still

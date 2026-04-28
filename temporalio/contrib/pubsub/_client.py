@@ -20,6 +20,7 @@ import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from typing import Any
 
 from typing_extensions import Self
@@ -76,9 +77,9 @@ class PubSubClient:
         handle: WorkflowHandle[Any, Any],
         *,
         client: Client | None = None,
-        batch_interval: float = 2.0,
+        batch_interval: timedelta = timedelta(seconds=2),
         max_batch_size: int | None = None,
-        max_retry_duration: float = 600.0,
+        max_retry_duration: timedelta = timedelta(seconds=600),
     ) -> None:
         """Create a pub/sub client from a workflow handle.
 
@@ -94,12 +95,12 @@ class PubSubClient:
                 codec chain is **not** applied per item (doing so would
                 double-encrypt — see module docstring). If ``None``, the
                 default payload converter is used.
-            batch_interval: Seconds between automatic flushes.
+            batch_interval: Interval between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
-            max_retry_duration: Maximum seconds to retry a failed flush
+            max_retry_duration: Maximum time to retry a failed flush
                 before raising TimeoutError. Must be less than the
-                workflow's ``publisher_ttl`` (default 900s) to preserve
-                exactly-once delivery. Default: 600s.
+                workflow's ``publisher_ttl`` (default 15 minutes) to
+                preserve exactly-once delivery. Default: 10 minutes.
         """
         self._handle: WorkflowHandle[Any, Any] = handle
         self._client: Client | None = client
@@ -123,9 +124,9 @@ class PubSubClient:
         client: Client,
         workflow_id: str,
         *,
-        batch_interval: float = 2.0,
+        batch_interval: timedelta = timedelta(seconds=2),
         max_batch_size: int | None = None,
-        max_retry_duration: float = 600.0,
+        max_retry_duration: timedelta = timedelta(seconds=600),
     ) -> PubSubClient:
         """Create a pub/sub client from a Temporal client and workflow ID.
 
@@ -141,10 +142,10 @@ class PubSubClient:
         Args:
             client: Temporal client.
             workflow_id: ID of the pub/sub workflow.
-            batch_interval: Seconds between automatic flushes.
+            batch_interval: Interval between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
-            max_retry_duration: Maximum seconds to retry a failed flush
-                before raising TimeoutError. Default: 600s.
+            max_retry_duration: Maximum time to retry a failed flush
+                before raising TimeoutError. Default: 10 minutes.
         """
         handle = client.get_workflow_handle(workflow_id)
         return cls(
@@ -159,9 +160,9 @@ class PubSubClient:
     def from_activity(
         cls,
         *,
-        batch_interval: float = 2.0,
+        batch_interval: timedelta = timedelta(seconds=2),
         max_batch_size: int | None = None,
-        max_retry_duration: float = 600.0,
+        max_retry_duration: timedelta = timedelta(seconds=600),
     ) -> PubSubClient:
         """Create a pub/sub client targeting the current activity's parent workflow.
 
@@ -169,10 +170,10 @@ class PubSubClient:
         parent workflow id are taken from the activity context.
 
         Args:
-            batch_interval: Seconds between automatic flushes.
+            batch_interval: Interval between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
-            max_retry_duration: Maximum seconds to retry a failed flush
-                before raising TimeoutError. Default: 600s.
+            max_retry_duration: Maximum time to retry a failed flush
+                before raising TimeoutError. Default: 10 minutes.
         """
         info = activity.info()
         workflow_id = info.workflow_id
@@ -302,7 +303,7 @@ class PubSubClient:
                 if (
                     self._pending_since is not None
                     and time.monotonic() - self._pending_since
-                    > self._max_retry_duration
+                    > self._max_retry_duration.total_seconds()
                 ):
                     # Advance confirmed sequence so the next batch gets
                     # a fresh sequence number. Without this, the next
@@ -316,7 +317,7 @@ class PubSubClient:
                     self._pending_since = None
                     raise TimeoutError(
                         f"Flush retry exceeded max_retry_duration "
-                        f"({self._max_retry_duration}s). Pending batch dropped. "
+                        f"({self._max_retry_duration}). Pending batch dropped. "
                         f"If the signal was delivered, items are in the log. "
                         f"If not, they are lost."
                     )
@@ -362,7 +363,8 @@ class PubSubClient:
         while True:
             try:
                 await asyncio.wait_for(
-                    self._flush_event.wait(), timeout=self._batch_interval
+                    self._flush_event.wait(),
+                    timeout=self._batch_interval.total_seconds(),
                 )
             except asyncio.TimeoutError:
                 pass
@@ -375,7 +377,7 @@ class PubSubClient:
         from_offset: int = 0,
         *,
         result_type: type | None = None,
-        poll_cooldown: float = 0.1,
+        poll_cooldown: timedelta = timedelta(milliseconds=100),
     ) -> AsyncIterator[PubSubItem]:
         """Async iterator that polls for new items.
 
@@ -393,9 +395,9 @@ class PubSubClient:
                 ``temporalio.api.common.v1.Payload`` — useful for
                 heterogeneous topics where the caller dispatches on
                 ``Payload.metadata``.
-            poll_cooldown: Minimum seconds between polls to avoid
+            poll_cooldown: Minimum interval between polls to avoid
                 overwhelming the workflow when items arrive faster
-                than the poll round-trip. Defaults to 0.1.
+                than the poll round-trip. Defaults to 100ms.
 
         Yields:
             :class:`PubSubItem` for each matching item.
@@ -443,8 +445,9 @@ class PubSubClient:
                     offset=wire_item.offset,
                 )
             offset = result.next_offset
-            if not result.more_ready and poll_cooldown > 0:
-                await asyncio.sleep(poll_cooldown)
+            cooldown_secs = poll_cooldown.total_seconds()
+            if not result.more_ready and cooldown_secs > 0:
+                await asyncio.sleep(cooldown_secs)
 
     async def _follow_continue_as_new(self) -> bool:
         """Check if the workflow continued-as-new and re-target the handle.

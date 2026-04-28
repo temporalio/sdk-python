@@ -25,6 +25,7 @@ the client's ``DataConverter.encode`` at dispatch time.
 from __future__ import annotations
 
 import sys
+from datetime import timedelta
 from typing import Any, Callable, NoReturn, Sequence
 
 from temporalio import workflow
@@ -169,24 +170,27 @@ class PubSub:
             payload = workflow.payload_converter().to_payloads([value])[0]
         self._log.append(PubSubItem(topic=topic, data=payload))
 
-    def get_state(self, *, publisher_ttl: float = 900.0) -> PubSubState:
+    def get_state(
+        self, *, publisher_ttl: timedelta = timedelta(seconds=900)
+    ) -> PubSubState:
         """Return a serializable snapshot of pub/sub state for continue-as-new.
 
-        Prunes publisher dedup entries older than ``publisher_ttl``
-        seconds. The TTL must exceed the ``max_retry_duration`` of any
-        client that may still be retrying a failed flush.
+        Prunes publisher dedup entries older than ``publisher_ttl``. The
+        TTL must exceed the ``max_retry_duration`` of any client that
+        may still be retrying a failed flush.
 
         Args:
-            publisher_ttl: Seconds after which a publisher's dedup
-                entry is pruned. Default 900 (15 minutes).
+            publisher_ttl: Duration after which a publisher's dedup
+                entry is pruned. Default 15 minutes.
         """
         now = workflow.time()
+        ttl_secs = publisher_ttl.total_seconds()
 
         active_sequences: dict[str, int] = {}
         active_last_seen: dict[str, float] = {}
         for pid, seq in self._publisher_sequences.items():
             ts = self._publisher_last_seen.get(pid, 0.0)
-            if now - ts < publisher_ttl:
+            if now - ts < ttl_secs:
                 active_sequences[pid] = seq
                 active_last_seen[pid] = ts
 
@@ -213,7 +217,7 @@ class PubSub:
         self,
         build_args: Callable[[PubSubState], Sequence[Any]],
         *,
-        publisher_ttl: float = 900.0,
+        publisher_ttl: timedelta = timedelta(seconds=900),
     ) -> NoReturn:
         """Drain, wait for handlers, then continue-as-new with built args.
 

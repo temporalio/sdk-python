@@ -67,12 +67,14 @@ batched publishing. The Temporal client and target workflow ID are taken
 from the activity context:
 
 ```python
+from datetime import timedelta
+
 from temporalio import activity
 from temporalio.contrib.pubsub import PubSubClient
 
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.from_activity(batch_interval=2.0)
+    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=2))
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -237,9 +239,9 @@ activation-ordering mechanics.
 |---|---|
 | `PubSub(prior_state=None)` | Constructor. Call once from `@workflow.init`; registers handlers on the current workflow. Raises `RuntimeError` if a `PubSub` is already registered. Pass `prior_state` if the input declares one (`None` on fresh starts). |
 | `publish(topic, value)` | Append to the log from workflow code. `value` is converted via the sync workflow payload converter (no codec). |
-| `get_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
+| `get_state(*, publisher_ttl=timedelta(seconds=900))` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` (a `timedelta`, default 15 minutes). |
 | `drain()` | Unblock polls and reject new ones. |
-| `continue_as_new(build_args, *, publisher_ttl=900.0)` | Async. Drain, wait for handlers, then `workflow.continue_as_new` with `build_args(post_drain_state)`. Use the explicit recipe to override other CAN parameters. |
+| `continue_as_new(build_args, *, publisher_ttl=timedelta(seconds=900))` | Async. Drain, wait for handlers, then `workflow.continue_as_new` with `build_args(post_drain_state)`. Use the explicit recipe to override other CAN parameters. |
 | `truncate(up_to_offset)` | Discard log entries below the given offset. Workflow-side only — no external API; wire up your own signal or update if external control is needed. |
 
 Handlers registered by the constructor:
@@ -258,7 +260,7 @@ Handlers registered by the constructor:
 | `PubSubClient.from_activity(*, batch_interval, max_batch_size, max_retry_duration)` | Factory that takes client and workflow id from the current activity context. Follows CAN. |
 | `PubSubClient(handle, *, batch_interval, max_batch_size, max_retry_duration)` | From handle (no CAN follow). |
 | `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. Per-item conversion uses the sync payload converter; the codec chain runs once on the signal envelope. |
-| `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=0.1)` | Async iterator. With `result_type=T`, `item.data` is decoded to `T`; otherwise it is a raw `Payload`. Follows CAN chains when created via `create` or `from_activity`. |
+| `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=timedelta(milliseconds=100))` | Async iterator. With `result_type=T`, `item.data` is decoded to `T`; otherwise it is a raw `Payload`. Follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
 Use as `async with` for batched publishing with automatic flush.

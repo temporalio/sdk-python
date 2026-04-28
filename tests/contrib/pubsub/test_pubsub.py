@@ -319,7 +319,7 @@ class DoubleInitWorkflow:
 
 @activity.defn(name="publish_items")
 async def publish_items(count: int) -> None:
-    client = PubSubClient.from_activity(batch_interval=0.5)
+    client = PubSubClient.from_activity(batch_interval=timedelta(milliseconds=500))
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -329,7 +329,7 @@ async def publish_items(count: int) -> None:
 @activity.defn(name="publish_multi_topic")
 async def publish_multi_topic(count: int) -> None:
     topics = ["a", "b", "c"]
-    client = PubSubClient.from_activity(batch_interval=0.5)
+    client = PubSubClient.from_activity(batch_interval=timedelta(milliseconds=500))
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -344,7 +344,7 @@ async def publish_with_priority() -> None:
     # The hold is deliberately much longer than the test's collect timeout
     # so a regression (force_flush no-op) surfaces as a missing item rather
     # than flaking on slow CI.
-    client = PubSubClient.from_activity(batch_interval=60.0)
+    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=60))
     async with client:
         client.publish("events", b"normal-0")
         client.publish("events", b"normal-1")
@@ -356,7 +356,7 @@ async def publish_with_priority() -> None:
 
 @activity.defn(name="publish_batch_test")
 async def publish_batch_test(count: int) -> None:
-    client = PubSubClient.from_activity(batch_interval=60.0)
+    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=60))
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -365,7 +365,9 @@ async def publish_batch_test(count: int) -> None:
 
 @activity.defn(name="publish_with_max_batch")
 async def publish_with_max_batch(count: int) -> None:
-    client = PubSubClient.from_activity(batch_interval=60.0, max_batch_size=3)
+    client = PubSubClient.from_activity(
+        batch_interval=timedelta(seconds=60), max_batch_size=3
+    )
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -419,7 +421,7 @@ async def collect_items(
             async for item in pubsub.subscribe(
                 topics=topics,
                 from_offset=from_offset,
-                poll_cooldown=0,
+                poll_cooldown=timedelta(0),
                 result_type=result_type,
             ):
                 items.append(item)
@@ -686,7 +688,7 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
         try:
             async with _async_timeout(5):
                 async for item in pubsub.subscribe(
-                    from_offset=1, poll_cooldown=0, result_type=bytes
+                    from_offset=1, poll_cooldown=timedelta(0), result_type=bytes
                 ):
                     items.append(item)
                     if len(items) >= 2:
@@ -791,7 +793,7 @@ async def test_iterator_cancellation(client: Client) -> None:
 
         async def subscribe_and_collect() -> None:
             async for item in pubsub_client.subscribe(
-                from_offset=0, poll_cooldown=0, result_type=bytes
+                from_offset=0, poll_cooldown=timedelta(0), result_type=bytes
             ):
                 items.append(item)
                 first_item.set()
@@ -862,7 +864,9 @@ async def test_explicit_flush_barrier(client: Client) -> None:
             task_queue=worker.task_queue,
         )
 
-        pubsub = PubSubClient.create(client, handle.id, batch_interval=60.0)
+        pubsub = PubSubClient.create(
+            client, handle.id, batch_interval=timedelta(seconds=60)
+        )
 
         async with _async_timeout(5):
             # 1. Empty-buffer flush is a no-op (must not block).
@@ -919,7 +923,10 @@ async def test_concurrent_subscribers(client: Client) -> None:
             events: list[asyncio.Event],
         ) -> None:
             async for item in pubsub.subscribe(
-                topics=[topic], from_offset=0, poll_cooldown=0, result_type=bytes
+                topics=[topic],
+                from_offset=0,
+                poll_cooldown=timedelta(0),
+                result_type=bytes,
             ):
                 collected.append(item)
                 events[len(collected) - 1].set()
@@ -1101,7 +1108,7 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
         # `max_retry_duration`, so advancing the clock between flushes makes
         # the timeout fire deterministically regardless of wall-clock speed
         # or clock resolution.
-        pubsub = PubSubClient(handle, max_retry_duration=0.1)
+        pubsub = PubSubClient(handle, max_retry_duration=timedelta(milliseconds=100))
         real_signal = handle.signal
         fail_signals = True
 
@@ -1406,8 +1413,10 @@ class TTLTestWorkflow:
         self._closed = True
 
     @workflow.query
-    def get_state_with_ttl(self, ttl: float) -> PubSubState:
-        return self.pubsub.get_state(publisher_ttl=ttl)
+    def get_state_with_ttl(self, ttl_seconds: float) -> PubSubState:
+        # Query arg is passed as float because the default JSON payload
+        # converter does not serialize ``timedelta``; convert here.
+        return self.pubsub.get_state(publisher_ttl=timedelta(seconds=ttl_seconds))
 
     @workflow.run
     async def run(self) -> None:
@@ -1695,7 +1704,10 @@ async def subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
     items: list[str] = []
     async with _async_timeout(15.0):
         async for item in client.subscribe(
-            topics=["events"], from_offset=0, poll_cooldown=0, result_type=bytes
+            topics=["events"],
+            from_offset=0,
+            poll_cooldown=timedelta(0),
+            result_type=bytes,
         ):
             items.append(item.data.decode())
             activity.heartbeat()
