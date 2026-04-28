@@ -202,7 +202,7 @@ class TestFunctionalAPIContinueAsNew:
                     },
                     tasks=tasks,
                     activity_options=_execute_in_activity(
-                        *(t.func.__name__ for t in tasks)
+                        *(getattr(t.func, "__name__") for t in tasks)
                     ),
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
@@ -247,7 +247,7 @@ class TestFunctionalAPIPartialExecution:
                     entrypoints={"e2e_partial_execution": partial_execution_entrypoint},
                     tasks=tasks,
                     activity_options=_execute_in_activity(
-                        *(t.func.__name__ for t in tasks)
+                        *(getattr(t.func, "__name__") for t in tasks)
                     ),
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
@@ -286,7 +286,7 @@ class TestFunctionalAPIInterruptV2:
                     entrypoints={"v2_interrupt": interrupt_entrypoint},
                     tasks=tasks,
                     activity_options=_execute_in_activity(
-                        *(t.func.__name__ for t in tasks)
+                        *(getattr(t.func, "__name__") for t in tasks)
                     ),
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                 )
