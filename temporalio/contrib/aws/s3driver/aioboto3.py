@@ -34,33 +34,13 @@ class _Aioboto3StorageDriverClient(S3StorageDriverClient):
                 ``aioboto3.Session().client("s3")``.
         """
         self._client = client
-        self._credentials_method: str | None = None
-        self._credentials_resolved = False
 
     def describe(self) -> Mapping[str, str]:
-        """Region and credentials source for the wrapped aioboto3 client.
-
-        The two most common misconfigurations that surface as opaque 403s
-        are wrong region and unexpected credential source; surfacing both
-        in driver error messages short-circuits those diagnoses.
+        """Region of the wrapped aioboto3 client, surfaced in driver error
+        messages to short-circuit the most common silent 403 misconfiguration.
         """
-        info: dict[str, str] = {}
         region = self._client.meta.region_name
-        if region:
-            info["region"] = region
-        if not self._credentials_resolved:
-            self._credentials_resolved = True
-            try:
-                import boto3
-
-                creds = boto3.Session().get_credentials()
-                if creds is not None:
-                    self._credentials_method = creds.method
-            except Exception:
-                pass
-        if self._credentials_method:
-            info["credentials"] = self._credentials_method
-        return info
+        return {"region": region} if region else {}
 
     async def object_exists(self, *, bucket: str, key: str) -> bool:
         """Check existence via aioboto3's ``head_object``."""
