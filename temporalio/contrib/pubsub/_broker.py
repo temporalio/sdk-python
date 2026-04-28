@@ -25,8 +25,9 @@ the client's ``DataConverter.encode`` at dispatch time.
 from __future__ import annotations
 
 import sys
+from collections.abc import Sequence
 from datetime import timedelta
-from typing import Any, Callable, NoReturn, Sequence
+from typing import Any, Callable, NoReturn
 
 from temporalio import workflow
 from temporalio.api.common.v1 import Payload
