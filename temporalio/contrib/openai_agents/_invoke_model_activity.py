@@ -25,10 +25,10 @@ from agents import (
     RunContextWrapper,
     Tool,
     TResponseInputItem,
-    Usage,
     UserError,
     WebSearchTool,
 )
+from agents.items import TResponseStreamEvent
 from agents.tool import (
     ApplyPatchTool,
     LocalShellTool,
@@ -40,7 +40,6 @@ from openai import (
     APIStatusError,
     AsyncOpenAI,
 )
-from openai.types.responses import ResponseCompletedEvent
 from openai.types.responses.tool_param import Mcp
 from typing_extensions import Required, TypedDict
 
@@ -50,8 +49,6 @@ from temporalio.contrib.pubsub import PubSubClient
 from temporalio.exceptions import ApplicationError
 
 logger = logging.getLogger(__name__)
-
-EVENTS_TOPIC = "events"
 
 
 @dataclass
@@ -193,6 +190,8 @@ class ActivityModelInput(TypedDict, total=False):
     previous_response_id: str | None
     conversation_id: str | None
     prompt: Any | None
+    streaming_event_topic: str | None
+    streaming_event_batch_interval: timedelta
 
 
 async def _empty_on_invoke_tool(_ctx: RunContextWrapper[Any], _input: str) -> str:
@@ -283,6 +282,10 @@ def _raise_for_openai_status(e: APIStatusError) -> NoReturn:
             next_retry_delay=retry_after,
         ) from e
 
+    # Retry on 408 (Request Timeout), 409 (Conflict / often transient
+    # state mismatch), 429 (Too Many Requests / rate-limited), and any
+    # 5xx (server-side errors). All other 4xx codes are caller errors
+    # that won't recover on retry.
     if e.response.status_code in [408, 409, 429] or e.response.status_code >= 500:
         raise ApplicationError(
             f"Retryable OpenAI status code: {e.response.status_code}",
@@ -335,22 +338,33 @@ class ModelActivity:
     @_auto_heartbeater
     async def invoke_model_activity_streaming(
         self, input: ActivityModelInput
-    ) -> ModelResponse:
+    ) -> list[TResponseStreamEvent]:
         """Streaming-aware model activity.
 
-        Calls model.stream_response(), publishes each yielded OpenAI event
-        as JSON to the pubsub side channel, and returns the ModelResponse
-        built from the final ResponseCompletedEvent. Consumers receive
-        native OpenAI event types; no normalization happens here.
+        Calls ``model.stream_response()`` and returns the collected list
+        of native OpenAI stream events. The workflow's
+        ``Model.stream_response`` stub yields these to the agents
+        framework, which builds the final ``ModelResponse`` from the
+        terminal ``ResponseCompletedEvent``.
+
+        When ``streaming_event_topic`` is set, each event is also
+        published to the workflow's pub/sub broker so external consumers
+        (UIs, tracing, etc.) can observe events as they arrive. Set the
+        topic to ``None`` to skip publishing entirely; in that case no
+        :class:`PubSubClient` is constructed.
+
+        Heartbeats run on a background task via ``_auto_heartbeater`` so
+        long initial-token latency or long pauses between chunks do not
+        trip ``heartbeat_timeout``.
         """
         model = self._model_provider.get_model(input.get("model_name"))
         tools, handoffs = _build_tools_and_handoffs(input)
 
-        pubsub = PubSubClient.from_activity(batch_interval=0.1)
-        final_response = None
+        topic = input.get("streaming_event_topic")
+        events: list[TResponseStreamEvent] = []
 
-        try:
-            async with pubsub:
+        async def consume(pubsub: PubSubClient | None, topic: str | None) -> None:
+            try:
                 async for event in model.stream_response(
                     system_instructions=input.get("system_instructions"),
                     input=input["input"],
@@ -363,29 +377,22 @@ class ModelActivity:
                     conversation_id=input.get("conversation_id"),
                     prompt=input.get("prompt"),
                 ):
-                    activity.heartbeat()
-                    pubsub.publish(EVENTS_TOPIC, event.model_dump_json().encode())
-                    if isinstance(event, ResponseCompletedEvent):
-                        final_response = event.response
-        except APIStatusError as e:
-            _raise_for_openai_status(e)
+                    events.append(event)
+                    if pubsub is not None and topic is not None:
+                        pubsub.publish(topic, event)
+            except APIStatusError as e:
+                _raise_for_openai_status(e)
 
-        if final_response is None:
-            raise ApplicationError(
-                "Stream ended without ResponseCompletedEvent",
-                non_retryable=True,
+        if topic is None:
+            await consume(None, None)
+        else:
+            batch_interval = input.get(
+                "streaming_event_batch_interval", timedelta(milliseconds=100)
             )
+            pubsub = PubSubClient.from_activity(
+                batch_interval=batch_interval,
+            )
+            async with pubsub:
+                await consume(pubsub, topic)
 
-        return ModelResponse(
-            output=final_response.output,
-            usage=Usage(
-                requests=1,
-                input_tokens=final_response.usage.input_tokens
-                if final_response.usage
-                else 0,
-                output_tokens=final_response.usage.output_tokens
-                if final_response.usage
-                else 0,
-            ),
-            response_id=final_response.id,
-        )
+        return events

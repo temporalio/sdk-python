@@ -69,8 +69,18 @@ class ModelActivityParameters:
     use_local_activity: bool = False
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
 
-    enable_streaming: bool = False
-    """When True, the model activity uses the streaming LLM endpoint and
-    publishes token events via PubSubClient. The workflow is unaffected --
-    it still receives a complete ModelResponse. Incompatible with
-    use_local_activity (local activities do not support heartbeats)."""
+    streaming_event_topic: str | None = "events"
+    """Pub/sub topic to publish raw model stream events to when the workflow
+    calls ``Runner.run_streamed``. Set to ``None`` to skip publishing
+    entirely (workflow-side iteration via ``stream_events()`` still works,
+    no broker required). When set, the workflow must host a
+    :class:`temporalio.contrib.pubsub.PubSub` broker to receive the
+    publishes; otherwise the signals are unhandled and dropped.
+
+    Streaming is incompatible with ``use_local_activity`` (local activities
+    do not support heartbeats or the pubsub signal channel)."""
+
+    streaming_event_batch_interval: timedelta = timedelta(milliseconds=100)
+    """Interval between automatic flushes for the pub/sub publisher used
+    by the streaming activity. Ignored when ``streaming_event_topic`` is
+    ``None``."""

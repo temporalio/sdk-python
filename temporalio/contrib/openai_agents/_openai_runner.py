@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 from collections.abc import Awaitable
 from typing import Any, Callable
@@ -243,14 +244,123 @@ class TemporalOpenAIRunner(AgentRunner):
         input: str | list[TResponseInputItem] | RunState[TContext],
         **kwargs: Any,
     ) -> RunResultStreaming:
-        """Run the agent with streaming responses (not supported in Temporal workflows)."""
+        """Run the agent with streaming responses.
+
+        Inside a workflow, model calls execute as the streaming model
+        activity. The workflow consumes events via
+        ``RunResultStreaming.stream_events()`` after each activity
+        completes; external clients can subscribe to the configured
+        pub/sub topic to receive events as they arrive.
+        """
         if not workflow.in_workflow():
             return self._runner.run_streamed(
                 starting_agent,
                 input,
                 **kwargs,
             )
-        raise RuntimeError("Temporal workflows do not support streaming.")
+
+        for t in starting_agent.tools:
+            if callable(t):
+                raise ValueError(
+                    "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
+                )
+
+        if starting_agent.mcp_servers:
+            from temporalio.contrib.openai_agents._mcp import (
+                _StatefulMCPServerReference,
+                _StatelessMCPServerReference,
+            )
+
+            for s in starting_agent.mcp_servers:
+                if not isinstance(
+                    s,
+                    (
+                        _StatelessMCPServerReference,
+                        _StatefulMCPServerReference,
+                    ),
+                ):
+                    raise ValueError(
+                        f"Unknown mcp_server type {type(s)} may not work durably."
+                    )
+
+        run_config = kwargs.get("run_config")
+        session = kwargs.get("session")
+
+        if isinstance(session, SQLiteSession):
+            raise ValueError("Temporal workflows don't support SQLite sessions.")
+
+        if run_config is None:
+            run_config = RunConfig()
+            kwargs["run_config"] = run_config
+
+        if run_config.model and not isinstance(run_config.model, _TemporalModelStub):
+            if not isinstance(run_config.model, str):
+                raise ValueError(
+                    "Temporal workflows require a model name to be a string in the run config."
+                )
+            run_config = dataclasses.replace(
+                run_config,
+                model=_TemporalModelStub(
+                    run_config.model, model_params=self.model_params, agent=None
+                ),
+            )
+            kwargs["run_config"] = run_config
+
+        if _has_sandbox_agent(starting_agent) or run_config.sandbox:
+            if run_config.sandbox is None:
+                raise ValueError(
+                    "A SandboxAgent was provided but run_config.sandbox is not configured. "
+                    "You must set run_config.sandbox to a SandboxRunConfig. "
+                    "For example:\n"
+                    "  from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client\n"
+                    "  run_config = RunConfig(sandbox=SandboxRunConfig(client=temporal_sandbox_client('my-backend')))"
+                )
+            elif run_config.sandbox.client is None:
+                raise ValueError(
+                    "run_config.sandbox.client must be set to a temporal sandbox client. "
+                    "Use temporalio.contrib.openai_agents.workflow.temporal_sandbox_client(name) "
+                    "to create one, where name matches a SandboxClientProvider registered on the plugin."
+                )
+            elif not isinstance(run_config.sandbox.client, TemporalSandboxClient):
+                raise ValueError(
+                    "run_config.sandbox.client must be created via "
+                    "temporalio.contrib.openai_agents.workflow.temporal_sandbox_client(name). "
+                    "Do not pass a raw sandbox client directly."
+                )
+
+        streamed_result = self._runner.run_streamed(
+            starting_agent=_convert_agent(self.model_params, starting_agent, None),
+            input=input,
+            **kwargs,
+        )
+
+        # Mirror the AgentsException -> AgentsWorkflowError rewrap done
+        # in run() above. The streaming runner attaches the actual run
+        # to ``run_loop_task``; wrap it so workflow-failure-bearing
+        # AgentsException instances surface as AgentsWorkflowError (the
+        # plugin registers that type in workflow_failure_exception_types,
+        # which is how durable failures propagate as terminal workflow
+        # failures rather than retrying workflow-task errors).
+        original_task = streamed_result.run_loop_task
+        if original_task is not None:
+
+            async def _rewrap_agents_exception() -> Any:
+                try:
+                    return await original_task
+                except AgentsException as e:
+                    if e.__cause__ and workflow.is_failure_exception(e.__cause__):
+                        reraise = AgentsWorkflowError(
+                            f"Workflow failure exception in Agents Framework: {e}"
+                        )
+                        reraise.__traceback__ = e.__traceback__
+                        raise reraise from e.__cause__
+                    raise
+
+            streamed_result.run_loop_task = asyncio.create_task(
+                _rewrap_agents_exception()
+            )
+
+        return streamed_result
 
 
 def _model_name(agent: Agent[Any]) -> str | None:
