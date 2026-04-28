@@ -88,6 +88,19 @@ Use `force_flush=True` to trigger an immediate flush for latency-sensitive event
 client.publish("events", data, force_flush=True)
 ```
 
+Use `await client.flush()` when you need proof that prior publications have
+reached the server before continuing — for example, before returning from an
+activity:
+
+```python
+async with client:
+    for chunk in generate_chunks():
+        client.publish("events", chunk)
+    # Ensure everything is confirmed before the activity completes.
+    await client.flush()
+    do_something_that_depends_on_delivery()
+```
+
 ### Subscribing
 
 Use `PubSubClient.create()` and the `subscribe()` async iterator:

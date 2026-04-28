@@ -61,9 +61,8 @@ class PubSubClient:
         async with client:
             client.publish("events", my_event)
             client.publish("events", another_event, force_flush=True)
-            # Optional synchronization point — wait until everything
-            # buffered so far has been confirmed by the server.
-            await client.flush()
+            ...  # more publishing
+        # Buffer is flushed automatically on context manager exit.
 
     For subscribing::
 
