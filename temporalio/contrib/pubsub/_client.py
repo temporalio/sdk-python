@@ -4,8 +4,8 @@ Used by activities, starters, and any code with a workflow handle to
 publish messages and subscribe to topics on a pub/sub workflow.
 
 Each published value is turned into a :class:`Payload` via the client's
-sync payload converter. The **codec chain** (encryption, PII-redaction,
-compression) is **not** run per item — it runs once at the envelope
+sync payload converter. The **codec chain** (e.g. encryption, compression)
+is **not** run per item — it runs once at the envelope
 level when Temporal's SDK encodes the ``__temporal_pubsub_publish`` signal args
 and the ``__temporal_pubsub_poll`` update result. Running the codec per item as
 well would double-encrypt / double-compress, because the envelope path
@@ -266,7 +266,7 @@ class PubSubClient:
 
         Uses the configured client's payload converter when available;
         otherwise falls back to the default. The codec chain
-        (encryption, compression, PII-redaction) is intentionally not
+        (e.g. encryption, compression) is intentionally not
         invoked here — it runs once at the envelope level when the
         signal/update goes over the wire. See module docstring.
         """

@@ -16,8 +16,8 @@ configurable batching coalesces high-frequency events, improving efficiency.
 
 Payloads are Temporal `Payload`s carrying the encoding metadata needed for
 typed decode (`subscribe(result_type=T)`) and heterogeneous-topic dispatch
-(`Payload.metadata`). The codec chain (encryption, PII-redaction,
-compression) runs once on the signal/update envelope that carries each
+(`Payload.metadata`). The codec chain (e.g. encryption, compression)
+runs once on the signal/update envelope that carries each
 batch — **not** per item — so there is no double-encryption, and codec
 behavior is symmetric between workflow-side and client-side publishing.
 
@@ -58,7 +58,7 @@ Both workflow-side and client-side `publish()` use the sync payload
 converter for per-item `Payload` construction. The codec chain runs
 once at the envelope level (`__temporal_pubsub_publish` signal,
 `__temporal_pubsub_poll` update) — never per item — so encryption,
-PII-redaction, and compression are applied once each way.
+compression, and any other codec transforms are applied once each way.
 
 ### Activity side (publishing)
 
