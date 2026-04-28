@@ -1,9 +1,15 @@
 """Shared data types for the pub/sub contrib module.
 
 The user-facing ``data`` fields on :class:`PubSubItem` are
-:class:`temporalio.api.common.v1.Payload` so that user codec chains
-(encryption, PII-redaction, compression) apply per item. See
-``DESIGN-v2.md`` §5 and ``docs/pubsub-payload-migration.md``.
+:class:`temporalio.api.common.v1.Payload`. Per-item values are
+converted to ``Payload`` by the payload converter at publish time, and
+the resulting bytes/metadata are preserved per item so subscribers can
+decode with ``subscribe(result_type=T)``. The codec chain (encryption,
+PII-redaction, compression) applies once at the outer signal/update
+envelope level — not separately to each embedded item — so codec
+behavior is symmetric between workflow-side and client-side
+publishing. See ``DESIGN-v2.md`` §5 and
+``docs/pubsub-payload-migration.md``.
 
 The wire representation (``PublishEntry``, ``_WireItem``) uses
 base64-encoded ``Payload.SerializeToString()`` bytes because the default

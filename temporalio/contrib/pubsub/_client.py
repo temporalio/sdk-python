@@ -177,9 +177,10 @@ class PubSubClient:
         """
         info = activity.info()
         workflow_id = info.workflow_id
-        assert (
-            workflow_id is not None
-        ), "from_activity requires an activity with a parent workflow"
+        if workflow_id is None:
+            raise RuntimeError(
+                "from_activity requires an activity with a parent workflow"
+            )
         return cls.create(
             activity.client(),
             workflow_id,
@@ -324,10 +325,12 @@ class PubSubClient:
                 batch = self._pending
                 seq = self._pending_seq
             elif self._buffer:
-                # New batch path
-                raw = self._buffer
+                # New batch path. Encode before clearing the buffer so
+                # a payload-converter exception leaves the items in
+                # place for inspection or retry rather than silently
+                # dropping them.
+                batch = self._encode_buffer(self._buffer)
                 self._buffer = []
-                batch = self._encode_buffer(raw)
                 seq = self._sequence + 1
                 self._pending = batch
                 self._pending_seq = seq

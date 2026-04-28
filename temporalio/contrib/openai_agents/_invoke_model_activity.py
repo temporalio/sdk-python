@@ -286,16 +286,13 @@ def _raise_for_openai_status(e: APIStatusError) -> NoReturn:
     # state mismatch), 429 (Too Many Requests / rate-limited), and any
     # 5xx (server-side errors). All other 4xx codes are caller errors
     # that won't recover on retry.
-    if e.response.status_code in [408, 409, 429] or e.response.status_code >= 500:
-        raise ApplicationError(
-            f"Retryable OpenAI status code: {e.response.status_code}",
-            non_retryable=False,
-            next_retry_delay=retry_after,
-        ) from e
-
+    retryable = (
+        e.response.status_code in [408, 409, 429] or e.response.status_code >= 500
+    )
     raise ApplicationError(
-        f"Non retryable OpenAI status code: {e.response.status_code}",
-        non_retryable=True,
+        f"{'Retryable' if retryable else 'Non retryable'} OpenAI status code: "
+        f"{e.response.status_code}",
+        non_retryable=not retryable,
         next_retry_delay=retry_after,
     ) from e
 
