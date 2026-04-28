@@ -332,6 +332,7 @@ class RequestCancelExternalWorkflowExecutionCommandAttributes(
     CHILD_WORKFLOW_ONLY_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
     namespace: builtins.str
+    """Deprecated. Cross-namespace operations are disabled by default as of server 1.30.1."""
     workflow_id: builtins.str
     run_id: builtins.str
     control: builtins.str
@@ -386,6 +387,7 @@ class SignalExternalWorkflowExecutionCommandAttributes(google.protobuf.message.M
     CHILD_WORKFLOW_ONLY_FIELD_NUMBER: builtins.int
     HEADER_FIELD_NUMBER: builtins.int
     namespace: builtins.str
+    """Deprecated. Cross-namespace operations are disabled by default as of server 1.30.1."""
     @property
     def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     signal_name: builtins.str
@@ -757,6 +759,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     INHERIT_BUILD_ID_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
+    """Deprecated. Cross-namespace operations are disabled by default as of server 1.30.1."""
     workflow_id: builtins.str
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
