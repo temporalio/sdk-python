@@ -90,8 +90,30 @@ Construct `PubSub(...)` once from `@workflow.init`. Include a
 `prior_state`: it is `None` on fresh starts and carries accumulated
 state across continue-as-new (see [Continue-as-New](#continue-as-new)).
 Workflows that will never continue-as-new may call `PubSub()` with no
-argument. Instantiating `PubSub` twice on the same workflow raises
-`RuntimeError`, detected via `workflow.get_signal_handler("__temporal_pubsub_publish")`.
+argument.
+
+Two construction-time guards keep misuse loud:
+
+- **Caller-frame check.** The constructor inspects
+  `sys._getframe(1).f_code.co_name` and raises `RuntimeError` if the
+  immediate caller is not a method named `__init__`. Calls from
+  `@workflow.run`, helpers, or signal/update/query handlers are
+  rejected immediately rather than silently producing a workflow that
+  registers handlers on every replay.
+- **Single-instance check.** Instantiating `PubSub` twice on the same
+  workflow raises `RuntimeError`, detected via
+  `workflow.get_signal_handler("__temporal_pubsub_publish")`.
+
+**Dynamic registration race.** Because the constructor registers
+`__temporal_pubsub_publish` *dynamically* in `__init__` rather than via
+`@workflow.signal` decorators, a synchronous custom signal/update
+handler that reads `PubSub` state can observe pre-publish state when
+the inbound publish and the custom call land in the same activation.
+The recipe is to make such handlers `async` and `await asyncio.sleep(0)`
+once before reading state. The module's own `__temporal_pubsub_poll`
+update is already safe (it is `async` and `await`s
+`workflow.wait_condition`). See the README "Gotcha" section for the
+full explanation.
 
 | Method / Handler | Kind | Description |
 |---|---|---|
@@ -141,7 +163,7 @@ async for item in client.subscribe(["events"], result_type=EventUnion):
 | `PubSubClient(handle)` | From handle directly (no CAN following; no codec chain — falls back to the default converter). |
 | `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. `force_flush` triggers immediate flush (fire-and-forget). |
 | `flush()` | Async. Block until items buffered at call time are confirmed by the server. No-op if nothing is buffered. |
-| `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=timedelta(milliseconds=100))` | Async iterator. `result_type` decodes `item.data` to the given type; omit for raw `Payload`. Always follows CAN chains when created via `create` or `from_activity`. |
+| `subscribe(topics=None, from_offset=0, *, result_type=None, poll_cooldown=timedelta(milliseconds=100))` | Async iterator. `topics` accepts a single string, a list of strings, or `None` (= all topics). `result_type` decodes `item.data` to the given type; omit for raw `Payload`. Always follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
 
 The client offers three complementary ways to flush:
@@ -437,8 +459,7 @@ across batches from a single publisher preserve their publish order.
 
 Concurrent publishers get a total order in the log (the workflow serializes
 all signal processing), but the interleaving is nondeterministic — it depends
-on arrival order at the server. Per-publisher ordering is preserved. This is
-formally verified as `OrderPreservedPerPublisher`.
+on arrival order at the server. Per-publisher ordering is preserved.
 
 Once items are in the log, their order is stable — reads are repeatable.
 
@@ -548,7 +569,16 @@ streaming workflows have shown this matters in practice: a session can
 accumulate tens of thousands of small audio/text events long before CAN
 is triggered, and the workflow needs a way to release entries the
 subscriber has already consumed without waiting for a CAN cycle.
-`PubSub.truncate(up_to_offset)` exposes this.
+`PubSub.truncate(up_to_offset)` exposes this — workflow-side only.
+Out-of-range offsets raise `ApplicationError` (type
+`TruncateOutOfRange`); applications that want external truncation
+control must wire up their own signal/update on top of `truncate()`.
+
+When a subscriber whose `from_offset` is below `base_offset` polls,
+`PubSubClient.subscribe()` catches the `TruncatedOffset`
+`ApplicationError`, resets `offset` to `0` (which the broker treats
+as "from whatever is available"), and continues. The application sees
+a gap in offsets but the iterator does not raise.
 
 ### 12. No timeout on long-poll
 
@@ -611,7 +641,7 @@ exactly-once via Update ID, eliminating application-level dedup. However:
 
 If the cross-CAN dedup gap is fixed and backpressure becomes desirable,
 switching publish to updates is a mechanical change — the dedup protocol,
-dedup protocol, and mixin handler logic are unchanged.
+retry path, and `PubSub` handler logic are unchanged.
 
 ## Design Principles
 
@@ -694,7 +724,7 @@ duplication).
 
 ### Solution
 
-Each `PubSubClient` instance generates a UUID (`publisher_id`) on creation.
+Each `PubSubClient` instance generates a 16-hex-char identifier (`publisher_id`, the prefix of a fresh UUID4) on creation.
 Each `flush()` increments a monotonic `sequence` counter. The signal payload
 includes both. The workflow tracks the highest seen sequence per publisher in
 `_publishers: dict[str, PublisherState]` and rejects any signal with
@@ -815,7 +845,7 @@ global offsets (see [Information Leakage and the BFF](#information-leakage-and-t
 
 ### Problem
 
-The pub/sub mixin accumulates workflow history through signals (each
+`PubSub` accumulates workflow history through signals (each
 `__temporal_pubsub_publish`) and updates (each `__temporal_pubsub_poll` response). Over a
 streaming session, history grows toward the ~50K event threshold. CAN resets
 the history while carrying the canonical log copy forward.
@@ -830,10 +860,16 @@ class PublisherState:
 
 @dataclass
 class PubSubState:
-    log: list[PubSubItem] = field(default_factory=list)
+    log: list[_WireItem] = field(default_factory=list)
     base_offset: int = 0
     publishers: dict[str, PublisherState] = field(default_factory=dict)
 ```
+
+The `log` carries the wire form (`_WireItem`, base64-encoded
+`Payload.SerializeToString()`) so the snapshot serializes through
+the default JSON converter without needing to embed proto `Payload`s
+in a dataclass. The constructor decodes them back to `PubSubItem`
+on the new run.
 
 `PubSub(prior_state=...)` restores all three fields. `PubSub.get_state()`
 snapshots them.
@@ -995,13 +1031,23 @@ Double-underscore prefix on handler names avoids collisions with application
 signals/updates. The envelope types are simple composites of strings, bytes,
 and ints — representable in every Temporal SDK's default data converter.
 
-**Requires the default (JSON) data converter.** The wire protocol depends on
-all participants — workflow, publishers, and subscribers — using the default
-JSON data converter. A custom converter (protobuf, encryption codecs) would
-change how the envelope types serialize, breaking cross-language interop.
-This is also why payload data is opaque bytes: the pub/sub layer controls the
-envelope format (guaranteed JSON-safe), while the application controls payload
-serialization independently.
+**Requires the default (JSON) data converter on the envelope.** The wire
+protocol depends on all participants — workflow, publishers, and
+subscribers — using the default JSON data converter for the
+*envelope* types (`PublishInput`, `PollInput`, `PollResult`,
+`PubSubState`). These are simple composites of strings, ints, and
+lists that serialize identically across SDKs under the default
+converter. A custom converter that changes how dataclasses serialize
+(protobuf-based, etc.) would break cross-language interop on the
+envelope.
+
+The user-facing data inside each envelope is a Temporal `Payload`,
+serialized to bytes and base64-encoded as a string field on
+`PublishEntry` / `_WireItem`. The user's payload converter and codec
+chain run once at the envelope level and apply to the whole batch
+(see [Design Decision 3](#3-items-are-temporal-payloads-not-opaque-bytes)).
+Cross-language clients interoperate by using the same shape:
+JSON-encoded envelopes containing base64-of-serialized-`Payload` items.
 
 ## Compatibility
 
@@ -1010,7 +1056,7 @@ serialization independently.
 > **Immutable handler names.** `__temporal_pubsub_publish`, `__temporal_pubsub_poll`, and
 > `__temporal_pubsub_offset` are permanent wire-level entry points. The escape hatch —
 > versioned handler names like `__temporal_pubsub_v2_poll` — gets more expensive over
-> time: the mixin must register all supported versions, with no discovery
+> time: `PubSub` must register all supported versions, with no discovery
 > mechanism for which versions a workflow supports.
 >
 > **No version field.** Committing to additive-only evolution means the *only*
@@ -1042,13 +1088,13 @@ version bump).
 
 **Versioned handler names** (e.g., `__temporal_pubsub_v2_poll`). The most robust
 option — creates entirely separate protocol surfaces so old and new code
-never interact. But premature: the mixin must register handlers for all
-supported versions, the client must probe which versions exist (Temporal
+never interact. But premature: `PubSub` would have to register handlers for
+all supported versions, the client must probe which versions exist (Temporal
 has no "does this handler exist?" primitive), and dead code accumulates.
 Reserved as the escape hatch for a future true breaking change.
 
 **Protocol negotiation.** Client declares version in poll, workflow
-responds with what it supports. Turns the mixin into a version-dispatching
+responds with what it supports. Turns `PubSub` into a version-dispatching
 router. Disproportionate complexity. Temporal's Worker Versioning (Build ID
 routing) solves this better at the infrastructure level — route tasks to
 compatible workers rather than negotiating at the message level.
@@ -1069,7 +1115,7 @@ for new fields) and Avro's schema evolution model. Temporal's own
 mechanisms cover the hard cases:
 
 - **Worker Versioning (Build IDs):** For true breaking changes, deploy v2
-  mixin on a new Build ID. Old workflows continue on old workers; new
+  `PubSub` on a new Build ID. Old workflows continue on old workers; new
   workflows start on new workers. Strictly more powerful than
   message-level versioning because it operates at the workflow execution
   level.
@@ -1118,11 +1164,11 @@ versions between client and workflow. The reasons:
   This is strictly worse than the current behavior, where unknown fields are
   harmlessly ignored.
 - **Temporal Worker Versioning handles the hard cases.** For a true breaking
-  change, deploy the new mixin on a new Build ID. Old running workflows continue
-  on old workers; new workflows start on new workers. This operates at the
-  infrastructure level — handling in-flight workflows, replay, and mixed-version
-  fleets — which message-level version fields cannot.
-- **`workflow.patched()` handles in-workflow transitions.** If a new mixin
+  change, deploy the new `PubSub` on a new Build ID. Old running workflows
+  continue on old workers; new workflows start on new workers. This operates at
+  the infrastructure level — handling in-flight workflows, replay, and
+  mixed-version fleets — which message-level version fields cannot.
+- **`workflow.patched()` handles in-workflow transitions.** If a new `PubSub`
   version changes behavior (e.g., how it processes a signal), `patched()` gates
   old vs. new logic within the same workflow code during the transition period.
 
@@ -1246,10 +1292,13 @@ await self._handle.signal(
 ```
 
 ```python
-# In _mixin.py, __temporal_pubsub_publish handler — drop the dedup branch:
-def _pubsub_publish(self, input: PublishInput) -> None:
+# In _broker.py, __temporal_pubsub_publish handler — drop the dedup branch:
+def _on_publish(self, input: PublishInput) -> None:
     # remove: if input.publisher_id and input.sequence ...
-    self._log.extend(input.items)
+    for entry in input.items:
+        self._log.append(
+            PubSubItem(topic=entry.topic, data=_decode_payload(entry.data))
+        )
 ```
 
 ```python
@@ -1275,9 +1324,6 @@ def _pubsub_publish(self, input: PublishInput) -> None:
 - `publishers` in `PubSubState`.
 - `publisher_ttl` and the `publisher_ttl > max_retry_duration` safety
   constraint — there is no longer a per-publisher map to expire.
-- The TLA+ retry-algorithm verification (`PubSubDedupTTL.tla`); the
-  on-workflow check it models has been removed. The
-  ordering/correctness specs that don't mention dedup still apply.
 
 **Migration path:**
 
