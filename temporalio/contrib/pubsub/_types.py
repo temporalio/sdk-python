@@ -1,33 +1,34 @@
 """Shared data types for the pub/sub contrib module.
 
 The user-facing ``data`` fields on :class:`PubSubItem` are
-:class:`temporalio.api.common.v1.Payload`. Per-item values are
-converted to ``Payload`` by the payload converter at publish time, and
-the resulting bytes/metadata are preserved per item so subscribers can
-decode with ``subscribe(result_type=T)``. The codec chain (encryption,
-PII-redaction, compression) applies once at the outer signal/update
-envelope level — not separately to each embedded item — so codec
-behavior is symmetric between workflow-side and client-side
-publishing. See ``DESIGN-v2.md`` §5 and
+:class:`temporalio.api.common.v1.Payload`. Per-item values are converted to
+``Payload`` by the payload converter at publish time, and the resulting
+bytes/metadata are preserved per item so subscribers can decode with
+``subscribe(result_type=T)``. The codec chain (e.g. encryption, compression)
+applies once at the outer signal/update envelope level — not separately to each
+embedded item — so codec behavior is symmetric between workflow-side and
+client-side publishing. See ``DESIGN-v2.md`` §5 and
 ``docs/pubsub-payload-migration.md``.
 
-The wire representation (``PublishEntry``, ``_WireItem``) uses
-base64-encoded ``Payload.SerializeToString()`` bytes because the default
-JSON payload converter cannot serialize a ``Payload`` embedded inside a
-dataclass (it only special-cases top-level Payloads on signal/update
-args). Round-trip validated in
-``tests/contrib/pubsub/test_payload_roundtrip_prototype.py``.
+The wire representation (``PublishEntry``, ``_WireItem``) uses base64-encoded
+``Payload.SerializeToString()`` bytes because the default JSON payload converter
+cannot serialize a ``Payload`` embedded inside a dataclass (it only
+special-cases top-level Payloads on signal/update args).
 """
 
 from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from temporalio.api.common.v1 import Payload
 
 
+# basedpyright flags _-prefixed module-level functions as unused even when
+# sibling modules import them (_broker.py, _client.py). Vanilla pyright does
+# not. Suppressions below are required for `poe lint`.
 def _encode_payload(payload: Payload) -> str:  # pyright: ignore[reportUnusedFunction]
     """Wire format: base64(Payload.SerializeToString())."""
     return base64.b64encode(payload.SerializeToString()).decode("ascii")
@@ -118,6 +119,19 @@ class PollResult:
 
 
 @dataclass
+class PublisherState:
+    """Per-publisher dedup state.
+
+    Tracks the last accepted ``sequence`` and the ``workflow.now()`` at
+    which it was accepted, used together for at-least-once dedup and
+    TTL-based pruning at continue-as-new time.
+    """
+
+    sequence: int
+    last_seen: datetime
+
+
+@dataclass
 class PubSubState:
     """Serializable snapshot of pub/sub state for continue-as-new.
 
@@ -130,5 +144,4 @@ class PubSubState:
 
     log: list[_WireItem] = field(default_factory=list)
     base_offset: int = 0
-    publisher_sequences: dict[str, int] = field(default_factory=dict)
-    publisher_last_seen: dict[str, float] = field(default_factory=dict)
+    publishers: dict[str, PublisherState] = field(default_factory=dict)

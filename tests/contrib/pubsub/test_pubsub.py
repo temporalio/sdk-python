@@ -246,7 +246,7 @@ class MaxBatchWorkflow:
 
     @workflow.query
     def publisher_sequences(self) -> dict[str, int]:
-        return dict(self.pubsub._publisher_sequences)
+        return {pid: ps.sequence for pid, ps in self.pubsub._publishers.items()}
 
     @workflow.run
     async def run(self, count: int) -> None:
@@ -1312,7 +1312,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
         # Sanity: pub-old is recorded (generous TTL retains it).
         state_before = await handle.query(TTLTestWorkflow.get_state_with_ttl, 9999.0)
-        assert "pub-old" in state_before.publisher_sequences
+        assert "pub-old" in state_before.publishers
 
         # Let workflow.time() advance by real wall-clock time. Use a
         # generous gap (1.0s) relative to the TTL (0.5s) so the test
@@ -1332,8 +1332,8 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
         # TTL=0.5s prunes pub-old (~1.0s old) but keeps pub-new (~0s).
         state = await handle.query(TTLTestWorkflow.get_state_with_ttl, 0.5)
-        assert "pub-old" not in state.publisher_sequences
-        assert "pub-new" in state.publisher_sequences
+        assert "pub-old" not in state.publishers
+        assert "pub-new" in state.publishers
         # Log contents are not touched by publisher pruning.
         assert len(state.log) == 2
 
@@ -1455,7 +1455,7 @@ class ContinueAsNewTypedWorkflow:
 
     @workflow.query
     def publisher_sequences(self) -> dict[str, int]:
-        return dict(self.pubsub._publisher_sequences)
+        return {pid: ps.sequence for pid, ps in self.pubsub._publishers.items()}
 
     @workflow.run
     async def run(self, _input: CANWorkflowInputTyped) -> None:

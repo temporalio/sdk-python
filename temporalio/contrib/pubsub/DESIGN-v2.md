@@ -33,7 +33,7 @@ the workflow does not interpret them.
                     │  │   Append-only log          │  │
                     │  │   [(topic, data), ...]     │  │
                     │  │   base_offset: int         │  │
-                    │  │   publisher_sequences: {}  │  │
+                    │  │   publishers: {}           │  │
                     │  └────────────────────────────┘  │
                     │                                  │
   signal ──────────►│  __temporal_pubsub_publish (with dedup)   │
@@ -48,7 +48,7 @@ the workflow does not interpret them.
                     ┌──────────────────────────────────┐
                     │  PubSubState carries:            │
                     │    log, base_offset,             │
-                    │    publisher_sequences           │
+                    │    publishers                    │
                     └──────────────────────────────────┘
 ```
 
@@ -116,8 +116,8 @@ from temporalio.contrib.pubsub import PubSubClient
 client = PubSubClient.create(temporal_client, workflow_id)
 
 # --- Publishing (with batching) ---
-# Values go through the client's data converter — including the codec
-# chain (encryption, PII-redaction, compression) — per item.
+# Values go through the client's payload converter per item; the codec
+# chain (e.g. encryption, compression) runs once at the envelope level.
 async with client:
     client.publish("events", TextDelta(delta="hello"))
     client.publish("events", TextDelta(delta=" world"))
@@ -214,11 +214,15 @@ class PollResult:
     more_ready: bool = False   # Truncated response; poll again
 
 @dataclass
+class PublisherState:
+    sequence: int
+    last_seen: datetime
+
+@dataclass
 class PubSubState:
     log: list[_WireItem] = field(default_factory=list)
     base_offset: int = 0
-    publisher_sequences: dict[str, int] = field(default_factory=dict)
-    publisher_last_seen: dict[str, float] = field(default_factory=dict)
+    publishers: dict[str, PublisherState] = field(default_factory=dict)
 ```
 
 The containing workflow input must type the field as `PubSubState | None`,
@@ -292,7 +296,7 @@ topics) or pass `result_type=T` to have it decoded.
 
 This replaces an earlier "opaque byte strings" design. We switched
 because the opaque-bytes path **skipped the user's codec chain** —
-encryption, PII-redaction, and compression codecs saw only the
+encryption and compression codecs saw only the
 outer `PublishInput` envelope, not the individual items. For users
 who expect their codec chain to cover every piece of data flowing
 through Temporal, that is a silent compliance/correctness gap.
@@ -693,8 +697,8 @@ duplication).
 Each `PubSubClient` instance generates a UUID (`publisher_id`) on creation.
 Each `flush()` increments a monotonic `sequence` counter. The signal payload
 includes both. The workflow tracks the highest seen sequence per publisher in
-`_publisher_sequences: dict[str, int]` and rejects any signal with
-`sequence <= last_seen`.
+`_publishers: dict[str, PublisherState]` and rejects any signal with
+`sequence <= existing.sequence`.
 
 ```
 Client                              Workflow
@@ -756,15 +760,15 @@ async def _flush(self) -> None:
 
 ### Dedup state and TTL pruning
 
-`publisher_sequences` is `dict[str, int]` — bounded by number of publishers
+`publishers` is `dict[str, PublisherState]` — bounded by number of publishers
 (typically 1-2), not number of flushes. Carried through continue-as-new in
 `PubSubState`. If `publisher_id` is empty (workflow-internal publish),
 dedup is skipped.
 
-`publisher_last_seen` tracks the last `workflow.time()` each publisher was
-seen. During `PubSub.get_state(publisher_ttl=timedelta(seconds=900))`,
-entries older than TTL are pruned to bound memory across long-lived
-workflow chains.
+Each `PublisherState` records the highest accepted `sequence` and the
+`workflow.now()` at which it was accepted (`last_seen: datetime`). During
+`PubSub.get_state(publisher_ttl=timedelta(seconds=900))`, entries older
+than TTL are pruned to bound memory across long-lived workflow chains.
 
 **Safety constraint**: `publisher_ttl` must exceed the client's
 `max_retry_duration`. If a publisher's dedup entry is pruned while it still
@@ -784,7 +788,7 @@ LLM API  -->  Activity  -->  PubSubClient  -->  Workflow Log  -->  BFF/SSE  --> 
 | Type | Cause | Handled by |
 |---|---|---|
 | A: Duplicate LLM work | Activity retry produces a second, semantically equivalent but textually different response | Application layer (activity idempotency keys, workflow orchestration) |
-| B: Duplicate signal batches | Signal retry after ambiguous failure delivers the same `(publisher_id, sequence)` batch twice | **Pub/sub layer** (`sequence <= last_seen` rejection) |
+| B: Duplicate signal batches | Signal retry after ambiguous failure delivers the same `(publisher_id, sequence)` batch twice | **Pub/sub layer** (`sequence <= existing.sequence` rejection) |
 | C: Duplicate SSE events | Browser reconnects and BFF replays previously-delivered events | Delivery layer (SSE `Last-Event-ID`, idempotent frontend reducers) |
 
 **Why Type A doesn't belong here.** Data escapes to the subscriber during the
@@ -820,14 +824,18 @@ the history while carrying the canonical log copy forward.
 
 ```python
 @dataclass
+class PublisherState:
+    sequence: int
+    last_seen: datetime
+
+@dataclass
 class PubSubState:
     log: list[PubSubItem] = field(default_factory=list)
     base_offset: int = 0
-    publisher_sequences: dict[str, int] = field(default_factory=dict)
-    publisher_last_seen: dict[str, float] = field(default_factory=dict)
+    publishers: dict[str, PublisherState] = field(default_factory=dict)
 ```
 
-`PubSub(prior_state=...)` restores all four fields. `PubSub.get_state()`
+`PubSub(prior_state=...)` restores all three fields. `PubSub.get_state()`
 snapshots them.
 
 ### Draining
@@ -1128,7 +1136,7 @@ All fields follow rule 1:
 | `PublishInput.sequence` | `0` | Zero skips dedup |
 | `_WireItem.offset` | `0` | Zero means "unknown" |
 | `PollResult.more_ready` | `False` | No truncation signaled |
-| `PubSubState.publisher_last_seen` | `{}` | No TTL pruning state |
+| `PubSubState.publishers` | `{}` | No dedup or TTL state |
 
 ## Ecosystem analogs
 
@@ -1245,10 +1253,9 @@ def _pubsub_publish(self, input: PublishInput) -> None:
 ```
 
 ```python
-# In PubSubState — these fields become unused and can be removed in a
+# In PubSubState — this field becomes unused and can be removed in a
 # follow-up wire migration (see Compatibility):
-# publisher_sequences: dict[str, int]
-# publisher_last_seen: dict[str, float]
+# publishers: dict[str, PublisherState]
 ```
 
 **What stays:**
@@ -1265,7 +1272,7 @@ def _pubsub_publish(self, input: PublishInput) -> None:
 
 **What goes away:**
 
-- `publisher_sequences` and `publisher_last_seen` in `PubSubState`.
+- `publishers` in `PubSubState`.
 - `publisher_ttl` and the `publisher_ttl > max_retry_duration` safety
   constraint — there is no longer a per-publisher map to expire.
 - The TLA+ retry-algorithm verification (`PubSubDedupTTL.tla`); the

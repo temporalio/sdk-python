@@ -14,8 +14,8 @@ state on continue-as-new.
 
 Both workflow-side :meth:`PubSub.publish` and client-side
 :meth:`PubSubClient.publish` use the synchronous payload converter for
-per-item ``Payload`` construction. The codec chain (encryption,
-PII-redaction, compression) is **not** run per item on either side —
+per-item ``Payload`` construction. The codec chain (e.g. encryption,
+compression) is **not** run per item on either side —
 it runs once at the envelope level when Temporal's SDK encodes the
 signal/update that carries the batch. Running it per item as well
 would double-encrypt, because every signal arg already goes through
@@ -36,6 +36,7 @@ from temporalio.exceptions import ApplicationError
 from ._types import (
     PollInput,
     PollResult,
+    PublisherState,
     PublishInput,
     PubSubItem,
     PubSubState,
@@ -55,8 +56,8 @@ def _payload_wire_size(payload: Payload, topic: str) -> int:
     """Approximate poll-response contribution of a single item.
 
     Wire form is ``_WireItem(topic, base64(proto(Payload)), offset)``.
-    Base64 inflates by ~4/3; we use the exact serialized length as a
-    close-enough proxy.
+    Base64 inflates by ~4/3; we use the serialized length as a
+    conservative approximation.
     """
     return (payload.ByteSize() * 4 + 2) // 3 + len(topic)
 
@@ -93,10 +94,7 @@ class PubSub:
         signal/update/query handlers raise :class:`RuntimeError`.
 
         The check inspects the immediate caller's frame and requires the
-        function name to be ``__init__``. A history-length check (expect
-        length 3 on the first workflow task) is not used because
-        pre-start signals inflate the first-task history and cache
-        evictions legitimately re-run ``__init__`` from later tasks.
+        function name to be ``__init__``.
 
         Args:
             prior_state: State carried from a previous run via
@@ -111,7 +109,7 @@ class PubSub:
 
         Note:
             When carrying state across continue-as-new, type the
-            carrying field as ``PubSubState | None`` — not ``Any``. The
+            carrying field as ``PubSubState | None``, not ``Any``. The
             default data converter deserializes ``Any`` fields as plain
             dicts, which silently strips the ``PubSubState`` type and
             breaks the new run.
@@ -135,17 +133,14 @@ class PubSub:
                 for item in prior_state.log
             ]
             self._base_offset: int = prior_state.base_offset
-            self._publisher_sequences: dict[str, int] = dict(
-                prior_state.publisher_sequences
-            )
-            self._publisher_last_seen: dict[str, float] = dict(
-                prior_state.publisher_last_seen
-            )
+            self._publishers: dict[str, PublisherState] = {
+                pid: PublisherState(sequence=ps.sequence, last_seen=ps.last_seen)
+                for pid, ps in prior_state.publishers.items()
+            }
         else:
             self._log = []
             self._base_offset = 0
-            self._publisher_sequences = {}
-            self._publisher_last_seen = {}
+            self._publishers = {}
         self._draining: bool = False
 
         workflow.set_signal_handler(_PUBLISH_SIGNAL, self._on_publish)
@@ -184,16 +179,13 @@ class PubSub:
             publisher_ttl: Duration after which a publisher's dedup
                 entry is pruned. Default 15 minutes.
         """
-        now = workflow.time()
-        ttl_secs = publisher_ttl.total_seconds()
+        now = workflow.now()
 
-        active_sequences: dict[str, int] = {}
-        active_last_seen: dict[str, float] = {}
-        for pid, seq in self._publisher_sequences.items():
-            ts = self._publisher_last_seen.get(pid, 0.0)
-            if now - ts < ttl_secs:
-                active_sequences[pid] = seq
-                active_last_seen[pid] = ts
+        active_publishers = {
+            pid: ps
+            for pid, ps in self._publishers.items()
+            if now - ps.last_seen < publisher_ttl
+        }
 
         return PubSubState(
             log=[
@@ -201,8 +193,7 @@ class PubSub:
                 for item in self._log
             ],
             base_offset=self._base_offset,
-            publisher_sequences=active_sequences,
-            publisher_last_seen=active_last_seen,
+            publishers=active_publishers,
         )
 
     def drain(self) -> None:
@@ -281,8 +272,8 @@ class PubSub:
             return
         if log_index > len(self._log):
             raise ApplicationError(
-                f"Cannot truncate to offset {up_to_offset}: only "
-                f"{self._base_offset + len(self._log)} items exist",
+                f"Cannot truncate to offset {up_to_offset}: "
+                f"valid range is [{self._base_offset}, {self._base_offset + len(self._log)})",
                 type="TruncateOutOfRange",
                 non_retryable=True,
             )
@@ -301,17 +292,18 @@ class PubSub:
         This block is a polyfill for missing server-side ``request_id``
         dedup across continue-as-new. If the SDK ever exposes
         ``request_id`` on signals and the server dedups it across CAN,
-        this branch and the ``_publisher_sequences`` /
-        ``_publisher_last_seen`` state become redundant. See DESIGN-v2
-        §"Replace workflow-side dedup with server-side request_id" for
-        the migration plan.
+        this branch and the ``_publishers`` state become redundant. See
+        DESIGN-v2 §"Replace workflow-side dedup with server-side
+        request_id" for the migration plan.
         """
         if payload.publisher_id:
-            last_seq = self._publisher_sequences.get(payload.publisher_id, 0)
-            if payload.sequence <= last_seq:
+            existing = self._publishers.get(payload.publisher_id)
+            if existing is not None and payload.sequence <= existing.sequence:
                 return
-            self._publisher_sequences[payload.publisher_id] = payload.sequence
-            self._publisher_last_seen[payload.publisher_id] = workflow.time()
+            self._publishers[payload.publisher_id] = PublisherState(
+                sequence=payload.sequence,
+                last_seen=workflow.now(),
+            )
         for entry in payload.items:
             self._log.append(
                 PubSubItem(topic=entry.topic, data=_decode_payload(entry.data))
