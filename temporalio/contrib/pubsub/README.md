@@ -118,32 +118,35 @@ Carry both your application state and pub/sub state across continue-as-new
 boundaries:
 
 ```python
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from temporalio import workflow
 from temporalio.contrib.pubsub import PubSub, PubSubState
 
 @dataclass
+class AppState:
+    # Whatever your workflow needs to carry forward.
+    ...
+
+@dataclass
 class WorkflowInput:
-    # Your application state
-    items_processed: int = 0
-    # Pub/sub state
+    app_state: AppState = field(default_factory=AppState)
     pubsub_state: PubSubState | None = None
 
 @workflow.defn
 class MyWorkflow:
     @workflow.init
     def __init__(self, input: WorkflowInput) -> None:
-        self.items_processed = input.items_processed
+        self.app_state = input.app_state
         self.pubsub = PubSub(prior_state=input.pubsub_state)
 
     @workflow.run
     async def run(self, input: WorkflowInput) -> None:
-        # ... do work, updating self.items_processed ...
+        # ... do work, updating self.app_state ...
 
         if workflow.info().is_continue_as_new_suggested():
-            await self.pubsub.continue_as_new(lambda state: [WorkflowInput(
-                items_processed=self.items_processed,
-                pubsub_state=state,
+            await self.pubsub.continue_as_new(lambda pubsub_state: [WorkflowInput(
+                app_state=self.app_state,
+                pubsub_state=pubsub_state,
             )])
 ```
 
@@ -162,7 +165,7 @@ Workflows that need to pass other CAN parameters (`task_queue`,
 self.pubsub.drain()
 await workflow.wait_condition(workflow.all_handlers_finished)
 workflow.continue_as_new(args=[WorkflowInput(
-    items_processed=self.items_processed,
+    app_state=self.app_state,
     pubsub_state=self.pubsub.get_state(),
 )], task_queue="other-tq")
 ```
