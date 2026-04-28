@@ -1568,6 +1568,83 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         await new_handle.signal(ContinueAsNewTypedWorkflow.close)
 
 
+@workflow.defn
+class ContinueAsNewHelperWorkflow:
+    """CAN workflow that uses the packaged ``PubSub.continue_as_new`` helper."""
+
+    @workflow.init
+    def __init__(self, input: CANWorkflowInputTyped) -> None:
+        self.pubsub = PubSub(prior_state=input.pubsub_state)
+        self._should_continue = False
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.signal
+    def trigger_continue(self) -> None:
+        self._should_continue = True
+
+    @workflow.run
+    async def run(self, _input: CANWorkflowInputTyped) -> None:
+        del _input
+        while True:
+            await workflow.wait_condition(lambda: self._should_continue or self._closed)
+            if self._closed:
+                return
+            if self._should_continue:
+                self._should_continue = False
+                await self.pubsub.continue_as_new(
+                    lambda state: [CANWorkflowInputTyped(pubsub_state=state)],
+                )
+
+
+@pytest.mark.asyncio
+async def test_continue_as_new_helper(client: Client) -> None:
+    """The ``PubSub.continue_as_new`` helper preserves log and dedup state
+    just like the explicit drain/wait/CAN recipe."""
+    async with new_worker(
+        client,
+        ContinueAsNewHelperWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            ContinueAsNewHelperWorkflow.run,
+            CANWorkflowInputTyped(),
+            id=f"pubsub-can-helper-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        await handle.signal(
+            "__temporal_pubsub_publish",
+            PublishInput(
+                items=[
+                    PublishEntry(topic="events", data=_wire_bytes(b"item-0")),
+                    PublishEntry(topic="events", data=_wire_bytes(b"item-1")),
+                ],
+                publisher_id="pub",
+                sequence=1,
+            ),
+        )
+
+        items_before = await collect_items(client, handle, None, 0, 2)
+        assert [i.data for i in items_before] == [b"item-0", b"item-1"]
+
+        await handle.signal(ContinueAsNewHelperWorkflow.trigger_continue)
+
+        new_handle = client.get_workflow_handle(handle.id)
+        await assert_eq_eventually(
+            True,
+            lambda: _is_different_run(handle, new_handle),
+        )
+
+        items_after = await collect_items(client, new_handle, None, 0, 2)
+        assert [i.data for i in items_after] == [b"item-0", b"item-1"]
+        assert [i.offset for i in items_after] == [0, 1]
+
+        await new_handle.signal(ContinueAsNewHelperWorkflow.close)
+
+
 # ---------------------------------------------------------------------------
 # Cross-workflow pub/sub (Scenario 1)
 # ---------------------------------------------------------------------------

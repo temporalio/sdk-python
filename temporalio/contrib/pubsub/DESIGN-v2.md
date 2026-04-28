@@ -99,6 +99,7 @@ argument. Instantiating `PubSub` twice on the same workflow raises
 | `publish(topic, value)` | instance method | Append to the log from workflow code. `value` is converted via the workflow's sync payload converter (no codec). |
 | `get_state(publisher_ttl=900)` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
 | `drain()` | instance method | Unblock polls and reject new ones for CAN. |
+| `continue_as_new(build_args, *, publisher_ttl=900)` | async instance method | Drain, wait for handlers, then `workflow.continue_as_new` with `build_args(post_drain_state)`. |
 | `truncate(up_to_offset)` | instance method | Discard log entries before offset. |
 | `__temporal_pubsub_publish` | signal handler | Receives publications from external clients (with dedup). |
 | `__temporal_pubsub_poll` | update handler | Long-poll subscription: blocks until new items or drain. |
@@ -838,13 +839,26 @@ allow CAN to proceed, draining uses two mechanisms:
 2. **Update validator** rejects new polls when draining, so no new handlers
    start and `all_handlers_finished()` stabilizes.
 
+`PubSub.continue_as_new(build_args)` packages the three steps:
+
 ```python
 # CAN sequence in the parent workflow:
+await self.pubsub.continue_as_new(lambda state: [WorkflowInput(
+    pubsub_state=state,
+)])
+```
+
+`build_args` runs *after* drain stabilizes, with the post-drain
+`PubSubState` as its single argument. Workflows that need to override
+other CAN parameters (`task_queue`, `retry_policy`, `run_timeout`, etc.)
+fall back to the explicit recipe:
+
+```python
 self.pubsub.drain()
 await workflow.wait_condition(workflow.all_handlers_finished)
 workflow.continue_as_new(args=[WorkflowInput(
     pubsub_state=self.pubsub.get_state(),
-)])
+)], task_queue="other-tq")
 ```
 
 ### Client-side CAN following
@@ -1294,40 +1308,35 @@ iterator over `self._log` slices that integrates with `wait_condition`
 for the "no data yet" case, mirroring the external poll API but
 bypassing the update RPC layer.
 
-### Packaged `continue_as_new` helper
+### Why `continue_as_new` takes a state-bound builder
 
-Today the documented continue-as-new recipe is three lines that the
-caller writes verbatim:
+The helper's signature is
+`continue_as_new(build_args: Callable[[PubSubState], Sequence[Any]])`.
+Two earlier shapes were rejected:
 
-```python
-self.pubsub.drain()
-await workflow.wait_condition(workflow.all_handlers_finished)
-workflow.continue_as_new(args=[WorkflowInput(
-    pubsub_state=self.pubsub.get_state(),
-    ...
-)])
-```
+1. **Eager-args form** —
+   `continue_as_new(args=[WorkflowInput(pubsub_state=self.get_state(), ...)])`.
+   Python evaluates call-site arguments before the method body runs,
+   so `self.get_state()` would snapshot state *before* `drain()` and
+   `all_handlers_finished` — the opposite of the recipe's intent.
+2. **Zero-arg builder** — `build_args: Callable[[], Sequence[Any]]`,
+   the lambda inspecting `self.pubsub` directly. Defers evaluation
+   correctly, but leaves the caller free to write
+   `self.pubsub.get_state()` inside the lambda, where the
+   "evaluated post-drain" contract is implicit and only documented in
+   prose.
 
-A natural-looking shortcut is `await self.pubsub.continue_as_new(...)`
-that performs the drain + wait + CAN in one call. Two reasons we have
-not added it:
+Passing the post-drain `PubSubState` as the lambda's parameter makes
+the contract structural: there is one path to the state and the helper
+controls when it's read. The signature itself reads as "here is the
+state, return the CAN args."
 
-1. To stay general it would mirror the full `workflow.continue_as_new`
-   signature (12 parameters today), so the contrib's surface area —
-   and its forward-compat burden as new CAN options land — grows in
-   exchange for collapsing two boilerplate lines.
-2. Python evaluates call-site arguments before the method body runs,
-   so `pubsub_state=self.get_state()` would snapshot state *before*
-   `drain()` and `all_handlers_finished` — the opposite of the
-   recipe's intent. The fix is to widen `args` to also accept a
-   zero-arg callable (`args=lambda: [...]`), but that introduces a
-   second footgun in place of the one removed.
-
-If the recipe ever picks up additional steps (e.g., a flush
-coordination with in-flight publishers, or a state-versioning bump),
-the helper becomes more attractive because it would absorb logic that
-no longer fits in three readable lines. Until then the explicit
-recipe is the better default.
+The helper deliberately does *not* mirror the full
+`workflow.continue_as_new` signature (12 parameters today). Workflows
+that need to override `task_queue` / `retry_policy` / `run_timeout` /
+etc. fall back to the explicit `drain` / `wait_condition` /
+`workflow.continue_as_new(...)` recipe — keeping the helper's surface
+area stable as new CAN options land in `temporalio.workflow`.
 
 ## File Layout
 

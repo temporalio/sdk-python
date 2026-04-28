@@ -25,7 +25,7 @@ the client's ``DataConverter.encode`` at dispatch time.
 from __future__ import annotations
 
 import sys
-from typing import Any
+from typing import Any, Callable, NoReturn, Sequence
 
 from temporalio import workflow
 from temporalio.api.common.v1 import Payload
@@ -208,6 +208,51 @@ class PubSub:
         and ``workflow.continue_as_new()``.
         """
         self._draining = True
+
+    async def continue_as_new(
+        self,
+        build_args: Callable[[PubSubState], Sequence[Any]],
+        *,
+        publisher_ttl: float = 900.0,
+    ) -> NoReturn:
+        """Drain, wait for handlers, then continue-as-new with built args.
+
+        Replaces the three-line recipe ``drain()`` →
+        ``wait_condition(all_handlers_finished)`` →
+        ``workflow.continue_as_new(args=...)`` for the common case where
+        the only CAN parameter that varies is ``args``.
+
+        ``build_args`` is invoked *after* drain has stabilized, with the
+        post-drain :class:`PubSubState` as its single argument. The
+        caller threads that state into whatever input dataclass the
+        workflow expects:
+
+        .. code-block:: python
+
+            await self.pubsub.continue_as_new(lambda state: [WorkflowInput(
+                items_processed=self.items_processed,
+                pubsub_state=state,
+            )])
+
+        Workflows that need to override other CAN parameters
+        (``task_queue``, ``retry_policy``, ``run_timeout``, etc.) should
+        keep using the explicit ``drain`` / ``wait_condition`` /
+        ``workflow.continue_as_new(...)`` recipe.
+
+        Args:
+            build_args: Callable that receives the post-drain pub/sub
+                state and returns the positional ``args`` for the new
+                run.
+            publisher_ttl: Forwarded to :meth:`get_state`.
+
+        Does not return; ``workflow.continue_as_new`` raises an internal
+        exception that the SDK uses to close the run.
+        """
+        self.drain()
+        await workflow.wait_condition(workflow.all_handlers_finished)
+        workflow.continue_as_new(
+            args=build_args(self.get_state(publisher_ttl=publisher_ttl)),
+        )
 
     def truncate(self, up_to_offset: int) -> None:
         """Discard log entries before ``up_to_offset``.

@@ -139,18 +139,31 @@ class MyWorkflow:
         # ... do work, updating self.items_processed ...
 
         if workflow.info().is_continue_as_new_suggested():
-            self.pubsub.drain()
-            await workflow.wait_condition(workflow.all_handlers_finished)
-            workflow.continue_as_new(args=[WorkflowInput(
+            await self.pubsub.continue_as_new(lambda state: [WorkflowInput(
                 items_processed=self.items_processed,
-                pubsub_state=self.pubsub.get_state(),
+                pubsub_state=state,
             )])
 ```
 
-`pubsub.drain()` unblocks waiting subscribers and rejects new polls so
-`all_handlers_finished` can stabilize. Subscribers created via
+`PubSub.continue_as_new(build_args)` drains waiting subscribers,
+waits for in-flight handlers to finish, then calls
+`workflow.continue_as_new` with `build_args(post_drain_state)`. The
+lambda receives the post-drain `PubSubState` so the snapshot is
+guaranteed to happen *after* drain. Subscribers created via
 `PubSubClient.create()` or `PubSubClient.from_activity()` automatically
 follow continue-as-new chains.
+
+Workflows that need to pass other CAN parameters (`task_queue`,
+`retry_policy`, `run_timeout`, etc.) fall back to the explicit recipe:
+
+```python
+self.pubsub.drain()
+await workflow.wait_condition(workflow.all_handlers_finished)
+workflow.continue_as_new(args=[WorkflowInput(
+    items_processed=self.items_processed,
+    pubsub_state=self.pubsub.get_state(),
+)], task_queue="other-tq")
+```
 
 ## Gotcha: sync handlers racing `__temporal_pubsub_publish`
 
@@ -226,6 +239,7 @@ activation-ordering mechanics.
 | `publish(topic, value)` | Append to the log from workflow code. `value` is converted via the sync workflow payload converter (no codec). |
 | `get_state(*, publisher_ttl=900.0)` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` seconds. |
 | `drain()` | Unblock polls and reject new ones. |
+| `continue_as_new(build_args, *, publisher_ttl=900.0)` | Async. Drain, wait for handlers, then `workflow.continue_as_new` with `build_args(post_drain_state)`. Use the explicit recipe to override other CAN parameters. |
 | `truncate(up_to_offset)` | Discard log entries below the given offset. Workflow-side only — no external API; wire up your own signal or update if external control is needed. |
 
 Handlers registered by the constructor:
