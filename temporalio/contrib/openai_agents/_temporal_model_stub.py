@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-
-logger = logging.getLogger(__name__)
 
 from collections.abc import AsyncIterator
 from typing import Any

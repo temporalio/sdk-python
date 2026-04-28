@@ -2,7 +2,7 @@ import asyncio
 import dataclasses
 import functools
 import inspect
-import logging
+
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
@@ -28,7 +28,6 @@ from temporalio.exceptions import (
 from temporalio.worker import PollerBehaviorSimpleMaximum, Worker
 from temporalio.workflow import ActivityConfig, ActivityHandle
 
-logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass

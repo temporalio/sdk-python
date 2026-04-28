@@ -4,7 +4,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 """
 
 import enum
-import logging
+
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, NoReturn
@@ -48,7 +48,6 @@ from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbea
 from temporalio.contrib.pubsub import PubSubClient
 from temporalio.exceptions import ApplicationError
 
-logger = logging.getLogger(__name__)
 
 
 @dataclass
