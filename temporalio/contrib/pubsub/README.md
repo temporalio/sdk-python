@@ -231,9 +231,6 @@ Already-safe patterns, no recipe needed:
 - Workflow-internal publishes (`self.pubsub.publish(...)` from
   `run()` or from an activity); these do not race.
 
-See `SIGNAL-UPDATE-RACE.md` in this directory for the full
-activation-ordering mechanics.
-
 ## API Reference
 
 ### PubSub
