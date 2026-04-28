@@ -1,7 +1,5 @@
-import json
-import logging
 from collections.abc import AsyncGenerator, Callable
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
@@ -11,20 +9,6 @@ import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.contrib.pubsub import PubSubClient
 from temporalio.workflow import ActivityConfig
-
-logger = logging.getLogger(__name__)
-
-EVENTS_TOPIC = "events"
-
-
-def _make_event(event_type: str, **data: object) -> bytes:
-    return json.dumps(
-        {
-            "type": event_type,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "data": data,
-        }
-    ).encode()
 
 
 @activity.defn
@@ -54,20 +38,22 @@ async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
 
 
 @activity.defn
-async def invoke_model_streaming(llm_request: LlmRequest) -> list[LlmResponse]:
+async def invoke_model_streaming(
+    llm_request: LlmRequest,
+    streaming_event_topic: str | None,
+    streaming_event_batch_interval: timedelta,
+) -> list[LlmResponse]:
     """Streaming-aware model activity.
 
-    Calls the LLM with stream=True, publishes TEXT_DELTA events via
-    PubSubClient as tokens arrive, and returns the collected responses.
+    Calls the LLM with ``stream=True`` and returns the collected list of
+    raw ``LlmResponse`` chunks. The workflow's ``TemporalModel.generate_content_async``
+    yields these to the caller.
 
-    The PubSubClient auto-detects the activity context to find the parent
-    workflow for publishing.
-
-    Args:
-        llm_request: The LLM request containing model name and parameters.
-
-    Returns:
-        List of LLM responses from the model.
+    When ``streaming_event_topic`` is set, each response is also
+    published to the workflow's pub/sub broker so external consumers
+    (UIs, tracing, etc.) can observe responses as they arrive. Set the
+    topic to ``None`` to skip publishing entirely; in that case no
+    :class:`PubSubClient` is constructed.
     """
     if llm_request.model is None:
         raise ValueError("No model name provided, could not create LLM.")
@@ -76,43 +62,25 @@ async def invoke_model_streaming(llm_request: LlmRequest) -> list[LlmResponse]:
     if not llm:
         raise ValueError(f"Failed to create LLM for model: {llm_request.model}")
 
-    pubsub = PubSubClient.from_activity(batch_interval=0.1)
     responses: list[LlmResponse] = []
-    text_buffer = ""
 
-    async with pubsub:
-        pubsub.publish(EVENTS_TOPIC, _make_event("LLM_CALL_START"), force_flush=True)
-
+    async def consume(pubsub: PubSubClient | None, topic: str | None) -> None:
         async for response in llm.generate_content_async(
             llm_request=llm_request, stream=True
         ):
             activity.heartbeat()
             responses.append(response)
+            if pubsub is not None and topic is not None:
+                pubsub.publish(topic, response)
 
-            if response.content and response.content.parts:
-                for part in response.content.parts:
-                    if part.text:
-                        text_buffer += part.text
-                        pubsub.publish(
-                            EVENTS_TOPIC,
-                            _make_event("TEXT_DELTA", delta=part.text),
-                        )
-                    if part.function_call:
-                        pubsub.publish(
-                            EVENTS_TOPIC,
-                            _make_event(
-                                "TOOL_CALL_START",
-                                tool_name=part.function_call.name,
-                            ),
-                        )
-
-        if text_buffer:
-            pubsub.publish(
-                EVENTS_TOPIC,
-                _make_event("TEXT_COMPLETE", text=text_buffer),
-                force_flush=True,
-            )
-        pubsub.publish(EVENTS_TOPIC, _make_event("LLM_CALL_COMPLETE"), force_flush=True)
+    if streaming_event_topic is None:
+        await consume(None, None)
+    else:
+        pubsub = PubSubClient.from_activity(
+            batch_interval=streaming_event_batch_interval,
+        )
+        async with pubsub:
+            await consume(pubsub, streaming_event_topic)
 
     return responses
 
@@ -124,31 +92,46 @@ class TemporalModel(BaseLlm):
         self,
         model_name: str,
         activity_config: ActivityConfig | None = None,
-        streaming: bool = False,
         *,
         summary_fn: Callable[[LlmRequest], str | None] | None = None,
+        streaming_event_topic: str | None = "events",
+        streaming_event_batch_interval: timedelta = timedelta(milliseconds=100),
     ) -> None:
         """Initialize the TemporalModel.
+
+        Streaming is selected by the caller via the ADK
+        ``generate_content_async(stream=True)`` argument; no plugin-level
+        flag is needed.
 
         Args:
             model_name: The name of the model to use.
             activity_config: Configuration options for the activity execution.
-            streaming: When True, the model activity uses the streaming LLM
-                endpoint and publishes token events via PubSubClient. The
-                workflow is unaffected -- it still receives complete responses.
             summary_fn: Optional callable that receives the LlmRequest and
                 returns a summary string (or None) for the activity. Must be
                 deterministic as it is called during workflow execution. If
                 the callable raises, the exception will propagate and fail
                 the workflow task.
+            streaming_event_topic: Pub/sub topic to publish raw
+                ``LlmResponse`` chunks to when streaming. Set to ``None``
+                to skip publishing entirely (workflow-side iteration via
+                ``stream=True`` still works, no broker required). When
+                set, the workflow must host a
+                :class:`temporalio.contrib.pubsub.PubSub` broker to
+                receive the publishes; otherwise the signals are
+                unhandled and dropped.
+            streaming_event_batch_interval: Interval between automatic
+                flushes for the pub/sub publisher used by the streaming
+                activity. Ignored when ``streaming_event_topic`` is
+                ``None``.
 
         Raises:
             ValueError: If both ``ActivityConfig["summary"]`` and ``summary_fn`` are set.
         """
         super().__init__(model=model_name)
         self._model_name = model_name
-        self._streaming = streaming
         self._summary_fn = summary_fn
+        self._streaming_event_topic = streaming_event_topic
+        self._streaming_event_batch_interval = streaming_event_batch_interval
         self._activity_config = ActivityConfig(
             start_to_close_timeout=timedelta(seconds=60)
         )
@@ -166,8 +149,9 @@ class TemporalModel(BaseLlm):
 
         Args:
             llm_request: The LLM request containing model parameters and content.
-            stream: Whether to stream the response (currently ignored; use the
-                ``streaming`` constructor parameter instead).
+            stream: Whether to use the streaming activity. When ``True``,
+                each chunk is also published to ``streaming_event_topic``
+                (if set) for external consumers.
 
         Yields:
             The responses from the model.
@@ -190,11 +174,22 @@ class TemporalModel(BaseLlm):
                 agent_name = llm_request.config.labels.get("adk_agent_name")
                 if agent_name:
                     config["summary"] = agent_name
-        activity_fn = invoke_model_streaming if self._streaming else invoke_model
-        responses = await workflow.execute_activity(
-            activity_fn,
-            args=[llm_request],
-            **config,
-        )
+
+        if stream:
+            responses = await workflow.execute_activity(
+                invoke_model_streaming,
+                args=[
+                    llm_request,
+                    self._streaming_event_topic,
+                    self._streaming_event_batch_interval,
+                ],
+                **config,
+            )
+        else:
+            responses = await workflow.execute_activity(
+                invoke_model,
+                args=[llm_request],
+                **config,
+            )
         for response in responses:
             yield response

@@ -1,11 +1,11 @@
 """Integration tests for ADK streaming support.
 
-Verifies that the streaming model activity publishes TEXT_DELTA events via
-the PubSub broker and that non-streaming mode remains backward-compatible.
+Verifies that the streaming model activity publishes raw ``LlmResponse``
+chunks via the PubSub broker and that non-streaming mode remains
+backward-compatible.
 """
 
 import asyncio
-import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator
@@ -13,6 +13,7 @@ from datetime import timedelta
 
 import pytest
 from google.adk import Agent
+from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
@@ -44,7 +45,7 @@ class StreamingTestModel(BaseLlm):
 
 @workflow.defn
 class StreamingAdkWorkflow:
-    """Test workflow that uses streaming TemporalModel with PubSub."""
+    """Test workflow that opts into streaming via RunConfig.streaming_mode."""
 
     @workflow.init
     def __init__(self, prompt: str) -> None:
@@ -52,7 +53,7 @@ class StreamingAdkWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        model = TemporalModel("streaming_test_model", streaming=True)
+        model = TemporalModel("streaming_test_model")
         agent = Agent(
             name="test_agent",
             model=model,
@@ -69,6 +70,7 @@ class StreamingAdkWorkflow:
             user_id="test",
             session_id=session.id,
             new_message=Content(role="user", parts=[Part(text=prompt)]),
+            run_config=RunConfig(streaming_mode=StreamingMode.SSE),
         ):
             if event.content and event.content.parts:
                 for part in event.content.parts:
@@ -80,11 +82,11 @@ class StreamingAdkWorkflow:
 
 @workflow.defn
 class NonStreamingAdkWorkflow:
-    """Test workflow without streaming -- verifies backward compatibility."""
+    """Test workflow without streaming."""
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        model = TemporalModel("streaming_test_model", streaming=False)
+        model = TemporalModel("streaming_test_model")
         agent = Agent(
             name="test_agent",
             model=model,
@@ -112,7 +114,7 @@ class NonStreamingAdkWorkflow:
 
 @pytest.mark.asyncio
 async def test_streaming_publishes_events(client: Client):
-    """Verify that streaming activity publishes TEXT_DELTA events via pubsub."""
+    """Streaming activity publishes raw LlmResponse chunks to the topic."""
     LLMRegistry.register(StreamingTestModel)
 
     new_config = client.config()
@@ -135,38 +137,33 @@ async def test_streaming_publishes_events(client: Client):
             execution_timeout=timedelta(seconds=30),
         )
 
-        # Subscribe concurrently while the workflow is running
         pubsub = PubSubClient.create(client, workflow_id)
-        events: list[dict] = []
+        responses: list[LlmResponse] = []
 
         async def collect_events() -> None:
             async for item in pubsub.subscribe(
-                ["events"], from_offset=0, result_type=bytes, poll_cooldown=0.05
+                ["events"],
+                from_offset=0,
+                result_type=LlmResponse,
+                poll_cooldown=timedelta(milliseconds=50),
             ):
-                event = json.loads(item.data)
-                events.append(event)
-                if event["type"] == "LLM_CALL_COMPLETE":
+                responses.append(item.data)
+                if len(responses) >= 2:
                     break
 
         collect_task = asyncio.create_task(collect_events())
         result = await handle.result()
-
-        # Wait for event collection with a timeout
         await asyncio.wait_for(collect_task, timeout=10.0)
 
     assert result is not None
 
-    event_types = [e["type"] for e in events]
-    assert (
-        "LLM_CALL_START" in event_types
-    ), f"Expected LLM_CALL_START, got: {event_types}"
-    assert "TEXT_DELTA" in event_types, f"Expected TEXT_DELTA, got: {event_types}"
-    assert (
-        "LLM_CALL_COMPLETE" in event_types
-    ), f"Expected LLM_CALL_COMPLETE, got: {event_types}"
-
-    text_deltas = [e["data"]["delta"] for e in events if e["type"] == "TEXT_DELTA"]
-    assert len(text_deltas) >= 1, f"Expected at least 1 TEXT_DELTA, got: {text_deltas}"
+    texts: list[str] = []
+    for r in responses:
+        if r.content and r.content.parts:
+            for part in r.content.parts:
+                if part.text:
+                    texts.append(part.text)
+    assert texts == ["Hello ", "world!"], f"Unexpected text deltas: {texts}"
 
 
 @pytest.mark.asyncio
