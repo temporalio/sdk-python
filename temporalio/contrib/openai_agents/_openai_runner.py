@@ -16,7 +16,7 @@ from agents import (
     TContext,
     TResponseInputItem,
 )
-from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner, RunOptions
+from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner, RunOptions
 from agents.sandbox import SandboxAgent
 from typing_extensions import Unpack
 
@@ -115,20 +115,12 @@ class TemporalOpenAIRunner(AgentRunner):
         self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
         self.model_params = model_params
 
-    async def run(
+    def _prepare_workflow_run(
         self,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem] | RunState[TContext],
-        **kwargs: Unpack[RunOptions[TContext]],
-    ) -> RunResult:
-        """Run the agent in a Temporal workflow."""
-        if not workflow.in_workflow():
-            return await self._runner.run(
-                starting_agent,
-                input,
-                **kwargs,
-            )
-
+        kwargs: RunOptions[TContext],
+    ) -> Agent[Any]:
+        """Workflow-only validation and ``kwargs`` rewrite shared by ``run()`` and ``run_streamed()``."""
         for t in starting_agent.tools:
             if callable(t):
                 raise ValueError(
@@ -153,16 +145,10 @@ class TemporalOpenAIRunner(AgentRunner):
                         f"Unknown mcp_server type {type(s)} may not work durably."
                     )
 
-        context = kwargs.get("context")
-        max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
-        hooks = kwargs.get("hooks")
-        run_config = kwargs.get("run_config")
-        previous_response_id = kwargs.get("previous_response_id")
-        session = kwargs.get("session")
-
-        if isinstance(session, SQLiteSession):
+        if isinstance(kwargs.get("session"), SQLiteSession):
             raise ValueError("Temporal workflows don't support SQLite sessions.")
 
+        run_config = kwargs.get("run_config")
         if run_config is None:
             run_config = RunConfig()
 
@@ -177,6 +163,7 @@ class TemporalOpenAIRunner(AgentRunner):
                     run_config.model, model_params=self.model_params, agent=None
                 ),
             )
+
         # run_config.sandbox is global for the entire run — configure it if any agent needs it.
         if _has_sandbox_agent(starting_agent) or run_config.sandbox:
             if run_config.sandbox is None:
@@ -200,16 +187,30 @@ class TemporalOpenAIRunner(AgentRunner):
                     "Do not pass a raw sandbox client directly."
                 )
 
+        kwargs["run_config"] = run_config
+        return _convert_agent(self.model_params, starting_agent, None)
+
+    async def run(
+        self,
+        starting_agent: Agent[TContext],
+        input: str | list[TResponseInputItem] | RunState[TContext],
+        **kwargs: Unpack[RunOptions[TContext]],
+    ) -> RunResult:
+        """Run the agent in a Temporal workflow."""
+        if not workflow.in_workflow():
+            return await self._runner.run(
+                starting_agent,
+                input,
+                **kwargs,
+            )
+
+        converted_agent = self._prepare_workflow_run(starting_agent, kwargs)
+
         try:
             return await self._runner.run(
-                starting_agent=_convert_agent(self.model_params, starting_agent, None),
+                starting_agent=converted_agent,
                 input=input,
-                context=context,
-                max_turns=max_turns,
-                hooks=hooks,
-                run_config=run_config,
-                previous_response_id=previous_response_id,
-                session=session,
+                **kwargs,
             )
         except AgentsException as e:
             # In order for workflow failures to properly fail the workflow, we need to rewrap them in
@@ -242,7 +243,7 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: str | list[TResponseInputItem] | RunState[TContext],
-        **kwargs: Any,
+        **kwargs: Unpack[RunOptions[TContext]],
     ) -> RunResultStreaming:
         """Run the agent with streaming responses.
 
@@ -263,77 +264,10 @@ class TemporalOpenAIRunner(AgentRunner):
                 **kwargs,
             )
 
-        for t in starting_agent.tools:
-            if callable(t):
-                raise ValueError(
-                    "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
-                )
-
-        if starting_agent.mcp_servers:
-            from temporalio.contrib.openai_agents._mcp import (
-                _StatefulMCPServerReference,
-                _StatelessMCPServerReference,
-            )
-
-            for s in starting_agent.mcp_servers:
-                if not isinstance(
-                    s,
-                    (
-                        _StatelessMCPServerReference,
-                        _StatefulMCPServerReference,
-                    ),
-                ):
-                    raise ValueError(
-                        f"Unknown mcp_server type {type(s)} may not work durably."
-                    )
-
-        run_config = kwargs.get("run_config")
-        session = kwargs.get("session")
-
-        if isinstance(session, SQLiteSession):
-            raise ValueError("Temporal workflows don't support SQLite sessions.")
-
-        if run_config is None:
-            run_config = RunConfig()
-            kwargs["run_config"] = run_config
-
-        if run_config.model and not isinstance(run_config.model, _TemporalModelStub):
-            if not isinstance(run_config.model, str):
-                raise ValueError(
-                    "Temporal workflows require a model name to be a string in the run config."
-                )
-            run_config = dataclasses.replace(
-                run_config,
-                model=_TemporalModelStub(
-                    run_config.model, model_params=self.model_params, agent=None
-                ),
-            )
-            kwargs["run_config"] = run_config
-
-        if _has_sandbox_agent(starting_agent) or run_config.sandbox:
-            if run_config.sandbox is None:
-                raise ValueError(
-                    "A SandboxAgent was provided but run_config.sandbox is not configured. "
-                    "You must set run_config.sandbox to a SandboxRunConfig. "
-                    "For example:\n"
-                    "  from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client\n"
-                    "  run_config = RunConfig(sandbox=SandboxRunConfig(client=temporal_sandbox_client('my-backend')))"
-                )
-            elif run_config.sandbox.client is None:
-                raise ValueError(
-                    "run_config.sandbox.client must be set to a temporal sandbox client. "
-                    "Use temporalio.contrib.openai_agents.workflow.temporal_sandbox_client(name) "
-                    "to create one, where name matches a SandboxClientProvider registered on the plugin."
-                )
-            elif not isinstance(run_config.sandbox.client, TemporalSandboxClient):
-                raise ValueError(
-                    "run_config.sandbox.client must be created via "
-                    "temporalio.contrib.openai_agents.workflow.temporal_sandbox_client(name). "
-                    "Do not pass a raw sandbox client directly."
-                )
+        converted_agent = self._prepare_workflow_run(starting_agent, kwargs)
 
         streamed_result = self._runner.run_streamed(
-            starting_agent=_convert_agent(self.model_params, starting_agent, None),
+            starting_agent=converted_agent,
             input=input,
             **kwargs,
         )
