@@ -1,21 +1,12 @@
-"""Prototype tests that de-risked the workflow_stream bytes -> Payload migration.
+"""Regression guards for the workflow_stream Payload wire format.
 
-The migration doc (``docs/pubsub-payload-migration.md`` — to be renamed
-to ``docs/workflow-stream-payload-migration.md`` in a follow-up PR)
-flagged two load-bearing questions, answered empirically here:
-
-1. Does the default JSON converter handle ``Payload`` embedded in a
-   dataclass? **No** — serialization fails with ``TypeError``. This
-   rules out a naive nested-Payload wire format.
-2. Does a proto-serialized ``Payload`` inside a dataclass round-trip?
-   **Yes**. This is the wire format the migration adopts: base64 of
-   ``Payload.SerializeToString()`` inside ``PublishEntry``/``_WorkflowStreamWireItem``,
-   surfacing ``Payload`` (or a decoded value via ``result_type=``) at
-   the user API.
-
-Kept as a regression guard: if a future payload converter change makes
-(1) succeed, the migration could in principle reclaim a zero-copy wire
-format; if (2) regresses, the migration breaks.
+1. The default JSON converter does not handle ``Payload`` embedded in a
+   dataclass — serialization fails with ``TypeError``. This rules out a
+   naive nested-Payload wire format.
+2. A proto-serialized ``Payload`` inside a dataclass does round-trip.
+   This is the wire format used: base64 of ``Payload.SerializeToString()``
+   inside ``PublishEntry``/``_WorkflowStreamWireItem``, surfacing
+   ``Payload`` (or a decoded value via ``result_type=``) at the user API.
 """
 
 from __future__ import annotations

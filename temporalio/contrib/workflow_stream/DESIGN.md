@@ -24,31 +24,30 @@ the workflow does not interpret them.
 ## Architecture
 
 ```
-                    ┌──────────────────────────────────┐
-                    │         Temporal Workflow        │
-                    │         (WorkflowStream)         │
-                    │                                  │
-                    │  ┌────────────────────────────┐  │
-                    │  │   Append-only log          │  │
-                    │  │   [(topic, data), ...]     │  │
-                    │  │   base_offset: int         │  │
-                    │  │   publishers: {}           │  │
-                    │  └────────────────────────────┘  │
-                    │                                  │
-  signal ──────────►│  __temporal_workflow_stream_publish (with dedup)   │
-  update ──────────►│  __temporal_workflow_stream_poll (long-poll)       │◄── subscribe()
-  query  ──────────►│  __temporal_workflow_stream_offset                 │
-                    │                                  │
-                    │  publish() ── workflow-side      │
-                    └──────────────────────────────────┘
-                              │
-                              │ continue-as-new
-                              ▼
-                    ┌──────────────────────────────────┐
-                    │  WorkflowStreamState carries:            │
-                    │    log, base_offset,             │
-                    │    publishers                    │
-                    └──────────────────────────────────┘
+              ┌──────────────────────────────────────────────────┐
+              │                Temporal Workflow                 │
+              │                 (WorkflowStream)                 │
+              │                                                  │
+              │  ┌────────────────────────────────────────────┐  │
+              │  │   Append-only log                          │  │
+              │  │   [(topic, data), ...]                     │  │
+              │  │   base_offset: int                         │  │
+              │  │   publishers: {}                           │  │
+              │  └────────────────────────────────────────────┘  │
+              │                                                  │
+  signal ────►│  __temporal_workflow_stream_publish (with dedup) │
+  update ────►│  __temporal_workflow_stream_poll (long-poll)     │◄── subscribe()
+  query  ────►│  __temporal_workflow_stream_offset               │
+              │                                                  │
+              │  publish() ── workflow-side                      │
+              └──────────────────────────────────────────────────┘
+                                    │
+                                    │ continue-as-new
+                                    ▼
+              ┌──────────────────────────────────────────────────┐
+              │  WorkflowStreamState carries:                    │
+              │    log, base_offset, publishers                  │
+              └──────────────────────────────────────────────────┘
 ```
 
 ## API Surface
@@ -267,7 +266,7 @@ serializable`). Embedding the proto-serialized bytes keeps the wire
 format JSON-compatible while preserving the full `Payload` — metadata
 and all — across the signal and update round-trips. Round-trip is
 guarded by
-`tests/contrib/workflow_stream/test_payload_roundtrip_prototype.py`.
+`tests/contrib/workflow_stream/test_payload_roundtrip.py`.
 
 ## Design Decisions
 
