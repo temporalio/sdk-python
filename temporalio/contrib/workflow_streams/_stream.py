@@ -85,13 +85,13 @@ class WorkflowStream:
     - ``__temporal_workflow_stream_offset`` query — current log length
 
     Note:
-        Because ``__temporal_workflow_stream_publish`` is registered
-        *dynamically* from ``__init__``, custom **synchronous**
-        update/signal handlers that read ``WorkflowStream`` state can
-        observe pre-publish state when both land in the same activation.
-        Make such handlers ``async`` and ``await asyncio.sleep(0)`` before
-        reading state. See the "Gotcha" section of this module's
-        ``README.md`` for the full explanation and recipe.
+        Because the publish handler is registered dynamically from
+        ``__init__``, on the activation where the stream is
+        constructed the publish signal can be buffered until after
+        class-level signal/update handlers are scheduled. Define
+        such handlers as ``async`` and ``await asyncio.sleep(0)``
+        before reading stream state, so the publish signal is
+        processed first.
     """
 
     def __init__(self, prior_state: WorkflowStreamState | None = None) -> None:
@@ -237,13 +237,14 @@ class WorkflowStream:
     ) -> WorkflowStreamState:
         """Return a serializable snapshot of stream state for continue-as-new.
 
-        Prunes publisher dedup entries older than ``publisher_ttl``. The
-        TTL must exceed the ``max_retry_duration`` of any client that
-        may still be retrying a failed flush.
+        Drops dedup state for publishers idle longer than
+        ``publisher_ttl``. The TTL must exceed the
+        ``max_retry_duration`` of any client that may still be
+        retrying a failed flush.
 
         Args:
-            publisher_ttl: Duration after which a publisher's dedup
-                entry is pruned. Default 15 minutes.
+            publisher_ttl: Duration after which an idle publisher's
+                dedup state is dropped. Default 15 minutes.
         """
         now = workflow.now()
 
@@ -290,10 +291,14 @@ class WorkflowStream:
     ) -> NoReturn:
         """Detach pollers, wait for handlers, continue-as-new with built args.
 
-        Replaces the three-line recipe ``detach_pollers()`` →
-        ``wait_condition(all_handlers_finished)`` →
-        ``workflow.continue_as_new(args=...)`` for the common case where
-        the only CAN parameter that varies is ``args``.
+        Replaces this three-line recipe for the common case where the
+        only continue-as-new parameter that varies is ``args``:
+
+        .. code-block:: python
+
+            self.stream.detach_pollers()
+            await workflow.wait_condition(workflow.all_handlers_finished)
+            workflow.continue_as_new(args=...)
 
         ``build_args`` is invoked *after* pollers have been detached,
         with the post-detach :class:`WorkflowStreamState` as its single
