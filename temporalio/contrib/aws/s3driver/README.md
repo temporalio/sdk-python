@@ -23,10 +23,9 @@ from temporalio.contrib.aws.s3driver.aioboto3 import new_aioboto3_client
 from temporalio.converter import DataConverter, ExternalStorage
 
 session = aioboto3.Session()
-# Credentials are resolved automatically from the standard AWS credential chain
-# (environment variables, ~/.aws/config, IAM instance profile, and so on).
-# Region is obtained either via `AWS_REGION` in the environment
-# or `region = ...` under the profile in ~/.aws/config.
+# To see how to set credentials and region via environment, config objects, or configuration files, 
+# see:
+# https://docs.aws.amazon.com/boto3/latest/guide/configuration.html
 async with session.client("s3") as s3_client:
     driver = S3StorageDriver(
         client=new_aioboto3_client(s3_client),
