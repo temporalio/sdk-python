@@ -21,7 +21,7 @@ from google.adk.runners import InMemoryRunner
 from google.genai.types import Content, Part
 
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
 from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamClient
 from temporalio.worker import Worker
@@ -139,3 +139,60 @@ async def test_streaming_publishes_events(client: Client):
                 if part.text:
                     texts.append(part.text)
     assert texts == ["Hello ", "world!"], f"Unexpected text deltas: {texts}"
+
+
+@workflow.defn
+class StreamingAdkRequiresTopicWorkflow:
+    """Calls ``generate_content_async(stream=True)`` without configuring
+    ``streaming_event_topic``; the call must raise before any activity
+    is scheduled."""
+
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        model = TemporalModel("streaming_test_model")
+        agent = Agent(
+            name="test_agent",
+            model=model,
+            instruction="You are a test agent.",
+        )
+        runner = InMemoryRunner(agent=agent, app_name="test-app")
+        session = await runner.session_service.create_session(
+            app_name="test-app", user_id="test"
+        )
+        async for _ in runner.run_async(
+            user_id="test",
+            session_id=session.id,
+            new_message=Content(role="user", parts=[Part(text=prompt)]),
+            run_config=RunConfig(streaming_mode=StreamingMode.SSE),
+        ):
+            pass
+        return "should not reach"
+
+
+@pytest.mark.asyncio
+async def test_streaming_requires_topic(client: Client):
+    """``stream=True`` fails fast when no streaming topic was configured
+    on ``TemporalModel``. The error is raised in the workflow before any
+    streaming activity is scheduled."""
+    LLMRegistry.register(StreamingTestModel)
+
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+
+    async with Worker(
+        client,
+        task_queue="adk-streaming-requires-topic",
+        workflows=[StreamingAdkRequiresTopicWorkflow],
+        max_cached_workflows=0,
+    ):
+        with pytest.raises(WorkflowFailureError) as exc_info:
+            await client.execute_workflow(
+                StreamingAdkRequiresTopicWorkflow.run,
+                "Hi",
+                id=f"adk-streaming-requires-topic-{uuid.uuid4()}",
+                task_queue="adk-streaming-requires-topic",
+                execution_timeout=timedelta(seconds=30),
+            )
+
+    assert "streaming_event_topic" in str(exc_info.value.cause)

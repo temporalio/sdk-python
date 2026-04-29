@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator, Callable
+from dataclasses import dataclass
 from datetime import timedelta
 
 from google.adk.models import BaseLlm, LLMRegistry
@@ -8,6 +9,7 @@ from google.adk.models.llm_response import LlmResponse
 import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.contrib.workflow_stream import WorkflowStreamClient
+from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ActivityConfig
 
 
@@ -37,11 +39,18 @@ async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
     ]
 
 
+@dataclass
+class StreamingInvokeInput:
+    """Input for :func:`invoke_model_streaming`."""
+
+    llm_request: LlmRequest
+    streaming_event_topic: str
+    streaming_event_batch_interval: timedelta
+
+
 @activity.defn
 async def invoke_model_streaming(
-    llm_request: LlmRequest,
-    streaming_event_topic: str | None,
-    streaming_event_batch_interval: timedelta,
+    input: StreamingInvokeInput,
 ) -> list[LlmResponse]:
     """Streaming-aware model activity.
 
@@ -53,12 +62,11 @@ async def invoke_model_streaming(
     raw ``LlmResponse`` chunks. The workflow's ``TemporalModel.generate_content_async``
     yields these to the caller.
 
-    When ``streaming_event_topic`` is set, each response is also
-    published to the workflow's stream so external consumers
-    (UIs, tracing, etc.) can observe responses as they arrive. Set the
-    topic to ``None`` to skip publishing entirely; in that case no
-    :class:`WorkflowStreamClient` is constructed.
+    Each response is also published to the workflow's stream on
+    ``streaming_event_topic`` so external consumers (UIs, tracing, etc.)
+    can observe responses as they arrive.
     """
+    llm_request = input.llm_request
     if llm_request.model is None:
         raise ValueError("No model name provided, could not create LLM.")
 
@@ -68,23 +76,16 @@ async def invoke_model_streaming(
 
     responses: list[LlmResponse] = []
 
-    async def consume(stream: WorkflowStreamClient | None, topic: str | None) -> None:
+    stream = WorkflowStreamClient.from_activity(
+        batch_interval=input.streaming_event_batch_interval,
+    )
+    async with stream:
         async for response in llm.generate_content_async(
             llm_request=llm_request, stream=True
         ):
             activity.heartbeat()
             responses.append(response)
-            if stream is not None and topic is not None:
-                stream.publish(topic, response)
-
-    if streaming_event_topic is None:
-        await consume(None, None)
-    else:
-        stream = WorkflowStreamClient.from_activity(
-            batch_interval=streaming_event_batch_interval,
-        )
-        async with stream:
-            await consume(stream, streaming_event_topic)
+            stream.publish(input.streaming_event_topic, response)
 
     return responses
 
@@ -116,18 +117,17 @@ class TemporalModel(BaseLlm):
                 the callable raises, the exception will propagate and fail
                 the workflow task.
             streaming_event_topic: Stream topic to publish raw
-                ``LlmResponse`` chunks to when streaming. Set to ``None``
-                to skip publishing entirely (workflow-side iteration via
-                ``stream=True`` still works, no stream required). When
-                set, the workflow must host a
+                ``LlmResponse`` chunks to when streaming. Required when
+                callers invoke ``generate_content_async(stream=True)``;
+                if ``None``, the streaming call raises before scheduling
+                an activity. The workflow must host a
                 :class:`temporalio.contrib.workflow_stream.WorkflowStream`
                 to receive the publishes; otherwise the signals are
                 unhandled and dropped. Streaming support is
                 experimental and may change in future versions.
             streaming_event_batch_interval: Interval between automatic
                 flushes for the stream publisher used by the streaming
-                activity. Ignored when ``streaming_event_topic`` is
-                ``None``. Streaming support is experimental and may
+                activity. Streaming support is experimental and may
                 change in future versions.
 
         Raises:
@@ -183,13 +183,19 @@ class TemporalModel(BaseLlm):
                     config["summary"] = agent_name
 
         if stream:
+            if self._streaming_event_topic is None:
+                raise ApplicationError(
+                    "generate_content_async(stream=True) requires "
+                    "TemporalModel(streaming_event_topic=...) to be set.",
+                    non_retryable=True,
+                )
             responses = await workflow.execute_activity(
                 invoke_model_streaming,
-                args=[
-                    llm_request,
-                    self._streaming_event_topic,
-                    self._streaming_event_batch_interval,
-                ],
+                StreamingInvokeInput(
+                    llm_request=llm_request,
+                    streaming_event_topic=self._streaming_event_topic,
+                    streaming_event_batch_interval=self._streaming_event_batch_interval,
+                ),
                 **config,
             )
         else:
