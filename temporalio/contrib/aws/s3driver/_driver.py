@@ -26,6 +26,20 @@ from temporalio.converter import (
 _T = TypeVar("_T")
 
 
+def _format_client_context(client: S3StorageDriverClient) -> str:
+    """Format the client's ``describe()`` output as ", k=v, k=v" for error
+    messages. Returns an empty string when the client reports no metadata or
+    describe itself raises (diagnostic output must never mask the real error).
+    """
+    try:
+        info = client.describe()
+    except Exception:
+        return ""
+    if not info:
+        return ""
+    return "".join(f", {k}={v}" for k, v in info.items())
+
+
 async def _gather_with_cancellation(
     coros: Sequence[Coroutine[Any, Any, _T]],
 ) -> list[_T]:
@@ -156,7 +170,8 @@ class S3StorageDriver(StorageDriver):
                     )
             except Exception as e:
                 raise RuntimeError(
-                    f"S3StorageDriver store failed [bucket={bucket}, key={key}]"
+                    f"S3StorageDriver store failed [bucket={bucket}, key={key}"
+                    f"{_format_client_context(self._client)}]"
                 ) from e
 
             return StorageDriverClaim(
@@ -185,7 +200,8 @@ class S3StorageDriver(StorageDriver):
                 payload_bytes = await self._client.get_object(bucket=bucket, key=key)
             except Exception as e:
                 raise RuntimeError(
-                    f"S3StorageDriver retrieve failed [bucket={bucket}, key={key}]"
+                    f"S3StorageDriver retrieve failed [bucket={bucket}, key={key}"
+                    f"{_format_client_context(self._client)}]"
                 ) from e
 
             hash_algorithm = claim.claim_data.get("hash_algorithm")
