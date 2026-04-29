@@ -1,4 +1,3 @@
-import asyncio
 import dataclasses
 from collections.abc import Awaitable
 from typing import Any, Callable
@@ -16,7 +15,7 @@ from agents import (
     TContext,
     TResponseInputItem,
 )
-from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner, RunOptions
+from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner, RunOptions
 from agents.sandbox import SandboxAgent
 from typing_extensions import Unpack
 
@@ -115,12 +114,20 @@ class TemporalOpenAIRunner(AgentRunner):
         self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
         self.model_params = model_params
 
-    def _prepare_workflow_run(
+    async def run(
         self,
         starting_agent: Agent[TContext],
-        kwargs: RunOptions[TContext],
-    ) -> Agent[Any]:
-        """Workflow-only validation and ``kwargs`` rewrite shared by ``run()`` and ``run_streamed()``."""
+        input: str | list[TResponseInputItem] | RunState[TContext],
+        **kwargs: Unpack[RunOptions[TContext]],
+    ) -> RunResult:
+        """Run the agent in a Temporal workflow."""
+        if not workflow.in_workflow():
+            return await self._runner.run(
+                starting_agent,
+                input,
+                **kwargs,
+            )
+
         for t in starting_agent.tools:
             if callable(t):
                 raise ValueError(
@@ -145,10 +152,16 @@ class TemporalOpenAIRunner(AgentRunner):
                         f"Unknown mcp_server type {type(s)} may not work durably."
                     )
 
-        if isinstance(kwargs.get("session"), SQLiteSession):
+        context = kwargs.get("context")
+        max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
+        hooks = kwargs.get("hooks")
+        run_config = kwargs.get("run_config")
+        previous_response_id = kwargs.get("previous_response_id")
+        session = kwargs.get("session")
+
+        if isinstance(session, SQLiteSession):
             raise ValueError("Temporal workflows don't support SQLite sessions.")
 
-        run_config = kwargs.get("run_config")
         if run_config is None:
             run_config = RunConfig()
 
@@ -163,7 +176,6 @@ class TemporalOpenAIRunner(AgentRunner):
                     run_config.model, model_params=self.model_params, agent=None
                 ),
             )
-
         # run_config.sandbox is global for the entire run — configure it if any agent needs it.
         if _has_sandbox_agent(starting_agent) or run_config.sandbox:
             if run_config.sandbox is None:
@@ -187,30 +199,16 @@ class TemporalOpenAIRunner(AgentRunner):
                     "Do not pass a raw sandbox client directly."
                 )
 
-        kwargs["run_config"] = run_config
-        return _convert_agent(self.model_params, starting_agent, None)
-
-    async def run(
-        self,
-        starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem] | RunState[TContext],
-        **kwargs: Unpack[RunOptions[TContext]],
-    ) -> RunResult:
-        """Run the agent in a Temporal workflow."""
-        if not workflow.in_workflow():
-            return await self._runner.run(
-                starting_agent,
-                input,
-                **kwargs,
-            )
-
-        converted_agent = self._prepare_workflow_run(starting_agent, kwargs)
-
         try:
             return await self._runner.run(
-                starting_agent=converted_agent,
+                starting_agent=_convert_agent(self.model_params, starting_agent, None),
                 input=input,
-                **kwargs,
+                context=context,
+                max_turns=max_turns,
+                hooks=hooks,
+                run_config=run_config,
+                previous_response_id=previous_response_id,
+                session=session,
             )
         except AgentsException as e:
             # In order for workflow failures to properly fail the workflow, we need to rewrap them in
@@ -243,79 +241,16 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: str | list[TResponseInputItem] | RunState[TContext],
-        **kwargs: Unpack[RunOptions[TContext]],
+        **kwargs: Any,
     ) -> RunResultStreaming:
-        """Run the agent with streaming responses.
-
-        .. warning::
-            Streaming inside Temporal workflows is experimental and may
-            change in future versions.
-
-        Inside a workflow, model calls execute as the streaming model
-        activity. The workflow consumes events via
-        ``RunResultStreaming.stream_events()`` after each activity
-        completes; external clients can subscribe to the configured
-        stream topic to receive events as they arrive.
-        """
+        """Run the agent with streaming responses (not supported in Temporal workflows)."""
         if not workflow.in_workflow():
             return self._runner.run_streamed(
                 starting_agent,
                 input,
                 **kwargs,
             )
-
-        # Fail-fast before the agents framework starts a background task:
-        # validation raised inside ``Model.stream_response`` is otherwise
-        # captured into ``RunResultStreaming._stored_exception`` and may
-        # be silently dropped if the queue completion sentinel is read
-        # before the run_loop_task is observed as done.
-        if self.model_params.streaming_event_topic is None:
-            raise AgentsWorkflowError(
-                "Runner.run_streamed requires "
-                "ModelActivityParameters.streaming_event_topic to be set."
-            )
-        if self.model_params.use_local_activity:
-            raise AgentsWorkflowError(
-                "Runner.run_streamed is incompatible with "
-                "use_local_activity (local activities do not support "
-                "heartbeats or the workflow stream signal channel)."
-            )
-
-        converted_agent = self._prepare_workflow_run(starting_agent, kwargs)
-
-        streamed_result = self._runner.run_streamed(
-            starting_agent=converted_agent,
-            input=input,
-            **kwargs,
-        )
-
-        # Mirror the AgentsException -> AgentsWorkflowError rewrap done
-        # in run() above. The streaming runner attaches the actual run
-        # to ``run_loop_task``; wrap it so workflow-failure-bearing
-        # AgentsException instances surface as AgentsWorkflowError (the
-        # plugin registers that type in workflow_failure_exception_types,
-        # which is how durable failures propagate as terminal workflow
-        # failures rather than retrying workflow-task errors).
-        original_task = streamed_result.run_loop_task
-        if original_task is not None:
-
-            async def _rewrap_agents_exception() -> Any:
-                try:
-                    return await original_task
-                except AgentsException as e:
-                    if e.__cause__ and workflow.is_failure_exception(e.__cause__):
-                        reraise = AgentsWorkflowError(
-                            f"Workflow failure exception in Agents Framework: {e}"
-                        )
-                        reraise.__traceback__ = e.__traceback__
-                        raise reraise from e.__cause__
-                    raise
-
-            streamed_result.run_loop_task = asyncio.create_task(
-                _rewrap_agents_exception()
-            )
-
-        return streamed_result
+        raise RuntimeError("Temporal workflows do not support streaming.")
 
 
 def _model_name(agent: Agent[Any]) -> str | None:

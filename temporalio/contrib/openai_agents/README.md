@@ -576,70 +576,10 @@ result = await Runner.run(
 )
 ```
 
-## Streaming
-
-⚠️ **Experimental** - This functionality is subject to change prior to General Availability.
-
-The integration supports streaming model responses via the SDK-native
-`Runner.run_streamed` API. Inside a workflow, model calls execute as a
-streaming activity (`invoke_model_activity_streaming`) that consumes
-`Model.stream_response` and returns the collected list of native OpenAI
-response events. The workflow surfaces those events to the caller
-through `RunResultStreaming.stream_events()`, which wraps them in the
-agents-SDK `StreamEvent` union (so raw model events arrive as
-`RawResponsesStreamEvent.data`).
-
-External consumers (UIs, tracing pipelines, etc.) observe events as
-they arrive by hosting a [`WorkflowStream`](../workflow_streams/README.md)
-in the workflow and subscribing with `WorkflowStreamClient`. The
-streaming activity publishes each event to the topic configured on
-`ModelActivityParameters.streaming_event_topic`. The topic is required
-when using `Runner.run_streamed`; calling it without a configured topic
-raises before any activity is scheduled.
-
-Example workflow consuming events via `stream_events()` while the
-streaming activity publishes to the `"events"` topic:
-
-```python
-from agents import Agent, Runner
-from agents.stream_events import RawResponsesStreamEvent
-
-from temporalio import workflow
-
-@workflow.defn
-class MyAgent:
-    @workflow.run
-    async def run(self, prompt: str) -> str:
-        agent = Agent(name="Assistant", instructions="...")
-        result = Runner.run_streamed(agent, prompt)
-        async for event in result.stream_events():
-            if isinstance(event, RawResponsesStreamEvent):
-                raw_event = event.data  # native OpenAI ResponseStreamEvent
-                ...
-        return result.final_output
-```
-
-To publish raw model events to external subscribers, host a
-`WorkflowStream` in the workflow and configure
-`OpenAIAgentsPlugin(model_params=ModelActivityParameters(streaming_event_topic="events"))`. See [`temporalio.contrib.workflow_streams`](../workflow_streams/README.md) for the
-publisher and subscriber API.
-
-`RunResultStreaming.stream_events()` yields the agents-SDK
-`StreamEvent` union (`RawResponsesStreamEvent`, `RunItemStreamEvent`,
-`AgentUpdatedStreamEvent`); native OpenAI response events arrive
-wrapped as `RawResponsesStreamEvent.data`. Workflow-stream subscribers,
-by contrast, receive the unwrapped native events directly because the
-streaming activity publishes them straight from `Model.stream_response`.
-
-Streaming is incompatible with `use_local_activity` because local
-activities support neither activity heartbeats nor the workflow stream
-signal channel.
-
 ## Feature Support
 
 This integration is presently subject to certain limitations.
-Realtime agents are not supported. Streaming is supported via
-`Runner.run_streamed` — see [Streaming](#streaming) above.
+Streaming and voice agents are not supported.
 Certain tools are not suitable for a distributed computing environment, so these have been disabled as well.
 
 ### Model Providers
@@ -651,10 +591,12 @@ Certain tools are not suitable for a distributed computing environment, so these
 
 ### Model Response format
 
-| Model Response | Supported            |
-| :------------- | :------------------: |
-| Get Response   |         Yes          |
-| Streaming      | Yes (experimental)   |
+This integration does not presently support streaming.
+
+| Model Response | Supported |
+| :------------- | :-------: |
+| Get Response   |    Yes    |
+| Streaming      |    No     |
 
 ### Tools
 
@@ -958,15 +900,10 @@ If OTEL instrumentation is not enabled, the integration works normally without a
 
 ### Voice
 
-| Mode                     | Supported     |
-| :----------------------- | :-----------: |
-| Voice agents (pipelines) | Yes [^voice]  |
-| Realtime agents          |      No       |
-
-[^voice]: `VoicePipeline` runs in your process and delegates the agent
-    step (`VoiceWorkflowBase.run`) to a Temporal workflow that uses
-    `Runner.run` or `Runner.run_streamed`. STT and TTS run outside
-    Temporal; the agent loop is durable.
+| Mode                     | Supported |
+| :----------------------- | :-------: |
+| Voice agents (pipelines) |    No     |
+| Realtime agents          |    No     |
 
 ### Utilities
 

@@ -205,11 +205,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             if not register_activities:
                 return activities or []
 
-            model_activity = ModelActivity(model_provider)
-            new_activities = [
-                model_activity.invoke_model_activity,
-                model_activity.invoke_model_activity_streaming,
-            ]
+            new_activities = [ModelActivity(model_provider).invoke_model_activity]
 
             server_names = [server.name for server in mcp_server_providers]
             if len(server_names) != len(set(server_names)):
