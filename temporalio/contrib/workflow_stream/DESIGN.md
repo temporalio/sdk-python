@@ -1,4 +1,4 @@
-# Temporal Workflow Streams — Design Document v2
+# Temporal Workflow Streams — Design Document
 
 Consolidated design document reflecting the current implementation.
 
@@ -1400,5 +1400,5 @@ temporalio/contrib/workflow_stream/
 ├── _client.py                   # WorkflowStreamClient (external-side)
 ├── _types.py                    # Shared data types
 ├── README.md                    # Usage documentation
-└── DESIGN-v2.md                 # This document
+└── DESIGN.md                    # This document
 ```

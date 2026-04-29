@@ -298,7 +298,7 @@ class WorkflowStream:
         dedup across continue-as-new. If the SDK ever exposes
         ``request_id`` on signals and the server dedups it across CAN,
         this branch and the ``_publishers`` state become redundant. See
-        DESIGN-v2 §"Replace workflow-side dedup with server-side
+        DESIGN §"Replace workflow-side dedup with server-side
         request_id" for the migration plan.
         """
         if payload.publisher_id:

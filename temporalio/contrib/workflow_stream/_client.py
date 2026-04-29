@@ -346,7 +346,7 @@ class WorkflowStreamClient:
                 # If the SDK ever exposes request_id on signal() and the
                 # server dedups it across CAN, pinning
                 # request_id=f"{publisher_id}:{seq}" here lets the
-                # workflow-side dedup go away. See DESIGN-v2 §"Replace
+                # workflow-side dedup go away. See DESIGN §"Replace
                 # workflow-side dedup with server-side request_id".
                 await self._handle.signal(
                     "__temporal_workflow_stream_publish",
