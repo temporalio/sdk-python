@@ -1785,9 +1785,9 @@ async def standalone_publish_to_broker(input: StandalonePublishInput) -> None:
     ``WorkflowStreamClient.create``. ``from_activity`` is not usable
     here because the activity has no parent workflow.
     """
-    assert activity.info().workflow_id is None, (
-        "test bug: this activity should be standalone"
-    )
+    assert (
+        activity.info().workflow_id is None
+    ), "test bug: this activity should be standalone"
     client = WorkflowStreamClient.create(
         client=activity.client(),
         workflow_id=input.broker_workflow_id,
@@ -1801,9 +1801,9 @@ async def standalone_publish_to_broker(input: StandalonePublishInput) -> None:
 
 @activity.defn(name="standalone_subscribe_to_broker")
 async def standalone_subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
-    assert activity.info().workflow_id is None, (
-        "test bug: this activity should be standalone"
-    )
+    assert (
+        activity.info().workflow_id is None
+    ), "test bug: this activity should be standalone"
     client = WorkflowStreamClient.create(
         client=activity.client(),
         workflow_id=input.broker_workflow_id,
