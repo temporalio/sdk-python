@@ -94,10 +94,13 @@ class TopicHandle(Generic[T]):
     ) -> AsyncIterator[WorkflowStreamItem]:
         """Async iterator over items on this topic, decoded as ``T``.
 
-        For decode types other than the handle's bound ``T`` (for
-        example :class:`temporalio.common.RawValue` or a different
-        projection), use :meth:`WorkflowStreamClient.subscribe`
-        directly with an explicit ``result_type``.
+        For raw ``Payload`` access, or any other decode type that
+        differs from the handle's bound ``T``, use
+        :meth:`WorkflowStreamClient.subscribe` directly with an
+        explicit ``result_type`` (typically
+        :class:`temporalio.common.RawValue`). The handle's bound
+        type intentionally cannot be ``Payload`` — the converter has
+        no Payload decode path.
 
         Args:
             from_offset: Global offset to start reading from.

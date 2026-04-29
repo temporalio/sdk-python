@@ -281,8 +281,13 @@ class WorkflowStreamClient:
         relationships are not recognized.
 
         For heterogeneous topics or dynamic-topic forwarders, pass
-        ``type=typing.Any`` (or ``type=Payload`` for the zero-copy
-        passthrough case).
+        ``type=typing.Any``; subscribers receive the converter's
+        default decoded value. Pre-built ``Payload`` values can be
+        passed to :meth:`TopicHandle.publish` regardless of the bound
+        type (zero-copy fast path) — there is no need to bind the
+        topic to ``Payload`` itself, and doing so would break the
+        subscribe path (use ``result_type=RawValue`` on
+        :meth:`subscribe` if you need raw payloads on a subscriber).
 
         Args:
             name: Topic name.
@@ -296,12 +301,22 @@ class WorkflowStreamClient:
             RuntimeError: If ``name`` is already bound on this client
                 to a different type.
         """
+        if type is Payload:
+            raise RuntimeError(
+                "Cannot bind a topic to type=Payload: the payload converter "
+                "has no Payload decode path, so TopicHandle.subscribe would "
+                "fail. Pre-built Payload values can be passed to "
+                "TopicHandle.publish on any-typed handle (zero-copy fast "
+                "path); use type=typing.Any for heterogeneous topics, and "
+                "subscribe via WorkflowStreamClient.subscribe with "
+                "result_type=RawValue when raw payloads are needed."
+            )
         existing = self._topic_types.get(name)
         if existing is not None and existing != type:
             raise RuntimeError(
                 f"Topic {name!r} is already bound to type {existing!r} on this "
                 f"client; refusing to rebind to {type!r}. Use a single type "
-                f"per topic, or pass type=Any/Payload for heterogeneous topics."
+                f"per topic, or pass type=typing.Any for heterogeneous topics."
             )
         self._topic_types[name] = type
         return TopicHandle(self, name, type)

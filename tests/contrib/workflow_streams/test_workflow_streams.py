@@ -661,6 +661,14 @@ async def test_topic_handle_client_uniqueness(client: Client) -> None:
     raw = stream.topic("forwarded", type=cast(type[Any], cast(object, Any)))
     assert raw.type is Any
 
+    # Binding to Payload itself is rejected — subscribers would have
+    # no decode path. Pre-built Payload values can still be published
+    # via a normally-typed handle (zero-copy fast path).
+    from temporalio.api.common.v1 import Payload
+
+    with pytest.raises(RuntimeError, match="type=Payload"):
+        stream.topic("misused", type=Payload)
+
 
 @pytest.mark.asyncio
 async def test_topic_handle_payload_passthrough(client: Client) -> None:

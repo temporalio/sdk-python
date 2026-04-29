@@ -198,8 +198,11 @@ class WorkflowStream:
         on the type object; subtype and union-superset relationships
         are not recognized.
 
-        For heterogeneous topics, pass ``type=typing.Any`` (or
-        ``type=Payload`` for the zero-copy passthrough case).
+        For heterogeneous topics, pass ``type=typing.Any``. Pre-built
+        ``Payload`` values can be passed to
+        :meth:`WorkflowTopicHandle.publish` regardless of the bound
+        type (zero-copy fast path) — there is no need to bind the
+        topic to ``Payload`` itself.
 
         Args:
             name: Topic name.
@@ -212,12 +215,19 @@ class WorkflowStream:
             RuntimeError: If ``name`` is already bound on this stream
                 to a different type.
         """
+        if type is Payload:
+            raise RuntimeError(
+                "Cannot bind a topic to type=Payload. Pre-built Payload "
+                "values can be passed to WorkflowTopicHandle.publish on "
+                "any-typed handle (zero-copy fast path); use "
+                "type=typing.Any for heterogeneous topics."
+            )
         existing = self._topic_types.get(name)
         if existing is not None and existing != type:
             raise RuntimeError(
                 f"Topic {name!r} is already bound to type {existing!r} on this "
                 f"workflow stream; refusing to rebind to {type!r}. Use a "
-                f"single type per topic, or pass type=Any/Payload for "
+                f"single type per topic, or pass type=typing.Any for "
                 f"heterogeneous topics."
             )
         self._topic_types[name] = type
