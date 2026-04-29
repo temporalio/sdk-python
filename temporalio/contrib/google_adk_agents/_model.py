@@ -76,7 +76,7 @@ async def invoke_model_streaming(
 
     responses: list[LlmResponse] = []
 
-    stream = WorkflowStreamClient.from_activity(
+    stream = WorkflowStreamClient.from_within_activity(
         batch_interval=input.streaming_event_batch_interval,
     )
     async with stream:

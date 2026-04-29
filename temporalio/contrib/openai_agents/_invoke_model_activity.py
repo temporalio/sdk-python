@@ -370,7 +370,9 @@ class ModelActivity:
         )
         events: list[TResponseStreamEvent] = []
 
-        stream = WorkflowStreamClient.from_activity(batch_interval=batch_interval)
+        stream = WorkflowStreamClient.from_within_activity(
+            batch_interval=batch_interval
+        )
         async with stream:
             try:
                 async for event in model.stream_response(

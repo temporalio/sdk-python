@@ -56,7 +56,7 @@ class WorkflowStreamClient:
         This class is experimental and may change in future versions.
 
     Create via :py:meth:`create` (explicit client + workflow id),
-    :py:meth:`from_activity` (infer both from the current activity
+    :py:meth:`from_within_activity` (infer both from the current activity
     context), or by passing a handle directly to the constructor.
 
     For publishing, use as an async context manager to get automatic
@@ -137,7 +137,7 @@ class WorkflowStreamClient:
         Use this when the caller has an explicit ``Client`` and
         ``workflow_id`` in hand (starters, BFFs, other workflows'
         activities). For code running inside an activity that targets
-        its own parent workflow, see :py:meth:`from_activity`.
+        its own parent workflow, see :py:meth:`from_within_activity`.
 
         A client created through this method follows continue-as-new
         chains in ``subscribe()`` and uses the client's payload
@@ -161,7 +161,7 @@ class WorkflowStreamClient:
         )
 
     @classmethod
-    def from_activity(
+    def from_within_activity(
         cls,
         *,
         batch_interval: timedelta = timedelta(seconds=2),
@@ -191,7 +191,7 @@ class WorkflowStreamClient:
         workflow_id = info.workflow_id
         if workflow_id is None:
             raise RuntimeError(
-                "from_activity requires an activity scheduled by a workflow; "
+                "from_within_activity requires an activity scheduled by a workflow; "
                 "this activity has no parent workflow. From a standalone "
                 "activity, use WorkflowStreamClient.create(activity.client(), "
                 "workflow_id) with the target workflow id passed in explicitly."

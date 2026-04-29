@@ -233,7 +233,7 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
         # Streaming relies on activity heartbeats to detect a stuck LLM
-        # call and on WorkflowStreamClient.from_activity() to signal
+        # call and on WorkflowStreamClient.from_within_activity() to signal
         # partial results back to the workflow. Local activities support
         # neither: their result commits with the workflow task, so there
         # is no independent task to heartbeat against or to send signals

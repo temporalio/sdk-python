@@ -319,7 +319,7 @@ class DoubleInitWorkflow:
 
 @activity.defn(name="publish_items")
 async def publish_items(count: int) -> None:
-    client = WorkflowStreamClient.from_activity(
+    client = WorkflowStreamClient.from_within_activity(
         batch_interval=timedelta(milliseconds=500)
     )
     async with client:
@@ -331,7 +331,7 @@ async def publish_items(count: int) -> None:
 @activity.defn(name="publish_multi_topic")
 async def publish_multi_topic(count: int) -> None:
     topics = ["a", "b", "c"]
-    client = WorkflowStreamClient.from_activity(
+    client = WorkflowStreamClient.from_within_activity(
         batch_interval=timedelta(milliseconds=500)
     )
     async with client:
@@ -348,7 +348,9 @@ async def publish_with_priority() -> None:
     # The hold is deliberately much longer than the test's collect timeout
     # so a regression (force_flush no-op) surfaces as a missing item rather
     # than flaking on slow CI.
-    client = WorkflowStreamClient.from_activity(batch_interval=timedelta(seconds=60))
+    client = WorkflowStreamClient.from_within_activity(
+        batch_interval=timedelta(seconds=60)
+    )
     async with client:
         client.publish("events", b"normal-0")
         client.publish("events", b"normal-1")
@@ -360,7 +362,9 @@ async def publish_with_priority() -> None:
 
 @activity.defn(name="publish_batch_test")
 async def publish_batch_test(count: int) -> None:
-    client = WorkflowStreamClient.from_activity(batch_interval=timedelta(seconds=60))
+    client = WorkflowStreamClient.from_within_activity(
+        batch_interval=timedelta(seconds=60)
+    )
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -369,7 +373,7 @@ async def publish_batch_test(count: int) -> None:
 
 @activity.defn(name="publish_with_max_batch")
 async def publish_with_max_batch(count: int) -> None:
-    client = WorkflowStreamClient.from_activity(
+    client = WorkflowStreamClient.from_within_activity(
         batch_interval=timedelta(seconds=60), max_batch_size=3
     )
     async with client:
@@ -1782,7 +1786,7 @@ async def standalone_publish_to_broker(input: StandalonePublishInput) -> None:
 
     Same usage as in any external program: build a Client (here taken
     via ``activity.client()``), pass an explicit workflow id to
-    ``WorkflowStreamClient.create``. ``from_activity`` is not usable
+    ``WorkflowStreamClient.create``. ``from_within_activity`` is not usable
     here because the activity has no parent workflow.
     """
     assert (
@@ -1823,11 +1827,11 @@ async def standalone_subscribe_to_broker(input: CrossWorkflowInput) -> list[str]
     return items
 
 
-@activity.defn(name="standalone_from_activity_misuse")
-async def standalone_from_activity_misuse() -> str:
-    """Calling from_activity in a standalone activity must raise a clear error."""
+@activity.defn(name="standalone_from_within_activity_misuse")
+async def standalone_from_within_activity_misuse() -> str:
+    """Calling from_within_activity in a standalone activity must raise a clear error."""
     try:
-        WorkflowStreamClient.from_activity()
+        WorkflowStreamClient.from_within_activity()
     except RuntimeError as e:
         return str(e)
     return ""
@@ -1922,10 +1926,10 @@ async def test_standalone_activity_subscribe(
 
 
 @pytest.mark.asyncio
-async def test_from_activity_in_standalone_activity_raises(
+async def test_from_within_activity_in_standalone_activity_raises(
     client: Client, env: WorkflowEnvironment
 ) -> None:
-    """from_activity() raises a clear error pointing at create() when used in a
+    """from_within_activity() raises a clear error pointing at create() when used in a
     standalone activity (one without a parent workflow)."""
     if env.supports_time_skipping:
         pytest.skip(
@@ -1936,11 +1940,11 @@ async def test_from_activity_in_standalone_activity_raises(
 
     async with new_worker(
         client,
-        activities=[standalone_from_activity_misuse],
+        activities=[standalone_from_within_activity_misuse],
         task_queue=task_queue,
     ):
         activity_handle = await client.start_activity(
-            standalone_from_activity_misuse,
+            standalone_from_within_activity_misuse,
             id=f"standalone-misuse-{uuid.uuid4()}",
             task_queue=task_queue,
             start_to_close_timeout=timedelta(seconds=10),
