@@ -47,12 +47,13 @@ class WorkflowStreamItem:
     .. warning::
         This class is experimental and may change in future versions.
 
-    The ``data`` field is a :class:`temporalio.api.common.v1.Payload`
-    as stored by the mixin and yielded by
-    :meth:`WorkflowStreamClient.subscribe` when no ``result_type`` is given.
-    When ``result_type`` is passed to ``subscribe``, ``data`` holds the
-    decoded value of that type instead — the dataclass is typed as
-    ``Any`` to accommodate both.
+    The ``data`` field always carries the decoded value produced by
+    :meth:`WorkflowStreamClient.subscribe`: the converter's default
+    ``Any`` decoding when ``result_type`` is omitted, an instance of
+    ``T`` when ``result_type=T`` is passed, or a
+    :class:`temporalio.common.RawValue` wrapping the original
+    ``Payload`` when ``result_type=RawValue`` is passed. The dataclass
+    is typed as ``Any`` to accommodate all three.
 
     The ``offset`` field is populated at poll time from the item's
     position in the global log.

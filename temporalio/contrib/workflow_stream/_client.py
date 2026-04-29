@@ -406,13 +406,17 @@ class WorkflowStreamClient:
             topics: Topic filter. A single topic name, a list of topic
                 names, or None. None or empty list means all topics.
             from_offset: Global offset to start reading from.
-            result_type: Optional target type. When provided, each
-                yielded :class:`WorkflowStreamItem` has its ``data``
-                decoded via the client's sync payload converter to the
-                specified type. When omitted, ``data`` is the raw
-                ``temporalio.api.common.v1.Payload`` — useful for
-                heterogeneous topics where the caller dispatches on
-                ``Payload.metadata``.
+            result_type: Optional target type. Each yielded
+                :class:`WorkflowStreamItem` has its ``data`` decoded via
+                the client's sync payload converter. When omitted, the
+                converter's default ``Any`` decoding is used (for the
+                stock JSON converter that means a Python primitive,
+                ``dict``, or ``list``). Pass
+                ``result_type=temporalio.common.RawValue`` for an
+                opaque ``RawValue`` wrapping the original
+                ``Payload`` — useful for heterogeneous topics where
+                the caller dispatches on ``Payload.metadata`` or wants
+                to forward the bytes without decoding.
             poll_cooldown: Minimum interval between polls to avoid
                 overwhelming the workflow when items arrive faster
                 than the poll round-trip. Defaults to 100ms.
@@ -453,10 +457,11 @@ class WorkflowStreamClient:
             converter = self._payload_converter()
             for wire_item in result.items:
                 payload = _decode_payload(wire_item.data)
-                if result_type is not None:
-                    data: Any = converter.from_payload(payload, result_type)
-                else:
-                    data = payload
+                data: Any = (
+                    converter.from_payload(payload)
+                    if result_type is None
+                    else converter.from_payload(payload, result_type)
+                )
                 yield WorkflowStreamItem(
                     topic=wire_item.topic,
                     data=data,

@@ -27,6 +27,7 @@ import temporalio.api.operatorservice.v1
 import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
+from temporalio.common import RawValue
 from temporalio.contrib.workflow_stream import (
     PollInput,
     PollResult,
@@ -420,7 +421,8 @@ async def collect_items(
 
     Default ``result_type=bytes`` matches the bytes-oriented tests that
     compare ``item.data`` against literal byte strings. Pass
-    ``result_type=None`` to receive raw ``Payload`` objects.
+    ``result_type=None`` for the converter's default ``Any`` decoding,
+    or ``result_type=RawValue`` for a ``RawValue``-wrapped ``Payload``.
     """
     stream = WorkflowStreamClient.create(client, handle.id)
     items: list[WorkflowStreamItem] = []
@@ -495,6 +497,37 @@ async def test_structured_type_round_trip(client: Client) -> None:
         for i, item in enumerate(items):
             assert isinstance(item.data, AgentEvent)
             assert item.data == AgentEvent(kind="tick", payload={"i": i})
+
+        await handle.signal(StructuredPublishWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_subscribe_default_decode_and_raw_value(client: Client) -> None:
+    """No ``result_type`` decodes via Any; ``result_type=RawValue`` yields a ``Payload``."""
+    count = 2
+    async with new_worker(client, StructuredPublishWorkflow) as worker:
+        handle = await client.start_workflow(
+            StructuredPublishWorkflow.run,
+            count,
+            id=f"workflow-stream-default-decode-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        any_items = await collect_items(
+            client, handle, None, 0, count, result_type=None
+        )
+        assert len(any_items) == count
+        for i, item in enumerate(any_items):
+            # Default JSON converter decodes a dataclass to a plain dict.
+            assert item.data == {"kind": "tick", "payload": {"i": i}}
+
+        raw_items = await collect_items(
+            client, handle, None, 0, count, result_type=RawValue
+        )
+        assert len(raw_items) == count
+        for item in raw_items:
+            assert isinstance(item.data, RawValue)
+            assert item.data.payload.data  # non-empty serialized JSON bytes
 
         await handle.signal(StructuredPublishWorkflow.close)
 
