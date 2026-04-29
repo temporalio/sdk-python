@@ -253,8 +253,17 @@ class WorkflowStream:
             publishers=active_publishers,
         )
 
-    def drain(self) -> None:
-        """Unblock all waiting poll handlers and reject new polls.
+    def stop_polling(self) -> None:
+        """Release waiting subscribers and reject new poll updates.
+
+        After this call the stream's ``__temporal_workflow_stream_poll``
+        update handler stops serving subscribers on this run: any
+        in-flight polls return their current item batch (often empty)
+        and new polls are rejected at the validator. Publishes still
+        land in the in-memory log and ``get_state`` /
+        ``continue_as_new`` remain valid — the stream is being held
+        open just long enough to snapshot state and hand off to the
+        next run.
 
         Call this before
         ``await workflow.wait_condition(workflow.all_handlers_finished)``
@@ -268,17 +277,17 @@ class WorkflowStream:
         *,
         publisher_ttl: timedelta = timedelta(seconds=900),
     ) -> NoReturn:
-        """Drain, wait for handlers, then continue-as-new with built args.
+        """Stop polling, wait for handlers, continue-as-new with built args.
 
-        Replaces the three-line recipe ``drain()`` →
+        Replaces the three-line recipe ``stop_polling()`` →
         ``wait_condition(all_handlers_finished)`` →
         ``workflow.continue_as_new(args=...)`` for the common case where
         the only CAN parameter that varies is ``args``.
 
-        ``build_args`` is invoked *after* drain has stabilized, with the
-        post-drain :class:`WorkflowStreamState` as its single argument.
-        The caller threads that state into whatever input dataclass the
-        workflow expects:
+        ``build_args`` is invoked *after* poll-serving has stopped, with
+        the post-stop :class:`WorkflowStreamState` as its single
+        argument. The caller threads that state into whatever input
+        dataclass the workflow expects:
 
         .. code-block:: python
 
@@ -289,11 +298,11 @@ class WorkflowStream:
 
         Workflows that need to override other CAN parameters
         (``task_queue``, ``retry_policy``, ``run_timeout``, etc.) should
-        keep using the explicit ``drain`` / ``wait_condition`` /
+        keep using the explicit ``stop_polling`` / ``wait_condition`` /
         ``workflow.continue_as_new(...)`` recipe.
 
         Args:
-            build_args: Callable that receives the post-drain stream
+            build_args: Callable that receives the post-stop stream
                 state and returns the positional ``args`` for the new
                 run.
             publisher_ttl: Forwarded to :meth:`get_state`.
@@ -301,7 +310,7 @@ class WorkflowStream:
         Does not return; ``workflow.continue_as_new`` raises an internal
         exception that the SDK uses to close the run.
         """
-        self.drain()
+        self.stop_polling()
         await workflow.wait_condition(workflow.all_handlers_finished)
         workflow.continue_as_new(
             args=build_args(self.get_state(publisher_ttl=publisher_ttl)),
