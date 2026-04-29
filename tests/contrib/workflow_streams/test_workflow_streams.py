@@ -1685,7 +1685,7 @@ class ContinueAsNewTypedWorkflow:
                 return
             if self._should_continue:
                 self._should_continue = False
-                self.stream.stop_polling()
+                self.stream.detach_pollers()
                 await workflow.wait_condition(workflow.all_handlers_finished)
                 workflow.continue_as_new(
                     args=[
@@ -1829,7 +1829,7 @@ class ContinueAsNewHelperWorkflow:
 @pytest.mark.asyncio
 async def test_continue_as_new_helper(client: Client) -> None:
     """The ``WorkflowStream.continue_as_new`` helper preserves log and dedup state
-    just like the explicit stop_polling/wait/CAN recipe."""
+    just like the explicit detach_pollers/wait/CAN recipe."""
     async with new_worker(
         client,
         ContinueAsNewHelperWorkflow,
