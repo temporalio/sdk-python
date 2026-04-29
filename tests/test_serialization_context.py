@@ -853,13 +853,13 @@ class UpdateSerializationContextTestWorkflow:
 
     @workflow.update
     def my_update(self, input: TraceData) -> TraceData:
+        self.input = input
         return input
 
     @my_update.validator
     def my_update_validator(self, input: TraceData) -> None:
-        self.input = input  # for test purposes; update validators should not mutate workflow state
         if not self.pass_validation:
-            raise ValueError("Rejected")
+            raise ApplicationError("Rejected", input)
 
 
 @pytest.mark.parametrize("pass_validation", [True, False])
@@ -900,10 +900,12 @@ async def test_update_payload_conversion(
                     UpdateSerializationContextTestWorkflow.my_update, TraceData()
                 )
                 raise AssertionError("Expected WorkflowUpdateFailedError")
-            except WorkflowUpdateFailedError:
-                pass
-
-            result = await wf_handle.result()
+            except WorkflowUpdateFailedError as e:
+                assert isinstance(e.cause, ApplicationError)
+                assert len(e.cause.details) == 1
+                result = e.cause.details[0]
+                assert isinstance(result, TraceData)
+            await wf_handle.terminate()
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
@@ -922,11 +924,11 @@ async def test_update_payload_conversion(
             ),
             TraceItem(
                 method="to_payload",
-                context=workflow_context,  # Outbound update/workflow result
+                context=workflow_context,  # Outbound update result or error detail
             ),
             TraceItem(
                 method="from_payload",
-                context=workflow_context,  # Inbound update/workflow result
+                context=workflow_context,  # Inbound update result or error detail
             ),
         ]
 

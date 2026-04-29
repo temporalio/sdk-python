@@ -175,3 +175,81 @@ class ComputeConfigScalingGroupUpdate(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ComputeConfigScalingGroupUpdate = ComputeConfigScalingGroupUpdate
+
+class ComputeConfigSummary(google.protobuf.message.Message):
+    """A subset of information in ComputeConfig optimized for list views."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class ScalingGroupsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___ComputeConfigScalingGroupSummary: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___ComputeConfigScalingGroupSummary | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
+    SCALING_GROUPS_FIELD_NUMBER: builtins.int
+    @property
+    def scaling_groups(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___ComputeConfigScalingGroupSummary
+    ]: ...
+    def __init__(
+        self,
+        *,
+        scaling_groups: collections.abc.Mapping[
+            builtins.str, global___ComputeConfigScalingGroupSummary
+        ]
+        | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["scaling_groups", b"scaling_groups"]
+    ) -> None: ...
+
+global___ComputeConfigSummary = ComputeConfigSummary
+
+class ComputeConfigScalingGroupSummary(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_QUEUE_TYPES_FIELD_NUMBER: builtins.int
+    PROVIDER_TYPE_FIELD_NUMBER: builtins.int
+    @property
+    def task_queue_types(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
+    ]: ...
+    provider_type: builtins.str
+    def __init__(
+        self,
+        *,
+        task_queue_types: collections.abc.Iterable[
+            temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
+        ]
+        | None = ...,
+        provider_type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "provider_type", b"provider_type", "task_queue_types", b"task_queue_types"
+        ],
+    ) -> None: ...
+
+global___ComputeConfigScalingGroupSummary = ComputeConfigScalingGroupSummary

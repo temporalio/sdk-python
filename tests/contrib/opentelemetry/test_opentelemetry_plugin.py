@@ -567,6 +567,69 @@ async def test_otel_tracing_workflow_failure(
     ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
 
 
+async def test_otel_standalone_activity_tracing(
+    client: Client,
+    env: WorkflowEnvironment,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    async with new_worker(
+        new_client,
+        activities=[simple_no_context_activity],
+    ) as worker:
+        handle = await new_client.start_activity(
+            simple_no_context_activity,
+            id=f"activity_{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        await handle.result()
+
+    # Use a queue with no worker so activities stay in SCHEDULED state,
+    # allowing describe/cancel/terminate to be called without a race.
+    no_worker_queue = f"task_queue_{uuid.uuid4()}"
+
+    cancel_handle = await new_client.start_activity(
+        simple_no_context_activity,
+        id=f"activity_{uuid.uuid4()}",
+        task_queue=no_worker_queue,
+        schedule_to_close_timeout=timedelta(seconds=30),
+    )
+    await cancel_handle.describe()
+    await cancel_handle.cancel()
+
+    terminate_handle = await new_client.start_activity(
+        simple_no_context_activity,
+        id=f"activity_{uuid.uuid4()}",
+        task_queue=no_worker_queue,
+        schedule_to_close_timeout=timedelta(seconds=30),
+    )
+    await terminate_handle.terminate()
+
+    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+        "StartActivity:simple_no_context_activity",
+        "  RunActivity:simple_no_context_activity",
+        "    Activity",
+        "StartActivity:simple_no_context_activity",
+        "DescribeActivity",
+        "CancelActivity",
+        "StartActivity:simple_no_context_activity",
+        "TerminateActivity",
+    ]
+
+
 def test_replay_safe_span_delegates_extra_attributes():
     """Test that _ReplaySafeSpan delegates attribute access to the underlying span.
 

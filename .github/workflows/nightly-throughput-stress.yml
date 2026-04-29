@@ -68,12 +68,12 @@ jobs:
           echo "=========================================="
 
       - name: Checkout SDK
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           submodules: recursive
 
       - name: Checkout OMES
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           repository: ${{ env.OMES_REPO }}
           ref: ${{ env.OMES_REF }}
@@ -89,7 +89,7 @@ jobs:
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Setup Rust cache
-        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: temporalio/bridge -> target
 
@@ -105,7 +105,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
 
       - name: Install poethepoet
         run: uv tool install poethepoet
@@ -200,7 +200,7 @@ jobs:
 
       - name: Notify Slack on failure
         if: failure() || cancelled()
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3
         with:
           webhook-type: incoming-webhook
           payload: |

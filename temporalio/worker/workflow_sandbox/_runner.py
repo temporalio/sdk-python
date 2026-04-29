@@ -187,6 +187,9 @@ class _Instance(WorkflowInstance):
             for k, v in extra_globals.items():
                 self.globals_and_locals.pop(k, None)
 
+    def get_info(self) -> temporalio.workflow.Info:
+        return self.instance_details.info
+
     def get_thread_id(self) -> int | None:
         return self._current_thread_id
 

@@ -1635,6 +1635,41 @@ class unsafe:
             _sandbox_import_notification_policy_override.value = original_policy
 
 
+def _build_log_context(
+    workflow_details: Mapping[str, Any] | None,
+    update_details: Mapping[str, Any] | None = None,
+    *,
+    workflow_info_on_message: bool = True,
+    workflow_info_on_extra: bool = True,
+    full_workflow_info: Info | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build the msg_extra suffix and extra dict entries for a temporal log record.
+
+    Returns:
+        (msg_extra, extra) where msg_extra should be appended to the log message
+        and extra should be merged into the log record's extra dict.
+    """
+    msg_extra: dict[str, Any] = {}
+    extra: dict[str, Any] = {}
+
+    if workflow_details is not None:
+        if workflow_info_on_message:
+            msg_extra.update(workflow_details)
+        if workflow_info_on_extra:
+            extra["temporal_workflow"] = dict(workflow_details)
+
+    if update_details is not None:
+        if workflow_info_on_message:
+            msg_extra.update(update_details)
+        if workflow_info_on_extra:
+            extra.setdefault("temporal_workflow", {}).update(update_details)
+
+    if full_workflow_info is not None:
+        extra["workflow_info"] = full_workflow_info
+
+    return msg_extra, extra
+
+
 class LoggerAdapter(logging.LoggerAdapter):
     """Adapter that adds details to the log about the running workflow.
 
@@ -1671,8 +1706,8 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
         """Override to add workflow details."""
-        extra: dict[str, Any] = {}
         msg_extra: dict[str, Any] = {}
+        extra: dict[str, Any] = {}
 
         if (
             self.workflow_info_on_message
@@ -1680,21 +1715,16 @@ class LoggerAdapter(logging.LoggerAdapter):
             or self.full_workflow_info_on_extra
         ):
             runtime = _Runtime.maybe_current()
-            if runtime:
-                workflow_details = runtime.logger_details
-                if self.workflow_info_on_message:
-                    msg_extra.update(workflow_details)
-                if self.workflow_info_on_extra:
-                    extra["temporal_workflow"] = workflow_details
-                if self.full_workflow_info_on_extra:
-                    extra["workflow_info"] = runtime.workflow_info()
             update_info = current_update_info()
-            if update_info:
-                update_details = update_info._logger_details
-                if self.workflow_info_on_message:
-                    msg_extra.update(update_details)
-                if self.workflow_info_on_extra:
-                    extra.setdefault("temporal_workflow", {}).update(update_details)
+            msg_extra, extra = _build_log_context(
+                runtime.logger_details if runtime else None,
+                update_info._logger_details if update_info else None,
+                workflow_info_on_message=self.workflow_info_on_message,
+                workflow_info_on_extra=self.workflow_info_on_extra,
+                full_workflow_info=runtime.workflow_info()
+                if runtime and self.full_workflow_info_on_extra
+                else None,
+            )
 
         kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:

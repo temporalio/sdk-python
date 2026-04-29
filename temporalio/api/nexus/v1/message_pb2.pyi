@@ -1006,8 +1006,10 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
     attempt: builtins.int
-    """The number of attempts made to start/deliver the operation request.
-    This number represents a minimum bound since the attempt is incremented after the request completes.
+    """The number of attempts made to deliver the start operation request.
+    This number is approximate, it is incremented when a task is added to the history queue.
+    In practice, there could be more attempts if a task is executed but fails to commit, or less attempts if a task
+    was never executed.
     """
     @property
     def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:

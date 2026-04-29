@@ -883,6 +883,36 @@ class Link(google.protobuf.message.Message):
             self, field_name: typing_extensions.Literal["job_id", b"job_id"]
         ) -> None: ...
 
+    class Activity(google.protobuf.message.Message):
+        """A link to an activity."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        ACTIVITY_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        activity_id: builtins.str
+        run_id: builtins.str
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            activity_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "activity_id",
+                b"activity_id",
+                "namespace",
+                b"namespace",
+                "run_id",
+                b"run_id",
+            ],
+        ) -> None: ...
+
     class NexusOperation(google.protobuf.message.Message):
         """A link to a standalone Nexus operation."""
 
@@ -915,11 +945,14 @@ class Link(google.protobuf.message.Message):
 
     WORKFLOW_EVENT_FIELD_NUMBER: builtins.int
     BATCH_JOB_FIELD_NUMBER: builtins.int
+    ACTIVITY_FIELD_NUMBER: builtins.int
     NEXUS_OPERATION_FIELD_NUMBER: builtins.int
     @property
     def workflow_event(self) -> global___Link.WorkflowEvent: ...
     @property
     def batch_job(self) -> global___Link.BatchJob: ...
+    @property
+    def activity(self) -> global___Link.Activity: ...
     @property
     def nexus_operation(self) -> global___Link.NexusOperation: ...
     def __init__(
@@ -927,11 +960,14 @@ class Link(google.protobuf.message.Message):
         *,
         workflow_event: global___Link.WorkflowEvent | None = ...,
         batch_job: global___Link.BatchJob | None = ...,
+        activity: global___Link.Activity | None = ...,
         nexus_operation: global___Link.NexusOperation | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
             "batch_job",
             b"batch_job",
             "nexus_operation",
@@ -945,6 +981,8 @@ class Link(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
             "batch_job",
             b"batch_job",
             "nexus_operation",
@@ -958,7 +996,9 @@ class Link(google.protobuf.message.Message):
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
     ) -> (
-        typing_extensions.Literal["workflow_event", "batch_job", "nexus_operation"]
+        typing_extensions.Literal[
+            "workflow_event", "batch_job", "activity", "nexus_operation"
+        ]
         | None
     ): ...
 
@@ -1132,3 +1172,40 @@ class WorkerSelector(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["worker_instance_key"] | None: ...
 
 global___WorkerSelector = WorkerSelector
+
+class OnConflictOptions(google.protobuf.message.Message):
+    """When starting an execution with a conflict policy that uses an existing execution and there is already an existing
+    running execution, OnConflictOptions defines actions to be taken on the existing running execution.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ATTACH_REQUEST_ID_FIELD_NUMBER: builtins.int
+    ATTACH_COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    ATTACH_LINKS_FIELD_NUMBER: builtins.int
+    attach_request_id: builtins.bool
+    """Attaches the request ID to the running execution."""
+    attach_completion_callbacks: builtins.bool
+    """Attaches the completion callbacks to the running execution."""
+    attach_links: builtins.bool
+    """Attaches the links to the running execution."""
+    def __init__(
+        self,
+        *,
+        attach_request_id: builtins.bool = ...,
+        attach_completion_callbacks: builtins.bool = ...,
+        attach_links: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attach_completion_callbacks",
+            b"attach_completion_callbacks",
+            "attach_links",
+            b"attach_links",
+            "attach_request_id",
+            b"attach_request_id",
+        ],
+    ) -> None: ...
+
+global___OnConflictOptions = OnConflictOptions

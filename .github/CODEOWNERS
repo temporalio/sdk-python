@@ -3,3 +3,16 @@
 # @temporalio/sdk will be requested for review when
 # someone opens a pull request.
 * @temporalio/sdk
+
+
+# Below are owners for modules in the temporalio/contrib/
+# and tests/contrib/ directories that are owned by teams 
+# other than the SDK team. For each one, we add the owning team, 
+# as well as @temporalio/sdk, so the SDK team can continue to
+# manage repo-wide concerns.
+/temporalio/contrib/google_adk_agents/      @temporalio/ai-sdk     @temporalio/sdk
+/temporalio/contrib/langsmith/              @temporalio/ai-sdk     @temporalio/sdk
+/temporalio/contrib/openai_agents/          @temporalio/ai-sdk     @temporalio/sdk
+/tests/contrib/google_adk_agents/           @temporalio/ai-sdk     @temporalio/sdk
+/tests/contrib/langsmith/                   @temporalio/ai-sdk     @temporalio/sdk
+/tests/contrib/openai_agents/               @temporalio/ai-sdk     @temporalio/sdk

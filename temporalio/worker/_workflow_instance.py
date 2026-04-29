@@ -198,6 +198,11 @@ class WorkflowInstance(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_info(self) -> temporalio.workflow.Info:
+        """Return the workflow info for this instance."""
+        raise NotImplementedError
+
     def get_thread_id(self) -> int | None:
         """Return the thread identifier that this workflow is running on.
 
@@ -1201,6 +1206,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             build_id=self._deployment_version_for_current_task.build_id,
             deployment_name=self._deployment_version_for_current_task.deployment_name,
         )
+
+    def get_info(self) -> temporalio.workflow.Info:
+        return self._info
 
     def workflow_get_current_history_length(self) -> int:
         return self._current_history_length

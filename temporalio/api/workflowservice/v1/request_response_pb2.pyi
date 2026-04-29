@@ -1082,19 +1082,31 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     WORKER_INSTANCE_KEY_FIELD_NUMBER: builtins.int
+    WORKER_CONTROL_TASK_QUEUE_FIELD_NUMBER: builtins.int
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
+    poller_group_id: builtins.str
+    """Unless this is the first poll, the client must pass one of the poller group IDs received in
+    `poller_group_infos` of the last the PollWorkflowTaskQueueResponse according to the
+    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    without receiving a task while the queue actually has tasks in another server location.
+    """
     identity: builtins.str
     """The identity of the worker/client who is polling this task queue"""
     worker_instance_key: builtins.str
     """A unique key for this worker instance, used for tracking worker lifecycle.
     This is guaranteed to be unique, whereas identity is not guaranteed to be unique.
+    """
+    worker_control_task_queue: builtins.str
+    """A dedicated per-worker Nexus task queue on which the server sends control
+    tasks (e.g. activity cancellation) to this specific worker instance.
     """
     binary_checksum: builtins.str
     """Deprecated. Use deployment_options instead.
@@ -1113,16 +1125,16 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     def deployment_options(
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
-        """Worker deployment options that user has set in the worker.
-        Experimental. Worker Deployments are experimental and might significantly change in the future.
-        """
+        """Worker deployment options that user has set in the worker."""
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
+        poller_group_id: builtins.str = ...,
         identity: builtins.str = ...,
         worker_instance_key: builtins.str = ...,
+        worker_control_task_queue: builtins.str = ...,
         binary_checksum: builtins.str = ...,
         worker_version_capabilities: temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities
         | None = ...,
@@ -1151,8 +1163,12 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "poller_group_id",
+            b"poller_group_id",
             "task_queue",
             b"task_queue",
+            "worker_control_task_queue",
+            b"worker_control_task_queue",
             "worker_instance_key",
             b"worker_instance_key",
             "worker_version_capabilities",
@@ -1203,6 +1219,8 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     QUERIES_FIELD_NUMBER: builtins.int
     MESSAGES_FIELD_NUMBER: builtins.int
     POLLER_SCALING_DECISION_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     @property
@@ -1286,6 +1304,23 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.taskqueue.v1.message_pb2.PollerScalingDecision:
         """Server-advised information the SDK may use to adjust its poller count."""
+    poller_group_id: builtins.str
+    """This poller group ID identifies the owner of the workflow task awaiting for query response.
+    Corresponding RespondQueryTaskCompleted should pass this value for proper routing.
+    """
+    @property
+    def poller_group_infos(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+    ]:
+        """The weighted list of poller groups IDs that client should use for future polls to this task
+        queue. Client is expected to:
+          1. Maintain minimum number of pollers no less than the number of groups.
+          2. Try to assign the next poll to a group without any pending polls,
+          3. If every group has some pending polls, assign the next poll to a group randomly
+            according to the weights.
+        """
     def __init__(
         self,
         *,
@@ -1313,6 +1348,11 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
         ]
         | None = ...,
         poller_scaling_decision: temporalio.api.taskqueue.v1.message_pb2.PollerScalingDecision
+        | None = ...,
+        poller_group_id: builtins.str = ...,
+        poller_group_infos: collections.abc.Iterable[
+            temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+        ]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -1349,6 +1389,10 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
             b"messages",
             "next_page_token",
             b"next_page_token",
+            "poller_group_id",
+            b"poller_group_id",
+            "poller_group_infos",
+            b"poller_group_infos",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "previous_started_event_id",
@@ -1446,6 +1490,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     DEPLOYMENT_FIELD_NUMBER: builtins.int
     VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    WORKER_INSTANCE_KEY_FIELD_NUMBER: builtins.int
+    WORKER_CONTROL_TASK_QUEUE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollWorkflowTaskQueueResponse`"""
     @property
@@ -1536,6 +1582,14 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    worker_instance_key: builtins.str
+    """A unique key for this worker instance, used for tracking worker lifecycle.
+    This is guaranteed to be unique, whereas identity is not guaranteed to be unique.
+    """
+    worker_control_task_queue: builtins.str
+    """A dedicated per-worker Nexus task queue on which the server sends control
+    tasks (e.g. activity cancellation) to this specific worker instance.
+    """
     def __init__(
         self,
         *,
@@ -1572,6 +1626,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         versioning_behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        worker_instance_key: builtins.str = ...,
+        worker_control_task_queue: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1629,6 +1685,10 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             b"task_token",
             "versioning_behavior",
             b"versioning_behavior",
+            "worker_control_task_queue",
+            b"worker_control_task_queue",
+            "worker_instance_key",
+            b"worker_instance_key",
             "worker_version_stamp",
             b"worker_version_stamp",
         ],
@@ -1816,19 +1876,31 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     WORKER_INSTANCE_KEY_FIELD_NUMBER: builtins.int
+    WORKER_CONTROL_TASK_QUEUE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
+    poller_group_id: builtins.str
+    """Unless this is the first poll, the client must pass one of the poller group IDs received in
+    `poller_group_infos` of the last the PollActivityTaskQueueResponse according to the
+    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    without receiving a task while the queue actually has tasks in another server location.
+    """
     identity: builtins.str
     """The identity of the worker/client"""
     worker_instance_key: builtins.str
     """A unique key for this worker instance, used for tracking worker lifecycle.
     This is guaranteed to be unique, whereas identity is not guaranteed to be unique.
+    """
+    worker_control_task_queue: builtins.str
+    """A dedicated per-worker Nexus task queue on which the server sends control
+    tasks (e.g. activity cancellation) to this specific worker instance.
     """
     @property
     def task_queue_metadata(
@@ -1852,8 +1924,10 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         *,
         namespace: builtins.str = ...,
         task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
+        poller_group_id: builtins.str = ...,
         identity: builtins.str = ...,
         worker_instance_key: builtins.str = ...,
+        worker_control_task_queue: builtins.str = ...,
         task_queue_metadata: temporalio.api.taskqueue.v1.message_pb2.TaskQueueMetadata
         | None = ...,
         worker_version_capabilities: temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities
@@ -1883,10 +1957,14 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "poller_group_id",
+            b"poller_group_id",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
+            "worker_control_task_queue",
+            b"worker_control_task_queue",
             "worker_instance_key",
             b"worker_instance_key",
             "worker_version_capabilities",
@@ -1919,6 +1997,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
     POLLER_SCALING_DECISION_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     ACTIVITY_RUN_ID_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     workflow_namespace: builtins.str
@@ -1999,6 +2078,19 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
         """Priority metadata"""
     activity_run_id: builtins.str
     """The run ID of the activity execution, only set for standalone activities."""
+    @property
+    def poller_group_infos(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+    ]:
+        """The weighted list of poller groups IDs that client should use for future polls to this task
+        queue. Client is expected to:
+          1. Maintain minimum number of pollers no less than the number of groups.
+          2. Try to assign the next poll to a group without any pending polls,
+          3. If every group has some pending polls, assign the next poll to a group randomly
+            according to the weights.
+        """
     def __init__(
         self,
         *,
@@ -2025,6 +2117,10 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         activity_run_id: builtins.str = ...,
+        poller_group_infos: collections.abc.Iterable[
+            temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2082,6 +2178,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "input",
             b"input",
+            "poller_group_infos",
+            b"poller_group_infos",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "priority",
@@ -3068,8 +3166,23 @@ global___SignalWorkflowExecutionRequest = SignalWorkflowExecutionRequest
 class SignalWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    LINK_FIELD_NUMBER: builtins.int
+    @property
+    def link(self) -> temporalio.api.common.v1.message_pb2.Link:
+        """Link to be associated with the WorkflowExecutionSignaled event.
+        Added on the response to propagate the backlink.
+        Available from Temporal server 1.31 and up.
+        """
     def __init__(
         self,
+        *,
+        link: temporalio.api.common.v1.message_pb2.Link | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["link", b"link"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["link", b"link"]
     ) -> None: ...
 
 global___SignalWorkflowExecutionResponse = SignalWorkflowExecutionResponse
@@ -3338,20 +3451,31 @@ class SignalWithStartWorkflowExecutionResponse(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     STARTED_FIELD_NUMBER: builtins.int
+    SIGNAL_LINK_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run id of the workflow that was started - or just signaled, if it was already running."""
     started: builtins.bool
     """If true, a new workflow was started."""
+    @property
+    def signal_link(self) -> temporalio.api.common.v1.message_pb2.Link:
+        """Link to be associated with the WorkflowExecutionSignaled event.
+        Added on the response to propagate the backlink.
+        Available from Temporal server 1.31 and up.
+        """
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
         started: builtins.bool = ...,
+        signal_link: temporalio.api.common.v1.message_pb2.Link | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["signal_link", b"signal_link"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "run_id", b"run_id", "started", b"started"
+            "run_id", b"run_id", "signal_link", b"signal_link", "started", b"started"
         ],
     ) -> None: ...
 
@@ -4171,6 +4295,7 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
     CAUSE_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     completed_type: temporalio.api.enums.v1.query_pb2.QueryResultType.ValueType
     @property
@@ -4199,6 +4324,10 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
     """Why did the task fail? It's important to note that many of the variants in this enum cannot
     apply to worker responses. See the type's doc for more.
     """
+    poller_group_id: builtins.str
+    """Client must forward the poller_group_id received in PollWorkflowTaskQueueResponse for proper
+    routing of the response.
+    """
     def __init__(
         self,
         *,
@@ -4209,6 +4338,7 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
         namespace: builtins.str = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
         cause: temporalio.api.enums.v1.failed_cause_pb2.WorkflowTaskFailedCause.ValueType = ...,
+        poller_group_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4229,6 +4359,8 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
             b"failure",
             "namespace",
             b"namespace",
+            "poller_group_id",
+            b"poller_group_id",
             "query_result",
             b"query_result",
             "task_token",
@@ -7379,21 +7511,28 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     WORKER_INSTANCE_KEY_FIELD_NUMBER: builtins.int
-    TASK_QUEUE_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
+    @property
+    def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
+    poller_group_id: builtins.str
+    """Unless this is the first poll, the client must pass one of the poller group IDs received in
+    `poller_group_infos` of the last the PollNexusTaskQueueResponse according to the
+    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    without receiving a task while the queue actually has tasks in another server location.
+    """
     identity: builtins.str
     """The identity of the client who initiated this request."""
     worker_instance_key: builtins.str
     """A unique key for this worker instance, used for tracking worker lifecycle.
     This is guaranteed to be unique, whereas identity is not guaranteed to be unique.
     """
-    @property
-    def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     @property
     def worker_version_capabilities(
         self,
@@ -7418,9 +7557,10 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
         self,
         *,
         namespace: builtins.str = ...,
+        task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
+        poller_group_id: builtins.str = ...,
         identity: builtins.str = ...,
         worker_instance_key: builtins.str = ...,
-        task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
         worker_version_capabilities: temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
@@ -7450,6 +7590,8 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "poller_group_id",
+            b"poller_group_id",
             "task_queue",
             b"task_queue",
             "worker_heartbeat",
@@ -7469,6 +7611,8 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     REQUEST_FIELD_NUMBER: builtins.int
     POLLER_SCALING_DECISION_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """An opaque unique identifier for this task for correlating a completion request the embedded request."""
     @property
@@ -7479,12 +7623,36 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.taskqueue.v1.message_pb2.PollerScalingDecision:
         """Server-advised information the SDK may use to adjust its poller count."""
+    poller_group_id: builtins.str
+    """This poller group ID identifies the owner of the nexus task awaiting for synchronous
+    response.
+    Corresponding `RespondNexusTaskCompleted` and `RespondNexusTaskFailed` calls should pass this
+    value for proper response routing.
+    """
+    @property
+    def poller_group_infos(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+    ]:
+        """The weighted list of poller groups IDs that client should use for future polls to this task
+        queue. Client is expected to:
+          1. Maintain minimum number of pollers no less than the number of groups.
+          2. Try to assign the next poll to a group without any pending polls,
+          3. If every group has some pending polls, assign the next poll to a group randomly
+            according to the weights.
+        """
     def __init__(
         self,
         *,
         task_token: builtins.bytes = ...,
         request: temporalio.api.nexus.v1.message_pb2.Request | None = ...,
         poller_scaling_decision: temporalio.api.taskqueue.v1.message_pb2.PollerScalingDecision
+        | None = ...,
+        poller_group_id: builtins.str = ...,
+        poller_group_infos: collections.abc.Iterable[
+            temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+        ]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -7496,6 +7664,10 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "poller_group_id",
+            b"poller_group_id",
+            "poller_group_infos",
+            b"poller_group_infos",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "request",
@@ -7514,6 +7686,7 @@ class RespondNexusTaskCompletedRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     RESPONSE_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     """The identity of the client who initiated this request."""
@@ -7522,6 +7695,10 @@ class RespondNexusTaskCompletedRequest(google.protobuf.message.Message):
     @property
     def response(self) -> temporalio.api.nexus.v1.message_pb2.Response:
         """Embedded response to be translated into a frontend response."""
+    poller_group_id: builtins.str
+    """Client must forward the poller_group_id received in PollNexusTaskQueueResponse for proper
+    routing of the response.
+    """
     def __init__(
         self,
         *,
@@ -7529,6 +7706,7 @@ class RespondNexusTaskCompletedRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         task_token: builtins.bytes = ...,
         response: temporalio.api.nexus.v1.message_pb2.Response | None = ...,
+        poller_group_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["response", b"response"]
@@ -7540,6 +7718,8 @@ class RespondNexusTaskCompletedRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "poller_group_id",
+            b"poller_group_id",
             "response",
             b"response",
             "task_token",
@@ -7566,6 +7746,7 @@ class RespondNexusTaskFailedRequest(google.protobuf.message.Message):
     TASK_TOKEN_FIELD_NUMBER: builtins.int
     ERROR_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     """The identity of the client who initiated this request."""
@@ -7577,6 +7758,10 @@ class RespondNexusTaskFailedRequest(google.protobuf.message.Message):
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """The error the handler failed with. Must contain a NexusHandlerFailureInfo object."""
+    poller_group_id: builtins.str
+    """Client must forward the poller_group_id received in PollNexusTaskQueueResponse for proper
+    routing of the response.
+    """
     def __init__(
         self,
         *,
@@ -7585,6 +7770,7 @@ class RespondNexusTaskFailedRequest(google.protobuf.message.Message):
         task_token: builtins.bytes = ...,
         error: temporalio.api.nexus.v1.message_pb2.HandlerError | None = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        poller_group_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -7601,6 +7787,8 @@ class RespondNexusTaskFailedRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "poller_group_id",
+            b"poller_group_id",
             "task_token",
             b"task_token",
         ],
@@ -11056,6 +11244,10 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
     HEADER_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
+    ON_CONFLICT_OPTIONS_FIELD_NUMBER: builtins.int
+    START_DELAY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     """The identity of the client who initiated this request"""
@@ -11133,6 +11325,32 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata."""
+    @property
+    def completion_callbacks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Callback
+    ]:
+        """Callbacks to be called by the server when this activity reaches a terminal state.
+        Callback addresses must be whitelisted in the server's dynamic configuration.
+        """
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the activity. Callbacks may also have associated links;
+        links already included with a callback should not be duplicated here.
+        """
+    @property
+    def on_conflict_options(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.OnConflictOptions:
+        """Options for handling conflicts when using ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING."""
+    @property
+    def start_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """Time to wait before dispatching the first activity task. This delay is not applied to retry attempts."""
     def __init__(
         self,
         *,
@@ -11156,6 +11374,15 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        completion_callbacks: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Callback
+        ]
+        | None = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
+        on_conflict_options: temporalio.api.common.v1.message_pb2.OnConflictOptions
+        | None = ...,
+        start_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -11168,6 +11395,8 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "input",
             b"input",
+            "on_conflict_options",
+            b"on_conflict_options",
             "priority",
             b"priority",
             "retry_policy",
@@ -11178,6 +11407,8 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
             b"schedule_to_start_timeout",
             "search_attributes",
             b"search_attributes",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -11193,6 +11424,8 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
             b"activity_id",
             "activity_type",
             b"activity_type",
+            "completion_callbacks",
+            b"completion_callbacks",
             "header",
             b"header",
             "heartbeat_timeout",
@@ -11205,8 +11438,12 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
             b"identity",
             "input",
             b"input",
+            "links",
+            b"links",
             "namespace",
             b"namespace",
+            "on_conflict_options",
+            b"on_conflict_options",
             "priority",
             b"priority",
             "request_id",
@@ -11219,6 +11456,8 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
             b"schedule_to_start_timeout",
             "search_attributes",
             b"search_attributes",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -11235,20 +11474,28 @@ class StartActivityExecutionResponse(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     STARTED_FIELD_NUMBER: builtins.int
+    LINK_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run ID of the activity that was started - or used (via ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING)."""
     started: builtins.bool
     """If true, a new activity was started."""
+    @property
+    def link(self) -> temporalio.api.common.v1.message_pb2.Link:
+        """Link to the started activity."""
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
         started: builtins.bool = ...,
+        link: temporalio.api.common.v1.message_pb2.Link | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["link", b"link"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "run_id", b"run_id", "started", b"started"
+            "link", b"link", "run_id", b"run_id", "started", b"started"
         ],
     ) -> None: ...
 
@@ -11317,6 +11564,7 @@ class DescribeActivityExecutionResponse(google.protobuf.message.Message):
     INPUT_FIELD_NUMBER: builtins.int
     OUTCOME_FIELD_NUMBER: builtins.int
     LONG_POLL_TOKEN_FIELD_NUMBER: builtins.int
+    CALLBACKS_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run ID of the activity, useful when run_id was not specified in the request."""
     @property
@@ -11334,6 +11582,13 @@ class DescribeActivityExecutionResponse(google.protobuf.message.Message):
         """Only set if the activity is completed and include_outcome was true in the request."""
     long_poll_token: builtins.bytes
     """Token for follow-on long-poll requests. Absent only if the activity is complete."""
+    @property
+    def callbacks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.activity.v1.message_pb2.CallbackInfo
+    ]:
+        """Callbacks attached to this activity execution and their current state."""
     def __init__(
         self,
         *,
@@ -11343,6 +11598,10 @@ class DescribeActivityExecutionResponse(google.protobuf.message.Message):
         outcome: temporalio.api.activity.v1.message_pb2.ActivityExecutionOutcome
         | None = ...,
         long_poll_token: builtins.bytes = ...,
+        callbacks: collections.abc.Iterable[
+            temporalio.api.activity.v1.message_pb2.CallbackInfo
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -11353,6 +11612,8 @@ class DescribeActivityExecutionResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "callbacks",
+            b"callbacks",
             "info",
             b"info",
             "input",
@@ -11527,6 +11788,8 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     SERVICE_FIELD_NUMBER: builtins.int
     OPERATION_FIELD_NUMBER: builtins.int
     SCHEDULE_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
+    SCHEDULE_TO_START_TIMEOUT_FIELD_NUMBER: builtins.int
+    START_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
     ID_REUSE_POLICY_FIELD_NUMBER: builtins.int
     ID_CONFLICT_POLICY_FIELD_NUMBER: builtins.int
@@ -11554,7 +11817,26 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     @property
     def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Schedule-to-close timeout for this operation.
-        This is the only timeout settable for a Nexus operation.
+        Indicates how long the caller is willing to wait for operation completion.
+        Calls are retried internally by the server.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    @property
+    def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-start timeout for this operation.
+        Indicates how long the caller is willing to wait for the operation to be started (or completed if synchronous)
+        by the handler.
+        If not set or zero, no schedule-to-start timeout is enforced.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    @property
+    def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Start-to-close timeout for this operation.
+        Indicates how long the caller is willing to wait for an asynchronous operation to complete after it has been
+        started. Synchronous operations ignore this timeout.
+        If not set or zero, no start-to-close timeout is enforced.
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
@@ -11603,6 +11885,8 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
         service: builtins.str = ...,
         operation: builtins.str = ...,
         schedule_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        schedule_to_start_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        start_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         input: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         id_reuse_policy: temporalio.api.enums.v1.nexus_pb2.NexusOperationIdReusePolicy.ValueType = ...,
         id_conflict_policy: temporalio.api.enums.v1.nexus_pb2.NexusOperationIdConflictPolicy.ValueType = ...,
@@ -11619,8 +11903,12 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
             b"input",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
             "search_attributes",
             b"search_attributes",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
             "user_metadata",
             b"user_metadata",
         ],
@@ -11650,10 +11938,14 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
             b"request_id",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
             "search_attributes",
             b"search_attributes",
             "service",
             b"service",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
             "user_metadata",
             b"user_metadata",
         ],
@@ -11703,7 +11995,7 @@ class DescribeNexusOperationExecutionRequest(google.protobuf.message.Message):
     include_outcome: builtins.bool
     """Include the outcome (result/failure) in the response if the operation has completed."""
     long_poll_token: builtins.bytes
-    """Token from a previous DescribeNexusOperationExecutionResponse. If present, long-poll until operation
+    """Token from a previous DescribeNexusOperationExecutionResponse. If present, this RPC will long-poll until operation
     state changes from the state encoded in this token. If absent, return current state immediately.
     If present, run_id must also be present.
     Note that operation state may change multiple times between requests, therefore it is not

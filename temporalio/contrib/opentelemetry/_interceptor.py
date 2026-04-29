@@ -341,6 +341,60 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
 
             return await super().start_update_with_start_workflow(input)
 
+    async def start_activity(
+        self, input: temporalio.client.StartActivityInput
+    ) -> temporalio.client.ActivityHandle[Any]:
+        with self.root._start_as_current_span(
+            f"StartActivity:{input.activity_type}",
+            attributes={
+                "temporalActivityID": input.id,
+                "temporalActivityType": input.activity_type,
+            },
+            input_with_headers=input,
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            return await super().start_activity(input)
+
+    async def cancel_activity(
+        self, input: temporalio.client.CancelActivityInput
+    ) -> None:
+        with self.root._start_as_current_span(
+            "CancelActivity",
+            attributes={"temporalActivityID": input.activity_id},
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            return await super().cancel_activity(input)
+
+    async def terminate_activity(
+        self, input: temporalio.client.TerminateActivityInput
+    ) -> None:
+        with self.root._start_as_current_span(
+            "TerminateActivity",
+            attributes={"temporalActivityID": input.activity_id},
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            return await super().terminate_activity(input)
+
+    async def describe_activity(
+        self, input: temporalio.client.DescribeActivityInput
+    ) -> temporalio.client.ActivityExecutionDescription:
+        with self.root._start_as_current_span(
+            "DescribeActivity",
+            attributes={"temporalActivityID": input.activity_id},
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            return await super().describe_activity(input)
+
+    async def count_activities(
+        self, input: temporalio.client.CountActivitiesInput
+    ) -> temporalio.client.ActivityExecutionCount:
+        with self.root._start_as_current_span(
+            "CountActivities",
+            attributes={},
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            return await super().count_activities(input)
+
 
 class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterceptor):
     def __init__(
