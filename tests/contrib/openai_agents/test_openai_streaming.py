@@ -47,7 +47,7 @@ from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.openai_agents import ModelActivityParameters
 from temporalio.contrib.openai_agents.testing import AgentEnvironment
-from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamClient
+from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 from tests.helpers import new_worker
 
 logger = logging.getLogger(__name__)

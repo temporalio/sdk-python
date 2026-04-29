@@ -8,7 +8,7 @@ from google.adk.models.llm_response import LlmResponse
 
 import temporalio.workflow
 from temporalio import activity, workflow
-from temporalio.contrib.workflow_stream import WorkflowStreamClient
+from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ActivityConfig
 
@@ -121,7 +121,7 @@ class TemporalModel(BaseLlm):
                 callers invoke ``generate_content_async(stream=True)``;
                 if ``None``, the streaming call raises before scheduling
                 an activity. The workflow must host a
-                :class:`temporalio.contrib.workflow_stream.WorkflowStream`
+                :class:`temporalio.contrib.workflow_streams.WorkflowStream`
                 to receive the publishes; otherwise the signals are
                 unhandled and dropped. Streaming support is
                 experimental and may change in future versions.

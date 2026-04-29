@@ -1,4 +1,4 @@
-"""Regression guards for the workflow_stream Payload wire format.
+"""Regression guards for the workflow_streams Payload wire format.
 
 1. The default JSON converter does not handle ``Payload`` embedded in a
    dataclass — serialization fails with ``TypeError``. This rules out a

@@ -23,7 +23,7 @@ from google.genai.types import Content, Part
 from temporalio import workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
-from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamClient
+from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 from temporalio.worker import Worker
 
 logger = logging.getLogger(__name__)

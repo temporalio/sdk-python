@@ -1,4 +1,4 @@
-"""E2E integration tests for temporalio.contrib.workflow_stream."""
+"""E2E integration tests for temporalio.contrib.workflow_streams."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
 from temporalio.common import RawValue
-from temporalio.contrib.workflow_stream import (
+from temporalio.contrib.workflow_streams import (
     PollInput,
     PollResult,
     PublishEntry,
@@ -38,7 +38,7 @@ from temporalio.contrib.workflow_stream import (
     WorkflowStreamItem,
     WorkflowStreamState,
 )
-from temporalio.contrib.workflow_stream._types import _encode_payload
+from temporalio.contrib.workflow_streams._types import _encode_payload
 from temporalio.converter import DataConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
@@ -1163,7 +1163,7 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
         clock = [0.0]
         with (
             patch(
-                "temporalio.contrib.workflow_stream._client.time.monotonic",
+                "temporalio.contrib.workflow_streams._client.time.monotonic",
                 side_effect=lambda: clock[0],
             ),
             patch.object(handle, "signal", side_effect=maybe_failing_signal),

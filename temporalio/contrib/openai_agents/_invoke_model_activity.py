@@ -44,7 +44,7 @@ from typing_extensions import Required, TypedDict
 
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
-from temporalio.contrib.workflow_stream import WorkflowStreamClient
+from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
 

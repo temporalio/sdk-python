@@ -12,9 +12,9 @@ See :py:class:`WorkflowStream` for the workflow-side stream object and
 :py:class:`WorkflowStreamClient` for the external client interface.
 """
 
-from temporalio.contrib.workflow_stream._client import WorkflowStreamClient
-from temporalio.contrib.workflow_stream._stream import WorkflowStream
-from temporalio.contrib.workflow_stream._types import (
+from temporalio.contrib.workflow_streams._client import WorkflowStreamClient
+from temporalio.contrib.workflow_streams._stream import WorkflowStream
+from temporalio.contrib.workflow_streams._types import (
     PollInput,
     PollResult,
     PublishEntry,
