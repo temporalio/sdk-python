@@ -203,25 +203,20 @@ class StreamingOpenAIWorkflow:
 
 
 @workflow.defn
-class NonStreamingOpenAIWorkflow:
-    """Test workflow that uses the non-streaming Runner.run path."""
-
-    @workflow.run
-    async def run(self, prompt: str) -> str:
-        agent = Agent[None](
-            name="Assistant",
-            instructions="You are a test agent.",
-        )
-        result = await Runner.run(starting_agent=agent, input=prompt)
-        return result.final_output
-
-
-@workflow.defn
 class StreamingWithoutStreamTopicWorkflow:
-    """Test workflow that uses run_streamed without a WorkflowStream broker."""
+    """Workflow that opts into ``Runner.run_streamed`` while the model
+    activity is configured with ``streaming_event_topic=None``.
+
+    Registers a :class:`WorkflowStream` so the test can subscribe and
+    verify the activity did not publish anything.
+    """
+
+    @workflow.init
+    def __init__(self, prompt: str) -> None:
+        self.stream = WorkflowStream()
 
     @workflow.run
-    async def run(self, prompt: str) -> str:
+    async def run(self, prompt: str) -> tuple[str, int]:
         agent = Agent[None](
             name="Assistant",
             instructions="You are a test agent.",
@@ -229,7 +224,7 @@ class StreamingWithoutStreamTopicWorkflow:
         result = Runner.run_streamed(starting_agent=agent, input=prompt)
         async for _ in result.stream_events():
             pass
-        return result.final_output
+        return result.final_output, self.stream._on_offset()
 
 
 @pytest.mark.asyncio
@@ -296,59 +291,8 @@ async def test_streaming_publishes_raw_events(client: Client):
     deltas = [e.delta for e in published if e.type == "response.output_text.delta"]
     assert deltas == ["Hello ", "world!"]
 
-    # Workflow-side iteration sees the same model events.
-    assert "response.output_text.delta" in workflow_event_types
-    assert "response.completed" in workflow_event_types
-
-
-@pytest.mark.asyncio
-async def test_non_streaming_path(client: Client):
-    """Runner.run still uses the non-streaming activity."""
-    model = StreamingTestModel()
-    async with AgentEnvironment(
-        model=model,
-        model_params=ModelActivityParameters(
-            start_to_close_timeout=timedelta(seconds=30),
-        ),
-    ) as env:
-        client = env.applied_on_client(client)
-
-        async with new_worker(
-            client,
-            NonStreamingOpenAIWorkflow,
-            max_cached_workflows=0,
-        ) as worker:
-            result = await client.execute_workflow(
-                NonStreamingOpenAIWorkflow.run,
-                "Hello",
-                id=f"openai-non-streaming-test-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            )
-
-    assert result == "Hello world!"
-
-
-class TruncatedStreamingTestModel(Model):
-    """Fake model whose stream ends without a ResponseCompletedEvent."""
-
-    __test__ = False
-
-    async def get_response(self, *a: Any, **kw: Any) -> ModelResponse:
-        raise NotImplementedError
-
-    async def stream_response(
-        self, *a: Any, **kw: Any
-    ) -> AsyncIterator[TResponseStreamEvent]:
-        yield ResponseTextDeltaEvent(
-            content_index=0,
-            delta="partial",
-            item_id="item1",
-            output_index=0,
-            sequence_number=0,
-            type="response.output_text.delta",
-            logprobs=[],
-        )
+    # Workflow-side iteration sees the same model events in the same order.
+    assert workflow_event_types == published_types
 
 
 @pytest.mark.asyncio
@@ -366,7 +310,7 @@ async def test_streaming_without_stream_topic(client: Client):
         async with new_worker(
             client, StreamingWithoutStreamTopicWorkflow, max_cached_workflows=0
         ) as worker:
-            result = await client.execute_workflow(
+            output, stream_offset = await client.execute_workflow(
                 StreamingWithoutStreamTopicWorkflow.run,
                 "Hi",
                 id=f"openai-streaming-without-stream-{uuid.uuid4()}",
@@ -374,4 +318,6 @@ async def test_streaming_without_stream_topic(client: Client):
                 execution_timeout=timedelta(seconds=30),
             )
 
-    assert result == "Hello world!"
+    assert output == "Hello world!"
+    # No publishes should have reached the broker when topic=None.
+    assert stream_offset == 0

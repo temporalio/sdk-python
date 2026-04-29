@@ -1,8 +1,8 @@
 """Integration tests for ADK streaming support.
 
 Verifies that the streaming model activity publishes raw ``LlmResponse``
-chunks via the WorkflowStream broker and that non-streaming mode remains
-backward-compatible.
+chunks via the WorkflowStream broker. Non-streaming behavior is covered
+by ``test_google_adk_agents.py``.
 """
 
 import asyncio
@@ -39,6 +39,12 @@ class StreamingTestModel(BaseLlm):
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
+        # The streaming activity must call us with stream=True; if a
+        # regression drops the flag this test should fail.
+        if not stream:
+            raise AssertionError(
+                "StreamingTestModel.generate_content_async requires stream=True"
+            )
         yield LlmResponse(content=Content(role="model", parts=[Part(text="Hello ")]))
         yield LlmResponse(content=Content(role="model", parts=[Part(text="world!")]))
 
@@ -71,38 +77,6 @@ class StreamingAdkWorkflow:
             session_id=session.id,
             new_message=Content(role="user", parts=[Part(text=prompt)]),
             run_config=RunConfig(streaming_mode=StreamingMode.SSE),
-        ):
-            if event.content and event.content.parts:
-                for part in event.content.parts:
-                    if part.text:
-                        final_text = part.text
-
-        return final_text
-
-
-@workflow.defn
-class NonStreamingAdkWorkflow:
-    """Test workflow without streaming."""
-
-    @workflow.run
-    async def run(self, prompt: str) -> str:
-        model = TemporalModel("streaming_test_model")
-        agent = Agent(
-            name="test_agent",
-            model=model,
-            instruction="You are a test agent.",
-        )
-
-        runner = InMemoryRunner(agent=agent, app_name="test-app")
-        session = await runner.session_service.create_session(
-            app_name="test-app", user_id="test"
-        )
-
-        final_text = ""
-        async for event in runner.run_async(
-            user_id="test",
-            session_id=session.id,
-            new_message=Content(role="user", parts=[Part(text=prompt)]),
         ):
             if event.content and event.content.parts:
                 for part in event.content.parts:
@@ -155,7 +129,8 @@ async def test_streaming_publishes_events(client: Client):
         result = await handle.result()
         await asyncio.wait_for(collect_task, timeout=10.0)
 
-    assert result is not None
+    # Workflow assembles streamed parts; the last part it observes is "world!".
+    assert result == "world!"
 
     texts: list[str] = []
     for r in responses:
@@ -164,30 +139,3 @@ async def test_streaming_publishes_events(client: Client):
                 if part.text:
                     texts.append(part.text)
     assert texts == ["Hello ", "world!"], f"Unexpected text deltas: {texts}"
-
-
-@pytest.mark.asyncio
-async def test_non_streaming_backward_compatible(client: Client):
-    """Verify non-streaming mode still works (backward compatibility)."""
-    LLMRegistry.register(StreamingTestModel)
-
-    new_config = client.config()
-    new_config["plugins"] = [GoogleAdkPlugin()]
-    client = Client(**new_config)
-
-    async with Worker(
-        client,
-        task_queue="adk-non-streaming-test",
-        workflows=[NonStreamingAdkWorkflow],
-        max_cached_workflows=0,
-    ):
-        handle = await client.start_workflow(
-            NonStreamingAdkWorkflow.run,
-            "Hello",
-            id=f"adk-non-streaming-test-{uuid.uuid4()}",
-            task_queue="adk-non-streaming-test",
-            execution_timeout=timedelta(seconds=30),
-        )
-        result = await handle.result()
-
-    assert result is not None
