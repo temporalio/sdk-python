@@ -156,26 +156,12 @@ class WorkflowStream:
         )
         workflow.set_query_handler(_OFFSET_QUERY, self._on_offset)
 
-    def publish(self, topic: str, value: Any) -> None:
-        """Publish an item from within workflow code.
-
-        .. deprecated::
-            Prefer :meth:`topic` and :meth:`WorkflowTopicHandle.publish`.
-            The handle form carries the value type, which is needed
-            for cross-language SDK consistency.
-
-        ``value`` may be any Python value the workflow's payload
-        converter can handle, or a pre-built
-        :class:`temporalio.api.common.v1.Payload` for zero-copy.
-
-        The codec chain is not applied here (it runs on the
-        ``__temporal_workflow_stream_poll`` update envelope that later
-        delivers the item to a subscriber).
-        """
-        self._publish_to_topic(topic, value)
-
     def _publish_to_topic(self, topic: str, value: Any) -> None:
-        """Internal publish path shared by :meth:`publish` and topic handles."""
+        """Internal publish path used by :class:`WorkflowTopicHandle`.
+
+        Not part of the public API — call
+        :meth:`WorkflowTopicHandle.publish` instead.
+        """
         if isinstance(value, Payload):
             payload = value
         else:

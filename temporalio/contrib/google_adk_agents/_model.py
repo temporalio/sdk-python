@@ -79,13 +79,14 @@ async def invoke_model_streaming(
     stream = WorkflowStreamClient.from_within_activity(
         batch_interval=input.streaming_event_batch_interval,
     )
+    events = stream.topic(input.streaming_event_topic, type=LlmResponse)
     async with stream:
         async for response in llm.generate_content_async(
             llm_request=llm_request, stream=True
         ):
             activity.heartbeat()
             responses.append(response)
-            stream.publish(input.streaming_event_topic, response)
+            events.publish(response)
 
     return responses
 

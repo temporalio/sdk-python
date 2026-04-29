@@ -101,7 +101,7 @@ class ActivityPublishWorkflow:
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.stream.publish("status", b"activity_done")
+        self.stream.topic("status", type=bytes).publish(b"activity_done")
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -125,7 +125,9 @@ class StructuredPublishWorkflow:
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.stream.publish("events", AgentEvent(kind="tick", payload={"i": i}))
+            self.stream.topic("events", type=AgentEvent).publish(
+                AgentEvent(kind="tick", payload={"i": i})
+            )
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -164,7 +166,7 @@ class WorkflowSidePublishWorkflow:
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.stream.publish("events", f"item-{i}".encode())
+            self.stream.topic("events", type=bytes).publish(f"item-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -203,14 +205,14 @@ class InterleavedWorkflow:
 
     @workflow.run
     async def run(self, count: int) -> None:
-        self.stream.publish("status", b"started")
+        self.stream.topic("status", type=bytes).publish(b"started")
         await workflow.execute_activity(
             "publish_items",
             count,
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.stream.publish("status", b"done")
+        self.stream.topic("status", type=bytes).publish(b"done")
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -280,7 +282,7 @@ class MaxBatchWorkflow:
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.stream.publish("status", b"activity_done")
+        self.stream.topic("status", type=bytes).publish(b"activity_done")
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -349,7 +351,7 @@ async def publish_items(count: int) -> None:
     async with client:
         for i in range(count):
             activity.heartbeat()
-            client.publish("events", f"item-{i}".encode())
+            client.topic("events", type=bytes).publish(f"item-{i}".encode())
 
 
 @activity.defn(name="publish_multi_topic")
@@ -362,7 +364,7 @@ async def publish_multi_topic(count: int) -> None:
         for i in range(count):
             activity.heartbeat()
             topic = topics[i % len(topics)]
-            client.publish(topic, f"{topic}-{i}".encode())
+            client.topic(topic, type=bytes).publish(f"{topic}-{i}".encode())
 
 
 @activity.defn(name="publish_with_priority")
@@ -376,9 +378,9 @@ async def publish_with_priority() -> None:
         batch_interval=timedelta(seconds=60)
     )
     async with client:
-        client.publish("events", b"normal-0")
-        client.publish("events", b"normal-1")
-        client.publish("events", b"priority", force_flush=True)
+        client.topic("events", type=bytes).publish(b"normal-0")
+        client.topic("events", type=bytes).publish(b"normal-1")
+        client.topic("events", type=bytes).publish(b"priority", force_flush=True)
         for _ in range(100):
             activity.heartbeat()
             await asyncio.sleep(0.1)
@@ -392,7 +394,7 @@ async def publish_batch_test(count: int) -> None:
     async with client:
         for i in range(count):
             activity.heartbeat()
-            client.publish("events", f"item-{i}".encode())
+            client.topic("events", type=bytes).publish(f"item-{i}".encode())
 
 
 @activity.defn(name="publish_with_max_batch")
@@ -403,7 +405,7 @@ async def publish_with_max_batch(count: int) -> None:
     async with client:
         for i in range(count):
             activity.heartbeat()
-            client.publish("events", f"item-{i}".encode())
+            client.topic("events", type=bytes).publish(f"item-{i}".encode())
             # Yield so the flusher task can run when max_batch_size triggers
             # _flush_event. Real workloads (e.g. agents awaiting LLM streams)
             # yield constantly; a tight loop with no awaits would never let
@@ -1085,9 +1087,9 @@ async def test_explicit_flush_barrier(client: Client) -> None:
 
             # 2. Flush makes prior publishes visible without waiting on
             # the 60s batch timer.
-            stream.publish("events", b"a")
-            stream.publish("events", b"b")
-            stream.publish("events", b"c")
+            stream.topic("events", type=bytes).publish(b"a")
+            stream.topic("events", type=bytes).publish(b"b")
+            stream.topic("events", type=bytes).publish(b"c")
             await stream.flush()
             assert await stream.get_offset() == 3
 
@@ -1279,14 +1281,14 @@ async def test_flush_retry_preserves_items_after_failures(
             return await real_signal(*args, **kwargs)
 
         with patch.object(handle, "signal", side_effect=maybe_failing_signal):
-            stream.publish("events", b"item-0")
-            stream.publish("events", b"item-1")
+            stream.topic("events", type=bytes).publish(b"item-0")
+            stream.topic("events", type=bytes).publish(b"item-1")
             with pytest.raises(RuntimeError):
                 await stream._flush()
 
             # Publish more during the failed state — must not overtake the
             # pending retry on eventual delivery.
-            stream.publish("events", b"item-2")
+            stream.topic("events", type=bytes).publish(b"item-2")
             with pytest.raises(RuntimeError):
                 await stream._flush()
 
@@ -1336,7 +1338,7 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
             ),
             patch.object(handle, "signal", side_effect=maybe_failing_signal),
         ):
-            stream.publish("events", b"lost")
+            stream.topic("events", type=bytes).publish(b"lost")
 
             # First flush fails and enters the pending-retry state.
             with pytest.raises(RuntimeError):
@@ -1351,7 +1353,7 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
 
             # Stop failing signals; subsequent publishes must succeed.
             fail_signals = False
-            stream.publish("events", b"kept")
+            stream.topic("events", type=bytes).publish(b"kept")
             await stream._flush()
 
         items = await collect_items(client, handle, None, 0, 1)
@@ -1586,7 +1588,7 @@ class TruncateWorkflow:
         self.stream = WorkflowStream()
         self._closed = False
         for i in range(prepub_count):
-            self.stream.publish("events", f"item-{i}".encode())
+            self.stream.topic("events", type=bytes).publish(f"item-{i}".encode())
 
     @workflow.signal
     def close(self) -> None:
@@ -1890,7 +1892,7 @@ class BrokerWorkflow:
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.stream.publish("events", f"broker-{i}".encode())
+            self.stream.topic("events", type=bytes).publish(f"broker-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -2001,7 +2003,7 @@ async def standalone_publish_to_broker(input: StandalonePublishInput) -> None:
     async with client:
         for i in range(input.count):
             activity.heartbeat()
-            client.publish("events", f"standalone-{i}".encode())
+            client.topic("events", type=bytes).publish(f"standalone-{i}".encode())
 
 
 @activity.defn(name="standalone_subscribe_to_broker")
@@ -2187,7 +2189,7 @@ class NexusBrokerWorkflow:
     @workflow.run
     async def run(self, count: int) -> str:
         for i in range(count):
-            self.stream.publish("events", f"nexus-{i}".encode())
+            self.stream.topic("events", type=bytes).publish(f"nexus-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
         return "done"
 

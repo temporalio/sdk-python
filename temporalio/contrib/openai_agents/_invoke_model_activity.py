@@ -6,7 +6,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 import enum
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 from agents import (
     AgentOutputSchemaBase,
@@ -373,6 +373,11 @@ class ModelActivity:
         stream = WorkflowStreamClient.from_within_activity(
             batch_interval=batch_interval
         )
+        # TResponseStreamEvent is a typing.Annotated[Union[...]] — a typing
+        # special form, not a class — so it cannot be passed as type[T].
+        # Use Any here; subscribers that want typed decode can pass
+        # result_type=TResponseStreamEvent on their own subscribe call.
+        events_topic = stream.topic(topic, type=cast("type[Any]", cast(object, Any)))
         async with stream:
             try:
                 async for event in model.stream_response(
@@ -388,7 +393,7 @@ class ModelActivity:
                     prompt=input.get("prompt"),
                 ):
                     events.append(event)
-                    stream.publish(topic, event)
+                    events_topic.publish(event)
             except APIStatusError as e:
                 _raise_for_openai_status(e)
 

@@ -62,13 +62,14 @@ class WorkflowStreamClient:
     :py:meth:`from_within_activity` (infer both from the current activity
     context), or by passing a handle directly to the constructor.
 
-    For publishing, use as an async context manager to get automatic
-    batching::
+    For publishing, bind a typed topic handle and use the client as
+    an async context manager to get automatic batching::
 
         client = WorkflowStreamClient.create(temporal_client, workflow_id)
+        events = client.topic("events", type=MyEvent)
         async with client:
-            client.publish("events", my_event)
-            client.publish("events", another_event, force_flush=True)
+            events.publish(my_event)
+            events.publish(another_event, force_flush=True)
             ...  # more publishing
         # Buffer is flushed automatically on context manager exit.
 
@@ -230,34 +231,14 @@ class WorkflowStreamClient:
         while self._pending is not None or self._buffer:
             await self._flush()
 
-    def publish(self, topic: str, value: Any, force_flush: bool = False) -> None:
-        """Buffer a message for publishing.
-
-        .. deprecated::
-            Prefer :meth:`topic` and :meth:`TopicHandle.publish`. The
-            handle form carries the value type, which is needed for
-            cross-language SDK consistency.
-
-        ``value`` may be any Python value the client's payload
-        converter can handle, or a pre-built
-        :class:`temporalio.api.common.v1.Payload` for zero-copy. The
-        codec chain is not applied per item — it runs once on the
-        signal envelope that delivers the batch.
-
-        Args:
-            topic: Topic string.
-            value: Value to publish. Converted to a ``Payload`` via
-                the client's sync payload converter at flush time.
-                Pre-built ``Payload`` instances bypass conversion.
-            force_flush: If True, wake the flusher to send immediately
-                (fire-and-forget — does not block the caller).
-        """
-        self._publish_to_topic(topic, value, force_flush=force_flush)
-
     def _publish_to_topic(
         self, topic: str, value: Any, *, force_flush: bool = False
     ) -> None:
-        """Internal publish path shared by :meth:`publish` and topic handles."""
+        """Internal publish path used by :class:`TopicHandle`.
+
+        Not part of the public API — call
+        :meth:`TopicHandle.publish` instead.
+        """
         self._buffer.append((topic, value))
         if force_flush or (
             self._max_batch_size is not None
