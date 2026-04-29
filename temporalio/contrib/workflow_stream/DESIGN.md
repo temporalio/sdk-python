@@ -1,6 +1,9 @@
 # Temporal Workflow Streams — Design Document
 
-Consolidated design document reflecting the current implementation.
+Consolidated design document reflecting the current implementation. This
+document is aimed at SDK contributors and reviewers — it captures rationale,
+internals, and wire format. User-facing documentation lives at
+[Workflow Streams — Python SDK](https://docs.temporal.io/develop/python/workflows/workflow-stream).
 
 > The Python code in `sdk-python/temporalio/contrib/workflow_stream/` is authoritative.
 > Both this document and the Notion page
