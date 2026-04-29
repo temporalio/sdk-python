@@ -310,13 +310,14 @@ class WorkflowStreamClient:
         if there is nothing to send.
 
         This is in addition to the declarative ``force_flush=True`` on
-        :py:meth:`publish` and to the automatic flush on context-manager
-        exit. Use this when you need a synchronization point — proof
-        that prior publications have reached the server — at a moment
-        that does not naturally correspond to a specific event.
+        :py:meth:`TopicHandle.publish` and to the automatic flush on
+        context-manager exit. Use this when you need a synchronization
+        point — proof that prior publications have reached the
+        server — at a moment that does not naturally correspond to a
+        specific event.
 
-        Safe to call concurrently with ``publish()`` and with the
-        background flusher: the flush lock serializes signal sends.
+        Safe to call concurrently with topic-handle publishes and with
+        the background flusher: the flush lock serializes signal sends.
         Items added concurrently after entry may piggyback on this
         flush or be deferred to a subsequent one.
 

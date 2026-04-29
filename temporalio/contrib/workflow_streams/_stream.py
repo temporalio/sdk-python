@@ -12,14 +12,16 @@ For workflows that support continue-as-new, include a
 ``prior_state`` — it is ``None`` on fresh starts and carries accumulated
 state on continue-as-new.
 
-Both workflow-side :meth:`WorkflowStream.publish` and client-side
-:meth:`WorkflowStreamClient.publish` use the synchronous payload converter for
-per-item ``Payload`` construction. The codec chain (e.g. encryption,
-compression) is **not** run per item on either side —
-it runs once at the envelope level when Temporal's SDK encodes the
-signal/update that carries the batch. Running it per item as well
-would double-encrypt, because every signal arg already goes through
-the client's ``DataConverter.encode`` at dispatch time.
+Workflow-side and client-side topic handles
+(:meth:`WorkflowTopicHandle.publish` and
+:meth:`TopicHandle.publish`) both use the synchronous payload
+converter for per-item ``Payload`` construction. The codec chain
+(e.g. encryption, compression) is **not** run per item on either
+side — it runs once at the envelope level when Temporal's SDK
+encodes the signal/update that carries the batch. Running it per
+item as well would double-encrypt, because every signal arg
+already goes through the client's ``DataConverter.encode`` at
+dispatch time.
 """
 
 from __future__ import annotations
