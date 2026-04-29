@@ -156,9 +156,7 @@ class WorkflowExecutionInfo(google.protobuf.message.Message):
         Experimental. Versioning info is experimental and might change in the future.
         """
     worker_deployment_name: builtins.str
-    """The name of Worker Deployment that completed the most recent workflow task.
-    Experimental. Worker Deployments are experimental and might change in the future.
-    """
+    """The name of Worker Deployment that completed the most recent workflow task."""
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata"""
@@ -427,6 +425,7 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
     DEPLOYMENT_TRANSITION_FIELD_NUMBER: builtins.int
     VERSION_TRANSITION_FIELD_NUMBER: builtins.int
     REVISION_NUMBER_FIELD_NUMBER: builtins.int
+    CONTINUE_AS_NEW_INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
     behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType
     """Versioning behavior determines how the server should treat this execution when workers are
     upgraded. When present it means this workflow execution is versioned; UNSPECIFIED means
@@ -533,6 +532,20 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
     face the problem of inconsistent dispatching that arises from eventual consistency between
     task queues and their partitions.
     """
+    continue_as_new_initial_versioning_behavior: (
+        temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType
+    )
+    """Experimental.
+    If this workflow is the result of a continue-as-new, this field is set to the initial_versioning_behavior
+    specified in that command.
+    Only used for the initial task of this run and the initial task of any retries of this run.
+    Not passed to children or to future continue-as-new.
+
+    Note: In the first release of Upgrade-on-CaN, when the only ContinueAsNewVersioningBehavior was AutoUpgrade,
+    a non-empty InheritedAutoUpgradeInfo meant that the workflow should start as AutoUpgrade. So for compatibility
+    with ContinueAsNew history commands generated during that time, know that an UNSPECIFIED value here is equivalent
+    to ContinueAsNewVersioningBehaviorAutoUpgrade if the behavior of the workflow is AutoUpgrade.
+    """
     def __init__(
         self,
         *,
@@ -545,6 +558,7 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
         deployment_transition: global___DeploymentTransition | None = ...,
         version_transition: global___DeploymentVersionTransition | None = ...,
         revision_number: builtins.int = ...,
+        continue_as_new_initial_versioning_behavior: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -566,6 +580,8 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "behavior",
             b"behavior",
+            "continue_as_new_initial_versioning_behavior",
+            b"continue_as_new_initial_versioning_behavior",
             "deployment",
             b"deployment",
             "deployment_transition",
@@ -1617,7 +1633,9 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     state: temporalio.api.enums.v1.common_pb2.PendingNexusOperationState.ValueType
     attempt: builtins.int
     """The number of attempts made to deliver the start operation request.
-    This number represents a minimum bound since the attempt is incremented after the request completes.
+    This number is approximate, it is incremented when a task is added to the history queue.
+    In practice, there could be more attempts if a task is executed but fails to commit, or less attempts if a task
+    was never executed.
     """
     @property
     def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
@@ -1822,32 +1840,125 @@ class WorkflowExecutionOptions(google.protobuf.message.Message):
 
     VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     @property
     def versioning_override(self) -> global___VersioningOverride:
         """If set, takes precedence over the Versioning Behavior sent by the SDK on Workflow Task completion."""
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """If set, overrides the workflow's priority sent by the SDK."""
+    @property
+    def time_skipping_config(self) -> global___TimeSkippingConfig:
+        """Time-skipping configuration for this workflow execution.
+        If not set, the time-skipping configuration is not updated by this request;
+        the existing configuration is preserved.
+        """
     def __init__(
         self,
         *,
         versioning_override: global___VersioningOverride | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        time_skipping_config: global___TimeSkippingConfig | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "priority", b"priority", "versioning_override", b"versioning_override"
+            "priority",
+            b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "versioning_override",
+            b"versioning_override",
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "priority", b"priority", "versioning_override", b"versioning_override"
+            "priority",
+            b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "versioning_override",
+            b"versioning_override",
         ],
     ) -> None: ...
 
 global___WorkflowExecutionOptions = WorkflowExecutionOptions
+
+class TimeSkippingConfig(google.protobuf.message.Message):
+    """Configuration for time skipping during a workflow execution.
+    When enabled, virtual time advances automatically whenever there is no in-flight work.
+    In-flight work includes activities, child workflows, Nexus operations, signal/cancel external workflow operations,
+    and possibly other features added in the future.
+    User timers are not classified as in-flight work and will be skipped over.
+    When time advances, it skips to the earlier of the next user timer or the configured bound, if either exists.
+
+    Propagation behavior of time skipping:
+    The enabled flag, bound fields, and accumulated skipped duration are propagated to related executions as follows:
+    (1) Child workflows and continue-as-new: both the configuration and the accumulated skipped duration are
+        inherited from the current execution. The configured bound is shared between the inherited skipped
+        duration and any additional duration skipped by the new run.
+    (2) Retry and cron: the configuration and accumulated skipped duration are inherited as recorded when the
+        current workflow started; the accumulated skipped duration of the current run is not propagated.
+    (3) Reset: the new run retains the time-skipping configuration of the current execution. Because reset replays
+        all events up to the reset point and re-applies any UpdateWorkflowExecutionOptions changes made after that
+        point, the resulting run ends up with the same final time-skipping configuration as the previous run.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENABLED_FIELD_NUMBER: builtins.int
+    MAX_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
+    MAX_ELAPSED_DURATION_FIELD_NUMBER: builtins.int
+    enabled: builtins.bool
+    """Enables or disables time skipping for this workflow execution."""
+    @property
+    def max_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Maximum total virtual time that can be skipped."""
+    @property
+    def max_elapsed_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Maximum elapsed time since time skipping was enabled.
+        This includes both skipped time and real time elapsing.
+        (-- api-linter: core::0142::time-field-names=disabled --)
+        """
+    def __init__(
+        self,
+        *,
+        enabled: builtins.bool = ...,
+        max_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        max_elapsed_duration: google.protobuf.duration_pb2.Duration | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "bound",
+            b"bound",
+            "max_elapsed_duration",
+            b"max_elapsed_duration",
+            "max_skipped_duration",
+            b"max_skipped_duration",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "bound",
+            b"bound",
+            "enabled",
+            b"enabled",
+            "max_elapsed_duration",
+            b"max_elapsed_duration",
+            "max_skipped_duration",
+            b"max_skipped_duration",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["bound", b"bound"]
+    ) -> (
+        typing_extensions.Literal["max_skipped_duration", "max_elapsed_duration"] | None
+    ): ...
+
+global___TimeSkippingConfig = TimeSkippingConfig
 
 class VersioningOverride(google.protobuf.message.Message):
     """Used to override the versioning behavior (and pinned deployment version, if applicable) of a

@@ -25,7 +25,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n$temporal/api/worker/v1/message.proto\x12\x16temporal.api.worker.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(temporal/api/deployment/v1/message.proto\x1a"temporal/api/enums/v1/common.proto"\x82\x01\n\x10WorkerPollerInfo\x12\x17\n\x0f\x63urrent_pollers\x18\x01 \x01(\x05\x12=\n\x19last_successful_poll_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0eis_autoscaling\x18\x03 \x01(\x08"\xf1\x01\n\x0fWorkerSlotsInfo\x12\x1f\n\x17\x63urrent_available_slots\x18\x01 \x01(\x05\x12\x1a\n\x12\x63urrent_used_slots\x18\x02 \x01(\x05\x12\x1a\n\x12slot_supplier_kind\x18\x03 \x01(\t\x12\x1d\n\x15total_processed_tasks\x18\x04 \x01(\x05\x12\x1a\n\x12total_failed_tasks\x18\x05 \x01(\x05\x12%\n\x1dlast_interval_processed_tasks\x18\x06 \x01(\x05\x12#\n\x1blast_interval_failure_tasks\x18\x07 \x01(\x05"\x94\x01\n\x0eWorkerHostInfo\x12\x11\n\thost_name\x18\x01 \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\x05 \x01(\t\x12\x12\n\nprocess_id\x18\x02 \x01(\t\x12\x1e\n\x16\x63urrent_host_cpu_usage\x18\x03 \x01(\x02\x12\x1e\n\x16\x63urrent_host_mem_usage\x18\x04 \x01(\x02"\x8b\n\n\x0fWorkerHeartbeat\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x39\n\thost_info\x18\x03 \x01(\x0b\x32&.temporal.api.worker.v1.WorkerHostInfo\x12\x12\n\ntask_queue\x18\x04 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x06 \x01(\t\x12\x13\n\x0bsdk_version\x18\x07 \x01(\t\x12\x33\n\x06status\x18\x08 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x32\n\x0eheartbeat_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12?\n\x1c\x65lapsed_since_last_heartbeat\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12I\n\x18workflow_task_slots_info\x18\x0c \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12I\n\x18\x61\x63tivity_task_slots_info\x18\r \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x15nexus_task_slots_info\x18\x0e \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12J\n\x19local_activity_slots_info\x18\x0f \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x14workflow_poller_info\x18\x10 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12M\n\x1bworkflow_sticky_poller_info\x18\x11 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x46\n\x14\x61\x63tivity_poller_info\x18\x12 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x43\n\x11nexus_poller_info\x18\x13 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x1e\n\x16total_sticky_cache_hit\x18\x14 \x01(\x05\x12\x1f\n\x17total_sticky_cache_miss\x18\x15 \x01(\x05\x12!\n\x19\x63urrent_sticky_cache_size\x18\x16 \x01(\x05\x12\x33\n\x07plugins\x18\x17 \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\x18 \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo"O\n\nWorkerInfo\x12\x41\n\x10worker_heartbeat\x18\x01 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\xec\x03\n\x0eWorkerListInfo\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x12\n\ntask_queue\x18\x03 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x04 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x05 \x01(\t\x12\x13\n\x0bsdk_version\x18\x06 \x01(\t\x12\x33\n\x06status\x18\x07 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\thost_name\x18\t \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\n \x01(\t\x12\x12\n\nprocess_id\x18\x0b \x01(\t\x12\x33\n\x07plugins\x18\x0c \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\r \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo"+\n\nPluginInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t"!\n\x11StorageDriverInfo\x12\x0c\n\x04type\x18\x01 \x01(\tB\x89\x01\n\x19io.temporal.api.worker.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/worker/v1;worker\xaa\x02\x18Temporalio.Api.Worker.V1\xea\x02\x1bTemporalio::Api::Worker::V1b\x06proto3'
+    b'\n$temporal/api/worker/v1/message.proto\x12\x16temporal.api.worker.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(temporal/api/deployment/v1/message.proto\x1a"temporal/api/enums/v1/common.proto"\x82\x01\n\x10WorkerPollerInfo\x12\x17\n\x0f\x63urrent_pollers\x18\x01 \x01(\x05\x12=\n\x19last_successful_poll_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0eis_autoscaling\x18\x03 \x01(\x08"\xf1\x01\n\x0fWorkerSlotsInfo\x12\x1f\n\x17\x63urrent_available_slots\x18\x01 \x01(\x05\x12\x1a\n\x12\x63urrent_used_slots\x18\x02 \x01(\x05\x12\x1a\n\x12slot_supplier_kind\x18\x03 \x01(\t\x12\x1d\n\x15total_processed_tasks\x18\x04 \x01(\x05\x12\x1a\n\x12total_failed_tasks\x18\x05 \x01(\x05\x12%\n\x1dlast_interval_processed_tasks\x18\x06 \x01(\x05\x12#\n\x1blast_interval_failure_tasks\x18\x07 \x01(\x05"\x94\x01\n\x0eWorkerHostInfo\x12\x11\n\thost_name\x18\x01 \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\x05 \x01(\t\x12\x12\n\nprocess_id\x18\x02 \x01(\t\x12\x1e\n\x16\x63urrent_host_cpu_usage\x18\x03 \x01(\x02\x12\x1e\n\x16\x63urrent_host_mem_usage\x18\x04 \x01(\x02"\x8b\n\n\x0fWorkerHeartbeat\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x39\n\thost_info\x18\x03 \x01(\x0b\x32&.temporal.api.worker.v1.WorkerHostInfo\x12\x12\n\ntask_queue\x18\x04 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x06 \x01(\t\x12\x13\n\x0bsdk_version\x18\x07 \x01(\t\x12\x33\n\x06status\x18\x08 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x32\n\x0eheartbeat_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12?\n\x1c\x65lapsed_since_last_heartbeat\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12I\n\x18workflow_task_slots_info\x18\x0c \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12I\n\x18\x61\x63tivity_task_slots_info\x18\r \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x15nexus_task_slots_info\x18\x0e \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12J\n\x19local_activity_slots_info\x18\x0f \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x14workflow_poller_info\x18\x10 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12M\n\x1bworkflow_sticky_poller_info\x18\x11 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x46\n\x14\x61\x63tivity_poller_info\x18\x12 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x43\n\x11nexus_poller_info\x18\x13 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x1e\n\x16total_sticky_cache_hit\x18\x14 \x01(\x05\x12\x1f\n\x17total_sticky_cache_miss\x18\x15 \x01(\x05\x12!\n\x19\x63urrent_sticky_cache_size\x18\x16 \x01(\x05\x12\x33\n\x07plugins\x18\x17 \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\x18 \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo"O\n\nWorkerInfo\x12\x41\n\x10worker_heartbeat\x18\x01 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\xec\x03\n\x0eWorkerListInfo\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x12\n\ntask_queue\x18\x03 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x04 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x05 \x01(\t\x12\x13\n\x0bsdk_version\x18\x06 \x01(\t\x12\x33\n\x06status\x18\x07 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\thost_name\x18\t \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\n \x01(\t\x12\x12\n\nprocess_id\x18\x0b \x01(\t\x12\x33\n\x07plugins\x18\x0c \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\r \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo"+\n\nPluginInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t"!\n\x11StorageDriverInfo\x12\x0c\n\x04type\x18\x01 \x01(\t"a\n\rWorkerCommand\x12H\n\x0f\x63\x61ncel_activity\x18\x01 \x01(\x0b\x32-.temporal.api.worker.v1.CancelActivityCommandH\x00\x42\x06\n\x04type"+\n\x15\x43\x61ncelActivityCommand\x12\x12\n\ntask_token\x18\x01 \x01(\x0c"f\n\x13WorkerCommandResult\x12G\n\x0f\x63\x61ncel_activity\x18\x01 \x01(\x0b\x32,.temporal.api.worker.v1.CancelActivityResultH\x00\x42\x06\n\x04type"\x16\n\x14\x43\x61ncelActivityResultB\x89\x01\n\x19io.temporal.api.worker.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/worker/v1;worker\xaa\x02\x18Temporalio.Api.Worker.V1\xea\x02\x1bTemporalio::Api::Worker::V1b\x06proto3'
 )
 
 
@@ -37,6 +37,10 @@ _WORKERINFO = DESCRIPTOR.message_types_by_name["WorkerInfo"]
 _WORKERLISTINFO = DESCRIPTOR.message_types_by_name["WorkerListInfo"]
 _PLUGININFO = DESCRIPTOR.message_types_by_name["PluginInfo"]
 _STORAGEDRIVERINFO = DESCRIPTOR.message_types_by_name["StorageDriverInfo"]
+_WORKERCOMMAND = DESCRIPTOR.message_types_by_name["WorkerCommand"]
+_CANCELACTIVITYCOMMAND = DESCRIPTOR.message_types_by_name["CancelActivityCommand"]
+_WORKERCOMMANDRESULT = DESCRIPTOR.message_types_by_name["WorkerCommandResult"]
+_CANCELACTIVITYRESULT = DESCRIPTOR.message_types_by_name["CancelActivityResult"]
 WorkerPollerInfo = _reflection.GeneratedProtocolMessageType(
     "WorkerPollerInfo",
     (_message.Message,),
@@ -125,6 +129,50 @@ StorageDriverInfo = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(StorageDriverInfo)
 
+WorkerCommand = _reflection.GeneratedProtocolMessageType(
+    "WorkerCommand",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _WORKERCOMMAND,
+        "__module__": "temporalio.api.worker.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.WorkerCommand)
+    },
+)
+_sym_db.RegisterMessage(WorkerCommand)
+
+CancelActivityCommand = _reflection.GeneratedProtocolMessageType(
+    "CancelActivityCommand",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _CANCELACTIVITYCOMMAND,
+        "__module__": "temporalio.api.worker.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.CancelActivityCommand)
+    },
+)
+_sym_db.RegisterMessage(CancelActivityCommand)
+
+WorkerCommandResult = _reflection.GeneratedProtocolMessageType(
+    "WorkerCommandResult",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _WORKERCOMMANDRESULT,
+        "__module__": "temporalio.api.worker.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.WorkerCommandResult)
+    },
+)
+_sym_db.RegisterMessage(WorkerCommandResult)
+
+CancelActivityResult = _reflection.GeneratedProtocolMessageType(
+    "CancelActivityResult",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _CANCELACTIVITYRESULT,
+        "__module__": "temporalio.api.worker.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.CancelActivityResult)
+    },
+)
+_sym_db.RegisterMessage(CancelActivityResult)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.worker.v1B\014MessageProtoP\001Z#go.temporal.io/api/worker/v1;worker\252\002\030Temporalio.Api.Worker.V1\352\002\033Temporalio::Api::Worker::V1"
@@ -144,4 +192,12 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _PLUGININFO._serialized_end = 2648
     _STORAGEDRIVERINFO._serialized_start = 2650
     _STORAGEDRIVERINFO._serialized_end = 2683
+    _WORKERCOMMAND._serialized_start = 2685
+    _WORKERCOMMAND._serialized_end = 2782
+    _CANCELACTIVITYCOMMAND._serialized_start = 2784
+    _CANCELACTIVITYCOMMAND._serialized_end = 2827
+    _WORKERCOMMANDRESULT._serialized_start = 2829
+    _WORKERCOMMANDRESULT._serialized_end = 2931
+    _CANCELACTIVITYRESULT._serialized_start = 2933
+    _CANCELACTIVITYRESULT._serialized_end = 2955
 # @@protoc_insertion_point(module_scope)

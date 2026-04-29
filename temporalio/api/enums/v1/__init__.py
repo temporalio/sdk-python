@@ -32,7 +32,13 @@ from .failed_cause_pb2 import (
     WorkflowTaskFailedCause,
 )
 from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
-from .nexus_pb2 import NexusHandlerErrorRetryBehavior
+from .nexus_pb2 import (
+    NexusHandlerErrorRetryBehavior,
+    NexusOperationExecutionStatus,
+    NexusOperationIdConflictPolicy,
+    NexusOperationIdReusePolicy,
+    NexusOperationWaitStage,
+)
 from .query_pb2 import QueryRejectCondition, QueryResultType
 from .reset_pb2 import ResetReapplyExcludeType, ResetReapplyType, ResetType
 from .schedule_pb2 import ScheduleOverlapPolicy
@@ -85,6 +91,10 @@ __all__ = [
     "NamespaceState",
     "NexusHandlerErrorRetryBehavior",
     "NexusOperationCancellationState",
+    "NexusOperationExecutionStatus",
+    "NexusOperationIdConflictPolicy",
+    "NexusOperationIdReusePolicy",
+    "NexusOperationWaitStage",
     "ParentClosePolicy",
     "PendingActivityState",
     "PendingNexusOperationState",

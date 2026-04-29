@@ -943,7 +943,7 @@ class CancelActivityWorkflow:
             self._activity_result = await handle
         except ActivityError as err:
             self._activity_result = f"Error: {err.cause.__class__.__name__}"
-        # TODO(cretz): Remove when https://github.com/temporalio/sdk-core/issues/323 is fixed
+        # TODO(cretz): Remove when https://github.com/temporalio/sdk-rust/issues/323 is fixed
         except CancelledError as err:
             self._activity_result = f"Error: {err.__class__.__name__}"
         # Wait forever
@@ -2430,7 +2430,7 @@ async def test_workflow_dataclass_typed(client: Client, env: WorkflowEnvironment
     # TODO(cretz): Fix
     if env.supports_time_skipping:
         pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-core/issues/390"
+            "Java test server: https://github.com/temporalio/sdk-rust/issues/390"
         )
     async with new_worker(
         client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
@@ -7246,7 +7246,7 @@ async def test_workflow_deadlock_interruptible(client: Client):
     # TODO(cretz): Improve this test and other deadlock/eviction tests by
     # checking slot counts with Core. There are a couple of bugs where used slot
     # counts are off by one and slots are released before eviction (see
-    # https://github.com/temporalio/sdk-core/issues/894).
+    # https://github.com/temporalio/sdk-rust/issues/894).
 
     # This worker used to not be able to shutdown because we hung evictions on
     # deadlock

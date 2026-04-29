@@ -6,6 +6,7 @@ from collections.abc import Sequence
 import pytest
 
 from temporalio.api.common.v1 import Payload
+from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.converter import (
     DataConverter,
     ExternalStorage,
@@ -16,8 +17,25 @@ from temporalio.converter import (
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
 )
-from temporalio.converter._extstore import _StorageReference
+from temporalio.converter._extstore import _REFERENCE_ENCODING, _StorageReference
+from temporalio.converter._payload_converter import JSONProtoPayloadConverter
 from temporalio.exceptions import ApplicationError
+
+_legacy_ref_converter = JSONPlainPayloadConverter(encoding=_REFERENCE_ENCODING.decode())
+
+
+def _make_legacy_payload(
+    driver_name: str, claim_data: dict[str, str], size_bytes: int
+) -> Payload:
+    """Build a reference payload in the legacy ``json/external-storage-reference`` format."""
+    ref = _StorageReference(
+        driver_name=driver_name,
+        driver_claim=StorageDriverClaim(claim_data=claim_data),
+    )
+    payload = _legacy_ref_converter.to_payload(ref)
+    assert payload is not None
+    payload.external_payloads.add().size_bytes = size_bytes
+    return payload
 
 
 class InMemoryTestDriver(StorageDriver):
@@ -115,7 +133,7 @@ class TestDataConverterExternalStorage:
         assert driver._retrieve_calls == 1
 
     async def test_extstore_reference_structure(self):
-        """Test that external storage creates proper reference structure."""
+        """Externalized payloads are written as ExternalStorageReference proto (json/protobuf encoding)."""
         converter = DataConverter(
             external_storage=ExternalStorage(
                 drivers=[InMemoryTestDriver("test-driver")],
@@ -123,25 +141,19 @@ class TestDataConverterExternalStorage:
             )
         )
 
-        # Create large payload
         large_value = "x" * 100
         encoded = await converter.encode([large_value])
 
-        # Verify reference structure
         reference_payload = encoded[0]
         assert len(reference_payload.external_payloads) > 0
+        assert reference_payload.metadata.get("encoding") == b"json/protobuf"
 
-        # The payload should contain a serialized _ExternalStorageReference
-        # Deserialize it to verify structure using the same encoding
-        claim_converter = JSONPlainPayloadConverter(
-            encoding="json/external-storage-reference"
+        reference = JSONProtoPayloadConverter().from_payload(
+            reference_payload, ExternalStorageReference
         )
-        reference = claim_converter.from_payload(reference_payload, _StorageReference)
-
-        assert isinstance(reference, _StorageReference)
-        assert "test-driver" == reference.driver_name
-        assert isinstance(reference.driver_claim, StorageDriverClaim)
-        assert "key" in reference.driver_claim.claim_data
+        assert isinstance(reference, ExternalStorageReference)
+        assert reference.driver_name == "test-driver"
+        assert "key" in reference.claim_data
 
     async def test_extstore_composite_conditional(self):
         """Test using multiple drivers based on size."""
@@ -482,9 +494,10 @@ class TestMultiDriver:
         assert second._store_calls == 0
 
         # The reference in history names the first driver.
-        ref = JSONPlainPayloadConverter(
-            encoding="json/external-storage-reference"
-        ).from_payload(encoded[0], _StorageReference)
+        ref = JSONProtoPayloadConverter().from_payload(
+            encoded[0], ExternalStorageReference
+        )
+        assert isinstance(ref, ExternalStorageReference)
         assert ref.driver_name == "driver-first"
 
         # Retrieval also goes to the first driver.
@@ -692,6 +705,100 @@ class TestMultiDriver:
                 drivers=[driver],
                 payload_size_threshold=threshold,
             )
+
+
+class TestBackwardCompat:
+    """Tests that the retrieval path handles the legacy ``json/external-storage-reference``
+    format for in-flight workflows written before the ExternalStorageReference proto."""
+
+    async def test_legacy_format_single_payload_decode(self):
+        """A single payload in the legacy reference format is retrieved correctly."""
+        driver = InMemoryTestDriver()
+
+        inner_payload = (await DataConverter().encode(["x" * 200]))[0]
+        stored_key = "payload-0"
+        driver._storage[stored_key] = inner_payload.SerializeToString()
+
+        legacy_payload = _make_legacy_payload(
+            driver_name=driver.name(),
+            claim_data={"key": stored_key},
+            size_bytes=inner_payload.ByteSize(),
+        )
+
+        converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=100,
+            )
+        )
+        decoded = await converter.decode([legacy_payload], [str])
+        assert decoded[0] == "x" * 200
+        assert driver._retrieve_calls == 1
+
+    async def test_legacy_and_new_format_mixed_batch_decode(self):
+        """A batch containing legacy-format, new proto-format, and inline payloads
+        all decode correctly in a single call."""
+        driver = InMemoryTestDriver()
+        converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=50,
+            )
+        )
+
+        new_value = "new-format-value" * 20
+        inline_value = "small"
+        encoded = await converter.encode([new_value, inline_value])
+        new_format_payload = encoded[0]
+        inline_payload = encoded[1]
+        assert driver._store_calls == 1
+
+        legacy_value = "legacy-format-value" * 20
+        legacy_inner = (await DataConverter().encode([legacy_value]))[0]
+        stored_key = f"payload-{len(driver._storage)}"
+        driver._storage[stored_key] = legacy_inner.SerializeToString()
+        legacy_payload = _make_legacy_payload(
+            driver_name=driver.name(),
+            claim_data={"key": stored_key},
+            size_bytes=legacy_inner.ByteSize(),
+        )
+
+        decoded = await converter.decode(
+            [legacy_payload, new_format_payload, inline_payload], [str, str, str]
+        )
+        assert decoded[0] == legacy_value
+        assert decoded[1] == new_value
+        assert decoded[2] == inline_value
+        # Both external payloads share the same driver and are batched into one retrieve call.
+        assert driver._retrieve_calls == 1
+
+    async def test_new_format_encode_round_trips(self):
+        """Payloads written with the new ExternalStorageReference format round-trip
+        correctly and carry the expected proto encoding."""
+        driver = InMemoryTestDriver()
+        converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=50,
+            )
+        )
+
+        value = "round-trip-value" * 20
+        encoded = await converter.encode([value])
+        ref_payload = encoded[0]
+
+        assert ref_payload.metadata.get("encoding") == b"json/protobuf"
+        assert len(ref_payload.external_payloads) > 0
+
+        ref = JSONProtoPayloadConverter().from_payload(
+            ref_payload, ExternalStorageReference
+        )
+        assert isinstance(ref, ExternalStorageReference)
+        assert ref.driver_name == driver.name()
+        assert "key" in ref.claim_data
+
+        decoded = await converter.decode(encoded, [str])
+        assert decoded[0] == value
 
 
 if __name__ == "__main__":
