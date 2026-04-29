@@ -187,7 +187,15 @@ class ActivityModelInput(TypedDict, total=False):
     previous_response_id: str | None
     conversation_id: str | None
     prompt: Any | None
-    streaming_event_topic: str | None
+
+
+class StreamingActivityModelInput(ActivityModelInput, total=False):
+    """Input for the invoke_model_activity_streaming activity.
+
+    Adds the streaming-only fields on top of :class:`ActivityModelInput`.
+    """
+
+    streaming_event_topic: Required[str]
     streaming_event_batch_interval: timedelta
 
 
@@ -331,7 +339,7 @@ class ModelActivity:
     @activity.defn
     @_auto_heartbeater
     async def invoke_model_activity_streaming(
-        self, input: ActivityModelInput
+        self, input: StreamingActivityModelInput
     ) -> list[TResponseStreamEvent]:
         """Streaming-aware model activity.
 
@@ -345,11 +353,9 @@ class ModelActivity:
         framework, which builds the final ``ModelResponse`` from the
         terminal ``ResponseCompletedEvent``.
 
-        When ``streaming_event_topic`` is set, each event is also
-        published to the workflow's stream so external consumers
-        (UIs, tracing, etc.) can observe events as they arrive. Set the
-        topic to ``None`` to skip publishing entirely; in that case no
-        :class:`WorkflowStreamClient` is constructed.
+        Each event is also published to the workflow's stream on
+        ``streaming_event_topic`` so external consumers (UIs, tracing,
+        etc.) can observe events as they arrive.
 
         Heartbeats run on a background task via ``_auto_heartbeater`` so
         long initial-token latency or long pauses between chunks do not
@@ -358,12 +364,14 @@ class ModelActivity:
         model = self._model_provider.get_model(input.get("model_name"))
         tools, handoffs = _build_tools_and_handoffs(input)
 
-        topic = input.get("streaming_event_topic")
+        topic = input["streaming_event_topic"]
+        batch_interval = input.get(
+            "streaming_event_batch_interval", timedelta(milliseconds=100)
+        )
         events: list[TResponseStreamEvent] = []
 
-        async def consume(
-            stream: WorkflowStreamClient | None, topic: str | None
-        ) -> None:
+        stream = WorkflowStreamClient.from_activity(batch_interval=batch_interval)
+        async with stream:
             try:
                 async for event in model.stream_response(
                     system_instructions=input.get("system_instructions"),
@@ -378,21 +386,8 @@ class ModelActivity:
                     prompt=input.get("prompt"),
                 ):
                     events.append(event)
-                    if stream is not None and topic is not None:
-                        stream.publish(topic, event)
+                    stream.publish(topic, event)
             except APIStatusError as e:
                 _raise_for_openai_status(e)
-
-        if topic is None:
-            await consume(None, None)
-        else:
-            batch_interval = input.get(
-                "streaming_event_batch_interval", timedelta(milliseconds=100)
-            )
-            stream = WorkflowStreamClient.from_activity(
-                batch_interval=batch_interval,
-            )
-            async with stream:
-                await consume(stream, topic)
 
         return events

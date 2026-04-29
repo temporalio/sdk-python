@@ -589,15 +589,16 @@ through `RunResultStreaming.stream_events()`, which wraps them in the
 agents-SDK `StreamEvent` union (so raw model events arrive as
 `RawResponsesStreamEvent.data`).
 
-External consumers (UIs, tracing pipelines, etc.) can observe events as
+External consumers (UIs, tracing pipelines, etc.) observe events as
 they arrive by hosting a [`WorkflowStream`](../workflow_stream/README.md)
 in the workflow and subscribing with `WorkflowStreamClient`. The
 streaming activity publishes each event to the topic configured on
-`ModelActivityParameters.streaming_event_topic` (defaults to `None`,
-which disables publishing; set it to a topic string such as `"events"`
-to publish).
+`ModelActivityParameters.streaming_event_topic`. The topic is required
+when using `Runner.run_streamed`; calling it without a configured topic
+raises before any activity is scheduled.
 
-Workflow-side iteration via `stream_events()` requires no stream:
+Example workflow consuming events via `stream_events()` while the
+streaming activity publishes to the `"events"` topic:
 
 ```python
 from agents import Agent, Runner

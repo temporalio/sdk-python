@@ -44,7 +44,7 @@ from openai.types.responses.response_usage import (
 from openai.types.shared.response_format_text import ResponseFormatText
 
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.openai_agents import ModelActivityParameters
 from temporalio.contrib.openai_agents.testing import AgentEnvironment
 from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamClient
@@ -203,20 +203,16 @@ class StreamingOpenAIWorkflow:
 
 
 @workflow.defn
-class StreamingWithoutStreamTopicWorkflow:
+class StreamingRequiresTopicWorkflow:
     """Workflow that opts into ``Runner.run_streamed`` while the model
-    activity is configured with ``streaming_event_topic=None``.
+    plugin was configured without a ``streaming_event_topic``.
 
-    Registers a :class:`WorkflowStream` so the test can subscribe and
-    verify the activity did not publish anything.
+    The stub raises before scheduling the streaming activity; this
+    propagates out of ``Runner.run_streamed`` and fails the workflow.
     """
 
-    @workflow.init
-    def __init__(self, prompt: str) -> None:
-        self.stream = WorkflowStream()
-
     @workflow.run
-    async def run(self, prompt: str) -> tuple[str, int]:
+    async def run(self, prompt: str) -> str:
         agent = Agent[None](
             name="Assistant",
             instructions="You are a test agent.",
@@ -224,7 +220,7 @@ class StreamingWithoutStreamTopicWorkflow:
         result = Runner.run_streamed(starting_agent=agent, input=prompt)
         async for _ in result.stream_events():
             pass
-        return result.final_output, self.stream._on_offset()
+        return result.final_output
 
 
 @pytest.mark.asyncio
@@ -296,9 +292,10 @@ async def test_streaming_publishes_raw_events(client: Client):
 
 
 @pytest.mark.asyncio
-async def test_streaming_without_stream_topic(client: Client):
-    """Setting streaming_event_topic=None disables publishing; the
-    workflow can still consume events via stream_events()."""
+async def test_streaming_requires_topic(client: Client):
+    """``Runner.run_streamed`` fails fast when the plugin has no topic
+    configured. The error is raised in ``stream_response`` before any
+    streaming activity is scheduled."""
     async with AgentEnvironment(
         model=StreamingTestModel(),
         model_params=ModelActivityParameters(
@@ -308,16 +305,44 @@ async def test_streaming_without_stream_topic(client: Client):
     ) as env:
         client = env.applied_on_client(client)
         async with new_worker(
-            client, StreamingWithoutStreamTopicWorkflow, max_cached_workflows=0
+            client, StreamingRequiresTopicWorkflow, max_cached_workflows=0
         ) as worker:
-            output, stream_offset = await client.execute_workflow(
-                StreamingWithoutStreamTopicWorkflow.run,
-                "Hi",
-                id=f"openai-streaming-without-stream-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            )
+            with pytest.raises(WorkflowFailureError) as exc_info:
+                await client.execute_workflow(
+                    StreamingRequiresTopicWorkflow.run,
+                    "Hi",
+                    id=f"openai-streaming-requires-topic-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
 
-    assert output == "Hello world!"
-    # No publishes should have reached the broker when topic=None.
-    assert stream_offset == 0
+    assert "streaming_event_topic" in str(exc_info.value.cause)
+
+
+@pytest.mark.asyncio
+async def test_streaming_rejects_local_activity(client: Client):
+    """``Runner.run_streamed`` fails fast when the plugin is configured
+    with ``use_local_activity=True``. Local activities support neither
+    heartbeats nor the workflow-stream signal channel."""
+    async with AgentEnvironment(
+        model=StreamingTestModel(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+            streaming_event_topic="events",
+            use_local_activity=True,
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client, StreamingRequiresTopicWorkflow, max_cached_workflows=0
+        ) as worker:
+            with pytest.raises(WorkflowFailureError) as exc_info:
+                await client.execute_workflow(
+                    StreamingRequiresTopicWorkflow.run,
+                    "Hi",
+                    id=f"openai-streaming-rejects-local-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
+
+    assert "use_local_activity" in str(exc_info.value.cause)

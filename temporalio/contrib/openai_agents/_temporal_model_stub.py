@@ -37,6 +37,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     ModelActivity,
     ModelTracingInput,
     ShellToolInput,
+    StreamingActivityModelInput,
     ToolInput,
 )
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
@@ -244,7 +245,14 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
                 "workflow stream signal channel)."
             )
 
-        activity_input, summary = self._build_activity_input(
+        topic = self.model_params.streaming_event_topic
+        if topic is None:
+            raise ValueError(
+                "Runner.run_streamed requires "
+                "ModelActivityParameters.streaming_event_topic to be set."
+            )
+
+        base_input, summary = self._build_activity_input(
             system_instructions=system_instructions,
             input=input,
             model_settings=model_settings,
@@ -256,16 +264,17 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
             conversation_id=conversation_id,
             prompt=prompt,
         )
-        activity_input["streaming_event_topic"] = (
-            self.model_params.streaming_event_topic
-        )
-        activity_input["streaming_event_batch_interval"] = (
-            self.model_params.streaming_event_batch_interval
-        )
+        streaming_input: StreamingActivityModelInput = {
+            **base_input,
+            "streaming_event_topic": topic,
+            "streaming_event_batch_interval": (
+                self.model_params.streaming_event_batch_interval
+            ),
+        }
 
         events = await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity_streaming,
-            activity_input,
+            streaming_input,
             summary=summary,
             task_queue=self.model_params.task_queue,
             schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,

@@ -71,9 +71,9 @@ class ModelActivityParameters:
 
     streaming_event_topic: str | None = None
     """Stream topic to publish raw model stream events to when the workflow
-    calls ``Runner.run_streamed``. Set to ``None`` to skip publishing
-    entirely (workflow-side iteration via ``stream_events()`` still works,
-    no stream required). When set, the workflow must host a
+    calls ``Runner.run_streamed``. Required for ``Runner.run_streamed``;
+    if left as ``None``, ``run_streamed`` raises before scheduling any
+    activity. The workflow must host a
     :class:`temporalio.contrib.workflow_stream.WorkflowStream` to receive
     the publishes; otherwise the signals are unhandled and dropped.
 
@@ -86,8 +86,7 @@ class ModelActivityParameters:
 
     streaming_event_batch_interval: timedelta = timedelta(milliseconds=100)
     """Interval between automatic flushes for the stream publisher used
-    by the streaming activity. Ignored when ``streaming_event_topic`` is
-    ``None``.
+    by the streaming activity.
 
     .. warning::
         Streaming support is experimental and may change in future

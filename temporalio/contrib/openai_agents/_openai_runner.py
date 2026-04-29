@@ -264,6 +264,23 @@ class TemporalOpenAIRunner(AgentRunner):
                 **kwargs,
             )
 
+        # Fail-fast before the agents framework starts a background task:
+        # validation raised inside ``Model.stream_response`` is otherwise
+        # captured into ``RunResultStreaming._stored_exception`` and may
+        # be silently dropped if the queue completion sentinel is read
+        # before the run_loop_task is observed as done.
+        if self.model_params.streaming_event_topic is None:
+            raise AgentsWorkflowError(
+                "Runner.run_streamed requires "
+                "ModelActivityParameters.streaming_event_topic to be set."
+            )
+        if self.model_params.use_local_activity:
+            raise AgentsWorkflowError(
+                "Runner.run_streamed is incompatible with "
+                "use_local_activity (local activities do not support "
+                "heartbeats or the workflow stream signal channel)."
+            )
+
         converted_agent = self._prepare_workflow_run(starting_agent, kwargs)
 
         streamed_result = self._runner.run_streamed(
