@@ -416,6 +416,18 @@ async def test_count_activities_calls_interceptor(
     assert call.query == query
 
 
+async def test_start_activity_rejects_negative_start_delay(client: Client):
+    with pytest.raises(ValueError, match="start_delay must be non-negative"):
+        await client.start_activity(
+            increment,
+            args=(1,),
+            id=str(uuid.uuid4()),
+            task_queue=str(uuid.uuid4()),
+            start_to_close_timeout=timedelta(seconds=5),
+            start_delay=timedelta(seconds=-1),
+        )
+
+
 async def test_get_result(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(

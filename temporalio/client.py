@@ -8449,6 +8449,8 @@ class _ClientImpl(OutboundInterceptor):
             raise ValueError(
                 "Activity must have start_to_close_timeout or schedule_to_close_timeout"
             )
+        if input.start_delay is not None and input.start_delay < timedelta(0):
+            raise ValueError("start_delay must be non-negative")
         req = await self._build_start_activity_execution_request(input)
 
         resp: temporalio.api.workflowservice.v1.StartActivityExecutionResponse
