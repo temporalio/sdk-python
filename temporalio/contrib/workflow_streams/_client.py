@@ -23,7 +23,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypeVar
 
 from typing_extensions import Self
 
@@ -38,6 +38,7 @@ from temporalio.client import (
 )
 from temporalio.converter import DataConverter, PayloadConverter
 
+from ._topic_handle import TopicHandle
 from ._types import (
     PollInput,
     PollResult,
@@ -47,6 +48,8 @@ from ._types import (
     _decode_payload,
     _encode_payload,
 )
+
+T = TypeVar("T")
 
 
 class WorkflowStreamClient:
@@ -121,6 +124,7 @@ class WorkflowStreamClient:
         self._pending: list[PublishEntry] | None = None
         self._pending_seq: int = 0
         self._pending_since: float | None = None
+        self._topic_types: dict[str, type[Any]] = {}
 
     @classmethod
     def create(
@@ -229,6 +233,11 @@ class WorkflowStreamClient:
     def publish(self, topic: str, value: Any, force_flush: bool = False) -> None:
         """Buffer a message for publishing.
 
+        .. deprecated::
+            Prefer :meth:`topic` and :meth:`TopicHandle.publish`. The
+            handle form carries the value type, which is needed for
+            cross-language SDK consistency.
+
         ``value`` may be any Python value the client's payload
         converter can handle, or a pre-built
         :class:`temporalio.api.common.v1.Payload` for zero-copy. The
@@ -243,12 +252,59 @@ class WorkflowStreamClient:
             force_flush: If True, wake the flusher to send immediately
                 (fire-and-forget — does not block the caller).
         """
+        self._publish_to_topic(topic, value, force_flush=force_flush)
+
+    def _publish_to_topic(
+        self, topic: str, value: Any, *, force_flush: bool = False
+    ) -> None:
+        """Internal publish path shared by :meth:`publish` and topic handles."""
         self._buffer.append((topic, value))
         if force_flush or (
             self._max_batch_size is not None
             and len(self._buffer) >= self._max_batch_size
         ):
             self._flush_event.set()
+
+    def topic(self, name: str, *, type: type[T]) -> TopicHandle[T]:
+        """Return a typed handle for publishing to and subscribing from ``name``.
+
+        The handle records the topic name and value type so call sites
+        do not have to repeat them. Each :class:`WorkflowStreamClient`
+        instance binds a topic name to exactly one ``T``: a second call
+        with an unequal type raises ``RuntimeError``. Repeating the
+        same call with the same type is idempotent and returns an
+        equivalent handle.
+
+        Type uniformity is checked only on this client instance — it
+        does not coordinate across processes. The check uses Python
+        equality on the type object; subtype and union-superset
+        relationships are not recognized.
+
+        For heterogeneous topics or dynamic-topic forwarders, pass
+        ``type=typing.Any`` (or ``type=Payload`` for the zero-copy
+        passthrough case).
+
+        Args:
+            name: Topic name.
+            type: Value type bound to this handle. Used as the
+                ``result_type`` when subscribing through the handle.
+
+        Returns:
+            :class:`TopicHandle` bound to ``name`` and ``type``.
+
+        Raises:
+            RuntimeError: If ``name`` is already bound on this client
+                to a different type.
+        """
+        existing = self._topic_types.get(name)
+        if existing is not None and existing != type:
+            raise RuntimeError(
+                f"Topic {name!r} is already bound to type {existing!r} on this "
+                f"client; refusing to rebind to {type!r}. Use a single type "
+                f"per topic, or pass type=Any/Payload for heterogeneous topics."
+            )
+        self._topic_types[name] = type
+        return TopicHandle(self, name, type)
 
     async def flush(self) -> None:
         """Flush buffered (and pending) items and wait for server confirmation.

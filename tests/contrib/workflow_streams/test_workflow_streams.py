@@ -7,7 +7,7 @@ import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 if sys.version_info >= (3, 11):
@@ -33,10 +33,12 @@ from temporalio.contrib.workflow_streams import (
     PollResult,
     PublishEntry,
     PublishInput,
+    TopicHandle,
     WorkflowStream,
     WorkflowStreamClient,
     WorkflowStreamItem,
     WorkflowStreamState,
+    WorkflowTopicHandle,
 )
 from temporalio.contrib.workflow_streams._types import _encode_payload
 from temporalio.converter import DataConverter
@@ -124,6 +126,27 @@ class StructuredPublishWorkflow:
     async def run(self, count: int) -> None:
         for i in range(count):
             self.stream.publish("events", AgentEvent(kind="tick", payload={"i": i}))
+        await workflow.wait_condition(lambda: self._closed)
+
+
+@workflow.defn
+class TopicHandlePublishWorkflow:
+    """Workflow that publishes via the workflow-side topic handle."""
+
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.stream = WorkflowStream()
+        self.events = self.stream.topic("events", type=AgentEvent)
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.run
+    async def run(self, count: int) -> None:
+        for i in range(count):
+            self.events.publish(AgentEvent(kind="tick", payload={"i": i}))
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -530,6 +553,143 @@ async def test_subscribe_default_decode_and_raw_value(client: Client) -> None:
             assert item.data.payload.data  # non-empty serialized JSON bytes
 
         await handle.signal(StructuredPublishWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_topic_handle_workflow_side_publish_and_subscribe(
+    client: Client,
+) -> None:
+    """Workflow publishes via WorkflowStream.topic; client subscribes via TopicHandle."""
+    count = 3
+    async with new_worker(client, TopicHandlePublishWorkflow) as worker:
+        handle = await client.start_workflow(
+            TopicHandlePublishWorkflow.run,
+            count,
+            id=f"workflow-stream-topic-handle-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        stream = WorkflowStreamClient.create(client, handle.id)
+        events = stream.topic("events", type=AgentEvent)
+        assert isinstance(events, TopicHandle)
+        assert events.name == "events"
+        assert events.type is AgentEvent
+
+        items: list[WorkflowStreamItem] = []
+        async with _async_timeout(15.0):
+            async for item in events.subscribe(poll_cooldown=timedelta(0)):
+                items.append(item)
+                if len(items) >= count:
+                    break
+        assert [item.data for item in items] == [
+            AgentEvent(kind="tick", payload={"i": i}) for i in range(count)
+        ]
+
+        await handle.signal(TopicHandlePublishWorkflow.close)
+
+
+@workflow.defn
+class TopicHandleUniquenessWorkflow:
+    """Probes the WorkflowStream.topic uniqueness check in @workflow.init.
+
+    Returns a tuple (idempotent_ok, error_message) so the test can assert
+    both branches: same-type rebind is silent, different-type rebind raises.
+    """
+
+    @workflow.init
+    def __init__(self) -> None:
+        self.stream = WorkflowStream()
+        first = self.stream.topic("events", type=AgentEvent)
+        self._idempotent_ok = (
+            isinstance(
+                self.stream.topic("events", type=AgentEvent), WorkflowTopicHandle
+            )
+            and first.type is AgentEvent
+        )
+        try:
+            self.stream.topic("events", type=bytes)
+        except RuntimeError as exc:
+            self._error = str(exc)
+        else:
+            self._error = ""
+
+    @workflow.run
+    async def run(self) -> tuple[bool, str]:
+        return (self._idempotent_ok, self._error)
+
+
+@pytest.mark.asyncio
+async def test_topic_handle_uniqueness_on_workflow_stream(client: Client) -> None:
+    """Same-type rebind is idempotent; different-type rebind raises in @workflow.init."""
+    async with new_worker(client, TopicHandleUniquenessWorkflow) as worker:
+        idempotent_ok, error = await client.execute_workflow(
+            TopicHandleUniquenessWorkflow.run,
+            id=f"workflow-stream-handle-unique-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert idempotent_ok is True
+        assert "already bound to type" in error
+        assert "events" in error
+
+
+@pytest.mark.asyncio
+async def test_topic_handle_client_uniqueness(client: Client) -> None:
+    """Re-binding a topic name to a different type on a client raises."""
+    handle = client.get_workflow_handle("nonexistent-workflow-id")
+    stream = WorkflowStreamClient(handle)
+
+    first = stream.topic("events", type=AgentEvent)
+    assert first.name == "events"
+    assert first.type is AgentEvent
+
+    # Same type is idempotent.
+    again = stream.topic("events", type=AgentEvent)
+    assert again.type is AgentEvent
+
+    # Different type raises.
+    with pytest.raises(RuntimeError, match="already bound to type"):
+        stream.topic("events", type=bytes)
+
+    # Different topic with a different type is fine.
+    other = stream.topic("other", type=bytes)
+    assert other.type is bytes
+
+    # Any escape hatch coexists on a different topic. ``Any`` is a
+    # typing special form, not a class, so cast through ``object`` to
+    # satisfy ``type[T]`` — the runtime check uses Python equality and
+    # accepts ``Any`` directly.
+    raw = stream.topic("forwarded", type=cast(type[Any], cast(object, Any)))
+    assert raw.type is Any
+
+
+@pytest.mark.asyncio
+async def test_topic_handle_payload_passthrough(client: Client) -> None:
+    """Pre-built Payloads pass through topic.publish regardless of bound type."""
+    count = 2
+    async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
+        handle = await client.start_workflow(
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-handle-payload-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        stream = WorkflowStreamClient.create(
+            client, handle.id, batch_interval=timedelta(milliseconds=50)
+        )
+        events = stream.topic("events", type=bytes)
+        async with stream:
+            converter = DataConverter.default.payload_converter
+            for i in range(count):
+                payload = converter.to_payloads([f"raw-{i}".encode()])[0]
+                events.publish(payload)
+            await stream.flush()
+
+        items = await collect_items(client, handle, ["events"], 0, count)
+        assert [item.data for item in items] == [
+            f"raw-{i}".encode() for i in range(count)
+        ]
+
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
