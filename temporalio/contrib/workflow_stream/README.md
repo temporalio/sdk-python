@@ -7,12 +7,13 @@ durable, offset-addressed event channel built from Signals and polling Updates
 with an SSE bridge. Cost scales with durable batches, not tokens. Latency is
 around 100ms per roundtrip; not for ultra-low-latency voice.
 
-Workflows sometimes need to push incremental updates to external observers.
-Examples include providing customer updates during order processing, creating
-interactive experiences with AI agents, or reporting progress from a
-long-running data pipeline. Temporal's core primitives (workflows, signals, and
-updates) already provide the building blocks, but wiring up batching, offset
-tracking, topic filtering, and continue-as-new hand-off is non-trivial.
+Workflows and associated Activities sometimes need to push incremental updates
+to external observers. Examples include providing customer updates during order
+processing, creating interactive experiences with AI agents, or reporting
+progress from a long-running data pipeline. Temporal's core primitives
+(workflows, signals, and updates) already provide the building blocks, but
+wiring up batching, offset tracking, topic filtering, and continue-as-new
+hand-off is non-trivial.
 
 This module packages that boilerplate into a reusable workflow-side stream and
 external client. The workflow maintains an append-only log. Applications can
@@ -71,7 +72,9 @@ compression, and any other codec transforms are applied once each way.
 
 Use `WorkflowStreamClient.from_activity()` with the async context manager for
 batched publishing. The Temporal client and target workflow ID are taken
-from the activity context:
+from the activity context. The target workflow must construct a
+`WorkflowStream` from `@workflow.init`; otherwise the publish signals
+are unhandled and dropped.
 
 ```python
 from datetime import timedelta
