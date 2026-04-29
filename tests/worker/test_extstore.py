@@ -27,7 +27,6 @@ from temporalio.converter import (
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
-    StorageWarning,
 )
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
@@ -406,23 +405,18 @@ async def test_replay_extstore_history_fails_without_extstore(
     )
     history = await handle.fetch_history()
 
-    # Replay without external storage — the reference payload cannot be decoded.
-    # The middleware emits a StorageWarning when it encounters a reference payload
-    # with no driver configured.
-    with pytest.warns(
-        StorageWarning,
-        match=r"^\[TMPRL1105\] Detected externally stored payload\(s\) but external storage is not configured\.$",
-    ):
-        result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
-            history, raise_on_replay_failure=False
-        )
-    # Must be a task-failure RuntimeError, not a NondeterminismError — external
-    # storage decode failures are distinct from workflow code changes.
+    # Replay without external storage: decode_activation raises when it
+    # encounters a reference payload with no driver configured, producing a
+    # task failure (not a NondeterminismError).
+    result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
+        history, raise_on_replay_failure=False
+    )
     assert isinstance(result.replay_failure, RuntimeError)
     assert not isinstance(result.replay_failure, workflow.NondeterminismError)
-    # The message is the full activation-completion failure string; the
-    # "Failed decoding arguments" text from _convert_payloads is embedded in it.
-    assert "Failed decoding arguments" in result.replay_failure.args[0]
+    assert (
+        "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured."
+        in result.replay_failure.args[0]
+    )
 
 
 async def test_replay_extstore_history_succeeds_with_correct_extstore(
@@ -483,9 +477,9 @@ async def test_replay_extstore_history_fails_with_empty_driver(
 async def test_replay_extstore_activity_result_fails_without_extstore(
     env: WorkflowEnvironment,
 ) -> None:
-    """A history where only the activity result was stored externally (the
-    workflow input is small enough to be inline) also fails to replay without
-    external storage — verifying that mid-workflow decode failures are caught."""
+    """A history where only the activity result was stored externally also fails
+    to replay without external storage, verifying that mid-workflow reference
+    payloads are caught regardless of whether the workflow uses the result."""
     driver = InMemoryTestDriver()
     handle = await _run_extstore_workflow_and_fetch_history(
         env,
@@ -496,22 +490,17 @@ async def test_replay_extstore_activity_result_fails_without_extstore(
     history = await handle.fetch_history()
 
     # Replay without external storage.  The workflow input decodes fine, but
-    # when the ActivityTaskCompleted result is delivered back to the workflow
-    # coroutine it cannot be decoded.
-    with pytest.warns(
-        StorageWarning,
-        match=r"^\[TMPRL1105\] Detected externally stored payload\(s\) but external storage is not configured\.$",
-    ):
-        result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
-            history, raise_on_replay_failure=False
-        )
-    # Mid-workflow decode failure is still a task failure (RuntimeError), not
-    # nondeterminism.
+    # decode_activation raises when the ActivityTaskCompleted reference payload
+    # is encountered, producing a task failure (not a NondeterminismError).
+    result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
+        history, raise_on_replay_failure=False
+    )
     assert isinstance(result.replay_failure, RuntimeError)
     assert not isinstance(result.replay_failure, workflow.NondeterminismError)
-    # The message is the full activation-completion failure string; the
-    # "Failed decoding arguments" text from _convert_payloads is embedded in it.
-    assert "Failed decoding arguments" in result.replay_failure.args[0]
+    assert (
+        "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured."
+        in result.replay_failure.args[0]
+    )
 
 
 async def test_extstore_chained_activities(

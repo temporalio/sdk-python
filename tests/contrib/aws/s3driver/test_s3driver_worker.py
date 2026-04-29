@@ -506,4 +506,4 @@ async def test_s3_store_failure_surfaces_in_workflow_history(
     msg = app_error.message
     assert f"S3StorageDriver store failed [bucket={bad_bucket}, key=" in msg
     assert f"/wt/LargeOutputNoRetryWorkflow/wi/{workflow_id}/ri/" in msg
-    assert f"/d/sha256/{expected_hash}]" in msg
+    assert f"/d/sha256/{expected_hash}, region={REGION}]" in msg
