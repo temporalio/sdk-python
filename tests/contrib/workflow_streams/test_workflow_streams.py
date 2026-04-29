@@ -656,12 +656,16 @@ async def test_topic_handle_client_uniqueness(client: Client) -> None:
     other = stream.topic("other", type=bytes)
     assert other.type is bytes
 
-    # Any escape hatch coexists on a different topic. ``Any`` is a
-    # typing special form, not a class, so cast through ``object`` to
-    # satisfy ``type[T]`` — the runtime check uses Python equality and
-    # accepts ``Any`` directly.
-    raw = stream.topic("forwarded", type=cast(type[Any], cast(object, Any)))
+    # Any escape hatch coexists on a different topic. Omitting ``type``
+    # is the documented form (defaults to ``typing.Any``); we also
+    # exercise the explicit ``type=Any`` path with the cast required
+    # because ``Any`` is a typing special form rather than a class.
+    raw = stream.topic("forwarded")
     assert raw.type is Any
+    explicit = stream.topic(
+        "forwarded-explicit", type=cast(type[Any], cast(object, Any))
+    )
+    assert explicit.type is Any
 
     # Binding to Payload itself is rejected — subscribers would have
     # no decode path. Pre-built Payload values can still be published

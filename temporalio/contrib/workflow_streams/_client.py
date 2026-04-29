@@ -23,7 +23,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from datetime import timedelta
-from typing import Any, TypeVar
+from typing import Any, TypeVar, overload
 
 from typing_extensions import Self
 
@@ -246,12 +246,19 @@ class WorkflowStreamClient:
         ):
             self._flush_event.set()
 
-    def topic(self, name: str, *, type: type[T]) -> TopicHandle[T]:
+    @overload
+    def topic(self, name: str) -> TopicHandle[Any]: ...
+    @overload
+    def topic(self, name: str, *, type: type[T]) -> TopicHandle[T]: ...
+
+    def topic(
+        self, name: str, *, type: type[T] | None = None
+    ) -> TopicHandle[T] | TopicHandle[Any]:
         """Return a typed handle for publishing to and subscribing from ``name``.
 
         The handle records the topic name and value type so call sites
         do not have to repeat them. Each :class:`WorkflowStreamClient`
-        instance binds a topic name to exactly one ``T``: a second call
+        instance binds a topic name to exactly one type: a second call
         with an unequal type raises ``RuntimeError``. Repeating the
         same call with the same type is idempotent and returns an
         equivalent handle.
@@ -261,46 +268,53 @@ class WorkflowStreamClient:
         equality on the type object; subtype and union-superset
         relationships are not recognized.
 
-        For heterogeneous topics or dynamic-topic forwarders, pass
-        ``type=typing.Any``; subscribers receive the converter's
-        default decoded value. Pre-built ``Payload`` values can be
-        passed to :meth:`TopicHandle.publish` regardless of the bound
-        type (zero-copy fast path) — there is no need to bind the
-        topic to ``Payload`` itself, and doing so would break the
-        subscribe path (use ``result_type=RawValue`` on
-        :meth:`subscribe` if you need raw payloads on a subscriber).
+        Omitting ``type`` (or passing ``type=typing.Any``) is the
+        documented escape hatch for heterogeneous topics or
+        dynamic-topic forwarders: the handle accepts any value, and
+        subscribers receive the converter's default decoded value.
+        Pre-built ``Payload`` values can be passed to
+        :meth:`TopicHandle.publish` regardless of the bound type
+        (zero-copy fast path) — there is no need to bind the topic to
+        ``Payload`` itself, and doing so would break the subscribe
+        path (use ``result_type=RawValue`` on
+        :meth:`WorkflowStreamClient.subscribe` if you need raw
+        payloads on a subscriber).
 
         Args:
             name: Topic name.
             type: Value type bound to this handle. Used as the
                 ``result_type`` when subscribing through the handle.
+                Defaults to ``typing.Any`` (heterogeneous topic).
 
         Returns:
-            :class:`TopicHandle` bound to ``name`` and ``type``.
+            :class:`TopicHandle` bound to ``name`` and the resolved
+            type.
 
         Raises:
             RuntimeError: If ``name`` is already bound on this client
                 to a different type.
         """
-        if type is Payload:
+        bound: Any = Any if type is None else type
+        if bound is Payload:
             raise RuntimeError(
                 "Cannot bind a topic to type=Payload: the payload converter "
                 "has no Payload decode path, so TopicHandle.subscribe would "
                 "fail. Pre-built Payload values can be passed to "
                 "TopicHandle.publish on any-typed handle (zero-copy fast "
-                "path); use type=typing.Any for heterogeneous topics, and "
-                "subscribe via WorkflowStreamClient.subscribe with "
-                "result_type=RawValue when raw payloads are needed."
+                "path); omit type (or pass type=typing.Any) for "
+                "heterogeneous topics, and subscribe via "
+                "WorkflowStreamClient.subscribe with result_type=RawValue "
+                "when raw payloads are needed."
             )
         existing = self._topic_types.get(name)
-        if existing is not None and existing != type:
+        if existing is not None and existing != bound:
             raise RuntimeError(
                 f"Topic {name!r} is already bound to type {existing!r} on this "
-                f"client; refusing to rebind to {type!r}. Use a single type "
-                f"per topic, or pass type=typing.Any for heterogeneous topics."
+                f"client; refusing to rebind to {bound!r}. Use a single type "
+                f"per topic, or omit type (=typing.Any) for heterogeneous topics."
             )
-        self._topic_types[name] = type
-        return TopicHandle(self, name, type)
+        self._topic_types[name] = bound
+        return TopicHandle(self, name, bound)
 
     async def flush(self) -> None:
         """Flush buffered (and pending) items and wait for server confirmation.

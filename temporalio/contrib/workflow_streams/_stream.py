@@ -29,7 +29,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 from datetime import timedelta
-from typing import Any, Callable, NoReturn, TypeVar
+from typing import Any, Callable, NoReturn, TypeVar, overload
 
 from temporalio import workflow
 from temporalio.api.common.v1 import Payload
@@ -170,14 +170,21 @@ class WorkflowStream:
             payload = workflow.payload_converter().to_payloads([value])[0]
         self._log.append(WorkflowStreamItem(topic=topic, data=payload))
 
-    def topic(self, name: str, *, type: type[T]) -> WorkflowTopicHandle[T]:
+    @overload
+    def topic(self, name: str) -> WorkflowTopicHandle[Any]: ...
+    @overload
+    def topic(self, name: str, *, type: type[T]) -> WorkflowTopicHandle[T]: ...
+
+    def topic(
+        self, name: str, *, type: type[T] | None = None
+    ) -> WorkflowTopicHandle[T] | WorkflowTopicHandle[Any]:
         """Return a typed handle for publishing to ``name`` from this workflow.
 
         The handle records the topic name and value type so call sites
         do not have to repeat them. Each :class:`WorkflowStream`
-        instance binds a topic name to exactly one ``T``: a second
-        call with an unequal type raises ``RuntimeError``. Repeating
-        the same call with the same type is idempotent and returns an
+        instance binds a topic name to exactly one type: a second call
+        with an unequal type raises ``RuntimeError``. Repeating the
+        same call with the same type is idempotent and returns an
         equivalent handle.
 
         Type uniformity is checked only on this stream instance — it
@@ -186,7 +193,8 @@ class WorkflowStream:
         on the type object; subtype and union-superset relationships
         are not recognized.
 
-        For heterogeneous topics, pass ``type=typing.Any``. Pre-built
+        Omitting ``type`` (or passing ``type=typing.Any``) is the
+        documented escape hatch for heterogeneous topics. Pre-built
         ``Payload`` values can be passed to
         :meth:`WorkflowTopicHandle.publish` regardless of the bound
         type (zero-copy fast path) — there is no need to bind the
@@ -194,32 +202,35 @@ class WorkflowStream:
 
         Args:
             name: Topic name.
-            type: Value type bound to this handle.
+            type: Value type bound to this handle. Defaults to
+                ``typing.Any`` (heterogeneous topic).
 
         Returns:
-            :class:`WorkflowTopicHandle` bound to ``name`` and ``type``.
+            :class:`WorkflowTopicHandle` bound to ``name`` and the
+            resolved type.
 
         Raises:
             RuntimeError: If ``name`` is already bound on this stream
                 to a different type.
         """
-        if type is Payload:
+        bound: Any = Any if type is None else type
+        if bound is Payload:
             raise RuntimeError(
                 "Cannot bind a topic to type=Payload. Pre-built Payload "
                 "values can be passed to WorkflowTopicHandle.publish on "
-                "any-typed handle (zero-copy fast path); use "
-                "type=typing.Any for heterogeneous topics."
+                "any-typed handle (zero-copy fast path); omit type (or "
+                "pass type=typing.Any) for heterogeneous topics."
             )
         existing = self._topic_types.get(name)
-        if existing is not None and existing != type:
+        if existing is not None and existing != bound:
             raise RuntimeError(
                 f"Topic {name!r} is already bound to type {existing!r} on this "
-                f"workflow stream; refusing to rebind to {type!r}. Use a "
-                f"single type per topic, or pass type=typing.Any for "
+                f"workflow stream; refusing to rebind to {bound!r}. Use a "
+                f"single type per topic, or omit type (=typing.Any) for "
                 f"heterogeneous topics."
             )
-        self._topic_types[name] = type
-        return WorkflowTopicHandle(self, name, type)
+        self._topic_types[name] = bound
+        return WorkflowTopicHandle(self, name, bound)
 
     def get_state(
         self, *, publisher_ttl: timedelta = timedelta(seconds=900)
