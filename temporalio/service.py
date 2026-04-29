@@ -146,6 +146,7 @@ class ConnectConfig:
     lazy: bool = False
     runtime: temporalio.runtime.Runtime | None = None
     http_connect_proxy_config: HttpConnectProxyConfig | None = None
+    override_origin: str | None = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -203,6 +204,7 @@ class ConnectConfig:
                 if self.http_connect_proxy_config
                 else None
             ),
+            override_origin=self.override_origin,
         )
 
 

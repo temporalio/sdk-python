@@ -1,3 +1,4 @@
+use http::Uri;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -35,6 +36,7 @@ pub struct ClientConfig {
     retry_config: Option<ClientRetryConfig>,
     keep_alive_config: Option<ClientKeepAliveConfig>,
     http_connect_proxy_config: Option<ClientHttpConnectProxyConfig>,
+    override_origin: Option<String>,
 }
 
 #[derive(FromPyObject)]
@@ -253,6 +255,15 @@ impl ClientConfig {
         .maybe_api_key(self.api_key)
         .maybe_tls_options(if let Some(tls_config) = self.tls_config {
             Some(tls_config.try_into()?)
+        } else {
+            None
+        })
+        .maybe_override_origin(if let Some(origin) = self.override_origin {
+            Some(
+                origin
+                    .parse::<Uri>()
+                    .map_err(|err| PyValueError::new_err(format!("invalid override_origin: {err}")))?,
+            )
         } else {
             None
         })

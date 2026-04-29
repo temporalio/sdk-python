@@ -2704,6 +2704,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
+ "http",
  "prost",
  "pyo3",
  "pyo3-async-runtimes",

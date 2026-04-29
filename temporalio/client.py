@@ -139,6 +139,7 @@ class Client:
         lazy: bool = False,
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
+        override_origin: str | None = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> Self:
         """Connect to a Temporal server.
@@ -194,6 +195,12 @@ class Client:
                 used for workers.
             runtime: The runtime for this client, or the default if unset.
             http_connect_proxy_config: Configuration for HTTP CONNECT proxy.
+            override_origin: If set, override the value of the gRPC ``:authority``
+                pseudo-header on every RPC call. Useful when connecting through a
+                local proxy (e.g. an Envoy sidecar) that routes by the
+                ``:authority`` header, while the connection target is something like
+                ``localhost:<port>``. Mirrors ``client.Options.HostPort`` in the Go
+                SDK and ``ConnectionOptions::override_origin`` in Rust Core.
             header_codec_behavior: Encoding behavior for headers sent by the client.
         """
         connect_config = temporalio.service.ConnectConfig(
@@ -207,6 +214,7 @@ class Client:
             lazy=lazy,
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
+            override_origin=override_origin,
         )
 
         def make_lambda(
@@ -2825,6 +2833,7 @@ class ClientConnectConfig(TypedDict, total=False):
     lazy: bool
     runtime: temporalio.runtime.Runtime | None
     http_connect_proxy_config: HttpConnectProxyConfig | None
+    override_origin: str | None
     header_codec_behavior: HeaderCodecBehavior
 
 
@@ -9721,6 +9730,7 @@ class CloudOperationsClient:
         lazy: bool = False,
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
+        override_origin: str | None = None,
     ) -> CloudOperationsClient:
         """Connect to a Temporal Cloud Operations API.
 
@@ -9757,6 +9767,9 @@ class CloudOperationsClient:
                 used for workers.
             runtime: The runtime for this client, or the default if unset.
             http_connect_proxy_config: Configuration for HTTP CONNECT proxy.
+            override_origin: If set, override the value of the gRPC ``:authority``
+                pseudo-header on every RPC call. See :py:meth:`Client.connect` for
+                details.
         """
         # Add version if given
         if version:
@@ -9773,6 +9786,7 @@ class CloudOperationsClient:
             lazy=lazy,
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
+            override_origin=override_origin,
         )
         return CloudOperationsClient(
             await temporalio.service.ServiceClient.connect(connect_config)

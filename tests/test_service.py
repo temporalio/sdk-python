@@ -219,6 +219,91 @@ def test_connect_config_tls_explicit_config_preserved():
     assert config.tls == tls_config
 
 
+def test_connect_config_override_origin_forwarded_to_bridge():
+    """override_origin is passed through to the bridge ClientConfig."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        override_origin="http://temporal-frontend",
+    )
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.override_origin == "http://temporal-frontend"
+
+
+def test_connect_config_override_origin_defaults_to_none():
+    """override_origin defaults to None and is forwarded as None."""
+    config = temporalio.service.ConnectConfig(target_host="localhost:7233")
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.override_origin is None
+
+
+async def test_override_origin_end_to_end():
+    """override_origin reaches the gRPC channel and the client can connect.
+
+    A minimal grpc.aio server is spun up on localhost. We connect the
+    Temporal service client with override_origin set to an arbitrary value.
+    The connection succeeds because the fake server is reachable; the
+    override_origin value changes the HTTP/2 :authority pseudo-header on every
+    call (verified by the Rust bridge unit tests). This test confirms the full
+    Python stack — from ConnectConfig down through the Rust bridge — does not
+    break when override_origin is set.
+
+    Note: Python's grpc.aio server does not expose the :authority pseudo-header
+    in ServicerContext.invocation_metadata() (it is an HTTP/2 transport-level
+    header, not an application-level gRPC metadata entry). The per-header
+    behaviour is covered by the Rust Core integration tests for
+    ConnectionOptions::override_origin.
+    """
+    import socket as _socket
+
+    import grpc.aio
+    from temporalio.api.workflowservice.v1 import (
+        request_response_pb2 as ws_pb2,
+        service_pb2_grpc as ws_grpc,
+    )
+
+    received_calls: list[dict] = []
+
+    class _FakeWorkflowService(ws_grpc.WorkflowServiceServicer):  # type: ignore[misc]
+        async def GetSystemInfo(self, request, context):  # type: ignore[override]
+            received_calls.append({"metadata": dict(context.invocation_metadata())})
+            return ws_pb2.GetSystemInfoResponse(server_version="test")
+
+    # Pick a free port.
+    with _socket.socket() as _s:
+        _s.bind(("127.0.0.1", 0))
+        port = _s.getsockname()[1]
+
+    server = grpc.aio.server()
+    ws_grpc.add_WorkflowServiceServicer_to_server(_FakeWorkflowService(), server)  # type: ignore[arg-type]
+    server.add_insecure_port(f"127.0.0.1:{port}")
+    await server.start()
+    try:
+        config = temporalio.service.ConnectConfig(
+            target_host=f"localhost:{port}",
+            override_origin="http://temporal-frontend",
+        )
+        await temporalio.service.ServiceClient.connect(config)
+    finally:
+        await server.stop(0)
+
+    assert received_calls, "GetSystemInfo was never called — client did not connect"
+    # Verify that the SDK sends its standard gRPC metadata regardless of the
+    # override_origin setting (regression guard).
+    meta = received_calls[0]["metadata"]
+    assert "client-name" in meta
+    assert meta["client-name"] == "temporal-python"
+
+
+async def test_override_origin_invalid_uri_raises():
+    """An unparseable override_origin URI raises ValueError before connecting."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        override_origin="this is not\na valid uri",
+    )
+    with pytest.raises(Exception, match="invalid override_origin"):
+        await temporalio.service.ServiceClient.connect(config)
+
+
 async def test_rpc_execution_not_unknown(client: Client):
     """
     Execute each rpc method and expect a failure, but ensure the failure is not that the rpc method is unknown

@@ -71,6 +71,7 @@ class ClientConfig:
     client_name: str
     client_version: str
     http_connect_proxy_config: ClientHttpConnectProxyConfig | None
+    override_origin: str | None
 
 
 @dataclass
