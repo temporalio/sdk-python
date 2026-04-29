@@ -170,8 +170,16 @@ class WorkflowStreamClient:
     ) -> WorkflowStreamClient:
         """Create a stream client targeting the current activity's parent workflow.
 
-        Must be called from within an activity. The Temporal client and
-        parent workflow id are taken from the activity context.
+        Must be called from within an activity that was scheduled by a
+        workflow. The Temporal client and parent workflow id are taken
+        from the activity context.
+
+        Standalone activities — those started directly via
+        :py:meth:`temporalio.client.Client.start_activity` rather than
+        from a workflow — have no parent workflow, so this method
+        raises. Use :py:meth:`create` from a standalone activity,
+        passing ``activity.client()`` and the target workflow id
+        explicitly (typically threaded through the activity's input).
 
         Args:
             batch_interval: Interval between automatic flushes.
@@ -183,7 +191,10 @@ class WorkflowStreamClient:
         workflow_id = info.workflow_id
         if workflow_id is None:
             raise RuntimeError(
-                "from_activity requires an activity with a parent workflow"
+                "from_activity requires an activity scheduled by a workflow; "
+                "this activity has no parent workflow. From a standalone "
+                "activity, use WorkflowStreamClient.create(activity.client(), "
+                "workflow_id) with the target workflow id passed in explicitly."
             )
         return cls.create(
             activity.client(),

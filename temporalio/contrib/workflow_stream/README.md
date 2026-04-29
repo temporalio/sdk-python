@@ -98,6 +98,20 @@ Use `force_flush=True` to trigger an immediate flush for latency-sensitive event
 client.publish("events", data, force_flush=True)
 ```
 
+`from_activity()` requires an activity scheduled by a workflow. Standalone
+activities — those started directly via `client.start_activity()` — have no
+parent workflow, so use `create()` with the target workflow id passed in
+explicitly (typically through the activity's input):
+
+```python
+@activity.defn
+async def stream_to(broker_workflow_id: str) -> None:
+    client = WorkflowStreamClient.create(activity.client(), broker_workflow_id)
+    async with client:
+        for chunk in generate_chunks():
+            client.publish("events", chunk)
+```
+
 Use `await client.flush()` when you need proof that prior publications have
 reached the server before continuing — for example, before returning from an
 activity:

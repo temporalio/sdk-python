@@ -1766,6 +1766,191 @@ async def test_cross_workflow_stream(client: Client) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Standalone activity (started directly via Client, no parent workflow)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StandalonePublishInput:
+    broker_workflow_id: str
+    count: int
+
+
+@activity.defn(name="standalone_publish_to_broker")
+async def standalone_publish_to_broker(input: StandalonePublishInput) -> None:
+    """Publish to a broker workflow from a standalone activity.
+
+    Same usage as in any external program: build a Client (here taken
+    via ``activity.client()``), pass an explicit workflow id to
+    ``WorkflowStreamClient.create``. ``from_activity`` is not usable
+    here because the activity has no parent workflow.
+    """
+    assert activity.info().workflow_id is None, (
+        "test bug: this activity should be standalone"
+    )
+    client = WorkflowStreamClient.create(
+        client=activity.client(),
+        workflow_id=input.broker_workflow_id,
+        batch_interval=timedelta(milliseconds=500),
+    )
+    async with client:
+        for i in range(input.count):
+            activity.heartbeat()
+            client.publish("events", f"standalone-{i}".encode())
+
+
+@activity.defn(name="standalone_subscribe_to_broker")
+async def standalone_subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
+    assert activity.info().workflow_id is None, (
+        "test bug: this activity should be standalone"
+    )
+    client = WorkflowStreamClient.create(
+        client=activity.client(),
+        workflow_id=input.broker_workflow_id,
+    )
+    items: list[str] = []
+    async with _async_timeout(15.0):
+        async for item in client.subscribe(
+            topics=["events"],
+            from_offset=0,
+            poll_cooldown=timedelta(0),
+            result_type=bytes,
+        ):
+            items.append(item.data.decode())
+            activity.heartbeat()
+            if len(items) >= input.expected_count:
+                break
+    return items
+
+
+@activity.defn(name="standalone_from_activity_misuse")
+async def standalone_from_activity_misuse() -> str:
+    """Calling from_activity in a standalone activity must raise a clear error."""
+    try:
+        WorkflowStreamClient.from_activity()
+    except RuntimeError as e:
+        return str(e)
+    return ""
+
+
+@pytest.mark.asyncio
+async def test_standalone_activity_publish(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    """Activity started directly via Client.start_activity publishes via create()."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server does not support Client.start_activity: "
+            "https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    count = 5
+    task_queue = str(uuid.uuid4())
+
+    async with new_worker(
+        client,
+        BasicWorkflowStreamWorkflow,
+        activities=[standalone_publish_to_broker],
+        task_queue=task_queue,
+    ):
+        broker_id = f"workflow-stream-standalone-broker-{uuid.uuid4()}"
+        broker_handle = await client.start_workflow(
+            BasicWorkflowStreamWorkflow.run,
+            id=broker_id,
+            task_queue=task_queue,
+        )
+
+        activity_handle = await client.start_activity(
+            standalone_publish_to_broker,
+            StandalonePublishInput(broker_workflow_id=broker_id, count=count),
+            id=f"standalone-publish-{uuid.uuid4()}",
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=10),
+        )
+        await activity_handle.result()
+
+        items = await collect_items(client, broker_handle, ["events"], 0, count)
+        assert [i.data for i in items] == [
+            f"standalone-{i}".encode() for i in range(count)
+        ]
+
+        await broker_handle.signal(BasicWorkflowStreamWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_standalone_activity_subscribe(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    """Standalone activity subscribes to a broker workflow via create()."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server does not support Client.start_activity: "
+            "https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    count = 5
+    task_queue = str(uuid.uuid4())
+
+    async with new_worker(
+        client,
+        BrokerWorkflow,
+        activities=[standalone_subscribe_to_broker],
+        task_queue=task_queue,
+    ):
+        broker_id = f"workflow-stream-standalone-sub-broker-{uuid.uuid4()}"
+        broker_handle = await client.start_workflow(
+            BrokerWorkflow.run,
+            count,
+            id=broker_id,
+            task_queue=task_queue,
+        )
+
+        activity_handle = await client.start_activity(
+            standalone_subscribe_to_broker,
+            CrossWorkflowInput(
+                broker_workflow_id=broker_id,
+                expected_count=count,
+            ),
+            id=f"standalone-subscribe-{uuid.uuid4()}",
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=10),
+        )
+        result = await activity_handle.result()
+        assert result == [f"broker-{i}" for i in range(count)]
+
+        await broker_handle.signal(BrokerWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_from_activity_in_standalone_activity_raises(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    """from_activity() raises a clear error pointing at create() when used in a
+    standalone activity (one without a parent workflow)."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server does not support Client.start_activity: "
+            "https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    task_queue = str(uuid.uuid4())
+
+    async with new_worker(
+        client,
+        activities=[standalone_from_activity_misuse],
+        task_queue=task_queue,
+    ):
+        activity_handle = await client.start_activity(
+            standalone_from_activity_misuse,
+            id=f"standalone-misuse-{uuid.uuid4()}",
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+        msg = await activity_handle.result()
+        assert "no parent workflow" in msg
+        assert "WorkflowStreamClient.create" in msg
+
+
+# ---------------------------------------------------------------------------
 # Cross-namespace workflow stream via Nexus (Scenario 2)
 # ---------------------------------------------------------------------------
 
