@@ -1342,6 +1342,19 @@ def _on_publish(self, input: PublishInput) -> None:
 Until both prerequisites are real, the workflow-side dedup is
 load-bearing and must stay.
 
+### Drop dedup bookkeeping on clean publisher exit
+
+Even with workflow-side dedup, a publisher that finishes cleanly carries
+its `PublisherState` for the full `publisher_ttl` after its last activity.
+A `final: bool` field on `PublishInput`, set by a new
+`WorkflowStreamClient.close()` (and by `__aexit__`), would let the workflow
+prune such entries on a tighter schedule (`final_publisher_ttl >=
+max_retry_duration`). Detailed proposal, including why immediate prune on
+receipt is unsafe and how to extend `PubSubDedupTTL.tla`, in
+`docs/pubsub-design-analysis/final-flag-prune.md`. Deferred until a
+workload makes the savings worth the wire-field churn, or until this is
+folded into a larger dedup overhaul (Option C / `request_id`).
+
 ### Workflow-side subscription
 
 [Design Decision 10](#10-workflow-can-publish-but-should-not-subscribe)
