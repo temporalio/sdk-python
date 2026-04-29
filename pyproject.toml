@@ -43,6 +43,9 @@ aioboto3 = [
   "aioboto3>=10.4.0",
   "types-aioboto3[s3]>=10.4.0",
 ]
+google-gemini = [
+    "google-genai>=1.66.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"

@@ -1,0 +1,46 @@
+set dotenv-filename := ".env.local"
+set dotenv-load
+
+run:
+    uv run python test_gemini.py
+
+worker:
+    uv run python first_class_example/worker.py
+
+query q="What's the weather right now?":
+    uv run python first_class_example/start_workflow.py "{{q}}"
+
+embed-worker:
+    uv run python embed_example/worker.py
+
+embed prompt="A serene mountain lake at sunset with pine trees":
+    uv run python embed_example/start_workflow.py "{{prompt}}"
+
+vibe-worker:
+    uv run python vibe_convergence_example/worker.py
+
+set positional-arguments
+
+vibe *ARGS:
+    uv run python vibe_convergence_example/start_workflow.py "$@"
+
+spy-worker:
+    uv run python i_spy_example/worker.py
+
+spy:
+    uv run python i_spy_example/start_workflow.py
+
+file-worker:
+    uv run python file_upload_example/worker.py
+
+file q="Summarize the key financial metrics and top 3 risks from this report.":
+    uv run python file_upload_example/start_workflow.py "{{q}}"
+
+file-store:
+    uv run python file_upload_example/start_workflow.py --store
+
+chat-worker:
+    uv run python chat_example/worker.py
+
+chat topic="recursion in programming":
+    uv run python chat_example/start_workflow.py "{{topic}}"
