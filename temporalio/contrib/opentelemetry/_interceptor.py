@@ -772,16 +772,6 @@ class _TracingWorkflowOutboundInterceptor(
         )
         await super().signal_external_workflow(input)
 
-    async def signal_with_start_workflow(
-        self, input: temporalio.worker.SignalWithStartWorkflowInput
-    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        self.root._completed_span(
-            f"SignalWithStartWorkflow:{input.signal}",
-            add_to_outbound=input,
-            kind=opentelemetry.trace.SpanKind.CLIENT,
-        )
-        return await super().signal_with_start_workflow(input)
-
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:

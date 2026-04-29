@@ -60,6 +60,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
+import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.nexus._util import ServiceHandlerT
 
@@ -86,6 +87,9 @@ from .types import (
     ReturnType,
     SelfType,
 )
+
+SignalParamType = TypeVar("SignalParamType")
+WorkflowParamType = TypeVar("WorkflowParamType")
 
 
 @overload
@@ -846,33 +850,6 @@ class _Runtime(ABC):
         static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> ChildWorkflowHandle[Any, Any]: ...
-
-    @abstractmethod
-    async def workflow_signal_with_start_workflow(
-        self,
-        workflow_id: str,
-        signal: str | Callable,
-        workflow: Any,
-        *,
-        signal_args: Sequence[Any],
-        workflow_args: Sequence[Any],
-        task_queue: str,
-        execution_timeout: timedelta | None,
-        run_timeout: timedelta | None,
-        task_timeout: timedelta | None,
-        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy,
-        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
-        retry_policy: temporalio.common.RetryPolicy | None,
-        cron_schedule: str,
-        memo: Mapping[str, Any] | None,
-        search_attributes: temporalio.common.TypedSearchAttributes | None,
-        static_summary: str | None,
-        static_details: str | None,
-        start_delay: timedelta | None,
-        request_id: str | None,
-        priority: temporalio.common.Priority,
-        versioning_override: temporalio.common.VersioningOverride | None,
-    ) -> ExternalWorkflowHandle[Any]: ...
 
     @abstractmethod
     def workflow_start_local_activity(
@@ -4684,14 +4661,10 @@ async def execute_child_workflow(
 
 @overload
 async def signal_with_start_workflow(
-    workflow_id: str,
-    signal: str | Callable,
-    workflow: MethodAsyncNoParam[SelfType, Any]
-    | MethodAsyncSingleParam[SelfType, Any, Any]
-    | Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[Any]],
+    workflow: MethodAsyncNoParam[SelfType, Any],
+    signal: MethodSyncOrAsyncNoParam[SelfType, None],
     *,
-    signal_args: Sequence[Any] = [],
-    workflow_args: Sequence[Any] = [],
+    id: str,
     task_queue: str,
     execution_timeout: timedelta | None = None,
     run_timeout: timedelta | None = None,
@@ -4713,12 +4686,175 @@ async def signal_with_start_workflow(
 
 @overload
 async def signal_with_start_workflow(
-    workflow_id: str,
-    signal: str | Callable,
-    workflow: str,
+    workflow: MethodAsyncNoParam[SelfType, Any],
+    signal: MethodSyncOrAsyncSingleParam[SelfType, SignalParamType, None],
     *,
+    id: str,
+    signal_arg: SignalParamType,
+    task_queue: str,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    start_delay: timedelta | None = None,
+    request_id: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+@overload
+async def signal_with_start_workflow(
+    workflow: MethodAsyncNoParam[SelfType, Any],
+    signal: str,
+    *,
+    id: str,
+    signal_arg: Any = temporalio.common._arg_unset,
     signal_args: Sequence[Any] = [],
+    task_queue: str,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    start_delay: timedelta | None = None,
+    request_id: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+@overload
+async def signal_with_start_workflow(
+    workflow: MethodAsyncSingleParam[SelfType, WorkflowParamType, Any],
+    signal: MethodSyncOrAsyncNoParam[SelfType, None],
+    *,
+    id: str,
+    workflow_arg: WorkflowParamType,
+    task_queue: str,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    start_delay: timedelta | None = None,
+    request_id: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+@overload
+async def signal_with_start_workflow(
+    workflow: MethodAsyncSingleParam[SelfType, WorkflowParamType, Any],
+    signal: MethodSyncOrAsyncSingleParam[SelfType, SignalParamType, None],
+    *,
+    id: str,
+    workflow_arg: WorkflowParamType,
+    signal_arg: SignalParamType,
+    task_queue: str,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    start_delay: timedelta | None = None,
+    request_id: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+@overload
+async def signal_with_start_workflow(
+    workflow: MethodAsyncSingleParam[SelfType, WorkflowParamType, Any],
+    signal: str,
+    *,
+    id: str,
+    workflow_arg: WorkflowParamType,
+    signal_arg: Any = temporalio.common._arg_unset,
+    signal_args: Sequence[Any] = [],
+    task_queue: str,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    start_delay: timedelta | None = None,
+    request_id: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+@overload
+async def signal_with_start_workflow(
+    workflow: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[Any]],
+    signal: str | Callable[..., None | Awaitable[None]],
+    *,
+    id: str,
     workflow_args: Sequence[Any] = [],
+    signal_args: Sequence[Any] = [],
+    task_queue: str,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    start_delay: timedelta | None = None,
+    request_id: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+@overload
+async def signal_with_start_workflow(
+    workflow: str,
+    signal: str | Callable[..., None | Awaitable[None]],
+    *,
+    id: str,
+    workflow_arg: Any = temporalio.common._arg_unset,
+    signal_arg: Any = temporalio.common._arg_unset,
+    workflow_args: Sequence[Any] = [],
+    signal_args: Sequence[Any] = [],
     task_queue: str,
     execution_timeout: timedelta | None = None,
     run_timeout: timedelta | None = None,
@@ -4739,12 +4875,14 @@ async def signal_with_start_workflow(
 
 
 async def signal_with_start_workflow(
-    workflow_id: str,
-    signal: str | Callable,
     workflow: str | Callable[..., Awaitable[Any]],
+    signal: str | Callable,
     *,
-    signal_args: Sequence[Any] = [],
+    id: str,
+    workflow_arg: Any = temporalio.common._arg_unset,
+    signal_arg: Any = temporalio.common._arg_unset,
     workflow_args: Sequence[Any] = [],
+    signal_args: Sequence[Any] = [],
     task_queue: str,
     execution_timeout: timedelta | None = None,
     run_timeout: timedelta | None = None,
@@ -4768,12 +4906,16 @@ async def signal_with_start_workflow(
     under the hood.
 
     Args:
-        workflow_id: Workflow ID to signal or start.
-        signal: Name or method reference for the signal.
         workflow: String name or class method decorated with ``@workflow.run``
             for the workflow to start.
-        signal_args: Arguments to the signal.
-        workflow_args: Arguments to the workflow.
+        signal: Name or method reference for the signal.
+        id: Workflow ID to signal or start.
+        workflow_arg: Single argument to the workflow.
+        signal_arg: Single argument to the signal.
+        workflow_args: Multiple arguments to the workflow. Cannot be set if
+            ``workflow_arg`` is.
+        signal_args: Multiple arguments to the signal. Cannot be set if
+            ``signal_arg`` is.
         task_queue: Task queue to run the workflow on if it is started.
         execution_timeout: Total workflow execution timeout including
             retries and continue as new.
@@ -4798,29 +4940,40 @@ async def signal_with_start_workflow(
     Returns:
         A handle for the resulting workflow run.
     """
-    return await _Runtime.current().workflow_signal_with_start_workflow(
-        workflow_id,
-        signal,
-        workflow,
-        signal_args=signal_args,
-        workflow_args=workflow_args,
-        task_queue=task_queue,
-        execution_timeout=execution_timeout,
-        run_timeout=run_timeout,
-        task_timeout=task_timeout,
-        id_reuse_policy=id_reuse_policy,
-        id_conflict_policy=id_conflict_policy,
-        retry_policy=retry_policy,
-        cron_schedule=cron_schedule,
-        memo=memo,
-        search_attributes=search_attributes,
-        static_summary=static_summary,
-        static_details=static_details,
-        start_delay=start_delay,
-        request_id=request_id,
-        priority=priority,
-        versioning_override=versioning_override,
+    workflow_name, _ = _Definition.get_name_and_result_type(workflow)
+    response = await create_nexus_client(
+        service=temporalio.nexus.system.generated.WorkflowService,
+        endpoint=temporalio.nexus.system._SYSTEM_NEXUS_ENDPOINT,
+    ).execute_operation(
+        operation=temporalio.nexus.system.generated.WorkflowService.signal_with_start_workflow_execution,
+        input=temporalio.nexus.system.build_signal_with_start_workflow_execution_input(
+            namespace=info().namespace,
+            workflow_id=id,
+            workflow=workflow_name,
+            workflow_args=temporalio.common._arg_or_args(workflow_arg, workflow_args),
+            signal=_SignalDefinition.must_name_from_fn_or_str(signal),
+            signal_args=temporalio.common._arg_or_args(signal_arg, signal_args),
+            task_queue=task_queue,
+            request_id=request_id,
+            payload_converter=payload_converter(),
+            execution_timeout=execution_timeout,
+            run_timeout=run_timeout,
+            task_timeout=task_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            cron_schedule=cron_schedule,
+            memo=memo,
+            search_attributes=search_attributes,
+            static_summary=static_summary,
+            static_details=static_details,
+            start_delay=start_delay,
+            priority=priority,
+            versioning_override=versioning_override,
+            headers={},
+        ),
     )
+    return get_external_workflow_handle(id, run_id=response.run_id)
 
 
 class NexusOperationHandle(Generic[OutputT]):

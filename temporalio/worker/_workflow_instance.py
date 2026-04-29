@@ -47,7 +47,6 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.sdk.v1
-import temporalio.api.workflowservice.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
@@ -73,7 +72,6 @@ from ._interceptor import (
     HandleUpdateInput,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
-    SignalWithStartWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
@@ -1550,65 +1548,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
 
-    async def workflow_signal_with_start_workflow(
-        self,
-        workflow_id: str,
-        signal: str | Callable,
-        workflow: Any,
-        *,
-        signal_args: Sequence[Any],
-        workflow_args: Sequence[Any],
-        task_queue: str,
-        execution_timeout: timedelta | None,
-        run_timeout: timedelta | None,
-        task_timeout: timedelta | None,
-        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy,
-        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
-        retry_policy: temporalio.common.RetryPolicy | None,
-        cron_schedule: str,
-        memo: Mapping[str, Any] | None,
-        search_attributes: temporalio.common.TypedSearchAttributes | None,
-        static_summary: str | None,
-        static_details: str | None,
-        start_delay: timedelta | None,
-        request_id: str | None,
-        priority: temporalio.common.Priority,
-        versioning_override: temporalio.common.VersioningOverride | None,
-    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        self._assert_not_read_only("signal with start workflow")
-        workflow_name, _ = temporalio.workflow._Definition.get_name_and_result_type(
-            workflow
-        )
-        return await self._outbound.signal_with_start_workflow(
-            SignalWithStartWorkflowInput(
-                signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
-                    signal
-                ),
-                signal_args=signal_args,
-                namespace=self._info.namespace,
-                workflow_id=workflow_id,
-                workflow=workflow_name,
-                workflow_args=workflow_args,
-                task_queue=task_queue,
-                execution_timeout=execution_timeout,
-                run_timeout=run_timeout,
-                task_timeout=task_timeout,
-                id_reuse_policy=id_reuse_policy,
-                id_conflict_policy=id_conflict_policy,
-                retry_policy=retry_policy,
-                cron_schedule=cron_schedule,
-                memo=memo,
-                search_attributes=search_attributes,
-                static_summary=static_summary,
-                static_details=static_details,
-                start_delay=start_delay,
-                request_id=request_id,
-                priority=priority,
-                versioning_override=versioning_override,
-                headers={},
-            )
-        )
-
     def workflow_start_local_activity(
         self,
         activity: Any,
@@ -2013,63 +1952,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if input.headers:
             temporalio.common._apply_headers(input.headers, v.headers)
         await self._signal_external_workflow(command)
-
-    async def _outbound_signal_with_start_workflow(
-        self, input: SignalWithStartWorkflowInput
-    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        payload_converter = self._payload_converter_with_context(
-            temporalio.converter.WorkflowSerializationContext(
-                namespace=input.namespace,
-                workflow_id=input.workflow_id,
-            )
-        )
-        request = (
-            temporalio.nexus.system.build_signal_with_start_workflow_execution_input(
-                namespace=input.namespace,
-                workflow_id=input.workflow_id,
-                workflow=input.workflow,
-                workflow_args=input.workflow_args,
-                signal=input.signal,
-                signal_args=input.signal_args,
-                task_queue=input.task_queue,
-                request_id=input.request_id,
-                payload_converter=payload_converter,
-                execution_timeout=input.execution_timeout,
-                run_timeout=input.run_timeout,
-                task_timeout=input.task_timeout,
-                id_reuse_policy=input.id_reuse_policy,
-                id_conflict_policy=input.id_conflict_policy,
-                retry_policy=input.retry_policy,
-                cron_schedule=input.cron_schedule,
-                memo=input.memo,
-                search_attributes=input.search_attributes,
-                static_summary=input.static_summary,
-                static_details=input.static_details,
-                start_delay=input.start_delay,
-                priority=input.priority,
-                versioning_override=input.versioning_override,
-                headers=input.headers,
-            )
-        )
-        handle = await self._outbound_start_nexus_operation(
-            StartNexusOperationInput(
-                endpoint=temporalio.nexus.system._SYSTEM_NEXUS_ENDPOINT,
-                service=temporalio.nexus.system.generated.WorkflowService.__name__,
-                operation=temporalio.nexus.system.generated.WorkflowService.signal_with_start_workflow_execution.name,
-                input=request,
-                schedule_to_close_timeout=None,
-                schedule_to_start_timeout=None,
-                start_to_close_timeout=None,
-                cancellation_type=temporalio.workflow.NexusOperationCancellationType.WAIT_COMPLETED,
-                headers=None,
-                summary=None,
-                output_type=temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
-            )
-        )
-        result = await handle
-        return self.workflow_get_external_workflow_handle(
-            input.workflow_id, run_id=result.run_id
-        )
 
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
@@ -3008,11 +2890,6 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
         self, input: SignalExternalWorkflowInput
     ) -> None:
         await self._instance._outbound_signal_external_workflow(input)
-
-    async def signal_with_start_workflow(
-        self, input: SignalWithStartWorkflowInput
-    ) -> temporalio.workflow.ExternalWorkflowHandle[Any]:
-        return await self._instance._outbound_signal_with_start_workflow(input)
 
     def start_activity(
         self, input: StartActivityInput
