@@ -34,6 +34,3 @@ snippets throughout.
 
 For a runnable end-to-end example, see the
 [Workflow Streams sample](https://github.com/temporalio/samples-python/tree/main/pubsub).
-
-For SDK contributors and reviewers, the authoritative design notes are in
-[`DESIGN.md`](./DESIGN.md) alongside this README.

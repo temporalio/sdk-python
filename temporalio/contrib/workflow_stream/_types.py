@@ -7,7 +7,7 @@ bytes/metadata are preserved per item so subscribers can decode with
 ``subscribe(result_type=T)``. The codec chain (e.g. encryption, compression)
 applies once at the outer signal/update envelope level — not separately to each
 embedded item — so codec behavior is symmetric between workflow-side and
-client-side publishing. See ``DESIGN.md`` §5.
+client-side publishing.
 
 The wire representation (``PublishEntry``, ``_WorkflowStreamWireItem``) uses
 base64-encoded ``Payload.SerializeToString()`` bytes because the default JSON
