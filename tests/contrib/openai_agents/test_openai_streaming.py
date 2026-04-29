@@ -3,7 +3,7 @@
 Streaming is opt-in via ``Runner.run_streamed``. Events flow back to the
 workflow through ``RunResultStreaming.stream_events()`` (in batch after
 each model activity completes) and to external consumers in real time
-via the configured pub/sub topic.
+via the configured stream topic.
 """
 
 import asyncio
@@ -47,7 +47,7 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.openai_agents import ModelActivityParameters
 from temporalio.contrib.openai_agents.testing import AgentEnvironment
-from temporalio.contrib.pubsub import PubSub, PubSubClient
+from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamClient
 from tests.helpers import new_worker
 
 logger = logging.getLogger(__name__)
@@ -174,13 +174,13 @@ class StreamingOpenAIWorkflow:
 
     Workflow code consumes events from ``stream_events()`` and exposes
     the seen event types via a query so the test can verify both the
-    workflow-side iteration and the pub/sub side channel observe the
+    in-workflow iteration and the external stream subscriber observe the
     same events.
     """
 
     @workflow.init
     def __init__(self, prompt: str) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self.workflow_event_types: list[str] = []
 
     @workflow.run
@@ -217,8 +217,8 @@ class NonStreamingOpenAIWorkflow:
 
 
 @workflow.defn
-class StreamingNoPubSubWorkflow:
-    """Test workflow that uses run_streamed without a PubSub broker."""
+class StreamingWithoutStreamTopicWorkflow:
+    """Test workflow that uses run_streamed without a WorkflowStream broker."""
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -234,7 +234,7 @@ class StreamingNoPubSubWorkflow:
 
 @pytest.mark.asyncio
 async def test_streaming_publishes_raw_events(client: Client):
-    """Both the workflow consumer (via stream_events) and the pubsub
+    """Both the workflow consumer (via stream_events) and the stream
     topic see the same native OpenAI events, in order, with no
     normalization."""
     async with AgentEnvironment(
@@ -258,11 +258,11 @@ async def test_streaming_publishes_raw_events(client: Client):
                 execution_timeout=timedelta(seconds=30),
             )
 
-            pubsub = PubSubClient.create(client, workflow_id)
+            stream = WorkflowStreamClient.create(client, workflow_id)
             published: list[TResponseStreamEvent] = []
 
             async def collect_events() -> None:
-                async for item in pubsub.subscribe(
+                async for item in stream.subscribe(
                     ["events"],
                     from_offset=0,
                     # TResponseStreamEvent is a discriminated union
@@ -291,7 +291,7 @@ async def test_streaming_publishes_raw_events(client: Client):
         "response.output_text.delta",
         "response.output_text.delta",
         "response.completed",
-    ], f"Unexpected pub/sub event sequence: {published_types}"
+    ], f"Unexpected published event sequence: {published_types}"
 
     deltas = [e.delta for e in published if e.type == "response.output_text.delta"]
     assert deltas == ["Hello ", "world!"]
@@ -352,7 +352,7 @@ class TruncatedStreamingTestModel(Model):
 
 
 @pytest.mark.asyncio
-async def test_streaming_no_pubsub_topic(client: Client):
+async def test_streaming_without_stream_topic(client: Client):
     """Setting streaming_event_topic=None disables publishing; the
     workflow can still consume events via stream_events()."""
     async with AgentEnvironment(
@@ -364,12 +364,12 @@ async def test_streaming_no_pubsub_topic(client: Client):
     ) as env:
         client = env.applied_on_client(client)
         async with new_worker(
-            client, StreamingNoPubSubWorkflow, max_cached_workflows=0
+            client, StreamingWithoutStreamTopicWorkflow, max_cached_workflows=0
         ) as worker:
             result = await client.execute_workflow(
-                StreamingNoPubSubWorkflow.run,
+                StreamingWithoutStreamTopicWorkflow.run,
                 "Hi",
-                id=f"openai-streaming-no-pubsub-{uuid.uuid4()}",
+                id=f"openai-streaming-without-stream-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
             )

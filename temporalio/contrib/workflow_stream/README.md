@@ -1,6 +1,11 @@
-# Temporal Workflow Pub/Sub
+# Temporal Workflow Streams
 
 > ⚠️ **This package is currently at an experimental release stage.** ⚠️
+
+**Workflow Streams** — a Temporal SDK contrib library that gives a workflow a
+durable, offset-addressed event channel built from Signals and polling Updates
+with an SSE bridge. Cost scales with durable batches, not tokens. Latency is
+around 100ms per roundtrip; not for ultra-low-latency voice.
 
 Workflows sometimes need to push incremental updates to external observers.
 Examples include providing customer updates during order processing, creating
@@ -9,11 +14,11 @@ long-running data pipeline. Temporal's core primitives (workflows, signals, and
 updates) already provide the building blocks, but wiring up batching, offset
 tracking, topic filtering, and continue-as-new hand-off is non-trivial.
 
-This module packages that boilerplate into a reusable broker and client. The
-workflow acts as a message broker that maintains an append-only log.
-Applications can interact directly from the workflow, or from external clients
-such as activities, starters, and other workflows. Under the hood, publishing
-uses signals (fire-and-forget) while subscribing uses updates (long-poll). A
+This module packages that boilerplate into a reusable workflow-side stream and
+external client. The workflow maintains an append-only log. Applications can
+interact directly from the workflow, or from external clients such as
+activities, starters, and other workflows. Under the hood, publishing uses
+signals (fire-and-forget) while subscribing uses updates (long-poll). A
 configurable batching coalesces high-frequency events, improving efficiency.
 
 Payloads are Temporal `Payload`s carrying the encoding metadata needed for
@@ -27,44 +32,44 @@ behavior is symmetric between workflow-side and client-side publishing.
 
 ### Workflow side
 
-Construct a `PubSub` from your `@workflow.init`. The constructor
-dynamically registers the pub/sub signal, update, and query handlers on
+Construct a `WorkflowStream` from your `@workflow.init`. The constructor
+dynamically registers the stream signal, update, and query handlers on
 the current workflow, and raises `RuntimeError` if called twice. If you
 want the workflow to support continue-as-new, include a
-`PubSubState | None` field on the input and pass it through — it's
-`None` on fresh starts and carries state across CAN otherwise:
+`WorkflowStreamState | None` field on the input and pass it through —
+it's `None` on fresh starts and carries state across CAN otherwise:
 
 ```python
 from dataclasses import dataclass
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSub, PubSubState
+from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamState
 
 @dataclass
 class MyInput:
-    pubsub_state: PubSubState | None = None
+    stream_state: WorkflowStreamState | None = None
 
 @workflow.defn
 class MyWorkflow:
     @workflow.init
     def __init__(self, input: MyInput) -> None:
-        self.pubsub = PubSub(prior_state=input.pubsub_state)
+        self.stream = WorkflowStream(prior_state=input.stream_state)
 
     @workflow.run
     async def run(self, input: MyInput) -> None:
-        self.pubsub.publish("status", StatusEvent(state="started"))
+        self.stream.publish("status", StatusEvent(state="started"))
         await do_work()
-        self.pubsub.publish("status", StatusEvent(state="done"))
+        self.stream.publish("status", StatusEvent(state="done"))
 ```
 
 Both workflow-side and client-side `publish()` use the sync payload
 converter for per-item `Payload` construction. The codec chain runs
-once at the envelope level (`__temporal_pubsub_publish` signal,
-`__temporal_pubsub_poll` update) — never per item — so encryption,
+once at the envelope level (`__temporal_workflow_stream_publish` signal,
+`__temporal_workflow_stream_poll` update) — never per item — so encryption,
 compression, and any other codec transforms are applied once each way.
 
 ### Activity side (publishing)
 
-Use `PubSubClient.from_activity()` with the async context manager for
+Use `WorkflowStreamClient.from_activity()` with the async context manager for
 batched publishing. The Temporal client and target workflow ID are taken
 from the activity context:
 
@@ -72,11 +77,11 @@ from the activity context:
 from datetime import timedelta
 
 from temporalio import activity
-from temporalio.contrib.pubsub import PubSubClient
+from temporalio.contrib.workflow_stream import WorkflowStreamClient
 
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=2))
+    client = WorkflowStreamClient.from_activity(batch_interval=timedelta(seconds=2))
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -105,12 +110,12 @@ async with client:
 
 ### Subscribing
 
-Use `PubSubClient.create()` and the `subscribe()` async iterator:
+Use `WorkflowStreamClient.create()` and the `subscribe()` async iterator:
 
 ```python
-from temporalio.contrib.pubsub import PubSubClient
+from temporalio.contrib.workflow_stream import WorkflowStreamClient
 
-client = PubSubClient.create(temporal_client, workflow_id)
+client = WorkflowStreamClient.create(temporal_client, workflow_id)
 async for item in client.subscribe(["events"], result_type=MyEvent):
     print(item.topic, item.data)
     if is_done(item):
@@ -123,19 +128,19 @@ async for item in client.subscribe(["events"], result_type=MyEvent):
 
 ## Topics
 
-Topics allow subscribers to receive a subset of the messages in the pub/sub system.
-Subscribers can request a list of specific topics, or provide an empty list to receive
-messages from all topics. Publishing to a topic implicitly creates it.
+Topics allow subscribers to receive a subset of the messages in the stream.
+Subscribers can request a list of specific topics, or provide an empty list to
+receive messages from all topics. Publishing to a topic implicitly creates it.
 
 ## Continue-as-new
 
-Carry both your application state and pub/sub state across continue-as-new
+Carry both your application state and stream state across continue-as-new
 boundaries:
 
 ```python
 from dataclasses import dataclass, field
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSub, PubSubState
+from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamState
 
 @dataclass
 class AppState:
@@ -145,61 +150,61 @@ class AppState:
 @dataclass
 class WorkflowInput:
     app_state: AppState = field(default_factory=AppState)
-    pubsub_state: PubSubState | None = None
+    stream_state: WorkflowStreamState | None = None
 
 @workflow.defn
 class MyWorkflow:
     @workflow.init
     def __init__(self, input: WorkflowInput) -> None:
         self.app_state = input.app_state
-        self.pubsub = PubSub(prior_state=input.pubsub_state)
+        self.stream = WorkflowStream(prior_state=input.stream_state)
 
     @workflow.run
     async def run(self, input: WorkflowInput) -> None:
         # ... do work, updating self.app_state ...
 
         if workflow.info().is_continue_as_new_suggested():
-            await self.pubsub.continue_as_new(lambda pubsub_state: [WorkflowInput(
+            await self.stream.continue_as_new(lambda stream_state: [WorkflowInput(
                 app_state=self.app_state,
-                pubsub_state=pubsub_state,
+                stream_state=stream_state,
             )])
 ```
 
-`PubSub.continue_as_new(build_args)` drains waiting subscribers,
+`WorkflowStream.continue_as_new(build_args)` drains waiting subscribers,
 waits for in-flight handlers to finish, then calls
 `workflow.continue_as_new` with `build_args(post_drain_state)`. The
-lambda receives the post-drain `PubSubState` so the snapshot is
+lambda receives the post-drain `WorkflowStreamState` so the snapshot is
 guaranteed to happen *after* drain. Subscribers created via
-`PubSubClient.create()` or `PubSubClient.from_activity()` automatically
-follow continue-as-new chains.
+`WorkflowStreamClient.create()` or `WorkflowStreamClient.from_activity()`
+automatically follow continue-as-new chains.
 
 Workflows that need to pass other CAN parameters (`task_queue`,
 `retry_policy`, `run_timeout`, etc.) fall back to the explicit recipe:
 
 ```python
-self.pubsub.drain()
+self.stream.drain()
 await workflow.wait_condition(workflow.all_handlers_finished)
 workflow.continue_as_new(args=[WorkflowInput(
     app_state=self.app_state,
-    pubsub_state=self.pubsub.get_state(),
+    stream_state=self.stream.get_state(),
 )], task_queue="other-tq")
 ```
 
-## Gotcha: sync handlers racing `__temporal_pubsub_publish`
+## Gotcha: sync handlers racing `__temporal_workflow_stream_publish`
 
 If you add a **custom synchronous** `@workflow.update` or
-`@workflow.signal` handler that reads `PubSub` state, and an
-external client calls `handle.signal("__temporal_pubsub_publish", ...)`
+`@workflow.signal` handler that reads `WorkflowStream` state, and an
+external client calls `handle.signal("__temporal_workflow_stream_publish", ...)`
 immediately followed by that handler, the handler may observe
 pre-publish state when both land in the same workflow activation.
-Root cause: `PubSub` installs `__temporal_pubsub_publish` *dynamically* from
-`@workflow.init`, so in the first activation the signal is buffered
-until after your class-level handler has already been scheduled.
+Root cause: `WorkflowStream` installs `__temporal_workflow_stream_publish`
+*dynamically* from `@workflow.init`, so in the first activation the signal
+is buffered until after your class-level handler has already been scheduled.
 
 Two framings for when you need to care:
 
 - If your producer and your update caller are **independent
-  services** (the common shape for `PubSub`), the handler already
+  services** (the common shape for `WorkflowStream`), the handler already
   has to be robust to "update arrived before publish" for reasons
   unrelated to this race — network timing, missing publishes, bad
   offsets. Whatever policy you have for those covers this race too.
@@ -210,7 +215,7 @@ Two framings for when you need to care:
 
 ### Recipe
 
-Make the handler `async` and yield once before touching `PubSub`
+Make the handler `async` and yield once before touching `WorkflowStream`
 state:
 
 ```python
@@ -221,12 +226,12 @@ from temporalio import workflow
 class MyWorkflow:
     @workflow.init
     def __init__(self) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
 
     @workflow.update
     async def truncate_at(self, offset: int) -> None:
         await asyncio.sleep(0)               # let pending publishes apply
-        self.pubsub.truncate(offset)         # now sees post-signal state
+        self.stream.truncate(offset)         # now sees post-signal state
 ```
 
 `asyncio.sleep(0)` is a pure asyncio-level yield — one event-loop
@@ -236,23 +241,23 @@ timer and adds history events on every call.
 
 Already-safe patterns, no recipe needed:
 
-- The module's own `__temporal_pubsub_poll` update (it is already `async` and
-  `await`s `workflow.wait_condition` internally).
+- The module's own `__temporal_workflow_stream_poll` update (it is already
+  `async` and `await`s `workflow.wait_condition` internally).
 - Any `async` handler that `await`s something before reading
-  `PubSub` state.
+  `WorkflowStream` state.
 - Handlers whose semantics are naturally "wait for the state I'm
   asking about" — use `await workflow.wait_condition(lambda: ...)`
   with a meaningful predicate instead of `asyncio.sleep(0)`.
-- Workflow-internal publishes (`self.pubsub.publish(...)` from
+- Workflow-internal publishes (`self.stream.publish(...)` from
   `run()` or from an activity); these do not race.
 
 ## API Reference
 
-### PubSub
+### WorkflowStream
 
 | Method | Description |
 |---|---|
-| `PubSub(prior_state=None)` | Constructor. Call once from `@workflow.init`; registers handlers on the current workflow. Raises `RuntimeError` if a `PubSub` is already registered. Pass `prior_state` if the input declares one (`None` on fresh starts). |
+| `WorkflowStream(prior_state=None)` | Constructor. Call once from `@workflow.init`; registers handlers on the current workflow. Raises `RuntimeError` if a `WorkflowStream` is already registered. Pass `prior_state` if the input declares one (`None` on fresh starts). |
 | `publish(topic, value)` | Append to the log from workflow code. `value` is converted via the sync workflow payload converter (no codec). |
 | `get_state(*, publisher_ttl=timedelta(seconds=900))` | Snapshot for continue-as-new. Drops publisher dedup entries older than `publisher_ttl` (a `timedelta`, default 15 minutes). |
 | `drain()` | Unblock polls and reject new ones. |
@@ -263,17 +268,17 @@ Handlers registered by the constructor:
 
 | Kind | Name | Description |
 |---|---|---|
-| Signal | `__temporal_pubsub_publish` | Receive external publications. |
-| Update | `__temporal_pubsub_poll` | Long-poll subscription. |
-| Query | `__temporal_pubsub_offset` | Current global offset. |
+| Signal | `__temporal_workflow_stream_publish` | Receive external publications. |
+| Update | `__temporal_workflow_stream_poll` | Long-poll subscription. |
+| Query | `__temporal_workflow_stream_offset` | Current global offset. |
 
-### PubSubClient
+### WorkflowStreamClient
 
 | Method | Description |
 |---|---|
-| `PubSubClient.create(client, workflow_id, *, batch_interval, max_batch_size, max_retry_duration)` | Factory with an explicit Temporal client and workflow id. Follows CAN. |
-| `PubSubClient.from_activity(*, batch_interval, max_batch_size, max_retry_duration)` | Factory that takes client and workflow id from the current activity context. Follows CAN. |
-| `PubSubClient(handle, *, batch_interval, max_batch_size, max_retry_duration)` | From handle (no CAN follow). |
+| `WorkflowStreamClient.create(client, workflow_id, *, batch_interval, max_batch_size, max_retry_duration)` | Factory with an explicit Temporal client and workflow id. Follows CAN. |
+| `WorkflowStreamClient.from_activity(*, batch_interval, max_batch_size, max_retry_duration)` | Factory that takes client and workflow id from the current activity context. Follows CAN. |
+| `WorkflowStreamClient(handle, *, batch_interval, max_batch_size, max_retry_duration)` | From handle (no CAN follow). |
 | `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. Per-item conversion uses the sync payload converter; the codec chain runs once on the signal envelope. |
 | `subscribe(topics, from_offset, *, result_type=None, poll_cooldown=timedelta(milliseconds=100))` | Async iterator. With `result_type=T`, `item.data` is decoded to `T`; otherwise it is a raw `Payload`. Follows CAN chains when created via `create` or `from_activity`. |
 | `get_offset()` | Query current global offset. |
@@ -282,19 +287,20 @@ Use as `async with` for batched publishing with automatic flush.
 
 ## Cross-Language Protocol
 
-Any Temporal client can interact with a pub/sub workflow using these
+Any Temporal client can interact with a Workflow Streams workflow using these
 fixed handler names:
 
-1. **Publish:** Signal `__temporal_pubsub_publish` with `PublishInput`
-2. **Subscribe:** Update `__temporal_pubsub_poll` with `PollInput` -> `PollResult`
-3. **Offset:** Query `__temporal_pubsub_offset` -> `int`
+1. **Publish:** Signal `__temporal_workflow_stream_publish` with `PublishInput`
+2. **Subscribe:** Update `__temporal_workflow_stream_poll` with `PollInput` -> `PollResult`
+3. **Offset:** Query `__temporal_workflow_stream_offset` -> `int`
 
 The Python API exposes Temporal `Payload`s and decodes via the client's
-data converter. On the wire, each `PublishEntry.data` / `_WireItem.data`
-is a base64-encoded `Payload.SerializeToString()` so the transport
-remains JSON-serializable while preserving `Payload.metadata` (used by
-codecs and by the decode path). Cross-language clients can publish and
-subscribe by following the same base64-of-serialized-`Payload` shape.
-The signal/update envelopes (`PublishInput`, `PollResult`, `PubSubState`)
-require the default (JSON) data converter; custom converters on the
-envelope layer will break cross-language interop.
+data converter. On the wire, each `PublishEntry.data` /
+`_WorkflowStreamWireItem.data` is a base64-encoded
+`Payload.SerializeToString()` so the transport remains JSON-serializable
+while preserving `Payload.metadata` (used by codecs and by the decode
+path). Cross-language clients can publish and subscribe by following the
+same base64-of-serialized-`Payload` shape. The signal/update envelopes
+(`PublishInput`, `PollResult`, `WorkflowStreamState`) require the
+default (JSON) data converter; custom converters on the envelope layer
+will break cross-language interop.

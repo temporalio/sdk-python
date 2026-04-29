@@ -590,14 +590,14 @@ agents-SDK `StreamEvent` union (so raw model events arrive as
 `RawResponsesStreamEvent.data`).
 
 External consumers (UIs, tracing pipelines, etc.) can observe events as
-they arrive by hosting a [`PubSub`](../pubsub/README.md) broker in the
-workflow and subscribing with `PubSubClient`. The streaming activity
-publishes each event to the topic configured on
+they arrive by hosting a [`WorkflowStream`](../workflow_stream/README.md)
+in the workflow and subscribing with `WorkflowStreamClient`. The
+streaming activity publishes each event to the topic configured on
 `ModelActivityParameters.streaming_event_topic` (defaults to `None`,
 which disables publishing; set it to a topic string such as `"events"`
 to publish).
 
-Workflow-side iteration via `stream_events()` requires no broker:
+Workflow-side iteration via `stream_events()` requires no stream:
 
 ```python
 from agents import Agent, Runner
@@ -619,20 +619,20 @@ class MyAgent:
 ```
 
 To publish raw model events to external subscribers, host a
-`PubSub` broker in the workflow and configure
-`OpenAIAgentsPlugin(model_params=ModelActivityParameters(streaming_event_topic="events"))`. See [`temporalio.contrib.pubsub`](../pubsub/README.md) for the
-broker and subscriber API.
+`WorkflowStream` in the workflow and configure
+`OpenAIAgentsPlugin(model_params=ModelActivityParameters(streaming_event_topic="events"))`. See [`temporalio.contrib.workflow_stream`](../workflow_stream/README.md) for the
+publisher and subscriber API.
 
 `RunResultStreaming.stream_events()` yields the agents-SDK
 `StreamEvent` union (`RawResponsesStreamEvent`, `RunItemStreamEvent`,
 `AgentUpdatedStreamEvent`); native OpenAI response events arrive
-wrapped as `RawResponsesStreamEvent.data`. Pub/sub subscribers, by
-contrast, receive the unwrapped native events directly because the
+wrapped as `RawResponsesStreamEvent.data`. Workflow-stream subscribers,
+by contrast, receive the unwrapped native events directly because the
 streaming activity publishes them straight from `Model.stream_response`.
 
 Streaming is incompatible with `use_local_activity` because local
-activities support neither activity heartbeats nor the pub/sub signal
-channel.
+activities support neither activity heartbeats nor the workflow stream
+signal channel.
 
 ## Feature Support
 

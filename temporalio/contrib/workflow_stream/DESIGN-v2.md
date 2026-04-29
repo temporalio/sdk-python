@@ -1,8 +1,8 @@
-# Temporal Workflow Pub/Sub — Design Document v2
+# Temporal Workflow Streams — Design Document v2
 
 Consolidated design document reflecting the current implementation.
 
-> The Python code in `sdk-python/temporalio/contrib/pubsub/` is authoritative.
+> The Python code in `sdk-python/temporalio/contrib/workflow_stream/` is authoritative.
 > Both this document and the Notion page
 > ["Streaming API Design Considerations"](https://www.notion.so/3478fc567738803d9c22eeb64a296e21)
 > track it. When API or wire-format facts change in code, update this doc in
@@ -12,13 +12,12 @@ Consolidated design document reflecting the current implementation.
 
 ## Overview
 
-A reusable pub/sub module for Temporal workflows. The workflow acts as the
-message broker — it holds an append-only log of `(topic, data)` entries.
-External clients (activities, starters, other services) publish and subscribe
-through the workflow handle using Temporal primitives (signals, updates,
-queries).
+A reusable workflow streams module for Temporal workflows. The workflow holds
+an append-only log of `(topic, data)` entries. External clients (activities,
+starters, other services) publish and subscribe through the workflow handle
+using Temporal primitives (signals, updates, queries).
 
-The module ships as `temporalio.contrib.pubsub` in the Python SDK and is
+The module ships as `temporalio.contrib.workflow_stream` in the Python SDK and is
 designed to be cross-language compatible. Payloads are opaque byte strings —
 the workflow does not interpret them.
 
@@ -27,7 +26,7 @@ the workflow does not interpret them.
 ```
                     ┌──────────────────────────────────┐
                     │         Temporal Workflow        │
-                    │         (PubSub broker)          │
+                    │         (WorkflowStream)         │
                     │                                  │
                     │  ┌────────────────────────────┐  │
                     │  │   Append-only log          │  │
@@ -36,9 +35,9 @@ the workflow does not interpret them.
                     │  │   publishers: {}           │  │
                     │  └────────────────────────────┘  │
                     │                                  │
-  signal ──────────►│  __temporal_pubsub_publish (with dedup)   │
-  update ──────────►│  __temporal_pubsub_poll (long-poll)       │◄── subscribe()
-  query  ──────────►│  __temporal_pubsub_offset                 │
+  signal ──────────►│  __temporal_workflow_stream_publish (with dedup)   │
+  update ──────────►│  __temporal_workflow_stream_poll (long-poll)       │◄── subscribe()
+  query  ──────────►│  __temporal_workflow_stream_offset                 │
                     │                                  │
                     │  publish() ── workflow-side      │
                     └──────────────────────────────────┘
@@ -46,7 +45,7 @@ the workflow does not interpret them.
                               │ continue-as-new
                               ▼
                     ┌──────────────────────────────────┐
-                    │  PubSubState carries:            │
+                    │  WorkflowStreamState carries:            │
                     │    log, base_offset,             │
                     │    publishers                    │
                     └──────────────────────────────────┘
@@ -54,10 +53,10 @@ the workflow does not interpret them.
 
 ## API Surface
 
-### Workflow side — `PubSub`
+### Workflow side — `WorkflowStream`
 
 A helper class instantiated from `@workflow.init`. Its constructor
-registers the pub/sub signal, update, and query handlers on the current
+registers the workflow streams signal, update, and query handlers on the current
 workflow via `workflow.set_signal_handler`, `workflow.set_update_handler`,
 and `workflow.set_query_handler` — there is no base class to inherit.
 This matches how other-language SDKs will express the same pattern
@@ -66,30 +65,30 @@ This matches how other-language SDKs will express the same pattern
 ```python
 from dataclasses import dataclass
 from temporalio import workflow
-from temporalio.contrib.pubsub import PubSub, PubSubState
+from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamState
 
 @dataclass
 class MyInput:
-    pubsub_state: PubSubState | None = None
+    stream_state: WorkflowStreamState | None = None
 
 @workflow.defn
 class MyWorkflow:
     @workflow.init
     def __init__(self, input: MyInput) -> None:
-        self.pubsub = PubSub(prior_state=input.pubsub_state)
+        self.stream = WorkflowStream(prior_state=input.stream_state)
 
     @workflow.run
     async def run(self, input: MyInput) -> None:
-        self.pubsub.publish("status", b"started")
+        self.stream.publish("status", b"started")
         await do_work()
-        self.pubsub.publish("status", b"done")
+        self.stream.publish("status", b"done")
 ```
 
-Construct `PubSub(...)` once from `@workflow.init`. Include a
-`PubSubState | None` field on your workflow input and always pass it as
+Construct `WorkflowStream(...)` once from `@workflow.init`. Include a
+`WorkflowStreamState | None` field on your workflow input and always pass it as
 `prior_state`: it is `None` on fresh starts and carries accumulated
 state across continue-as-new (see [Continue-as-New](#continue-as-new)).
-Workflows that will never continue-as-new may call `PubSub()` with no
+Workflows that will never continue-as-new may call `WorkflowStream()` with no
 argument.
 
 Two construction-time guards keep misuse loud:
@@ -100,42 +99,42 @@ Two construction-time guards keep misuse loud:
   `@workflow.run`, helpers, or signal/update/query handlers are
   rejected immediately rather than silently producing a workflow that
   registers handlers on every replay.
-- **Single-instance check.** Instantiating `PubSub` twice on the same
+- **Single-instance check.** Instantiating `WorkflowStream` twice on the same
   workflow raises `RuntimeError`, detected via
-  `workflow.get_signal_handler("__temporal_pubsub_publish")`.
+  `workflow.get_signal_handler("__temporal_workflow_stream_publish")`.
 
 **Dynamic registration race.** Because the constructor registers
-`__temporal_pubsub_publish` *dynamically* in `__init__` rather than via
+`__temporal_workflow_stream_publish` *dynamically* in `__init__` rather than via
 `@workflow.signal` decorators, a synchronous custom signal/update
-handler that reads `PubSub` state can observe pre-publish state when
+handler that reads `WorkflowStream` state can observe pre-publish state when
 the inbound publish and the custom call land in the same activation.
 The recipe is to make such handlers `async` and `await asyncio.sleep(0)`
-once before reading state. The module's own `__temporal_pubsub_poll`
+once before reading state. The module's own `__temporal_workflow_stream_poll`
 update is already safe (it is `async` and `await`s
 `workflow.wait_condition`). See the README "Gotcha" section for the
 full explanation.
 
 | Method / Handler | Kind | Description |
 |---|---|---|
-| `PubSub(prior_state=None)` | constructor | Initialize internal state and register handlers on the current workflow. Must be called from `@workflow.init`. |
+| `WorkflowStream(prior_state=None)` | constructor | Initialize internal state and register handlers on the current workflow. Must be called from `@workflow.init`. |
 | `publish(topic, value)` | instance method | Append to the log from workflow code. `value` is converted via the workflow's sync payload converter (no codec). |
 | `get_state(publisher_ttl=timedelta(seconds=900))` | instance method | Snapshot for CAN. Prunes dedup entries older than TTL. |
 | `drain()` | instance method | Unblock polls and reject new ones for CAN. |
 | `continue_as_new(build_args, *, publisher_ttl=timedelta(seconds=900))` | async instance method | Drain, wait for handlers, then `workflow.continue_as_new` with `build_args(post_drain_state)`. |
 | `truncate(up_to_offset)` | instance method | Discard log entries before offset. |
-| `__temporal_pubsub_publish` | signal handler | Receives publications from external clients (with dedup). |
-| `__temporal_pubsub_poll` | update handler | Long-poll subscription: blocks until new items or drain. |
-| `__temporal_pubsub_offset` | query handler | Returns the current global offset. |
+| `__temporal_workflow_stream_publish` | signal handler | Receives publications from external clients (with dedup). |
+| `__temporal_workflow_stream_poll` | update handler | Long-poll subscription: blocks until new items or drain. |
+| `__temporal_workflow_stream_offset` | query handler | Returns the current global offset. |
 
-### Client side — `PubSubClient`
+### Client side — `WorkflowStreamClient`
 
 Used by activities, starters, and any code with a workflow handle.
 
 ```python
-from temporalio.contrib.pubsub import PubSubClient
+from temporalio.contrib.workflow_stream import WorkflowStreamClient
 
 # Preferred: factory method (enables CAN following + activity auto-detect)
-client = PubSubClient.create(temporal_client, workflow_id)
+client = WorkflowStreamClient.create(temporal_client, workflow_id)
 
 # --- Publishing (with batching) ---
 # Values go through the client's payload converter per item; the codec
@@ -158,9 +157,9 @@ async for item in client.subscribe(["events"], result_type=EventUnion):
 
 | Method | Description |
 |---|---|
-| `PubSubClient.create(client, wf_id)` | Factory with explicit Temporal client and workflow id. Follows CAN in `subscribe()`. |
-| `PubSubClient.from_activity()` | Factory that pulls client and workflow id from the current activity context. Follows CAN in `subscribe()`. |
-| `PubSubClient(handle)` | From handle directly (no CAN following; no codec chain — falls back to the default converter). |
+| `WorkflowStreamClient.create(client, wf_id)` | Factory with explicit Temporal client and workflow id. Follows CAN in `subscribe()`. |
+| `WorkflowStreamClient.from_activity()` | Factory that pulls client and workflow id from the current activity context. Follows CAN in `subscribe()`. |
+| `WorkflowStreamClient(handle)` | From handle directly (no CAN following; no codec chain — falls back to the default converter). |
 | `publish(topic, value, force_flush=False)` | Buffer a message. `value` may be any converter-compatible object or a pre-built `Payload`. `force_flush` triggers immediate flush (fire-and-forget). |
 | `flush()` | Async. Block until items buffered at call time are confirmed by the server. No-op if nothing is buffered. |
 | `subscribe(topics=None, from_offset=0, *, result_type=None, poll_cooldown=timedelta(milliseconds=100))` | Async iterator. `topics` accepts a single string, a list of strings, or `None` (= all topics). `result_type` decodes `item.data` to the given type; omit for raw `Payload`. Always follows CAN chains when created via `create` or `from_activity`. |
@@ -182,14 +181,14 @@ The client offers three complementary ways to flush:
 
 #### Activity convenience
 
-Inside an activity, use `PubSubClient.from_activity()` — the Temporal
+Inside an activity, use `WorkflowStreamClient.from_activity()` — the Temporal
 client and target workflow id come from the activity context, so the
 caller doesn't have to thread them through:
 
 ```python
 @activity.defn
 async def stream_events() -> None:
-    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=2))
+    client = WorkflowStreamClient.from_activity(batch_interval=timedelta(seconds=2))
     async with client:
         for chunk in generate_chunks():
             client.publish("events", chunk)
@@ -207,7 +206,7 @@ path.
 from temporalio.api.common.v1 import Payload
 
 @dataclass
-class PubSubItem:
+class WorkflowStreamItem:
     topic: str
     data: Any          # Payload by default; decoded value when
                        # subscribe is called with result_type=T
@@ -231,7 +230,7 @@ class PollInput:
 
 @dataclass
 class PollResult:
-    items: list[_WireItem]     # Wire-format items
+    items: list[_WorkflowStreamWireItem]     # Wire-format items
     next_offset: int = 0       # Offset for next poll
     more_ready: bool = False   # Truncated response; poll again
 
@@ -241,18 +240,18 @@ class PublisherState:
     last_seen: datetime
 
 @dataclass
-class PubSubState:
-    log: list[_WireItem] = field(default_factory=list)
+class WorkflowStreamState:
+    log: list[_WorkflowStreamWireItem] = field(default_factory=list)
     base_offset: int = 0
     publishers: dict[str, PublisherState] = field(default_factory=dict)
 ```
 
-The containing workflow input must type the field as `PubSubState | None`,
+The containing workflow input must type the field as `WorkflowStreamState | None`,
 not `Any` — `Any`-typed fields deserialize as plain dicts, losing the type.
 
 ### Wire format for payloads
 
-The user-facing `data` on `PubSubItem` is a
+The user-facing `data` on `WorkflowStreamItem` is a
 `temporalio.api.common.v1.Payload`, which carries both the data bytes
 and the encoding metadata written by the client's data converter and
 codec chain. Subscribers can either decode by passing `result_type=T`
@@ -268,7 +267,7 @@ serializable`). Embedding the proto-serialized bytes keeps the wire
 format JSON-compatible while preserving the full `Payload` — metadata
 and all — across the signal and update round-trips. Round-trip is
 guarded by
-`tests/contrib/pubsub/test_payload_roundtrip_prototype.py`.
+`tests/contrib/workflow_stream/test_payload_roundtrip_prototype.py`.
 
 ## Design Decisions
 
@@ -327,20 +326,20 @@ The three original arguments for opaque bytes don't hold up:
 
 1. **Decoupling from the data converter.** Signals and updates
    accept `Any` without making handlers generic; `Payload.metadata`
-   carries per-value encoding info. Pub/sub can do the same.
+   carries per-value encoding info. Workflow Streams can do the same.
 2. **Layering — transport vs. application.** Every other Temporal
    API surface (signals, updates, activity args, workflow args)
-   uses `Payload`. Pub/sub was the outlier.
+   uses `Payload`. Workflow Streams was the outlier.
 3. **Type hints at decode time.** Subscribers pass `result_type` at
    the subscribe boundary — the same pattern as
    `execute_update(result_type=...)`.
 
 **Codec runs once, at the envelope level.** Both
-`PubSubClient.publish` and `PubSub.publish` turn values into
+`WorkflowStreamClient.publish` and `WorkflowStream.publish` turn values into
 `Payload` via the **sync** payload converter. The codec chain is
-not applied per item. It runs once — on the `__temporal_pubsub_publish`
+not applied per item. It runs once — on the `__temporal_workflow_stream_publish`
 signal envelope (client → workflow path) and on the
-`__temporal_pubsub_poll` update envelope (workflow → subscriber path) —
+`__temporal_workflow_stream_poll` update envelope (workflow → subscriber path) —
 because Temporal's SDK already runs `DataConverter.encode` on
 signal and update args. Running the codec per item *as well*
 would double-encrypt / double-compress, and compressing
@@ -349,7 +348,7 @@ carries the encoding metadata (`encoding: json/plain`,
 `messageType`, etc.), so `subscribe(result_type=T)` works
 without needing the codec to have run per item.
 
-**Wire format.** `PublishEntry.data` and `_WireItem.data` are
+**Wire format.** `PublishEntry.data` and `_WorkflowStreamWireItem.data` are
 base64-encoded `Payload.SerializeToString()` bytes, not nested
 `Payload` protos, because the default JSON converter cannot
 serialize a `Payload` embedded inside a dataclass. See [Data
@@ -369,7 +368,7 @@ Every entry gets a global offset from a single counter. Subscribers filter by
 topic but advance through the global offset space.
 
 We surveyed offset models across Kafka, Redis Streams, NATS JetStream, PubNub,
-Google Pub/Sub, RabbitMQ Streams, and Amazon SQS/SNS. No major system provides
+Google Workflow Streams, RabbitMQ Streams, and Amazon SQS/SNS. No major system provides
 a true global offset across independent topics. The two closest:
 
 - **NATS JetStream**: one stream captures multiple subjects via wildcards, with
@@ -386,11 +385,11 @@ per-topic offsets with cursor hints, and accepting the leakage.
 | Per-topic count as cursor | *(theoretical)* | None | Preserved | O(n) or extra state | Coupled to filter |
 | Opaque cursor wrapping global offset | *(theoretical)* | Observable | Preserved | O(1) | Filter-independent |
 | Encrypted global offset | *(theoretical)* | None | Preserved | O(1) | Filter-independent |
-| Per-topic / per-partition lists | Kafka, Redis Streams, RabbitMQ Streams, Google Pub/Sub, SQS/SNS | None | **Lost** | O(1) | N/A |
+| Per-topic / per-partition lists | Kafka, Redis Streams, RabbitMQ Streams, Google Workflow Streams, SQS/SNS | None | **Lost** | O(1) | N/A |
 | **Global offsets (chosen)** | NATS JetStream, PubNub (timestamp variant) | Contained at BFF | Preserved | O(new items) | Filter-independent |
 | Per-topic offsets with cursor hints | *(theoretical)* | None | Preserved | O(new items) | Per-topic only |
 
-**Decision:** Global offsets are the right choice for workflow-scoped pub/sub.
+**Decision:** Global offsets are the right choice for workflow-scoped workflow streams.
 
 **Why not per-topic offsets?** The most sophisticated alternative — per-topic
 offsets with opaque cursors carrying global position hints — was rejected
@@ -399,7 +398,7 @@ for three reasons:
 1. **The threat model doesn't apply.** Information leakage assumes untrusted
    multi-tenant subscribers who shouldn't learn about each other's traffic
    volumes. That's Kafka's world — separate consumers for separate services.
-   In workflow-scoped pub/sub, the subscriber is the BFF: trusted server-side
+   In workflow-scoped workflow streams, the subscriber is the BFF: trusted server-side
    code that could just as easily subscribe to all topics.
 
 2. **Cursor portability.** A global offset is a stream position that works
@@ -446,7 +445,7 @@ Specifically: (1) signals sent sequentially from the same client appear in
 workflow history in send order, and (2) signal handlers are invoked in
 history order. The guarantee breaks down only for *concurrent* signals — if
 two signal RPCs are in flight simultaneously, their order in history is
-nondeterministic. The `PubSubClient` flush lock (`_flush_lock`) ensures
+nondeterministic. The `WorkflowStreamClient` flush lock (`_flush_lock`) ensures
 signals are never in flight concurrently from a single client:
 
 1. Acquire lock
@@ -454,7 +453,7 @@ signals are never in flight concurrently from a single client:
 3. Release lock
 
 Combined with the workflow's single-threaded signal processing (the
-`__temporal_pubsub_publish` handler is synchronous — no `await`), items within and
+`__temporal_workflow_stream_publish` handler is synchronous — no `await`), items within and
 across batches from a single publisher preserve their publish order.
 
 Concurrent publishers get a total order in the log (the workflow serializes
@@ -465,7 +464,7 @@ Once items are in the log, their order is stable — reads are repeatable.
 
 ### 8. Batching is built into the client
 
-`PubSubClient` includes a Nagle-like batcher (buffer + timer). The async
+`WorkflowStreamClient` includes a Nagle-like batcher (buffer + timer). The async
 context manager starts a background flush task; exiting cancels it and does a
 final flush. Batching amortizes Temporal signal overhead.
 
@@ -476,12 +475,12 @@ Parameters:
 ### 9. Subscription is poll-based, exposed as async iterator
 
 The fundamental primitive is an offset-based long-poll: the subscriber sends
-`from_offset` and gets back items plus `next_offset`. `__temporal_pubsub_poll` is a
+`from_offset` and gets back items plus `next_offset`. `__temporal_workflow_stream_poll` is a
 Temporal update with `wait_condition`. `subscribe()` wraps this in an
 `AsyncIterator` with a configurable `poll_cooldown` (`timedelta`, default
 100ms) to rate-limit polls.
 
-**Trade-off.** The alternative is server-push — the pub/sub system executes
+**Trade-off.** The alternative is server-push — the workflow streams system executes
 a callback on the subscriber. Pull is better aligned with durable streams:
 
 1. **Back-pressure is natural.** A slow subscriber just polls less
@@ -516,7 +515,7 @@ are the same cost: one slice, one filter pass. The worst case is a poll from
 offset 0 (full log scan), which only happens on first connection or after the
 subscriber falls behind.
 
-**Fan-out is per-poll, not shared.** Each `__temporal_pubsub_poll` update is an
+**Fan-out is per-poll, not shared.** Each `__temporal_workflow_stream_poll` update is an
 independent Temporal update RPC. The handler has no registry of active
 subscribers; every call executes `_on_poll` from scratch with its own
 `from_offset` closure and topic set. When a publish grows the log,
@@ -569,14 +568,14 @@ streaming workflows have shown this matters in practice: a session can
 accumulate tens of thousands of small audio/text events long before CAN
 is triggered, and the workflow needs a way to release entries the
 subscriber has already consumed without waiting for a CAN cycle.
-`PubSub.truncate(up_to_offset)` exposes this — workflow-side only.
+`WorkflowStream.truncate(up_to_offset)` exposes this — workflow-side only.
 Out-of-range offsets raise `ApplicationError` (type
 `TruncateOutOfRange`); applications that want external truncation
 control must wire up their own signal/update on top of `truncate()`.
 
 When a subscriber whose `from_offset` is below `base_offset` polls,
-`PubSubClient.subscribe()` catches the `TruncatedOffset`
-`ApplicationError`, resets `offset` to `0` (which the broker treats
+`WorkflowStreamClient.subscribe()` catches the `TruncatedOffset`
+`ApplicationError`, resets `offset` to `0` (which the stream treats
 as "from whatever is available"), and continues. The application sees
 a gap in offsets but the iterator does not raise.
 
@@ -586,7 +585,7 @@ a gap in offsets but the iterator does not raise.
 indefinitely until one of three things happens:
 
 1. **New data arrives** — the `len(log) > offset` condition fires.
-2. **Draining for continue-as-new** — `PubSub.drain()` sets the flag.
+2. **Draining for continue-as-new** — `WorkflowStream.drain()` sets the flag.
 3. **Client disconnects** — the BFF drops the SSE connection, cancels the
    update RPC, and the handler becomes an inert coroutine cleaned up at
    the next drain cycle.
@@ -597,7 +596,7 @@ forever" mechanism. This was removed because:
 - **It adds unnecessary history events.** Every poll creates a `TimerStarted`
   event. For a streaming session doing hundreds of polls, this doubles the
   history event count and accelerates approach to the ~50K event CAN threshold.
-- **The drain mechanism already handles cleanup.** `PubSub.drain()` unblocks
+- **The drain mechanism already handles cleanup.** `WorkflowStream.drain()` unblocks
   all waiting polls, and the update validator rejects new polls, so
   `all_handlers_finished()` converges without timers.
 - **Zombie polls are harmless.** If a client crashes without cancelling, its
@@ -641,7 +640,7 @@ exactly-once via Update ID, eliminating application-level dedup. However:
 
 If the cross-CAN dedup gap is fixed and backpressure becomes desirable,
 switching publish to updates is a mechanical change — the dedup protocol,
-retry path, and `PubSub` handler logic are unchanged.
+retry path, and `WorkflowStream` handler logic are unchanged.
 
 ## Design Principles
 
@@ -673,14 +672,14 @@ out, or a tool call that fails because a worker crashes — its previous
 attempt's streaming events remain in the log. The new attempt publishes
 fresh events. The subscriber sees both.
 
-**Why the pub/sub layer cannot handle this completely.** When an LLM
+**Why the workflow streams layer cannot handle this completely.** When an LLM
 activity retries, the model runs again and produces different output —
-different tokens, different wording, a different response. The pub/sub
+different tokens, different wording, a different response. The workflow streams
 layer sees two different message sequences. It has no way to know these
 represent the same logical operation. Only the application knows that the
 second response supersedes the first.
 
-We could have added retry semantics to the pub/sub protocol — for example,
+We could have added retry semantics to the workflow streams protocol — for example,
 tagging messages with attempt numbers and letting the transport filter
 superseded attempts, similar to signal-level dedup. But this would be
 incomplete, and the incompleteness creates a real problem: if the
@@ -701,11 +700,11 @@ the retry's tokens replace the failed attempt's partial output. This
 reducer produces the same state whether it processes events live or
 replays them on reconnect — there is only one code path.
 
-**The pub/sub layer handles what it can handle completely.** Signal-level
+**The workflow streams layer handles what it can handle completely.** Signal-level
 dedup (same publisher ID + same sequence number) is fully resolvable at the
 transport layer — the layer has all the information it needs, so it
 deduplicates there. Activity-level dedup cannot be fully resolved at the
-transport layer — it requires application context — so the pub/sub layer
+transport layer — it requires application context — so the workflow streams layer
 does not attempt it. Each layer handles the duplicates it can completely
 resolve.
 
@@ -724,7 +723,7 @@ duplication).
 
 ### Solution
 
-Each `PubSubClient` instance generates a 16-hex-char identifier (`publisher_id`, the prefix of a fresh UUID4) on creation.
+Each `WorkflowStreamClient` instance generates a 16-hex-char identifier (`publisher_id`, the prefix of a fresh UUID4) on creation.
 Each `flush()` increments a monotonic `sequence` counter. The signal payload
 includes both. The workflow tracks the highest seen sequence per publisher in
 `_publishers: dict[str, PublisherState]` and rejects any signal with
@@ -763,7 +762,7 @@ async def _flush(self) -> None:
             return
         try:
             await self._handle.signal(
-                "__temporal_pubsub_publish",
+                "__temporal_workflow_stream_publish",
                 PublishInput(items=batch, publisher_id=self._publisher_id,
                              sequence=seq),
             )
@@ -792,43 +791,43 @@ async def _flush(self) -> None:
 
 `publishers` is `dict[str, PublisherState]` — bounded by number of publishers
 (typically 1-2), not number of flushes. Carried through continue-as-new in
-`PubSubState`. If `publisher_id` is empty (workflow-internal publish),
+`WorkflowStreamState`. If `publisher_id` is empty (workflow-internal publish),
 dedup is skipped.
 
 Each `PublisherState` records the highest accepted `sequence` and the
 `workflow.now()` at which it was accepted (`last_seen: datetime`). During
-`PubSub.get_state(publisher_ttl=timedelta(seconds=900))`, entries older
+`WorkflowStream.get_state(publisher_ttl=timedelta(seconds=900))`, entries older
 than TTL are pruned to bound memory across long-lived workflow chains.
 
 **Safety constraint**: `publisher_ttl` must exceed the client's
 `max_retry_duration`. If a publisher's dedup entry is pruned while it still
 has a pending retry, the retry could be accepted as new, creating duplicates.
 
-### Scope: what pub/sub dedup does and does not handle
+### Scope: what workflow streams dedup does and does not handle
 
 Duplicates arise at three points in the pipeline. Each layer handles the
 duplicates it introduces — applying the end-to-end principle (Saltzer, Reed,
 Clark 1984).
 
 ```
-LLM API  -->  Activity  -->  PubSubClient  -->  Workflow Log  -->  BFF/SSE  -->  Browser
+LLM API  -->  Activity  -->  WorkflowStreamClient  -->  Workflow Log  -->  BFF/SSE  -->  Browser
   (A)                            (B)                                (C)
 ```
 
 | Type | Cause | Handled by |
 |---|---|---|
 | A: Duplicate LLM work | Activity retry produces a second, semantically equivalent but textually different response | Application layer (activity idempotency keys, workflow orchestration) |
-| B: Duplicate signal batches | Signal retry after ambiguous failure delivers the same `(publisher_id, sequence)` batch twice | **Pub/sub layer** (`sequence <= existing.sequence` rejection) |
+| B: Duplicate signal batches | Signal retry after ambiguous failure delivers the same `(publisher_id, sequence)` batch twice | **Workflow Streams layer** (`sequence <= existing.sequence` rejection) |
 | C: Duplicate SSE events | Browser reconnects and BFF replays previously-delivered events | Delivery layer (SSE `Last-Event-ID`, idempotent frontend reducers) |
 
 **Why Type A doesn't belong here.** Data escapes to the subscriber during the
 first LLM call — tokens are consumed, forwarded to the browser, and rendered
 before any retry occurs. By the time a retry produces a duplicate response,
-the original is already consumed. The pub/sub layer has no opportunity to
+the original is already consumed. The workflow streams layer has no opportunity to
 suppress it, and resolution requires application semantics (discard, replace,
 merge) that the transport layer has no knowledge of.
 
-**Why Type B must be here.** The consumer sees `PubSubItem(topic, data)` with
+**Why Type B must be here.** The consumer sees `WorkflowStreamItem(topic, data)` with
 no unique ID. If the workflow accepted a duplicate batch, the duplicates would
 get fresh offsets and be indistinguishable from originals. Content-based dedup
 has false positives (an LLM legitimately produces the same token twice; a
@@ -837,7 +836,7 @@ status event like `{"type":"THINKING_START"}` repeats across turns). The
 preserves transport encapsulation and uses context only the transport layer
 has.
 
-**Why Type C doesn't belong here.** SSE reconnection is below the pub/sub
+**Why Type C doesn't belong here.** SSE reconnection is below the workflow streams
 layer. The BFF assigns gapless event IDs and maps `Last-Event-ID` back to
 global offsets (see [Information Leakage and the BFF](#information-leakage-and-the-bff)).
 
@@ -845,8 +844,8 @@ global offsets (see [Information Leakage and the BFF](#information-leakage-and-t
 
 ### Problem
 
-`PubSub` accumulates workflow history through signals (each
-`__temporal_pubsub_publish`) and updates (each `__temporal_pubsub_poll` response). Over a
+`WorkflowStream` accumulates workflow history through signals (each
+`__temporal_workflow_stream_publish`) and updates (each `__temporal_workflow_stream_poll` response). Over a
 streaming session, history grows toward the ~50K event threshold. CAN resets
 the history while carrying the canonical log copy forward.
 
@@ -859,50 +858,50 @@ class PublisherState:
     last_seen: datetime
 
 @dataclass
-class PubSubState:
-    log: list[_WireItem] = field(default_factory=list)
+class WorkflowStreamState:
+    log: list[_WorkflowStreamWireItem] = field(default_factory=list)
     base_offset: int = 0
     publishers: dict[str, PublisherState] = field(default_factory=dict)
 ```
 
-The `log` carries the wire form (`_WireItem`, base64-encoded
+The `log` carries the wire form (`_WorkflowStreamWireItem`, base64-encoded
 `Payload.SerializeToString()`) so the snapshot serializes through
 the default JSON converter without needing to embed proto `Payload`s
-in a dataclass. The constructor decodes them back to `PubSubItem`
+in a dataclass. The constructor decodes them back to `WorkflowStreamItem`
 on the new run.
 
-`PubSub(prior_state=...)` restores all three fields. `PubSub.get_state()`
+`WorkflowStream(prior_state=...)` restores all three fields. `WorkflowStream.get_state()`
 snapshots them.
 
 ### Draining
 
-A long-poll `__temporal_pubsub_poll` blocks indefinitely until new data arrives. To
+A long-poll `__temporal_workflow_stream_poll` blocks indefinitely until new data arrives. To
 allow CAN to proceed, draining uses two mechanisms:
 
-1. **`PubSub.drain()`** sets a flag that unblocks all waiting poll handlers
+1. **`WorkflowStream.drain()`** sets a flag that unblocks all waiting poll handlers
    (the `or self._draining` clause in `wait_condition`).
 2. **Update validator** rejects new polls when draining, so no new handlers
    start and `all_handlers_finished()` stabilizes.
 
-`PubSub.continue_as_new(build_args)` packages the three steps:
+`WorkflowStream.continue_as_new(build_args)` packages the three steps:
 
 ```python
 # CAN sequence in the parent workflow:
-await self.pubsub.continue_as_new(lambda state: [WorkflowInput(
-    pubsub_state=state,
+await self.stream.continue_as_new(lambda state: [WorkflowInput(
+    stream_state=state,
 )])
 ```
 
 `build_args` runs *after* drain stabilizes, with the post-drain
-`PubSubState` as its single argument. Workflows that need to override
+`WorkflowStreamState` as its single argument. Workflows that need to override
 other CAN parameters (`task_queue`, `retry_policy`, `run_timeout`, etc.)
 fall back to the explicit recipe:
 
 ```python
-self.pubsub.drain()
+self.stream.drain()
 await workflow.wait_condition(workflow.all_handlers_finished)
 workflow.continue_as_new(args=[WorkflowInput(
-    pubsub_state=self.pubsub.get_state(),
+    stream_state=self.stream.get_state(),
 )], task_queue="other-tq")
 ```
 
@@ -937,7 +936,7 @@ failed (not CAN), the subscriber stops instead of retrying.
 Since the full log is carried forward:
 
 - Pre-CAN: offsets `0..N-1`, log length N.
-- Post-CAN: `PubSub(prior_state=...)` restores N items. New appends start
+- Post-CAN: `WorkflowStream(prior_state=...)` restores N items. New appends start
   at offset N.
 - A subscriber at offset K resumes seamlessly against the new run.
 
@@ -952,12 +951,12 @@ its handle is pinned to the old run. The workflow should ensure activities
 complete before triggering CAN.
 
 **Concurrent subscribers.** Each maintains its own offset. Sharing a
-`PubSubClient` across concurrent `subscribe()` calls is safe.
+`WorkflowStreamClient` across concurrent `subscribe()` calls is safe.
 
 ## Information Leakage and the BFF
 
 Global offsets leak cross-topic activity (a single-topic subscriber sees gaps).
-This is acceptable within the pub/sub API because the subscriber is the BFF —
+This is acceptable within the workflow streams API because the subscriber is the BFF —
 trusted server-side code. The leakage must not reach the end client (browser).
 
 ### The problem
@@ -1000,8 +999,8 @@ workflow's offset — it sees the BFF's event numbering.
 sse_id = 0
 sse_id_to_offset: dict[int, int] = {}
 
-start_offset = await pubsub.get_offset()
-async for item in pubsub.subscribe(topics=["events"], from_offset=start_offset):
+start_offset = await stream.get_offset()
+async for item in stream.subscribe(topics=["events"], from_offset=start_offset):
     sse_id += 1
     sse_id_to_offset[sse_id] = item_global_offset
     yield f"id: {sse_id}\ndata: {item.data}\n\n"
@@ -1021,11 +1020,11 @@ reconnection pattern.
 
 ## Cross-Language Protocol
 
-Any Temporal client in any language can interact with a pub/sub workflow by:
+Any Temporal client in any language can interact with a workflow streams workflow by:
 
-1. **Publishing**: Signal `__temporal_pubsub_publish` with `PublishInput` payload
-2. **Subscribing**: Execute update `__temporal_pubsub_poll` with `PollInput`, loop
-3. **Checking offset**: Query `__temporal_pubsub_offset`
+1. **Publishing**: Signal `__temporal_workflow_stream_publish` with `PublishInput` payload
+2. **Subscribing**: Execute update `__temporal_workflow_stream_poll` with `PollInput`, loop
+3. **Checking offset**: Query `__temporal_workflow_stream_offset`
 
 Double-underscore prefix on handler names avoids collisions with application
 signals/updates. The envelope types are simple composites of strings, bytes,
@@ -1035,7 +1034,7 @@ and ints — representable in every Temporal SDK's default data converter.
 protocol depends on all participants — workflow, publishers, and
 subscribers — using the default JSON data converter for the
 *envelope* types (`PublishInput`, `PollInput`, `PollResult`,
-`PubSubState`). These are simple composites of strings, ints, and
+`WorkflowStreamState`). These are simple composites of strings, ints, and
 lists that serialize identically across SDKs under the default
 converter. A custom converter that changes how dataclasses serialize
 (protobuf-based, etc.) would break cross-language interop on the
@@ -1043,7 +1042,7 @@ envelope.
 
 The user-facing data inside each envelope is a Temporal `Payload`,
 serialized to bytes and base64-encoded as a string field on
-`PublishEntry` / `_WireItem`. The user's payload converter and codec
+`PublishEntry` / `_WorkflowStreamWireItem`. The user's payload converter and codec
 chain run once at the envelope level and apply to the whole batch
 (see [Design Decision 3](#3-items-are-temporal-payloads-not-opaque-bytes)).
 Cross-language clients interoperate by using the same shape:
@@ -1053,10 +1052,10 @@ JSON-encoded envelopes containing base64-of-serialized-`Payload` items.
 
 > 🚪 **One-way door (two parts).**
 >
-> **Immutable handler names.** `__temporal_pubsub_publish`, `__temporal_pubsub_poll`, and
-> `__temporal_pubsub_offset` are permanent wire-level entry points. The escape hatch —
-> versioned handler names like `__temporal_pubsub_v2_poll` — gets more expensive over
-> time: `PubSub` must register all supported versions, with no discovery
+> **Immutable handler names.** `__temporal_workflow_stream_publish`, `__temporal_workflow_stream_poll`, and
+> `__temporal_workflow_stream_offset` are permanent wire-level entry points. The escape hatch —
+> versioned handler names like `__temporal_workflow_stream_v2_poll` — gets more expensive over
+> time: `WorkflowStream` must register all supported versions, with no discovery
 > mechanism for which versions a workflow supports.
 >
 > **No version field.** Committing to additive-only evolution means the *only*
@@ -1086,15 +1085,15 @@ return an error, but this only helps if you change the semantics of an
 existing field — which you should not do (that is a new handler, not a
 version bump).
 
-**Versioned handler names** (e.g., `__temporal_pubsub_v2_poll`). The most robust
+**Versioned handler names** (e.g., `__temporal_workflow_stream_v2_poll`). The most robust
 option — creates entirely separate protocol surfaces so old and new code
-never interact. But premature: `PubSub` would have to register handlers for
+never interact. But premature: `WorkflowStream` would have to register handlers for
 all supported versions, the client must probe which versions exist (Temporal
 has no "does this handler exist?" primitive), and dead code accumulates.
 Reserved as the escape hatch for a future true breaking change.
 
 **Protocol negotiation.** Client declares version in poll, workflow
-responds with what it supports. Turns `PubSub` into a version-dispatching
+responds with what it supports. Turns `WorkflowStream` into a version-dispatching
 router. Disproportionate complexity. Temporal's Worker Versioning (Build ID
 routing) solves this better at the infrastructure level — route tasks to
 compatible workers rather than negotiating at the message level.
@@ -1115,7 +1114,7 @@ for new fields) and Avro's schema evolution model. Temporal's own
 mechanisms cover the hard cases:
 
 - **Worker Versioning (Build IDs):** For true breaking changes, deploy v2
-  `PubSub` on a new Build ID. Old workflows continue on old workers; new
+  `WorkflowStream` on a new Build ID. Old workflows continue on old workers; new
   workflows start on new workers. Strictly more powerful than
   message-level versioning because it operates at the workflow execution
   level.
@@ -1132,7 +1131,7 @@ breaking changes get a new message type (handler name).
 
 ### 1. Additive-only wire evolution
 
-New fields on `PublishInput`, `PollInput`, `PollResult`, and `PubSubState` must
+New fields on `PublishInput`, `PollInput`, `PollResult`, and `WorkflowStreamState` must
 have defaults. Existing field semantics must not change. Temporal's JSON data
 converter drops unknown fields on deserialization and uses defaults for missing
 fields, so additive changes are safe in both directions (new client → old
@@ -1141,12 +1140,12 @@ compatibility.
 
 ### 2. Handler names are immutable
 
-`__temporal_pubsub_publish`, `__temporal_pubsub_poll`, and `__temporal_pubsub_offset` will never change
+`__temporal_workflow_stream_publish`, `__temporal_workflow_stream_poll`, and `__temporal_workflow_stream_offset` will never change
 meaning. If a future change is incompatible with additive evolution, the correct
-mechanism is a new handler name (e.g., `__temporal_pubsub_v2_poll`) — creating an
+mechanism is a new handler name (e.g., `__temporal_workflow_stream_v2_poll`) — creating an
 entirely separate protocol surface so old and new code never interact.
 
-### 3. `PubSubState` must be forward-compatible
+### 3. `WorkflowStreamState` must be forward-compatible
 
 New fields use `field(default_factory=...)` or scalar defaults. Old state loaded
 into new code works (new fields get defaults). New state loaded into old code
@@ -1164,11 +1163,11 @@ versions between client and workflow. The reasons:
   This is strictly worse than the current behavior, where unknown fields are
   harmlessly ignored.
 - **Temporal Worker Versioning handles the hard cases.** For a true breaking
-  change, deploy the new `PubSub` on a new Build ID. Old running workflows
+  change, deploy the new `WorkflowStream` on a new Build ID. Old running workflows
   continue on old workers; new workflows start on new workers. This operates at
   the infrastructure level — handling in-flight workflows, replay, and
   mixed-version fleets — which message-level version fields cannot.
-- **`workflow.patched()` handles in-workflow transitions.** If a new `PubSub`
+- **`workflow.patched()` handles in-workflow transitions.** If a new `WorkflowStream`
   version changes behavior (e.g., how it processes a signal), `patched()` gates
   old vs. new logic within the same workflow code during the transition period.
 
@@ -1180,9 +1179,9 @@ All fields follow rule 1:
 |---|---|---|
 | `PublishInput.publisher_id` | `""` | Empty string skips dedup |
 | `PublishInput.sequence` | `0` | Zero skips dedup |
-| `_WireItem.offset` | `0` | Zero means "unknown" |
+| `_WorkflowStreamWireItem.offset` | `0` | Zero means "unknown" |
 | `PollResult.more_ready` | `False` | No truncation signaled |
-| `PubSubState.publishers` | `{}` | No dedup or TTL state |
+| `WorkflowStreamState.publishers` | `{}` | No dedup or TTL state |
 
 ## Ecosystem analogs
 
@@ -1194,7 +1193,7 @@ The closest analogs in established messaging systems, for orientation:
 - **Idempotent producer** — Kafka's producer ID + monotonic sequence
   number, scoped to the broker. Our `publisher_id` + `sequence` at the
   workflow does the same job, scoped to signal delivery into one workflow.
-- **Blocking pull** — Redis Streams `XREAD BLOCK`. Our `__temporal_pubsub_poll`
+- **Blocking pull** — Redis Streams `XREAD BLOCK`. Our `__temporal_workflow_stream_poll`
   update with `wait_condition` is the Temporal-native equivalent.
 - **Durable-execution peer** — the Workflow SDK ([workflow-sdk.dev](https://workflow-sdk.dev))
   has a first-class streaming model with indexed resumption and buffered
@@ -1209,7 +1208,7 @@ Streams, and Workflow SDK) live on the
 
 ### Shared workflow-side fan-out
 
-Each `__temporal_pubsub_poll` update today is serviced independently, and an item
+Each `__temporal_workflow_stream_poll` update today is serviced independently, and an item
 published to N interested subscribers crosses the wire N times (see
 [Design Decision 9](#9-subscription-is-poll-based-exposed-as-async-iterator)).
 For low fan-out (1–2 consumers) this is fine; for workloads with many
@@ -1238,7 +1237,7 @@ shipping items the subscriber will discard, and lets workflows enforce
 access control per subscriber rather than delegating it to clients.
 
 Design questions left open: filter/transform registration API (at
-`PubSub` construction, or later?), whether transforms may change the
+`WorkflowStream` construction, or later?), whether transforms may change the
 item count (e.g., aggregation), how filter state interacts with
 continue-as-new, and how filter identity is named on the wire for
 cross-language clients.
@@ -1281,7 +1280,7 @@ both layers are already aligned.
 ```python
 # In _client.py, _flush() — pin a deterministic request_id:
 await self._handle.signal(
-    "__temporal_pubsub_publish",
+    "__temporal_workflow_stream_publish",
     PublishInput(
         items=batch,
         publisher_id=self._publisher_id,
@@ -1292,17 +1291,17 @@ await self._handle.signal(
 ```
 
 ```python
-# In _broker.py, __temporal_pubsub_publish handler — drop the dedup branch:
+# In _stream.py, __temporal_workflow_stream_publish handler — drop the dedup branch:
 def _on_publish(self, input: PublishInput) -> None:
     # remove: if input.publisher_id and input.sequence ...
     for entry in input.items:
         self._log.append(
-            PubSubItem(topic=entry.topic, data=_decode_payload(entry.data))
+            WorkflowStreamItem(topic=entry.topic, data=_decode_payload(entry.data))
         )
 ```
 
 ```python
-# In PubSubState — this field becomes unused and can be removed in a
+# In WorkflowStreamState — this field becomes unused and can be removed in a
 # follow-up wire migration (see Compatibility):
 # publishers: dict[str, PublisherState]
 ```
@@ -1321,7 +1320,7 @@ def _on_publish(self, input: PublishInput) -> None:
 
 **What goes away:**
 
-- `publishers` in `PubSubState`.
+- `publishers` in `WorkflowStreamState`.
 - `publisher_ttl` and the `publisher_ttl > max_retry_duration` safety
   constraint — there is no longer a per-publisher map to expire.
 
@@ -1337,7 +1336,7 @@ def _on_publish(self, input: PublishInput) -> None:
    not yet been re-deployed remains correct.
 4. After all clients are upgraded, deploy a workflow version that
    ignores `(publisher_id, sequence)` and relies on the server. Drop
-   the dedup fields from `PubSubState` in a subsequent wire-format
+   the dedup fields from `WorkflowStreamState` in a subsequent wire-format
    pass once the old fields are no longer read by any deployed
    version.
 
@@ -1365,22 +1364,22 @@ bypassing the update RPC layer.
 ### Why `continue_as_new` takes a state-bound builder
 
 The helper's signature is
-`continue_as_new(build_args: Callable[[PubSubState], Sequence[Any]])`.
+`continue_as_new(build_args: Callable[[WorkflowStreamState], Sequence[Any]])`.
 Two earlier shapes were rejected:
 
 1. **Eager-args form** —
-   `continue_as_new(args=[WorkflowInput(pubsub_state=self.get_state(), ...)])`.
+   `continue_as_new(args=[WorkflowInput(stream_state=self.get_state(), ...)])`.
    Python evaluates call-site arguments before the method body runs,
    so `self.get_state()` would snapshot state *before* `drain()` and
    `all_handlers_finished` — the opposite of the recipe's intent.
 2. **Zero-arg builder** — `build_args: Callable[[], Sequence[Any]]`,
-   the lambda inspecting `self.pubsub` directly. Defers evaluation
+   the lambda inspecting `self.stream` directly. Defers evaluation
    correctly, but leaves the caller free to write
-   `self.pubsub.get_state()` inside the lambda, where the
+   `self.stream.get_state()` inside the lambda, where the
    "evaluated post-drain" contract is implicit and only documented in
    prose.
 
-Passing the post-drain `PubSubState` as the lambda's parameter makes
+Passing the post-drain `WorkflowStreamState` as the lambda's parameter makes
 the contract structural: there is one path to the state and the helper
 controls when it's read. The signature itself reads as "here is the
 state, return the CAN args."
@@ -1395,10 +1394,10 @@ area stable as new CAN options land in `temporalio.workflow`.
 ## File Layout
 
 ```
-temporalio/contrib/pubsub/
+temporalio/contrib/workflow_stream/
 ├── __init__.py                  # Public API exports
-├── _broker.py                   # PubSub (workflow-side)
-├── _client.py                   # PubSubClient (external-side)
+├── _stream.py                   # WorkflowStream (workflow-side)
+├── _client.py                   # WorkflowStreamClient (external-side)
 ├── _types.py                    # Shared data types
 ├── README.md                    # Usage documentation
 └── DESIGN-v2.md                 # This document

@@ -7,7 +7,7 @@ from google.adk.models.llm_response import LlmResponse
 
 import temporalio.workflow
 from temporalio import activity, workflow
-from temporalio.contrib.pubsub import PubSubClient
+from temporalio.contrib.workflow_stream import WorkflowStreamClient
 from temporalio.workflow import ActivityConfig
 
 
@@ -54,10 +54,10 @@ async def invoke_model_streaming(
     yields these to the caller.
 
     When ``streaming_event_topic`` is set, each response is also
-    published to the workflow's pub/sub broker so external consumers
+    published to the workflow's stream so external consumers
     (UIs, tracing, etc.) can observe responses as they arrive. Set the
     topic to ``None`` to skip publishing entirely; in that case no
-    :class:`PubSubClient` is constructed.
+    :class:`WorkflowStreamClient` is constructed.
     """
     if llm_request.model is None:
         raise ValueError("No model name provided, could not create LLM.")
@@ -68,23 +68,23 @@ async def invoke_model_streaming(
 
     responses: list[LlmResponse] = []
 
-    async def consume(pubsub: PubSubClient | None, topic: str | None) -> None:
+    async def consume(stream: WorkflowStreamClient | None, topic: str | None) -> None:
         async for response in llm.generate_content_async(
             llm_request=llm_request, stream=True
         ):
             activity.heartbeat()
             responses.append(response)
-            if pubsub is not None and topic is not None:
-                pubsub.publish(topic, response)
+            if stream is not None and topic is not None:
+                stream.publish(topic, response)
 
     if streaming_event_topic is None:
         await consume(None, None)
     else:
-        pubsub = PubSubClient.from_activity(
+        stream = WorkflowStreamClient.from_activity(
             batch_interval=streaming_event_batch_interval,
         )
-        async with pubsub:
-            await consume(pubsub, streaming_event_topic)
+        async with stream:
+            await consume(stream, streaming_event_topic)
 
     return responses
 
@@ -115,17 +115,17 @@ class TemporalModel(BaseLlm):
                 deterministic as it is called during workflow execution. If
                 the callable raises, the exception will propagate and fail
                 the workflow task.
-            streaming_event_topic: Pub/sub topic to publish raw
+            streaming_event_topic: Stream topic to publish raw
                 ``LlmResponse`` chunks to when streaming. Set to ``None``
                 to skip publishing entirely (workflow-side iteration via
-                ``stream=True`` still works, no broker required). When
+                ``stream=True`` still works, no stream required). When
                 set, the workflow must host a
-                :class:`temporalio.contrib.pubsub.PubSub` broker to
-                receive the publishes; otherwise the signals are
+                :class:`temporalio.contrib.workflow_stream.WorkflowStream`
+                to receive the publishes; otherwise the signals are
                 unhandled and dropped. Streaming support is
                 experimental and may change in future versions.
             streaming_event_batch_interval: Interval between automatic
-                flushes for the pub/sub publisher used by the streaming
+                flushes for the stream publisher used by the streaming
                 activity. Ignored when ``streaming_event_topic`` is
                 ``None``. Streaming support is experimental and may
                 change in future versions.

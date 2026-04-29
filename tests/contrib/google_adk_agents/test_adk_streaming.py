@@ -1,7 +1,7 @@
 """Integration tests for ADK streaming support.
 
 Verifies that the streaming model activity publishes raw ``LlmResponse``
-chunks via the PubSub broker and that non-streaming mode remains
+chunks via the WorkflowStream broker and that non-streaming mode remains
 backward-compatible.
 """
 
@@ -23,7 +23,7 @@ from google.genai.types import Content, Part
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
-from temporalio.contrib.pubsub import PubSub, PubSubClient
+from temporalio.contrib.workflow_stream import WorkflowStream, WorkflowStreamClient
 from temporalio.worker import Worker
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class StreamingAdkWorkflow:
 
     @workflow.init
     def __init__(self, prompt: str) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -137,11 +137,11 @@ async def test_streaming_publishes_events(client: Client):
             execution_timeout=timedelta(seconds=30),
         )
 
-        pubsub = PubSubClient.create(client, workflow_id)
+        stream = WorkflowStreamClient.create(client, workflow_id)
         responses: list[LlmResponse] = []
 
         async def collect_events() -> None:
-            async for item in pubsub.subscribe(
+            async for item in stream.subscribe(
                 ["events"],
                 from_offset=0,
                 result_type=LlmResponse,

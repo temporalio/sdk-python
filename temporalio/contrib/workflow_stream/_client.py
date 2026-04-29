@@ -1,17 +1,19 @@
-"""External-side pub/sub client.
+"""External-side client for Workflow Streams.
 
 Used by activities, starters, and any code with a workflow handle to
-publish messages and subscribe to topics on a pub/sub workflow.
+publish messages and subscribe to topics on a workflow that hosts a
+:class:`WorkflowStream`.
 
 Each published value is turned into a :class:`Payload` via the client's
 sync payload converter. The **codec chain** (e.g. encryption, compression)
 is **not** run per item — it runs once at the envelope
-level when Temporal's SDK encodes the ``__temporal_pubsub_publish`` signal args
-and the ``__temporal_pubsub_poll`` update result. Running the codec per item as
-well would double-encrypt / double-compress, because the envelope path
-covers the items again. The per-item ``Payload`` still carries the
-encoding metadata (``encoding: json/plain``, ``messageType``, etc.)
-required by ``subscribe(result_type=T)`` on the consumer side.
+level when Temporal's SDK encodes the ``__temporal_workflow_stream_publish``
+signal args and the ``__temporal_workflow_stream_poll`` update result.
+Running the codec per item as well would double-encrypt / double-compress,
+because the envelope path covers the items again. The per-item
+``Payload`` still carries the encoding metadata (``encoding: json/plain``,
+``messageType``, etc.) required by ``subscribe(result_type=T)`` on the
+consumer side.
 """
 
 from __future__ import annotations
@@ -41,14 +43,14 @@ from ._types import (
     PollResult,
     PublishEntry,
     PublishInput,
-    PubSubItem,
+    WorkflowStreamItem,
     _decode_payload,
     _encode_payload,
 )
 
 
-class PubSubClient:
-    """Client for publishing to and subscribing from a pub/sub workflow.
+class WorkflowStreamClient:
+    """Client for publishing to and subscribing from a workflow stream.
 
     .. warning::
         This class is experimental and may change in future versions.
@@ -60,7 +62,7 @@ class PubSubClient:
     For publishing, use as an async context manager to get automatic
     batching::
 
-        client = PubSubClient.create(temporal_client, workflow_id)
+        client = WorkflowStreamClient.create(temporal_client, workflow_id)
         async with client:
             client.publish("events", my_event)
             client.publish("events", another_event, force_flush=True)
@@ -69,7 +71,7 @@ class PubSubClient:
 
     For subscribing::
 
-        client = PubSubClient.create(temporal_client, workflow_id)
+        client = WorkflowStreamClient.create(temporal_client, workflow_id)
         async for item in client.subscribe(["events"], result_type=MyEvent):
             process(item.data)
     """
@@ -83,14 +85,14 @@ class PubSubClient:
         max_batch_size: int | None = None,
         max_retry_duration: timedelta = timedelta(seconds=600),
     ) -> None:
-        """Create a pub/sub client from a workflow handle.
+        """Create a stream client from a workflow handle.
 
         Prefer :py:meth:`create` — it enables continue-as-new following
         in ``subscribe()`` and supplies the :class:`Client` needed to
         reach the data converter chain.
 
         Args:
-            handle: Workflow handle to the pub/sub workflow.
+            handle: Workflow handle to the workflow hosting the stream.
             client: Temporal client whose payload converter will be used
                 to turn published values into ``Payload`` objects and to
                 decode subscriptions when ``result_type`` is set. The
@@ -129,8 +131,8 @@ class PubSubClient:
         batch_interval: timedelta = timedelta(seconds=2),
         max_batch_size: int | None = None,
         max_retry_duration: timedelta = timedelta(seconds=600),
-    ) -> PubSubClient:
-        """Create a pub/sub client from a Temporal client and workflow ID.
+    ) -> WorkflowStreamClient:
+        """Create a stream client from a Temporal client and workflow ID.
 
         Use this when the caller has an explicit ``Client`` and
         ``workflow_id`` in hand (starters, BFFs, other workflows'
@@ -143,7 +145,7 @@ class PubSubClient:
 
         Args:
             client: Temporal client.
-            workflow_id: ID of the pub/sub workflow.
+            workflow_id: ID of the workflow hosting the stream.
             batch_interval: Interval between automatic flushes.
             max_batch_size: Auto-flush when buffer reaches this size.
             max_retry_duration: Maximum time to retry a failed flush
@@ -165,8 +167,8 @@ class PubSubClient:
         batch_interval: timedelta = timedelta(seconds=2),
         max_batch_size: int | None = None,
         max_retry_duration: timedelta = timedelta(seconds=600),
-    ) -> PubSubClient:
-        """Create a pub/sub client targeting the current activity's parent workflow.
+    ) -> WorkflowStreamClient:
+        """Create a stream client targeting the current activity's parent workflow.
 
         Must be called from within an activity. The Temporal client and
         parent workflow id are taken from the activity context.
@@ -347,7 +349,7 @@ class PubSubClient:
                 # workflow-side dedup go away. See DESIGN-v2 §"Replace
                 # workflow-side dedup with server-side request_id".
                 await self._handle.signal(
-                    "__temporal_pubsub_publish",
+                    "__temporal_workflow_stream_publish",
                     PublishInput(
                         items=batch,
                         publisher_id=self._publisher_id,
@@ -383,7 +385,7 @@ class PubSubClient:
         *,
         result_type: type | None = None,
         poll_cooldown: timedelta = timedelta(milliseconds=100),
-    ) -> AsyncIterator[PubSubItem]:
+    ) -> AsyncIterator[WorkflowStreamItem]:
         """Async iterator that polls for new items.
 
         Automatically follows continue-as-new chains when the client
@@ -394,8 +396,8 @@ class PubSubClient:
                 names, or None. None or empty list means all topics.
             from_offset: Global offset to start reading from.
             result_type: Optional target type. When provided, each
-                yielded :class:`PubSubItem` has its ``data`` decoded
-                via the client's sync payload converter to the
+                yielded :class:`WorkflowStreamItem` has its ``data``
+                decoded via the client's sync payload converter to the
                 specified type. When omitted, ``data`` is the raw
                 ``temporalio.api.common.v1.Payload`` — useful for
                 heterogeneous topics where the caller dispatches on
@@ -405,7 +407,7 @@ class PubSubClient:
                 than the poll round-trip. Defaults to 100ms.
 
         Yields:
-            :class:`PubSubItem` for each matching item.
+            :class:`WorkflowStreamItem` for each matching item.
         """
         topic_filter: list[str]
         if topics is None:
@@ -418,7 +420,7 @@ class PubSubClient:
         while True:
             try:
                 result: PollResult = await self._handle.execute_update(
-                    "__temporal_pubsub_poll",
+                    "__temporal_workflow_stream_poll",
                     PollInput(topics=topic_filter, from_offset=offset),
                     result_type=PollResult,
                 )
@@ -427,7 +429,7 @@ class PubSubClient:
             except WorkflowUpdateFailedError as e:
                 if e.cause and getattr(e.cause, "type", None) == "TruncatedOffset":
                     # Subscriber fell behind truncation. Retry from
-                    # offset 0 which the mixin treats as "from the
+                    # offset 0 which the stream treats as "from the
                     # beginning of whatever exists" (i.e., from
                     # base_offset).
                     offset = 0
@@ -444,7 +446,7 @@ class PubSubClient:
                     data: Any = converter.from_payload(payload, result_type)
                 else:
                     data = payload
-                yield PubSubItem(
+                yield WorkflowStreamItem(
                     topic=wire_item.topic,
                     data=data,
                     offset=wire_item.offset,
@@ -472,4 +474,6 @@ class PubSubClient:
 
     async def get_offset(self) -> int:
         """Query the current global offset (base_offset + log length)."""
-        return await self._handle.query("__temporal_pubsub_offset", result_type=int)
+        return await self._handle.query(
+            "__temporal_workflow_stream_offset", result_type=int
+        )

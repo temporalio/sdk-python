@@ -1,14 +1,15 @@
-"""Prototype tests that de-risked the pubsub bytes -> Payload migration.
+"""Prototype tests that de-risked the workflow_stream bytes -> Payload migration.
 
-The migration doc (``docs/pubsub-payload-migration.md``) flagged two
-load-bearing questions, answered empirically here:
+The migration doc (``docs/pubsub-payload-migration.md`` — to be renamed
+to ``docs/workflow-stream-payload-migration.md`` in a follow-up PR)
+flagged two load-bearing questions, answered empirically here:
 
 1. Does the default JSON converter handle ``Payload`` embedded in a
    dataclass? **No** — serialization fails with ``TypeError``. This
    rules out a naive nested-Payload wire format.
 2. Does a proto-serialized ``Payload`` inside a dataclass round-trip?
    **Yes**. This is the wire format the migration adopts: base64 of
-   ``Payload.SerializeToString()`` inside ``PublishEntry``/``_WireItem``,
+   ``Payload.SerializeToString()`` inside ``PublishEntry``/``_WorkflowStreamWireItem``,
    surfacing ``Payload`` (or a decoded value via ``result_type=``) at
    the user API.
 

@@ -70,22 +70,22 @@ class ModelActivityParameters:
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
 
     streaming_event_topic: str | None = None
-    """Pub/sub topic to publish raw model stream events to when the workflow
+    """Stream topic to publish raw model stream events to when the workflow
     calls ``Runner.run_streamed``. Set to ``None`` to skip publishing
     entirely (workflow-side iteration via ``stream_events()`` still works,
-    no broker required). When set, the workflow must host a
-    :class:`temporalio.contrib.pubsub.PubSub` broker to receive the
-    publishes; otherwise the signals are unhandled and dropped.
+    no stream required). When set, the workflow must host a
+    :class:`temporalio.contrib.workflow_stream.WorkflowStream` to receive
+    the publishes; otherwise the signals are unhandled and dropped.
 
     Streaming is incompatible with ``use_local_activity`` (local activities
-    do not support heartbeats or the pubsub signal channel).
+    do not support heartbeats or the workflow stream signal channel).
 
     .. warning::
         Streaming support is experimental and may change in future
         versions."""
 
     streaming_event_batch_interval: timedelta = timedelta(milliseconds=100)
-    """Interval between automatic flushes for the pub/sub publisher used
+    """Interval between automatic flushes for the stream publisher used
     by the streaming activity. Ignored when ``streaming_event_topic`` is
     ``None``.
 

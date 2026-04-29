@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from datetime import timedelta
-
-from temporalio import workflow
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from typing import Any
 
 from agents import (
@@ -30,6 +26,7 @@ from agents.items import TResponseStreamEvent
 from agents.tool import ApplyPatchTool, LocalShellTool, ShellTool, ToolSearchTool
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 
+from temporalio import workflow
 from temporalio.contrib.openai_agents._invoke_model_activity import (
     ActivityModelInput,
     AgentOutputSchemaInput,
@@ -42,6 +39,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     ShellToolInput,
     ToolInput,
 )
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 
 
 class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
@@ -234,8 +232,8 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
         # Streaming relies on activity heartbeats to detect a stuck LLM
-        # call and on PubSubClient.from_activity() to signal partial
-        # results back to the workflow. Local activities support
+        # call and on WorkflowStreamClient.from_activity() to signal
+        # partial results back to the workflow. Local activities support
         # neither: their result commits with the workflow task, so there
         # is no independent task to heartbeat against or to send signals
         # from.
@@ -243,7 +241,7 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
             raise ValueError(
                 "Streaming is incompatible with use_local_activity "
                 "(local activities do not support heartbeats or the "
-                "pubsub signal channel)."
+                "workflow stream signal channel)."
             )
 
         activity_input, summary = self._build_activity_input(

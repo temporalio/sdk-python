@@ -2,7 +2,6 @@ import asyncio
 import dataclasses
 import functools
 import inspect
-
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
@@ -27,7 +26,6 @@ from temporalio.exceptions import (
 )
 from temporalio.worker import PollerBehaviorSimpleMaximum, Worker
 from temporalio.workflow import ActivityConfig, ActivityHandle
-
 
 
 @dataclasses.dataclass

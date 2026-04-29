@@ -4,7 +4,6 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 """
 
 import enum
-
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, NoReturn
@@ -45,9 +44,8 @@ from typing_extensions import Required, TypedDict
 
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
-from temporalio.contrib.pubsub import PubSubClient
+from temporalio.contrib.workflow_stream import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
-
 
 
 @dataclass
@@ -348,10 +346,10 @@ class ModelActivity:
         terminal ``ResponseCompletedEvent``.
 
         When ``streaming_event_topic`` is set, each event is also
-        published to the workflow's pub/sub broker so external consumers
+        published to the workflow's stream so external consumers
         (UIs, tracing, etc.) can observe events as they arrive. Set the
         topic to ``None`` to skip publishing entirely; in that case no
-        :class:`PubSubClient` is constructed.
+        :class:`WorkflowStreamClient` is constructed.
 
         Heartbeats run on a background task via ``_auto_heartbeater`` so
         long initial-token latency or long pauses between chunks do not
@@ -363,7 +361,9 @@ class ModelActivity:
         topic = input.get("streaming_event_topic")
         events: list[TResponseStreamEvent] = []
 
-        async def consume(pubsub: PubSubClient | None, topic: str | None) -> None:
+        async def consume(
+            stream: WorkflowStreamClient | None, topic: str | None
+        ) -> None:
             try:
                 async for event in model.stream_response(
                     system_instructions=input.get("system_instructions"),
@@ -378,8 +378,8 @@ class ModelActivity:
                     prompt=input.get("prompt"),
                 ):
                     events.append(event)
-                    if pubsub is not None and topic is not None:
-                        pubsub.publish(topic, event)
+                    if stream is not None and topic is not None:
+                        stream.publish(topic, event)
             except APIStatusError as e:
                 _raise_for_openai_status(e)
 
@@ -389,10 +389,10 @@ class ModelActivity:
             batch_interval = input.get(
                 "streaming_event_batch_interval", timedelta(milliseconds=100)
             )
-            pubsub = PubSubClient.from_activity(
+            stream = WorkflowStreamClient.from_activity(
                 batch_interval=batch_interval,
             )
-            async with pubsub:
-                await consume(pubsub, topic)
+            async with stream:
+                await consume(stream, topic)
 
         return events

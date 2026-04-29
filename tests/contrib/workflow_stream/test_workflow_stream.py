@@ -1,4 +1,4 @@
-"""E2E integration tests for temporalio.contrib.pubsub."""
+"""E2E integration tests for temporalio.contrib.workflow_stream."""
 
 from __future__ import annotations
 
@@ -27,17 +27,17 @@ import temporalio.api.operatorservice.v1
 import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
-from temporalio.contrib.pubsub import (
+from temporalio.contrib.workflow_stream import (
     PollInput,
     PollResult,
     PublishEntry,
     PublishInput,
-    PubSub,
-    PubSubClient,
-    PubSubItem,
-    PubSubState,
+    WorkflowStream,
+    WorkflowStreamClient,
+    WorkflowStreamItem,
+    WorkflowStreamState,
 )
-from temporalio.contrib.pubsub._types import _encode_payload
+from temporalio.contrib.workflow_stream._types import _encode_payload
 from temporalio.converter import DataConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
@@ -50,7 +50,7 @@ from tests.helpers.nexus import make_nexus_endpoint_name
 def _wire_bytes(data: bytes) -> str:
     """Build a PublishEntry.data string from raw bytes.
 
-    Mirrors what :class:`PubSubClient` produces on the encode path:
+    Mirrors what :class:`WorkflowStreamClient` produces on the encode path:
     default payload converter turns the bytes into a ``Payload``, which
     is then proto-serialized and base64-encoded for the wire.
     """
@@ -64,10 +64,10 @@ def _wire_bytes(data: bytes) -> str:
 
 
 @workflow.defn
-class BasicPubSubWorkflow:
+class BasicWorkflowStreamWorkflow:
     @workflow.init
     def __init__(self) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -83,7 +83,7 @@ class BasicPubSubWorkflow:
 class ActivityPublishWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -98,7 +98,7 @@ class ActivityPublishWorkflow:
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.pubsub.publish("status", b"activity_done")
+        self.stream.publish("status", b"activity_done")
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -112,7 +112,7 @@ class AgentEvent:
 class StructuredPublishWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -122,7 +122,7 @@ class StructuredPublishWorkflow:
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.pubsub.publish("events", AgentEvent(kind="tick", payload={"i": i}))
+            self.stream.publish("events", AgentEvent(kind="tick", payload={"i": i}))
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -130,7 +130,7 @@ class StructuredPublishWorkflow:
 class WorkflowSidePublishWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -140,7 +140,7 @@ class WorkflowSidePublishWorkflow:
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.pubsub.publish("events", f"item-{i}".encode())
+            self.stream.publish("events", f"item-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -148,7 +148,7 @@ class WorkflowSidePublishWorkflow:
 class MultiTopicWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -170,7 +170,7 @@ class MultiTopicWorkflow:
 class InterleavedWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -179,14 +179,14 @@ class InterleavedWorkflow:
 
     @workflow.run
     async def run(self, count: int) -> None:
-        self.pubsub.publish("status", b"started")
+        self.stream.publish("status", b"started")
         await workflow.execute_activity(
             "publish_items",
             count,
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.pubsub.publish("status", b"done")
+        self.stream.publish("status", b"done")
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -194,7 +194,7 @@ class InterleavedWorkflow:
 class PriorityWorkflow:
     @workflow.init
     def __init__(self) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -215,7 +215,7 @@ class PriorityWorkflow:
 class FlushOnExitWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -237,7 +237,7 @@ class FlushOnExitWorkflow:
 class MaxBatchWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -246,7 +246,7 @@ class MaxBatchWorkflow:
 
     @workflow.query
     def publisher_sequences(self) -> dict[str, int]:
-        return {pid: ps.sequence for pid, ps in self.pubsub._publishers.items()}
+        return {pid: ps.sequence for pid, ps in self.stream._publishers.items()}
 
     @workflow.run
     async def run(self, count: int) -> None:
@@ -256,13 +256,13 @@ class MaxBatchWorkflow:
             start_to_close_timeout=timedelta(seconds=30),
             heartbeat_timeout=timedelta(seconds=10),
         )
-        self.pubsub.publish("status", b"activity_done")
+        self.stream.publish("status", b"activity_done")
         await workflow.wait_condition(lambda: self._closed)
 
 
 @workflow.defn
-class LatePubSubWorkflow:
-    """Calls PubSub() from @workflow.run, not from @workflow.init.
+class LateWorkflowStreamWorkflow:
+    """Calls WorkflowStream() from @workflow.run, not from @workflow.init.
 
     The constructor inspects the caller's frame and requires the
     function name to be ``__init__``; called from ``run``, it must
@@ -273,7 +273,7 @@ class LatePubSubWorkflow:
     @workflow.run
     async def run(self) -> str:
         try:
-            PubSub()
+            WorkflowStream()
         except RuntimeError as e:
             return str(e)
         return "no error raised"
@@ -281,21 +281,21 @@ class LatePubSubWorkflow:
 
 @workflow.defn
 class DoubleInitWorkflow:
-    """Calls PubSub() twice from @workflow.init.
+    """Calls WorkflowStream() twice from @workflow.init.
 
     The first call succeeds; the second must raise RuntimeError because
-    the pub/sub signal handler is already registered. The workflow
+    the workflow stream signal handler is already registered. The workflow
     stashes the error message so the test can assert on it without
     forcing a workflow task failure.
     """
 
     @workflow.init
     def __init__(self) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
         self.double_init_error: str | None = None
         try:
-            PubSub()
+            WorkflowStream()
         except RuntimeError as e:
             self.double_init_error = str(e)
 
@@ -319,7 +319,9 @@ class DoubleInitWorkflow:
 
 @activity.defn(name="publish_items")
 async def publish_items(count: int) -> None:
-    client = PubSubClient.from_activity(batch_interval=timedelta(milliseconds=500))
+    client = WorkflowStreamClient.from_activity(
+        batch_interval=timedelta(milliseconds=500)
+    )
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -329,7 +331,9 @@ async def publish_items(count: int) -> None:
 @activity.defn(name="publish_multi_topic")
 async def publish_multi_topic(count: int) -> None:
     topics = ["a", "b", "c"]
-    client = PubSubClient.from_activity(batch_interval=timedelta(milliseconds=500))
+    client = WorkflowStreamClient.from_activity(
+        batch_interval=timedelta(milliseconds=500)
+    )
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -344,7 +348,7 @@ async def publish_with_priority() -> None:
     # The hold is deliberately much longer than the test's collect timeout
     # so a regression (force_flush no-op) surfaces as a missing item rather
     # than flaking on slow CI.
-    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=60))
+    client = WorkflowStreamClient.from_activity(batch_interval=timedelta(seconds=60))
     async with client:
         client.publish("events", b"normal-0")
         client.publish("events", b"normal-1")
@@ -356,7 +360,7 @@ async def publish_with_priority() -> None:
 
 @activity.defn(name="publish_batch_test")
 async def publish_batch_test(count: int) -> None:
-    client = PubSubClient.from_activity(batch_interval=timedelta(seconds=60))
+    client = WorkflowStreamClient.from_activity(batch_interval=timedelta(seconds=60))
     async with client:
         for i in range(count):
             activity.heartbeat()
@@ -365,7 +369,7 @@ async def publish_batch_test(count: int) -> None:
 
 @activity.defn(name="publish_with_max_batch")
 async def publish_with_max_batch(count: int) -> None:
-    client = PubSubClient.from_activity(
+    client = WorkflowStreamClient.from_activity(
         batch_interval=timedelta(seconds=60), max_batch_size=3
     )
     async with client:
@@ -407,18 +411,18 @@ async def collect_items(
     timeout: float = 15.0,
     *,
     result_type: type | None = bytes,
-) -> list[PubSubItem]:
+) -> list[WorkflowStreamItem]:
     """Subscribe and collect exactly expected_count items, with timeout.
 
     Default ``result_type=bytes`` matches the bytes-oriented tests that
     compare ``item.data`` against literal byte strings. Pass
     ``result_type=None`` to receive raw ``Payload`` objects.
     """
-    pubsub = PubSubClient.create(client, handle.id)
-    items: list[PubSubItem] = []
+    stream = WorkflowStreamClient.create(client, handle.id)
+    items: list[WorkflowStreamItem] = []
     try:
         async with _async_timeout(timeout):
-            async for item in pubsub.subscribe(
+            async for item in stream.subscribe(
                 topics=topics,
                 from_offset=from_offset,
                 poll_cooldown=timedelta(0),
@@ -449,7 +453,7 @@ async def test_activity_publish_and_subscribe(client: Client) -> None:
         handle = await client.start_workflow(
             ActivityPublishWorkflow.run,
             count,
-            id=f"pubsub-basic-{uuid.uuid4()}",
+            id=f"workflow-stream-basic-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         # Collect activity items + the "activity_done" status item
@@ -476,7 +480,7 @@ async def test_structured_type_round_trip(client: Client) -> None:
         handle = await client.start_workflow(
             StructuredPublishWorkflow.run,
             count,
-            id=f"pubsub-structured-{uuid.uuid4()}",
+            id=f"workflow-stream-structured-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -503,7 +507,7 @@ async def test_topic_filtering(client: Client) -> None:
         handle = await client.start_workflow(
             MultiTopicWorkflow.run,
             count,
-            id=f"pubsub-filter-{uuid.uuid4()}",
+            id=f"workflow-stream-filter-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -535,7 +539,7 @@ async def test_subscribe_from_offset_and_per_item_offsets(client: Client) -> Non
         handle = await client.start_workflow(
             WorkflowSidePublishWorkflow.run,
             count,
-            id=f"pubsub-offset-{uuid.uuid4()}",
+            id=f"workflow-stream-offset-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -569,7 +573,7 @@ async def test_per_item_offsets_with_topic_filter(client: Client) -> None:
         handle = await client.start_workflow(
             MultiTopicWorkflow.run,
             count,
-            id=f"pubsub-item-offset-filter-{uuid.uuid4()}",
+            id=f"workflow-stream-item-offset-filter-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -601,7 +605,7 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
         handle = await client.start_workflow(
             TruncateWorkflow.run,
             5,
-            id=f"pubsub-trunc-error-{uuid.uuid4()}",
+            id=f"workflow-stream-trunc-error-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -618,7 +622,7 @@ async def test_poll_truncated_offset_returns_application_error(client: Client) -
         # below proves the workflow task wasn't poisoned.
         with pytest.raises(WorkflowUpdateFailedError) as exc_info:
             await handle.execute_update(
-                "__temporal_pubsub_poll",
+                "__temporal_workflow_stream_poll",
                 PollInput(topics=[], from_offset=1),
                 result_type=PollResult,
             )
@@ -646,7 +650,7 @@ async def test_truncate_past_end_raises_application_error(client: Client) -> Non
         handle = await client.start_workflow(
             TruncateWorkflow.run,
             2,
-            id=f"pubsub-trunc-oor-{uuid.uuid4()}",
+            id=f"workflow-stream-trunc-oor-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -674,7 +678,7 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
         handle = await client.start_workflow(
             TruncateWorkflow.run,
             5,
-            id=f"pubsub-trunc-recover-{uuid.uuid4()}",
+            id=f"workflow-stream-trunc-recover-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -683,11 +687,11 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
 
         # subscribe from offset 1 (truncated) — should auto-recover
         # and deliver items from base_offset (3)
-        pubsub = PubSubClient(handle)
-        items: list[PubSubItem] = []
+        stream = WorkflowStreamClient(handle)
+        items: list[WorkflowStreamItem] = []
         try:
             async with _async_timeout(5):
-                async for item in pubsub.subscribe(
+                async for item in stream.subscribe(
                     from_offset=1, poll_cooldown=timedelta(0), result_type=bytes
                 ):
                     items.append(item)
@@ -713,7 +717,7 @@ async def test_workflow_and_activity_publish_interleaved(client: Client) -> None
         handle = await client.start_workflow(
             InterleavedWorkflow.run,
             count,
-            id=f"pubsub-interleave-{uuid.uuid4()}",
+            id=f"workflow-stream-interleave-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -747,7 +751,7 @@ async def test_priority_flush(client: Client) -> None:
     ) as worker:
         handle = await client.start_workflow(
             PriorityWorkflow.run,
-            id=f"pubsub-priority-{uuid.uuid4()}",
+            id=f"workflow-stream-priority-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -770,29 +774,29 @@ async def test_iterator_cancellation(client: Client) -> None:
     completes cleanly."""
     async with new_worker(
         client,
-        BasicPubSubWorkflow,
+        BasicWorkflowStreamWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-cancel-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-cancel-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
         # Seed one item so the iterator provably reaches an active state
         # before we cancel — no sleep-based wait.
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"seed"))]
             ),
         )
 
-        pubsub_client = PubSubClient.create(client, handle.id)
+        stream_client = WorkflowStreamClient.create(client, handle.id)
         first_item = asyncio.Event()
-        items: list[PubSubItem] = []
+        items: list[WorkflowStreamItem] = []
 
         async def subscribe_and_collect() -> None:
-            async for item in pubsub_client.subscribe(
+            async for item in stream_client.subscribe(
                 from_offset=0, poll_cooldown=timedelta(0), result_type=bytes
             ):
                 items.append(item)
@@ -811,7 +815,7 @@ async def test_iterator_cancellation(client: Client) -> None:
         assert len(items) == 1
         assert items[0].data == b"seed"
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
@@ -826,7 +830,7 @@ async def test_context_manager_flushes_on_exit(client: Client) -> None:
         handle = await client.start_workflow(
             FlushOnExitWorkflow.run,
             count,
-            id=f"pubsub-flush-{uuid.uuid4()}",
+            id=f"workflow-stream-flush-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -856,37 +860,37 @@ async def test_explicit_flush_barrier(client: Client) -> None:
     """
     async with new_worker(
         client,
-        BasicPubSubWorkflow,
+        BasicWorkflowStreamWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-flush-barrier-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-flush-barrier-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
-        pubsub = PubSubClient.create(
+        stream = WorkflowStreamClient.create(
             client, handle.id, batch_interval=timedelta(seconds=60)
         )
 
         async with _async_timeout(5):
             # 1. Empty-buffer flush is a no-op (must not block).
-            assert await pubsub.get_offset() == 0
-            await pubsub.flush()
-            assert await pubsub.get_offset() == 0
+            assert await stream.get_offset() == 0
+            await stream.flush()
+            assert await stream.get_offset() == 0
 
             # 2. Flush makes prior publishes visible without waiting on
             # the 60s batch timer.
-            pubsub.publish("events", b"a")
-            pubsub.publish("events", b"b")
-            pubsub.publish("events", b"c")
-            await pubsub.flush()
-            assert await pubsub.get_offset() == 3
+            stream.publish("events", b"a")
+            stream.publish("events", b"b")
+            stream.publish("events", b"c")
+            await stream.flush()
+            assert await stream.get_offset() == 3
 
             # 3. Second flush with no new items is a no-op.
-            await pubsub.flush()
-            assert await pubsub.get_offset() == 3
+            await stream.flush()
+            assert await stream.get_offset() == 3
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
@@ -903,26 +907,26 @@ async def test_concurrent_subscribers(client: Client) -> None:
     """
     async with new_worker(
         client,
-        BasicPubSubWorkflow,
+        BasicWorkflowStreamWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-concurrent-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-concurrent-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
-        pubsub = PubSubClient(handle)
-        a_items: list[PubSubItem] = []
-        b_items: list[PubSubItem] = []
+        stream = WorkflowStreamClient(handle)
+        a_items: list[WorkflowStreamItem] = []
+        b_items: list[WorkflowStreamItem] = []
         a_got = [asyncio.Event(), asyncio.Event()]
         b_got = [asyncio.Event(), asyncio.Event()]
 
         async def collect(
             topic: str,
-            collected: list[PubSubItem],
+            collected: list[WorkflowStreamItem],
             events: list[asyncio.Event],
         ) -> None:
-            async for item in pubsub.subscribe(
+            async for item in stream.subscribe(
                 topics=[topic],
                 from_offset=0,
                 poll_cooldown=timedelta(0),
@@ -938,7 +942,7 @@ async def test_concurrent_subscribers(client: Client) -> None:
 
         async def publish(topic: str, data: bytes) -> None:
             await handle.signal(
-                "__temporal_pubsub_publish",
+                "__temporal_workflow_stream_publish",
                 PublishInput(items=[PublishEntry(topic=topic, data=_wire_bytes(data))]),
             )
 
@@ -963,7 +967,7 @@ async def test_concurrent_subscribers(client: Client) -> None:
         assert [i.data for i in a_items] == [b"a-0", b"a-1"]
         assert [i.data for i in b_items] == [b"b-0", b"b-1"]
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
@@ -979,7 +983,7 @@ async def test_max_batch_size(client: Client) -> None:
         handle = await client.start_workflow(
             MaxBatchWorkflow.run,
             count,
-            id=f"pubsub-maxbatch-{uuid.uuid4()}",
+            id=f"workflow-stream-maxbatch-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         # count items from activity + 1 "activity_done" from workflow
@@ -1010,7 +1014,7 @@ async def test_max_batch_size(client: Client) -> None:
 
 @pytest.mark.asyncio
 async def test_replay_safety(client: Client) -> None:
-    """Pub/sub broker survives workflow replay (max_cached_workflows=0)."""
+    """Workflow stream broker survives workflow replay (max_cached_workflows=0)."""
     async with new_worker(
         client,
         InterleavedWorkflow,
@@ -1020,7 +1024,7 @@ async def test_replay_safety(client: Client) -> None:
         handle = await client.start_workflow(
             InterleavedWorkflow.run,
             5,
-            id=f"pubsub-replay-{uuid.uuid4()}",
+            id=f"workflow-stream-replay-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         # 1 (started) + 5 (activity) + 1 (done) = 7
@@ -1051,14 +1055,14 @@ async def test_flush_retry_preserves_items_after_failures(
     must not drop items, must not duplicate them on retry, and must not
     reorder items published during the failed state.
     """
-    async with new_worker(client, BasicPubSubWorkflow) as worker:
+    async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-flush-retry-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-flush-retry-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
-        pubsub = PubSubClient(handle)
+        stream = WorkflowStreamClient(handle)
         real_signal = handle.signal
         fail_remaining = 2
 
@@ -1070,36 +1074,36 @@ async def test_flush_retry_preserves_items_after_failures(
             return await real_signal(*args, **kwargs)
 
         with patch.object(handle, "signal", side_effect=maybe_failing_signal):
-            pubsub.publish("events", b"item-0")
-            pubsub.publish("events", b"item-1")
+            stream.publish("events", b"item-0")
+            stream.publish("events", b"item-1")
             with pytest.raises(RuntimeError):
-                await pubsub._flush()
+                await stream._flush()
 
             # Publish more during the failed state — must not overtake the
             # pending retry on eventual delivery.
-            pubsub.publish("events", b"item-2")
+            stream.publish("events", b"item-2")
             with pytest.raises(RuntimeError):
-                await pubsub._flush()
+                await stream._flush()
 
             # Third flush succeeds, delivering the pending retry batch.
-            await pubsub._flush()
+            await stream._flush()
             # Fourth flush delivers the buffered "item-2".
-            await pubsub._flush()
+            await stream._flush()
 
         items = await collect_items(client, handle, None, 0, 3)
         assert [i.data for i in items] == [b"item-0", b"item-1", b"item-2"]
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
 async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
     """When max_retry_duration is exceeded, flush raises TimeoutError and the
     client can resume publishing without losing subsequent items."""
-    async with new_worker(client, BasicPubSubWorkflow) as worker:
+    async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-retry-expiry-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-retry-expiry-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -1108,7 +1112,9 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
         # `max_retry_duration`, so advancing the clock between flushes makes
         # the timeout fire deterministically regardless of wall-clock speed
         # or clock resolution.
-        pubsub = PubSubClient(handle, max_retry_duration=timedelta(milliseconds=100))
+        stream = WorkflowStreamClient(
+            handle, max_retry_duration=timedelta(milliseconds=100)
+        )
         real_signal = handle.signal
         fail_signals = True
 
@@ -1120,34 +1126,34 @@ async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
         clock = [0.0]
         with (
             patch(
-                "temporalio.contrib.pubsub._client.time.monotonic",
+                "temporalio.contrib.workflow_stream._client.time.monotonic",
                 side_effect=lambda: clock[0],
             ),
             patch.object(handle, "signal", side_effect=maybe_failing_signal),
         ):
-            pubsub.publish("events", b"lost")
+            stream.publish("events", b"lost")
 
             # First flush fails and enters the pending-retry state.
             with pytest.raises(RuntimeError):
-                await pubsub._flush()
+                await stream._flush()
 
             # Advance the clock well past max_retry_duration.
             clock[0] = 10.0
 
             # Next flush raises TimeoutError — the pending batch is abandoned.
             with pytest.raises(TimeoutError, match="max_retry_duration"):
-                await pubsub._flush()
+                await stream._flush()
 
             # Stop failing signals; subsequent publishes must succeed.
             fail_signals = False
-            pubsub.publish("events", b"kept")
-            await pubsub._flush()
+            stream.publish("events", b"kept")
+            await stream._flush()
 
         items = await collect_items(client, handle, None, 0, 1)
         assert len(items) == 1
         assert items[0].data == b"kept"
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
@@ -1155,17 +1161,17 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
     """Workflow deduplicates signals with the same publisher_id + sequence."""
     async with new_worker(
         client,
-        BasicPubSubWorkflow,
+        BasicWorkflowStreamWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-dedup-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-dedup-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
         # Send a batch with publisher_id and sequence
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"item-0"))],
                 publisher_id="test-pub",
@@ -1175,7 +1181,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
 
         # Send the same sequence again — should be deduped
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"duplicate"))],
                 publisher_id="test-pub",
@@ -1185,7 +1191,7 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
 
         # Send a new sequence — should go through
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"item-1"))],
                 publisher_id="test-pub",
@@ -1200,25 +1206,25 @@ async def test_dedup_rejects_duplicate_signal(client: Client) -> None:
         assert items[1].data == b"item-1"
 
         # Verify offset is 2 (not 3)
-        pubsub_client = PubSubClient(handle)
-        offset = await pubsub_client.get_offset()
+        stream_client = WorkflowStreamClient(handle)
+        offset = await stream_client.get_offset()
         assert offset == 2
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
 async def test_double_init_raises(client: Client) -> None:
-    """Instantiating PubSub twice from @workflow.init raises RuntimeError.
+    """Instantiating WorkflowStream twice from @workflow.init raises RuntimeError.
 
-    The first PubSub() registers the __temporal_pubsub_publish signal handler; the
+    The first WorkflowStream() registers the __temporal_workflow_stream_publish signal handler; the
     second call detects the existing handler and raises rather than
     silently overwriting it.
     """
     async with new_worker(client, DoubleInitWorkflow) as worker:
         handle = await client.start_workflow(
             DoubleInitWorkflow.run,
-            id=f"pubsub-double-init-{uuid.uuid4()}",
+            id=f"workflow-stream-double-init-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         err = await handle.query(DoubleInitWorkflow.get_double_init_error)
@@ -1228,17 +1234,17 @@ async def test_double_init_raises(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_pubsub_outside_init_raises(client: Client) -> None:
-    """Constructing PubSub outside @workflow.init raises RuntimeError.
+async def test_workflow_stream_outside_init_raises(client: Client) -> None:
+    """Constructing WorkflowStream outside @workflow.init raises RuntimeError.
 
-    The workflow calls PubSub() from @workflow.run; the caller-frame
+    The workflow calls WorkflowStream() from @workflow.run; the caller-frame
     guard must reject the call because the caller's function name is
     ``run``, not ``__init__``.
     """
-    async with new_worker(client, LatePubSubWorkflow) as worker:
+    async with new_worker(client, LateWorkflowStreamWorkflow) as worker:
         result = await client.execute_workflow(
-            LatePubSubWorkflow.run,
-            id=f"pubsub-late-init-{uuid.uuid4()}",
+            LateWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-late-init-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         assert "must be constructed directly from the workflow's" in result
@@ -1246,8 +1252,8 @@ async def test_pubsub_outside_init_raises(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_truncate_pubsub(client: Client) -> None:
-    """PubSub.truncate discards prefix and adjusts base_offset."""
+async def test_truncate_stream(client: Client) -> None:
+    """WorkflowStream.truncate discards prefix and adjusts base_offset."""
     async with new_worker(
         client,
         TruncateWorkflow,
@@ -1255,7 +1261,7 @@ async def test_truncate_pubsub(client: Client) -> None:
         handle = await client.start_workflow(
             TruncateWorkflow.run,
             5,
-            id=f"pubsub-truncate-{uuid.uuid4()}",
+            id=f"workflow-stream-truncate-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -1268,8 +1274,8 @@ async def test_truncate_pubsub(client: Client) -> None:
         await handle.execute_update("truncate", 3)
 
         # Offset should still be 5 (truncation moves base_offset, not tail)
-        pubsub_client = PubSubClient(handle)
-        offset = await pubsub_client.get_offset()
+        stream_client = WorkflowStreamClient(handle)
+        offset = await stream_client.get_offset()
         assert offset == 5
 
         # Reading from offset 3 should work (items 3, 4)
@@ -1282,8 +1288,8 @@ async def test_truncate_pubsub(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
-    """PubSub.get_state prunes publishers whose last-seen time exceeds the
+async def test_ttl_pruning_in_get_stream_state(client: Client) -> None:
+    """WorkflowStream.get_state prunes publishers whose last-seen time exceeds the
     TTL while retaining newer publishers. The log itself is unaffected.
 
     Uses a wall-clock gap between publishes so that workflow.time()
@@ -1296,13 +1302,13 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
     ) as worker:
         handle = await client.start_workflow(
             TTLTestWorkflow.run,
-            id=f"pubsub-ttl-{uuid.uuid4()}",
+            id=f"workflow-stream-ttl-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
         # pub-old arrives first.
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"old"))],
                 publisher_id="pub-old",
@@ -1322,7 +1328,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
         # pub-new arrives after the gap.
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[PublishEntry(topic="events", data=_wire_bytes(b"new"))],
                 publisher_id="pub-new",
@@ -1347,7 +1353,7 @@ async def test_ttl_pruning_in_get_pubsub_state(client: Client) -> None:
 
 @workflow.defn
 class TruncateWorkflow:
-    """Test scaffolding that exposes PubSub.truncate via a user-authored
+    """Test scaffolding that exposes WorkflowStream.truncate via a user-authored
     update.
 
     The contrib module does not define a built-in external truncate API —
@@ -1358,8 +1364,8 @@ class TruncateWorkflow:
 
     The ``truncate`` update is ``async`` and opens with
     ``await asyncio.sleep(0)`` — the documented recipe from the
-    contrib/pubsub README for sync-shaped handlers that read ``PubSub``
-    state. The yield lets any buffered ``__temporal_pubsub_publish`` signal in
+    contrib/stream README for sync-shaped handlers that read ``WorkflowStream``
+    state. The yield lets any buffered ``__temporal_workflow_stream_publish`` signal in
     the same activation apply before the handler inspects ``self._log``.
     This keeps the test workflow aligned with the pattern users are
     directed to follow.
@@ -1372,10 +1378,10 @@ class TruncateWorkflow:
 
     @workflow.init
     def __init__(self, prepub_count: int = 0) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
         for i in range(prepub_count):
-            self.pubsub.publish("events", f"item-{i}".encode())
+            self.stream.publish("events", f"item-{i}".encode())
 
     @workflow.signal
     def close(self) -> None:
@@ -1384,11 +1390,11 @@ class TruncateWorkflow:
     @workflow.update
     async def truncate(self, up_to_offset: int) -> None:
         # Recipe from README.md "Gotcha" section: yield once so any
-        # buffered __temporal_pubsub_publish in the same activation applies
+        # buffered __temporal_workflow_stream_publish in the same activation applies
         # before we read self._log. asyncio.sleep(0) is a pure asyncio
         # yield — no Temporal timer, no history event.
         await asyncio.sleep(0)
-        self.pubsub.truncate(up_to_offset)
+        self.stream.truncate(up_to_offset)
 
     @workflow.run
     async def run(self, _prepub_count: int = 0) -> None:
@@ -1401,11 +1407,11 @@ class TruncateWorkflow:
 
 @workflow.defn
 class TTLTestWorkflow:
-    """Workflow that exposes PubSub.get_state via query for TTL testing."""
+    """Workflow that exposes WorkflowStream.get_state via query for TTL testing."""
 
     @workflow.init
     def __init__(self) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -1413,10 +1419,10 @@ class TTLTestWorkflow:
         self._closed = True
 
     @workflow.query
-    def get_state_with_ttl(self, ttl_seconds: float) -> PubSubState:
+    def get_state_with_ttl(self, ttl_seconds: float) -> WorkflowStreamState:
         # Query arg is passed as float because the default JSON payload
         # converter does not serialize ``timedelta``; convert here.
-        return self.pubsub.get_state(publisher_ttl=timedelta(seconds=ttl_seconds))
+        return self.stream.get_state(publisher_ttl=timedelta(seconds=ttl_seconds))
 
     @workflow.run
     async def run(self) -> None:
@@ -1432,16 +1438,16 @@ class TTLTestWorkflow:
 class CANWorkflowInputTyped:
     """Uses proper typing."""
 
-    pubsub_state: PubSubState | None = None
+    stream_state: WorkflowStreamState | None = None
 
 
 @workflow.defn
 class ContinueAsNewTypedWorkflow:
-    """CAN workflow using properly-typed pubsub_state."""
+    """CAN workflow using properly-typed stream_state."""
 
     @workflow.init
     def __init__(self, input: CANWorkflowInputTyped) -> None:
-        self.pubsub = PubSub(prior_state=input.pubsub_state)
+        self.stream = WorkflowStream(prior_state=input.stream_state)
         self._should_continue = False
         self._closed = False
 
@@ -1455,7 +1461,7 @@ class ContinueAsNewTypedWorkflow:
 
     @workflow.query
     def publisher_sequences(self) -> dict[str, int]:
-        return {pid: ps.sequence for pid, ps in self.pubsub._publishers.items()}
+        return {pid: ps.sequence for pid, ps in self.stream._publishers.items()}
 
     @workflow.run
     async def run(self, _input: CANWorkflowInputTyped) -> None:
@@ -1468,12 +1474,12 @@ class ContinueAsNewTypedWorkflow:
                 return
             if self._should_continue:
                 self._should_continue = False
-                self.pubsub.drain()
+                self.stream.drain()
                 await workflow.wait_condition(workflow.all_handlers_finished)
                 workflow.continue_as_new(
                     args=[
                         CANWorkflowInputTyped(
-                            pubsub_state=self.pubsub.get_state(),
+                            stream_state=self.stream.get_state(),
                         )
                     ]
                 )
@@ -1482,7 +1488,7 @@ class ContinueAsNewTypedWorkflow:
 @pytest.mark.asyncio
 async def test_continue_as_new_properly_typed(client: Client) -> None:
     """CAN preserves the log, global offsets, AND publisher dedup state
-    when pubsub_state is properly typed as ``PubSubState | None``."""
+    when stream_state is properly typed as ``WorkflowStreamState | None``."""
     async with new_worker(
         client,
         ContinueAsNewTypedWorkflow,
@@ -1490,14 +1496,14 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         handle = await client.start_workflow(
             ContinueAsNewTypedWorkflow.run,
             CANWorkflowInputTyped(),
-            id=f"pubsub-can-{uuid.uuid4()}",
+            id=f"workflow-stream-can-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
         # Publish 3 items with an explicit publisher_id/sequence so dedup
         # state is seeded and we can verify it survives CAN.
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[
                     PublishEntry(topic="events", data=_wire_bytes(b"item-0")),
@@ -1535,7 +1541,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         # Re-sending publisher_id="pub", sequence=1 must be rejected by
         # dedup — both the log and the publisher_sequences entry stay put.
         await new_handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[
                     PublishEntry(topic="events", data=_wire_bytes(b"dup")),
@@ -1552,7 +1558,7 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
         # A fresh sequence from the same publisher is accepted, advances
         # publisher_sequences to 2, and the new item gets offset 3.
         await new_handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[
                     PublishEntry(topic="events", data=_wire_bytes(b"item-3")),
@@ -1579,11 +1585,11 @@ async def test_continue_as_new_properly_typed(client: Client) -> None:
 
 @workflow.defn
 class ContinueAsNewHelperWorkflow:
-    """CAN workflow that uses the packaged ``PubSub.continue_as_new`` helper."""
+    """CAN workflow that uses the packaged ``WorkflowStream.continue_as_new`` helper."""
 
     @workflow.init
     def __init__(self, input: CANWorkflowInputTyped) -> None:
-        self.pubsub = PubSub(prior_state=input.pubsub_state)
+        self.stream = WorkflowStream(prior_state=input.stream_state)
         self._should_continue = False
         self._closed = False
 
@@ -1604,14 +1610,14 @@ class ContinueAsNewHelperWorkflow:
                 return
             if self._should_continue:
                 self._should_continue = False
-                await self.pubsub.continue_as_new(
-                    lambda state: [CANWorkflowInputTyped(pubsub_state=state)],
+                await self.stream.continue_as_new(
+                    lambda state: [CANWorkflowInputTyped(stream_state=state)],
                 )
 
 
 @pytest.mark.asyncio
 async def test_continue_as_new_helper(client: Client) -> None:
-    """The ``PubSub.continue_as_new`` helper preserves log and dedup state
+    """The ``WorkflowStream.continue_as_new`` helper preserves log and dedup state
     just like the explicit drain/wait/CAN recipe."""
     async with new_worker(
         client,
@@ -1620,12 +1626,12 @@ async def test_continue_as_new_helper(client: Client) -> None:
         handle = await client.start_workflow(
             ContinueAsNewHelperWorkflow.run,
             CANWorkflowInputTyped(),
-            id=f"pubsub-can-helper-{uuid.uuid4()}",
+            id=f"workflow-stream-can-helper-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
         await handle.signal(
-            "__temporal_pubsub_publish",
+            "__temporal_workflow_stream_publish",
             PublishInput(
                 items=[
                     PublishEntry(topic="events", data=_wire_bytes(b"item-0")),
@@ -1655,7 +1661,7 @@ async def test_continue_as_new_helper(client: Client) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Cross-workflow pub/sub (Scenario 1)
+# Cross-workflow workflow stream (Scenario 1)
 # ---------------------------------------------------------------------------
 
 
@@ -1669,7 +1675,7 @@ class CrossWorkflowInput:
 class BrokerWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -1679,7 +1685,7 @@ class BrokerWorkflow:
     @workflow.run
     async def run(self, count: int) -> None:
         for i in range(count):
-            self.pubsub.publish("events", f"broker-{i}".encode())
+            self.stream.publish("events", f"broker-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
 
 
@@ -1697,7 +1703,7 @@ class SubscriberWorkflow:
 
 @activity.defn(name="subscribe_to_broker")
 async def subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
-    client = PubSubClient.create(
+    client = WorkflowStreamClient.create(
         client=activity.client(),
         workflow_id=input.broker_workflow_id,
     )
@@ -1717,7 +1723,7 @@ async def subscribe_to_broker(input: CrossWorkflowInput) -> list[str]:
 
 
 @pytest.mark.asyncio
-async def test_cross_workflow_pubsub(client: Client) -> None:
+async def test_cross_workflow_stream(client: Client) -> None:
     """Workflow B's activity subscribes to events published by Workflow A."""
     count = 5
     task_queue = str(uuid.uuid4())
@@ -1729,7 +1735,7 @@ async def test_cross_workflow_pubsub(client: Client) -> None:
         activities=[subscribe_to_broker],
         task_queue=task_queue,
     ):
-        broker_id = f"pubsub-broker-{uuid.uuid4()}"
+        broker_id = f"workflow-stream-broker-{uuid.uuid4()}"
         broker_handle = await client.start_workflow(
             BrokerWorkflow.run,
             count,
@@ -1743,7 +1749,7 @@ async def test_cross_workflow_pubsub(client: Client) -> None:
                 broker_workflow_id=broker_id,
                 expected_count=count,
             ),
-            id=f"pubsub-subscriber-{uuid.uuid4()}",
+            id=f"workflow-stream-subscriber-{uuid.uuid4()}",
             task_queue=task_queue,
         )
 
@@ -1760,7 +1766,7 @@ async def test_cross_workflow_pubsub(client: Client) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Cross-namespace pub/sub via Nexus (Scenario 2)
+# Cross-namespace workflow stream via Nexus (Scenario 2)
 # ---------------------------------------------------------------------------
 
 
@@ -1781,7 +1787,7 @@ class NexusCallerInput:
 class NexusBrokerWorkflow:
     @workflow.init
     def __init__(self, count: int) -> None:
-        self.pubsub = PubSub()
+        self.stream = WorkflowStream()
         self._closed = False
 
     @workflow.signal
@@ -1791,18 +1797,18 @@ class NexusBrokerWorkflow:
     @workflow.run
     async def run(self, count: int) -> str:
         for i in range(count):
-            self.pubsub.publish("events", f"nexus-{i}".encode())
+            self.stream.publish("events", f"nexus-{i}".encode())
         await workflow.wait_condition(lambda: self._closed)
         return "done"
 
 
 @nexusrpc.service
-class PubSubNexusService:
+class WorkflowStreamNexusService:
     start_broker: nexusrpc.Operation[StartBrokerInput, str]
 
 
-@nexusrpc.handler.service_handler(service=PubSubNexusService)
-class PubSubNexusHandler:
+@nexusrpc.handler.service_handler(service=WorkflowStreamNexusService)
+class WorkflowStreamNexusHandler:
     @workflow_run_operation
     async def start_broker(
         self, ctx: WorkflowRunOperationContext, input: StartBrokerInput
@@ -1819,11 +1825,11 @@ class NexusCallerWorkflow:
     @workflow.run
     async def run(self, input: NexusCallerInput) -> str:
         nc = workflow.create_nexus_client(
-            service=PubSubNexusService,
+            service=WorkflowStreamNexusService,
             endpoint=input.endpoint,
         )
         return await nc.execute_operation(
-            PubSubNexusService.start_broker,
+            WorkflowStreamNexusService.start_broker,
             StartBrokerInput(count=input.count, broker_id=input.broker_id),
         )
 
@@ -1856,11 +1862,11 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
     """Poll response sets more_ready=True when items exceed ~1MB wire size."""
     async with new_worker(
         client,
-        BasicPubSubWorkflow,
+        BasicWorkflowStreamWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-more-ready-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-more-ready-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -1870,7 +1876,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         chunk = b"x" * 200_000
         for _ in range(8):
             await handle.signal(
-                "__temporal_pubsub_publish",
+                "__temporal_workflow_stream_publish",
                 PublishInput(
                     items=[PublishEntry(topic="big", data=_wire_bytes(chunk))]
                 ),
@@ -1879,7 +1885,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         # First poll from offset 0 — should get some items but not all.
         # (The update acts as a barrier for all prior publish signals.)
         result1: PollResult = await handle.execute_update(
-            "__temporal_pubsub_poll",
+            "__temporal_workflow_stream_poll",
             PollInput(topics=[], from_offset=0),
             result_type=PollResult,
         )
@@ -1893,7 +1899,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         last_result: PollResult = result1
         while len(all_items) < 8:
             last_result = await handle.execute_update(
-                "__temporal_pubsub_poll",
+                "__temporal_workflow_stream_poll",
                 PollInput(topics=[], from_offset=offset),
                 result_type=PollResult,
             )
@@ -1903,7 +1909,7 @@ async def test_poll_more_ready_when_response_exceeds_size_limit(
         # The final poll that drained the log should set more_ready=False
         assert last_result.more_ready is False
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
@@ -1911,11 +1917,11 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
     """Subscriber correctly yields all items when polls are size-truncated."""
     async with new_worker(
         client,
-        BasicPubSubWorkflow,
+        BasicWorkflowStreamWorkflow,
     ) as worker:
         handle = await client.start_workflow(
-            BasicPubSubWorkflow.run,
-            id=f"pubsub-more-ready-iter-{uuid.uuid4()}",
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-more-ready-iter-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
 
@@ -1923,7 +1929,7 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
         chunk = b"x" * 200_000
         for _ in range(8):
             await handle.signal(
-                "__temporal_pubsub_publish",
+                "__temporal_workflow_stream_publish",
                 PublishInput(
                     items=[PublishEntry(topic="big", data=_wire_bytes(chunk))]
                 ),
@@ -1935,14 +1941,14 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
         for item in items:
             assert item.data == chunk
 
-        await handle.signal(BasicPubSubWorkflow.close)
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
 @pytest.mark.asyncio
-async def test_cross_namespace_nexus_pubsub(
+async def test_cross_namespace_nexus_stream(
     client: Client, env: WorkflowEnvironment
 ) -> None:
-    """Nexus operation starts a pub/sub broker in another namespace; test subscribes."""
+    """Nexus operation starts a workflow stream broker in another namespace; test subscribes."""
     if env.supports_time_skipping:
         pytest.skip("Nexus not supported with time-skipping server")
 
@@ -1980,7 +1986,7 @@ async def test_cross_namespace_nexus_pubsub(
         handler_client,
         task_queue=task_queue,
         workflows=[NexusBrokerWorkflow],
-        nexus_service_handlers=[PubSubNexusHandler()],
+        nexus_service_handlers=[WorkflowStreamNexusHandler()],
     ):
         # Caller worker in default namespace
         caller_tq = str(uuid.uuid4())

@@ -1,6 +1,6 @@
-"""Shared data types for the pub/sub contrib module.
+"""Shared data types for the Workflow Streams contrib module.
 
-The user-facing ``data`` fields on :class:`PubSubItem` are
+The user-facing ``data`` fields on :class:`WorkflowStreamItem` are
 :class:`temporalio.api.common.v1.Payload`. Per-item values are converted to
 ``Payload`` by the payload converter at publish time, and the resulting
 bytes/metadata are preserved per item so subscribers can decode with
@@ -10,10 +10,10 @@ embedded item — so codec behavior is symmetric between workflow-side and
 client-side publishing. See ``DESIGN-v2.md`` §5 and
 ``docs/pubsub-payload-migration.md``.
 
-The wire representation (``PublishEntry``, ``_WireItem``) uses base64-encoded
-``Payload.SerializeToString()`` bytes because the default JSON payload converter
-cannot serialize a ``Payload`` embedded inside a dataclass (it only
-special-cases top-level Payloads on signal/update args).
+The wire representation (``PublishEntry``, ``_WorkflowStreamWireItem``) uses
+base64-encoded ``Payload.SerializeToString()`` bytes because the default JSON
+payload converter cannot serialize a ``Payload`` embedded inside a dataclass
+(it only special-cases top-level Payloads on signal/update args).
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from temporalio.api.common.v1 import Payload
 
 
 # basedpyright flags _-prefixed module-level functions as unused even when
-# sibling modules import them (_broker.py, _client.py). Vanilla pyright does
+# sibling modules import them (_stream.py, _client.py). Vanilla pyright does
 # not. Suppressions below are required for `poe lint`.
 def _encode_payload(payload: Payload) -> str:  # pyright: ignore[reportUnusedFunction]
     """Wire format: base64(Payload.SerializeToString())."""
@@ -42,15 +42,15 @@ def _decode_payload(wire: str) -> Payload:  # pyright: ignore[reportUnusedFuncti
 
 
 @dataclass
-class PubSubItem:
-    """A single item in the pub/sub log.
+class WorkflowStreamItem:
+    """A single item in the workflow stream's log.
 
     .. warning::
         This class is experimental and may change in future versions.
 
     The ``data`` field is a :class:`temporalio.api.common.v1.Payload`
     as stored by the mixin and yielded by
-    :meth:`PubSubClient.subscribe` when no ``result_type`` is given.
+    :meth:`WorkflowStreamClient.subscribe` when no ``result_type`` is given.
     When ``result_type`` is passed to ``subscribe``, ``data`` holds the
     decoded value of that type instead — the dataclass is typed as
     ``Any`` to accommodate both.
@@ -108,8 +108,8 @@ class PollInput:
 
 
 @dataclass
-class _WireItem:
-    """Wire representation of a PubSubItem (base64 of serialized Payload)."""
+class _WorkflowStreamWireItem:
+    """Wire representation of a WorkflowStreamItem (base64 of serialized Payload)."""
 
     topic: str
     data: str
@@ -129,7 +129,7 @@ class PollResult:
     cooldown delay.
     """
 
-    items: list[_WireItem] = field(default_factory=list)
+    items: list[_WorkflowStreamWireItem] = field(default_factory=list)
     next_offset: int = 0
     more_ready: bool = False
 
@@ -151,19 +151,19 @@ class PublisherState:
 
 
 @dataclass
-class PubSubState:
-    """Serializable snapshot of pub/sub state for continue-as-new.
+class WorkflowStreamState:
+    """Serializable snapshot of stream state for continue-as-new.
 
     .. warning::
         This class is experimental and may change in future versions.
 
     The containing workflow input must type the field as
-    ``PubSubState | None``, not ``Any``, so the default data converter
+    ``WorkflowStreamState | None``, not ``Any``, so the default data converter
     can reconstruct the dataclass from JSON.
 
     Log items use the wire representation for serialization stability.
     """
 
-    log: list[_WireItem] = field(default_factory=list)
+    log: list[_WorkflowStreamWireItem] = field(default_factory=list)
     base_offset: int = 0
     publishers: dict[str, PublisherState] = field(default_factory=dict)

@@ -1,19 +1,19 @@
-"""Workflow-side pub/sub broker.
+"""Workflow-side stream object for Workflow Streams.
 
-Instantiate :class:`PubSub` once from your workflow's ``@workflow.init``
-method. The constructor registers the pub/sub signal, update, and query
+Instantiate :class:`WorkflowStream` once from your workflow's ``@workflow.init``
+method. The constructor registers the stream signal, update, and query
 handlers on the current workflow via
 :func:`temporalio.workflow.set_signal_handler`,
 :func:`temporalio.workflow.set_update_handler`, and
 :func:`temporalio.workflow.set_query_handler`.
 
 For workflows that support continue-as-new, include a
-``PubSubState | None`` field on the workflow input and pass it as
+``WorkflowStreamState | None`` field on the workflow input and pass it as
 ``prior_state`` — it is ``None`` on fresh starts and carries accumulated
 state on continue-as-new.
 
-Both workflow-side :meth:`PubSub.publish` and client-side
-:meth:`PubSubClient.publish` use the synchronous payload converter for
+Both workflow-side :meth:`WorkflowStream.publish` and client-side
+:meth:`WorkflowStreamClient.publish` use the synchronous payload converter for
 per-item ``Payload`` construction. The codec chain (e.g. encryption,
 compression) is **not** run per item on either side —
 it runs once at the envelope level when Temporal's SDK encodes the
@@ -38,16 +38,16 @@ from ._types import (
     PollResult,
     PublisherState,
     PublishInput,
-    PubSubItem,
-    PubSubState,
+    WorkflowStreamItem,
+    WorkflowStreamState,
     _decode_payload,
     _encode_payload,
-    _WireItem,
+    _WorkflowStreamWireItem,
 )
 
-_PUBLISH_SIGNAL = "__temporal_pubsub_publish"
-_POLL_UPDATE = "__temporal_pubsub_poll"
-_OFFSET_QUERY = "__temporal_pubsub_offset"
+_PUBLISH_SIGNAL = "__temporal_workflow_stream_publish"
+_POLL_UPDATE = "__temporal_workflow_stream_poll"
+_OFFSET_QUERY = "__temporal_workflow_stream_offset"
 
 _MAX_POLL_RESPONSE_BYTES = 1_000_000
 
@@ -55,42 +55,42 @@ _MAX_POLL_RESPONSE_BYTES = 1_000_000
 def _payload_wire_size(payload: Payload, topic: str) -> int:
     """Approximate poll-response contribution of a single item.
 
-    Wire form is ``_WireItem(topic, base64(proto(Payload)), offset)``.
+    Wire form is ``_WorkflowStreamWireItem(topic, base64(proto(Payload)), offset)``.
     Base64 inflates by ~4/3; we use the serialized length as a
     conservative approximation.
     """
     return (payload.ByteSize() * 4 + 2) // 3 + len(topic)
 
 
-class PubSub:
-    """Workflow-side pub/sub broker.
+class WorkflowStream:
+    """Workflow-side stream object — append-only log with publish/poll handlers.
 
     .. warning::
         This class is experimental and may change in future versions.
 
     Construct once from ``@workflow.init``; the constructor registers
-    the pub/sub signal, update, and query handlers on the current
-    workflow. Raises :class:`RuntimeError` if a ``PubSub`` has already
-    been registered on the workflow.
+    the stream signal, update, and query handlers on the current
+    workflow. Raises :class:`RuntimeError` if a ``WorkflowStream`` has
+    already been registered on the workflow.
 
     Registered handlers:
 
-    - ``__temporal_pubsub_publish`` signal — external publish with dedup
-    - ``__temporal_pubsub_poll`` update — long-poll subscription
-    - ``__temporal_pubsub_offset`` query — current log length
+    - ``__temporal_workflow_stream_publish`` signal — external publish with dedup
+    - ``__temporal_workflow_stream_poll`` update — long-poll subscription
+    - ``__temporal_workflow_stream_offset`` query — current log length
 
     Note:
-        Because ``__temporal_pubsub_publish`` is registered *dynamically* from
-        ``__init__``, custom **synchronous** update/signal handlers
-        that read ``PubSub`` state can observe pre-publish state when
-        both land in the same activation. Make such handlers ``async``
-        and ``await asyncio.sleep(0)`` before reading state. See the
-        "Gotcha" section of this module's ``README.md`` for the
-        full explanation and recipe.
+        Because ``__temporal_workflow_stream_publish`` is registered
+        *dynamically* from ``__init__``, custom **synchronous**
+        update/signal handlers that read ``WorkflowStream`` state can
+        observe pre-publish state when both land in the same activation.
+        Make such handlers ``async`` and ``await asyncio.sleep(0)`` before
+        reading state. See the "Gotcha" section of this module's
+        ``README.md`` for the full explanation and recipe.
     """
 
-    def __init__(self, prior_state: PubSubState | None = None) -> None:
-        """Initialize pub/sub state and register workflow handlers.
+    def __init__(self, prior_state: WorkflowStreamState | None = None) -> None:
+        """Initialize stream state and register workflow handlers.
 
         Must be called directly from the workflow's ``@workflow.init``
         method. Calls made from ``@workflow.run``, helper methods, or
@@ -106,33 +106,33 @@ class PubSub:
 
         Raises:
             RuntimeError: If not called directly from a method named
-                ``__init__``, or if the pub/sub signal handler is
-                already registered on this workflow (i.e., ``PubSub``
-                was instantiated twice).
+                ``__init__``, or if the stream signal handler is
+                already registered on this workflow (i.e.,
+                ``WorkflowStream`` was instantiated twice).
 
         Note:
             When carrying state across continue-as-new, type the
-            carrying field as ``PubSubState | None``, not ``Any``. The
-            default data converter deserializes ``Any`` fields as plain
-            dicts, which silently strips the ``PubSubState`` type and
-            breaks the new run.
+            carrying field as ``WorkflowStreamState | None``, not
+            ``Any``. The default data converter deserializes ``Any``
+            fields as plain dicts, which silently strips the
+            ``WorkflowStreamState`` type and breaks the new run.
         """
         caller = sys._getframe(1)
         caller_name = caller.f_code.co_name
         if caller_name != "__init__":
             raise RuntimeError(
-                "PubSub must be constructed directly from the workflow's "
+                "WorkflowStream must be constructed directly from the workflow's "
                 f"@workflow.init method, not from {caller_name!r}."
             )
         if workflow.get_signal_handler(_PUBLISH_SIGNAL) is not None:
             raise RuntimeError(
-                "PubSub is already registered on this workflow. "
-                "Construct PubSub(...) at most once from @workflow.init."
+                "WorkflowStream is already registered on this workflow. "
+                "Construct WorkflowStream(...) at most once from @workflow.init."
             )
 
         if prior_state is not None:
-            self._log: list[PubSubItem] = [
-                PubSubItem(topic=item.topic, data=_decode_payload(item.data))
+            self._log: list[WorkflowStreamItem] = [
+                WorkflowStreamItem(topic=item.topic, data=_decode_payload(item.data))
                 for item in prior_state.log
             ]
             self._base_offset: int = prior_state.base_offset
@@ -160,19 +160,19 @@ class PubSub:
         :class:`temporalio.api.common.v1.Payload` for zero-copy.
 
         The codec chain is not applied here (it runs on the
-        ``__temporal_pubsub_poll`` update envelope that later delivers the
-        item to a subscriber).
+        ``__temporal_workflow_stream_poll`` update envelope that later
+        delivers the item to a subscriber).
         """
         if isinstance(value, Payload):
             payload = value
         else:
             payload = workflow.payload_converter().to_payloads([value])[0]
-        self._log.append(PubSubItem(topic=topic, data=payload))
+        self._log.append(WorkflowStreamItem(topic=topic, data=payload))
 
     def get_state(
         self, *, publisher_ttl: timedelta = timedelta(seconds=900)
-    ) -> PubSubState:
-        """Return a serializable snapshot of pub/sub state for continue-as-new.
+    ) -> WorkflowStreamState:
+        """Return a serializable snapshot of stream state for continue-as-new.
 
         Prunes publisher dedup entries older than ``publisher_ttl``. The
         TTL must exceed the ``max_retry_duration`` of any client that
@@ -190,9 +190,11 @@ class PubSub:
             if now - ps.last_seen < publisher_ttl
         }
 
-        return PubSubState(
+        return WorkflowStreamState(
             log=[
-                _WireItem(topic=item.topic, data=_encode_payload(item.data))
+                _WorkflowStreamWireItem(
+                    topic=item.topic, data=_encode_payload(item.data)
+                )
                 for item in self._log
             ],
             base_offset=self._base_offset,
@@ -210,7 +212,7 @@ class PubSub:
 
     async def continue_as_new(
         self,
-        build_args: Callable[[PubSubState], Sequence[Any]],
+        build_args: Callable[[WorkflowStreamState], Sequence[Any]],
         *,
         publisher_ttl: timedelta = timedelta(seconds=900),
     ) -> NoReturn:
@@ -222,15 +224,15 @@ class PubSub:
         the only CAN parameter that varies is ``args``.
 
         ``build_args`` is invoked *after* drain has stabilized, with the
-        post-drain :class:`PubSubState` as its single argument. The
-        caller threads that state into whatever input dataclass the
+        post-drain :class:`WorkflowStreamState` as its single argument.
+        The caller threads that state into whatever input dataclass the
         workflow expects:
 
         .. code-block:: python
 
-            await self.pubsub.continue_as_new(lambda state: [WorkflowInput(
+            await self.stream.continue_as_new(lambda state: [WorkflowInput(
                 items_processed=self.items_processed,
-                pubsub_state=state,
+                stream_state=state,
             )])
 
         Workflows that need to override other CAN parameters
@@ -239,7 +241,7 @@ class PubSub:
         ``workflow.continue_as_new(...)`` recipe.
 
         Args:
-            build_args: Callable that receives the post-drain pub/sub
+            build_args: Callable that receives the post-drain stream
                 state and returns the positional ``args`` for the new
                 run.
             publisher_ttl: Forwarded to :meth:`get_state`.
@@ -309,7 +311,7 @@ class PubSub:
             )
         for entry in payload.items:
             self._log.append(
-                PubSubItem(topic=entry.topic, data=_decode_payload(entry.data))
+                WorkflowStreamItem(topic=entry.topic, data=_decode_payload(entry.data))
             )
 
     async def _on_poll(self, payload: PollInput) -> PollResult:
@@ -347,7 +349,7 @@ class PubSub:
                 for i, item in enumerate(all_new)
             ]
         # Cap response size to ~1MB wire bytes.
-        wire_items: list[_WireItem] = []
+        wire_items: list[_WorkflowStreamWireItem] = []
         size = 0
         more_ready = False
         next_offset = self._base_offset + len(self._log)
@@ -360,7 +362,9 @@ class PubSub:
                 break
             size += item_size
             wire_items.append(
-                _WireItem(topic=item.topic, data=_encode_payload(item.data), offset=off)
+                _WorkflowStreamWireItem(
+                    topic=item.topic, data=_encode_payload(item.data), offset=off
+                )
             )
         return PollResult(
             items=wire_items,

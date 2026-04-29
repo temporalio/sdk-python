@@ -255,7 +255,7 @@ class TemporalOpenAIRunner(AgentRunner):
         activity. The workflow consumes events via
         ``RunResultStreaming.stream_events()`` after each activity
         completes; external clients can subscribe to the configured
-        pub/sub topic to receive events as they arrive.
+        stream topic to receive events as they arrive.
         """
         if not workflow.in_workflow():
             return self._runner.run_streamed(
