@@ -558,6 +558,24 @@ async def test_subscribe_default_decode_and_raw_value(client: Client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_subscribe_with_payload_result_type_rejected(client: Client) -> None:
+    """``subscribe(result_type=Payload)`` raises — there is no Payload decode path.
+
+    Mirrors the topic-handle rejection (``stream.topic(name, type=Payload)``)
+    so the direct ``subscribe`` API can't smuggle in the same ambiguity that
+    the topic-handle layer already guards against. Users wanting raw payloads
+    pass ``result_type=RawValue``.
+    """
+    from temporalio.api.common.v1 import Payload
+
+    handle = client.get_workflow_handle("nonexistent-workflow-id")
+    stream = WorkflowStreamClient(handle)
+    with pytest.raises(RuntimeError, match="result_type=Payload"):
+        async for _ in stream.subscribe(result_type=Payload):
+            pass
+
+
+@pytest.mark.asyncio
 async def test_topic_handle_workflow_side_publish_and_subscribe(
     client: Client,
 ) -> None:
@@ -600,6 +618,8 @@ class TopicHandleUniquenessWorkflow:
 
     @workflow.init
     def __init__(self) -> None:
+        from temporalio.api.common.v1 import Payload
+
         self.stream = WorkflowStream()
         first = self.stream.topic("events", type=AgentEvent)
         self._idempotent_ok = (
@@ -614,17 +634,28 @@ class TopicHandleUniquenessWorkflow:
             self._error = str(exc)
         else:
             self._error = ""
+        try:
+            self.stream.topic("misused", type=Payload)
+        except RuntimeError as exc:
+            self._payload_error = str(exc)
+        else:
+            self._payload_error = ""
 
     @workflow.run
-    async def run(self) -> tuple[bool, str]:
-        return (self._idempotent_ok, self._error)
+    async def run(self) -> tuple[bool, str, str]:
+        return (self._idempotent_ok, self._error, self._payload_error)
 
 
 @pytest.mark.asyncio
 async def test_topic_handle_uniqueness_on_workflow_stream(client: Client) -> None:
-    """Same-type rebind is idempotent; different-type rebind raises in @workflow.init."""
+    """Same-type rebind is idempotent; different-type rebind raises in @workflow.init.
+
+    Also covers the workflow-side rejection of ``type=Payload`` —
+    binding a topic to ``Payload`` itself has no decode path, so
+    ``WorkflowStream.topic`` raises in ``@workflow.init``.
+    """
     async with new_worker(client, TopicHandleUniquenessWorkflow) as worker:
-        idempotent_ok, error = await client.execute_workflow(
+        idempotent_ok, error, payload_error = await client.execute_workflow(
             TopicHandleUniquenessWorkflow.run,
             id=f"workflow-stream-handle-unique-{uuid.uuid4()}",
             task_queue=worker.task_queue,
@@ -632,6 +663,7 @@ async def test_topic_handle_uniqueness_on_workflow_stream(client: Client) -> Non
         assert idempotent_ok is True
         assert "already bound to type" in error
         assert "events" in error
+        assert "type=Payload" in payload_error
 
 
 @pytest.mark.asyncio

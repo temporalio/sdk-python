@@ -491,6 +491,13 @@ class WorkflowStreamClient:
         Yields:
             :class:`WorkflowStreamItem` for each matching item.
         """
+        if result_type is Payload:
+            raise RuntimeError(
+                "Cannot subscribe with result_type=Payload: the payload "
+                "converter has no Payload decode path. Omit result_type "
+                "for default decoding, or pass result_type=RawValue to "
+                "receive a RawValue wrapping the raw Payload."
+            )
         topic_filter: list[str]
         if topics is None:
             topic_filter = []
