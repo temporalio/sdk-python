@@ -1,4 +1,4 @@
-from asyncio import sleep
+import asyncio
 from datetime import timedelta
 from typing import Any
 from uuid import uuid4
@@ -19,11 +19,10 @@ class State(TypedDict):
 
 
 async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
-    # Sleep much longer than the start_to_close_timeout below: Temporal does
-    # not actively cancel an activity when start_to_close_timeout fires, it
-    # just rejects late completions. A short sleep races with the server
-    # processing the completion vs. the timeout, which flakes on slow CI.
-    await sleep(30)
+    # Wait forever; the only exit is the start_to_close_timeout below or
+    # worker-shutdown cancellation. A finite sleep would race with the server
+    # processing the activity's completion vs. processing the timeout.
+    await asyncio.Event().wait()
     return {"value": "done"}
 
 

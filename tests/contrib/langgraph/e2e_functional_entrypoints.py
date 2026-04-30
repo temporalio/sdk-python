@@ -134,12 +134,11 @@ async def interrupt_entrypoint(value: str) -> dict:
 
 @task
 async def slow_task(x: int) -> int:
-    # Sleep much longer than the start_to_close_timeout used by tests that
-    # exercise this task's timeout path. Temporal does not actively cancel
-    # an activity when start_to_close_timeout fires; it just rejects late
-    # completions, so a short sleep races with the activity completing
-    # before the server processes the timeout.
-    await asyncio.sleep(30)
+    # Wait forever; the only exit is the start_to_close_timeout configured
+    # by tests that exercise this task's timeout path, or worker-shutdown
+    # cancellation. A finite sleep would race with the server processing the
+    # activity's completion vs. processing the timeout.
+    await asyncio.Event().wait()
     return x
 
 
