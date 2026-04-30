@@ -4779,11 +4779,17 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     )
 
     async def static_summary(self) -> str | None:
+        """Gets the single-line fixed summary for this Nexus operation execution that may appear in
+        UI/CLI. This can be in single-line Temporal markdown format.
+        """
         if not self._metadata_decoded:
             await self._decode_metadata()
         return self._static_summary
 
     async def static_details(self) -> str | None:
+        """Gets the general fixed details for this Nexus operation execution that may appear in UI/CLI.
+        This can be in Temporal markdown format and can span multiple lines.
+        """
         if not self._metadata_decoded:
             await self._decode_metadata()
         return self._static_details

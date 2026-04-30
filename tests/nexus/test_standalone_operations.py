@@ -8,7 +8,6 @@ and interceptor integration.
 from __future__ import annotations
 
 import asyncio
-import time
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -31,7 +30,6 @@ from temporalio.client import (
     GetNexusOperationResultInput,
     Interceptor,
     ListNexusOperationsInput,
-    NexusClient,
     NexusOperationExecutionDescription,
     NexusOperationFailureError,
     NexusOperationHandle,
@@ -54,9 +52,7 @@ from temporalio.exceptions import (
     TerminatedError,
 )
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
-from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.types import ParamType, ReturnType
 from temporalio.worker import Worker
 from tests.helpers import assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
@@ -179,81 +175,6 @@ class StandaloneTestServiceHandler:
 
 
 # ---------------------------------------------------------------------------
-# Retry helper for endpoint propagation
-# ---------------------------------------------------------------------------
-
-
-async def start_with_retry(
-    nexus_client: NexusClient[StandaloneTestService],
-    operation: nexusrpc.Operation[ParamType, ReturnType],
-    arg: ParamType,
-    *,
-    id: str,
-    id_reuse_policy: NexusOperationIDReusePolicy = NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
-    id_conflict_policy: NexusOperationIDConflictPolicy = NexusOperationIDConflictPolicy.FAIL,
-    schedule_to_close_timeout: timedelta | None = None,
-    timeout_secs: float = 15.0,
-) -> NexusOperationHandle[ReturnType]:
-    """Retry start_operation until the endpoint has propagated.
-
-    The Nexus endpoint registry is eventually consistent. This mirrors the
-    Go SDK's ``executeNexusOpWithRetry`` pattern.
-    """
-    deadline = time.monotonic() + timeout_secs
-    last_err: BaseException | None = None
-    while time.monotonic() < deadline:
-        try:
-            return await nexus_client.start_operation(
-                operation,
-                arg,
-                id=id,
-                id_reuse_policy=id_reuse_policy,
-                id_conflict_policy=id_conflict_policy,
-                schedule_to_close_timeout=schedule_to_close_timeout,
-                summary=operation.name,
-            )
-        except (RPCError, NexusOperationFailureError) as err:
-            last_err = err
-            await asyncio.sleep(0.1)
-    raise AssertionError(
-        f"Timed out after {timeout_secs}s waiting for endpoint to propagate"
-    ) from last_err
-
-
-async def execute_with_retry(
-    nexus_client: NexusClient[StandaloneTestService],
-    operation: nexusrpc.Operation[ParamType, ReturnType],
-    arg: ParamType,
-    *,
-    id: str,
-    id_reuse_policy: NexusOperationIDReusePolicy = NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
-    id_conflict_policy: NexusOperationIDConflictPolicy = NexusOperationIDConflictPolicy.FAIL,
-    schedule_to_close_timeout: timedelta | None = None,
-    timeout_secs: float = 15.0,
-) -> ReturnType:
-    """Retry execute_operation until the endpoint has propagated."""
-    deadline = time.monotonic() + timeout_secs
-    last_err: BaseException | None = None
-    while time.monotonic() < deadline:
-        try:
-            return await nexus_client.execute_operation(
-                operation,
-                arg,
-                id=id,
-                id_reuse_policy=id_reuse_policy,
-                id_conflict_policy=id_conflict_policy,
-                schedule_to_close_timeout=schedule_to_close_timeout,
-                summary=operation.name,
-            )
-        except (RPCError, NexusOperationFailureError) as err:
-            last_err = err
-            await asyncio.sleep(0.1)
-    raise AssertionError(
-        f"Timed out after {timeout_secs}s waiting for endpoint to propagate"
-    ) from last_err
-
-
-# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
@@ -278,8 +199,7 @@ async def test_start_sync_operation_and_get_result(
         )
         # Use execute_with_retry to retry the full start+result cycle
         # (endpoint propagation may cause the first attempt to time out)
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.echo_sync,
             EchoInput(value="hello"),
             id=str(uuid.uuid4()),
@@ -312,8 +232,7 @@ async def test_start_async_operation_and_poll_result(
         nexus_client = client.create_nexus_client(
             service=StandaloneTestService, endpoint=endpoint_name
         )
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.echo_async,
             EchoInput(value="async-hello"),
             id=str(uuid.uuid4()),
@@ -340,8 +259,7 @@ async def test_execute_operation(client: Client, env: WorkflowEnvironment):
         nexus_client = client.create_nexus_client(
             service=StandaloneTestService, endpoint=endpoint_name
         )
-        result = await execute_with_retry(
-            nexus_client,
+        result = await nexus_client.execute_operation(
             StandaloneTestService.echo_sync,
             EchoInput(value="execute"),
             id=str(uuid.uuid4()),
@@ -370,8 +288,7 @@ async def test_errors(client: Client, env: WorkflowEnvironment):
             service=StandaloneTestService, endpoint=endpoint_name
         )
 
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.raise_err,
             RaiseErrInput("handler_err"),
             id=str(uuid.uuid4()),
@@ -391,8 +308,7 @@ async def test_errors(client: Client, env: WorkflowEnvironment):
             await handle.result()
         assert err.value is second_err.value
 
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.raise_err,
             RaiseErrInput("application_err"),
             id=str(uuid.uuid4()),
@@ -427,14 +343,14 @@ async def test_describe_operation(client: Client, env: WorkflowEnvironment):
             service=StandaloneTestService, endpoint=endpoint_name
         )
         # Start an async operation and get its result first, then describe
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.echo_async,
             EchoInput(value="describe-me"),
             id=str(uuid.uuid4()),
             id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
             id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
             schedule_to_close_timeout=timedelta(seconds=30),
+            summary=StandaloneTestService.echo_async.name,
         )
         await handle.result()
 
@@ -476,8 +392,7 @@ async def test_cancel_operation(client: Client, env: WorkflowEnvironment):
         nexus_client = client.create_nexus_client(
             service=StandaloneTestService, endpoint=endpoint_name
         )
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.blocking_async,
             EchoInput(value="cancel-me"),
             id=str(uuid.uuid4()),
@@ -514,8 +429,7 @@ async def test_terminate_operation(client: Client, env: WorkflowEnvironment):
         nexus_client = client.create_nexus_client(
             service=StandaloneTestService, endpoint=endpoint_name
         )
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.blocking_async,
             EchoInput(value="terminate-me"),
             id=str(uuid.uuid4()),
@@ -556,8 +470,7 @@ async def test_list_operations(client: Client, env: WorkflowEnvironment):
         for i in range(3):
             op_id = str(uuid.uuid4())
             op_ids.append(op_id)
-            await start_with_retry(
-                nexus_client,
+            await nexus_client.start_operation(
                 StandaloneTestService.blocking_async,
                 EchoInput(value=f"list-{i}"),
                 id=op_id,
@@ -597,8 +510,7 @@ async def test_count_operations(client: Client, env: WorkflowEnvironment):
 
         # Start some blocking operations
         for i in range(2):
-            await start_with_retry(
-                nexus_client,
+            await nexus_client.start_operation(
                 StandaloneTestService.blocking_async,
                 EchoInput(value=f"count-{i}"),
                 id=str(uuid.uuid4()),
@@ -635,8 +547,7 @@ async def test_get_nexus_operation_handle(client: Client, env: WorkflowEnvironme
         )
 
         op_id = str(uuid.uuid4())
-        original_handle = await start_with_retry(
-            nexus_client,
+        original_handle = await nexus_client.start_operation(
             StandaloneTestService.echo_async,
             EchoInput(value="handle-test"),
             id=op_id,
@@ -682,8 +593,7 @@ async def test_id_conflict_policy_use_existing(
         op_id = str(uuid.uuid4())
 
         # First start
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.blocking_async,
             EchoInput(value=task_queue),
             id=op_id,
@@ -721,7 +631,6 @@ async def test_id_conflict_policy_use_existing(
         assert first_result.value == second_result.value
 
 
-@pytest.mark.skip(reason="server currently doesn't send error details")
 async def test_id_conflict_policy_fail(client: Client, env: WorkflowEnvironment):
     """Start op, re-start with FAIL, verify raises NexusOperationAlreadyStartedError."""
     task_queue = str(uuid.uuid4())
@@ -742,8 +651,7 @@ async def test_id_conflict_policy_fail(client: Client, env: WorkflowEnvironment)
         op_id = str(uuid.uuid4())
 
         # First start
-        await start_with_retry(
-            nexus_client,
+        await nexus_client.start_operation(
             StandaloneTestService.blocking_async,
             EchoInput(value="first"),
             id=op_id,
@@ -859,8 +767,7 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         op_id = str(uuid.uuid4())
 
         # Start operation -- should trigger start interceptor (with retry)
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.blocking_async,
             EchoInput(value=f"interceptor-test-{op_id}"),
             id=op_id,
@@ -902,8 +809,7 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         # Start another so we can terminate it
         previous_start_count = len(interceptor.start_calls)
         op_id = str(uuid.uuid4())
-        handle = await start_with_retry(
-            nexus_client,
+        handle = await nexus_client.start_operation(
             StandaloneTestService.blocking_async,
             EchoInput(value=f"interceptor-test-{op_id}"),
             id=op_id,

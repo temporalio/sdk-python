@@ -2635,7 +2635,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2665,7 +2665,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-common"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2691,7 +2691,6 @@ dependencies = [
  "prost-types",
  "prost-wkt",
  "prost-wkt-types",
- "rand 0.10.0",
  "ringbuf",
  "serde",
  "serde_json",
@@ -2710,7 +2709,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-macros"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2719,7 +2718,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-sdk-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",

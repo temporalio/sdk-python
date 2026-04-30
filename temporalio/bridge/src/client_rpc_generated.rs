@@ -1273,6 +1273,15 @@ impl ClientRef {
                         create_connectivity_rule
                     )
                 }
+                "create_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        create_custom_role
+                    )
+                }
                 "create_namespace" => {
                     rpc_call!(
                         connection,
@@ -1346,6 +1355,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         delete_connectivity_rule
+                    )
+                }
+                "delete_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        delete_custom_role
                     )
                 }
                 "delete_namespace" => {
@@ -1493,6 +1511,24 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         get_current_identity
+                    )
+                }
+                "get_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_custom_role
+                    )
+                }
+                "get_custom_roles" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_custom_roles
                     )
                 }
                 "get_namespace" => {
@@ -1682,6 +1718,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         update_api_key
+                    )
+                }
+                "update_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        update_custom_role
                     )
                 }
                 "update_namespace" => {

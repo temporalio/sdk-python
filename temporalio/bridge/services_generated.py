@@ -2477,6 +2477,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def create_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.CreateCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.CreateCustomRoleResponse:
+        """Invokes the CloudService.create_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.CreateCustomRoleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def create_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateNamespaceRequest,
@@ -2634,6 +2652,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.DeleteConnectivityRuleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleResponse:
+        """Invokes the CloudService.delete_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2976,6 +3012,42 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.GetCurrentIdentityResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCustomRoleResponse:
+        """Invokes the CloudService.get_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCustomRoleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_custom_roles(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCustomRolesRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCustomRolesResponse:
+        """Invokes the CloudService.get_custom_roles rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_custom_roles",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCustomRolesResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3426,6 +3498,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.UpdateApiKeyResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleResponse:
+        """Invokes the CloudService.update_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,

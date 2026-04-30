@@ -4414,9 +4414,6 @@ class HistoryEvent(google.protobuf.message.Message):
     def principal(self) -> temporalio.api.common.v1.message_pb2.Principal:
         """Server-computed authenticated caller identity associated with this event."""
     @property
-    def principal(self) -> temporalio.api.common.v1.message_pb2.Principal:
-        """Server-computed authenticated caller identity associated with this event."""
-    @property
     def workflow_execution_started_event_attributes(
         self,
     ) -> global___WorkflowExecutionStartedEventAttributes: ...
