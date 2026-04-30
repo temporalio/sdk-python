@@ -130,12 +130,14 @@ from tests.helpers import (
     assert_pending_activity_exists_eventually,
     assert_task_fail_eventually,
     assert_workflow_exists_eventually,
+    async_wait_for_pause_event,
     ensure_search_attributes_present,
     find_free_port,
     get_pending_activity_info,
     new_worker,
     pause_and_assert,
     unpause_and_assert,
+    wait_for_pause_event,
     workflow_update_exists,
 )
 from tests.helpers.cache_eviction import (
@@ -7782,6 +7784,7 @@ async def heartbeat_activity(
     except (CancelledError, asyncio.CancelledError) as err:
         if not catch_err:
             raise err
+        await async_wait_for_pause_event(activity.info().activity_id)
         return activity.cancellation_details()
     finally:
         activity.heartbeat("finally-complete")
@@ -7801,6 +7804,7 @@ def sync_heartbeat_activity(
     except (CancelledError, asyncio.CancelledError) as err:
         if not catch_err:
             raise err
+        wait_for_pause_event(activity.info().activity_id)
         return activity.cancellation_details()
     finally:
         activity.heartbeat("finally-complete")
