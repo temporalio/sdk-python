@@ -134,10 +134,6 @@ async def interrupt_entrypoint(value: str) -> dict:
 
 @task
 async def slow_task(x: int) -> int:
-    # Wait forever; the only exit is the start_to_close_timeout configured
-    # by tests that exercise this task's timeout path, or worker-shutdown
-    # cancellation. A finite sleep would race with the server processing the
-    # activity's completion vs. processing the timeout.
     await asyncio.Event().wait()
     return x
 

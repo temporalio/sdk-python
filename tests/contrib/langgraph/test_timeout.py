@@ -19,9 +19,6 @@ class State(TypedDict):
 
 
 async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
-    # Wait forever; the only exit is the start_to_close_timeout below or
-    # worker-shutdown cancellation. A finite sleep would race with the server
-    # processing the activity's completion vs. processing the timeout.
     await asyncio.Event().wait()
     return {"value": "done"}
 
