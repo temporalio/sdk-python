@@ -3,6 +3,7 @@ import logging
 import logging.handlers
 import queue
 import socket
+import threading
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Iterator, Sequence
@@ -265,8 +266,35 @@ async def get_pending_activity_info(
     return None
 
 
+_wait_for_pause_events: dict[str, threading.Event] = {}
+
+
+def wait_for_pause_release(activity_id: str) -> None:
+    """Block a sync activity until pause_and_assert releases it.
+
+    No-op if no event is registered: pause_and_assert may finish (and clean up
+    the event) before the activity catches its cancel, since the server has
+    already committed paused=true by the time pause_activity returns.
+    """
+    event = _wait_for_pause_events.get(activity_id)
+    if event is not None:
+        event.wait()
+
+
+async def async_wait_for_pause_release(activity_id: str) -> None:
+    """Block an async activity until pause_and_assert releases it. No-op if not registered."""
+    event = _wait_for_pause_events.get(activity_id)
+    if event is not None:
+        await asyncio.get_running_loop().run_in_executor(None, event.wait)
+
+
 async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
-    """Pause the given activity and assert it becomes paused."""
+    """Pause the given activity and assert it becomes paused.
+
+    Registers an event before calling the pause API so cooperating test
+    activities (those that catch the pause-induced cancel via
+    wait_for_pause_release) hang until we have observed paused=true.
+    """
     desc = await handle.describe()
     req = PauseActivityRequest(
         namespace=client.namespace,
@@ -276,19 +304,19 @@ async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: 
         ),
         id=activity_id,
     )
-    await client.workflow_service.pause_activity(req)
 
-    # Assert eventually paused. If the activity catches the pause-induced
-    # cancellation and returns, it leaves the pending list before we poll —
-    # treat that as success since these test activities only stop running
-    # because of the cancellation we triggered.
-    async def check_paused() -> None:
-        info = await get_pending_activity_info(handle, activity_id)
-        if info is None:
-            return
-        assert info.paused, f"Activity {activity_id} not yet paused"
+    _wait_for_pause_events[activity_id] = threading.Event()
+    try:
+        await client.workflow_service.pause_activity(req)
 
-    await assert_eventually(check_paused)
+        async def check_paused() -> None:
+            info = await assert_pending_activity_exists_eventually(handle, activity_id)
+            assert info.paused, f"Activity {activity_id} not yet paused"
+
+        await assert_eventually(check_paused)
+    finally:
+        _wait_for_pause_events[activity_id].set()
+        del _wait_for_pause_events[activity_id]
 
 
 async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
