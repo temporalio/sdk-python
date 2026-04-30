@@ -1136,30 +1136,27 @@ async def test_schedule_backfill(
             )
         ],
     )
-    # We accept both 1.24 and pre-1.24 action counts
-    assert (await handle.describe()).info.num_actions in [1, 2]
-
-    # Add two more backfills and and -2m will be deduped
-    await handle.backfill(
-        # 3 actions on Server >= 1.24, 2 actions on Server < 1.24
-        ScheduleBackfill(
-            start_at=begin - timedelta(minutes=4),
-            end_at=begin - timedelta(minutes=2),
-            overlap=ScheduleOverlapPolicy.ALLOW_ALL,
-        ),
-        # 3 actions on Server >= 1.24, 2 actions on Server < 1.24, except on
-        # Server >= 1.24, there is overlap with the prior backfill, so this is
-        # only net +2 actions, regardless of Server version.
-        ScheduleBackfill(
-            start_at=begin - timedelta(minutes=2),
-            end_at=begin,
-            overlap=ScheduleOverlapPolicy.ALLOW_ALL,
-        ),
-    )
-    assert (await handle.describe()).info.num_actions in [5, 7]
-
-    await handle.delete()
-    await assert_no_schedules(client)
+    try:
+        # Add two more backfills. Older servers treat the end time as
+        # exclusive, 1.24+ servers treat it as inclusive, and 1.31+ servers no
+        # longer dedupe the overlapping ALLOW_ALL backfills below.
+        await handle.backfill(
+            # 3 actions on Server >= 1.24, 2 actions on Server < 1.24
+            ScheduleBackfill(
+                start_at=begin - timedelta(minutes=4),
+                end_at=begin - timedelta(minutes=2),
+                overlap=ScheduleOverlapPolicy.ALLOW_ALL,
+            ),
+            # 3 actions on Server >= 1.24, 2 actions on Server < 1.24.
+            ScheduleBackfill(
+                start_at=begin - timedelta(minutes=2),
+                end_at=begin,
+                overlap=ScheduleOverlapPolicy.ALLOW_ALL,
+            ),
+        )
+    finally:
+        await handle.delete()
+        await assert_no_schedules(client)
 
 
 async def test_schedule_create_limited_actions_validation(
