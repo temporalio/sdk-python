@@ -220,6 +220,7 @@ async def test_start_activity_calls_interceptor(
 
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
+    start_delay = timedelta(seconds=3)
 
     await intercepted_client.start_activity(
         increment,
@@ -227,6 +228,7 @@ async def test_start_activity_calls_interceptor(
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
+        start_delay=start_delay,
     )
 
     assert len(interceptor.start_activity_calls) == 1
@@ -234,6 +236,7 @@ async def test_start_activity_calls_interceptor(
     assert call.id == activity_id
     assert call.task_queue == task_queue
     assert call.activity_type == "increment"
+    assert call.start_delay == start_delay
 
 
 async def test_describe_activity_calls_interceptor(
@@ -411,6 +414,18 @@ async def test_count_activities_calls_interceptor(
     assert len(interceptor.count_activities_calls) == 1
     call = interceptor.count_activities_calls[0]
     assert call.query == query
+
+
+async def test_start_activity_rejects_negative_start_delay(client: Client):
+    with pytest.raises(ValueError, match="start_delay must be non-negative"):
+        await client.start_activity(
+            increment,
+            args=(1,),
+            id=str(uuid.uuid4()),
+            task_queue=str(uuid.uuid4()),
+            start_to_close_timeout=timedelta(seconds=5),
+            start_delay=timedelta(seconds=-1),
+        )
 
 
 async def test_get_result(client: Client, env: WorkflowEnvironment):
