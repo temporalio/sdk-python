@@ -278,10 +278,15 @@ async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: 
     )
     await client.workflow_service.pause_activity(req)
 
-    # Assert eventually paused
-    async def check_paused() -> bool:
-        info = await assert_pending_activity_exists_eventually(handle, activity_id)
-        return info.paused
+    # Assert eventually paused. If the activity catches the pause-induced
+    # cancellation and returns, it leaves the pending list before we poll —
+    # treat that as success since these test activities only stop running
+    # because of the cancellation we triggered.
+    async def check_paused() -> None:
+        info = await get_pending_activity_info(handle, activity_id)
+        if info is None:
+            return
+        assert info.paused, f"Activity {activity_id} not yet paused"
 
     await assert_eventually(check_paused)
 
@@ -300,9 +305,9 @@ async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id
     await client.workflow_service.unpause_activity(req)
 
     # Assert eventually not paused
-    async def check_unpaused() -> bool:
+    async def check_unpaused() -> None:
         info = await assert_pending_activity_exists_eventually(handle, activity_id)
-        return not info.paused
+        assert not info.paused, f"Activity {activity_id} still paused"
 
     await assert_eventually(check_unpaused)
 
