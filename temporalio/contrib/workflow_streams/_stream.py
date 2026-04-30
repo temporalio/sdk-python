@@ -149,7 +149,7 @@ class WorkflowStream:
             self._log = []
             self._base_offset = 0
             self._publishers = {}
-        self._draining: bool = False
+        self._detaching: bool = False
         self._topic_types: dict[str, type[Any]] = {}
 
         workflow.set_signal_handler(_PUBLISH_SIGNAL, self._on_publish)
@@ -281,7 +281,7 @@ class WorkflowStream:
         ``await workflow.wait_condition(workflow.all_handlers_finished)``
         and ``workflow.continue_as_new()``.
         """
-        self._draining = True
+        self._detaching = True
 
     async def continue_as_new(
         self,
@@ -392,7 +392,20 @@ class WorkflowStream:
             )
 
     async def _on_poll(self, payload: PollInput) -> PollResult:
-        """Long-poll: block until new items available or draining, then return."""
+        """Long-poll: block until new items available or detaching, then return."""
+        # Re-evaluate the predicate against current ``_base_offset`` on
+        # every iteration: a ``truncate()`` between this poll's arrival
+        # and the wait firing changes ``log_offset`` underneath us, so
+        # capturing it as a local would freeze the wait against stale
+        # state and the poll would only return when the long-poll RPC
+        # times out.
+        await workflow.wait_condition(
+            lambda: (
+                payload.from_offset < self._base_offset
+                or len(self._log) > payload.from_offset - self._base_offset
+                or self._detaching
+            ),
+        )
         log_offset = payload.from_offset - self._base_offset
         if log_offset < 0:
             if payload.from_offset == 0:
@@ -409,9 +422,6 @@ class WorkflowStream:
                     type="TruncatedOffset",
                     non_retryable=True,
                 )
-        await workflow.wait_condition(
-            lambda: len(self._log) > log_offset or self._draining,
-        )
         all_new = self._log[log_offset:]
         if payload.topics:
             topic_set = set(payload.topics)
@@ -450,9 +460,9 @@ class WorkflowStream:
         )
 
     def _validate_poll(self, _payload: PollInput) -> None:
-        """Reject new polls when draining for continue-as-new."""
-        if self._draining:
-            raise RuntimeError("Workflow is draining for continue-as-new")
+        """Reject new polls when pollers are detached for continue-as-new."""
+        if self._detaching:
+            raise RuntimeError("Workflow pollers are detached for continue-as-new")
 
     def _on_offset(self) -> int:
         """Return the current global offset (base_offset + log length)."""

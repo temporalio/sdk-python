@@ -26,7 +26,12 @@ import temporalio.api.nexus.v1
 import temporalio.api.operatorservice.v1
 import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
-from temporalio.client import Client, WorkflowHandle, WorkflowUpdateFailedError
+from temporalio.client import (
+    Client,
+    WorkflowHandle,
+    WorkflowUpdateFailedError,
+    WorkflowUpdateStage,
+)
 from temporalio.common import RawValue
 from temporalio.contrib.workflow_streams import (
     PollInput,
@@ -949,6 +954,62 @@ async def test_subscribe_recovers_from_truncation(client: Client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_truncate_during_waiting_poll_raises_truncated_offset(
+    client: Client,
+) -> None:
+    """A truncate that advances ``base_offset`` past a waiting poll's
+    ``from_offset`` must wake the poll and raise ``TruncatedOffset``.
+
+    Reproduces the bug where ``_on_poll`` captured ``log_offset`` once
+    before ``wait_condition`` and then sliced ``self._log[log_offset:]``
+    against the post-truncate state. With the old predicate
+    ``len(self._log) > log_offset`` the wait would either never fire
+    (truncation shrinks the log below the captured offset) or fire on a
+    later publish and silently emit the wrong items at offsets the
+    subscriber had already moved past.
+    """
+    async with new_worker(client, TruncateRaceWorkflow) as worker:
+        handle = await client.start_workflow(
+            TruncateRaceWorkflow.run,
+            id=f"workflow-stream-trunc-race-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Seed: 5 items at offsets 0..4. base_offset stays 0.
+        await handle.execute_update(TruncateRaceWorkflow.publish, 5)
+
+        # Park a poll from offset=10 — past the current end of the log.
+        # With wait_for_stage=ACCEPTED the handler has begun executing
+        # and is parked at workflow.wait_condition by the time the
+        # client gets the handle back.
+        poll_handle = await handle.start_update(
+            "__temporal_workflow_stream_poll",
+            PollInput(topics=[], from_offset=10),
+            result_type=PollResult,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+        )
+
+        # In one workflow activation: publish 7 more items (log grows to
+        # 12 entries at offsets 0..11) and then truncate to 11. Result:
+        # base_offset=11, log=[item @11]. The waiting poll's
+        # from_offset=10 is now strictly less than base_offset, so the
+        # fixed predicate must wake it and the post-wait recompute must
+        # raise TruncatedOffset. Both halves of the fix are exercised:
+        # without the predicate change the wait stays asleep through
+        # this activation; without the post-wait recompute the slice
+        # silently returns wrong items / next_offset.
+        await handle.execute_update(TruncateRaceWorkflow.publish_then_truncate, (7, 11))
+
+        with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+            await poll_handle.result()
+        cause = exc_info.value.cause
+        assert isinstance(cause, ApplicationError)
+        assert cause.type == "TruncatedOffset"
+
+        await handle.signal(TruncateRaceWorkflow.close)
+
+
+@pytest.mark.asyncio
 async def test_workflow_and_activity_publish_interleaved(client: Client) -> None:
     """Workflow publishes status events around activity publishing."""
     count = 5
@@ -1645,6 +1706,50 @@ class TruncateWorkflow:
         # must accept the same positional args, but the names are free
         # to differ.
         del _prepub_count
+        await workflow.wait_condition(lambda: self._closed)
+
+
+@workflow.defn
+class TruncateRaceWorkflow:
+    """Workflow that exposes ``publish`` and ``publish_then_truncate``
+    updates so a test can deterministically interleave a waiting
+    ``__temporal_workflow_stream_poll`` update against a truncate that
+    advances ``base_offset`` past the poll's ``from_offset``.
+
+    The ``publish_then_truncate`` handler runs publish loop and truncate
+    in a single workflow activation (no awaits between them), so a poll
+    parked at ``wait_condition`` sees the post-truncate state on its
+    next predicate evaluation rather than firing on an intermediate
+    publish.
+    """
+
+    @workflow.init
+    def __init__(self) -> None:
+        self.stream = WorkflowStream()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.update
+    async def publish(self, count: int) -> None:
+        await asyncio.sleep(0)
+        topic = self.stream.topic("events", type=bytes)
+        for i in range(count):
+            topic.publish(f"item-{i}".encode())
+
+    @workflow.update
+    async def publish_then_truncate(self, args: tuple[int, int]) -> None:
+        await asyncio.sleep(0)
+        publish_count, truncate_to = args
+        topic = self.stream.topic("events", type=bytes)
+        for i in range(publish_count):
+            topic.publish(f"prepub-{i}".encode())
+        self.stream.truncate(truncate_to)
+
+    @workflow.run
+    async def run(self) -> None:
         await workflow.wait_condition(lambda: self._closed)
 
 

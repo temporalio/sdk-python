@@ -37,6 +37,7 @@ from temporalio.client import (
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
 from temporalio.converter import DataConverter, PayloadConverter
+from temporalio.service import RPCError, RPCStatusCode
 
 from ._topic_handle import TopicHandle
 from ._types import (
@@ -535,18 +536,38 @@ class WorkflowStreamClient:
             except asyncio.CancelledError:
                 return
             except WorkflowUpdateFailedError as e:
-                if e.cause and getattr(e.cause, "type", None) == "TruncatedOffset":
+                cause_type = getattr(e.cause, "type", None)
+                if cause_type == "TruncatedOffset":
                     # Subscriber fell behind truncation. Retry from
                     # offset 0 which the stream treats as "from the
                     # beginning of whatever exists" (i.e., from
                     # base_offset).
                     offset = 0
                     continue
+                if cause_type == "AcceptedUpdateCompletedWorkflow":
+                    # Workflow returned (or continued-as-new) before
+                    # this poll's update completed. Either follow the
+                    # chain or exit cleanly.
+                    if await self._follow_continue_as_new():
+                        continue
+                    return
                 raise
             except WorkflowUpdateRPCTimeoutOrCancelledError:
                 if await self._follow_continue_as_new():
                     continue
                 return
+            except RPCError as e:
+                # Workflow may have completed between polls; subscribe
+                # exits cleanly on terminal status so callers don't
+                # have to wrap the iterator in error handling for the
+                # normal end-of-stream case.
+                if e.status != RPCStatusCode.NOT_FOUND:
+                    raise
+                if await self._follow_continue_as_new():
+                    continue
+                if await self._workflow_in_terminal_state():
+                    return
+                raise
             converter = self._payload_converter()
             for wire_item in result.items:
                 payload = _decode_payload(wire_item.data)
@@ -580,6 +601,25 @@ class WorkflowStreamClient:
             self._handle = self._client.get_workflow_handle(self._workflow_id)
             return True
         return False
+
+    async def _workflow_in_terminal_state(self) -> bool:
+        """Return True if the workflow has reached a terminal state.
+
+        Used by ``subscribe()`` to distinguish "workflow finished —
+        stream is done" from "wrong workflow id" when a poll RPC
+        returns NOT_FOUND.
+        """
+        try:
+            desc = await self._handle.describe()
+        except Exception:
+            return False
+        return desc.status in (
+            WorkflowExecutionStatus.COMPLETED,
+            WorkflowExecutionStatus.FAILED,
+            WorkflowExecutionStatus.CANCELED,
+            WorkflowExecutionStatus.TERMINATED,
+            WorkflowExecutionStatus.TIMED_OUT,
+        )
 
     async def get_offset(self) -> int:
         """Query the current global offset (base_offset + log length)."""
