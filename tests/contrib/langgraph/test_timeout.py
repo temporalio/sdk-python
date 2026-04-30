@@ -19,6 +19,7 @@ class State(TypedDict):
 
 
 async def node(state: State) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
+    # Wait (forever) until start_to_close_timeout or worker shutdown cancellation
     await asyncio.Event().wait()
     return {"value": "done"}
 

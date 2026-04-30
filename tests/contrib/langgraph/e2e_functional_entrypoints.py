@@ -133,12 +133,13 @@ async def interrupt_entrypoint(value: str) -> dict:
 
 
 @task
-async def slow_task(x: int) -> int:
+async def waiting_task(x: int) -> int:
+    # Wait (forever) until start_to_close_timeout or worker shutdown cancellation
     await asyncio.Event().wait()
     return x
 
 
 @entrypoint()
 async def slow_entrypoint(value: int) -> dict:
-    result = await slow_task(value)
+    result = await waiting_task(value)
     return {"result": result}
