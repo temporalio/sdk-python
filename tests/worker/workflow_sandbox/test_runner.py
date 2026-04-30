@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import uuid
+import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -645,7 +646,8 @@ async def test_workflow_sandbox_import_suppress_warnings(client: Client):
         workflows=[SupressWarningsLazyImportWorkflow],
         workflow_runner=SandboxedWorkflowRunner(restrictions),
     ) as worker:
-        with pytest.warns(None) as recorder:  # type:ignore
+        with warnings.catch_warnings(record=True) as recorder:
+            warnings.simplefilter("always")
             await client.execute_workflow(
                 SupressWarningsLazyImportWorkflow.run,
                 id=f"workflow-{uuid.uuid4()}",
