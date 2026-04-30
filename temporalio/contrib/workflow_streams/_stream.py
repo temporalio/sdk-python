@@ -136,7 +136,7 @@ class WorkflowStream:
             )
 
         if prior_state is not None:
-            self._log: list[WorkflowStreamItem] = [
+            self._log: list[WorkflowStreamItem[Payload]] = [
                 WorkflowStreamItem(topic=item.topic, data=_decode_payload(item.data))
                 for item in prior_state.log
             ]

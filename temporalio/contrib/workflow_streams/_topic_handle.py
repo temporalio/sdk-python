@@ -91,7 +91,7 @@ class TopicHandle(Generic[T]):
         from_offset: int = 0,
         *,
         poll_cooldown: timedelta = timedelta(milliseconds=100),
-    ) -> AsyncIterator[WorkflowStreamItem]:
+    ) -> AsyncIterator[WorkflowStreamItem[T]]:
         """Async iterator over items on this topic, decoded as ``T``.
 
         For raw ``Payload`` access, or any other decode type that

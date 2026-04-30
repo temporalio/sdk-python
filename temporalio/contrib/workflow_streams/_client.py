@@ -456,6 +456,25 @@ class WorkflowStreamClient:
             self._flush_event.clear()
             await self._flush()
 
+    @overload
+    def subscribe(
+        self,
+        topics: str | list[str] | None = ...,
+        from_offset: int = ...,
+        *,
+        result_type: type[T],
+        poll_cooldown: timedelta = ...,
+    ) -> AsyncIterator[WorkflowStreamItem[T]]: ...
+    @overload
+    def subscribe(
+        self,
+        topics: str | list[str] | None = ...,
+        from_offset: int = ...,
+        *,
+        result_type: None = None,
+        poll_cooldown: timedelta = ...,
+    ) -> AsyncIterator[WorkflowStreamItem[Any]]: ...
+
     async def subscribe(
         self,
         topics: str | list[str] | None = None,
@@ -463,7 +482,7 @@ class WorkflowStreamClient:
         *,
         result_type: type | None = None,
         poll_cooldown: timedelta = timedelta(milliseconds=100),
-    ) -> AsyncIterator[WorkflowStreamItem]:
+    ) -> AsyncIterator[WorkflowStreamItem[Any]]:
         """Async iterator that polls for new items.
 
         Automatically follows continue-as-new chains when the client

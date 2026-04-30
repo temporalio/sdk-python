@@ -20,9 +20,11 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Generic, TypeVar
 
 from temporalio.api.common.v1 import Payload
+
+T = TypeVar("T")
 
 
 # basedpyright flags _-prefixed module-level functions as unused even when
@@ -41,26 +43,26 @@ def _decode_payload(wire: str) -> Payload:  # pyright: ignore[reportUnusedFuncti
 
 
 @dataclass
-class WorkflowStreamItem:
+class WorkflowStreamItem(Generic[T]):
     """A single item in the workflow stream's log.
 
     .. warning::
         This class is experimental and may change in future versions.
 
-    The ``data`` field always carries the decoded value produced by
-    :meth:`WorkflowStreamClient.subscribe`: the converter's default
-    ``Any`` decoding when ``result_type`` is omitted, an instance of
-    ``T`` when ``result_type=T`` is passed, or a
+    The ``data`` field carries the decoded value produced by
+    :meth:`WorkflowStreamClient.subscribe`. The generic parameter ``T``
+    matches the ``result_type`` passed to ``subscribe``: an instance of
+    ``T`` when ``result_type=T``, the converter's default ``Any``
+    decoding when ``result_type`` is omitted, or a
     :class:`temporalio.common.RawValue` wrapping the original
-    ``Payload`` when ``result_type=RawValue`` is passed. The dataclass
-    is typed as ``Any`` to accommodate all three.
+    ``Payload`` when ``result_type=RawValue``.
 
     The ``offset`` field is populated at poll time from the item's
     position in the global log.
     """
 
     topic: str
-    data: Any
+    data: T
     offset: int = 0
 
 
