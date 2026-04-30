@@ -81,7 +81,7 @@ dev = [
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
   "langgraph>=1.1.0",
-  "langsmith>=0.7.0,<0.8",
+  "langsmith>=0.7.0,<0.7.34",
   "setuptools<82",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
