@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Mapping
 
 from botocore.exceptions import ClientError
 from types_aiobotocore_s3.client import S3Client
@@ -33,6 +34,13 @@ class _Aioboto3StorageDriverClient(S3StorageDriverClient):
                 ``aioboto3.Session().client("s3")``.
         """
         self._client = client
+
+    def describe(self) -> Mapping[str, str]:
+        """Region of the wrapped aioboto3 client, surfaced in driver error
+        messages to short-circuit the most common silent 403 misconfiguration.
+        """
+        region = self._client.meta.region_name
+        return {"region": region} if region else {}
 
     async def object_exists(self, *, bucket: str, key: str) -> bool:
         """Check existence via aioboto3's ``head_object``."""

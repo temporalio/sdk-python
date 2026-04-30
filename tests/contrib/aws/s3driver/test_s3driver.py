@@ -26,6 +26,8 @@ from temporalio.contrib.aws.s3driver import (
     S3StorageDriver,
     S3StorageDriverClient,
 )
+from temporalio.contrib.aws.s3driver._driver import _format_client_context
+from temporalio.contrib.aws.s3driver.aioboto3 import _Aioboto3StorageDriverClient
 from temporalio.converter import (
     JSONPlainPayloadConverter,
     StorageDriverActivityInfo,
@@ -34,7 +36,7 @@ from temporalio.converter import (
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
 )
-from tests.contrib.aws.s3driver.conftest import BUCKET
+from tests.contrib.aws.s3driver.conftest import BUCKET, REGION
 
 _CONVERTER = JSONPlainPayloadConverter()
 
@@ -618,7 +620,7 @@ class TestS3StorageDriverErrors:
             await driver.store(make_store_context(), [payload])
         assert (
             str(exc_info.value)
-            == f"S3StorageDriver store failed [bucket={bucket}, key={expected_key}]"
+            == f"S3StorageDriver store failed [bucket={bucket}, key={expected_key}, region={REGION}]"
         )
         assert isinstance(exc_info.value.__cause__, ClientError)
         assert (
@@ -636,7 +638,7 @@ class TestS3StorageDriverErrors:
             await driver.retrieve(StorageDriverRetrieveContext(), [claim])
         assert (
             str(exc_info.value)
-            == f"S3StorageDriver retrieve failed [bucket={BUCKET}, key={key}]"
+            == f"S3StorageDriver retrieve failed [bucket={BUCKET}, key={key}, region={REGION}]"
         )
         assert isinstance(exc_info.value.__cause__, ClientError)
         assert (
@@ -655,7 +657,7 @@ class TestS3StorageDriverErrors:
             await driver.retrieve(StorageDriverRetrieveContext(), [claim])
         assert (
             str(exc_info.value)
-            == f"S3StorageDriver retrieve failed [bucket={bucket}, key={key}]"
+            == f"S3StorageDriver retrieve failed [bucket={bucket}, key={key}, region={REGION}]"
         )
         assert isinstance(exc_info.value.__cause__, ClientError)
         assert (
@@ -839,3 +841,49 @@ class TestS3StorageDriverConcurrency:
         assert (
             len(faulty_client.cancelled) == 2
         ), "Expected 2 remaining tasks to be cancelled"
+
+
+# ---------------------------------------------------------------------------
+# TestAioboto3StorageDriverClientDescribe
+# ---------------------------------------------------------------------------
+
+
+class TestAioboto3StorageDriverClientDescribe:
+    def _make_client(self, region: str | None) -> _Aioboto3StorageDriverClient:
+        mock_s3 = MagicMock()
+        mock_s3.meta.region_name = region
+        return _Aioboto3StorageDriverClient(mock_s3)
+
+    def test_returns_region(self) -> None:
+        client = self._make_client(region="ap-southeast-1")
+        assert client.describe() == {"region": "ap-southeast-1"}
+
+    def test_omits_region_when_none(self) -> None:
+        client = self._make_client(region=None)
+        assert client.describe() == {}
+
+    def test_omits_region_when_empty_string(self) -> None:
+        client = self._make_client(region="")
+        assert client.describe() == {}
+
+
+# ---------------------------------------------------------------------------
+# TestFormatClientContext
+# ---------------------------------------------------------------------------
+
+
+class TestFormatClientContext:
+    def test_formats_entry(self) -> None:
+        client = MagicMock(spec=S3StorageDriverClient)
+        client.describe.return_value = {"region": "us-east-1"}
+        assert _format_client_context(client) == ", region=us-east-1"
+
+    def test_returns_empty_string_for_empty_describe(self) -> None:
+        client = MagicMock(spec=S3StorageDriverClient)
+        client.describe.return_value = {}
+        assert _format_client_context(client) == ""
+
+    def test_returns_empty_string_when_describe_raises(self) -> None:
+        client = MagicMock(spec=S3StorageDriverClient)
+        client.describe.side_effect = RuntimeError("oops")
+        assert _format_client_context(client) == ""
