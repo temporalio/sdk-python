@@ -1137,7 +1137,6 @@ async def test_schedule_backfill(
         ],
     )
     try:
-
         # Add two more backfills. Older servers treat the end time as
         # exclusive, 1.24+ servers treat it as inclusive, and 1.31+ servers no
         # longer dedupe the overlapping ALLOW_ALL backfills below.
