@@ -1297,6 +1297,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1319,6 +1320,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1342,6 +1344,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1365,6 +1368,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1388,6 +1392,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1411,6 +1416,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1436,6 +1442,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[Any]: ...
@@ -1462,6 +1469,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]:
@@ -1490,6 +1498,8 @@ class Client:
             summary: A single-line fixed summary for this activity that may appear
                 in the UI/CLI. This can be in single-line Temporal markdown format.
             priority: Priority of the activity execution.
+            start_delay: Time to wait before dispatching the activity.
+                This delay is not applied to retry attempts.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
@@ -1515,6 +1525,7 @@ class Client:
                 retry_policy=retry_policy,
                 search_attributes=search_attributes,
                 summary=summary,
+                start_delay=start_delay,
                 headers={},
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -1540,6 +1551,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1562,6 +1574,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1585,6 +1598,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1608,6 +1622,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1631,6 +1646,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1654,6 +1670,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1679,6 +1696,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> Any: ...
@@ -1705,6 +1723,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType:
@@ -1739,6 +1758,7 @@ class Client:
             search_attributes=search_attributes,
             summary=summary,
             priority=priority,
+            start_delay=start_delay,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
         )
@@ -1762,6 +1782,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1784,6 +1805,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1807,6 +1829,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1830,6 +1853,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1853,6 +1877,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1876,6 +1901,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -1899,6 +1925,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[Any]:
@@ -1926,6 +1953,7 @@ class Client:
             search_attributes=search_attributes,
             summary=summary,
             priority=priority,
+            start_delay=start_delay,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
         )
@@ -1948,6 +1976,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1970,6 +1999,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -1993,6 +2023,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2016,6 +2047,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2039,6 +2071,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2062,6 +2095,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2085,6 +2119,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> Any:
@@ -2112,6 +2147,7 @@ class Client:
             search_attributes=search_attributes,
             summary=summary,
             priority=priority,
+            start_delay=start_delay,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
         )
@@ -2134,6 +2170,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -2157,6 +2194,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -2182,6 +2220,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -2205,6 +2244,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]: ...
@@ -2228,6 +2268,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[Any]:
@@ -2255,6 +2296,7 @@ class Client:
             search_attributes=search_attributes,
             summary=summary,
             priority=priority,
+            start_delay=start_delay,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
         )
@@ -2277,6 +2319,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2300,6 +2343,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2325,6 +2369,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2348,6 +2393,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType: ...
@@ -2371,6 +2417,7 @@ class Client:
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> Any:
@@ -2398,6 +2445,7 @@ class Client:
             search_attributes=search_attributes,
             summary=summary,
             priority=priority,
+            start_delay=start_delay,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
         )
@@ -8769,6 +8817,7 @@ class StartActivityInput:
     priority: temporalio.common.Priority
     search_attributes: temporalio.common.TypedSearchAttributes | None
     summary: str | None
+    start_delay: timedelta | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
@@ -9911,6 +9960,8 @@ class _ClientImpl(OutboundInterceptor):
             raise ValueError(
                 "Activity must have start_to_close_timeout or schedule_to_close_timeout"
             )
+        if input.start_delay is not None and input.start_delay < timedelta(0):
+            raise ValueError("start_delay must be non-negative")
         req = await self._build_start_activity_execution_request(input)
 
         resp: temporalio.api.workflowservice.v1.StartActivityExecutionResponse
@@ -9987,6 +10038,8 @@ class _ClientImpl(OutboundInterceptor):
             req.schedule_to_start_timeout.FromTimedelta(input.schedule_to_start_timeout)
         if input.heartbeat_timeout is not None:
             req.heartbeat_timeout.FromTimedelta(input.heartbeat_timeout)
+        if input.start_delay is not None:
+            req.start_delay.FromTimedelta(input.start_delay)
         if input.retry_policy is not None:
             input.retry_policy.apply_to_proto(req.retry_policy)
 
