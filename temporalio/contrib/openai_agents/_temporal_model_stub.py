@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-import logging
-
-from temporalio import workflow
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-
-logger = logging.getLogger(__name__)
-
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from typing import Any
 
 from agents import (
@@ -32,6 +26,7 @@ from agents.items import TResponseStreamEvent
 from agents.tool import ApplyPatchTool, LocalShellTool, ShellTool, ToolSearchTool
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 
+from temporalio import workflow
 from temporalio.contrib.openai_agents._invoke_model_activity import (
     ActivityModelInput,
     AgentOutputSchemaInput,
@@ -42,8 +37,10 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     ModelActivity,
     ModelTracingInput,
     ShellToolInput,
+    StreamingActivityModelInput,
     ToolInput,
 )
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 
 
 class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
@@ -60,8 +57,9 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         self.model_params = model_params
         self.agent = agent
 
-    async def get_response(
+    def _build_activity_input(
         self,
+        *,
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
@@ -69,11 +67,10 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
         previous_response_id: str | None,
         conversation_id: str | None,
         prompt: ResponsePromptParam | None,
-    ) -> ModelResponse:
+    ) -> tuple[ActivityModelInput, str | None]:
         def make_tool_info(tool: Tool) -> ToolInput:
             if isinstance(
                 tool,
@@ -166,6 +163,35 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         else:
             summary = None
 
+        return activity_input, summary
+
+    async def get_response(
+        self,
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: AgentOutputSchemaBase | None,
+        handoffs: list[Handoff],
+        tracing: ModelTracing,
+        *,
+        previous_response_id: str | None,
+        conversation_id: str | None,
+        prompt: ResponsePromptParam | None,
+    ) -> ModelResponse:
+        activity_input, summary = self._build_activity_input(
+            system_instructions=system_instructions,
+            input=input,
+            model_settings=model_settings,
+            tools=tools,
+            output_schema=output_schema,
+            handoffs=handoffs,
+            tracing=tracing,
+            previous_response_id=previous_response_id,
+            conversation_id=conversation_id,
+            prompt=prompt,
+        )
+
         if self.model_params.use_local_activity:
             return await workflow.execute_local_activity_method(
                 ModelActivity.invoke_model_activity,
@@ -177,23 +203,22 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
                 retry_policy=self.model_params.retry_policy,
                 cancellation_type=self.model_params.cancellation_type,
             )
-        else:
-            return await workflow.execute_activity_method(
-                ModelActivity.invoke_model_activity,
-                activity_input,
-                summary=summary,
-                task_queue=self.model_params.task_queue,
-                schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
-                schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
-                start_to_close_timeout=self.model_params.start_to_close_timeout,
-                heartbeat_timeout=self.model_params.heartbeat_timeout,
-                retry_policy=self.model_params.retry_policy,
-                cancellation_type=self.model_params.cancellation_type,
-                versioning_intent=self.model_params.versioning_intent,
-                priority=self.model_params.priority,
-            )
+        return await workflow.execute_activity_method(
+            ModelActivity.invoke_model_activity,
+            activity_input,
+            summary=summary,
+            task_queue=self.model_params.task_queue,
+            schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+            schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+            start_to_close_timeout=self.model_params.start_to_close_timeout,
+            heartbeat_timeout=self.model_params.heartbeat_timeout,
+            retry_policy=self.model_params.retry_policy,
+            cancellation_type=self.model_params.cancellation_type,
+            versioning_intent=self.model_params.versioning_intent,
+            priority=self.model_params.priority,
+        )
 
-    def stream_response(
+    async def stream_response(
         self,
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
@@ -207,4 +232,60 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         conversation_id: str | None,
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
-        raise NotImplementedError("Temporal model doesn't support streams yet")
+        # Streaming relies on activity heartbeats to detect a stuck LLM
+        # call and on WorkflowStreamClient.from_within_activity() to signal
+        # partial results back to the workflow. Local activities support
+        # neither: their result commits with the workflow task, so there
+        # is no independent task to heartbeat against or to send signals
+        # from.
+        if self.model_params.use_local_activity:
+            raise ValueError(
+                "Streaming is incompatible with use_local_activity "
+                "(local activities do not support heartbeats or the "
+                "workflow stream signal channel)."
+            )
+
+        topic = self.model_params.streaming_event_topic
+        if topic is None:
+            raise ValueError(
+                "Runner.run_streamed requires "
+                "ModelActivityParameters.streaming_event_topic to be set."
+            )
+
+        base_input, summary = self._build_activity_input(
+            system_instructions=system_instructions,
+            input=input,
+            model_settings=model_settings,
+            tools=tools,
+            output_schema=output_schema,
+            handoffs=handoffs,
+            tracing=tracing,
+            previous_response_id=previous_response_id,
+            conversation_id=conversation_id,
+            prompt=prompt,
+        )
+        streaming_input: StreamingActivityModelInput = {
+            **base_input,
+            "streaming_event_topic": topic,
+            "streaming_event_batch_interval": (
+                self.model_params.streaming_event_batch_interval
+            ),
+        }
+
+        events = await workflow.execute_activity_method(
+            ModelActivity.invoke_model_activity_streaming,
+            streaming_input,
+            summary=summary,
+            task_queue=self.model_params.task_queue,
+            schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+            schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+            start_to_close_timeout=self.model_params.start_to_close_timeout,
+            heartbeat_timeout=self.model_params.heartbeat_timeout
+            or timedelta(seconds=30),
+            retry_policy=self.model_params.retry_policy,
+            cancellation_type=self.model_params.cancellation_type,
+            versioning_intent=self.model_params.versioning_intent,
+            priority=self.model_params.priority,
+        )
+        for event in events:
+            yield event

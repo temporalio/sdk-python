@@ -6,7 +6,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 import enum
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import Any, NoReturn
 
 from agents import (
     AgentOutputSchemaBase,
@@ -27,6 +27,7 @@ from agents import (
     UserError,
     WebSearchTool,
 )
+from agents.items import TResponseStreamEvent
 from agents.tool import (
     ApplyPatchTool,
     LocalShellTool,
@@ -43,6 +44,7 @@ from typing_extensions import Required, TypedDict
 
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
+from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
 
@@ -187,6 +189,119 @@ class ActivityModelInput(TypedDict, total=False):
     prompt: Any | None
 
 
+class StreamingActivityModelInput(ActivityModelInput, total=False):
+    """Input for the invoke_model_activity_streaming activity.
+
+    Adds the streaming-only fields on top of :class:`ActivityModelInput`.
+    """
+
+    streaming_event_topic: Required[str]
+    streaming_event_batch_interval: timedelta
+
+
+async def _empty_on_invoke_tool(_ctx: RunContextWrapper[Any], _input: str) -> str:
+    return ""
+
+
+async def _empty_on_invoke_handoff(_ctx: RunContextWrapper[Any], _input: str) -> Any:
+    return None
+
+
+async def _noop_shell_executor(*_a: Any, **_kw: Any) -> str:
+    return ""
+
+
+def _build_tool(tool: ToolInput) -> Tool:
+    """Reconstruct a Tool from its data-conversion-friendly input form."""
+    if isinstance(
+        tool,
+        (
+            FileSearchTool,
+            WebSearchTool,
+            ImageGenerationTool,
+            CodeInterpreterTool,
+            LocalShellTool,
+            ToolSearchTool,
+        ),
+    ):
+        return tool
+    elif isinstance(tool, ShellToolInput):
+        return ShellTool(
+            name=tool.name,
+            environment=tool.environment,
+            executor=_noop_shell_executor,
+        )
+    elif isinstance(tool, ApplyPatchToolInput):
+        return ApplyPatchTool(name=tool.name, editor=_NoopApplyPatchEditor())
+    elif isinstance(tool, HostedMCPToolInput):
+        return HostedMCPTool(tool_config=tool.tool_config)
+    elif isinstance(tool, FunctionToolInput):
+        return FunctionTool(
+            name=tool.name,
+            description=tool.description,
+            params_json_schema=tool.params_json_schema,
+            on_invoke_tool=_empty_on_invoke_tool,
+            strict_json_schema=tool.strict_json_schema,
+        )
+    else:
+        raise UserError(f"Unknown tool type: {tool.name}")  # type:ignore[reportUnreachable]
+
+
+def _build_tools_and_handoffs(
+    input: ActivityModelInput,
+) -> tuple[list[Tool], list[Handoff[Any, Any]]]:
+    tools = [_build_tool(x) for x in input.get("tools", [])]
+    handoffs: list[Handoff[Any, Any]] = [
+        Handoff(
+            tool_name=x.tool_name,
+            tool_description=x.tool_description,
+            input_json_schema=x.input_json_schema,
+            agent_name=x.agent_name,
+            strict_json_schema=x.strict_json_schema,
+            on_invoke_handoff=_empty_on_invoke_handoff,
+        )
+        for x in input.get("handoffs", [])
+    ]
+    return tools, handoffs
+
+
+def _raise_for_openai_status(e: APIStatusError) -> NoReturn:
+    """Translate an OpenAI APIStatusError into the right retry posture."""
+    retry_after: timedelta | None = None
+    retry_after_ms_header = e.response.headers.get("retry-after-ms")
+    if retry_after_ms_header is not None:
+        retry_after = timedelta(milliseconds=float(retry_after_ms_header))
+
+    if retry_after is None:
+        retry_after_header = e.response.headers.get("retry-after")
+        if retry_after_header is not None:
+            retry_after = timedelta(seconds=float(retry_after_header))
+
+    should_retry_header = e.response.headers.get("x-should-retry")
+    if should_retry_header == "true":
+        raise e
+    if should_retry_header == "false":
+        raise ApplicationError(
+            "Non retryable OpenAI error",
+            non_retryable=True,
+            next_retry_delay=retry_after,
+        ) from e
+
+    # Retry on 408 (Request Timeout), 409 (Conflict / often transient
+    # state mismatch), 429 (Too Many Requests / rate-limited), and any
+    # 5xx (server-side errors). All other 4xx codes are caller errors
+    # that won't recover on retry.
+    retryable = (
+        e.response.status_code in [408, 409, 429] or e.response.status_code >= 500
+    )
+    raise ApplicationError(
+        f"{'Retryable' if retryable else 'Non retryable'} OpenAI status code: "
+        f"{e.response.status_code}",
+        non_retryable=not retryable,
+        next_retry_delay=retry_after,
+    ) from e
+
+
 class ModelActivity:
     """Class wrapper for model invocation activities to allow model customization. By default, we use an OpenAIProvider with retries disabled.
     Disabling retries in your model of choice is recommended to allow activity retries to define the retry model.
@@ -203,72 +318,7 @@ class ModelActivity:
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
         model = self._model_provider.get_model(input.get("model_name"))
-
-        async def empty_on_invoke_tool(
-            _ctx: RunContextWrapper[Any], _input: str
-        ) -> str:
-            return ""
-
-        async def empty_on_invoke_handoff(
-            _ctx: RunContextWrapper[Any], _input: str
-        ) -> Any:
-            return None
-
-        def make_tool(tool: ToolInput) -> Tool:
-            if isinstance(
-                tool,
-                (
-                    FileSearchTool,
-                    WebSearchTool,
-                    ImageGenerationTool,
-                    CodeInterpreterTool,
-                    LocalShellTool,
-                    ToolSearchTool,
-                ),
-            ):
-                return tool
-            elif isinstance(tool, ShellToolInput):
-
-                async def _noop_executor(*a: Any, **kw: Any) -> str:  # type: ignore[reportUnusedParameter]
-                    return ""
-
-                return ShellTool(
-                    name=tool.name,
-                    environment=tool.environment,
-                    executor=_noop_executor,
-                )
-            elif isinstance(tool, ApplyPatchToolInput):
-                return ApplyPatchTool(
-                    name=tool.name,
-                    editor=_NoopApplyPatchEditor(),
-                )
-            elif isinstance(tool, HostedMCPToolInput):
-                return HostedMCPTool(
-                    tool_config=tool.tool_config,
-                )
-            elif isinstance(tool, FunctionToolInput):
-                return FunctionTool(
-                    name=tool.name,
-                    description=tool.description,
-                    params_json_schema=tool.params_json_schema,
-                    on_invoke_tool=empty_on_invoke_tool,
-                    strict_json_schema=tool.strict_json_schema,
-                )
-            else:
-                raise UserError(f"Unknown tool type: {tool.name}")  # type:ignore[reportUnreachable]
-
-        tools = [make_tool(x) for x in input.get("tools", [])]
-        handoffs: list[Handoff[Any, Any]] = [
-            Handoff(
-                tool_name=x.tool_name,
-                tool_description=x.tool_description,
-                input_json_schema=x.input_json_schema,
-                agent_name=x.agent_name,
-                strict_json_schema=x.strict_json_schema,
-                on_invoke_handoff=empty_on_invoke_handoff,
-            )
-            for x in input.get("handoffs", [])
-        ]
+        tools, handoffs = _build_tools_and_handoffs(input)
 
         try:
             return await model.get_response(
@@ -284,40 +334,68 @@ class ModelActivity:
                 prompt=input.get("prompt"),
             )
         except APIStatusError as e:
-            # Listen to server hints
-            retry_after = None
-            retry_after_ms_header = e.response.headers.get("retry-after-ms")
-            if retry_after_ms_header is not None:
-                retry_after = timedelta(milliseconds=float(retry_after_ms_header))
+            _raise_for_openai_status(e)
 
-            if retry_after is None:
-                retry_after_header = e.response.headers.get("retry-after")
-                if retry_after_header is not None:
-                    retry_after = timedelta(seconds=float(retry_after_header))
+    @activity.defn
+    @_auto_heartbeater
+    async def invoke_model_activity_streaming(
+        self, input: StreamingActivityModelInput
+    ) -> list[TResponseStreamEvent]:
+        """Streaming-aware model activity.
 
-            should_retry_header = e.response.headers.get("x-should-retry")
-            if should_retry_header == "true":
-                raise e
-            if should_retry_header == "false":
-                raise ApplicationError(
-                    "Non retryable OpenAI error",
-                    non_retryable=True,
-                    next_retry_delay=retry_after,
-                ) from e
+        .. warning::
+            Streaming support is experimental and may change in future
+            versions.
 
-            # Specifically retryable status codes
-            if (
-                e.response.status_code in [408, 409, 429]
-                or e.response.status_code >= 500
-            ):
-                raise ApplicationError(
-                    f"Retryable OpenAI status code: {e.response.status_code}",
-                    non_retryable=False,
-                    next_retry_delay=retry_after,
-                ) from e
+        Calls ``model.stream_response()`` and returns the collected list
+        of native OpenAI stream events. The workflow's
+        ``Model.stream_response`` stub yields these to the agents
+        framework, which builds the final ``ModelResponse`` from the
+        terminal ``ResponseCompletedEvent``.
 
-            raise ApplicationError(
-                f"Non retryable OpenAI status code: {e.response.status_code}",
-                non_retryable=True,
-                next_retry_delay=retry_after,
-            ) from e
+        Each event is also published to the workflow's stream on
+        ``streaming_event_topic`` so external consumers (UIs, tracing,
+        etc.) can observe events as they arrive.
+
+        Heartbeats run on a background task via ``_auto_heartbeater`` so
+        long initial-token latency or long pauses between chunks do not
+        trip ``heartbeat_timeout``.
+        """
+        model = self._model_provider.get_model(input.get("model_name"))
+        tools, handoffs = _build_tools_and_handoffs(input)
+
+        topic = input["streaming_event_topic"]
+        batch_interval = input.get(
+            "streaming_event_batch_interval", timedelta(milliseconds=100)
+        )
+        events: list[TResponseStreamEvent] = []
+
+        stream = WorkflowStreamClient.from_within_activity(
+            batch_interval=batch_interval
+        )
+        # TResponseStreamEvent is a typing.Annotated[Union[...]] — a typing
+        # special form, not a class — so it cannot be passed as type[T].
+        # Leave the topic untyped (default Any); subscribers that want
+        # typed decode can pass result_type=TResponseStreamEvent on
+        # their own subscribe call.
+        events_topic = stream.topic(topic)
+        async with stream:
+            try:
+                async for event in model.stream_response(
+                    system_instructions=input.get("system_instructions"),
+                    input=input["input"],
+                    model_settings=input["model_settings"],
+                    tools=tools,
+                    output_schema=input.get("output_schema"),
+                    handoffs=handoffs,
+                    tracing=ModelTracing(input["tracing"]),
+                    previous_response_id=input.get("previous_response_id"),
+                    conversation_id=input.get("conversation_id"),
+                    prompt=input.get("prompt"),
+                ):
+                    events.append(event)
+                    events_topic.publish(event)
+            except APIStatusError as e:
+                _raise_for_openai_status(e)
+
+        return events
