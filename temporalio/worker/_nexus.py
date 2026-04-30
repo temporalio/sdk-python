@@ -216,6 +216,14 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         ]
         await asyncio.gather(*running_tasks, return_exceptions=True)
 
+    # Task comletion should never be dropped in case of cancellation.
+    # The Rust future in core must complete for shutdown to happen without
+    # hanging.
+    async def _complete_task(
+        self, completion: temporalio.bridge.proto.nexus.NexusTaskCompletion
+    ):
+        await asyncio.shield(self._bridge_worker().complete_nexus_task(completion))
+
     # TODO(nexus-preview): stack trace pruning. See sdk-typescript NexusHandler.execute
     # "Any call up to this function and including this one will be trimmed out of stack traces.""
 
@@ -281,8 +289,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                         cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
                     ),
                 )
-
-            await self._bridge_worker().complete_nexus_task(completion)
+            await self._complete_task(completion)
         except Exception:
             logger.exception("Failed to send Nexus task completion")
         finally:
@@ -341,7 +348,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                     ),
                 )
 
-            await self._bridge_worker().complete_nexus_task(completion)
+            await self._complete_task(completion)
         except Exception:
             logger.exception("Failed to send Nexus task completion")
         finally:

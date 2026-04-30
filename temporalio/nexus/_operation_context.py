@@ -71,6 +71,10 @@ _temporal_nexus_backing_workflow_start_context: ContextVar[bool] = ContextVar(
     "temporal-nexus-backing-workflow-start-context"
 )
 
+_WORKFLOW_EVENT_LINK_TYPE = (
+    temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name
+)
+
 
 @dataclass(frozen=True)
 class Info:
@@ -244,6 +248,8 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
     ) -> list[temporalio.api.common.v1.Link.WorkflowEvent]:
         event_links = []
         for inbound_link in self.nexus_context.inbound_links:
+            if inbound_link.type != _WORKFLOW_EVENT_LINK_TYPE:
+                continue
             if link := nexus_link_to_workflow_event(inbound_link):
                 event_links.append(link)
         return event_links
