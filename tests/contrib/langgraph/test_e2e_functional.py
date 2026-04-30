@@ -46,12 +46,12 @@ from tests.contrib.langgraph.e2e_functional_entrypoints import (
     reset_task_execution_counts,
     simple_functional_entrypoint,
     slow_entrypoint,
-    waiting_task,
     step_1,
     step_2,
     step_3,
     step_4,
     step_5,
+    waiting_task,
 )
 from tests.contrib.langgraph.e2e_functional_workflows import (
     ContinueAsNewFunctionalWorkflow,
