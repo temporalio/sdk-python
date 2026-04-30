@@ -269,20 +269,13 @@ async def get_pending_activity_info(
 _wait_for_pause_events: dict[str, threading.Event] = {}
 
 
-def wait_for_pause_release(activity_id: str) -> None:
-    """Block a sync activity until pause_and_assert releases it.
-
-    No-op if no event is registered: pause_and_assert may finish (and clean up
-    the event) before the activity catches its cancel, since the server has
-    already committed paused=true by the time pause_activity returns.
-    """
+def wait_for_pause_event(activity_id: str) -> None:
     event = _wait_for_pause_events.get(activity_id)
     if event is not None:
         event.wait()
 
 
-async def async_wait_for_pause_release(activity_id: str) -> None:
-    """Block an async activity until pause_and_assert releases it. No-op if not registered."""
+async def async_wait_for_pause_event(activity_id: str) -> None:
     event = _wait_for_pause_events.get(activity_id)
     if event is not None:
         await asyncio.get_running_loop().run_in_executor(None, event.wait)
