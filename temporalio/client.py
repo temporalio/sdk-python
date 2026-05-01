@@ -8938,7 +8938,7 @@ class DescribeNexusOperationInput:
 
 @dataclass
 class GetNexusOperationResultInput:
-    """Input for :py:meth:`OutbountInterceptor.get_nexus_operation_result`.
+    """Input for :py:meth:`OutboundInterceptor.get_nexus_operation_result`.
 
     .. warning::
         This API is experimental and unstable.
