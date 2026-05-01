@@ -332,7 +332,7 @@ class NexusOperationCancellationState(IntEnum):
     BLOCKED = int(
         temporalio.api.enums.v1.NexusOperationCancellationState.NEXUS_OPERATION_CANCELLATION_STATE_BLOCKED
     )
-    """Cancellation request is blocked (eg: by circuit breaker)."""
+    """Cancellation request is blocked, eg: by circuit breaker."""
 
 
 class QueryRejectCondition(IntEnum):
