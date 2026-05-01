@@ -195,8 +195,8 @@ class StreamingActivityModelInput(ActivityModelInput, total=False):
     Adds the streaming-only fields on top of :class:`ActivityModelInput`.
     """
 
-    streaming_event_topic: Required[str]
-    streaming_event_batch_interval: timedelta
+    streaming_topic: Required[str]
+    streaming_batch_interval: timedelta
 
 
 async def _empty_on_invoke_tool(_ctx: RunContextWrapper[Any], _input: str) -> str:
@@ -354,7 +354,7 @@ class ModelActivity:
         terminal ``ResponseCompletedEvent``.
 
         Each event is also published to the workflow's stream on
-        ``streaming_event_topic`` so external consumers (UIs, tracing,
+        ``streaming_topic`` so external consumers (UIs, tracing,
         etc.) can observe events as they arrive.
 
         Heartbeats run on a background task via ``_auto_heartbeater`` so
@@ -364,9 +364,9 @@ class ModelActivity:
         model = self._model_provider.get_model(input.get("model_name"))
         tools, handoffs = _build_tools_and_handoffs(input)
 
-        topic = input["streaming_event_topic"]
+        topic = input["streaming_topic"]
         batch_interval = input.get(
-            "streaming_event_batch_interval", timedelta(milliseconds=100)
+            "streaming_batch_interval", timedelta(milliseconds=100)
         )
         events: list[TResponseStreamEvent] = []
 

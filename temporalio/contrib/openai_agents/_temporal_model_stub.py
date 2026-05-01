@@ -245,11 +245,11 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
                 "workflow stream signal channel)."
             )
 
-        topic = self.model_params.streaming_event_topic
+        topic = self.model_params.streaming_topic
         if topic is None:
             raise ValueError(
                 "Runner.run_streamed requires "
-                "ModelActivityParameters.streaming_event_topic to be set."
+                "ModelActivityParameters.streaming_topic to be set."
             )
 
         base_input, summary = self._build_activity_input(
@@ -266,10 +266,8 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         )
         streaming_input: StreamingActivityModelInput = {
             **base_input,
-            "streaming_event_topic": topic,
-            "streaming_event_batch_interval": (
-                self.model_params.streaming_event_batch_interval
-            ),
+            "streaming_topic": topic,
+            "streaming_batch_interval": (self.model_params.streaming_batch_interval),
         }
 
         events = await workflow.execute_activity_method(

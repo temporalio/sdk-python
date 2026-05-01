@@ -69,7 +69,7 @@ class ModelActivityParameters:
     use_local_activity: bool = False
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
 
-    streaming_event_topic: str | None = None
+    streaming_topic: str | None = None
     """Stream topic to publish raw model stream events to when the workflow
     calls ``Runner.run_streamed``. Required for ``Runner.run_streamed``;
     if left as ``None``, ``run_streamed`` raises before scheduling any
@@ -84,7 +84,7 @@ class ModelActivityParameters:
         Streaming support is experimental and may change in future
         versions."""
 
-    streaming_event_batch_interval: timedelta = timedelta(milliseconds=100)
+    streaming_batch_interval: timedelta = timedelta(milliseconds=100)
     """Interval between automatic flushes for the stream publisher used
     by the streaming activity.
 

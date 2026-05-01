@@ -268,10 +268,10 @@ class TemporalOpenAIRunner(AgentRunner):
         # captured into ``RunResultStreaming._stored_exception`` and may
         # be silently dropped if the queue completion sentinel is read
         # before the run_loop_task is observed as done.
-        if self.model_params.streaming_event_topic is None:
+        if self.model_params.streaming_topic is None:
             raise AgentsWorkflowError(
                 "Runner.run_streamed requires "
-                "ModelActivityParameters.streaming_event_topic to be set."
+                "ModelActivityParameters.streaming_topic to be set."
             )
         if self.model_params.use_local_activity:
             raise AgentsWorkflowError(

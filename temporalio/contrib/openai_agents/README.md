@@ -593,7 +593,7 @@ External consumers (UIs, tracing pipelines, etc.) observe events as
 they arrive by hosting a [`WorkflowStream`](../workflow_streams/README.md)
 in the workflow and subscribing with `WorkflowStreamClient`. The
 streaming activity publishes each event to the topic configured on
-`ModelActivityParameters.streaming_event_topic`. The topic is required
+`ModelActivityParameters.streaming_topic`. The topic is required
 when using `Runner.run_streamed`; calling it without a configured topic
 raises before any activity is scheduled.
 
@@ -621,7 +621,7 @@ class MyAgent:
 
 To publish raw model events to external subscribers, host a
 `WorkflowStream` in the workflow and configure
-`OpenAIAgentsPlugin(model_params=ModelActivityParameters(streaming_event_topic="events"))`. See [`temporalio.contrib.workflow_streams`](../workflow_streams/README.md) for the
+`OpenAIAgentsPlugin(model_params=ModelActivityParameters(streaming_topic="events"))`. See [`temporalio.contrib.workflow_streams`](../workflow_streams/README.md) for the
 publisher and subscriber API.
 
 `RunResultStreaming.stream_events()` yields the agents-SDK

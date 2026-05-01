@@ -205,7 +205,7 @@ class StreamingOpenAIWorkflow:
 @workflow.defn
 class StreamingRequiresTopicWorkflow:
     """Workflow that opts into ``Runner.run_streamed`` while the model
-    plugin was configured without a ``streaming_event_topic``.
+    plugin was configured without a ``streaming_topic``.
 
     The stub raises before scheduling the streaming activity; this
     propagates out of ``Runner.run_streamed`` and fails the workflow.
@@ -232,7 +232,7 @@ async def test_streaming_publishes_raw_events(client: Client):
         model=StreamingTestModel(),
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
-            streaming_event_topic="events",
+            streaming_topic="events",
         ),
     ) as env:
         client = env.applied_on_client(client)
@@ -300,7 +300,7 @@ async def test_streaming_requires_topic(client: Client):
         model=StreamingTestModel(),
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
-            streaming_event_topic=None,
+            streaming_topic=None,
         ),
     ) as env:
         client = env.applied_on_client(client)
@@ -316,7 +316,7 @@ async def test_streaming_requires_topic(client: Client):
                     execution_timeout=timedelta(seconds=30),
                 )
 
-    assert "streaming_event_topic" in str(exc_info.value.cause)
+    assert "streaming_topic" in str(exc_info.value.cause)
 
 
 @pytest.mark.asyncio
@@ -328,7 +328,7 @@ async def test_streaming_rejects_local_activity(client: Client):
         model=StreamingTestModel(),
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
-            streaming_event_topic="events",
+            streaming_topic="events",
             use_local_activity=True,
         ),
     ) as env:
