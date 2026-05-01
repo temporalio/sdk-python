@@ -46,12 +46,12 @@ from tests.contrib.langgraph.e2e_functional_entrypoints import (
     reset_task_execution_counts,
     simple_functional_entrypoint,
     slow_entrypoint,
-    slow_task,
     step_1,
     step_2,
     step_3,
     step_4,
     step_5,
+    waiting_task,
 )
 from tests.contrib.langgraph.e2e_functional_workflows import (
     ContinueAsNewFunctionalWorkflow,
@@ -316,10 +316,10 @@ class TestFunctionalAPIPerTaskOptions:
             plugins=[
                 LangGraphPlugin(
                     entrypoints={"e2e_slow_functional": slow_entrypoint},
-                    tasks=[slow_task],
+                    tasks=[waiting_task],
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                     activity_options={
-                        "slow_task": {
+                        "waiting_task": {
                             "execute_in": "activity",
                             "start_to_close_timeout": timedelta(milliseconds=100),
                             "retry_policy": RetryPolicy(maximum_attempts=1),
