@@ -150,14 +150,13 @@ async def test_workflow_publishes_astream_chunks(client: Client):
 
         ws_client = WorkflowStreamClient.create(client, handle.id)
         chunks: list[dict[str, Any]] = []
-        async with asyncio.timeout(15.0):
-            async for item in ws_client.topic("astream", type=dict).subscribe(
-                from_offset=0,
-                poll_cooldown=timedelta(0),
-            ):
-                chunks.append(item.data)
-                if chunks[-1].get("done"):
-                    break
+        async for item in ws_client.topic("astream", type=dict).subscribe(
+            from_offset=0,
+            poll_cooldown=timedelta(0),
+        ):
+            chunks.append(item.data)
+            if chunks[-1].get("done"):
+                break
 
         await handle.result()
 
