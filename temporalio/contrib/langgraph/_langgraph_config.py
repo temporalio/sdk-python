@@ -102,10 +102,6 @@ def set_langgraph_config(
 
     Returns the reconstructed Runtime so callers can re-inject it into the
     user function's kwargs without needing to know the configurable layout.
-
-    If ``stream_writer`` is provided, it replaces the default no-op writer
-    in the reconstructed Runtime, so ``get_stream_writer()`` inside a node
-    delivers chunks through the caller's sink.
     """
     configurable = config.get("configurable") or {}
     scratchpad = configurable.get(CONFIG_KEY_SCRATCHPAD) or {}

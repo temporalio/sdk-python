@@ -22,13 +22,7 @@ from temporalio.contrib.langgraph._task_cache import (
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 
 STREAM_TOPIC = "langgraph_stream"
-"""Topic that LangGraph node stream_writer chunks are published to.
-
-Each chunk is encoded by the configured payload converter and delivered
-to the parent workflow's :class:`WorkflowStream`. Subscribers receive
-already-decoded values via ``WorkflowStreamClient.subscribe`` —
-``item.data`` is the chunk, no manual decoding required.
-"""
+"""Workflow stream topic that LangGraph stream_writer publishes to."""
 
 # Per-run dedupe so we only warn once when a user passes a Store via
 # graph.compile(store=...) / @entrypoint(store=...). Cleared by
@@ -71,15 +65,10 @@ def wrap_activity(
     async def wrapper(input: ActivityInput) -> ActivityOutput:
         # Back get_stream_writer() with a WorkflowStreamClient targeting the
         # owning workflow. Chunks emitted inside the node are signaled back
-        # to the workflow's WorkflowStream. If the node never calls
-        # writer(...), the buffer stays empty and the final flush is a
-        # no-op — no signals are sent.
+        # to the workflow's WorkflowStream.
         client = WorkflowStreamClient.from_within_activity()
 
         def stream_writer(chunk: Any) -> None:
-            # force_flush=True wakes the flusher to send immediately instead
-            # of waiting for the batch_interval timer; rapid writer calls
-            # still coalesce into a single signal while in-flight.
             client.topic(STREAM_TOPIC).publish(chunk, force_flush=True)
 
         async with client:
