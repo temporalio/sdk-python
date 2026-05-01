@@ -267,7 +267,7 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
         streaming_input: StreamingActivityModelInput = {
             **base_input,
             "streaming_topic": topic,
-            "streaming_batch_interval": (self.model_params.streaming_batch_interval),
+            "streaming_batch_interval": self.model_params.streaming_batch_interval,
         }
 
         events = await workflow.execute_activity_method(
