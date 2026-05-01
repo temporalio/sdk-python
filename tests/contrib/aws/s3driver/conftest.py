@@ -14,7 +14,7 @@ from temporalio.contrib.aws.s3driver import S3StorageDriverClient
 from temporalio.contrib.aws.s3driver.aioboto3 import new_aioboto3_client
 
 BUCKET = "test-bucket"
-REGION = "us-east-1"
+CLIENT_REGION = "us-east-1"
 
 
 def _find_free_port() -> int:
@@ -50,7 +50,7 @@ async def aioboto3_client(moto_server_url: str) -> AsyncIterator[S3Client]:
     session = aioboto3.Session()
     async with session.client(
         "s3",
-        region_name=REGION,
+        region_name=CLIENT_REGION,
         endpoint_url=moto_server_url,
         aws_access_key_id="testing",
         aws_secret_access_key="testing",
