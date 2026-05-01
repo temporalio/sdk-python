@@ -62,7 +62,12 @@ class LangGraphPlugin(SimplePlugin):
         streaming_topic: str | None = None,
         streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ):
-        """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
+        """Initialize the LangGraph plugin with graphs, entrypoints, and tasks.
+
+        .. warning::
+            Streaming support is experimental and may change in
+            future versions.
+        """
         if sys.version_info < (3, 11):
             warnings.warn(  # type: ignore[reportUnreachable]
                 "LangGraphPlugin requires Python >= 3.11 for full async support. "
