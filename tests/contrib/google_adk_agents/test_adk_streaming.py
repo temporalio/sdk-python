@@ -6,7 +6,6 @@ by ``test_google_adk_agents.py``.
 """
 
 import asyncio
-import logging
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import timedelta
