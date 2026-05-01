@@ -32,7 +32,7 @@ async def token_node(state: State) -> dict[str, str]:
 @workflow.defn
 class StreamingWorkflowStreamsWorkflow:
     def __init__(self) -> None:
-        self.stream = WorkflowStream()
+        _ = WorkflowStream()
         self.app = graph("streaming-ws").compile()
 
     @workflow.run
