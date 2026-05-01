@@ -10,7 +10,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.langgraph import STREAM_TOPIC, LangGraphPlugin, graph
+from temporalio.contrib.langgraph import LangGraphPlugin, graph
 from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 from temporalio.worker import Worker
 
@@ -57,6 +57,7 @@ async def test_streaming_via_workflow_streams(client: Client):
                 default_activity_options={
                     "start_to_close_timeout": timedelta(seconds=10)
                 },
+                streaming_topic="tokens",
             )
         ],
     ):
@@ -69,7 +70,7 @@ async def test_streaming_via_workflow_streams(client: Client):
 
         ws_client = WorkflowStreamClient.create(client, handle.id)
         chunks: list[dict[str, Any]] = []
-        async for item in ws_client.topic(STREAM_TOPIC, type=dict).subscribe(
+        async for item in ws_client.topic("tokens", type=dict).subscribe(
             from_offset=0,
             poll_cooldown=timedelta(0),
         ):

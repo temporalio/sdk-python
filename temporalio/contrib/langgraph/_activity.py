@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable
 from dataclasses import dataclass
+from datetime import timedelta
 from inspect import iscoroutinefunction, signature
 from typing import Any, Callable
 
@@ -20,9 +21,6 @@ from temporalio.contrib.langgraph._task_cache import (
     cache_put,
 )
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
-
-STREAM_TOPIC = "langgraph_stream"
-"""Workflow stream topic that LangGraph stream_writer publishes to."""
 
 # Per-run dedupe so we only warn once when a user passes a Store via
 # graph.compile(store=...) / @entrypoint(store=...). Cleared by
@@ -55,6 +53,9 @@ class ActivityOutput:
 
 def wrap_activity(
     func: Callable,
+    *,
+    streaming_topic: str | None = None,
+    streaming_batch_interval: timedelta = timedelta(milliseconds=100),
 ) -> Callable[[ActivityInput], Awaitable[ActivityOutput]]:
     """Wrap a function as a Temporal activity that handles LangGraph config and interrupts."""
     # Graph nodes declare `runtime: Runtime[Ctx]` in their signature; tasks
@@ -63,15 +64,7 @@ def wrap_activity(
     accepts_runtime = "runtime" in signature(func).parameters
 
     async def wrapper(input: ActivityInput) -> ActivityOutput:
-        # Back get_stream_writer() with a WorkflowStreamClient targeting the
-        # owning workflow. Chunks emitted inside the node are signaled back
-        # to the workflow's WorkflowStream.
-        client = WorkflowStreamClient.from_within_activity()
-
-        def stream_writer(chunk: Any) -> None:
-            client.topic(STREAM_TOPIC).publish(chunk, force_flush=True)
-
-        async with client:
+        async def run(stream_writer: Callable[[Any], None] | None) -> ActivityOutput:
             runtime = set_langgraph_config(
                 input.langgraph_config, stream_writer=stream_writer
             )
@@ -88,6 +81,14 @@ def wrap_activity(
                 return ActivityOutput(result=result)
             except GraphInterrupt as e:
                 return ActivityOutput(langgraph_interrupts=e.args[0])
+
+        if streaming_topic is None:
+            return await run(stream_writer=None)
+        async with WorkflowStreamClient.from_within_activity(
+            batch_interval=streaming_batch_interval,
+        ) as client:
+            topic = client.topic(streaming_topic)
+            return await run(stream_writer=topic.publish)
 
     return wrapper
 

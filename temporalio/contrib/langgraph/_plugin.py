@@ -8,6 +8,7 @@ import inspect
 import sys
 import warnings
 from dataclasses import replace
+from datetime import timedelta
 from typing import Any, Callable
 
 from langgraph._internal._runnable import RunnableCallable
@@ -58,6 +59,8 @@ class LangGraphPlugin(SimplePlugin):
         # TODO: Remove activity_options when we have support for @task(metadata=...)
         activity_options: dict[str, dict[str, Any]] | None = None,
         default_activity_options: dict[str, Any] | None = None,
+        streaming_topic: str | None = None,
+        streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ):
         """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
         if sys.version_info < (3, 11):
@@ -79,6 +82,8 @@ class LangGraphPlugin(SimplePlugin):
             )
 
         self.activities: list = []
+        self._streaming_topic = streaming_topic
+        self._streaming_batch_interval = streaming_batch_interval
 
         # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
@@ -197,7 +202,12 @@ class LangGraphPlugin(SimplePlugin):
         execute_in = opts.pop("execute_in")
 
         if execute_in == "activity":
-            a = activity.defn(name=activity_name)(wrap_activity(func))
+            wrapped = wrap_activity(
+                func,
+                streaming_topic=self._streaming_topic,
+                streaming_batch_interval=self._streaming_batch_interval,
+            )
+            a = activity.defn(name=activity_name)(wrapped)
             self.activities.append(a)
             return wrap_execute_activity(a, task_id=task_id(func), **opts)
         elif execute_in == "workflow":
