@@ -26,8 +26,6 @@ from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
 from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 from temporalio.worker import Worker
 
-logger = logging.getLogger(__name__)
-
 
 class StreamingTestModel(BaseLlm):
     """Test model that yields multiple partial responses to simulate streaming."""
