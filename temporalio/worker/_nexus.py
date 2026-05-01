@@ -216,7 +216,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         ]
         await asyncio.gather(*running_tasks, return_exceptions=True)
 
-    # Task comletion should never be dropped in case of cancellation.
+    # Task completion should never be dropped in case of cancellation.
     # The Rust future in core must complete for shutdown to happen without
     # hanging.
     async def _complete_task(
