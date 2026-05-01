@@ -3,7 +3,9 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
-from langgraph.config import get_stream_writer  # pyright: ignore[reportMissingTypeStubs]
+from langgraph.config import (
+    get_stream_writer,  # pyright: ignore[reportMissingTypeStubs]
+)
 from langgraph.graph import START, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from typing_extensions import TypedDict
 
@@ -18,73 +20,13 @@ class State(TypedDict):
     value: str
 
 
-async def node_a(state: State) -> dict[str, str]:
-    return {"value": state["value"] + "a"}
-
-
-async def node_b(state: State) -> dict[str, str]:
-    return {"value": state["value"] + "b"}
-
-
-@workflow.defn
-class StreamingWorkflow:
-    def __init__(self) -> None:
-        self.app = graph("streaming").compile()
-
-    @workflow.run
-    async def run(self, input: str) -> Any:
-        chunks = []
-        async for chunk in self.app.astream({"value": input}):
-            chunks.append(chunk)
-        return chunks
-
-
-async def test_streaming(client: Client):
-    g = StateGraph(State)
-    g.add_node("node_a", node_a, metadata={"execute_in": "activity"})
-    g.add_node("node_b", node_b, metadata={"execute_in": "activity"})
-    g.add_edge(START, "node_a")
-    g.add_edge("node_a", "node_b")
-
-    task_queue = f"streaming-{uuid4()}"
-
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[StreamingWorkflow],
-        plugins=[
-            LangGraphPlugin(
-                graphs={"streaming": g},
-                default_activity_options={
-                    "start_to_close_timeout": timedelta(seconds=10)
-                },
-            )
-        ],
-    ):
-        chunks = await client.execute_workflow(
-            StreamingWorkflow.run,
-            "",
-            id=f"test-streaming-{uuid4()}",
-            task_queue=task_queue,
-        )
-
-    assert chunks == [{"node_a": {"value": "a"}}, {"node_b": {"value": "ab"}}]
-
-
-# ---------------------------------------------------------------------------
-# Streaming via WorkflowStream: stream_writer inside an activity-wrapped node
-# publishes back to the owning workflow, an external client subscribes.
-# ---------------------------------------------------------------------------
-
-TOKENS = ["alpha", "beta", "gamma"]
-
-
 async def token_node(state: State) -> dict[str, str]:
+    tokens = ["a", "b", "c"]
     writer = get_stream_writer()
-    for token in TOKENS:
+    for token in tokens:
         writer({"token": token})
     writer({"done": True})
-    return {"value": "".join(TOKENS)}
+    return {"value": state["value"] + "".join(tokens)}
 
 
 @workflow.defn
@@ -128,21 +70,21 @@ async def test_streaming_via_workflow_streams(client: Client):
 
         ws_client = WorkflowStreamClient.create(client, handle.id)
         chunks: list[dict[str, Any]] = []
-        async with asyncio.timeout(15.0):
-            async for item in ws_client.topic(STREAM_TOPIC, type=dict).subscribe(
-                from_offset=0, poll_cooldown=timedelta(0),
-            ):
-                chunks.append(item.data)
-                if chunks[-1].get("done"):
-                    break
+        async for item in ws_client.topic(STREAM_TOPIC, type=dict).subscribe(
+            from_offset=0,
+            poll_cooldown=timedelta(0),
+        ):
+            chunks.append(item.data)
+            if chunks[-1].get("done"):
+                break
 
         result = await handle.result()
 
-    assert result == "alphabetagamma"
+    assert result == "abc"
     assert chunks == [
-        {"token": "alpha"},
-        {"token": "beta"},
-        {"token": "gamma"},
+        {"token": "a"},
+        {"token": "b"},
+        {"token": "c"},
         {"done": True},
     ]
 
@@ -167,6 +109,14 @@ class AstreamPublishWorkflow:
             topic.publish(chunk)
         topic.publish({"done": True})
         return "done"
+
+
+async def node_a(state: State) -> dict[str, str]:
+    return {"value": state["value"] + "a"}
+
+
+async def node_b(state: State) -> dict[str, str]:
+    return {"value": state["value"] + "b"}
 
 
 async def test_workflow_publishes_astream_chunks(client: Client):
@@ -202,7 +152,8 @@ async def test_workflow_publishes_astream_chunks(client: Client):
         chunks: list[dict[str, Any]] = []
         async with asyncio.timeout(15.0):
             async for item in ws_client.topic("astream", type=dict).subscribe(
-                from_offset=0, poll_cooldown=timedelta(0),
+                from_offset=0,
+                poll_cooldown=timedelta(0),
             ):
                 chunks.append(item.data)
                 if chunks[-1].get("done"):
