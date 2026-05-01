@@ -56,7 +56,7 @@ class StreamingAdkWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        model = TemporalModel("streaming_test_model", streaming_event_topic="events")
+        model = TemporalModel("streaming_test_model", streaming_topic="events")
         agent = Agent(
             name="test_agent",
             model=model,
@@ -141,7 +141,7 @@ async def test_streaming_publishes_events(client: Client):
 @workflow.defn
 class StreamingAdkRequiresTopicWorkflow:
     """Calls ``generate_content_async(stream=True)`` without configuring
-    ``streaming_event_topic``; the call must raise before any activity
+    ``streaming_topic``; the call must raise before any activity
     is scheduled."""
 
     @workflow.run
@@ -192,4 +192,4 @@ async def test_streaming_requires_topic(client: Client):
                 execution_timeout=timedelta(seconds=30),
             )
 
-    assert "streaming_event_topic" in str(exc_info.value.cause)
+    assert "streaming_topic" in str(exc_info.value.cause)
