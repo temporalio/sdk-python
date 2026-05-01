@@ -10,6 +10,7 @@ execution, automatic retries, and timeouts. It supports both the LangGraph Graph
 API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
 """
 
+from temporalio.contrib.langgraph._activity import STREAM_TOPIC
 from temporalio.contrib.langgraph._plugin import (
     LangGraphPlugin,
     cache,
@@ -19,7 +20,8 @@ from temporalio.contrib.langgraph._plugin import (
 
 __all__ = [
     "LangGraphPlugin",
-    "entrypoint",
+    "STREAM_TOPIC",
     "cache",
+    "entrypoint",
     "graph",
 ]

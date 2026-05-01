@@ -19,6 +19,16 @@ from temporalio.contrib.langgraph._task_cache import (
     cache_lookup,
     cache_put,
 )
+from temporalio.contrib.workflow_streams import WorkflowStreamClient
+
+STREAM_TOPIC = "langgraph_stream"
+"""Topic that LangGraph node stream_writer chunks are published to.
+
+Each chunk is encoded by the configured payload converter and delivered
+to the parent workflow's :class:`WorkflowStream`. Subscribers receive
+already-decoded values via ``WorkflowStreamClient.subscribe`` —
+``item.data`` is the chunk, no manual decoding required.
+"""
 
 # Per-run dedupe so we only warn once when a user passes a Store via
 # graph.compile(store=...) / @entrypoint(store=...). Cleared by
@@ -59,20 +69,36 @@ def wrap_activity(
     accepts_runtime = "runtime" in signature(func).parameters
 
     async def wrapper(input: ActivityInput) -> ActivityOutput:
-        runtime = set_langgraph_config(input.langgraph_config)
-        kwargs = dict(input.kwargs)
-        if accepts_runtime:
-            kwargs["runtime"] = runtime
-        try:
-            if iscoroutinefunction(func):
-                result = await func(*input.args, **kwargs)
-            else:
-                result = func(*input.args, **kwargs)
-            if isinstance(result, Command):
-                return ActivityOutput(langgraph_command=result)
-            return ActivityOutput(result=result)
-        except GraphInterrupt as e:
-            return ActivityOutput(langgraph_interrupts=e.args[0])
+        # Back get_stream_writer() with a WorkflowStreamClient targeting the
+        # owning workflow. Chunks emitted inside the node are signaled back
+        # to the workflow's WorkflowStream. If the node never calls
+        # writer(...), the buffer stays empty and the final flush is a
+        # no-op — no signals are sent.
+        client = WorkflowStreamClient.from_within_activity()
+
+        def stream_writer(chunk: Any) -> None:
+            # force_flush=True wakes the flusher to send immediately instead
+            # of waiting for the batch_interval timer; rapid writer calls
+            # still coalesce into a single signal while in-flight.
+            client.topic(STREAM_TOPIC).publish(chunk, force_flush=True)
+
+        async with client:
+            runtime = set_langgraph_config(
+                input.langgraph_config, stream_writer=stream_writer
+            )
+            kwargs = dict(input.kwargs)
+            if accepts_runtime:
+                kwargs["runtime"] = runtime
+            try:
+                if iscoroutinefunction(func):
+                    result = await func(*input.args, **kwargs)
+                else:
+                    result = func(*input.args, **kwargs)
+                if isinstance(result, Command):
+                    return ActivityOutput(langgraph_command=result)
+                return ActivityOutput(result=result)
+            except GraphInterrupt as e:
+                return ActivityOutput(langgraph_interrupts=e.args[0])
 
     return wrapper
 
