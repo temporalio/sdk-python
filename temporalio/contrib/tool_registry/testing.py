@@ -138,6 +138,54 @@ class MockProvider:
         while not self.run_turn(messages, registry):
             pass
 
+    async def arun_turn(
+        self, messages: list[dict[str, Any]], registry: ToolRegistry
+    ) -> bool:
+        """Async sibling of :meth:`run_turn` — uses ``registry.adispatch``.
+
+        Use this when scripted handlers are ``async def`` (the common case for
+        handlers doing HTTP, subprocess, or Temporal-client I/O).
+        """
+        if self._index >= len(self._responses):
+            return True
+
+        response = self._responses[self._index]
+        self._index += 1
+        stop = response.get("_mock_stop", True)
+        content = response.get("content", [])
+
+        messages.append({"role": "assistant", "content": content})
+
+        if not stop:
+            tool_results = []
+            for block in content:
+                if block.get("type") == "tool_use":
+                    result = await registry.adispatch(
+                        block["name"], block.get("input", {})
+                    )
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": block["id"],
+                            "content": result,
+                        }
+                    )
+            if tool_results:
+                messages.append({"role": "user", "content": tool_results})
+
+        return stop
+
+    async def arun_loop(
+        self,
+        messages: list[dict[str, Any]],
+        registry: ToolRegistry | None = None,
+    ) -> None:
+        """Run all scripted turns asynchronously, awaiting handler dispatch."""
+        if registry is None:
+            registry = ToolRegistry()
+        while not await self.arun_turn(messages, registry):
+            pass
+
 
 class FakeToolRegistry(ToolRegistry):
     """A :class:`ToolRegistry` that records all dispatch calls.
