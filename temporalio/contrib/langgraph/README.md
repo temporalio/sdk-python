@@ -143,6 +143,10 @@ await g.ainvoke({...}, context=Context(user_id="alice"))
 
 Your `context` object must be serializable by the configured Temporal payload converter, since it crosses the Activity boundary.
 
+## Streaming
+
+When `streaming_topic` is set on `LangGraphPlugin`, calls to `stream_writer` leverage Temporal [Workflow Streams](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/workflow_streams). Async nodes are recommended for this feature.
+
 ## Tracing
 
 We recommend the [Temporal LangSmith Plugin](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/langsmith) to trace your LangGraph Workflows and Activities.
