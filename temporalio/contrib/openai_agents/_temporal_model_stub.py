@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import timedelta
 from typing import Any
 
 from agents import (
@@ -278,8 +277,7 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
             schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
             schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
             start_to_close_timeout=self.model_params.start_to_close_timeout,
-            heartbeat_timeout=self.model_params.heartbeat_timeout
-            or timedelta(seconds=30),
+            heartbeat_timeout=self.model_params.heartbeat_timeout,
             retry_policy=self.model_params.retry_policy,
             cancellation_type=self.model_params.cancellation_type,
             versioning_intent=self.model_params.versioning_intent,

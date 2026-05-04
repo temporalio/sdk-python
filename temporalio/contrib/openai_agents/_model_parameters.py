@@ -49,7 +49,10 @@ class ModelActivityParameters:
     """Maximum time for the activity to complete."""
 
     heartbeat_timeout: timedelta | None = None
-    """Maximum time between heartbeats."""
+    """Maximum time between heartbeats. For streaming
+    (``Runner.run_streamed``), set this lower than
+    ``start_to_close_timeout`` so a stuck model call is detected before the
+    overall activity timeout fires."""
 
     retry_policy: RetryPolicy | None = None
     """Policy for retrying failed activities."""
