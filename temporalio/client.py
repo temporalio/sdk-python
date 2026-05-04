@@ -6121,6 +6121,8 @@ class _NexusClient(NexusClient[ServiceType]):
         self._client = client
         if isinstance(service, str):
             self._service_name = service
+        elif service_defn := nexusrpc.get_service_definition(service):
+            self._service_name = service_defn.name
         else:
             self._service_name = service.__name__
         self._endpoint = endpoint

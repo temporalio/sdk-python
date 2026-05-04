@@ -90,6 +90,11 @@ class StandaloneTestService:
     raise_err: nexusrpc.Operation[RaiseErrInput, None]
 
 
+@nexusrpc.service(name="StandaloneTestService")
+class NamedService:
+    echo_sync: nexusrpc.Operation[EchoInput, EchoOutput]
+
+
 # ---------------------------------------------------------------------------
 # Handler workflows
 # ---------------------------------------------------------------------------
@@ -276,6 +281,43 @@ async def test_execute_operation(client: Client, env: WorkflowEnvironment):
         )
         result = await nexus_client.execute_operation(
             StandaloneTestService.echo_sync,
+            EchoInput(value="execute"),
+            id=str(uuid.uuid4()),
+            id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
+            id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        assert isinstance(result, EchoOutput)
+        assert result.value == "execute"
+
+
+async def test_execute_operation_named_service(
+    client: Client, env: WorkflowEnvironment
+):
+    """Verify that the name on the service decorator is respected by the standalone nexus client"""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        # Register the standalone test service handler
+        nexus_service_handlers=[StandaloneTestServiceHandler()],
+        workflows=[EchoHandlerWorkflow, BlockingHandlerWorkflow],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+        # Create client using the service that is uses the name "StandaloneTestService"
+        nexus_client = client.create_nexus_client(
+            service=NamedService, endpoint=endpoint_name
+        )
+        result = await nexus_client.execute_operation(
+            NamedService.echo_sync,
             EchoInput(value="execute"),
             id=str(uuid.uuid4()),
             id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
