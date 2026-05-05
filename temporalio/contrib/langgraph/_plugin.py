@@ -27,6 +27,7 @@ from temporalio.contrib.langgraph._task_cache import (
     set_task_cache,
     task_id,
 )
+from temporalio.contrib.langgraph._workflow import wrap_workflow
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -220,7 +221,7 @@ class LangGraphPlugin(SimplePlugin):
             self.activities.append(a)
             return wrap_execute_activity(a, task_id=task_id(func), **opts)
         elif execute_in == "workflow":
-            return func
+            return wrap_workflow(func, streaming_topic=self._streaming_topic)
         else:
             raise ValueError(f"Invalid execute_in value: {execute_in}")
 

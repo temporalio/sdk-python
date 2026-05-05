@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from langgraph.config import (
     get_stream_writer,  # pyright: ignore[reportMissingTypeStubs]
 )
@@ -40,9 +41,10 @@ class StreamingWorkflowStreamsWorkflow:
         return result["value"]
 
 
-async def test_streaming_via_workflow_streams(client: Client):
+@pytest.mark.parametrize("execute_in", ["activity", "workflow"])
+async def test_streaming_via_workflow_streams(client: Client, execute_in: str):
     g = StateGraph(State)
-    g.add_node("token_node", token_node, metadata={"execute_in": "activity"})
+    g.add_node("token_node", token_node, metadata={"execute_in": execute_in})
     g.add_edge(START, "token_node")
 
     task_queue = f"streaming-ws-{uuid4()}"
