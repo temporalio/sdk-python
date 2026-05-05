@@ -193,7 +193,11 @@ class LangGraphPlugin(SimplePlugin):
             "langchain.LangGraphPlugin",
             activities=self.activities,
             workflow_runner=workflow_runner,
-            interceptors=[LangGraphInterceptor(graphs or {}, entrypoints or {})],
+            interceptors=[
+                LangGraphInterceptor(
+                    graphs or {}, entrypoints or {}, streaming_topic=streaming_topic
+                )
+            ],
         )
 
     def execute(
