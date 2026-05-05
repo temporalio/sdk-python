@@ -145,7 +145,106 @@ Your `context` object must be serializable by the configured Temporal payload co
 
 ## Streaming
 
-When `streaming_topic` is set on `LangGraphPlugin`, calls to `stream_writer` leverage Temporal [Workflow Streams](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/workflow_streams). Async nodes are recommended for this feature.
+When `streaming_topic` is set on `LangGraphPlugin`, calls to `langgraph.config.get_stream_writer()` inside a node publish to the named topic on the workflow's [`WorkflowStream`](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/workflow_streams). Activity-side nodes publish via `WorkflowStreamClient` (a signal carrying batched items, controlled by `streaming_batch_interval`); workflow-side nodes publish synchronously to the in-workflow stream (no signal). External subscribers consume the stream with `WorkflowStreamClient.create(...).topic(...).subscribe(...)`.
+
+The workflow **must** construct `WorkflowStream()` in its `@workflow.init` (i.e. `__init__`)
+
+```python
+from datetime import timedelta
+from typing import Any
+
+from langgraph.config import get_stream_writer
+from langgraph.graph import START, StateGraph
+from typing_extensions import TypedDict
+
+from temporalio import workflow
+from temporalio.client import Client
+from temporalio.contrib.langgraph import LangGraphPlugin, graph
+from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
+from temporalio.worker import Worker
+
+
+class State(TypedDict):
+    value: str
+
+
+async def token_node(state: State) -> dict[str, str]:
+    writer = get_stream_writer()
+    for token in ["hello", " ", "world"]:
+        writer({"token": token})
+    writer({"done": True})
+    return {"value": "hello world"}
+
+
+@workflow.defn
+class StreamingWorkflow:
+    def __init__(self) -> None:
+        # Required when streaming_topic is set on the plugin.
+        _ = WorkflowStream()
+        self.app = graph("streaming").compile()
+
+    @workflow.run
+    async def run(self) -> str:
+        result = await self.app.ainvoke({"value": ""})
+        return result["value"]
+
+
+async def main(client: Client) -> None:
+    g = StateGraph(State)
+    g.add_node("token_node", token_node, metadata={"execute_in": "activity"})
+    g.add_edge(START, "token_node")
+
+    async with Worker(
+        client,
+        task_queue="streaming-tq",
+        workflows=[StreamingWorkflow],
+        plugins=[
+            LangGraphPlugin(
+                graphs={"streaming": g},
+                default_activity_options={
+                    "start_to_close_timeout": timedelta(seconds=10)
+                },
+                streaming_topic="tokens",
+            )
+        ],
+    ):
+        handle = await client.start_workflow(
+            StreamingWorkflow.run, id="streaming-wf", task_queue="streaming-tq"
+        )
+
+        ws_client = WorkflowStreamClient.create(client, handle.id)
+        async for item in ws_client.topic("tokens", type=dict).subscribe(from_offset=0):
+            print(item.data)
+            if item.data.get("done"):
+                break
+
+        print(await handle.result())
+```
+
+### What's covered, and what isn't
+
+`streaming_topic` wires up exactly **one** LangGraph stream mode: `stream_mode="custom"`, i.e. values written through `get_stream_writer()`. The other modes — `"messages"`, `"values"`, `"updates"`, `"debug"` — are **not** captured by `streaming_topic`. They aren't produced by node-side writers; LangGraph's orchestrator emits them as it walks the graph. The documented pattern is to **bridge `astream()` in the workflow** and republish each yielded chunk to a `WorkflowStream` topic yourself:
+
+```python
+@workflow.defn
+class AstreamBridge:
+    def __init__(self) -> None:
+        self.stream = WorkflowStream()
+        self.app = graph("g").compile()
+
+    @workflow.run
+    async def run(self) -> None:
+        topic = self.stream.topic("astream")
+        async for chunk in self.app.astream({...}, stream_mode="messages"):
+            topic.publish(chunk)
+        topic.publish({"done": True})
+```
+
+The two mechanisms compose. A workflow can both set `streaming_topic="tokens"` (so nodes' `get_stream_writer()` calls publish to `"tokens"`) **and** iterate `astream()` to republish orchestrator-level chunks to a separate topic (e.g. `"messages"`). External subscribers pick the topic that matches what they want.
+
+### Retry semantics
+
+Streaming has **at-least-once** delivery per activity attempt. When an activity-wrapped node retries (transient failure, worker crash, etc.), the user function re-runs from scratch and re-publishes its writes — earlier publishes from the failed attempt are not rolled back. Subscribers should be ready to see duplicates and recover idempotently (e.g. dedupe on a sequence id you include in each chunk, or treat the stream as advisory and rely on the workflow's final result for state).
 
 ## Tracing
 

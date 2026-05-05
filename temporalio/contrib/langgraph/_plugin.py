@@ -48,6 +48,49 @@ class LangGraphPlugin(SimplePlugin):
     and tasks as Temporal Activities, giving your AI agent workflows durable
     execution, automatic retries, and timeouts. It supports both the LangGraph Graph
     API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
+
+    Args:
+        graphs: Graph API graphs to make available to workflows, keyed by name.
+            Workflows retrieve them with :func:`graph` and call
+            ``.compile()`` to get a runnable. Each node's ``metadata`` must
+            include ``execute_in`` (``"activity"`` or ``"workflow"``) and
+            may include any kwarg accepted by
+            :func:`workflow.execute_activity` (e.g. ``start_to_close_timeout``,
+            ``retry_policy``).
+        entrypoints: Functional API entrypoints to make available to
+            workflows, keyed by name. Workflows retrieve them with
+            :func:`entrypoint`.
+        tasks: Functional API ``@task`` functions to wrap as Temporal
+            Activities.
+        activity_options: Per-task activity options for the Functional
+            API, keyed by task function name. Each entry must include
+            ``execute_in`` and may include any
+            :func:`workflow.execute_activity` kwarg. Used because LangGraph's
+            Functional API has no per-task ``metadata`` channel.
+        default_activity_options: Activity options applied to every
+            activity-bound node and task, overridable per-node (Graph API
+            ``metadata``) or per-task (``activity_options[name]``).
+        streaming_topic: When set, ``langgraph.config.get_stream_writer()``
+            inside a node publishes to this topic on the workflow's
+            :class:`WorkflowStream`. The workflow must construct
+            ``WorkflowStream()`` in its ``@workflow.init`` (the plugin's
+            interceptor verifies this on workflow start). Nodes with
+            ``execute_in='activity'`` publish through
+            :class:`WorkflowStreamClient` (signal); nodes with
+            ``execute_in='workflow'`` publish synchronously to the
+            in-workflow stream (no signal).
+        streaming_batch_interval: How often the activity-side stream
+            client flushes buffered publishes into a single
+            ``__temporal_workflow_stream_publish`` signal. Has no effect
+            on workflow-side nodes (their publishes are synchronous
+            in-memory log appends). Lower values reduce streaming
+            latency at the cost of more signals (more workflow history
+            events); higher values amortize signal cost but make
+            chunks arrive in larger bursts. Default 100ms suits
+            interactive token streaming; raise to 250–1000ms for
+            non-interactive aggregation, lower toward 10–50ms only if
+            you've measured the latency need and accept the history
+            cost.
     """
 
     def __init__(
