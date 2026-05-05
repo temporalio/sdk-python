@@ -149,7 +149,7 @@ class LangGraphPlugin(SimplePlugin):
                     runnable = node.runnable
                     if not isinstance(runnable, RunnableCallable):
                         raise ValueError(f"Node {node_name} must be a RunnableCallable")
-                    user_func = runnable.afunc or runnable.func
+                    user_func = runnable.func or runnable.afunc
                     if user_func is None:
                         raise ValueError(f"Node {node_name} must have a function")
                     # Keep 'config' (for metadata/tags) and 'runtime' (for

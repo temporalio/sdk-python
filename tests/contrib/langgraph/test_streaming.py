@@ -20,7 +20,16 @@ class State(TypedDict):
     value: str
 
 
-async def token_node(state: State) -> dict[str, str]:
+async def async_token_node(state: State) -> dict[str, str]:
+    tokens = ["a", "b", "c"]
+    writer = get_stream_writer()
+    for token in tokens:
+        writer({"token": token})
+    writer({"done": True})
+    return {"value": state["value"] + "".join(tokens)}
+
+
+def sync_token_node(state: State) -> dict[str, str]:
     tokens = ["a", "b", "c"]
     writer = get_stream_writer()
     for token in tokens:
@@ -42,9 +51,14 @@ class StreamingWorkflowStreamsWorkflow:
 
 
 @pytest.mark.parametrize("execute_in", ["activity", "workflow"])
-async def test_streaming_via_workflow_streams(client: Client, execute_in: str):
+@pytest.mark.parametrize(
+    "node", [async_token_node, sync_token_node], ids=["async", "sync"]
+)
+async def test_streaming_via_workflow_streams(
+    client: Client, execute_in: str, node: Any
+):
     g = StateGraph(State)
-    g.add_node("token_node", token_node, metadata={"execute_in": execute_in})
+    g.add_node("token_node", node, metadata={"execute_in": execute_in})
     g.add_edge(START, "token_node")
 
     task_queue = f"streaming-ws-{uuid4()}"

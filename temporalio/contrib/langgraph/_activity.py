@@ -1,5 +1,6 @@
 """Activity wrappers for executing LangGraph nodes and tasks."""
 
+import asyncio
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -58,24 +59,35 @@ def wrap_activity(
     streaming_batch_interval: timedelta = timedelta(milliseconds=100),
 ) -> Callable[[ActivityInput], Awaitable[ActivityOutput]]:
     """Wrap a function as a Temporal activity that handles LangGraph config and interrupts."""
-    # Graph nodes declare `runtime: Runtime[Ctx]` in their signature; tasks
-    # don't and instead reach for Runtime via get_runtime(). We re-inject the
-    # reconstructed Runtime only when the user function asks.
-    accepts_runtime = "runtime" in signature(func).parameters
 
     async def wrapper(input: ActivityInput) -> ActivityOutput:
         async def run(stream_writer: Callable[[Any], None] | None) -> ActivityOutput:
+            # Sync funcs run on a thread (so the loop keeps flushing the
+            # stream client mid-execution); marshal writer calls back to
+            # the loop thread because the client's flush event is an
+            # asyncio.Event and isn't safe to set off-thread.
+            effective_writer = stream_writer
+            if not iscoroutinefunction(func) and stream_writer is not None:
+                loop = asyncio.get_running_loop()
+                inner_writer = stream_writer
+
+                def thread_safe_writer(value: Any) -> None:
+                    loop.call_soon_threadsafe(inner_writer, value)
+
+                effective_writer = thread_safe_writer
+
             runtime = set_langgraph_config(
-                input.langgraph_config, stream_writer=stream_writer
+                input.langgraph_config, stream_writer=effective_writer
             )
             kwargs = dict(input.kwargs)
-            if accepts_runtime:
+            if "runtime" in signature(func).parameters:
                 kwargs["runtime"] = runtime
+
             try:
                 if iscoroutinefunction(func):
                     result = await func(*input.args, **kwargs)
                 else:
-                    result = func(*input.args, **kwargs)
+                    result = await asyncio.to_thread(func, *input.args, **kwargs)
                 if isinstance(result, Command):
                     return ActivityOutput(langgraph_command=result)
                 return ActivityOutput(result=result)
