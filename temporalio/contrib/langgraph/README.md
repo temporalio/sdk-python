@@ -240,8 +240,6 @@ class AstreamBridge:
         topic.publish({"done": True})
 ```
 
-The two mechanisms compose. A workflow can both set `streaming_topic="tokens"` (so nodes' `get_stream_writer()` calls publish to `"tokens"`) **and** iterate `astream()` to republish orchestrator-level chunks to a separate topic (e.g. `"messages"`). External subscribers pick the topic that matches what they want.
-
 ### Retry semantics
 
 Streaming has **at-least-once** delivery per activity attempt. When an activity-wrapped node retries (transient failure, worker crash, etc.), the user function re-runs from scratch and re-publishes its writes — earlier publishes from the failed attempt are not rolled back. Subscribers should be ready to see duplicates and recover idempotently (e.g. dedupe on a sequence id you include in each chunk, or treat the stream as advisory and rely on the workflow's final result for state).
