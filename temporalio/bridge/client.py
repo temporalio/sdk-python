@@ -60,7 +60,8 @@ class ClientHttpConnectProxyConfig:
 @dataclass
 class ClientDnsLoadBalancingConfig:
     """Python representation of the Rust struct for configuring DNS load
-    balancing."""
+    balancing.
+    """
 
     resolution_interval_millis: int
 
