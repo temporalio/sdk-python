@@ -59,7 +59,6 @@ def wrap_activity(
     streaming_batch_interval: timedelta = timedelta(milliseconds=100),
 ) -> Callable[[ActivityInput], Awaitable[ActivityOutput]]:
     """Wrap a function as a Temporal activity that handles LangGraph config and interrupts."""
-
     accepts_runtime = "runtime" in signature(func).parameters
 
     async def wrapper(input: ActivityInput) -> ActivityOutput:
