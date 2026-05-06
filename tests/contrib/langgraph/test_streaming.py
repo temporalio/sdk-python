@@ -88,7 +88,7 @@ async def test_streaming_via_workflow_streams(
         chunks: list[dict[str, Any]] = []
         async for item in ws_client.topic("tokens", type=dict).subscribe(
             from_offset=0,
-            poll_cooldown=timedelta(0),
+            poll_cooldown=timedelta(milliseconds=10),
         ):
             chunks.append(item.data)
             if chunks[-1].get("done"):
@@ -117,6 +117,11 @@ class AstreamPublishWorkflow:
     def __init__(self) -> None:
         self.stream = WorkflowStream()
         self.app = graph("astream-publish").compile()
+        self._done_acked = False
+
+    @workflow.signal
+    def ack_done(self) -> None:
+        self._done_acked = True
 
     @workflow.run
     async def run(self, input: str) -> str:
@@ -124,6 +129,7 @@ class AstreamPublishWorkflow:
         async for chunk in self.app.astream({"value": input}):
             topic.publish(chunk)
         topic.publish({"done": True})
+        await workflow.wait_condition(lambda: self._done_acked)
         return "done"
 
 
@@ -168,10 +174,11 @@ async def test_workflow_publishes_astream_chunks(client: Client):
         chunks: list[dict[str, Any]] = []
         async for item in ws_client.topic("astream", type=dict).subscribe(
             from_offset=0,
-            poll_cooldown=timedelta(0),
+            poll_cooldown=timedelta(milliseconds=10),
         ):
             chunks.append(item.data)
             if chunks[-1].get("done"):
+                await handle.signal(AstreamPublishWorkflow.ack_done)
                 break
 
         await handle.result()

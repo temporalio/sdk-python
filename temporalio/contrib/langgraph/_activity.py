@@ -60,6 +60,8 @@ def wrap_activity(
 ) -> Callable[[ActivityInput], Awaitable[ActivityOutput]]:
     """Wrap a function as a Temporal activity that handles LangGraph config and interrupts."""
 
+    accepts_runtime = "runtime" in signature(func).parameters
+
     async def wrapper(input: ActivityInput) -> ActivityOutput:
         async def run(stream_writer: Callable[[Any], None] | None) -> ActivityOutput:
             # Sync funcs run on a thread (so the loop keeps flushing the
@@ -80,7 +82,7 @@ def wrap_activity(
                 input.langgraph_config, stream_writer=effective_writer
             )
             kwargs = dict(input.kwargs)
-            if "runtime" in signature(func).parameters:
+            if accepts_runtime:
                 kwargs["runtime"] = runtime
 
             try:
