@@ -51,19 +51,29 @@ class StreamingWorkflowStreamsWorkflow:
         return result["value"]
 
 
-@pytest.mark.parametrize("execute_in", ["activity", "workflow"])
+@pytest.mark.parametrize(
+    "execute_in",
+    [
+        "activity",
+        pytest.param(
+            "workflow",
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 11),
+                reason=(
+                    "execute_in='workflow' streaming relies on contextvar "
+                    "propagation through asyncio.create_task, which only "
+                    "works on Python >= 3.11"
+                ),
+            ),
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "node", [async_token_node, sync_token_node], ids=["async", "sync"]
 )
 async def test_streaming_via_workflow_streams(
     client: Client, execute_in: str, node: Any
 ):
-    if execute_in == "workflow" and sys.version_info < (3, 11):
-        pytest.skip(
-            "execute_in='workflow' streaming relies on contextvar propagation "
-            "through asyncio.create_task, which only works on Python >= 3.11"
-        )
-
     g = StateGraph(State)
     g.add_node("token_node", node, metadata={"execute_in": execute_in})
     g.add_edge(START, "token_node")
