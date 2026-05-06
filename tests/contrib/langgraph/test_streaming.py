@@ -44,10 +44,16 @@ class StreamingWorkflowStreamsWorkflow:
     def __init__(self) -> None:
         _ = WorkflowStream()
         self.app = graph("streaming-ws").compile()
+        self._done_acked = False
+
+    @workflow.signal
+    def ack_done(self) -> None:
+        self._done_acked = True
 
     @workflow.run
     async def run(self, input: str) -> str:
         result = await self.app.ainvoke({"value": input})
+        await workflow.wait_condition(lambda: self._done_acked)
         return result["value"]
 
 
@@ -109,6 +115,7 @@ async def test_streaming_via_workflow_streams(
         ):
             chunks.append(item.data)
             if chunks[-1].get("done"):
+                await handle.signal(StreamingWorkflowStreamsWorkflow.ack_done)
                 break
 
         result = await handle.result()
