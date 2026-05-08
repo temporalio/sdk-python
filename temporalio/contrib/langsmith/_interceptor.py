@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from typing import Any, ClassVar, NoReturn, Protocol
 
 import langsmith
+import langsmith.utils
 import nexusrpc.handler
 from langsmith import tracing_context
 from langsmith.run_helpers import get_current_run_tree
@@ -42,6 +43,7 @@ _BUILTIN_QUERIES: frozenset[str] = frozenset(
         "__enhanced_stack_trace",
     }
 )
+
 
 # ---------------------------------------------------------------------------
 # Context helpers
@@ -457,8 +459,18 @@ def _maybe_run(
 ) -> Iterator[None]:
     """Create a LangSmith run, handling errors.
 
-    - If add_temporal_runs is False, yields None (no run created).
+    - If add_temporal_runs is False **or** ``langsmith.utils.tracing_is_enabled()``
+      returns False, yields None (no run created).
       Context propagation is handled unconditionally by callers.
+
+    Note on ``tracing_is_enabled()`` and cross-process traces:
+      ``tracing_is_enabled()`` checks for an active run tree in context
+      *before* consulting the ``LANGSMITH_TRACING`` env var (langsmith
+      semantics).  If a parent run is propagated into this worker via
+      headers from an upstream tracer, tracing continues regardless of
+      ``LANGSMITH_TRACING=false``.  This matches langsmith's "continue
+      mid-trace" model: the env var suppresses *new* local traces but
+      does not break an inbound parent trace.
     - When a run IS created, uses :class:`_ReplaySafeRunTree` for
       replay and event loop safety, then sets it as ambient context via
       ``tracing_context(parent=run_tree)`` so ``get_current_run_tree()``
@@ -477,7 +489,7 @@ def _maybe_run(
         project_name: LangSmith project name override.
         executor: ThreadPoolExecutor for background I/O.
     """
-    if not add_temporal_runs:
+    if not add_temporal_runs or not langsmith.utils.tracing_is_enabled():
         yield None
         return
 
@@ -717,12 +729,8 @@ class _LangSmithActivityInboundInterceptor(
             "temporalRunID": info.workflow_run_id or "",
             "temporalActivityID": info.activity_id or "",
         }
-        # Unconditionally set tracing context so @traceable functions inside
-        # activities inherit the plugin's client and parent, regardless of
-        # the add_temporal_runs toggle.
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": parent,
         }
@@ -786,7 +794,6 @@ class _LangSmithWorkflowInboundInterceptor(
         )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": tracing_parent,
         }
@@ -947,7 +954,6 @@ class _LangSmithNexusOperationInboundInterceptor(
         )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": parent,
         }
@@ -967,7 +973,6 @@ class _LangSmithNexusOperationInboundInterceptor(
         )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": parent,
         }
