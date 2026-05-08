@@ -16,7 +16,7 @@ env:
 jobs:
   # Build and test the project
   build-lint-test:
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -58,22 +58,25 @@ jobs:
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
       - run: uv sync --all-extras
-      - run: poe bridge-lint
-        if: ${{ matrix.clippyLinter }}
+      # [STRESS TEST BRANCH] bridge-lint disabled
+      # - run: poe bridge-lint
+      #   if: ${{ matrix.clippyLinter }}
       - run: poe build-develop
-      - run: poe lint
+      # [STRESS TEST BRANCH] poe lint disabled
+      # - run: poe lint
       - run: mkdir junit-xml
-      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
-        timeout-minutes: 15
-      # Time skipping doesn't yet support ARM
-      - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
-        timeout-minutes: 10
-      - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
-        timeout-minutes: 10
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # [STRESS TEST BRANCH] Run only the flaky test 1000x with no rerun hiding
+      - run: uv run pytest tests/contrib/langsmith/test_integration.py::TestBuiltinQueryFiltering::test_temporal_prefixed_query_not_traced -n auto --dist=worksteal -p no:rerunfailures -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 30
+      # [STRESS TEST BRANCH] Time-skipping and openai steps disabled for this branch
+      # - if: ${{ !endsWith(matrix.os, '-arm') }}
+      #   run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+      #   timeout-minutes: 10
+      # - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
+      #   run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
+      #   timeout-minutes: 10
+      #   env:
+      #     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
