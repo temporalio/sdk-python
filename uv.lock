@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-23T17:46:27.746666Z"
+exclude-newer = "2026-05-01T16:44:01.967317Z"
 exclude-newer-span = "P1W"
 
 [options.exclude-newer-package]
@@ -5198,6 +5198,7 @@ dev = [
     { name = "async-timeout", marker = "python_full_version < '3.11'" },
     { name = "basedpyright" },
     { name = "cibuildwheel" },
+    { name = "google-adk" },
     { name = "googleapis-common-protos" },
     { name = "grpcio-tools" },
     { name = "httpx" },
@@ -5263,6 +5264,7 @@ dev = [
     { name = "async-timeout", marker = "python_full_version < '3.11'", specifier = ">=4.0,<6" },
     { name = "basedpyright", specifier = "==1.34.0" },
     { name = "cibuildwheel", specifier = ">=2.22.0,<3" },
+    { name = "google-adk", specifier = "<1.32" },
     { name = "googleapis-common-protos", specifier = "==1.70.0" },
     { name = "grpcio-tools", specifier = ">=1.48.2,<2" },
     { name = "httpx", specifier = ">=0.28.1" },
