@@ -1252,6 +1252,7 @@ class TestBuiltinQueryFiltering:
             worker_client,
             QueryFilteringWorkflow,
             task_queue=task_queue,
+            max_cached_workflows=0,
         ) as worker:
             handle = await query_client.start_workflow(
                 QueryFilteringWorkflow.run,
