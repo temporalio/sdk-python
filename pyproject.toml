@@ -75,10 +75,7 @@ dev = [
   "openai-agents>=0.14.0; python_version >= '3.14'",
   "openai-agents[litellm]>=0.14.0; python_version < '3.14'",
   "litellm>=1.83.0",
-  "openinference-instrumentation-google-adk>=0.1.8",
-  # openinference-instrumentation-google-adk 0.1.10 patches `trace_tool_call`,
-  # which was removed in google-adk 1.32. Cap until upstream catches up.
-  "google-adk<1.32",
+  "openinference-instrumentation-google-adk>=0.1.11",
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
@@ -259,4 +256,4 @@ exclude = ["temporalio/bridge/target/**/*"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "1 week"
-exclude-newer-package = { openai-agents = false }
+exclude-newer-package = { openai-agents = false, openinference-instrumentation-google-adk = false }
