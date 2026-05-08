@@ -462,20 +462,20 @@ def _maybe_run(
     - If add_temporal_runs is False **or** ``langsmith.utils.tracing_is_enabled()``
       returns False, yields None (no run created).
       Context propagation is handled unconditionally by callers.
-
-    Note on ``tracing_is_enabled()`` and cross-process traces:
-      ``tracing_is_enabled()`` checks for an active run tree in context
-      *before* consulting the ``LANGSMITH_TRACING`` env var (langsmith
-      semantics).  If a parent run is propagated into this worker via
-      headers from an upstream tracer, tracing continues regardless of
-      ``LANGSMITH_TRACING=false``.  This matches langsmith's "continue
-      mid-trace" model: the env var suppresses *new* local traces but
-      does not break an inbound parent trace.
     - When a run IS created, uses :class:`_ReplaySafeRunTree` for
       replay and event loop safety, then sets it as ambient context via
       ``tracing_context(parent=run_tree)`` so ``get_current_run_tree()``
       returns it and ``_inject_current_context()`` can inject it.
     - On exception: marks run as errored (unless benign ApplicationError), re-raises.
+
+    Note on ``tracing_is_enabled()`` and cross-process traces:
+    ``tracing_is_enabled()`` checks for an active run tree in context
+    *before* consulting the ``LANGSMITH_TRACING`` env var (langsmith
+    semantics).  If a parent run is propagated into this worker via
+    headers from an upstream tracer, tracing continues regardless of
+    ``LANGSMITH_TRACING=false``.  This matches langsmith's "continue
+    mid-trace" model: the env var suppresses *new* local traces but
+    does not break an inbound parent trace.
 
     Args:
         client: LangSmith client instance.
