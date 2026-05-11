@@ -10227,12 +10227,15 @@ class _ClientImpl(OutboundInterceptor):
         self, input: DescribeNexusOperationInput
     ) -> NexusOperationExecutionDescription:
         """Describe a nexus operation."""
+        req = temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionRequest(
+            namespace=self._client.namespace,
+            operation_id=input.operation_id,
+            run_id=input.run_id or "",
+        )
+        if input.long_poll_token:
+            req.long_poll_token = input.long_poll_token
         resp = await self._client.workflow_service.describe_nexus_operation_execution(
-            temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionRequest(
-                namespace=self._client.namespace,
-                operation_id=input.operation_id,
-                run_id=input.run_id or "",
-            ),
+            req=req,
             retry=True,
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
