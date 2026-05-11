@@ -11,6 +11,7 @@ use temporalio_client::{
     ClientKeepAliveOptions as CoreClientKeepAliveConfig, Connection, ConnectionOptions,
     DnsLoadBalancingOptions, HttpConnectProxyOptions, RetryOptions,
 };
+use tracing::warn;
 use url::Url;
 
 use crate::runtime;
@@ -246,6 +247,7 @@ impl ClientConfig {
         // suppress DNS LB whenever a proxy is configured to keep the
         // pre-existing behavior even if a caller leaves the default.
         let dns_load_balancing = if has_proxy {
+            warn!("Disabling DNS load balancing because http_connect_proxy_config is set");
             None
         } else {
             self.dns_load_balancing_config.map(Into::into)
