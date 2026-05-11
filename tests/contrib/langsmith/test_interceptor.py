@@ -1111,7 +1111,6 @@ class TestAddTemporalRunsToggle:
         # (unconditionally, before _maybe_run)
         mock_tracing_ctx.assert_called_once_with(
             client=config._client,
-            enabled=True,
             project_name=None,
             parent=mock_extracted_parent,
         )
@@ -1143,8 +1142,8 @@ class TestAddTemporalRunsToggle:
             await act_interceptor.execute_activity(mock_act_input)
 
         MockRunTree.assert_not_called()
-        # tracing_context called with client and enabled (no parent)
+        # tracing_context called with client (no parent)
         mock_tracing_ctx.assert_called_once_with(
-            client=config._client, enabled=True, project_name=None, parent=None
+            client=config._client, project_name=None, parent=None
         )
         mock_act_next.execute_activity.assert_called_once()
