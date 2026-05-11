@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-01T17:48:32.303305Z"
+exclude-newer = "2026-05-04T19:41:35.334574Z"
 exclude-newer-span = "P1W"
 
 [options.exclude-newer-package]
@@ -5242,7 +5242,7 @@ requires-dist = [
     { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.7.0,<0.8" },
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
     { name = "nexus-rpc", specifier = "==1.4.0" },
-    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.14.0" },
+    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.14.0,<0.17.1" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
@@ -5274,8 +5274,8 @@ dev = [
     { name = "moto", extras = ["s3", "server"], specifier = ">=5" },
     { name = "mypy", specifier = "==1.18.2" },
     { name = "mypy-protobuf", specifier = ">=3.3.0,<4" },
-    { name = "openai-agents", marker = "python_full_version >= '3.14'", specifier = ">=0.14.0" },
-    { name = "openai-agents", extras = ["litellm"], marker = "python_full_version < '3.14'", specifier = ">=0.14.0" },
+    { name = "openai-agents", marker = "python_full_version >= '3.14'", specifier = ">=0.14.0,<0.17.1" },
+    { name = "openai-agents", extras = ["litellm"], marker = "python_full_version < '3.14'", specifier = ">=0.14.0,<0.17.1" },
     { name = "openinference-instrumentation-google-adk", specifier = ">=0.1.11" },
     { name = "openinference-instrumentation-openai-agents", specifier = ">=0.1.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.11.1,<2" },
