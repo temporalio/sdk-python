@@ -2103,6 +2103,11 @@ tests.
 
 ### Style
 
+```
+# runs ruff + cargo fmt
+poe format
+```
+
 * Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
   * We use [ruff](https://docs.astral.sh/ruff/) for formatting, so that takes precedence
   * In tests and example code, can import individual classes/functions to make it more readable. Can also do this for

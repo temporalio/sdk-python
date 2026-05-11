@@ -49,7 +49,10 @@ class ModelActivityParameters:
     """Maximum time for the activity to complete."""
 
     heartbeat_timeout: timedelta | None = None
-    """Maximum time between heartbeats."""
+    """Maximum time between heartbeats. For streaming
+    (``Runner.run_streamed``), set this lower than
+    ``start_to_close_timeout`` so a stuck model call is detected before the
+    overall activity timeout fires."""
 
     retry_policy: RetryPolicy | None = None
     """Policy for retrying failed activities."""
@@ -68,3 +71,26 @@ class ModelActivityParameters:
 
     use_local_activity: bool = False
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
+
+    streaming_topic: str | None = None
+    """Stream topic to publish raw model stream events to when the workflow
+    calls ``Runner.run_streamed``. Required for ``Runner.run_streamed``;
+    if left as ``None``, ``run_streamed`` raises before scheduling any
+    activity. The workflow must host a
+    :class:`temporalio.contrib.workflow_streams.WorkflowStream` to receive
+    the publishes; otherwise the signals are unhandled and dropped.
+
+    Streaming is incompatible with ``use_local_activity`` (local activities
+    do not support heartbeats or the workflow stream signal channel).
+
+    .. warning::
+        Streaming support is experimental and may change in future
+        versions."""
+
+    streaming_batch_interval: timedelta = timedelta(milliseconds=100)
+    """Interval between automatic flushes for the stream publisher used
+    by the streaming activity.
+
+    .. warning::
+        Streaming support is experimental and may change in future
+        versions."""

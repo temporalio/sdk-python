@@ -14,6 +14,7 @@ exclude-newer-span = "P1W"
 
 [options.exclude-newer-package]
 openai-agents = false
+openinference-instrumentation-google-adk = false
 
 [[package]]
 name = "aioboto3"
@@ -3452,7 +3453,7 @@ wheels = [
 
 [[package]]
 name = "openinference-instrumentation-google-adk"
-version = "0.1.10"
+version = "0.1.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openinference-instrumentation" },
@@ -3463,9 +3464,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/7a/bba3337066dcd391f7091d840c6d22e351a9f8412bb8de4b901cc6443aa9/openinference_instrumentation_google_adk-0.1.10.tar.gz", hash = "sha256:5ccb61d58532b2d829b71b411a997b573ddc2b03dcd5481fb2f9f67ec7368a97", size = 12383, upload-time = "2026-03-03T08:07:34.296Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/7e/a6a6c7dc7bd01e098374cdee69b10b6586d2f7a481ed34f8a283fcbfd830/openinference_instrumentation_google_adk-0.1.11.tar.gz", hash = "sha256:b36310d4e8b8143d41fe5c74be04c09f367710ec8019471f232bb721ede143b1", size = 14473, upload-time = "2026-05-05T06:43:34.828Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/82/8ee4f5f40d2353ac643668c4f6a98e0ce51a76afeab1cfba2dab1976d7c4/openinference_instrumentation_google_adk-0.1.10-py3-none-any.whl", hash = "sha256:d97be628ce60b8eeab017f34ffaa2ec6fdaa11c64f3d0a032706ef74659e2a3e", size = 14201, upload-time = "2026-03-03T08:07:33.406Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/51/0d4df97fd0fb3ac2282dc268e9a11f82523f881e623264291d6abf2fd5ed/openinference_instrumentation_google_adk-0.1.11-py3-none-any.whl", hash = "sha256:8dd546f9db3a6589106287b8a99b99f06361ac95e6e0b32305e6ce1a76f98630", size = 16384, upload-time = "2026-05-05T06:43:33.836Z" },
 ]
 
 [[package]]
@@ -5275,7 +5276,7 @@ dev = [
     { name = "mypy-protobuf", specifier = ">=3.3.0,<4" },
     { name = "openai-agents", marker = "python_full_version >= '3.14'", specifier = ">=0.14.0" },
     { name = "openai-agents", extras = ["litellm"], marker = "python_full_version < '3.14'", specifier = ">=0.14.0" },
-    { name = "openinference-instrumentation-google-adk", specifier = ">=0.1.8" },
+    { name = "openinference-instrumentation-google-adk", specifier = ">=0.1.11" },
     { name = "openinference-instrumentation-openai-agents", specifier = ">=0.1.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk-extension-aws", specifier = ">=2.0.0,<3" },
