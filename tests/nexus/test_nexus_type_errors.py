@@ -32,6 +32,11 @@ class MyService:
     my_workflow_run_operation: nexusrpc.Operation[MyInput, MyOutput]
 
 
+@nexusrpc.service
+class MyNoInputService:
+    my_no_input_operation: nexusrpc.Operation[None, MyOutput]
+
+
 @nexusrpc.handler.service_handler(service=MyService)
 class MyServiceHandler:
     @nexusrpc.handler.sync_operation
@@ -219,6 +224,10 @@ async def standalone_operation_type_tests():
         MyService,
         endpoint="fake-endpoint",
     )
+    no_input_nexus_client = client.create_nexus_client(
+        MyNoInputService,
+        endpoint="fake-endpoint",
+    )
 
     # execute with an operation definition infers output type
     _op_defn_output: MyOutput = await nexus_client.execute_operation(
@@ -242,6 +251,63 @@ async def standalone_operation_type_tests():
     # string operation name and result_type infers output type
     _str_op_result_type_output: MyOutput = await nexus_client.execute_operation(
         "my_sync_operation", MyInput(), id="op-1", result_type=MyOutput
+    )
+
+    # omitting arg for string operation names is not supported
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await nexus_client.execute_operation(  # type: ignore
+        "my_sync_operation",
+        id="op-1",
+        result_type=MyOutput,
+    )
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await nexus_client.start_operation(  # type: ignore
+        "my_sync_operation",
+        id="op-1",
+        result_type=MyOutput,
+    )
+
+    # omitting arg for callable operations is not supported
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await nexus_client.execute_operation(  # type: ignore
+        MyServiceHandler.my_sync_operation,
+        id="op-1",
+        result_type=MyOutput,
+    )
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await nexus_client.start_operation(  # type: ignore
+        MyServiceHandler.my_sync_operation,
+        id="op-1",
+        result_type=MyOutput,
+    )
+
+    # no-input operation definitions must still be called with explicit None
+    _no_input_op_defn_output: MyOutput = await no_input_nexus_client.execute_operation(
+        MyNoInputService.my_no_input_operation,
+        None,
+        id="op-1",
+    )
+    _no_input_op_defn_handle: NexusOperationHandle[
+        MyOutput
+    ] = await no_input_nexus_client.start_operation(
+        MyNoInputService.my_no_input_operation,
+        None,
+        id="op-1",
+    )
+    _no_input_op_defn_handle_output: MyOutput = (
+        await _no_input_op_defn_handle.result()
+    )
+
+    # omitting arg for no-input operation definitions is not supported
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await no_input_nexus_client.execute_operation(  # type: ignore
+        MyNoInputService.my_no_input_operation,
+        id="op-1",
+    )
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await no_input_nexus_client.start_operation(  # type: ignore
+        MyNoInputService.my_no_input_operation,
+        id="op-1",
     )
 
     # execute with an operation definition and a wrong input type produces a type error

@@ -5813,33 +5813,13 @@ class NexusClient(ABC, Generic[ServiceType]):
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
-    # Overload for nexusrpc.Operation with no input
-    @overload
-    @abstractmethod
-    async def start_operation(
-        self,
-        operation: nexusrpc.Operation[None, OutputT],
-        *,
-        id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        schedule_to_close_timeout: timedelta | None = None,
-        schedule_to_start_timeout: timedelta | None = None,
-        start_to_close_timeout: timedelta | None = None,
-        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
-        summary: str | None = None,
-        headers: Mapping[str, str] | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
-    ) -> NexusOperationHandle[OutputT]: ...
-
     # Overload for Callable with result_type
     @overload
     @abstractmethod
     async def start_operation(
         self,
         operation: Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -5861,7 +5841,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def start_operation(
         self,
         operation: Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -5882,7 +5862,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def start_operation(
         self,
         operation: str,
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -5904,7 +5884,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def start_operation(
         self,
         operation: str,
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -5923,7 +5903,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def start_operation(
         self,
         operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -5993,33 +5973,13 @@ class NexusClient(ABC, Generic[ServiceType]):
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
 
-    # Overload for nexusrpc.Operation with no input
-    @overload
-    @abstractmethod
-    async def execute_operation(
-        self,
-        operation: nexusrpc.Operation[None, OutputT],
-        *,
-        id: str,
-        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        schedule_to_close_timeout: timedelta | None = None,
-        schedule_to_start_timeout: timedelta | None = None,
-        start_to_close_timeout: timedelta | None = None,
-        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
-        summary: str | None = None,
-        headers: Mapping[str, str] | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
-    ) -> OutputT: ...
-
     # Overload for Callable with result_type
     @overload
     @abstractmethod
     async def execute_operation(
         self,
         operation: Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -6041,7 +6001,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def execute_operation(
         self,
         operation: Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -6062,7 +6022,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def execute_operation(
         self,
         operation: str,
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -6084,7 +6044,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def execute_operation(
         self,
         operation: str,
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -6103,7 +6063,7 @@ class NexusClient(ABC, Generic[ServiceType]):
     async def execute_operation(
         self,
         operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -6198,7 +6158,7 @@ class _NexusClient(NexusClient[ServiceType]):
     async def start_operation(
         self,
         operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -6245,7 +6205,7 @@ class _NexusClient(NexusClient[ServiceType]):
     async def execute_operation(
         self,
         operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
-        arg: Any = temporalio.common._arg_unset,
+        arg: Any,
         *,
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
@@ -10235,10 +10195,9 @@ class _ClientImpl(OutboundInterceptor):
             req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
 
         # Set input payload
-        if input.arg is not temporalio.common._arg_unset:
-            encoded = await self._client.data_converter.encode([input.arg])
-            if encoded:
-                req.input.CopyFrom(encoded[0])
+        encoded = await self._client.data_converter.encode([input.arg])
+        if encoded:
+            req.input.CopyFrom(encoded[0])
 
         # Set search attributes
         if input.search_attributes is not None:
