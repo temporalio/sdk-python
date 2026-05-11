@@ -4,6 +4,7 @@ It doesn't contain any test functions.
 """
 
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 from unittest.mock import Mock
 
@@ -221,7 +222,11 @@ async def standalone_operation_type_tests():
 
     # execute with an operation definition infers output type
     _op_defn_output: MyOutput = await nexus_client.execute_operation(
-        MyService.my_sync_operation, MyInput(), id="op-1"
+        MyService.my_sync_operation,
+        MyInput(),
+        id="op-1",
+        schedule_to_start_timeout=timedelta(seconds=1),
+        start_to_close_timeout=timedelta(seconds=2),
     )
 
     # result_type overrides output type from operation definition
@@ -260,7 +265,11 @@ async def standalone_operation_type_tests():
     # starting with an operation definition infers output type on the handle and
     # result from handle
     _defn_handle: NexusOperationHandle[MyOutput] = await nexus_client.start_operation(
-        MyService.my_sync_operation, MyInput(), id="op-1"
+        MyService.my_sync_operation,
+        MyInput(),
+        id="op-1",
+        schedule_to_start_timeout=timedelta(seconds=1),
+        start_to_close_timeout=timedelta(seconds=2),
     )
     _defn_handle_output: MyOutput = await _defn_handle.result()
 

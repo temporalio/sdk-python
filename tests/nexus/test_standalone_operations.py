@@ -881,6 +881,8 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
             id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
             id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
             schedule_to_close_timeout=timedelta(seconds=30),
+            schedule_to_start_timeout=timedelta(seconds=5),
+            start_to_close_timeout=timedelta(seconds=20),
         )
         assert len(interceptor.start_calls) >= 1
         start_input = interceptor.start_calls[-1]
@@ -889,6 +891,8 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         assert start_input.operation == "blocking_async"
         assert start_input.endpoint == endpoint_name
         assert start_input.service == "StandaloneTestService"
+        assert start_input.schedule_to_start_timeout == timedelta(seconds=5)
+        assert start_input.start_to_close_timeout == timedelta(seconds=20)
 
         # Describe
         await handle.describe()
