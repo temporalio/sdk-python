@@ -78,6 +78,7 @@ from temporalio.converter import (
 )
 from temporalio.service import (
     ConnectConfig,
+    DnsLoadBalancingConfig,
     HttpConnectProxyConfig,
     KeepAliveConfig,
     RetryConfig,
@@ -144,6 +145,8 @@ class Client:
         lazy: bool = False,
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
+        dns_load_balancing_config: DnsLoadBalancingConfig
+        | None = DnsLoadBalancingConfig.default,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> Self:
         """Connect to a Temporal server.
@@ -199,6 +202,11 @@ class Client:
                 used for workers.
             runtime: The runtime for this client, or the default if unset.
             http_connect_proxy_config: Configuration for HTTP CONNECT proxy.
+            dns_load_balancing_config: DNS load balancing configuration for the
+                client connection. Default is to re-resolve DNS every 30s. Can
+                be set to ``None`` to disable. Silently disabled when
+                ``http_connect_proxy_config`` is set, since the two are mutually
+                exclusive.
             header_codec_behavior: Encoding behavior for headers sent by the client.
         """
         connect_config = temporalio.service.ConnectConfig(
@@ -212,6 +220,7 @@ class Client:
             lazy=lazy,
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
+            dns_load_balancing_config=dns_load_balancing_config,
         )
 
         def make_lambda(
@@ -3030,6 +3039,7 @@ class ClientConnectConfig(TypedDict, total=False):
     lazy: bool
     runtime: temporalio.runtime.Runtime | None
     http_connect_proxy_config: HttpConnectProxyConfig | None
+    dns_load_balancing_config: DnsLoadBalancingConfig | None
     header_codec_behavior: HeaderCodecBehavior
 
 
@@ -11509,6 +11519,7 @@ class CloudOperationsClient:
         lazy: bool = False,
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
+        dns_load_balancing_config: DnsLoadBalancingConfig | None = None,
     ) -> CloudOperationsClient:
         """Connect to a Temporal Cloud Operations API.
 
@@ -11545,6 +11556,10 @@ class CloudOperationsClient:
                 used for workers.
             runtime: The runtime for this client, or the default if unset.
             http_connect_proxy_config: Configuration for HTTP CONNECT proxy.
+            dns_load_balancing_config: DNS load balancing configuration for the
+                client connection. Default is disabled. Silently disabled when
+                ``http_connect_proxy_config`` is set, since the two are mutually
+                exclusive.
         """
         # Add version if given
         if version:
@@ -11561,6 +11576,7 @@ class CloudOperationsClient:
             lazy=lazy,
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
+            dns_load_balancing_config=dns_load_balancing_config,
         )
         return CloudOperationsClient(
             await temporalio.service.ServiceClient.connect(connect_config)
