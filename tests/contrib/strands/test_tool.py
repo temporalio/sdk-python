@@ -2,8 +2,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 from strands import Agent, tool
-from strands_tools import calculator
-from strands_tools.current_time import current_time
+from strands_tools import calculator, current_time
 
 from temporalio import activity, workflow
 from temporalio.api.enums.v1 import EventType
@@ -20,7 +19,7 @@ def letter_counter(word: str, letter: str) -> int:
 
 @activity.defn(name="current_time")
 async def current_time_activity() -> str:
-    return current_time()
+    return current_time.current_time()
 
 
 @workflow.defn
