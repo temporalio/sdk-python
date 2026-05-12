@@ -3,6 +3,7 @@ from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
+from strands.models import Model
 from strands.types.tools import AgentTool
 
 from temporalio.common import Priority, RetryPolicy
@@ -13,6 +14,7 @@ from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
+from ._model import _ModelActivity
 from ._temporal_activity_tool import _TemporalActivityTool
 
 
@@ -21,13 +23,23 @@ class StrandsPlugin(SimplePlugin):
 
     Configures sandbox passthrough for ``strands`` and ``strands_tools`` and
     swaps in ``pydantic_data_converter`` so structured outputs serialize.
+
+    When ``model`` is supplied, registers the activities that back
+    :class:`temporalio.contrib.strands.TemporalModel` so the model's
+    ``stream()`` call runs durably as a Temporal activity. The ``model``
+    instance lives on the worker and is reused across activity invocations.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, model: Model | None = None) -> None:
+        activities: list[Callable] | None = None
+        if model is not None:
+            ma = _ModelActivity(model)
+            activities = [ma.invoke_model, ma.invoke_model_streaming]
         super().__init__(
             "aws.StrandsPlugin",
             workflow_runner=_workflow_runner,
             data_converter=_data_converter,
+            activities=activities,
         )
 
 

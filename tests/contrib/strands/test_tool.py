@@ -5,10 +5,10 @@ from strands import Agent, tool
 from strands_tools import calculator, current_time
 
 from temporalio import activity, workflow
-from temporalio.api.enums.v1 import EventType
-from temporalio.client import Client, WorkflowHistory
+from temporalio.client import Client
 from temporalio.contrib.strands import StrandsPlugin, activity_as_tool
 from temporalio.worker import Replayer, Worker
+from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
 
 
@@ -86,11 +86,3 @@ async def test_tool(client: Client):
         workflows=[ToolWorkflow],
         plugins=[plugin],
     ).replay_workflow(history)
-
-
-def get_activities(history: WorkflowHistory) -> list[str]:
-    return [
-        event.activity_task_scheduled_event_attributes.activity_type.name
-        for event in history.events
-        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
-    ]

@@ -14,3 +14,17 @@
   async def current_time_activity() -> str:
       return current_time.current_time()
   ```
+* Wrap the model with `TemporalModel` so the LLM call runs as a durable activity. Pass the real model to `StrandsPlugin` on the worker:
+  ```python
+  # workflow
+  from temporalio.contrib.strands import TemporalModel
+
+  agent = Agent(model=TemporalModel(start_to_close_timeout=timedelta(seconds=60)))
+
+  # worker
+  from strands.models.bedrock import BedrockModel
+  from temporalio.contrib.strands import StrandsPlugin
+
+  Worker(..., plugins=[StrandsPlugin(model=BedrockModel(model_id="claude-3-5-sonnet"))])
+  ```
+  To stream chunks to external consumers, pass `streaming_topic="..."` to `TemporalModel` and host a `WorkflowStream` on the workflow.
