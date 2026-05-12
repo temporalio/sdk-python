@@ -81,6 +81,7 @@ from .types import (
     MethodSyncOrAsyncSingleParam,
     MethodSyncSingleParam,
     MultiParamSpec,
+    NexusServiceType,
     ParamType,
     ProtocolReturnType,
     ReturnType,
@@ -5446,9 +5447,6 @@ class ContinueAsNewVersioningBehavior(IntEnum):
     """
 
 
-ServiceT = TypeVar("ServiceT")
-
-
 class NexusOperationCancellationType(IntEnum):
     """Defines behavior of a Nexus operation when the caller workflow initiates cancellation.
 
@@ -5486,7 +5484,7 @@ class NexusOperationCancellationType(IntEnum):
     :py:exc:`asyncio.CancelledError` resulting from the cancellation request)."""
 
 
-class NexusClient(ABC, Generic[ServiceT]):
+class NexusClient(ABC, Generic[NexusServiceType]):
     """A client for invoking Nexus operations.
 
     Example::
@@ -5709,7 +5707,7 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
+            [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             Awaitable[OutputT],
         ],
         input: InputT,
@@ -5729,7 +5727,7 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
+            [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
         ],
         input: InputT,
@@ -5749,7 +5747,7 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceT],
+            [NexusServiceType],
             nexusrpc.handler.OperationHandler[InputT, OutputT],
         ],
         input: InputT,
@@ -5794,12 +5792,12 @@ class NexusClient(ABC, Generic[ServiceT]):
         ...
 
 
-class _NexusClient(NexusClient[ServiceT]):
+class _NexusClient(NexusClient[NexusServiceType]):
     def __init__(
         self,
         *,
         endpoint: str,
-        service: type[ServiceT] | str,
+        service: type[NexusServiceType] | str,
     ) -> None:
         """Create a Nexus client.
 
@@ -5880,9 +5878,9 @@ class _NexusClient(NexusClient[ServiceT]):
 @overload
 def create_nexus_client(
     *,
-    service: type[ServiceT],
+    service: type[NexusServiceType],
     endpoint: str,
-) -> NexusClient[ServiceT]: ...
+) -> NexusClient[NexusServiceType]: ...
 
 
 @overload
@@ -5895,9 +5893,9 @@ def create_nexus_client(
 
 def create_nexus_client(
     *,
-    service: type[ServiceT] | str,
+    service: type[NexusServiceType] | str,
     endpoint: str,
-) -> NexusClient[ServiceT]:
+) -> NexusClient[NexusServiceType]:
     """Create a Nexus client.
 
     Args:

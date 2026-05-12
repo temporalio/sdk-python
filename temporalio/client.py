@@ -100,10 +100,10 @@ from .types import (
     MethodSyncOrAsyncNoParam,
     MethodSyncOrAsyncSingleParam,
     MultiParamSpec,
+    NexusServiceType,
     ParamType,
     ReturnType,
     SelfType,
-    ServiceType,
 )
 
 
@@ -2525,10 +2525,10 @@ class Client:
 
     def create_nexus_client(
         self,
-        service: type[ServiceType] | str,
+        service: type[NexusServiceType] | str,
         *,
         endpoint: str,
-    ) -> NexusClient[ServiceType]:
+    ) -> NexusClient[NexusServiceType]:
         """Create a client for starting standalone Nexus operations.
 
         .. warning::
@@ -5783,7 +5783,7 @@ class NexusOperationExecutionAsyncIterator:
             return ret
 
 
-class NexusClient(ABC, Generic[ServiceType]):
+class NexusClient(ABC, Generic[NexusServiceType]):
     """Client for starting standalone Nexus operations.
 
     .. warning::
@@ -6115,13 +6115,13 @@ class NexusClient(ABC, Generic[ServiceType]):
         ...
 
 
-class _NexusClient(NexusClient[ServiceType]):
+class _NexusClient(NexusClient[NexusServiceType]):
     """Concrete implementation of NexusClient."""
 
     def __init__(
         self,
         client: Client,
-        service: type[ServiceType] | str,
+        service: type[NexusServiceType] | str,
         endpoint: str,
     ) -> None:
         self._client = client
