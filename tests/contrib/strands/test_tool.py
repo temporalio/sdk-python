@@ -2,12 +2,13 @@ from datetime import timedelta
 from uuid import uuid4
 
 from strands import Agent, tool
-from strands_tools import calculator, current_time
+from strands_tools import calculator
+from strands_tools.current_time import current_time
 
-from temporalio import workflow
+from temporalio import activity, workflow
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client, WorkflowHistory
-from temporalio.contrib.strands import StrandsPlugin, as_activity
+from temporalio.contrib.strands import StrandsPlugin, activity_as_tool
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.mock_model import MockModel
 
@@ -15,6 +16,11 @@ from tests.contrib.strands.mock_model import MockModel
 @tool
 def letter_counter(word: str, letter: str) -> int:
     return word.lower().count(letter.lower())
+
+
+@activity.defn(name="current_time")
+async def current_time_activity() -> str:
+    return current_time()
 
 
 @workflow.defn
@@ -38,8 +44,8 @@ class ToolWorkflow:
             model=model,
             tools=[
                 calculator,
-                as_activity(
-                    current_time,
+                activity_as_tool(
+                    current_time_activity,
                     start_to_close_timeout=timedelta(seconds=15),
                 ),
                 letter_counter,
@@ -54,12 +60,13 @@ class ToolWorkflow:
 
 async def test_tool(client: Client):
     task_queue = "test_tool"
-    plugin = StrandsPlugin(activity_tools=[current_time])
+    plugin = StrandsPlugin()
 
     async with Worker(
         client,
         task_queue=task_queue,
         workflows=[ToolWorkflow],
+        activities=[current_time_activity],
         plugins=[plugin],
     ):
         handle = await client.start_workflow(

@@ -4,5 +4,12 @@
 * File-based tool lookup
 
 # Migration Guide
-* Mark non-deterministic tools with `as_activity()` and include in `StrandsAgent(activity_tools=[...])`
 * Use `agent.invoke_async(message)` instead of `agent(message)` which spawns a thread
+* Decorate non-deterministic tools with `@activity.defn` and register them via `Worker(activities=[...])`. Wrap them in the agent with `activity_as_tool()`. For tools from `strands_tools` (or any `@tool`-decorated input), write a thin async wrapper that calls the tool, e.g.:
+  ```python
+  from strands_tools.current_time import current_time
+
+  @activity.defn(name="current_time")
+  async def current_time_activity() -> str:
+      return current_time()
+  ```
