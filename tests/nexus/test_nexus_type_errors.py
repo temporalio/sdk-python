@@ -294,9 +294,7 @@ async def standalone_operation_type_tests():
         None,
         id="op-1",
     )
-    _no_input_op_defn_handle_output: MyOutput = (
-        await _no_input_op_defn_handle.result()
-    )
+    _no_input_op_defn_handle_output: MyOutput = await _no_input_op_defn_handle.result()
 
     # omitting arg for no-input operation definitions is not supported
     # assert-type-error-pyright: 'No overloads for "execute_operation" match'
