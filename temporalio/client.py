@@ -9784,8 +9784,7 @@ class CloudOperationsClient:
         lazy: bool = False,
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
-        dns_load_balancing_config: DnsLoadBalancingConfig
-        | None = DnsLoadBalancingConfig.default,
+        dns_load_balancing_config: DnsLoadBalancingConfig | None = None,
     ) -> CloudOperationsClient:
         """Connect to a Temporal Cloud Operations API.
 
@@ -9823,8 +9822,7 @@ class CloudOperationsClient:
             runtime: The runtime for this client, or the default if unset.
             http_connect_proxy_config: Configuration for HTTP CONNECT proxy.
             dns_load_balancing_config: DNS load balancing configuration for the
-                client connection. Default is to re-resolve DNS every 30s. Can
-                be set to ``None`` to disable. Silently disabled when
+                client connection. Default is disabled. Silently disabled when
                 ``http_connect_proxy_config`` is set, since the two are mutually
                 exclusive.
         """
