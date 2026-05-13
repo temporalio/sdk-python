@@ -44,7 +44,7 @@ aioboto3 = [
   "types-aioboto3[s3]>=10.4.0",
 ]
 google-gemini = [
-    "google-genai>=1.66.0",
+    "google-genai>=1.66.0,<2.0.0",
 ]
 
 [project.urls]

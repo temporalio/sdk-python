@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-06T04:54:10.585581442Z"
+exclude-newer = "2026-05-06T05:20:04.067663308Z"
 exclude-newer-span = "P1W"
 
 [options.exclude-newer-package]
@@ -5240,7 +5240,7 @@ dev = [
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
     { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=1.27.0,<2" },
-    { name = "google-genai", marker = "extra == 'google-gemini'", specifier = ">=1.66.0" },
+    { name = "google-genai", marker = "extra == 'google-gemini'", specifier = ">=1.66.0,<2.0.0" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=1.1.0" },
     { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.7.0,<0.8" },
