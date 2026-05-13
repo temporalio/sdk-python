@@ -248,8 +248,6 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
     ) -> list[temporalio.api.common.v1.Link.WorkflowEvent]:
         event_links = []
         for inbound_link in self.nexus_context.inbound_links:
-            if inbound_link.type != _WORKFLOW_EVENT_LINK_TYPE:
-                continue
             if link := nexus_link_to_workflow_event(inbound_link):
                 event_links.append(link)
         return event_links

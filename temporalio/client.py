@@ -4814,7 +4814,7 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     """Server-generated request ID used as an idempotency token."""
 
     operation_token: str | None
-    """operation_token is only set for asynchronous operations after a successful start_operation call."""
+    """Operation token is only set for asynchronous operations after a successful start_operation call."""
 
     identity: str
     """Identity of the client that started this operation."""
@@ -5107,13 +5107,13 @@ class NexusOperationFailureError(temporalio.exceptions.TemporalError):
     """
 
     def __init__(self, *, cause: BaseException) -> None:
-        """Create nexus operation failure error."""
+        """Create Nexus operation failure error."""
         super().__init__("Nexus operation execution failed")
         self.__cause__ = cause
 
     @property
     def cause(self) -> BaseException:
-        """Cause of the nexus operation failure."""
+        """Cause of the Nexus operation failure."""
         assert self.__cause__
         return self.__cause__
 
