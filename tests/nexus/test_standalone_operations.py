@@ -42,6 +42,7 @@ from temporalio.common import (
     NexusOperationExecutionStatus,
     NexusOperationIDConflictPolicy,
     NexusOperationIDReusePolicy,
+    PendingNexusOperationExecutionState,
     WorkflowIDConflictPolicy,
     WorkflowIDReusePolicy,
 )
@@ -422,21 +423,15 @@ async def test_describe_operation(client: Client, env: WorkflowEnvironment):
         await handle.result()
 
         desc = await handle.describe()
-        assert isinstance(desc, NexusOperationExecutionDescription)
         assert desc.operation_id == handle.operation_id
         assert desc.endpoint == endpoint_name
         assert desc.service == "StandaloneTestService"
         assert desc.operation == "echo_async"
-        assert desc.status in (
-            NexusOperationExecutionStatus.RUNNING,
-            NexusOperationExecutionStatus.COMPLETED,
-        )
-        assert isinstance(desc.state, int)
-        assert isinstance(desc.attempt, int)
-        assert desc.blocked_reason is None or isinstance(desc.blocked_reason, str)
-        assert desc.last_attempt_failure is None or isinstance(
-            desc.last_attempt_failure, BaseException
-        )
+        assert desc.status == NexusOperationExecutionStatus.COMPLETED
+        assert desc.state == PendingNexusOperationExecutionState.UNSPECIFIED
+        assert desc.attempt >= 1
+        assert desc.blocked_reason is None
+        assert desc.last_attempt_failure is None
         summary = await desc.static_summary()
         assert summary == StandaloneTestService.echo_async.name
 
