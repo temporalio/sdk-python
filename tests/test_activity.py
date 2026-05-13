@@ -1,4 +1,5 @@
 import asyncio
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -6,6 +7,7 @@ from datetime import timedelta
 import pytest
 
 from temporalio import activity, workflow
+from temporalio.api.workflowservice.v1 import GetSystemInfoRequest
 from temporalio.client import (
     ActivityExecutionCount,
     ActivityExecutionCountAggregationGroup,
@@ -459,6 +461,57 @@ async def test_get_result(client: Client, env: WorkflowEnvironment):
     ):
         assert await activity_handle.result() == 2
         assert await result_via_execute_activity == 2
+
+
+async def test_start_activity_start_delay(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
+    system_info = await client.workflow_service.get_system_info(GetSystemInfoRequest())
+    try:
+        normalized_server_version = system_info.server_version.split("-", 1)[0].split(
+            "+", 1
+        )[0]
+        server_version = tuple(
+            int(part) for part in normalized_server_version.split(".")[:3]
+        )
+    except ValueError:
+        server_version = None
+    if server_version is not None and server_version <= (1, 31, 0):
+        pytest.skip(
+            "Temporal server 1.31.0 accepts but does not honor standalone activity start_delay"
+        )
+
+    activity_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+    start_delay = timedelta(seconds=2)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[increment],
+    ):
+        started_at = time.monotonic()
+        activity_handle = await client.start_activity(
+            increment,
+            args=(1,),
+            id=activity_id,
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=5),
+            start_delay=start_delay,
+        )
+
+        elapsed_after_start = time.monotonic() - started_at
+        if elapsed_after_start < start_delay.total_seconds() - 0.5:
+            desc = await activity_handle.describe()
+            assert desc.status == ActivityExecutionStatus.RUNNING
+            assert desc.run_state == PendingActivityState.SCHEDULED
+            assert desc.last_started_time is None
+
+        assert await activity_handle.result() == 2
+        assert time.monotonic() - started_at >= start_delay.total_seconds() - 0.5
 
 
 async def test_get_activity_handle(client: Client, env: WorkflowEnvironment):
