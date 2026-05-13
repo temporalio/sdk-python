@@ -3,6 +3,7 @@ from datetime import timedelta
 from typing import Any
 
 from strands.models import Model
+from strands.models.bedrock import BedrockModel
 from strands.types.content import Messages, SystemContentBlock
 from strands.types.streaming import StreamEvent
 from strands.types.tools import ToolChoice, ToolSpec
@@ -22,7 +23,8 @@ class TemporalModel(Model):
     """A Strands :class:`Model` that runs ``stream()`` as a Temporal activity.
 
     ``model_factory`` is called once on the worker (when the plugin is
-    constructed) to produce the real model used inside the activity.
+    constructed) to produce the real model used inside the activity. Defaults
+    to :class:`strands.models.bedrock.BedrockModel`, matching Strands' default.
     Construction of this :class:`TemporalModel` itself does no I/O, so it is
     safe to instantiate at module level — the lambda is just stored.
 
@@ -39,7 +41,7 @@ class TemporalModel(Model):
     def __init__(
         self,
         *,
-        model_factory: Callable[[], Model],
+        model_factory: Callable[[], Model] = BedrockModel,
         task_queue: str | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
