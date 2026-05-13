@@ -58,7 +58,7 @@ class GeminiApiCaller:
     def activities(self) -> Sequence[Callable]:
         """Return activities that route SDK calls through this client."""
 
-        @activity.defn(name="gemini_api_client_async_request")
+        @activity.defn
         async def gemini_api_client_async_request(
             req: _GeminiApiRequest,
         ) -> _GeminiApiResponse:
@@ -76,7 +76,7 @@ class GeminiApiCaller:
                 body=response.body or "",
             )
 
-        @activity.defn(name="gemini_api_client_async_request_streamed")
+        @activity.defn
         async def gemini_api_client_async_request_streamed(
             req: _GeminiApiRequest,
         ) -> _GeminiApiStreamedResponse:
@@ -97,7 +97,7 @@ class GeminiApiCaller:
                 )
             return _GeminiApiStreamedResponse(chunks=chunks)
 
-        @activity.defn(name="gemini_files_upload")
+        @activity.defn
         async def gemini_files_upload(
             req: _GeminiUploadFileRequest,
         ) -> types.File:
@@ -111,7 +111,7 @@ class GeminiApiCaller:
 
             return await self._client.aio.files.upload(file=file_arg, config=req.config)
 
-        @activity.defn(name="gemini_files_download")
+        @activity.defn
         async def gemini_files_download(
             req: _GeminiDownloadFileRequest,
         ) -> bytes:
@@ -120,7 +120,7 @@ class GeminiApiCaller:
                 file=req.file, config=req.config
             )
 
-        @activity.defn(name="gemini_files_register")
+        @activity.defn
         async def gemini_files_register(
             req: _GeminiRegisterFilesRequest,
         ) -> types.RegisterFilesResponse:
@@ -144,7 +144,7 @@ class GeminiApiCaller:
                 config=req.config,
             )
 
-        @activity.defn(name="gemini_file_search_stores_upload")
+        @activity.defn
         async def gemini_file_search_stores_upload(
             req: _GeminiUploadToFileSearchStoreRequest,
         ) -> types.UploadToFileSearchStoreOperation:

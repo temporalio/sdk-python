@@ -44,8 +44,10 @@ class TemporalAsyncFileSearchStores(AsyncFileSearchStores):
     ) -> None:
         """Initialize with activity config for upload timeouts."""
         super().__init__(api_client)
-        self._activity_config = activity_config or ActivityConfig(
-            start_to_close_timeout=timedelta(seconds=60),
+        self._activity_config = (
+            ActivityConfig(start_to_close_timeout=timedelta(seconds=60))
+            if activity_config is None
+            else activity_config
         )
 
     async def upload_to_file_search_store(
@@ -75,9 +77,15 @@ class TemporalAsyncFileSearchStores(AsyncFileSearchStores):
             _validate_http_options(upload_config.http_options)
 
         if isinstance(file, io.IOBase):
+            file_bytes = file.read()
+            if not isinstance(file_bytes, bytes):
+                raise TypeError(
+                    "file must be a binary stream when passing an io.IOBase; "
+                    f"file.read() must return bytes (got {type(file_bytes).__name__})"
+                )
             req = _GeminiUploadToFileSearchStoreRequest(
                 file_search_store_name=file_search_store_name,
-                file_bytes=file.read(),
+                file_bytes=file_bytes,
                 config=upload_config,
             )
         elif isinstance(file, str):

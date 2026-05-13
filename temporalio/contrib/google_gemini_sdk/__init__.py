@@ -5,8 +5,10 @@
     Use with caution in production environments.
 
 This integration lets you use the Gemini SDK's async client with full
-automatic function calling (AFC) support, where every API call and every
-tool invocation is a **durable Temporal activity**.
+automatic function calling (AFC) support. Every API call becomes a
+**durable Temporal activity**. Tools default to plain workflow methods
+that run deterministically in-workflow; wrap any ``@activity.defn`` with
+:func:`activity_as_tool` to run a tool as a durable activity instead.
 
 No credentials are fetched in the workflow, and no auth material appears in
 Temporal's event history.
@@ -20,14 +22,14 @@ Temporal's event history.
 
 Quickstart::
 
-    # ---- worker setup (outside sandbox) ----
+    # ---- worker setup (outside the Temporal Python Sandbox) ----
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     plugin = GeminiPlugin(client)
 
     @activity.defn
     async def get_weather(state: str) -> str: ...
 
-    # ---- workflow (sandbox-safe) ----
+    # ---- workflow (inside the Temporal Python Sandbox) ----
     @workflow.defn
     class AgentWorkflow:
         @workflow.run
@@ -40,7 +42,9 @@ Quickstart::
                     tools=[
                         activity_as_tool(
                             get_weather,
-                            start_to_close_timeout=timedelta(seconds=30),
+                            activity_config=ActivityConfig(
+                                start_to_close_timeout=timedelta(seconds=30),
+                            ),
                         ),
                     ],
                 ),

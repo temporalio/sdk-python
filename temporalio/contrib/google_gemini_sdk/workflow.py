@@ -79,10 +79,9 @@ def activity_as_tool(
 
     config: ActivityConfig = {
         **(
-            activity_config
-            or ActivityConfig(
-                start_to_close_timeout=timedelta(seconds=30),
-            )
+            ActivityConfig(start_to_close_timeout=timedelta(seconds=30))
+            if activity_config is None
+            else activity_config
         )
     }
     if "summary" not in config:

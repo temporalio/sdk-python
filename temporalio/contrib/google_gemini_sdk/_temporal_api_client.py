@@ -87,8 +87,10 @@ class TemporalApiClient(BaseApiClient):
         self.api_key: str | None = None
         self.custom_base_url: str | None = None
 
-        self._activity_config = activity_config or ActivityConfig(
-            start_to_close_timeout=__import__("datetime").timedelta(seconds=60),
+        self._activity_config = (
+            ActivityConfig(start_to_close_timeout=timedelta(seconds=60))
+            if activity_config is None
+            else activity_config
         )
 
     def _verify_response(self, response_model: Any) -> None:

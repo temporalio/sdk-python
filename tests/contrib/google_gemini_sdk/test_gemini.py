@@ -185,7 +185,7 @@ class GeminiApiCallTracker:
             )
         return self._mock_responses[idx]
 
-    @activity.defn(name="gemini_api_client_async_request")
+    @activity.defn
     async def gemini_api_client_async_request(
         self, req: _GeminiApiRequest
     ) -> _GeminiApiResponse:
@@ -194,7 +194,7 @@ class GeminiApiCallTracker:
             body=self._next_response(req),
         )
 
-    @activity.defn(name="gemini_api_client_async_request_streamed")
+    @activity.defn
     async def gemini_api_client_async_request_streamed(
         self, req: _GeminiApiRequest
     ) -> _GeminiApiStreamedResponse:
@@ -219,7 +219,7 @@ class GeminiApiCallTracker:
             )
         return _GeminiApiStreamedResponse(chunks=chunks)
 
-    @activity.defn(name="gemini_files_upload")
+    @activity.defn
     async def gemini_files_upload(self, req: _GeminiUploadFileRequest) -> types.File:
         self.file_upload_requests.append(req)
         return types.File(
@@ -228,12 +228,12 @@ class GeminiApiCallTracker:
             size_bytes=len(req.file_bytes) if req.file_bytes else 0,
         )
 
-    @activity.defn(name="gemini_files_download")
+    @activity.defn
     async def gemini_files_download(self, req: _GeminiDownloadFileRequest) -> bytes:
         self.file_download_requests.append(req)
         return b"fake file content"
 
-    @activity.defn(name="gemini_file_search_stores_upload")
+    @activity.defn
     async def gemini_file_search_stores_upload(
         self, req: _GeminiUploadToFileSearchStoreRequest
     ) -> types.UploadToFileSearchStoreOperation:
@@ -1299,3 +1299,29 @@ def test_gemini_client_vertexai_config():
     assert result._api_client.vertexai is True
     assert result._api_client.project == "proj"
     assert result._api_client.location == "us-central1"
+
+
+# ===========================================================================
+# Unit tests for io.IOBase text-stream rejection
+# ===========================================================================
+
+
+async def test_file_upload_text_stream_raises():
+    """TemporalAsyncFiles.upload rejects text streams with a clear TypeError."""
+    files = TemporalAsyncFiles(TemporalApiClient())
+    with pytest.raises(
+        TypeError, match="file must be a binary stream when passing an io.IOBase"
+    ):
+        await files.upload(file=io.StringIO("text"))
+
+
+async def test_file_search_store_upload_text_stream_raises():
+    """TemporalAsyncFileSearchStores.upload_to_file_search_store rejects text streams."""
+    stores = TemporalAsyncFileSearchStores(TemporalApiClient())
+    with pytest.raises(
+        TypeError, match="file must be a binary stream when passing an io.IOBase"
+    ):
+        await stores.upload_to_file_search_store(
+            file_search_store_name="fileSearchStores/x",
+            file=io.StringIO("text"),
+        )
