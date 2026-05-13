@@ -1359,6 +1359,7 @@ class WorkflowToolWorkflow:
         agent: Agent = Agent(
             name="Assistant",
             instructions="You are a helpful assistant.",
+            model="gpt-4o",
             tools=[function_tool(self.run_tool)],
         )
         await Runner.run(
