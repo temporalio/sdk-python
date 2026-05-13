@@ -7,7 +7,7 @@ from strands.types.streaming import StreamEvent
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin, TemporalModel
+from temporalio.contrib.strands import StrandsPlugin
 from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
@@ -18,12 +18,7 @@ from tests.contrib.strands.mock_model import MockModel
 class StreamingModelWorkflow:
     def __init__(self) -> None:
         self.stream = WorkflowStream()
-        self.agent = Agent(
-            model=TemporalModel(
-                start_to_close_timeout=timedelta(seconds=15),
-                streaming_topic="events",
-            ),
-        )
+        self.agent = Agent()
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -33,7 +28,11 @@ class StreamingModelWorkflow:
 
 async def test_model_streaming(client: Client):
     task_queue = "test_model_streaming"
-    plugin = StrandsPlugin(model=MockModel(["Done!"]))
+    plugin = StrandsPlugin(
+        model=MockModel(["Done!"]),
+        start_to_close_timeout=timedelta(seconds=15),
+        streaming_topic="events",
+    )
     workflow_id = f"test_model_streaming_{uuid4()}"
 
     async with Worker(
@@ -70,8 +69,6 @@ async def test_model_streaming(client: Client):
     history = await handle.fetch_history()
     assert get_activities(history) == ["invoke_strands_model_streaming"]
 
-    # The "Done!" response from MockModel produces four StreamEvents:
-    # messageStart, contentBlockDelta(text), contentBlockStop, messageStop.
     assert any("messageStart" in e for e in events)
     assert any("messageStop" in e for e in events)
 

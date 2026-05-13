@@ -25,22 +25,7 @@ async def current_time_activity() -> str:
 @workflow.defn
 class ToolWorkflow:
     def __init__(self) -> None:
-        model = MockModel(
-            [
-                {"name": "current_time", "input": {}},
-                {
-                    "name": "calculator",
-                    "input": {"expression": "3111696 / 74088"},
-                },
-                {
-                    "name": "letter_counter",
-                    "input": {"word": "strawberry", "letter": "R"},
-                },
-                "Done!",
-            ]
-        )
         self.agent = Agent(
-            model=model,
             tools=[
                 calculator,
                 activity_as_tool(
@@ -59,7 +44,23 @@ class ToolWorkflow:
 
 async def test_tool(client: Client):
     task_queue = "test_tool"
-    plugin = StrandsPlugin()
+    plugin = StrandsPlugin(
+        model=MockModel(
+            [
+                {"name": "current_time", "input": {}},
+                {
+                    "name": "calculator",
+                    "input": {"expression": "3111696 / 74088"},
+                },
+                {
+                    "name": "letter_counter",
+                    "input": {"word": "strawberry", "letter": "R"},
+                },
+                "Done!",
+            ]
+        ),
+        start_to_close_timeout=timedelta(seconds=15),
+    )
 
     async with Worker(
         client,
@@ -80,7 +81,15 @@ async def test_tool(client: Client):
         assert await handle.result() == "Done!\n"
 
     history = await handle.fetch_history()
-    assert get_activities(history) == ["current_time"]
+    assert get_activities(history) == [
+        "invoke_strands_model",
+        "current_time",
+        "invoke_strands_model",
+        # calculator (in-workflow)
+        "invoke_strands_model",
+        # letter_counter (in-workflow)
+        "invoke_strands_model",
+    ]
 
     await Replayer(
         workflows=[ToolWorkflow],
