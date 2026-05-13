@@ -149,14 +149,23 @@ from strands_tools import current_time
 @activity.defn
 async def fetch_user(user_id: str) -> dict:
     ...
-    
+
 @activity.defn(name="current_time")
 async def current_time_activity() -> str:
     return current_time.current_time()
 
+# workflow
 agent = Agent(tools=[
     activity_as_tool(fetch_user, start_to_close_timeout=timedelta(seconds=30)),
+    activity_as_tool(current_time_activity, start_to_close_timeout=timedelta(seconds=15)),
 ])
+
+# worker
+Worker(
+    ...,
+    activities=[fetch_user, current_time_activity],
+    plugins=[StrandsPlugin(model=MODEL)],
+)
 ```
 
 ## MCP
