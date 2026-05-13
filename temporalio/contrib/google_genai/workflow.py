@@ -3,7 +3,7 @@
 This module provides utilities for using the Google Gemini SDK within Temporal
 workflows.  The key entry points are:
 
-- :func:`gemini_client` — returns an ``AsyncClient`` backed by a
+- :func:`google_genai_client` — returns an ``AsyncClient`` backed by a
   ``TemporalApiClient`` that routes all API calls through Temporal activities.
 - :func:`activity_as_tool` — converts a Temporal activity into a Gemini tool
   callable for use with automatic function calling (AFC).
@@ -126,7 +126,7 @@ def activity_as_tool(
     return wrapper
 
 
-def gemini_client(
+def google_genai_client(
     *,
     vertexai: bool = False,
     project: str | None = None,
@@ -153,7 +153,7 @@ def gemini_client(
         class MyWorkflow:
             @workflow.run
             async def run(self, query: str) -> str:
-                client = gemini_client()
+                client = google_genai_client()
                 response = await client.models.generate_content(
                     model="gemini-2.0-flash",
                     contents=query,

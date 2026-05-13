@@ -199,7 +199,7 @@ class TemporalApiClient(BaseApiClient):
         """Raise — sync requests not supported in workflows."""
         raise RuntimeError(
             "Synchronous requests are not supported in Temporal workflows. "
-            "Use the AsyncClient returned by gemini_client() instead."
+            "Use the AsyncClient returned by google_genai_client() instead."
         )
 
     def request_streamed(
@@ -212,7 +212,7 @@ class TemporalApiClient(BaseApiClient):
         """Raise — sync streaming not supported in workflows."""
         raise RuntimeError(
             "Synchronous streaming is not supported in Temporal workflows. "
-            "Use the AsyncClient returned by gemini_client() instead."
+            "Use the AsyncClient returned by google_genai_client() instead."
         )
 
     async def async_request_streamed(

@@ -15,7 +15,7 @@ Temporal's event history.
 
 - :class:`GeminiPlugin` — registers the ``gemini_api_client_async_request``
   activity using a caller-provided ``genai.Client`` on the worker side.
-- :func:`gemini_client` — call from a workflow to get an ``AsyncClient``
+- :func:`google_genai_client` — call from a workflow to get an ``AsyncClient``
   that routes API calls through activities.
 - :func:`activity_as_tool` — convert any ``@activity.defn`` function into a
   Gemini tool callable; Gemini's AFC invokes it as a Temporal activity.
@@ -34,7 +34,7 @@ Quickstart::
     class AgentWorkflow:
         @workflow.run
         async def run(self, query: str) -> str:
-            client = gemini_client()
+            client = google_genai_client()
             response = await client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=query,
@@ -57,11 +57,11 @@ from __future__ import annotations
 from temporalio.contrib.google_genai._gemini_plugin import GeminiPlugin
 from temporalio.contrib.google_genai.workflow import (
     activity_as_tool,
-    gemini_client,
+    google_genai_client,
 )
 
 __all__ = [
     "GeminiPlugin",
     "activity_as_tool",
-    "gemini_client",
+    "google_genai_client",
 ]

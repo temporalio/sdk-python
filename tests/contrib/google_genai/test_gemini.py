@@ -14,7 +14,7 @@ Tests cover:
 - TemporalAsyncClient wiring (files, file_search_stores)
 - TemporalApiClient edge cases (sync raises)
 - activity_as_tool validation and metadata preservation
-- gemini_client configuration
+- google_genai_client configuration
 """
 
 import inspect
@@ -36,7 +36,7 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib.google_genai import (
     GeminiPlugin,
     activity_as_tool,
-    gemini_client,
+    google_genai_client,
 )
 from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
@@ -288,7 +288,7 @@ class SimpleGenerateWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -302,7 +302,7 @@ class SingleArgToolWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -326,7 +326,7 @@ class MultiArgToolWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -350,7 +350,7 @@ class ToolFailureWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -375,7 +375,7 @@ class MultipleToolsWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -408,7 +408,7 @@ class WorkflowMethodToolWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -434,7 +434,7 @@ class StreamedGenerateWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> list[str]:
-        client = gemini_client()
+        client = google_genai_client()
         chunks: list[str] = []
         async for chunk in await client.models.generate_content_stream(
             model="gemini-2.5-flash",
@@ -451,7 +451,7 @@ class HttpOptionsWorkflow:
 
     @workflow.run
     async def run(self, prompt: str, http_options: types.HttpOptionsDict) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -473,7 +473,7 @@ class FullIntegrationWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> dict[str, Any]:
-        client = gemini_client()
+        client = google_genai_client()
         results: dict[str, Any] = {}
 
         # 1. generate_content (async_request activity)
@@ -544,7 +544,7 @@ class FileUploadStrWorkflow:
 
     @workflow.run
     async def run(self, file_path: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         uploaded = await client.files.upload(
             file=file_path,
             config=types.UploadFileConfig(
@@ -561,7 +561,7 @@ class FileUploadBytesWorkflow:
 
     @workflow.run
     async def run(self, data: bytes) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         uploaded = await client.files.upload(
             file=io.BytesIO(data),
             config=types.UploadFileConfig(
@@ -578,7 +578,7 @@ class FileDownloadWorkflow:
 
     @workflow.run
     async def run(self, file_name: str) -> bytes:
-        client = gemini_client()
+        client = google_genai_client()
         return await client.files.download(file=file_name)
 
 
@@ -588,7 +588,7 @@ class FileSearchStoreUploadWorkflow:
 
     @workflow.run
     async def run(self, store_name: str, file_path: str) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         op = await client.file_search_stores.upload_to_file_search_store(
             file_search_store_name=store_name,
             file=file_path,
@@ -606,7 +606,7 @@ class RegisterFilesWorkflow:
 
     @workflow.run
     async def run(self, uris: list[str]) -> str:
-        client = gemini_client()
+        client = google_genai_client()
         # auth arg is ignored by TemporalAsyncFiles — the activity uses
         # credentials from GeminiPlugin init.  We pass a dummy here;
         # can't import google.auth.credentials in the sandbox so we
@@ -624,7 +624,7 @@ class ChatWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> list[str]:
-        client = gemini_client()
+        client = google_genai_client()
         chat = client.chats.create(
             model="gemini-2.5-flash",
         )
@@ -1194,15 +1194,15 @@ async def test_register_files_without_credentials_fails(client: Client):
 
 
 def test_temporal_async_client_has_temporal_files():
-    """gemini_client() returns a client with TemporalAsyncFiles."""
-    client = gemini_client()
+    """google_genai_client() returns a client with TemporalAsyncFiles."""
+    client = google_genai_client()
     assert isinstance(client, TemporalAsyncClient)
     assert isinstance(client.files, TemporalAsyncFiles)
 
 
 def test_temporal_async_client_has_temporal_file_search_stores():
-    """gemini_client() returns a client with TemporalAsyncFileSearchStores."""
-    client = gemini_client()
+    """google_genai_client() returns a client with TemporalAsyncFileSearchStores."""
+    client = google_genai_client()
     assert isinstance(client.file_search_stores, TemporalAsyncFileSearchStores)
 
 
@@ -1289,13 +1289,13 @@ def test_activity_as_tool_is_async_callable():
 
 
 # ===========================================================================
-# Unit tests for gemini_client
+# Unit tests for google_genai_client
 # ===========================================================================
 
 
-def test_gemini_client_vertexai_config():
-    """gemini_client() forwards Vertex AI configuration to the TemporalApiClient."""
-    result = gemini_client(vertexai=True, project="proj", location="us-central1")
+def test_google_genai_client_vertexai_config():
+    """google_genai_client() forwards Vertex AI configuration to the TemporalApiClient."""
+    result = google_genai_client(vertexai=True, project="proj", location="us-central1")
     assert result._api_client.vertexai is True
     assert result._api_client.project == "proj"
     assert result._api_client.location == "us-central1"
