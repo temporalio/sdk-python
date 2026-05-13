@@ -27,7 +27,7 @@ class _SerializableHttpOptions(BaseModel):
     """Per-request HTTP options that can be serialized across the activity boundary.
 
     Non-serializable fields (httpx_client, httpx_async_client, aiohttp_client,
-    client_args, async_client_args) must be configured at GeminiPlugin init.
+    client_args, async_client_args) must be configured at GoogleGenAIPlugin init.
 
     ``timeout`` is excluded because Temporal owns timeouts/retries — configure
     via ``ActivityConfig`` instead.

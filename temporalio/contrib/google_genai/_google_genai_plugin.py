@@ -25,7 +25,7 @@ def _data_converter(converter: DataConverter | None) -> DataConverter:
     return converter
 
 
-class GeminiPlugin(SimplePlugin):
+class GoogleGenAIPlugin(SimplePlugin):
     """A Temporal Worker Plugin configured for the Google Gemini SDK.
 
     .. warning::
@@ -44,20 +44,20 @@ class GeminiPlugin(SimplePlugin):
     Example (Gemini Developer API)::
 
         client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-        plugin = GeminiPlugin(client)
+        plugin = GoogleGenAIPlugin(client)
 
     Example (Vertex AI)::
 
         client = genai.Client(
             vertexai=True, project="my-project", location="us-central1",
         )
-        plugin = GeminiPlugin(client)
+        plugin = GoogleGenAIPlugin(client)
 
     Example (with separate GCS credentials for file registration)::
 
         client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
         gcs_creds, _ = google.auth.default()
-        plugin = GeminiPlugin(client, extra_credentials=gcs_creds)
+        plugin = GoogleGenAIPlugin(client, extra_credentials=gcs_creds)
     """
 
     def __init__(
@@ -80,7 +80,7 @@ class GeminiPlugin(SimplePlugin):
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
-                raise ValueError("No WorkflowRunner provided to GeminiPlugin.")
+                raise ValueError("No WorkflowRunner provided to GoogleGenAIPlugin.")
             if isinstance(runner, SandboxedWorkflowRunner):
                 return dataclasses.replace(
                     runner,
@@ -91,7 +91,7 @@ class GeminiPlugin(SimplePlugin):
             return runner
 
         super().__init__(
-            name="GeminiPlugin",
+            name="GoogleGenAIPlugin",
             data_converter=_data_converter,
             activities=self._api_caller.activities(),
             workflow_runner=workflow_runner,

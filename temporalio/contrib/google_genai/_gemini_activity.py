@@ -135,7 +135,7 @@ class GeminiApiCaller:
             if auth is None:
                 raise ValueError(
                     "No credentials available for register_files(). "
-                    "Pass extra_credentials to GeminiPlugin or initialize "
+                    "Pass extra_credentials to GoogleGenAIPlugin or initialize "
                     "the genai.Client with credentials."
                 )
             return await self._client.aio.files.register_files(

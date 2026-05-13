@@ -13,7 +13,7 @@ that run deterministically in-workflow; wrap any ``@activity.defn`` with
 No credentials are fetched in the workflow, and no auth material appears in
 Temporal's event history.
 
-- :class:`GeminiPlugin` — registers the ``gemini_api_client_async_request``
+- :class:`GoogleGenAIPlugin` — registers the ``gemini_api_client_async_request``
   activity using a caller-provided ``genai.Client`` on the worker side.
 - :func:`google_genai_client` — call from a workflow to get an ``AsyncClient``
   that routes API calls through activities.
@@ -24,7 +24,7 @@ Quickstart::
 
     # ---- worker setup (outside the Temporal Python Sandbox) ----
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-    plugin = GeminiPlugin(client)
+    plugin = GoogleGenAIPlugin(client)
 
     @activity.defn
     async def get_weather(state: str) -> str: ...
@@ -54,14 +54,14 @@ Quickstart::
 
 from __future__ import annotations
 
-from temporalio.contrib.google_genai._gemini_plugin import GeminiPlugin
+from temporalio.contrib.google_genai._google_genai_plugin import GoogleGenAIPlugin
 from temporalio.contrib.google_genai.workflow import (
     activity_as_tool,
     google_genai_client,
 )
 
 __all__ = [
-    "GeminiPlugin",
+    "GoogleGenAIPlugin",
     "activity_as_tool",
     "google_genai_client",
 ]

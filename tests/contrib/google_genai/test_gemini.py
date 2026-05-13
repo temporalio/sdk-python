@@ -34,7 +34,7 @@ from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
 from temporalio.contrib.google_genai import (
-    GeminiPlugin,
+    GoogleGenAIPlugin,
     activity_as_tool,
     google_genai_client,
 )
@@ -158,7 +158,7 @@ class GeminiApiCallTracker:
     For streamed requests, the mock response is split into per-line chunks
     to simulate multiple streamed chunks.
 
-    The real ``GeminiPlugin`` is still used for its data converter, sandbox
+    The real ``GoogleGenAIPlugin`` is still used for its data converter, sandbox
     passthrough, and workflow runner configuration — only its activity
     registration is suppressed so this tracker can take its place.
     """
@@ -246,7 +246,7 @@ class GeminiApiCallTracker:
 def apply_plugin(
     client: Client, mock_responses: list[str]
 ) -> tuple[Client, GeminiApiCallTracker]:
-    """Create a real GeminiPlugin whose activities include a tracking fake.
+    """Create a real GoogleGenAIPlugin whose activities include a tracking fake.
 
     Monkey-patches ``GeminiApiCaller.activities`` so that when the plugin
     constructs itself, it registers our tracking activity instead of
@@ -268,7 +268,7 @@ def apply_plugin(
     ]
     try:
         gemini = GeminiClient(api_key="fake-test-key")
-        plugin = GeminiPlugin(gemini)
+        plugin = GoogleGenAIPlugin(gemini)
     finally:
         GeminiApiCaller.activities = original_activities  # type: ignore[method-assign]
 
@@ -466,7 +466,7 @@ class HttpOptionsWorkflow:
 class FullIntegrationWorkflow:
     """Exercises every activity path in a single workflow run.
 
-    Uses the real GeminiPlugin activities (not the tracker), so this
+    Uses the real GoogleGenAIPlugin activities (not the tracker), so this
     tests the actual activity implementations end-to-end with a mocked
     genai.Client.
     """
@@ -608,7 +608,7 @@ class RegisterFilesWorkflow:
     async def run(self, uris: list[str]) -> str:
         client = google_genai_client()
         # auth arg is ignored by TemporalAsyncFiles — the activity uses
-        # credentials from GeminiPlugin init.  We pass a dummy here;
+        # credentials from GoogleGenAIPlugin init.  We pass a dummy here;
         # can't import google.auth.credentials in the sandbox so we
         # use a sentinel that satisfies the type at runtime.
         resp = await client.files.register_files(
@@ -1059,7 +1059,7 @@ async def test_chat_multi_turn(client: Client):
 
 
 def _apply_plugin_with_mock_client(client: Client, mock_responses: list[str]) -> Client:
-    """Create a real GeminiPlugin with real activities but a mocked client.
+    """Create a real GoogleGenAIPlugin with real activities but a mocked client.
 
     Unlike ``apply_plugin``, this does NOT replace the activities.  The
     real ``GeminiApiCaller.activities()`` are registered, exercising the
@@ -1119,7 +1119,7 @@ def _apply_plugin_with_mock_client(client: Client, mock_responses: list[str]) ->
         )
     )
 
-    plugin = GeminiPlugin(gemini)
+    plugin = GoogleGenAIPlugin(gemini)
     config = client.config()
     config["plugins"] = [plugin]
     return Client(**config)

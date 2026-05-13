@@ -165,7 +165,7 @@ def google_genai_client(
 
     Args:
         vertexai: Whether to use Vertex AI API endpoints.  Must match the
-            ``GeminiPlugin`` configuration on the worker side.  Defaults to
+            ``GoogleGenAIPlugin`` configuration on the worker side.  Defaults to
             ``False`` (Gemini Developer API).
         project: Google Cloud project ID.  Only needed when ``vertexai=True``
             and the SDK's request formatting requires it (e.g., cache

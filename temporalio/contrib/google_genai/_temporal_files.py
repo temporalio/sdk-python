@@ -144,7 +144,7 @@ class TemporalAsyncFiles(AsyncFiles):
 
         .. note::
             The ``auth`` parameter is **ignored**.  The activity uses
-            ``credentials`` if provided to ``GeminiPlugin``,
+            ``credentials`` if provided to ``GoogleGenAIPlugin``,
             otherwise falls back to the ``genai.Client``'s own credentials.
             Either way, those credentials must have access to the GCS URIs
             being registered.

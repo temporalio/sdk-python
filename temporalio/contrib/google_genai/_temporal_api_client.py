@@ -54,7 +54,7 @@ def _validate_http_options(http_options: HttpOptions | None) -> None:
     if bad_fields:
         raise ValueError(
             f"http_options cannot include {bad_fields}. "
-            f"Configure custom HTTP clients at GeminiPlugin init instead."
+            f"Configure custom HTTP clients at GoogleGenAIPlugin init instead."
         )
 
 
