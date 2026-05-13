@@ -683,6 +683,7 @@ impl WorkerRef {
     }
 
     fn initiate_shutdown(&self) -> PyResult<()> {
+        enter_sync!(self.runtime);
         let worker = self.worker.as_ref().unwrap().clone();
         worker.initiate_shutdown();
         Ok(())
