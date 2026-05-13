@@ -33,12 +33,12 @@ from google.genai.types import HttpResponse as SdkHttpResponse
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
-from temporalio.contrib.google_gemini_sdk import (
+from temporalio.contrib.google_genai import (
     GeminiPlugin,
     activity_as_tool,
     gemini_client,
 )
-from temporalio.contrib.google_gemini_sdk._models import (
+from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
     _GeminiApiStreamedResponse,
@@ -46,16 +46,16 @@ from temporalio.contrib.google_gemini_sdk._models import (
     _GeminiUploadFileRequest,
     _GeminiUploadToFileSearchStoreRequest,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_api_client import (
+from temporalio.contrib.google_genai._temporal_api_client import (
     TemporalApiClient,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_async_client import (
+from temporalio.contrib.google_genai._temporal_async_client import (
     TemporalAsyncClient,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_file_search_stores import (
+from temporalio.contrib.google_genai._temporal_file_search_stores import (
     TemporalAsyncFileSearchStores,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_files import (
+from temporalio.contrib.google_genai._temporal_files import (
     TemporalAsyncFiles,
 )
 from temporalio.exceptions import ApplicationError
@@ -255,7 +255,7 @@ def apply_plugin(
 
     Returns the configured Temporal client and the tracker.
     """
-    from temporalio.contrib.google_gemini_sdk._gemini_activity import GeminiApiCaller
+    from temporalio.contrib.google_genai._gemini_activity import GeminiApiCaller
 
     tracker = GeminiApiCallTracker(mock_responses)
     original_activities = GeminiApiCaller.activities

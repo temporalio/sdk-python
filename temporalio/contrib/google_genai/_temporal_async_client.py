@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from google.genai.client import AsyncClient
 
-from temporalio.contrib.google_gemini_sdk._temporal_api_client import (
+from temporalio.contrib.google_genai._temporal_api_client import (
     TemporalApiClient,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_file_search_stores import (
+from temporalio.contrib.google_genai._temporal_file_search_stores import (
     TemporalAsyncFileSearchStores,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_files import (
+from temporalio.contrib.google_genai._temporal_files import (
     TemporalAsyncFiles,
 )
 from temporalio.workflow import ActivityConfig

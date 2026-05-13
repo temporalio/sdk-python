@@ -16,10 +16,10 @@ from google.genai import types
 from google.genai.file_search_stores import AsyncFileSearchStores
 
 from temporalio import workflow as temporal_workflow
-from temporalio.contrib.google_gemini_sdk._models import (
+from temporalio.contrib.google_genai._models import (
     _GeminiUploadToFileSearchStoreRequest,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_api_client import (
+from temporalio.contrib.google_genai._temporal_api_client import (
     TemporalApiClient,
     _validate_http_options,
 )

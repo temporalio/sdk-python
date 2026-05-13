@@ -19,12 +19,12 @@ from google.genai import types
 from google.genai.files import AsyncFiles
 
 from temporalio import workflow as temporal_workflow
-from temporalio.contrib.google_gemini_sdk._models import (
+from temporalio.contrib.google_genai._models import (
     _GeminiDownloadFileRequest,
     _GeminiRegisterFilesRequest,
     _GeminiUploadFileRequest,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_api_client import (
+from temporalio.contrib.google_genai._temporal_api_client import (
     TemporalApiClient,
     _validate_http_options,
 )

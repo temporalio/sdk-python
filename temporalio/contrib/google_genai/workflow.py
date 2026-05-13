@@ -21,10 +21,10 @@ from google.genai.client import AsyncClient
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
-from temporalio.contrib.google_gemini_sdk._temporal_api_client import (
+from temporalio.contrib.google_genai._temporal_api_client import (
     TemporalApiClient,
 )
-from temporalio.contrib.google_gemini_sdk._temporal_async_client import (
+from temporalio.contrib.google_genai._temporal_async_client import (
     TemporalAsyncClient,
 )
 from temporalio.exceptions import ApplicationError

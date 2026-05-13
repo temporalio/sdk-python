@@ -54,8 +54,8 @@ Quickstart::
 
 from __future__ import annotations
 
-from temporalio.contrib.google_gemini_sdk._gemini_plugin import GeminiPlugin
-from temporalio.contrib.google_gemini_sdk.workflow import (
+from temporalio.contrib.google_genai._gemini_plugin import GeminiPlugin
+from temporalio.contrib.google_genai.workflow import (
     activity_as_tool,
     gemini_client,
 )

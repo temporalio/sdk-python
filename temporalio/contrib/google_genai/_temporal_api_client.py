@@ -22,7 +22,7 @@ from google.genai.types import HttpOptions, HttpOptionsOrDict
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio import workflow as temporal_workflow
-from temporalio.contrib.google_gemini_sdk._models import (
+from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
     _GeminiApiStreamedResponse,

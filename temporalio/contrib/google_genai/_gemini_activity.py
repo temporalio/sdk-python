@@ -18,7 +18,7 @@ from google.genai.types import HttpOptions
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio import activity
-from temporalio.contrib.google_gemini_sdk._models import (
+from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
     _GeminiApiStreamedResponse,

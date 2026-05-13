@@ -7,7 +7,7 @@ import dataclasses
 import google.auth.credentials
 from google.genai import Client as GeminiClient
 
-from temporalio.contrib.google_gemini_sdk._gemini_activity import GeminiApiCaller
+from temporalio.contrib.google_genai._gemini_activity import GeminiApiCaller
 from temporalio.contrib.pydantic import PydanticPayloadConverter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
@@ -34,7 +34,7 @@ class GeminiPlugin(SimplePlugin):
 
     This plugin registers the ``gemini_api_client_async_request`` activity
     using the provided ``genai.Client`` with real credentials.  Workflows use
-    :func:`~temporalio.contrib.google_gemini_sdk.workflow.gemini_client` to
+    :func:`~temporalio.contrib.google_genai.workflow.gemini_client` to
     get an ``AsyncClient`` backed by a ``TemporalApiClient`` that routes all
     API calls through this activity.
 
