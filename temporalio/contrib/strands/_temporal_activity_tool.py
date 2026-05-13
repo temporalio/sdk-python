@@ -10,7 +10,7 @@ from strands.types.tools import AgentTool, ToolGenerator, ToolResult, ToolSpec, 
 from temporalio import activity, workflow
 
 
-class _TemporalActivityTool(AgentTool):
+class TemporalActivityTool(AgentTool):
     """Strands ``AgentTool`` whose body dispatches a Temporal activity."""
 
     def __init__(self, activity_fn: Callable, options: dict[str, Any]) -> None:

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -28,7 +26,7 @@ class _StreamingInvokeModelInput(_InvokeModelInput):
     streaming_batch_interval_seconds: float = 0.1
 
 
-class _ModelActivity:
+class ModelActivity:
     """Holds the user-supplied model and exposes the model activities."""
 
     def __init__(self, model: Model) -> None:

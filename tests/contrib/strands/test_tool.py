@@ -6,7 +6,7 @@ from strands_tools import calculator, current_time
 
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin, activity_as_tool
+from temporalio.contrib.strands import StrandsPlugin, TemporalModel, activity_as_tool
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
@@ -22,10 +22,24 @@ async def current_time_activity() -> str:
     return current_time.current_time()
 
 
+MODEL = TemporalModel(
+    model_factory=lambda: MockModel(
+        [
+            {"name": "current_time", "input": {}},
+            {"name": "calculator", "input": {"expression": "3111696 / 74088"}},
+            {"name": "letter_counter", "input": {"word": "strawberry", "letter": "R"}},
+            "Done!",
+        ]
+    ),
+    start_to_close_timeout=timedelta(seconds=15),
+)
+
+
 @workflow.defn
 class ToolWorkflow:
     def __init__(self) -> None:
         self.agent = Agent(
+            model=MODEL,
             tools=[
                 calculator,
                 activity_as_tool(
@@ -44,23 +58,7 @@ class ToolWorkflow:
 
 async def test_tool(client: Client):
     task_queue = "test_tool"
-    plugin = StrandsPlugin(
-        model=MockModel(
-            [
-                {"name": "current_time", "input": {}},
-                {
-                    "name": "calculator",
-                    "input": {"expression": "3111696 / 74088"},
-                },
-                {
-                    "name": "letter_counter",
-                    "input": {"word": "strawberry", "letter": "R"},
-                },
-                "Done!",
-            ]
-        ),
-        start_to_close_timeout=timedelta(seconds=15),
-    )
+    plugin = StrandsPlugin(model=MODEL)
 
     async with Worker(
         client,
