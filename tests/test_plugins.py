@@ -6,8 +6,8 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import cast
 
 import pytest
-
 import temporalio.bridge.temporal_sdk_bridge
+
 import temporalio.client
 import temporalio.converter
 import temporalio.worker
@@ -463,9 +463,9 @@ async def test_simple_plugin_worker_interceptor_only_used_on_worker(
 
     # The interceptor should NOT have been used for client interception
     # since the plugin was not added to the client
-    assert (
-        not interceptor.client_intercepted
-    ), "Client interceptor should not have been used"
+    assert not interceptor.client_intercepted, (
+        "Client interceptor should not have been used"
+    )
 
     # The interceptor SHOULD have been used for worker interception
     # even though it was specified in interceptors
@@ -527,9 +527,9 @@ async def test_simple_plugin_interceptor_duplication_when_used_on_client_and_wor
         assert result == "Hello, test!"
 
         # The workflow interceptor should only be called ONCE, not twice
-        assert (
-            interceptor.call_count["execute_workflow"] == 1
-        ), f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+        assert interceptor.call_count["execute_workflow"] == 1, (
+            f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+        )
 
 
 async def test_simple_plugin_no_duplication_when_interceptor_in_both_client_and_worker_params(
@@ -571,9 +571,9 @@ async def test_simple_plugin_no_duplication_when_interceptor_in_both_client_and_
         assert result == "Hello, test!"
 
         # The workflow interceptor should only be called ONCE, not twice
-        assert (
-            interceptor.call_count["execute_workflow"] == 1
-        ), f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+        assert interceptor.call_count["execute_workflow"] == 1, (
+            f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+        )
 
 
 async def test_simple_plugin_no_duplication_in_interceptor_chain(
@@ -612,6 +612,6 @@ async def test_simple_plugin_no_duplication_in_interceptor_chain(
         assert result == "Hello, test!"
 
         # The workflow interceptor should only be called ONCE, not twice
-        assert (
-            interceptor.call_count["execute_workflow"] == 1
-        ), f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in the chain."
+        assert interceptor.call_count["execute_workflow"] == 1, (
+            f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in the chain."
+        )
