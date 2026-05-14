@@ -18,7 +18,11 @@ from typing import Any, ClassVar, TypeVar
 from typing_extensions import Self
 
 from temporalio.api.common.v1 import Payload, Payloads
-from temporalio.converter._payload_converter import JSONPlainPayloadConverter
+from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
+from temporalio.converter._payload_converter import (
+    JSONPlainPayloadConverter,
+    JSONProtoPayloadConverter,
+)
 
 _T = TypeVar("_T")
 
@@ -225,6 +229,11 @@ class StorageWarning(RuntimeWarning):
 
 @dataclass(frozen=True)
 class _StorageReference:
+    """Legacy external storage reference used only on the retrieval path as a
+    fallback for in-flight workflows that were written before the
+    ExternalStorageReference proto was introduced.
+    """
+
     driver_name: str
     driver_claim: StorageDriverClaim
 
@@ -278,8 +287,9 @@ class ExternalStorage:
     )
     """Store context bound to this instance via :meth:`_with_store_context`."""
 
-    _claim_converter: ClassVar[JSONPlainPayloadConverter] = JSONPlainPayloadConverter(
-        encoding=_REFERENCE_ENCODING.decode()
+    _claim_converter: ClassVar[JSONProtoPayloadConverter] = JSONProtoPayloadConverter()
+    _legacy_claim_converter: ClassVar[JSONPlainPayloadConverter] = (
+        JSONPlainPayloadConverter(encoding=_REFERENCE_ENCODING.decode())
     )
 
     def __post_init__(self) -> None:
@@ -357,9 +367,9 @@ class ExternalStorage:
         self._validate_claim_length(claims, expected=1, driver=driver)
 
         external_size = payload.ByteSize()
-        reference = _StorageReference(
+        reference = ExternalStorageReference(
             driver_name=driver.name(),
-            driver_claim=claims[0],
+            claim_data=claims[0].claim_data,
         )
         reference_payload = self._claim_converter.to_payload(reference)
         if reference_payload is None:
@@ -421,9 +431,9 @@ class ExternalStorage:
             self._validate_claim_length(claims, expected=len(indices), driver=driver)
 
             for i, claim in enumerate(claims):
-                reference = _StorageReference(
+                reference = ExternalStorageReference(
                     driver_name=driver.name(),
-                    driver_claim=claim,
+                    claim_data=claim.claim_data,
                 )
                 reference_payload = self._claim_converter.to_payload(reference)
                 if reference_payload is None:
@@ -443,20 +453,35 @@ class ExternalStorage:
 
         return results
 
-    async def _retrieve_payload(self, payload: Payload) -> Payload:
+    def _decode_reference(self, payload: Payload) -> ExternalStorageReference | None:
+        """Decode an external storage reference from a payload."""
         if len(payload.external_payloads) == 0:
+            return None
+        encoding = payload.metadata.get("encoding", b"")
+        if encoding == _REFERENCE_ENCODING:
+            legacy = self._legacy_claim_converter.from_payload(
+                payload, _StorageReference
+            )
+            if not isinstance(legacy, _StorageReference):
+                return None
+            return ExternalStorageReference(
+                driver_name=legacy.driver_name,
+                claim_data=legacy.driver_claim.claim_data,
+            )
+        ref = self._claim_converter.from_payload(payload, ExternalStorageReference)
+        return ref if isinstance(ref, ExternalStorageReference) else None
+
+    async def _retrieve_payload(self, payload: Payload) -> Payload:
+        ref = self._decode_reference(payload)
+        if ref is None:
             return payload
 
         start_time = time.monotonic()
-
-        reference = self._claim_converter.from_payload(payload, _StorageReference)
-        if not isinstance(reference, _StorageReference):
-            return payload
-
-        driver = self._get_driver_by_name(reference.driver_name)
+        driver = self._get_driver_by_name(ref.driver_name)
         context = StorageDriverRetrieveContext()
+        claim = StorageDriverClaim(claim_data=dict(ref.claim_data))
 
-        stored_payloads = await driver.retrieve(context, [reference.driver_claim])
+        stored_payloads = await driver.retrieve(context, [claim])
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
 
@@ -486,15 +511,12 @@ class ExternalStorage:
 
         driver_claims: dict[StorageDriver, list[tuple[int, StorageDriverClaim]]] = {}
         for index, payload in enumerate(payloads):
-            if len(payload.external_payloads) == 0:
+            ref = self._decode_reference(payload)
+            if ref is None:
                 continue
-
-            reference = self._claim_converter.from_payload(payload, _StorageReference)
-            if not isinstance(reference, _StorageReference):
-                continue
-
-            driver = self._get_driver_by_name(reference.driver_name)
-            driver_claims.setdefault(driver, []).append((index, reference.driver_claim))
+            driver = self._get_driver_by_name(ref.driver_name)
+            claim = StorageDriverClaim(claim_data=dict(ref.claim_data))
+            driver_claims.setdefault(driver, []).append((index, claim))
 
         if not driver_claims:
             return results

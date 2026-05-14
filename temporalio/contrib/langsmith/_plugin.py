@@ -9,6 +9,15 @@ from typing import Any
 
 import langsmith
 
+# langsmith conditionally imports langchain_core when it is installed.
+# Pre-import the lazily-loaded submodule so it is in sys.modules before the
+# workflow sandbox starts; otherwise the sandbox's __getattr__-triggered
+# import hits restrictions on concurrent.futures.ThreadPoolExecutor.
+try:
+    import langchain_core.runnables.config  # noqa: F401  # pyright: ignore[reportUnusedImport]
+except ImportError:
+    pass
+
 from temporalio.contrib.langsmith._interceptor import LangSmithInterceptor
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
@@ -62,7 +71,8 @@ class LangSmithPlugin(SimplePlugin):
                 return dataclasses.replace(
                     runner,
                     restrictions=runner.restrictions.with_passthrough_modules(
-                        "langsmith"
+                        "langsmith",
+                        "langchain_core",
                     ),
                 )
             return runner

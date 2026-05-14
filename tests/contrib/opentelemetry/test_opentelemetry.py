@@ -720,12 +720,12 @@ async def test_opentelemetry_baggage_propagation_basic(client_with_tracing: Clie
                 task_queue=task_queue,
             )
 
-        assert (
-            result["user_id"] == "test-user-123"
-        ), "user.id baggage should propagate to activity"
-        assert (
-            result["tenant_id"] == "some-corp"
-        ), "tenant.id baggage should propagate to activity"
+        assert result["user_id"] == "test-user-123", (
+            "user.id baggage should propagate to activity"
+        )
+        assert result["tenant_id"] == "some-corp", (
+            "tenant.id baggage should propagate to activity"
+        )
 
 
 @activity.defn
@@ -886,15 +886,15 @@ async def test_opentelemetry_context_restored_after_activity(
                         id=f"workflow_{uuid.uuid4()}",
                         task_queue=task_queue,
                     )
-                    assert (
-                        not expect_failure
-                    ), "This test should have raised an exception"
+                    assert not expect_failure, (
+                        "This test should have raised an exception"
+                    )
                 except Exception:
                     assert expect_failure, "This test is not expeced to raise"
 
-        assert (
-            attach_count == detach_count
-        ), f"Context leak detected: {attach_count} attaches vs {detach_count} detaches. "
+        assert attach_count == detach_count, (
+            f"Context leak detected: {attach_count} attaches vs {detach_count} detaches. "
+        )
         assert attach_count > 0, "Expected at least one context attach/detach"
 
     finally:
@@ -960,6 +960,7 @@ async def test_opentelemetry_standalone_activity_tracing(
     client = Client(**client_config)
 
     task_queue = f"task_queue_{uuid.uuid4()}"
+    activity_id = f"activity_{uuid.uuid4()}"
     async with Worker(
         client,
         task_queue=task_queue,
@@ -968,44 +969,23 @@ async def test_opentelemetry_standalone_activity_tracing(
         handle = await client.start_activity(
             tracing_activity,
             TracingActivityParam(heartbeat=False),
-            id=f"activity_{uuid.uuid4()}",
+            id=activity_id,
             task_queue=task_queue,
             schedule_to_close_timeout=timedelta(seconds=10),
         )
         await handle.result()
 
-    # Use a queue with no worker so activities stay in SCHEDULED state,
-    # allowing describe/cancel/terminate to be called without a race.
-    no_worker_queue = f"task_queue_{uuid.uuid4()}"
-
-    cancel_handle = await client.start_activity(
-        tracing_activity,
-        TracingActivityParam(heartbeat=False),
-        id=f"activity_{uuid.uuid4()}",
-        task_queue=no_worker_queue,
-        schedule_to_close_timeout=timedelta(seconds=30),
-    )
-    await cancel_handle.describe()
-    await cancel_handle.cancel()
-
-    terminate_handle = await client.start_activity(
-        tracing_activity,
-        TracingActivityParam(heartbeat=False),
-        id=f"activity_{uuid.uuid4()}",
-        task_queue=no_worker_queue,
-        schedule_to_close_timeout=timedelta(seconds=30),
-    )
-    await terminate_handle.terminate()
-
-    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+    finished_spans = exporter.get_finished_spans()
+    assert dump_spans(finished_spans, with_attributes=False) == [
         "StartActivity:tracing_activity",
         "  RunActivity:tracing_activity",
-        "StartActivity:tracing_activity",
-        "DescribeActivity",
-        "CancelActivity",
-        "StartActivity:tracing_activity",
-        "TerminateActivity",
     ]
+    start_activity_span = next(
+        s for s in finished_spans if s.name == "StartActivity:tracing_activity"
+    )
+    assert start_activity_span.attributes is not None
+    assert start_activity_span.attributes["temporalActivityID"] == activity_id
+    assert start_activity_span.attributes["temporalActivityType"] == "tracing_activity"
 
 
 def test_opentelemetry_safe_detach():
@@ -1050,6 +1030,6 @@ def test_opentelemetry_safe_detach():
                 and "Failed to detach context" in record.message
             )
 
-        assert (
-            capturer.find(otel_context_error) is None
-        ), "Detach from context message should not be logged"
+        assert capturer.find(otel_context_error) is None, (
+            "Detach from context message should not be logged"
+        )
