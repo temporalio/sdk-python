@@ -172,9 +172,7 @@ class ConnectConfig:
     lazy: bool = False
     runtime: temporalio.runtime.Runtime | None = None
     http_connect_proxy_config: HttpConnectProxyConfig | None = None
-    dns_load_balancing_config: DnsLoadBalancingConfig | None = (
-        DnsLoadBalancingConfig.default
-    )
+    dns_load_balancing_config: DnsLoadBalancingConfig | None = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
