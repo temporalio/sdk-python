@@ -3298,7 +3298,7 @@ wheels = [
 
 [[package]]
 name = "openai-agents"
-version = "0.14.0"
+version = "0.17.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "griffelib" },
@@ -3310,9 +3310,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/3c/965968ab53d6afc1d6e4223b6b2e8cdfca15f39fdcc20cfe5dd526ea99f4/openai_agents-0.14.0.tar.gz", hash = "sha256:d82cbafbeea5b189712c243664552268df16082fa14f1778af40f706eb976692", size = 5192284, upload-time = "2026-04-15T17:12:10.191Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/cd/14acaf94c6a438cfe72c5ea043bfbc77d7fbb9514ab7796d82f2180d1518/openai_agents-0.17.2.tar.gz", hash = "sha256:5e11414bdd8c20c8e9192d21f78265d30e65992f4537f940309eca9255804449", size = 5403689, upload-time = "2026-05-12T03:14:57.433Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/3e/0be9a884d3b770114572e0be101ab8adb04a7f1a99620261e7393b72a655/openai_agents-0.14.0-py3-none-any.whl", hash = "sha256:5a1dad74de95970efbf4a3f89dfd50d6a22202d9105b81d7abb25a0be3d493c7", size = 795734, upload-time = "2026-04-15T17:12:08.001Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/71/5ba9afa4b6a0d250bfdbdd1cf9a5255ae131a7f82915c634ac50c0633c3a/openai_agents-0.17.2-py3-none-any.whl", hash = "sha256:1b3560c1690bcee635a487f77ebfb8b4fb2dd52a653e045a86e51974ab87faf3", size = 838225, upload-time = "2026-05-12T03:14:55.149Z" },
 ]
 
 [package.optional-dependencies]
@@ -5099,7 +5099,7 @@ requires-dist = [
     { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.7.0,<0.8" },
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
     { name = "nexus-rpc", specifier = "==1.4.0" },
-    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.14.0" },
+    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.17.1" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
@@ -5123,7 +5123,7 @@ dev = [
     { name = "googleapis-common-protos", specifier = "==1.70.0" },
     { name = "grpcio-tools", specifier = ">=1.48.2,<2" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "langsmith", specifier = ">=0.7.0,<0.8" },
+    { name = "langsmith", specifier = ">=0.7.0,<0.7.34" },
     { name = "litellm", specifier = ">=1.83.0" },
     { name = "maturin", specifier = ">=1.8.2" },
     { name = "moto", extras = ["s3", "server"], specifier = ">=5" },
