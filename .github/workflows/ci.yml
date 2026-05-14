@@ -61,19 +61,27 @@ jobs:
       - run: uv sync --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
-      - name: Debug rustc for maturin
-        if: ${{ matrix.python == '3.14' && startsWith(matrix.os, 'macos') }}
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -x
-          which rustc
-          rustc -vV
-          uv run python -c 'import shutil, subprocess; print("rustc:", shutil.which("rustc")); r = subprocess.run(["rustc", "-vV"], capture_output=True, text=True); print("returncode:", r.returncode); print("stdout:", repr(r.stdout)); print("stderr:", repr(r.stderr))'
-          uv run maturin --version
-          uv run maturin develop --uv -vv
       - run: poe build-develop
       - run: poe lint
+      - name: Warm Temporal dev server download
+        shell: bash
+        run: |
+          uv run python - <<'PY'
+          import asyncio
+
+          from temporalio.testing import WorkflowEnvironment
+          from tests import DEV_SERVER_DOWNLOAD_VERSION
+
+
+          async def main() -> None:
+              env = await WorkflowEnvironment.start_local(
+                  dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+              )
+              await env.shutdown()
+
+
+          asyncio.run(main())
+          PY
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
