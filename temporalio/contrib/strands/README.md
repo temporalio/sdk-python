@@ -250,6 +250,44 @@ class MyWorkflow:
 
 Interrupt hooks must be deterministic: branch on the activity result and call `event.interrupt(...)` on the workflow side. Tools wrapped via `activity_as_tool` cannot raise interrupts — the activity body has no `Agent` reference — so hooks are the interrupt surface for this plugin.
 
+## Continue-as-new
+
+A chat-style workflow accumulates history with every turn and will eventually hit Temporal's per-workflow history limit. `workflow.info().is_continue_as_new_suggested()` flips true once the server decides history has grown large enough; check it after each turn and hand off to a fresh run, carrying `agent.messages` as input:
+
+```python
+from dataclasses import dataclass, field
+from strands.types.content import Messages
+
+@dataclass
+class ChatInput:
+    messages: Messages = field(default_factory=list)
+
+@workflow.defn
+class ChatWorkflow:
+    def __init__(self) -> None:
+        self._pending: list[str] = []
+        self._done = False
+
+    @workflow.signal
+    def user_says(self, prompt: str) -> None:
+        self._pending.append(prompt)
+
+    @workflow.signal
+    def end_chat(self) -> None:
+        self._done = True
+
+    @workflow.run
+    async def run(self, input: ChatInput) -> None:
+        agent = Agent(model=MODEL, messages=list(input.messages))
+        while True:
+            await workflow.wait_condition(lambda: self._pending or self._done)
+            if self._done:
+                return
+            await agent.invoke_async(self._pending.pop(0))
+            if workflow.info().is_continue_as_new_suggested():
+                workflow.continue_as_new(ChatInput(messages=agent.messages))
+```
+
 ## MCP
 
 Construct `TemporalMCPClient` once at module level and reference the same instance from both the plugin (which registers a per-server `{server}-call-tool` activity and connects at worker startup to discover tools) and `Agent(tools=[...])`:
