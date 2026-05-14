@@ -78,11 +78,11 @@ def _get_workflow_command_protos_with_seq() -> Iterator[type[Any]]:
     """Get concrete classes of all workflow command protos with a seq field."""
     for descriptor in workflow_commands_pb2.DESCRIPTOR.message_types_by_name.values():
         if "seq" in descriptor.fields_by_name:
-            yield descriptor._concrete_class
+            yield descriptor._concrete_class  # type: ignore[attr-defined]
 
 
 def _get_workflow_activation_job_protos_with_seq() -> Iterator[type[Any]]:
     """Get concrete classes of all workflow activation job protos with a seq field."""
     for descriptor in workflow_activation_pb2.DESCRIPTOR.message_types_by_name.values():
         if "seq" in descriptor.fields_by_name:
-            yield descriptor._concrete_class
+            yield descriptor._concrete_class  # type: ignore[attr-defined]
