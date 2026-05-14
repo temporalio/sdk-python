@@ -211,6 +211,45 @@ class AuditHook(HookProvider):
 
 `activity_input` extracts serializable values from the event to pass as the activity's input. Use a dataclass or Pydantic model for multiple values. This is needed because events hold references to the `Agent`, `AgentTool` instances, etc., none of which cross the activity boundary.
 
+## Human-in-the-loop interrupts
+
+A hook on an interruptible event (e.g. `BeforeToolCallEvent`) can pause the agent by calling `event.interrupt(name, reason=...)`. When this fires, `agent.invoke_async()` returns `AgentResult(stop_reason="interrupt", interrupts=[...])` instead of raising. Pair this with a signal handler that supplies responses, then resume by calling `agent.invoke_async(responses)`:
+
+```python
+from strands.hooks import HookProvider, HookRegistry
+from strands.hooks.events import BeforeToolCallEvent
+
+class ApprovalHook(HookProvider):
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(BeforeToolCallEvent, self._gate)
+
+    def _gate(self, event: BeforeToolCallEvent) -> None:
+        if event.interrupt("approval", reason="confirm delete") != "approve":
+            event.cancel_tool = "denied"
+
+@workflow.defn
+class MyWorkflow:
+    def __init__(self) -> None:
+        self.agent = Agent(model=MODEL, tools=[delete_thing], hooks=[ApprovalHook()])
+        self._approval: str | None = None
+
+    @workflow.signal
+    def approve(self, response: str) -> None:
+        self._approval = response
+
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        result = await self.agent.invoke_async(prompt)
+        if result.stop_reason == "interrupt":
+            await workflow.wait_condition(lambda: self._approval is not None)
+            result = await self.agent.invoke_async([
+                {"interruptResponse": {"interruptId": result.interrupts[0].id, "response": self._approval}}
+            ])
+        return str(result)
+```
+
+Interrupt hooks must be deterministic: branch on the activity result and call `event.interrupt(...)` on the workflow side. Tools wrapped via `activity_as_tool` cannot raise interrupts — the activity body has no `Agent` reference — so hooks are the interrupt surface for this plugin.
+
 ## MCP
 
 Construct `TemporalMCPClient` once at module level and reference the same instance from both the plugin (which registers a per-server `{server}-call-tool` activity and connects at worker startup to discover tools) and `Agent(tools=[...])`:
