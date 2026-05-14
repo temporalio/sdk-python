@@ -9,12 +9,8 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-01T17:48:32.303305Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P1W"
-
-[options.exclude-newer-package]
-openai-agents = false
-openinference-instrumentation-google-adk = false
 
 [[package]]
 name = "aioboto3"
