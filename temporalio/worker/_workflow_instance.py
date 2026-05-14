@@ -2025,6 +2025,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 return handle
             except asyncio.CancelledError:
                 apply_child_cancel_error()
+                raise
 
     async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
