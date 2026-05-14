@@ -801,5 +801,67 @@ class TestBackwardCompat:
         assert decoded[0] == value
 
 
+class TestHeadersAlwaysExternalStorage:
+    """Headers must always pass through external storage and validation,
+    regardless of the encode_headers/decode_headers flag.  Codec encoding
+    and decoding remain gated by that flag."""
+
+    async def test_transform_outbound_payload_encode_false_still_stores(
+        self,
+    ):
+        """encode=False skips codec but still stores externally."""
+        driver = InMemoryTestDriver()
+        dc = DataConverter(
+            payload_codec=RecordingPayloadCodec("test-codec"),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=0,
+            ),
+        )
+
+        payload = Payload(data=b"x" * 100)
+
+        # encode=True: codec encodes AND external storage stores
+        result_encode = await dc._transform_outbound_payload(
+            payload, encode=True
+        )
+        assert driver._store_calls == 1
+
+        # encode=False: codec does NOT encode but external storage still stores
+        driver._store_calls = 0
+        result_no_encode = await dc._transform_outbound_payload(
+            payload, encode=False
+        )
+        assert driver._store_calls == 1
+
+    async def test_transform_inbound_payload_decode_false_still_retrieves(
+        self,
+    ):
+        """decode=False skips codec but still retrieves from external storage."""
+        driver = InMemoryTestDriver()
+        dc = DataConverter(
+            payload_codec=RecordingPayloadCodec("test-codec"),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=0,
+            ),
+        )
+
+        # First store a payload externally so there is something to retrieve
+        payload = Payload(data=b"x" * 100)
+        stored = await dc._transform_outbound_payload(payload, encode=True)
+        assert driver._store_calls == 1
+
+        # decode=True: retrieve AND decode
+        driver._store_calls = 0
+        await dc._transform_inbound_payload(stored, decode=True)
+        assert driver._retrieve_calls == 1
+
+        # decode=False: retrieve but do NOT decode
+        driver._retrieve_calls = 0
+        await dc._transform_inbound_payload(stored, decode=False)
+        assert driver._retrieve_calls == 1
+
+
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    pytest.main([__file], "-v")
