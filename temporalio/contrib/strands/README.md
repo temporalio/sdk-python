@@ -312,3 +312,23 @@ Worker(..., plugins=[StrandsPlugin(mcp_clients=[ECHO])])
 ```
 
 The plugin connects to the MCP server once at worker startup to enumerate tools. The schema is frozen for the worker's lifetime; restart workers to pick up MCP-server changes. If the MCP server is unavailable at startup, the worker fails to start.
+
+## Observability
+
+`StrandsPlugin` composes cleanly with [`OpenTelemetryPlugin`](../opentelemetry) — add both to the worker to get OTel spans around the model, tool, and MCP activities the plugin schedules, plus any spans Strands itself emits inside `invoke_async`:
+
+```python
+import opentelemetry.trace
+from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
+
+opentelemetry.trace.set_tracer_provider(create_tracer_provider())
+
+Worker(
+    client,
+    task_queue="strands",
+    workflows=[MyWorkflow],
+    plugins=[StrandsPlugin(model=MODEL), OpenTelemetryPlugin()],
+)
+```
+
+Set the tracer provider before connecting the client. See the [OpenTelemetry plugin README](../opentelemetry) for exporter setup.
