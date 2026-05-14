@@ -14,6 +14,7 @@ class TemporalActivityTool(AgentTool):
     """Strands ``AgentTool`` whose body dispatches a Temporal activity."""
 
     def __init__(self, activity_fn: Callable, options: dict[str, Any]) -> None:
+        """Capture the target activity and the options to invoke it with."""
         super().__init__()
         defn = activity._Definition.from_callable(activity_fn)
         if not defn or not defn.name:
@@ -27,14 +28,17 @@ class TemporalActivityTool(AgentTool):
 
     @property
     def tool_name(self) -> str:
+        """Name of the underlying Temporal activity."""
         return self._activity_name
 
     @property
     def tool_spec(self) -> ToolSpec:
+        """Strands ToolSpec derived from the activity's signature."""
         return self._spec
 
     @property
     def tool_type(self) -> str:
+        """Tool kind identifier used by Strands."""
         return "temporal_activity"
 
     async def stream(
@@ -43,6 +47,7 @@ class TemporalActivityTool(AgentTool):
         invocation_state: dict[str, Any],
         **kwargs: Any,
     ) -> ToolGenerator:
+        """Execute the tool by dispatching to the bound Temporal activity."""
         bound = self._signature.bind(**tool_use["input"])
         bound.apply_defaults()
         positional = list(bound.arguments.values())

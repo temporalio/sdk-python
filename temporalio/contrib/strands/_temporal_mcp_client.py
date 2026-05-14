@@ -65,6 +65,7 @@ class TemporalMCPClient(ToolProvider):
         summary: str | None = None,
         priority: Priority = Priority.default,
     ) -> None:
+        """Configure the server name, transport factory, and activity options."""
         self._server = server
         self._transport_factory = transport_factory
         self._options: dict[str, Any] = {
@@ -82,18 +83,22 @@ class TemporalMCPClient(ToolProvider):
 
     @property
     def server(self) -> str:
+        """MCP server name used as the activity prefix."""
         return self._server
 
     async def load_tools(self, **_kwargs: Any) -> Sequence[AgentTool]:
+        """Return TemporalMCPTool wrappers for tools cached at worker startup."""
         from ._temporal_mcp_tool import TemporalMCPTool
 
         infos = _TOOL_CACHE.get(self._server, [])
         return [TemporalMCPTool(self._server, info, self._options) for info in infos]
 
     def add_consumer(self, consumer_id: Any, **_kwargs: Any) -> None:
+        """No-op; consumer tracking is handled by the underlying MCP client."""
         return None
 
     def remove_consumer(self, consumer_id: Any, **_kwargs: Any) -> None:
+        """No-op; consumer tracking is handled by the underlying MCP client."""
         return None
 
     async def _populate_cache(self) -> None:

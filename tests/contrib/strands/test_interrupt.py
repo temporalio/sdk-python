@@ -48,9 +48,7 @@ MODEL = TemporalModel(
 @workflow.defn
 class InterruptWorkflow:
     def __init__(self) -> None:
-        self.agent = Agent(
-            model=MODEL, tools=[delete_thing], hooks=[ApprovalHook()]
-        )
+        self.agent = Agent(model=MODEL, tools=[delete_thing], hooks=[ApprovalHook()])
         self._approval: str | None = None
 
     @workflow.signal

@@ -55,6 +55,7 @@ class TemporalModel(Model):
         streaming_topic: str | None = None,
         streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ) -> None:
+        """Configure the model factory, activity options, and streaming settings."""
         self._model_factory = model_factory
         self._streaming_topic = streaming_topic
         self._streaming_batch_interval = streaming_batch_interval
@@ -75,12 +76,15 @@ class TemporalModel(Model):
         return ModelActivity(self._model_factory())
 
     def update_config(self, **_model_config: Any) -> None:
+        """No-op; the real model is configured worker-side via ``model_factory``."""
         return None
 
     def get_config(self) -> dict[str, Any]:
+        """Return an empty config; configuration lives on the worker-side model."""
         return {}
 
     def structured_output(self, *_args: Any, **_kwargs: Any) -> Any:
+        """Not supported; use ``Agent(structured_output_model=...)`` instead."""
         raise NotImplementedError(
             "TemporalModel.structured_output is not supported. Use "
             "Agent(structured_output_model=...) which routes structured output "
@@ -98,6 +102,7 @@ class TemporalModel(Model):
         invocation_state: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AsyncIterable[StreamEvent]:
+        """Run the model via the registered Temporal activity and yield events."""
         if self._streaming_topic is not None:
             events = await workflow.execute_activity_method(
                 ModelActivity.invoke_model_streaming,

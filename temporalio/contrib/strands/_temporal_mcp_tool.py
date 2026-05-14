@@ -17,6 +17,7 @@ class TemporalMCPTool(AgentTool):
         info: _MCPToolInfo,
         options: dict[str, Any],
     ) -> None:
+        """Bind this tool to a server, its cached info, and activity options."""
         super().__init__()
         self._server = server
         self._info = info
@@ -24,10 +25,12 @@ class TemporalMCPTool(AgentTool):
 
     @property
     def tool_name(self) -> str:
+        """Name of the underlying MCP tool."""
         return self._info.name
 
     @property
     def tool_spec(self) -> ToolSpec:
+        """Strands ToolSpec built from the cached MCP tool info."""
         spec: ToolSpec = {
             "name": self._info.name,
             "description": self._info.description
@@ -40,6 +43,7 @@ class TemporalMCPTool(AgentTool):
 
     @property
     def tool_type(self) -> str:
+        """Tool kind identifier used by Strands."""
         return "temporal_mcp"
 
     async def stream(
@@ -48,6 +52,7 @@ class TemporalMCPTool(AgentTool):
         invocation_state: dict[str, Any],
         **kwargs: Any,
     ) -> ToolGenerator:
+        """Execute the tool by dispatching to the per-server call-tool activity."""
         result: ToolResult = await workflow.execute_activity(
             f"{self._server}-call-tool",
             _CallToolArgs(

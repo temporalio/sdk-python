@@ -30,16 +30,19 @@ class ModelActivity:
     """Holds the user-supplied model and exposes the model activities."""
 
     def __init__(self, model: Model) -> None:
+        """Store the model that activities will invoke."""
         self._model = model
 
     @activity.defn(name="invoke_strands_model")
     async def invoke_model(self, input: _InvokeModelInput) -> list[StreamEvent]:
+        """Run the model and return its stream events as a list."""
         return [event async for event in _stream(self._model, input)]
 
     @activity.defn(name="invoke_strands_model_streaming")
     async def invoke_model_streaming(
         self, input: _StreamingInvokeModelInput
     ) -> list[StreamEvent]:
+        """Run the model and publish each stream event to a WorkflowStream."""
         events: list[StreamEvent] = []
         stream = WorkflowStreamClient.from_within_activity(
             batch_interval=timedelta(seconds=input.streaming_batch_interval_seconds),

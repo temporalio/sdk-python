@@ -2,7 +2,10 @@ from datetime import timedelta
 from uuid import uuid4
 
 from strands import Agent, tool
-from strands_tools import calculator, current_time
+from strands_tools import (  # pyright: ignore[reportMissingTypeStubs]
+    calculator,
+    current_time,
+)
 
 from temporalio import activity, workflow
 from temporalio.client import Client

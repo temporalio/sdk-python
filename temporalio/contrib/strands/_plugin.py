@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
 
@@ -37,6 +37,7 @@ class StrandsPlugin(SimplePlugin):
         model: TemporalModel | None = None,
         mcp_clients: list[TemporalMCPClient] = [],
     ) -> None:
+        """Build the plugin from an optional model and MCP client list."""
         activities: list[Callable] = []
         if model is not None:
             ma = model._build_activity()
@@ -51,7 +52,7 @@ class StrandsPlugin(SimplePlugin):
             activities.extend(c._get_activities())
 
         @asynccontextmanager
-        async def run_context() -> AsyncIterator[None]:
+        async def run_context() -> AsyncGenerator[None, None]:
             for c in mcp_clients:
                 await c._populate_cache()
             try:
