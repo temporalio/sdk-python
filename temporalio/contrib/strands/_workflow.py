@@ -61,7 +61,7 @@ TEvent = TypeVar("TEvent", bound=BaseHookEvent)
 def activity_as_hook(
     activity_fn: Callable,
     *,
-    extract: Callable[[TEvent], Any],
+    activity_input: Callable[[TEvent], Any],
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -78,7 +78,7 @@ def activity_as_hook(
 
     The returned coroutine, when registered with ``HookRegistry.add_callback``,
     dispatches ``activity_fn`` as a Temporal activity each time the associated
-    event fires. ``extract`` is called with the event to produce a
+    event fires. ``activity_input`` is called with the event to produce a
     serializable activity input — events themselves are not serializable, since
     they hold references to the ``Agent`` and other workflow-bound objects.
     All other keyword arguments are forwarded to ``workflow.execute_activity``.
@@ -98,6 +98,6 @@ def activity_as_hook(
     }
 
     async def callback(event: TEvent) -> None:
-        await workflow.execute_activity(activity_fn, extract(event), **options)
+        await workflow.execute_activity(activity_fn, activity_input(event), **options)
 
     return callback

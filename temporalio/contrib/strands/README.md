@@ -1,4 +1,4 @@
-# AWS Strands Agents
+# Strands Agents
 
 ⚠️ **This package is currently at an experimental release stage.** ⚠️
 
@@ -203,13 +203,13 @@ class AuditHook(HookProvider):
             AfterToolCallEvent,
             activity_as_hook(
                 persist_tool_call,
-                extract=lambda event: event.tool_use["name"],
+                activity_input=lambda event: event.tool_use["name"],
                 start_to_close_timeout=timedelta(seconds=10),
             ),
         )
 ```
 
-`extract` pulls a serializable value from the event (the activity input). Events hold references to the `Agent`, `AgentTool` instances, etc., none of which cross the activity boundary. Multi-agent hook events (`graph` / `swarm` / A2A) aren't supported yet — they require multi-agent support, which is still in progress.
+`activity_input` extracts serializable values from the event to pass as the activity's input. Use a dataclass or Pydantic model for multiple values. This is needed because events hold references to the `Agent`, `AgentTool` instances, etc., none of which cross the activity boundary.
 
 ## MCP
 

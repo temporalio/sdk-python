@@ -41,7 +41,7 @@ class AuditHook(HookProvider):
             AfterToolCallEvent,
             activity_as_hook(
                 audit_tool,
-                extract=lambda event: event.tool_use["name"],
+                activity_input=lambda event: event.tool_use["name"],
                 start_to_close_timeout=timedelta(seconds=10),
             ),
         )
