@@ -42,7 +42,7 @@ $service_defns
 ''')
 
     def service_name(s):
-        return f"import {sanitize_proto_name(s.full_name)[:-len(s.name)-1]}"
+        return f"import {sanitize_proto_name(s.full_name)[: -len(s.name) - 1]}"
 
     service_imports = [
         service_name(service_descriptor)

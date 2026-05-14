@@ -720,12 +720,12 @@ async def test_opentelemetry_baggage_propagation_basic(client_with_tracing: Clie
                 task_queue=task_queue,
             )
 
-        assert (
-            result["user_id"] == "test-user-123"
-        ), "user.id baggage should propagate to activity"
-        assert (
-            result["tenant_id"] == "some-corp"
-        ), "tenant.id baggage should propagate to activity"
+        assert result["user_id"] == "test-user-123", (
+            "user.id baggage should propagate to activity"
+        )
+        assert result["tenant_id"] == "some-corp", (
+            "tenant.id baggage should propagate to activity"
+        )
 
 
 @activity.defn
@@ -886,15 +886,15 @@ async def test_opentelemetry_context_restored_after_activity(
                         id=f"workflow_{uuid.uuid4()}",
                         task_queue=task_queue,
                     )
-                    assert (
-                        not expect_failure
-                    ), "This test should have raised an exception"
+                    assert not expect_failure, (
+                        "This test should have raised an exception"
+                    )
                 except Exception:
                     assert expect_failure, "This test is not expeced to raise"
 
-        assert (
-            attach_count == detach_count
-        ), f"Context leak detected: {attach_count} attaches vs {detach_count} detaches. "
+        assert attach_count == detach_count, (
+            f"Context leak detected: {attach_count} attaches vs {detach_count} detaches. "
+        )
         assert attach_count > 0, "Expected at least one context attach/detach"
 
     finally:
@@ -1030,6 +1030,6 @@ def test_opentelemetry_safe_detach():
                 and "Failed to detach context" in record.message
             )
 
-        assert (
-            capturer.find(otel_context_error) is None
-        ), "Detach from context message should not be logged"
+        assert capturer.find(otel_context_error) is None, (
+            "Detach from context message should not be logged"
+        )
