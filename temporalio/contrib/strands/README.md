@@ -168,6 +168,49 @@ Worker(
 )
 ```
 
+## Hooks
+
+Strands' [hook system](https://strandsagents.com/) (`strands.hooks`) lets you subscribe callbacks to events in the agent lifecycle — invocation start/end, model call before/after, tool call before/after, message added. The native `Agent(hooks=[MyHookProvider()])` API works as-is: every single-agent hook event fires in workflow context, so deterministic callbacks just work.
+
+```python
+from strands.hooks import HookProvider, HookRegistry
+from strands.hooks.events import AfterToolCallEvent
+
+class AuditHook(HookProvider):
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(AfterToolCallEvent, self._on_tool_call)
+
+    def _on_tool_call(self, event: AfterToolCallEvent) -> None:
+        # Pure local state - deterministic across replay.
+        workflow.logger.info(f"tool {event.tool_use['name']} finished")
+
+agent = Agent(hooks=[AuditHook()])
+```
+
+Callbacks run in workflow context, so they must be deterministic: no `time.time()`, `uuid.uuid4()`, or I/O — same rules as workflow code. For callbacks that need I/O (audit logging, metrics, alerting), use `activity_as_hook()` to dispatch the work as a Temporal activity:
+
+```python
+from temporalio.contrib.strands import activity_as_hook
+
+@activity.defn
+async def persist_tool_call(tool_name: str) -> None:
+    # I/O safely in an activity.
+    ...
+
+class AuditHook(HookProvider):
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(
+            AfterToolCallEvent,
+            activity_as_hook(
+                persist_tool_call,
+                extract=lambda event: event.tool_use["name"],
+                start_to_close_timeout=timedelta(seconds=10),
+            ),
+        )
+```
+
+`extract` pulls a serializable value from the event (the activity input). Events hold references to the `Agent`, `AgentTool` instances, etc., none of which cross the activity boundary. Multi-agent hook events (`graph` / `swarm` / A2A) aren't supported yet — they require multi-agent support, which is still in progress.
+
 ## MCP
 
 Construct `TemporalMCPClient` once at module level and reference the same instance from both the plugin (which registers a per-server `{server}-call-tool` activity and connects at worker startup to discover tools) and `Agent(tools=[...])`:
