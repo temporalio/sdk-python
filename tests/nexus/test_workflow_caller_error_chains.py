@@ -574,15 +574,15 @@ def _validate_exception_chain(
     # Check remaining expected errors are all optional
     while expected_idx < len(expected_chain):
         expected = expected_chain[expected_idx]
-        assert (
-            expected.optional
-        ), f"Required expected error not found in chain: {expected}"
+        assert expected.optional, (
+            f"Required expected error not found in chain: {expected}"
+        )
         expected_idx += 1
 
     # Check no remaining actual errors
-    assert actual_idx == len(
-        actual_chain
-    ), f"Unexpected errors in chain: {actual_chain[actual_idx:]}"
+    assert actual_idx == len(actual_chain), (
+        f"Unexpected errors in chain: {actual_chain[actual_idx:]}"
+    )
 
 
 @workflow.defn(sandboxed=False)

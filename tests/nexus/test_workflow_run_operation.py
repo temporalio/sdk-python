@@ -182,7 +182,7 @@ async def test_request_deadline_is_accessible_in_workflow_run_operation(
 
         assert len(service_handler.start_deadlines_received) == 1
         deadline = service_handler.start_deadlines_received[0]
-        assert (
-            deadline is not None
-        ), "request_deadline should be set in WorkflowRunOperationContext"
+        assert deadline is not None, (
+            "request_deadline should be set in WorkflowRunOperationContext"
+        )
         assert deadline.tzinfo is timezone.utc, "request_deadline should be in utc"

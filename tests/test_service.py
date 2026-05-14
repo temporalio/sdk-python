@@ -272,9 +272,9 @@ async def test_rpc_execution_not_unknown(client: Client):
         try:
             await rpc_call(request, timeout=timedelta(milliseconds=1))
         except ValueError as err:
-            assert (
-                "Unknown RPC call" not in str(err)
-            ), f"Unexpected unknown-RPC error for {target_service_name}.{method_name}: {err}"
+            assert "Unknown RPC call" not in str(err), (
+                f"Unexpected unknown-RPC error for {target_service_name}.{method_name}: {err}"
+            )
         except temporalio.service.RPCError:
             pass
 
