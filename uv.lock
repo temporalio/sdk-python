@@ -4386,7 +4386,7 @@ wheels = [
 
 [[package]]
 name = "temporalio"
-version = "1.24.1"
+version = "1.24.2"
 source = { virtual = "." }
 dependencies = [
     { name = "nexus-rpc" },
