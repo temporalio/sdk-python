@@ -145,8 +145,7 @@ class Client:
         lazy: bool = False,
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
-        dns_load_balancing_config: DnsLoadBalancingConfig
-        | None = DnsLoadBalancingConfig.default,
+        dns_load_balancing_config: DnsLoadBalancingConfig | None = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> Self:
         """Connect to a Temporal server.
