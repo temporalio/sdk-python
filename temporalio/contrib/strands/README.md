@@ -96,7 +96,7 @@ MODEL = TemporalModel(
 
 ## Retries
 
-The plugin disables Strands' built-in `ModelRetryStrategy` so retries are handled exclusively by Temporal. Configure retries via `RetryPolicy` on the activity options accepted by `TemporalModel`, `activity_as_tool`, `activity_as_hook`, and `TemporalMCPClient`:
+The plugin disables Strands' built-in `ModelRetryStrategy` so retries are handled exclusively by Temporal. Configure retries via `RetryPolicy` on the activity options accepted by `TemporalModel`, `workflow.activity_as_tool`, `workflow.activity_as_hook`, and `TemporalMCPClient`:
 
 ```python
 from temporalio.common import RetryPolicy
@@ -156,10 +156,11 @@ async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
 
 ## Tools
 
-Decorate non-deterministic tools with `@activity.defn`, or if you're importing tools from `strands_tools`, wrap them in a thin async function. Then, register the activity on the worker via `Worker(activities=[...])` and pass it to the agent with `activity_as_tool(activity, **options)` along with any activity options (e.g. `start_to_close_timeout`):
+Decorate non-deterministic tools with `@activity.defn`, or if you're importing tools from `strands_tools`, wrap them in a thin async function. Then, register the activity on the worker via `Worker(activities=[...])` and pass it to the agent with `workflow.activity_as_tool(activity, **options)` along with any activity options (e.g. `start_to_close_timeout`):
 
 ```python
 from strands_tools import current_time
+from temporalio.contrib.strands import workflow as strands_workflow
 
 @activity.defn
 async def fetch_user(user_id: str) -> dict:
@@ -171,8 +172,8 @@ async def current_time_activity() -> str:
 
 # workflow
 agent = Agent(tools=[
-    activity_as_tool(fetch_user, start_to_close_timeout=timedelta(seconds=30)),
-    activity_as_tool(current_time_activity, start_to_close_timeout=timedelta(seconds=15)),
+    strands_workflow.activity_as_tool(fetch_user, start_to_close_timeout=timedelta(seconds=30)),
+    strands_workflow.activity_as_tool(current_time_activity, start_to_close_timeout=timedelta(seconds=15)),
 ])
 
 # worker
@@ -202,10 +203,10 @@ class AuditHook(HookProvider):
 agent = Agent(hooks=[AuditHook()])
 ```
 
-Callbacks run in workflow context, so they must be deterministic: no `time.time()`, `uuid.uuid4()`, or I/O — same rules as workflow code. For callbacks that need I/O (audit logging, metrics, alerting), use `activity_as_hook()` to dispatch the work as a Temporal activity:
+Callbacks run in workflow context, so they must be deterministic: no `time.time()`, `uuid.uuid4()`, or I/O — same rules as workflow code. For callbacks that need I/O (audit logging, metrics, alerting), use `workflow.activity_as_hook()` to dispatch the work as a Temporal activity:
 
 ```python
-from temporalio.contrib.strands import activity_as_hook
+from temporalio.contrib.strands.workflow import activity_as_hook
 
 @activity.defn
 async def persist_tool_call(tool_name: str) -> None:
@@ -263,7 +264,7 @@ class MyWorkflow:
         return str(result)
 ```
 
-Interrupt hooks must be deterministic: branch on the activity result and call `event.interrupt(...)` on the workflow side. Tools wrapped via `activity_as_tool` cannot raise interrupts — the activity body has no `Agent` reference — so hooks are the interrupt surface for this plugin.
+Interrupt hooks must be deterministic: branch on the activity result and call `event.interrupt(...)` on the workflow side. Tools wrapped via `workflow.activity_as_tool` cannot raise interrupts — the activity body has no `Agent` reference — so hooks are the interrupt surface for this plugin.
 
 ## Continue-as-new
 

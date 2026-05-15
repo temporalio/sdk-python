@@ -32,7 +32,7 @@ def _patched_agent_init(self: Any, *args: Any, **kwargs: Any) -> None:
         raise ValueError(
             "StrandsPlugin disables Strands retries; configure retries via "
             "RetryPolicy on the activity options passed to TemporalModel, "
-            "activity_as_tool, activity_as_hook, or TemporalMCPClient. "
+            "workflow.activity_as_tool, workflow.activity_as_hook, or TemporalMCPClient. "
             "Remove retry_strategy from Agent(...) or pass retry_strategy=None."
         )
     kwargs["retry_strategy"] = None

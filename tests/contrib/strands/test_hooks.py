@@ -7,11 +7,8 @@ from strands.hooks.events import AfterToolCallEvent
 
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import (
-    StrandsPlugin,
-    TemporalModel,
-    activity_as_hook,
-)
+from temporalio.contrib.strands import StrandsPlugin, TemporalModel
+from temporalio.contrib.strands.workflow import activity_as_hook
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
