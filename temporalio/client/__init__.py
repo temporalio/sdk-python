@@ -2,6 +2,46 @@
 
 from __future__ import annotations
 
+from temporalio.activity import ActivityCancellationDetails
+from temporalio.converter import (
+    ActivitySerializationContext,
+    DataConverter,
+    SerializationContext,
+    StorageDriverActivityInfo,
+    StorageDriverStoreContext,
+    StorageDriverWorkflowInfo,
+    WithSerializationContext,
+    WorkflowSerializationContext,
+)
+from temporalio.service import (
+    ConnectConfig,
+    DnsLoadBalancingConfig,
+    HttpConnectProxyConfig,
+    KeepAliveConfig,
+    RetryConfig,
+    RPCError,
+    RPCStatusCode,
+    ServiceClient,
+    TLSConfig,
+)
+
+from ..common import HeaderCodecBehavior
+from ..types import (
+    AnyType,
+    CallableAsyncNoParam,
+    CallableAsyncSingleParam,
+    CallableSyncNoParam,
+    CallableSyncSingleParam,
+    LocalReturnType,
+    MethodAsyncNoParam,
+    MethodAsyncSingleParam,
+    MethodSyncOrAsyncNoParam,
+    MethodSyncOrAsyncSingleParam,
+    MultiParamSpec,
+    ParamType,
+    ReturnType,
+    SelfType,
+)
 from ._activity import (
     ActivityExecution,
     ActivityExecutionAsyncIterator,
@@ -37,7 +77,7 @@ from ._exceptions import (
     WorkflowUpdateFailedError,
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
-from ._helpers import _history_from_json as _history_from_json
+from ._helpers import _history_from_json
 from ._interceptor import (
     BackfillScheduleInput,
     CancelActivityInput,
@@ -252,4 +292,39 @@ __all__ = [
     "Plugin",
     "Callback",
     "_history_from_json",
+    # Re-export Temporal-owned names that old temporalio/client.py imported at
+    # module scope so explicit imports from temporalio.client keep working.
+    "ActivityCancellationDetails",
+    "ActivitySerializationContext",
+    "DataConverter",
+    "SerializationContext",
+    "StorageDriverActivityInfo",
+    "StorageDriverStoreContext",
+    "StorageDriverWorkflowInfo",
+    "WithSerializationContext",
+    "WorkflowSerializationContext",
+    "ConnectConfig",
+    "DnsLoadBalancingConfig",
+    "HttpConnectProxyConfig",
+    "KeepAliveConfig",
+    "RetryConfig",
+    "RPCError",
+    "RPCStatusCode",
+    "ServiceClient",
+    "TLSConfig",
+    "HeaderCodecBehavior",
+    "AnyType",
+    "CallableAsyncNoParam",
+    "CallableAsyncSingleParam",
+    "CallableSyncNoParam",
+    "CallableSyncSingleParam",
+    "LocalReturnType",
+    "MethodAsyncNoParam",
+    "MethodAsyncSingleParam",
+    "MethodSyncOrAsyncNoParam",
+    "MethodSyncOrAsyncSingleParam",
+    "MultiParamSpec",
+    "ParamType",
+    "ReturnType",
+    "SelfType",
 ]
