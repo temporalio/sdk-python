@@ -2,6 +2,31 @@
 
 from __future__ import annotations
 
+from temporalio.nexus._util import ServiceHandlerT
+
+from ..types import (
+    AnyType,
+    CallableAsyncNoParam,
+    CallableAsyncSingleParam,
+    CallableAsyncType,
+    CallableSyncNoParam,
+    CallableSyncOrAsyncReturnNoneType,
+    CallableSyncOrAsyncType,
+    CallableSyncSingleParam,
+    CallableType,
+    ClassType,
+    MethodAsyncNoParam,
+    MethodAsyncSingleParam,
+    MethodSyncNoParam,
+    MethodSyncOrAsyncNoParam,
+    MethodSyncOrAsyncSingleParam,
+    MethodSyncSingleParam,
+    MultiParamSpec,
+    ParamType,
+    ProtocolReturnType,
+    ReturnType,
+    SelfType,
+)
 from ._activities import (
     ActivityCancellationType,
     ActivityConfig,
@@ -268,4 +293,28 @@ __all__ = [
     "_in_sandbox",
     "_sandbox_import_notification_policy_override",
     "_sandbox_unrestricted",
+    # Re-export Temporal-owned names that old temporalio/workflow.py imported
+    # at module scope so explicit imports from temporalio.workflow keep working.
+    "ServiceHandlerT",
+    "AnyType",
+    "CallableAsyncNoParam",
+    "CallableAsyncSingleParam",
+    "CallableAsyncType",
+    "CallableSyncNoParam",
+    "CallableSyncOrAsyncReturnNoneType",
+    "CallableSyncOrAsyncType",
+    "CallableSyncSingleParam",
+    "CallableType",
+    "ClassType",
+    "MethodAsyncNoParam",
+    "MethodAsyncSingleParam",
+    "MethodSyncNoParam",
+    "MethodSyncOrAsyncNoParam",
+    "MethodSyncOrAsyncSingleParam",
+    "MethodSyncSingleParam",
+    "MultiParamSpec",
+    "ParamType",
+    "ProtocolReturnType",
+    "ReturnType",
+    "SelfType",
 ]
