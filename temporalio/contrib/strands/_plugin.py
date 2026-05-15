@@ -2,6 +2,8 @@ from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
 
+import strands.models.model as _strands_model
+
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
@@ -10,6 +12,10 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 from ._temporal_mcp_client import TemporalMCPClient
 from ._temporal_model import TemporalModel
+
+# Force Strands' base Model.count_tokens to skip tiktoken (non-deterministic)
+# and use its chars-per-token heuristic (deterministic).
+setattr(_strands_model, "_get_encoding", lambda: None)
 
 
 class StrandsPlugin(SimplePlugin):
@@ -81,6 +87,12 @@ def _workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
                 "strands_tools",
                 "mcp",
                 "temporalio.contrib.strands",
+                # The SDK's default passthrough already includes ``pydantic`` because
+                # it lazy-imports inside some classes; extend that to its compiled
+                # validation core and its ``Annotated`` helper for the same reason.
+                "pydantic",
+                "pydantic_core",
+                "annotated_types",
             ),
         )
     return runner

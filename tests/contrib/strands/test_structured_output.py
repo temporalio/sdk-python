@@ -44,11 +44,14 @@ async def test_structured_output(client: Client):
     task_queue = "test_structured_output"
     plugin = StrandsPlugin()
 
+    config = client.config()
+    config["plugins"] = [*config["plugins"], plugin]
+    client = Client(**config)
+
     async with Worker(
         client,
         task_queue=task_queue,
         workflows=[StructuredOutputWorkflow],
-        plugins=[plugin],
     ):
         handle = await client.start_workflow(
             StructuredOutputWorkflow.run,
