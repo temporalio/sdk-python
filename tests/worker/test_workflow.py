@@ -1211,9 +1211,58 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
         assert isinstance(err.value.cause.cause, CancelledError)
 
 
-@pytest.mark.skip(reason="unable to easily prevent child start currently")
-async def test_workflow_cancel_child_unstarted(_client: Client):
-    raise NotImplementedError
+@workflow.defn
+class CancelDuringChildStartWorkflow:
+    def __init__(self) -> None:
+        self._proceed = False
+
+    @workflow.signal
+    def proceed(self) -> None:
+        self._proceed = True
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._proceed)
+        # Start a child on a task queue with no worker. The child's first WFT
+        # never starts, so _start_fut remains unresolved and the start loop
+        # blocks forever.
+        await workflow.start_child_workflow(
+            LongSleepWorkflow.run,
+            id=f"{workflow.info().workflow_id}_child",
+            task_queue="nonexistent-task-queue-no-worker-abc123",
+        )
+        await workflow.sleep(1000)
+
+
+async def test_workflow_cancel_child_unstarted(client: Client):
+    # Regression test for https://github.com/temporalio/sdk-python/issues/1445
+    #
+    # When cancellation arrived while the parent was waiting for a child
+    # workflow to start, the CancelledError was caught in the start loop
+    # to send a cancel command to the child — but was not re-raised.
+    # Because _start_fut never resolves (child on a queue with no worker),
+    # the loop would keep waiting forever, hanging the parent workflow.
+    #
+    # The fix: re-raise only when self._cancel_requested is True, which
+    # distinguishes Temporal workflow cancellation from other CancelledError
+    # sources such as asyncio.wait_for timeouts.
+    async with new_worker(
+        client,
+        CancelDuringChildStartWorkflow,
+        # Deliberately not registering LongSleepWorkflow and not starting
+        # a worker on the child's task queue.
+    ) as worker:
+        handle = await client.start_workflow(
+            CancelDuringChildStartWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        await handle.signal(CancelDuringChildStartWorkflow.proceed)
+        await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
 
 
 @workflow.defn
