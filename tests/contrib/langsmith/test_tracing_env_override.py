@@ -238,6 +238,6 @@ class TestTracingEnvOverride:
             result = await handle.result()
 
         assert result == "response to: hello"
-        assert (
-            len(collector.runs) > 0
-        ), "Expected LangSmith runs when LANGSMITH_TRACING=true, but got none"
+        assert len(collector.runs) > 0, (
+            "Expected LangSmith runs when LANGSMITH_TRACING=true, but got none"
+        )

@@ -430,9 +430,9 @@ class TestS3StorageDriverStoreRetrieve:
         assert counting_driver_client.put_object_count == 1
 
         await driver.store(make_store_context(), [payload])
-        assert (
-            counting_driver_client.put_object_count == 1
-        ), "put_object should not be called for an existing key"
+        assert counting_driver_client.put_object_count == 1, (
+            "put_object should not be called for an existing key"
+        )
 
     async def test_skips_upload_preserves_data(
         self, driver_client: S3StorageDriverClient
@@ -812,9 +812,9 @@ class TestS3StorageDriverConcurrency:
 
         assert isinstance(exc_info.value.__cause__, ConnectionError)
         assert str(exc_info.value.__cause__) == "S3 connection lost"
-        assert (
-            len(faulty_client.cancelled) == 2
-        ), "Expected 2 remaining tasks to be cancelled"
+        assert len(faulty_client.cancelled) == 2, (
+            "Expected 2 remaining tasks to be cancelled"
+        )
 
     async def test_retrieve_cancels_remaining_on_failure(
         self, driver_client: S3StorageDriverClient
@@ -838,9 +838,9 @@ class TestS3StorageDriverConcurrency:
 
         assert isinstance(exc_info.value.__cause__, ConnectionError)
         assert str(exc_info.value.__cause__) == "S3 connection lost"
-        assert (
-            len(faulty_client.cancelled) == 2
-        ), "Expected 2 remaining tasks to be cancelled"
+        assert len(faulty_client.cancelled) == 2, (
+            "Expected 2 remaining tasks to be cancelled"
+        )
 
 
 # ---------------------------------------------------------------------------

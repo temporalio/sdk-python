@@ -367,27 +367,27 @@ class TestBasicTracing:
             "  RunActivity:simple_activity",
             "    simple_activity",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        assert hierarchy == expected, (
+            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        )
 
         # Verify run_type: RunActivity is "tool", others are "chain"
         for run in collector.runs:
             if run.name == "RunActivity:simple_activity":
-                assert (
-                    run.run_type == "tool"
-                ), f"Expected RunActivity run_type='tool', got '{run.run_type}'"
+                assert run.run_type == "tool", (
+                    f"Expected RunActivity run_type='tool', got '{run.run_type}'"
+                )
             else:
-                assert (
-                    run.run_type == "chain"
-                ), f"Expected {run.name} run_type='chain', got '{run.run_type}'"
+                assert run.run_type == "chain", (
+                    f"Expected {run.name} run_type='chain', got '{run.run_type}'"
+                )
 
         # Verify successful runs have outputs == {"status": "ok"}
         for run in collector.runs:
             if ":" in run.name:  # Interceptor runs use "Type:Name" format
-                assert run.outputs == {
-                    "status": "ok"
-                }, f"Expected {run.name} outputs={{'status': 'ok'}}, got {run.outputs}"
+                assert run.outputs == {"status": "ok"}, (
+                    f"Expected {run.name} outputs={{'status': 'ok'}}, got {run.outputs}"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -475,9 +475,9 @@ class TestErrorTracing:
             "  RunActivity:failing_activity",
             "    failing_activity",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        assert hierarchy == expected, (
+            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        )
         # Verify the RunActivity run has an error
         activity_runs = [
             r for r in collector.runs if r.name == "RunActivity:failing_activity"
@@ -514,9 +514,9 @@ class TestErrorTracing:
             "StartWorkflow:FailingWorkflow",
             "RunWorkflow:FailingWorkflow",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        assert hierarchy == expected, (
+            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        )
         # Verify the RunWorkflow run has an error
         wf_runs = [r for r in collector.runs if r.name == "RunWorkflow:FailingWorkflow"]
         assert len(wf_runs) == 1
@@ -555,9 +555,9 @@ class TestErrorTracing:
             "  RunActivity:benign_failing_activity",
             "    benign_failing_activity",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        assert hierarchy == expected, (
+            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        )
         # The RunActivity run for benign error should NOT have error set
         activity_runs = [
             r for r in collector.runs if r.name == "RunActivity:benign_failing_activity"
@@ -988,15 +988,15 @@ class TestBackgroundIOIntegration:
             "  outer_chain",
             "    inner_llm_call",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        assert hierarchy == expected, (
+            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        )
 
         # Verify no duplicate run IDs (replay safety with max_cached_workflows=0)
         run_ids = [r.id for r in collector.runs]
-        assert len(run_ids) == len(
-            set(run_ids)
-        ), f"Duplicate run IDs found (replay issue): {run_ids}"
+        assert len(run_ids) == len(set(run_ids)), (
+            f"Duplicate run IDs found (replay issue): {run_ids}"
+        )
 
     async def test_factory_passes_project_name_to_children(
         self,
@@ -1081,15 +1081,15 @@ class TestBackgroundIOIntegration:
             "      outer_chain",
             "        inner_llm_call",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        assert hierarchy == expected, (
+            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        )
 
         # Verify no duplicate run IDs (replay safety with max_cached_workflows=0)
         run_ids = [r.id for r in collector.runs]
-        assert len(run_ids) == len(
-            set(run_ids)
-        ), f"Duplicate run IDs found (replay issue): {run_ids}"
+        assert len(run_ids) == len(set(run_ids)), (
+            f"Duplicate run IDs found (replay issue): {run_ids}"
+        )
 
 
 # --- Nexus service with direct @traceable call in handler ---
@@ -1190,9 +1190,9 @@ class TestNexusInboundTracing:
             "nexus_direct_traceable",
             "  inner_llm_call",
         ]
-        assert (
-            hierarchy == expected
-        ), f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        assert hierarchy == expected, (
+            f"Hierarchy mismatch.\nExpected:\n{expected}\nActual:\n{hierarchy}"
+        )
 
 
 # ---------------------------------------------------------------------------

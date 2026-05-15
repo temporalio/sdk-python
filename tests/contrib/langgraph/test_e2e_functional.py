@@ -219,15 +219,15 @@ class TestFunctionalAPIContinueAsNew:
         assert result["result"] == 260
 
         counts = get_task_execution_counts()
-        assert (
-            counts.get("task_a", 0) == 1
-        ), f"task_a executed {counts.get('task_a', 0)} times, expected 1"
-        assert (
-            counts.get("task_b", 0) == 1
-        ), f"task_b executed {counts.get('task_b', 0)} times, expected 1"
-        assert (
-            counts.get("task_c", 0) == 1
-        ), f"task_c executed {counts.get('task_c', 0)} times, expected 1"
+        assert counts.get("task_a", 0) == 1, (
+            f"task_a executed {counts.get('task_a', 0)} times, expected 1"
+        )
+        assert counts.get("task_b", 0) == 1, (
+            f"task_b executed {counts.get('task_b', 0)} times, expected 1"
+        )
+        assert counts.get("task_c", 0) == 1, (
+            f"task_c executed {counts.get('task_c', 0)} times, expected 1"
+        )
 
 
 class TestFunctionalAPIPartialExecution:
@@ -266,9 +266,9 @@ class TestFunctionalAPIPartialExecution:
 
         counts = get_task_execution_counts()
         for i in range(1, 6):
-            assert (
-                counts.get(f"step_{i}", 0) == 1
-            ), f"step_{i} executed {counts.get(f'step_{i}', 0)} times, expected 1"
+            assert counts.get(f"step_{i}", 0) == 1, (
+                f"step_{i} executed {counts.get(f'step_{i}', 0)} times, expected 1"
+            )
 
 
 class TestFunctionalAPIInterruptV2:
