@@ -8772,3 +8772,222 @@ async def test_random_seed_functionality(
         assert isinstance(result["seed_changes"], list)
         assert len(result["auto_values"]) == 2
         assert len(result["seed_changes"]) == 1
+
+
+# Tests for task.uncancel() fix in shield loops (Python 3.11+)
+# See https://github.com/temporalio/sdk-python/pull/1523
+
+
+@workflow.defn
+class UncancelShieldActivityWorkflow:
+    """Workflow that cancels a shielded activity and checks for duplicate commands."""
+
+    def __init__(self) -> None:
+        self._activity_result = "<none>"
+        self._cancel_count = 0
+
+    @workflow.run
+    async def run(self) -> str:
+        handle = workflow.start_activity(
+            wait_cancel,
+            schedule_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=2),
+            cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+        )
+        # Let activity start
+        await asyncio.sleep(0.01)
+        # Cancel the activity task
+        handle.cancel()
+        try:
+            self._activity_result = await handle
+        except ActivityError as err:
+            self._activity_result = f"Error: {err.cause.__class__.__name__}"
+        except CancelledError:
+            self._activity_result = "CancelledError"
+        return self._activity_result
+
+    @workflow.query
+    def activity_result(self) -> str:
+        return self._activity_result
+
+
+async def test_workflow_uncancel_shield_activity(client: Client):
+    """Verify that cancelling a shielded activity does not produce duplicate
+    cancel commands or spurious error logs due to elevated cancellation counter.
+    """
+    log_capturer = LogCapturer()
+    with log_capturer.logs_captured(
+        temporalio.worker._workflow_instance.logger, level=logging.WARNING
+    ):
+        async with new_worker(
+            client,
+            UncancelShieldActivityWorkflow,
+            activities=[wait_cancel],
+        ) as worker:
+            result = await client.execute_workflow(
+                UncancelShieldActivityWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+    # The activity should have been cancelled successfully
+    assert result == "Got cancelled error, cancelled? True"
+
+    # Verify no spurious "exception in shielded future" error logs
+    shielded_err = log_capturer.find_log("exception in shielded future")
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
+
+
+@workflow.defn
+class UncancelShieldChildWorkflow:
+    """Workflow that starts a child workflow, cancels it via task cancel,
+    and returns information about the cancellation."""
+
+    def __init__(self) -> None:
+        self._ready = False
+
+    @workflow.run
+    async def run(self) -> str:
+        # Start a child workflow via execute (which internally uses shield loops)
+        child_task = asyncio.create_task(
+            workflow.execute_child_workflow(
+                LongSleepWorkflow.run,
+                id=f"{workflow.info().workflow_id}_child",
+            )
+        )
+        self._ready = True
+        # Let the child start
+        await asyncio.sleep(0.01)
+        # Cancel the child task — this triggers the shield loop's CancelledError
+        child_task.cancel()
+        try:
+            await child_task
+            return "completed"
+        except ChildWorkflowError as err:
+            if isinstance(err.cause, CancelledError):
+                return "child_cancelled"
+            return f"child_error: {err.cause}"
+        except CancelledError:
+            return "task_cancelled"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+
+async def test_workflow_uncancel_shield_child_workflow(client: Client):
+    """Verify that cancelling a shielded child workflow task does not produce
+    duplicate RequestCancelExternalWorkflowExecution commands in history.
+    This was the primary symptom of the bug fixed by task.uncancel().
+    """
+    log_capturer = LogCapturer()
+    with log_capturer.logs_captured(
+        temporalio.worker._workflow_instance.logger, level=logging.WARNING
+    ):
+        async with new_worker(
+            client,
+            UncancelShieldChildWorkflow,
+            LongSleepWorkflow,
+        ) as worker:
+            handle = await client.start_workflow(
+                UncancelShieldChildWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            result = await handle.result()
+
+    assert result == "child_cancelled"
+
+    # Check history for duplicate cancel commands
+    resp = await client.workflow_service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=handle.id),
+        )
+    )
+    cancel_events = [
+        e
+        for e in resp.history.events
+        if e.event_type
+        == EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED
+    ]
+    # There should be exactly one cancel request, not duplicates
+    assert len(cancel_events) == 1, (
+        f"Expected exactly 1 RequestCancelExternalWorkflowExecution event, "
+        f"got {len(cancel_events)}"
+    )
+
+    # Verify no spurious "exception in shielded future" error logs
+    shielded_err = log_capturer.find_log("exception in shielded future")
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
+
+
+@workflow.defn
+class UncancelShieldSignalExternalWorkflow:
+    """Workflow that signals an external workflow from a task that gets
+    cancelled, exercising the shield loop in _signal_external_workflow."""
+
+    def __init__(self) -> None:
+        self._ready = False
+
+    @workflow.run
+    async def run(self, target_workflow_id: str) -> str:
+        # Start a signal task
+        signal_task = asyncio.create_task(
+            workflow.get_external_workflow_handle(target_workflow_id).signal(
+                ReturnSignalWorkflow.my_signal, "test_value"
+            )
+        )
+        self._ready = True
+        # The signal should complete quickly, but we test the path where
+        # the workflow itself gets cancelled while the signal is pending
+        try:
+            await signal_task
+            return "signal_sent"
+        except CancelledError:
+            return "signal_cancelled"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+
+async def test_workflow_uncancel_shield_signal_external(client: Client):
+    """Verify that signal external workflow completes without spurious errors
+    when the shield loop properly resets the cancellation counter.
+    """
+    log_capturer = LogCapturer()
+    with log_capturer.logs_captured(
+        temporalio.worker._workflow_instance.logger, level=logging.WARNING
+    ):
+        async with new_worker(
+            client,
+            UncancelShieldSignalExternalWorkflow,
+            ReturnSignalWorkflow,
+        ) as worker:
+            # Start the target workflow that waits for a signal
+            target_handle = await client.start_workflow(
+                ReturnSignalWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            # Start the signaler workflow
+            result = await client.execute_workflow(
+                UncancelShieldSignalExternalWorkflow.run,
+                target_handle.id,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert result == "signal_sent"
+            # Confirm the target received the signal
+            target_result = await target_handle.result()
+            assert target_result == "test_value"
+
+    # Verify no spurious error logs
+    shielded_err = log_capturer.find_log("exception in shielded future")
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
