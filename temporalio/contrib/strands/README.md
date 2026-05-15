@@ -2,7 +2,7 @@
 
 ⚠️ **This package is currently at an experimental release stage.** ⚠️
 
-This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows you to run [Strands Agents](https://strandsagents.com/) inside Temporal Workflows, routing model invocations, tool calls, and MCP tool calls through Temporal Activities for durable execution, automatic retries, and timeouts.
+This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows you to run [Strands Agents](https://strandsagents.com/) inside Temporal Workflows, routing model invocations, tool calls, and MCP tool calls through Temporal Activities for durable execution, Temporal-managed retries, and timeouts.
 
 ## Installation
 
@@ -93,6 +93,21 @@ MODEL = TemporalModel(
     start_to_close_timeout=timedelta(seconds=60),
 )
 ```
+
+## Retries
+
+The plugin disables Strands' built-in `ModelRetryStrategy` so retries are handled exclusively by Temporal. Configure retries via `RetryPolicy` on the activity options accepted by `TemporalModel`, `activity_as_tool`, `activity_as_hook`, and `TemporalMCPClient`:
+
+```python
+from temporalio.common import RetryPolicy
+
+MODEL = TemporalModel(
+    start_to_close_timeout=timedelta(seconds=60),
+    retry_policy=RetryPolicy(maximum_attempts=3),
+)
+```
+
+Passing `retry_strategy=...` to `Agent(...)` raises `ValueError`; remove the argument (or pass `retry_strategy=None`) and put the retry config on the activity options instead.
 
 ## Structured Output
 

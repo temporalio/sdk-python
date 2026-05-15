@@ -1,7 +1,9 @@
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from typing import Any
 
+import strands.agent.agent as _strands_agent
 import strands.models.model as _strands_model
 
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -16,6 +18,28 @@ from ._temporal_model import TemporalModel
 # Force Strands' base Model.count_tokens to skip tiktoken (non-deterministic)
 # and use its chars-per-token heuristic (deterministic).
 setattr(_strands_model, "_get_encoding", lambda: None)
+
+# Temporal handles retries via RetryPolicy on activity options. Disable
+# Strands' in-activity ModelRetryStrategy (default max_attempts=6) so retries
+# aren't duplicated, and fail fast if the user tries to configure one.
+_original_agent_init = _strands_agent.Agent.__init__
+_RETRY_STRATEGY_NOT_PASSED: Any = object()
+
+
+def _patched_agent_init(self: Any, *args: Any, **kwargs: Any) -> None:
+    retry_strategy = kwargs.get("retry_strategy", _RETRY_STRATEGY_NOT_PASSED)
+    if retry_strategy is not _RETRY_STRATEGY_NOT_PASSED and retry_strategy is not None:
+        raise ValueError(
+            "StrandsPlugin disables Strands retries; configure retries via "
+            "RetryPolicy on the activity options passed to TemporalModel, "
+            "activity_as_tool, activity_as_hook, or TemporalMCPClient. "
+            "Remove retry_strategy from Agent(...) or pass retry_strategy=None."
+        )
+    kwargs["retry_strategy"] = None
+    _original_agent_init(self, *args, **kwargs)
+
+
+setattr(_strands_agent.Agent, "__init__", _patched_agent_init)
 
 
 class StrandsPlugin(SimplePlugin):
