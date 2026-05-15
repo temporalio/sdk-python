@@ -64,6 +64,7 @@ dev = [
   "openinference-instrumentation-google-adk>=0.1.8",
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
+  "setuptools<82",
 ]
 
 [tool.poe.tasks]
