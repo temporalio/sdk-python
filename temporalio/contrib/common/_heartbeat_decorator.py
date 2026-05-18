@@ -8,7 +8,7 @@ from temporalio import activity
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
-def _auto_heartbeater(fn: F) -> F:
+def auto_heartbeater(fn: F) -> F:
     """Decorator that heartbeats at half the activity's heartbeat timeout."""
 
     @wraps(fn)

@@ -43,7 +43,7 @@ from openai.types.responses.tool_param import Mcp
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
-from temporalio.contrib.common._heartbeat_decorator import _auto_heartbeater
+from temporalio.contrib.common._heartbeat_decorator import auto_heartbeater
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
@@ -314,7 +314,7 @@ class ModelActivity:
         )
 
     @activity.defn
-    @_auto_heartbeater
+    @auto_heartbeater
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
         model = self._model_provider.get_model(input.get("model_name"))
@@ -337,7 +337,7 @@ class ModelActivity:
             _raise_for_openai_status(e)
 
     @activity.defn
-    @_auto_heartbeater
+    @auto_heartbeater
     async def invoke_model_activity_streaming(
         self, input: StreamingActivityModelInput
     ) -> list[TResponseStreamEvent]:
@@ -357,7 +357,7 @@ class ModelActivity:
         ``streaming_topic`` so external consumers (UIs, tracing,
         etc.) can observe events as they arrive.
 
-        Heartbeats run on a background task via ``_auto_heartbeater`` so
+        Heartbeats run on a background task via ``auto_heartbeater`` so
         long initial-token latency or long pauses between chunks do not
         trip ``heartbeat_timeout``.
         """
