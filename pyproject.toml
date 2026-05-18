@@ -31,7 +31,7 @@ pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.17.1", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=1.27.0,<2"]
 langgraph = ["langgraph>=1.1.0"]
-langsmith = ["langsmith>=0.7.0,<0.8"]
+langsmith = ["langsmith>=0.7.34,<0.8"]
 lambda-worker-otel = [
   "opentelemetry-api>=1.11.1,<2",
   "opentelemetry-sdk>=1.11.1,<2",
@@ -81,7 +81,7 @@ dev = [
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
   "langgraph>=1.1.0",
-  "langsmith>=0.7.0,<0.7.34",
+  "langsmith>=0.7.34,<0.8",
   "setuptools<82",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
