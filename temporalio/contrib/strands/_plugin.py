@@ -15,8 +15,8 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from ._temporal_mcp_client import TemporalMCPClient
 from ._temporal_model import TemporalModel
 
-# Force Strands' base Model.count_tokens to skip tiktoken (non-deterministic)
-# and use its chars-per-token heuristic (deterministic).
+# Force Strands' base Model.count_tokens to avoid tiktoken, which lazily downloads
+# an encoding file. Use the default chars-per-token heuristic instead (deterministic).
 setattr(_strands_model, "_get_encoding", lambda: None)
 
 # Temporal handles retries via RetryPolicy on activity options. Disable
