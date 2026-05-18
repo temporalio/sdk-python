@@ -16,6 +16,7 @@ from typing import (
     cast,
     overload,
 )
+
 import nexusrpc
 from nexusrpc import OutputT
 from typing_extensions import Required, Self, TypedDict
@@ -48,10 +49,10 @@ from ..types import (
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
     MultiParamSpec,
+    NexusServiceType,
     ParamType,
     ReturnType,
     SelfType,
-    NexusServiceType,
 )
 from ._activity import (
     ActivityExecutionAsyncIterator,
@@ -80,6 +81,13 @@ from ._interceptor import (
     UpdateWithStartUpdateWorkflowInput,
     UpdateWorkerBuildIdCompatibilityInput,
 )
+from ._nexus import (
+    NexusClient,
+    NexusOperationExecutionAsyncIterator,
+    NexusOperationExecutionCount,
+    NexusOperationHandle,
+    _NexusClient,
+)
 from ._schedule import (
     Schedule,
     ScheduleAsyncIterator,
@@ -99,13 +107,6 @@ from ._workflow import (
     WorkflowHandle,
     WorkflowUpdateHandle,
     WorkflowUpdateStage,
-)
-from ._nexus import (
-    NexusClient,
-    _NexusClient,
-    NexusOperationExecutionAsyncIterator,
-    NexusOperationExecutionCount,
-    NexusOperationHandle,
 )
 
 if TYPE_CHECKING:

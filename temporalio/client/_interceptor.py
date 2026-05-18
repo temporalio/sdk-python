@@ -32,6 +32,12 @@ if TYPE_CHECKING:
         ActivityHandle,
         AsyncActivityIDReference,
     )
+    from ._nexus import (
+        NexusOperationExecutionAsyncIterator,
+        NexusOperationExecutionCount,
+        NexusOperationExecutionDescription,
+        NexusOperationHandle,
+    )
     from ._schedule import (
         Schedule,
         ScheduleAsyncIterator,
@@ -57,12 +63,6 @@ if TYPE_CHECKING:
         WorkflowHistoryEventFilterType,
         WorkflowUpdateHandle,
         WorkflowUpdateStage,
-    )
-    from ._nexus import (
-        NexusOperationHandle,
-        NexusOperationExecutionDescription,
-        NexusOperationExecutionCount,
-        NexusOperationExecutionAsyncIterator,
     )
 
 

@@ -106,6 +106,13 @@ from ._interceptor import (
     UpdateWithStartUpdateWorkflowInput,
     UpdateWorkerBuildIdCompatibilityInput,
 )
+from ._nexus import (
+    NexusOperationExecutionAsyncIterator,
+    NexusOperationExecutionCount,
+    NexusOperationExecutionDescription,
+    NexusOperationFailureError,
+    NexusOperationHandle,
+)
 from ._schedule import (
     ScheduleAsyncIterator,
     ScheduleDescription,
@@ -123,13 +130,6 @@ from ._workflow import (
     WorkflowHistoryEventAsyncIterator,
     WorkflowUpdateHandle,
     WorkflowUpdateStage,
-)
-from ._nexus import (
-    NexusOperationExecutionDescription,
-    NexusOperationHandle,
-    NexusOperationFailureError,
-    NexusOperationExecutionCount,
-    NexusOperationExecutionAsyncIterator,
 )
 
 if TYPE_CHECKING:

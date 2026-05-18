@@ -1,32 +1,32 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Generic, cast, overload
 
-from typing_extensions import Self
-
 import nexusrpc
 from nexusrpc import InputT, OutputT
+from typing_extensions import Self
 
-import temporalio.common
-import temporalio.exceptions
-import temporalio.converter
-import temporalio.converter._search_attributes
 import temporalio.api.nexus.v1
 import temporalio.api.workflowservice.v1
+import temporalio.common
+import temporalio.converter
+import temporalio.converter._search_attributes
+import temporalio.exceptions
 import temporalio.nexus._util
 from temporalio.types import NexusServiceType, ReturnType
+
 from ._helpers import _decode_user_metadata
 from ._interceptor import (
-    GetNexusOperationResultInput,
-    DescribeNexusOperationInput,
     CancelNexusOperationInput,
+    DescribeNexusOperationInput,
+    GetNexusOperationResultInput,
+    ListNexusOperationsInput,
     StartNexusOperationInput,
     TerminateNexusOperationInput,
-    ListNexusOperationsInput,
 )
 
 if TYPE_CHECKING:
@@ -802,7 +802,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         ...
 
 
-class _NexusClient(NexusClient[NexusServiceType]):
+class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnusedClass]
     """Concrete implementation of NexusClient."""
 
     def __init__(
