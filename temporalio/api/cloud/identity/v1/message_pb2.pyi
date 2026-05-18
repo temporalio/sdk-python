@@ -92,7 +92,6 @@ class AccountAccess(google.protobuf.message.Message):
 
     ROLE_DEPRECATED_FIELD_NUMBER: builtins.int
     ROLE_FIELD_NUMBER: builtins.int
-    CUSTOM_ROLES_FIELD_NUMBER: builtins.int
     role_deprecated: builtins.str
     """The role on the account, should be one of [owner, admin, developer, financeadmin, read, metricsread]
     owner - gives full access to the account, including users, namespaces, and billing
@@ -109,29 +108,16 @@ class AccountAccess(google.protobuf.message.Message):
     temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=role_deprecated
     """
-    @property
-    def custom_roles(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """List of custom role IDs assigned to the user or service account.
-        temporal:versioning:min_version=v0.13.0
-        """
     def __init__(
         self,
         *,
         role_deprecated: builtins.str = ...,
         role: global___AccountAccess.Role.ValueType = ...,
-        custom_roles: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "custom_roles",
-            b"custom_roles",
-            "role",
-            b"role",
-            "role_deprecated",
-            b"role_deprecated",
+            "role", b"role", "role_deprecated", b"role_deprecated"
         ],
     ) -> None: ...
 
@@ -228,7 +214,6 @@ class Access(google.protobuf.message.Message):
 
     ACCOUNT_ACCESS_FIELD_NUMBER: builtins.int
     NAMESPACE_ACCESSES_FIELD_NUMBER: builtins.int
-    CUSTOM_ROLES_DEPRECATED_FIELD_NUMBER: builtins.int
     @property
     def account_access(self) -> global___AccountAccess:
         """The account access"""
@@ -241,14 +226,6 @@ class Access(google.protobuf.message.Message):
         """The map of namespace accesses
         The key is the namespace name and the value is the access to the namespace
         """
-    @property
-    def custom_roles_deprecated(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """List of custom role IDs assigned to the user or service account.
-        Deprecated: Not supported after v0.12.0 api version. Use account_access.custom_roles instead.
-        temporal:versioning:max_version=v0.12.0
-        """
     def __init__(
         self,
         *,
@@ -257,7 +234,6 @@ class Access(google.protobuf.message.Message):
             builtins.str, global___NamespaceAccess
         ]
         | None = ...,
-        custom_roles_deprecated: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["account_access", b"account_access"]
@@ -267,8 +243,6 @@ class Access(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "account_access",
             b"account_access",
-            "custom_roles_deprecated",
-            b"custom_roles_deprecated",
             "namespace_accesses",
             b"namespace_accesses",
         ],
@@ -1035,186 +1009,3 @@ class ApiKeySpec(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ApiKeySpec = ApiKeySpec
-
-class CustomRoleSpec(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    class Resources(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        RESOURCE_TYPE_FIELD_NUMBER: builtins.int
-        RESOURCE_IDS_FIELD_NUMBER: builtins.int
-        ALLOW_ALL_FIELD_NUMBER: builtins.int
-        resource_type: builtins.str
-        """The resource type the permission applies to."""
-        @property
-        def resource_ids(
-            self,
-        ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
-            builtins.str
-        ]:
-            """The resource IDs the permission applies to. Can be empty if allow_all is true."""
-        allow_all: builtins.bool
-        """Whether the permission applies to all resources of the given type."""
-        def __init__(
-            self,
-            *,
-            resource_type: builtins.str = ...,
-            resource_ids: collections.abc.Iterable[builtins.str] | None = ...,
-            allow_all: builtins.bool = ...,
-        ) -> None: ...
-        def ClearField(
-            self,
-            field_name: typing_extensions.Literal[
-                "allow_all",
-                b"allow_all",
-                "resource_ids",
-                b"resource_ids",
-                "resource_type",
-                b"resource_type",
-            ],
-        ) -> None: ...
-
-    class Permission(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        RESOURCES_FIELD_NUMBER: builtins.int
-        ACTIONS_FIELD_NUMBER: builtins.int
-        @property
-        def resources(self) -> global___CustomRoleSpec.Resources:
-            """The resources the permission applies to."""
-        @property
-        def actions(
-            self,
-        ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
-            builtins.str
-        ]:
-            """The actions allowed by the permission."""
-        def __init__(
-            self,
-            *,
-            resources: global___CustomRoleSpec.Resources | None = ...,
-            actions: collections.abc.Iterable[builtins.str] | None = ...,
-        ) -> None: ...
-        def HasField(
-            self, field_name: typing_extensions.Literal["resources", b"resources"]
-        ) -> builtins.bool: ...
-        def ClearField(
-            self,
-            field_name: typing_extensions.Literal[
-                "actions", b"actions", "resources", b"resources"
-            ],
-        ) -> None: ...
-
-    NAME_FIELD_NUMBER: builtins.int
-    DESCRIPTION_FIELD_NUMBER: builtins.int
-    PERMISSIONS_FIELD_NUMBER: builtins.int
-    name: builtins.str
-    """The name of the custom role."""
-    description: builtins.str
-    """The description of the custom role."""
-    @property
-    def permissions(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___CustomRoleSpec.Permission
-    ]:
-        """The permissions assigned to the custom role."""
-    def __init__(
-        self,
-        *,
-        name: builtins.str = ...,
-        description: builtins.str = ...,
-        permissions: collections.abc.Iterable[global___CustomRoleSpec.Permission]
-        | None = ...,
-    ) -> None: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "description",
-            b"description",
-            "name",
-            b"name",
-            "permissions",
-            b"permissions",
-        ],
-    ) -> None: ...
-
-global___CustomRoleSpec = CustomRoleSpec
-
-class CustomRole(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    ID_FIELD_NUMBER: builtins.int
-    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
-    SPEC_FIELD_NUMBER: builtins.int
-    STATE_FIELD_NUMBER: builtins.int
-    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
-    CREATED_TIME_FIELD_NUMBER: builtins.int
-    LAST_MODIFIED_TIME_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    """The id of the custom role."""
-    resource_version: builtins.str
-    """The current version of the custom role specification.
-    The next update operation will have to include this version.
-    """
-    @property
-    def spec(self) -> global___CustomRoleSpec:
-        """The custom role specification."""
-    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
-    """The current state of the custom role.
-    For any failed state, reach out to Temporal Cloud support for remediation.
-    """
-    async_operation_id: builtins.str
-    """The id of the async operation that is creating/updating/deleting the custom role, if any."""
-    @property
-    def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The date and time when the custom role was created."""
-    @property
-    def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The date and time when the custom role was last modified.
-        Will not be set if the custom role has never been modified.
-        """
-    def __init__(
-        self,
-        *,
-        id: builtins.str = ...,
-        resource_version: builtins.str = ...,
-        spec: global___CustomRoleSpec | None = ...,
-        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
-        async_operation_id: builtins.str = ...,
-        created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "created_time",
-            b"created_time",
-            "last_modified_time",
-            b"last_modified_time",
-            "spec",
-            b"spec",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "async_operation_id",
-            b"async_operation_id",
-            "created_time",
-            b"created_time",
-            "id",
-            b"id",
-            "last_modified_time",
-            b"last_modified_time",
-            "resource_version",
-            b"resource_version",
-            "spec",
-            b"spec",
-            "state",
-            b"state",
-        ],
-    ) -> None: ...
-
-global___CustomRole = CustomRole
