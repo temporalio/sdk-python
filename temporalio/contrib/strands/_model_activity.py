@@ -1,23 +1,26 @@
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Any
 
 from strands.models import Model
-from strands.types.content import Messages, SystemContentBlock
 from strands.types.streaming import StreamEvent
-from strands.types.tools import ToolChoice, ToolSpec
 
 from temporalio import activity
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 
 
+# Fields are typed as Any because strands TypedDicts (Message, ToolSpec) use
+# NotRequired, which Python < 3.11's get_type_hints leaks through unchanged
+# and the default JSON converter then fails to deserialize. Values flow
+# through unchanged to ``Model.stream`` which accepts the raw dicts.
 @dataclass
 class _InvokeModelInput:
-    messages: Messages
-    tool_specs: list[ToolSpec] | None = None
+    messages: Any
+    tool_specs: Any = None
     system_prompt: str | None = None
-    tool_choice: ToolChoice | None = None
-    system_prompt_content: list[SystemContentBlock] | None = None
+    tool_choice: Any = None
+    system_prompt_content: Any = None
 
 
 @dataclass
