@@ -46,7 +46,6 @@ jobs:
           components: "clippy"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          cache-bin: false
           workspaces: temporalio/bridge -> target
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -63,25 +62,6 @@ jobs:
         if: ${{ matrix.clippyLinter }}
       - run: poe build-develop
       - run: poe lint
-      - name: Warm Temporal dev server download
-        shell: bash
-        run: |
-          uv run python - <<'PY'
-          import asyncio
-
-          from temporalio.testing import WorkflowEnvironment
-          from tests import DEV_SERVER_DOWNLOAD_VERSION
-
-
-          async def main() -> None:
-              env = await WorkflowEnvironment.start_local(
-                  dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
-              )
-              await env.shutdown()
-
-
-          asyncio.run(main())
-          PY
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
@@ -131,7 +111,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          cache-bin: false
           workspaces: temporalio/bridge -> target
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -168,7 +147,6 @@ jobs:
           components: "clippy"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          cache-bin: false
           workspaces: temporalio/bridge -> target
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -207,7 +185,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          cache-bin: false
           workspaces: temporalio/bridge -> target
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
