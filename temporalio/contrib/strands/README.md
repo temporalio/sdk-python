@@ -109,6 +109,10 @@ MODEL = TemporalModel(
 
 Passing `retry_strategy=...` to `Agent(...)` raises `ValueError`; remove the argument (or pass `retry_strategy=None`) and put the retry config on the activity options instead.
 
+## Snapshots
+
+The plugin disables `Agent.take_snapshot()` and `Agent.load_snapshot()`. Temporal's event history already persists workflow state durably at a finer granularity than Strands snapshots, so calling either inside a workflow is redundant. Both methods raise `NotImplementedError`.
+
 ## Structured Output
 
 Pass a Pydantic model to `Agent(structured_output_model=...)`. Strands routes the call through `stream()` as a synthetic tool, so it dispatches via the model activity like any other invocation. The result is available as `result.structured_output` and can be returned directly from the workflow — `StrandsPlugin` defaults to [`pydantic_data_converter`](../pydantic), so Pydantic types serialize across the activity and workflow boundary.

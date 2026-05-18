@@ -42,6 +42,23 @@ def _patched_agent_init(self: Any, *args: Any, **kwargs: Any) -> None:
 setattr(_strands_agent.Agent, "__init__", _patched_agent_init)
 
 
+# Temporal workflows already persist agent state durably via the event history at
+# a finer granularity than Strands snapshots, so calling either method inside a
+# workflow is redundant; fail loudly to steer users to Temporal's durability.
+def _snapshots_disabled(*args: Any, **kwargs: Any) -> Any:
+    del args, kwargs
+    raise NotImplementedError(
+        "StrandsPlugin disables Agent.take_snapshot()/load_snapshot(). "
+        "Temporal workflows already persist agent state durably via the event "
+        "history at a finer granularity than Strands snapshots. Remove the "
+        "snapshot call and rely on Temporal's durable execution instead."
+    )
+
+
+setattr(_strands_agent.Agent, "take_snapshot", _snapshots_disabled)
+setattr(_strands_agent.Agent, "load_snapshot", _snapshots_disabled)
+
+
 class StrandsPlugin(SimplePlugin):
     """Temporal Worker plugin for the Strands Agents SDK.
 
