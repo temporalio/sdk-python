@@ -73,6 +73,7 @@ class LangSmithPlugin(SimplePlugin):
                     restrictions=runner.restrictions.with_passthrough_modules(
                         "langsmith",
                         "langchain_core",
+                        "opentelemetry",
                     ),
                 )
             return runner
