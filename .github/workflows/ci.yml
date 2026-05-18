@@ -154,7 +154,7 @@ jobs:
       - name: Stress test Nexus WAIT_COMPLETED cancellation ordering
         shell: bash
         run: |
-          for i in $(seq 1 30); do
+          for i in $(seq 1 100); do
             echo "::group::WAIT_COMPLETED stress iteration ${i} (${{ matrix.workflowEnvironment }})"
             uv run pytest \
               -s \

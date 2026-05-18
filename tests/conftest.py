@@ -123,6 +123,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "--dynamic-config-value",
                 "activity.enableStandalone=true",
                 "--dynamic-config-value",
+                "activity.startDelayEnabled=true",
+                "--dynamic-config-value",
                 "history.enableChasm=true",
                 "--dynamic-config-value",
                 "history.enableTransitionHistory=true",
