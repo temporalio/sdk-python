@@ -91,8 +91,8 @@ async def test_interrupt(client: Client):
 
     history = await handle.fetch_history()
     assert get_activities(history) == [
-        "invoke_strands_model",
-        "invoke_strands_model",
+        "invoke_model",
+        "invoke_model",
     ]
 
     await Replayer(

@@ -46,7 +46,7 @@ async def test_model(client: Client):
         assert await handle.result() == "Done!\n"
 
     history = await handle.fetch_history()
-    assert get_activities(history) == ["invoke_strands_model"]
+    assert get_activities(history) == ["invoke_model"]
 
     await Replayer(
         workflows=[ModelWorkflow],

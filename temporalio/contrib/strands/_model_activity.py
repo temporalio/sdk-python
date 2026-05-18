@@ -7,6 +7,7 @@ from strands.models import Model
 from strands.types.streaming import StreamEvent
 
 from temporalio import activity
+from temporalio.contrib.common._heartbeat_decorator import _auto_heartbeater
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 
 
@@ -36,12 +37,14 @@ class ModelActivity:
         """Store the model that activities will invoke."""
         self._model = model
 
-    @activity.defn(name="invoke_strands_model")
+    @activity.defn
+    @_auto_heartbeater
     async def invoke_model(self, input: _InvokeModelInput) -> list[StreamEvent]:
         """Run the model and return its stream events as a list."""
         return [event async for event in _stream(self._model, input)]
 
-    @activity.defn(name="invoke_strands_model_streaming")
+    @activity.defn
+    @_auto_heartbeater
     async def invoke_model_streaming(
         self, input: _StreamingInvokeModelInput
     ) -> list[StreamEvent]:
@@ -53,7 +56,6 @@ class ModelActivity:
         topic = stream.topic(input.streaming_topic)
         async with stream:
             async for event in _stream(self._model, input):
-                activity.heartbeat()
                 events.append(event)
                 topic.publish(event)
         return events

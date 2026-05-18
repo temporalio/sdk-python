@@ -84,13 +84,13 @@ async def test_tool(client: Client):
 
     history = await handle.fetch_history()
     assert get_activities(history) == [
-        "invoke_strands_model",
+        "invoke_model",
         "current_time",
-        "invoke_strands_model",
+        "invoke_model",
         # calculator (in-workflow)
-        "invoke_strands_model",
+        "invoke_model",
         # letter_counter (in-workflow)
-        "invoke_strands_model",
+        "invoke_model",
     ]
 
     await Replayer(

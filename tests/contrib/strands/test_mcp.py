@@ -70,9 +70,9 @@ async def test_mcp(client: Client):
 
     history = await handle.fetch_history()
     assert get_activities(history) == [
-        "invoke_strands_model",
+        "invoke_model",
         "echo-call-tool",
-        "invoke_strands_model",
+        "invoke_model",
     ]
 
     await Replayer(

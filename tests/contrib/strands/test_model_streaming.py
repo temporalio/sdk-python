@@ -69,7 +69,7 @@ async def test_model_streaming(client: Client):
         await asyncio.wait_for(collect_task, timeout=10.0)
 
     history = await handle.fetch_history()
-    assert get_activities(history) == ["invoke_strands_model_streaming"]
+    assert get_activities(history) == ["invoke_model_streaming"]
 
     assert any("messageStart" in e for e in events)
     assert any("messageStop" in e for e in events)
