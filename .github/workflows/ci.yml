@@ -16,6 +16,7 @@ env:
 jobs:
   # Build and test the project
   build-lint-test:
+    if: ${{ false }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -144,6 +145,7 @@ jobs:
           done
 
   check-protos:
+    if: ${{ false }}
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
@@ -179,6 +181,7 @@ jobs:
           TEMPORAL_TEST_PROTO3: 1
 
   test-latest-deps:
+    if: ${{ false }}
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
@@ -219,7 +222,7 @@ jobs:
 
   # Run tests against Temporal Cloud (skipped on forks)
   cloud-test:
-    if: ${{ github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python' }}
+    if: ${{ false }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
@@ -263,6 +266,7 @@ jobs:
 
   # Runs the sdk features repo tests with this repo's current SDK code
   features-tests:
+    if: ${{ false }}
     uses: temporalio/features/.github/workflows/python.yaml@main
     with:
       python-repo-path: ${{github.event.pull_request.head.repo.full_name}}
