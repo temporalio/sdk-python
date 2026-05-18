@@ -461,6 +461,38 @@ async def test_get_result(client: Client, env: WorkflowEnvironment):
         assert await result_via_execute_activity == 2
 
 
+async def test_start_activity_start_delay(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
+    activity_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+    start_delay = timedelta(seconds=2)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[increment],
+    ):
+        activity_handle = await client.start_activity(
+            increment,
+            args=(1,),
+            id=activity_id,
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=5),
+            start_delay=start_delay,
+        )
+
+        assert await activity_handle.result() == 2
+        desc = await activity_handle.describe()
+        assert desc.last_started_time is not None
+        assert (
+            desc.last_started_time - desc.scheduled_time
+        ).total_seconds() >= start_delay.total_seconds() - 0.5
+
+
 async def test_get_activity_handle(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(
