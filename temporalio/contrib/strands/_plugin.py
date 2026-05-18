@@ -127,11 +127,8 @@ def _workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
                 "strands",
                 "strands_tools",
                 "mcp",
-                "temporalio.contrib.strands",
-                # The SDK's default passthrough already includes ``pydantic`` because
-                # it lazy-imports inside some classes; extend that to its compiled
-                # validation core and its ``Annotated`` helper for the same reason.
-                "pydantic",
+                # ``pydantic`` is already in the SDK default passthrough; extend it
+                # to its compiled validation core and ``Annotated`` helper.
                 "pydantic_core",
                 "annotated_types",
             ),

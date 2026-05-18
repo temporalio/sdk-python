@@ -31,9 +31,8 @@ class _CallToolArgs:
 
 # Server name -> cached tool list. Populated by TemporalMCPClient._populate_cache
 # at worker startup and read by TemporalMCPClient.load_tools() inside the
-# workflow sandbox. ``StrandsPlugin`` adds ``temporalio.contrib.strands`` to
-# sandbox passthrough so this dict is shared between worker process and
-# workflow execution.
+# workflow sandbox. ``temporalio`` is in the SDK's default sandbox passthrough,
+# so this dict is shared between worker process and workflow execution.
 _TOOL_CACHE: dict[str, list[_MCPToolInfo]] = {}
 
 
