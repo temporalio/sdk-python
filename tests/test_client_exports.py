@@ -1,6 +1,5 @@
 import temporalio.client
 
-
 # Generated from temporalio.client on main with /private/tmp/gather_client_exports.py.
 EXPECTED_CLIENT_EXPORTS = [
     "ActivityCancellationDetails",
