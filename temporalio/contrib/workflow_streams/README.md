@@ -22,7 +22,7 @@ that hand stream state across Workflow runs.
 ## Documentation
 
 📖 **The full guide lives in the Temporal documentation site:**
-**[Workflow Streams — Python SDK](https://docs.temporal.io/develop/python/libraries/workflow-streams)**
+**[Workflow Streams — Python SDK](https://docs.temporal.io/develop/python/workflows/workflow-streams)**
 
 It covers installation, enabling streaming on a Workflow, publishing from
 Workflows and Activities, subscribing, continue-as-new, delivery semantics,
