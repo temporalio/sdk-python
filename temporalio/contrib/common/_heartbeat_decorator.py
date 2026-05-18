@@ -8,23 +8,22 @@ from temporalio import activity
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
-def _auto_heartbeater(fn: F) -> F:  # type:ignore[reportUnusedClass]
-    # Propagate type hints from the original callable.
+def _auto_heartbeater(fn: F) -> F:
+    """Decorator that heartbeats at half the activity's heartbeat timeout."""
+
     @wraps(fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         heartbeat_timeout = activity.info().heartbeat_timeout
         heartbeat_task = None
         if heartbeat_timeout:
-            # Heartbeat twice as often as the timeout
             heartbeat_task = asyncio.create_task(
-                heartbeat_every(heartbeat_timeout.total_seconds() / 2)
+                _heartbeat_every(heartbeat_timeout.total_seconds() / 2)
             )
         try:
             return await fn(*args, **kwargs)
         finally:
             if heartbeat_task:
                 heartbeat_task.cancel()
-                # Wait for heartbeat cancellation to complete
                 try:
                     await heartbeat_task
                 except asyncio.CancelledError:
@@ -33,8 +32,7 @@ def _auto_heartbeater(fn: F) -> F:  # type:ignore[reportUnusedClass]
     return cast(F, wrapper)
 
 
-async def heartbeat_every(delay: float, *details: Any) -> None:
-    """Heartbeat every so often while not cancelled"""
+async def _heartbeat_every(delay: float) -> None:
     while True:
         await asyncio.sleep(delay)
-        activity.heartbeat(*details)
+        activity.heartbeat()
