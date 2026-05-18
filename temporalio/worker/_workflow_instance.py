@@ -2039,9 +2039,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 apply_child_cancel_error()
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
-                if (t := asyncio.current_task()) is not None and hasattr(
-                    t, "uncancel"
-                ):
+                if (t := asyncio.current_task()) is not None and hasattr(t, "uncancel"):
                     t.uncancel()
                 if self._cancel_requested:
                     raise
@@ -2093,9 +2091,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 handle._apply_cancel_command(cancel_command)
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
-                if (t := asyncio.current_task()) is not None and hasattr(
-                    t, "uncancel"
-                ):
+                if (t := asyncio.current_task()) is not None and hasattr(t, "uncancel"):
                     t.uncancel()
                 if self._cancel_requested:
                     raise
@@ -2631,9 +2627,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 cancel_command.cancel_signal_workflow.seq = seq
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
-                if (t := asyncio.current_task()) is not None and hasattr(
-                    t, "uncancel"
-                ):
+                if (t := asyncio.current_task()) is not None and hasattr(t, "uncancel"):
                     t.uncancel()
 
     def _stack_trace(self) -> str:

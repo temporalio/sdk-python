@@ -310,16 +310,24 @@ async def test_cancellation_type(
 
             if cancellation_type == workflow.NexusOperationCancellationType.ABANDON:
                 await check_behavior_for_abandon(caller_wf, handler_wf)
-            elif cancellation_type == workflow.NexusOperationCancellationType.TRY_CANCEL:
+            elif (
+                cancellation_type == workflow.NexusOperationCancellationType.TRY_CANCEL
+            ):
                 await check_behavior_for_try_cancel(caller_wf, handler_wf)
             elif (
-                cancellation_type == workflow.NexusOperationCancellationType.WAIT_REQUESTED
+                cancellation_type
+                == workflow.NexusOperationCancellationType.WAIT_REQUESTED
             ):
-                await check_behavior_for_wait_cancellation_requested(caller_wf, handler_wf)
+                await check_behavior_for_wait_cancellation_requested(
+                    caller_wf, handler_wf
+                )
             elif (
-                cancellation_type == workflow.NexusOperationCancellationType.WAIT_COMPLETED
+                cancellation_type
+                == workflow.NexusOperationCancellationType.WAIT_COMPLETED
             ):
-                await check_behavior_for_wait_cancellation_completed(caller_wf, handler_wf)
+                await check_behavior_for_wait_cancellation_completed(
+                    caller_wf, handler_wf
+                )
             else:
                 pytest.fail(f"Invalid cancellation type: {cancellation_type}")
 
