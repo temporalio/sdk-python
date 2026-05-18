@@ -2534,7 +2534,6 @@ class Client:
     def create_nexus_client(
         self,
         service: type[NexusServiceType] | str,
-        *,
         endpoint: str,
     ) -> NexusClient[NexusServiceType]:
         """Create a client for starting standalone Nexus operations.
