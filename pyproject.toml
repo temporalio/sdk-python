@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.27.0"
+version = "1.27.2"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -28,10 +28,10 @@ classifiers = [
 grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
-openai-agents = ["openai-agents>=0.14.0", "mcp>=1.9.4, <2"]
+openai-agents = ["openai-agents>=0.17.1", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=1.27.0,<2"]
 langgraph = ["langgraph>=1.1.0"]
-langsmith = ["langsmith>=0.7.0,<0.8"]
+langsmith = ["langsmith>=0.7.34,<0.8"]
 lambda-worker-otel = [
   "opentelemetry-api>=1.11.1,<2",
   "opentelemetry-sdk>=1.11.1,<2",
@@ -78,13 +78,13 @@ dev = [
   "openai-agents>=0.14.0; python_version >= '3.14'",
   "openai-agents[litellm]>=0.14.0; python_version < '3.14'",
   "litellm>=1.83.0",
-  "openinference-instrumentation-google-adk>=0.1.8",
+  "openinference-instrumentation-google-adk>=0.1.11",
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
   "langgraph>=1.1.0",
-  "langsmith>=0.7.0,<0.7.34",
+  "langsmith>=0.7.34,<0.8",
   "setuptools<82",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
@@ -261,4 +261,4 @@ exclude = ["temporalio/bridge/target/**/*"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "1 week"
-exclude-newer-package = { openai-agents = false }
+exclude-newer-package = { openai-agents = false, openinference-instrumentation-google-adk = false }
