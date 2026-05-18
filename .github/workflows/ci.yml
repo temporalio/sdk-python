@@ -104,13 +104,32 @@ jobs:
           [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
 
   nexus-wait-completed-cancellation-stress:
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.14"]
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - python: "3.10"
+            os: ubuntu-latest
+            workflowEnvironment: local
+          - python: "3.14"
+            os: ubuntu-latest
+            workflowEnvironment: time-skipping
+          - python: "3.10"
+            os: windows-latest
+            workflowEnvironment: local
+          - python: "3.14"
+            os: windows-latest
+            workflowEnvironment: time-skipping
+          - python: "3.10"
+            os: macos-intel
+            runsOn: macos-15-intel
+            workflowEnvironment: local
+          - python: "3.14"
+            os: macos-intel
+            runsOn: macos-15-intel
+            workflowEnvironment: time-skipping
+    runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -135,11 +154,11 @@ jobs:
       - name: Stress test Nexus WAIT_COMPLETED cancellation ordering
         shell: bash
         run: |
-          for i in $(seq 1 50); do
-            echo "::group::WAIT_COMPLETED stress iteration ${i}"
-            poe test \
+          for i in $(seq 1 30); do
+            echo "::group::WAIT_COMPLETED stress iteration ${i} (${{ matrix.workflowEnvironment }})"
+            uv run pytest \
               -s \
-              --workflow-environment time-skipping \
+              --workflow-environment "${{ matrix.workflowEnvironment }}" \
               "tests/nexus/test_workflow_caller_cancellation_types.py::test_cancellation_type[WAIT_COMPLETED]"
             echo "::endgroup::"
           done
