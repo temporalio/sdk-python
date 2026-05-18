@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -235,6 +236,20 @@ class CallerWorkflow:
     ],
 )
 async def test_cancellation_type(
+    env: WorkflowEnvironment,
+    cancellation_type_name: str,
+):
+    stress_runs = int(os.getenv("TEMPORAL_NEXUS_CANCELLATION_STRESS_RUNS", "1"))
+    for i in range(stress_runs):
+        if stress_runs > 1:
+            print(
+                f"WAIT_COMPLETED cancellation stress iteration "
+                f"{i + 1}/{stress_runs}"
+            )
+        await _run_cancellation_type_test(env, cancellation_type_name)
+
+
+async def _run_cancellation_type_test(
     env: WorkflowEnvironment,
     cancellation_type_name: str,
 ):

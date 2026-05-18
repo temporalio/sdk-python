@@ -152,16 +152,9 @@ jobs:
       - run: uv sync --all-extras
       - run: poe build-develop
       - name: Stress test Nexus WAIT_COMPLETED cancellation ordering
-        shell: bash
-        run: |
-          for i in $(seq 1 100); do
-            echo "::group::WAIT_COMPLETED stress iteration ${i} (${{ matrix.workflowEnvironment }})"
-            uv run pytest \
-              -s \
-              --workflow-environment "${{ matrix.workflowEnvironment }}" \
-              "tests/nexus/test_workflow_caller_cancellation_types.py::test_cancellation_type[WAIT_COMPLETED]"
-            echo "::endgroup::"
-          done
+        run: uv run pytest -s --workflow-environment "${{ matrix.workflowEnvironment }}" "tests/nexus/test_workflow_caller_cancellation_types.py::test_cancellation_type[WAIT_COMPLETED]"
+        env:
+          TEMPORAL_NEXUS_CANCELLATION_STRESS_RUNS: 100
 
   check-protos:
     if: ${{ false }}
