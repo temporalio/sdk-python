@@ -77,7 +77,16 @@ from ._exceptions import (
     WorkflowUpdateFailedError,
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
-from ._helpers import _history_from_json
+from ._helpers import (
+    _apply_headers,
+    _decode_user_metadata,
+    _encode_user_metadata,
+    _fix_history_enum,
+    _fix_history_failure,
+    _history_from_json,
+    _pascal_case_match,
+)
+from ._impl import _ClientImpl
 from ._interceptor import (
     BackfillScheduleInput,
     CancelActivityInput,
@@ -291,7 +300,14 @@ __all__ = [
     "CloudOperationsClient",
     "Plugin",
     "Callback",
+    "_ClientImpl",
+    "_apply_headers",
+    "_decode_user_metadata",
+    "_encode_user_metadata",
+    "_fix_history_enum",
+    "_fix_history_failure",
     "_history_from_json",
+    "_pascal_case_match",
     # Re-export Temporal-owned names that old temporalio/client.py imported at
     # module scope so explicit imports from temporalio.client keep working.
     "ActivityCancellationDetails",
