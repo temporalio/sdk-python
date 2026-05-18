@@ -1,6 +1,6 @@
 import temporalio.workflow
 
-# Generated from temporalio.workflow on main with /private/tmp/gather_workflow_exports.py.
+# Generated from temporalio.workflow on main
 EXPECTED_WORKFLOW_EXPORTS = [
     "ActivityCancellationType",
     "ActivityConfig",
