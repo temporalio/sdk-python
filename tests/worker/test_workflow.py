@@ -329,6 +329,24 @@ async def test_workflow_history_info(
         await handle.signal(
             HistoryInfoWorkflow.bunch_of_events, continue_as_new_suggest_history_count
         )
+
+        # Wait for the first signal's timers to be committed so the next
+        # signal creates a post-timer workflow task with updated workflow.info().
+        # This avoids a race where both signals are accepted before the worker
+        # processes the first one and both make it into the same activation.
+        # If that occurs, the query will have the stale history that the
+        # final signal is intended to avoid.
+        async def timer_events_recorded() -> None:
+            timer_started_count = 0
+            async for event in handle.fetch_history_events():
+                if event.HasField("timer_started_event_attributes"):
+                    timer_started_count += 1
+                    if timer_started_count >= continue_as_new_suggest_history_count:
+                        return
+            assert timer_started_count >= continue_as_new_suggest_history_count
+
+        await assert_eventually(timer_events_recorded)
+
         # Send one more event to trigger the WFT update. We have to do this
         # because just a query will have a stale representation of history
         # counts, but signal forces a new WFT.
