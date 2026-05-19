@@ -1,6 +1,12 @@
-"""Failure converter that preserves Strands ``InterruptException`` payloads."""
+"""Failure converter for Strands-specific exceptions."""
 
 from strands.interrupt import InterruptException
+from strands.types.exceptions import (
+    ContextWindowOverflowException,
+    MaxTokensReachedException,
+    SessionException,
+    StructuredOutputException,
+)
 
 import temporalio.api.failure.v1
 from temporalio.converter import DefaultFailureConverter, PayloadConverter
@@ -14,9 +20,21 @@ from temporalio.exceptions import ApplicationError
 # can rebuild a real ``Interrupt``.
 STRANDS_INTERRUPT_TYPE = "StrandsInterrupt"
 
+# Strands' model/session exceptions that are deterministic failures (token
+# limits, context overflow, structured-output validation, session I/O). They
+# won't succeed on retry, so they cross the boundary as non-retryable typed
+# ApplicationErrors. TemporalAgent.invoke_async rewraps these as
+# StrandsWorkflowError on the workflow side so users can `except` cleanly.
+_TERMINAL_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    MaxTokensReachedException,
+    ContextWindowOverflowException,
+    StructuredOutputException,
+    SessionException,
+)
+
 
 class StrandsFailureConverter(DefaultFailureConverter):
-    """Failure converter that preserves Strands ``InterruptException`` payloads."""
+    """Failure converter that preserves Strands exception payloads and retryability."""
 
     def to_failure(
         self,
@@ -24,13 +42,24 @@ class StrandsFailureConverter(DefaultFailureConverter):
         payload_converter: PayloadConverter,
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
-        """Translate ``InterruptException`` to a typed ``ApplicationError``."""
+        """Translate Strands exceptions to typed ``ApplicationError``s."""
         if isinstance(exception, InterruptException):
             super().to_failure(
                 ApplicationError(
                     f"interrupt:{exception.interrupt.name}",
                     exception.interrupt.to_dict(),
                     type=STRANDS_INTERRUPT_TYPE,
+                    non_retryable=True,
+                ),
+                payload_converter,
+                failure,
+            )
+            return
+        if isinstance(exception, _TERMINAL_EXCEPTIONS):
+            super().to_failure(
+                ApplicationError(
+                    str(exception),
+                    type=type(exception).__name__,
                     non_retryable=True,
                 ),
                 payload_converter,
