@@ -71,6 +71,10 @@ _temporal_nexus_backing_workflow_start_context: ContextVar[bool] = ContextVar(
     "temporal-nexus-backing-workflow-start-context"
 )
 
+_WORKFLOW_EVENT_LINK_TYPE = (
+    temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name
+)
+
 
 @dataclass(frozen=True)
 class Info:
