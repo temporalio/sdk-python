@@ -99,7 +99,7 @@ class StartWorkflowInput:
     priority: temporalio.common.Priority
     # The following options are experimental and unstable.
     callbacks: Sequence[Callback]
-    workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
+    links: Sequence[temporalio.api.common.v1.Link]
     request_id: str | None
     versioning_override: temporalio.common.VersioningOverride | None = None
 

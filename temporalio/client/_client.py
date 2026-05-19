@@ -553,9 +553,7 @@ class Client:
         # are deliberately not exposed in overloads, and are not subject to any
         # backwards compatibility guarantees.
         callbacks: Sequence[Callback] = [],
-        workflow_event_links: Sequence[
-            temporalio.api.common.v1.Link.WorkflowEvent
-        ] = [],
+        links: Sequence[temporalio.api.common.v1.Link] = [],
         request_id: str | None = None,
         stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
@@ -649,7 +647,7 @@ class Client:
                 request_eager_start=request_eager_start,
                 priority=priority,
                 callbacks=callbacks,
-                workflow_event_links=workflow_event_links,
+                links=links,
                 request_id=request_id,
             )
         )

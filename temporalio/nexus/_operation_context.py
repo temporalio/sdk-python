@@ -42,7 +42,7 @@ from temporalio.types import (
 )
 
 from ._link_conversion import (
-    nexus_link_to_workflow_event,
+    nexus_link_to_temporal_link,
     workflow_event_to_nexus_link,
     workflow_execution_started_event_link_from_workflow_handle,
 )
@@ -69,10 +69,6 @@ _temporal_cancel_operation_context: ContextVar[_TemporalCancelOperationContext] 
 # It is thus a narrower context than _temporal_start_operation_context.
 _temporal_nexus_backing_workflow_start_context: ContextVar[bool] = ContextVar(
     "temporal-nexus-backing-workflow-start-context"
-)
-
-_WORKFLOW_EVENT_LINK_TYPE = (
-    temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name
 )
 
 
@@ -243,12 +239,12 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
             else []
         )
 
-    def _get_workflow_event_links(
+    def _get_links(
         self,
-    ) -> list[temporalio.api.common.v1.Link.WorkflowEvent]:
-        event_links = []
+    ) -> list[temporalio.api.common.v1.Link]:
+        event_links: list[temporalio.api.common.v1.Link] = []
         for inbound_link in self.nexus_context.inbound_links:
-            if link := nexus_link_to_workflow_event(inbound_link):
+            if link := nexus_link_to_temporal_link(inbound_link):
                 event_links.append(link)
         return event_links
 
@@ -496,7 +492,7 @@ class WorkflowRunOperationContext(StartOperationContext):
             Nexus caller is itself a workflow, this means that the workflow in the caller
             namespace web UI will contain links to the started workflow, and vice versa.
         """
-        # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
+        # We must pass nexus_completion_callbacks, event_links, and request_id,
         # but these are deliberately not exposed in overloads, hence the type-check
         # violation.
 
@@ -533,7 +529,7 @@ class WorkflowRunOperationContext(StartOperationContext):
                 priority=priority,
                 versioning_override=versioning_override,
                 callbacks=self._temporal_context._get_callbacks(),
-                workflow_event_links=self._temporal_context._get_workflow_event_links(),
+                links=self._temporal_context._get_links(),
                 request_id=self._temporal_context.nexus_context.request_id,
             )
 
