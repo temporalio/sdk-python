@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
 
@@ -17,8 +17,9 @@ from temporalio.contrib.workflow_streams import WorkflowStreamClient
 # through unchanged to ``Model.stream`` which accepts the raw dicts.
 @dataclass
 class _InvokeModelInput:
-    model_name: str
+    model_name: str | None
     messages: Any
+    invocation_state: dict[str, Any] = field(default_factory=dict)
     tool_specs: Any = None
     system_prompt: str | None = None
     tool_choice: Any = None
@@ -39,7 +40,16 @@ class ModelActivity:
         self._factories = factories
         self._models: dict[str, Model] = {}
 
-    def _get_model(self, name: str) -> Model:
+    def _get_model(self, name: str | None) -> Model:
+        if name is None:
+            if len(self._factories) != 1:
+                raise ValueError(
+                    f"TemporalAgent constructed without an explicit `model`, "
+                    f"but the plugin has {len(self._factories)} models registered. "
+                    f"Pass model='...' to disambiguate. "
+                    f"Known: {sorted(self._factories)}"
+                )
+            name = next(iter(self._factories))
         if name not in self._models:
             if name not in self._factories:
                 raise ValueError(
@@ -81,4 +91,5 @@ def _stream(model: Model, input: _InvokeModelInput) -> AsyncIterable[StreamEvent
         input.system_prompt,
         tool_choice=input.tool_choice,
         system_prompt_content=input.system_prompt_content,
+        invocation_state=input.invocation_state,
     )

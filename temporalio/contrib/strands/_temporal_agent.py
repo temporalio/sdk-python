@@ -33,7 +33,7 @@ class TemporalAgent(Agent):
     def __init__(
         self,
         *,
-        model: str,
+        model: str | None = None,
         task_queue: str | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,

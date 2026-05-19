@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterable
 from datetime import timedelta
 from typing import Any
@@ -16,6 +17,24 @@ from ._model_activity import (
     _InvokeModelInput,
     _StreamingInvokeModelInput,
 )
+
+
+def _filter_serializable(state: dict[str, Any]) -> dict[str, Any]:
+    """Keep invocation_state entries that JSON-serialize; drop the rest with a debug log."""
+    clean: dict[str, Any] = {}
+    dropped: list[str] = []
+    for key, value in state.items():
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            dropped.append(key)
+            continue
+        clean[key] = value
+    if dropped:
+        workflow.logger.debug(
+            f"Dropping non-serializable invocation_state keys: {dropped}"
+        )
+    return clean
 
 
 class TemporalModel(Model):
@@ -38,7 +57,7 @@ class TemporalModel(Model):
 
     def __init__(
         self,
-        model_name: str,
+        model_name: str | None = None,
         *,
         task_queue: str | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -98,12 +117,14 @@ class TemporalModel(Model):
         **kwargs: Any,
     ) -> AsyncIterable[StreamEvent]:
         """Run the model via the registered Temporal activity and yield events."""
+        clean_state = _filter_serializable(invocation_state) if invocation_state else {}
         if self._streaming_topic is not None:
             events = await workflow.execute_activity_method(
                 ModelActivity.invoke_model_streaming,
                 _StreamingInvokeModelInput(
                     model_name=self._model_name,
                     messages=messages,
+                    invocation_state=clean_state,
                     tool_specs=tool_specs,
                     system_prompt=system_prompt,
                     tool_choice=tool_choice,
@@ -119,6 +140,7 @@ class TemporalModel(Model):
                 _InvokeModelInput(
                     model_name=self._model_name,
                     messages=messages,
+                    invocation_state=clean_state,
                     tool_specs=tool_specs,
                     system_prompt=system_prompt,
                     tool_choice=tool_choice,

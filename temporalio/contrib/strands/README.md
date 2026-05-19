@@ -18,8 +18,6 @@ uv add temporalio[strands]
 import asyncio
 from datetime import timedelta
 
-from strands.models.bedrock import BedrockModel
-
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.strands import StrandsPlugin, TemporalAgent
@@ -29,9 +27,7 @@ from temporalio.worker import Worker
 @workflow.defn
 class MyWorkflow:
     def __init__(self) -> None:
-        self.agent = TemporalAgent(
-            model="bedrock", start_to_close_timeout=timedelta(seconds=60)
-        )
+        self.agent = TemporalAgent(start_to_close_timeout=timedelta(seconds=60))
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -45,7 +41,7 @@ async def main() -> None:
         client,
         task_queue="strands",
         workflows=[MyWorkflow],
-        plugins=[StrandsPlugin(models={"bedrock": lambda: BedrockModel()})],
+        plugins=[StrandsPlugin()],
     )
     await worker.run()
 
@@ -85,6 +81,8 @@ Note: Use `agent.invoke_async(message)` instead of `agent(message)`. The synchro
 
 `StrandsPlugin(models=...)` takes a mapping of `name → factory`. Each factory is called lazily on first use (on the worker, outside the workflow sandbox) and the constructed model is cached for the worker's lifetime. `TemporalAgent(model="name", ...)` selects which factory to invoke and carries the activity options for that agent's model calls.
 
+If `models` is omitted, the plugin registers a single `BedrockModel()` factory under the name `"bedrock"`, matching Strands' own implicit default. That's why the quickstart can drop `models=` entirely.
+
 ```python
 from strands.models.anthropic import AnthropicModel
 from strands.models.bedrock import BedrockModel
@@ -111,6 +109,8 @@ Worker(..., plugins=[StrandsPlugin(models={
 
 Each `TemporalAgent` carries its own activity options (timeouts, retry policy, task queue, streaming topic) and dispatches to the shared model activity, which resolves the model name against the registered factories at runtime. A name not present in `models` raises `ValueError` inside the activity.
 
+If `models` has a single entry, `TemporalAgent` may be constructed without an explicit `model=` and the sole factory is used automatically.
+
 ## Retries
 
 `TemporalAgent` disables Strands' built-in `ModelRetryStrategy` so retries are handled exclusively by Temporal. Configure retries via `retry_policy` on `TemporalAgent`, and on the activity options accepted by `workflow.activity_as_tool`, `workflow.activity_as_hook`, and `TemporalMCPClient`:
@@ -119,7 +119,6 @@ Each `TemporalAgent` carries its own activity options (timeouts, retry policy, t
 from temporalio.common import RetryPolicy
 
 TemporalAgent(
-    model="bedrock",
     start_to_close_timeout=timedelta(seconds=60),
     retry_policy=RetryPolicy(maximum_attempts=3),
 )
@@ -146,7 +145,6 @@ class PersonInfo(BaseModel):
 class MyWorkflow:
     def __init__(self) -> None:
         self.agent = TemporalAgent(
-            model="bedrock",
             start_to_close_timeout=timedelta(seconds=60),
             structured_output_model=PersonInfo,
         )
@@ -167,7 +165,7 @@ To forward model chunks to external consumers, pass `streaming_topic="..."` to `
 class MyWorkflow:
     def __init__(self) -> None:
         self.stream = WorkflowStream()
-        self.agent = TemporalAgent(model="bedrock", streaming_topic="events")
+        self.agent = TemporalAgent(streaming_topic="events")
 
 # client
 async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
@@ -194,7 +192,6 @@ async def current_time_activity() -> str:
 
 # workflow
 agent = TemporalAgent(
-    model="bedrock",
     start_to_close_timeout=timedelta(seconds=60),
     tools=[
         strands_workflow.activity_as_tool(fetch_user, start_to_close_timeout=timedelta(seconds=30)),
@@ -226,7 +223,7 @@ class AuditHook(HookProvider):
         # Pure local state - deterministic across replay.
         workflow.logger.info(f"tool {event.tool_use['name']} finished")
 
-agent = TemporalAgent(model="bedrock", start_to_close_timeout=..., hooks=[AuditHook()])
+agent = TemporalAgent(start_to_close_timeout=..., hooks=[AuditHook()])
 ```
 
 Callbacks run in workflow context, so they must be deterministic: no `time.time()`, `uuid.uuid4()`, or I/O — same rules as workflow code. For callbacks that need I/O (audit logging, metrics, alerting), use `workflow.activity_as_hook()` to dispatch the work as a Temporal activity:
@@ -277,7 +274,6 @@ class ApprovalHook(HookProvider):
 class MyWorkflow:
     def __init__(self) -> None:
         self.agent = TemporalAgent(
-            model="bedrock",
             start_to_close_timeout=timedelta(seconds=60),
             tools=[delete_thing],
             hooks=[ApprovalHook()],
@@ -333,7 +329,6 @@ async def delete_thing(name: str) -> str:
 class MyWorkflow:
     def __init__(self) -> None:
         self.agent = TemporalAgent(
-            model="bedrock",
             start_to_close_timeout=timedelta(seconds=60),
             tools=[activity_as_tool(delete_thing, start_to_close_timeout=timedelta(seconds=10))],
         )
@@ -375,7 +370,6 @@ class ChatWorkflow:
     @workflow.run
     async def run(self, input: ChatInput) -> None:
         agent = TemporalAgent(
-            model="bedrock",
             start_to_close_timeout=timedelta(seconds=60),
             messages=list(input.messages),
         )
@@ -402,7 +396,6 @@ class MyWorkflow:
     def __init__(self) -> None:
         echo = TemporalMCPClient(server="echo", start_to_close_timeout=timedelta(seconds=30))
         self.agent = TemporalAgent(
-            model="bedrock",
             start_to_close_timeout=timedelta(seconds=60),
             tools=[echo],
         )

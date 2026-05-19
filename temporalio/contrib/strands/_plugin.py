@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import strands.models.model as _strands_model
 from strands.models import Model
+from strands.models.bedrock import BedrockModel
 from strands.tools.mcp.mcp_types import MCPTransport
 
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -46,7 +47,13 @@ class StrandsPlugin(SimplePlugin):
         models: dict[str, Callable[[], Model]] | None = None,
         mcp_clients: dict[str, Callable[[], MCPTransport]] | None = None,
     ) -> None:
-        """Build the plugin from optional model and MCP transport factories."""
+        """Build the plugin from optional model and MCP transport factories.
+
+        If ``models`` is omitted, registers a single ``BedrockModel()`` factory
+        under the name ``"bedrock"``, matching Strands' own implicit default.
+        """
+        if models is None:
+            models = {"bedrock": lambda: BedrockModel()}
         activities: list[Callable] = []
         if models:
             ma = ModelActivity(models)
