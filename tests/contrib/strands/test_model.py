@@ -1,23 +1,21 @@
 from datetime import timedelta
 from uuid import uuid4
 
-from strands import Agent
-
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin, TemporalModel
+from temporalio.contrib.strands import StrandsPlugin, TemporalAgent
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
 
+
 @workflow.defn
 class ModelWorkflow:
     def __init__(self) -> None:
-        model = TemporalModel(
-            model_name="mock",
+        self.agent = TemporalAgent(
+            model="mock",
             start_to_close_timeout=timedelta(seconds=15),
         )
-        self.agent = Agent(model=model)
 
     @workflow.run
     async def run(self, prompt: str) -> str:

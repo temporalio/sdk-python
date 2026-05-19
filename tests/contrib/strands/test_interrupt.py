@@ -1,14 +1,14 @@
 from datetime import timedelta
 from uuid import uuid4
 
-from strands import Agent, tool
+from strands import tool
 from strands.hooks import HookProvider, HookRegistry
 from strands.hooks.events import BeforeToolCallEvent
 from strands.types.interrupt import InterruptResponseContent
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin, TemporalModel
+from temporalio.contrib.strands import StrandsPlugin, TemporalAgent
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
@@ -37,11 +37,12 @@ class ApprovalHook(HookProvider):
 @workflow.defn
 class InterruptWorkflow:
     def __init__(self) -> None:
-        model = TemporalModel(
-            model_name="mock",
+        self.agent = TemporalAgent(
+            model="mock",
             start_to_close_timeout=timedelta(seconds=15),
+            tools=[delete_thing],
+            hooks=[ApprovalHook()],
         )
-        self.agent = Agent(model=model, tools=[delete_thing], hooks=[ApprovalHook()])
         self._approval: str | None = None
 
     @workflow.signal

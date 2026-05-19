@@ -4,31 +4,31 @@ from pathlib import Path
 from uuid import uuid4
 
 from mcp import StdioServerParameters, stdio_client
-from strands import Agent
 
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.strands import (
     StrandsPlugin,
+    TemporalAgent,
     TemporalMCPClient,
-    TemporalModel,
 )
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
 
+
 @workflow.defn
 class MCPWorkflow:
     def __init__(self) -> None:
-        model = TemporalModel(
-            model_name="mock",
-            start_to_close_timeout=timedelta(seconds=30),
-        )
         echo = TemporalMCPClient(
             server="echo",
             start_to_close_timeout=timedelta(seconds=30),
         )
-        self.agent = Agent(model=model, tools=[echo])
+        self.agent = TemporalAgent(
+            model="mock",
+            start_to_close_timeout=timedelta(seconds=30),
+            tools=[echo],
+        )
 
     @workflow.run
     async def run(self, prompt: str) -> str:

@@ -1,7 +1,7 @@
 from datetime import timedelta
 from uuid import uuid4
 
-from strands import Agent, tool
+from strands import tool
 from strands_tools import (  # pyright: ignore[reportMissingTypeStubs]
     calculator,
     current_time,
@@ -9,7 +9,7 @@ from strands_tools import (  # pyright: ignore[reportMissingTypeStubs]
 
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin, TemporalModel
+from temporalio.contrib.strands import StrandsPlugin, TemporalAgent
 from temporalio.contrib.strands.workflow import activity_as_tool
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
@@ -29,12 +29,9 @@ async def current_time_activity() -> str:
 @workflow.defn
 class ToolWorkflow:
     def __init__(self) -> None:
-        model = TemporalModel(
-            model_name="mock",
+        self.agent = TemporalAgent(
+            model="mock",
             start_to_close_timeout=timedelta(seconds=15),
-        )
-        self.agent = Agent(
-            model=model,
             tools=[
                 calculator,
                 activity_as_tool(

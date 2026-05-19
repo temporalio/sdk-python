@@ -1,13 +1,13 @@
 from datetime import timedelta
 from uuid import uuid4
 
-from strands import Agent, tool
+from strands import tool
 from strands.hooks import HookProvider, HookRegistry
 from strands.hooks.events import AfterToolCallEvent
 
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin, TemporalModel
+from temporalio.contrib.strands import StrandsPlugin, TemporalAgent
 from temporalio.contrib.strands.workflow import activity_as_hook
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
@@ -51,12 +51,13 @@ class AuditHook(HookProvider):
 @workflow.defn
 class HooksWorkflow:
     def __init__(self) -> None:
-        model = TemporalModel(
-            model_name="mock",
-            start_to_close_timeout=timedelta(seconds=15),
-        )
         self.hook = AuditHook()
-        self.agent = Agent(model=model, tools=[echo], hooks=[self.hook])
+        self.agent = TemporalAgent(
+            model="mock",
+            start_to_close_timeout=timedelta(seconds=15),
+            tools=[echo],
+            hooks=[self.hook],
+        )
 
     @workflow.run
     async def run(self, prompt: str) -> list[str]:
