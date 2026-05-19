@@ -89,20 +89,24 @@ Note: Use `agent.invoke_async(message)` instead of `agent(message)`. The synchro
 from strands.models.anthropic import AnthropicModel
 from strands.models.bedrock import BedrockModel
 
-MODELS = {
-    "claude": lambda: AnthropicModel(client_args={"api_key": "..."}),
-    "bedrock": lambda: BedrockModel(),
-}
-
 # workflow
 @workflow.defn
 class MultiModelWorkflow:
     def __init__(self) -> None:
-        self.agent_a = TemporalAgent(model="claude", start_to_close_timeout=timedelta(seconds=60))
-        self.agent_b = TemporalAgent(model="bedrock", start_to_close_timeout=timedelta(seconds=60))
+        self.agent_a = TemporalAgent(
+            model="claude",
+            start_to_close_timeout=timedelta(seconds=60),
+        )
+        self.agent_b = TemporalAgent(
+            model="bedrock",
+            start_to_close_timeout=timedelta(seconds=60),
+        )
 
 # worker
-Worker(..., plugins=[StrandsPlugin(models=MODELS)])
+Worker(..., plugins=[StrandsPlugin(models={
+    "claude": lambda: AnthropicModel(client_args={"api_key": "..."}),
+    "bedrock": lambda: BedrockModel(),
+})])
 ```
 
 Each `TemporalAgent` carries its own activity options (timeouts, retry policy, task queue, streaming topic) and dispatches to the shared model activity, which resolves the model name against the registered factories at runtime. A name not present in `models` raises `ValueError` inside the activity.
@@ -129,7 +133,7 @@ Passing `retry_strategy=...` to `TemporalAgent(...)` raises `ValueError`; remove
 
 ## Structured Output
 
-Pass a Pydantic model as `structured_output_model=`. Strands routes the call through `stream()` as a synthetic tool, so it dispatches via the model activity like any other invocation. The result is available as `result.structured_output` and can be returned directly from the workflow — `StrandsPlugin` defaults to [`pydantic_data_converter`](../pydantic), so Pydantic types serialize across the activity and workflow boundary.
+Like Strands `Agent`, `TemporalAgent` supports structured output with `structured_output_model`. The plugin defaults to [`pydantic_data_converter`](../pydantic), so Pydantic types easily serialize across the activity and workflow boundary.
 
 ```python
 from pydantic import BaseModel
@@ -371,7 +375,7 @@ The plugin connects to each MCP server once at worker startup to enumerate tools
 
 ## Observability
 
-`StrandsPlugin` composes cleanly with [`OpenTelemetryPlugin`](../opentelemetry) — add both to the worker to get OTel spans around the model, tool, and MCP activities the plugin schedules, plus any spans Strands itself emits inside `invoke_async`:
+`StrandsPlugin` composes cleanly with [`OpenTelemetryPlugin`](../opentelemetry). Register `OpenTelemetryPlugin` on the client (workers built from that client pick it up automatically) and `StrandsPlugin` on the worker. You'll get OTel spans around the model, tool, and MCP activities the plugin schedules, plus any spans Strands itself emits inside `invoke_async`:
 
 ```python
 import opentelemetry.trace
@@ -379,11 +383,13 @@ from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_
 
 opentelemetry.trace.set_tracer_provider(create_tracer_provider())
 
+client = await Client.connect("localhost:7233", plugins=[OpenTelemetryPlugin()])
+
 Worker(
     client,
     task_queue="strands",
     workflows=[MyWorkflow],
-    plugins=[StrandsPlugin(models=MODELS), OpenTelemetryPlugin()],
+    plugins=[StrandsPlugin(models=MODELS)],
 )
 ```
 
