@@ -1,9 +1,8 @@
-from collections.abc import AsyncIterable, Callable
+from collections.abc import AsyncIterable
 from datetime import timedelta
 from typing import Any
 
 from strands.models import Model
-from strands.models.bedrock import BedrockModel
 from strands.types.content import Messages, SystemContentBlock
 from strands.types.streaming import StreamEvent
 from strands.types.tools import ToolChoice, ToolSpec
@@ -22,15 +21,14 @@ from ._model_activity import (
 class TemporalModel(Model):
     """A Strands :class:`Model` that runs ``stream()`` as a Temporal activity.
 
-    ``model_factory`` is called once on the worker (when the plugin is
-    constructed) to produce the real model used inside the activity. Defaults
-    to :class:`strands.models.bedrock.BedrockModel`, matching Strands' default.
-    Construction of this :class:`TemporalModel` itself does no I/O, so it is
-    safe to instantiate at module level — the lambda is just stored.
+    ``model_name`` selects which factory the plugin will invoke worker-side; it
+    must match a key in ``StrandsPlugin(models={...})``. Construction of this
+    :class:`TemporalModel` itself does no I/O, so it is safe to instantiate at
+    module level.
 
-    Pass the same instance to ``StrandsPlugin(model=...)`` (so the plugin can
-    register the model's activities) and to ``Agent(model=...)`` inside the
-    workflow (so the agent dispatches through that activity).
+    Pass this instance to ``Agent(model=...)`` inside the workflow; each call
+    dispatches through the registered model activity with ``model_name`` in
+    the input, and the worker resolves it against the plugin's factories.
 
     When ``streaming_topic`` is set, each ``StreamEvent`` is also published to
     the named topic on the workflow's
@@ -40,8 +38,8 @@ class TemporalModel(Model):
 
     def __init__(
         self,
+        model_name: str,
         *,
-        model_factory: Callable[[], Model] = BedrockModel,
         task_queue: str | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -55,8 +53,8 @@ class TemporalModel(Model):
         streaming_topic: str | None = None,
         streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ) -> None:
-        """Configure the model factory, activity options, and streaming settings."""
-        self._model_factory = model_factory
+        """Configure the model name, activity options, and streaming settings."""
+        self._model_name = model_name
         self._streaming_topic = streaming_topic
         self._streaming_batch_interval = streaming_batch_interval
         self._options: dict[str, Any] = {
@@ -72,11 +70,8 @@ class TemporalModel(Model):
             "priority": priority,
         }
 
-    def _build_activity(self) -> ModelActivity:
-        return ModelActivity(self._model_factory())
-
     def update_config(self, **_model_config: Any) -> None:
-        """No-op; the real model is configured worker-side via ``model_factory``."""
+        """No-op; the real model is configured worker-side via the plugin's factories."""
         return None
 
     def get_config(self) -> dict[str, Any]:
@@ -107,6 +102,7 @@ class TemporalModel(Model):
             events = await workflow.execute_activity_method(
                 ModelActivity.invoke_model_streaming,
                 _StreamingInvokeModelInput(
+                    model_name=self._model_name,
                     messages=messages,
                     tool_specs=tool_specs,
                     system_prompt=system_prompt,
@@ -121,6 +117,7 @@ class TemporalModel(Model):
             events = await workflow.execute_activity_method(
                 ModelActivity.invoke_model,
                 _InvokeModelInput(
+                    model_name=self._model_name,
                     messages=messages,
                     tool_specs=tool_specs,
                     system_prompt=system_prompt,

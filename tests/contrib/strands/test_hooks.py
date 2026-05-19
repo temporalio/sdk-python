@@ -48,22 +48,15 @@ class AuditHook(HookProvider):
         self.fired_events.append(event.tool_use["name"])
 
 
-MODEL = TemporalModel(
-    model_factory=lambda: MockModel(
-        [
-            {"name": "echo", "input": {"text": "hi"}},
-            "Done!",
-        ]
-    ),
-    start_to_close_timeout=timedelta(seconds=15),
-)
-
-
 @workflow.defn
 class HooksWorkflow:
     def __init__(self) -> None:
+        model = TemporalModel(
+            model_name="mock",
+            start_to_close_timeout=timedelta(seconds=15),
+        )
         self.hook = AuditHook()
-        self.agent = Agent(model=MODEL, tools=[echo], hooks=[self.hook])
+        self.agent = Agent(model=model, tools=[echo], hooks=[self.hook])
 
     @workflow.run
     async def run(self, prompt: str) -> list[str]:
@@ -74,7 +67,16 @@ class HooksWorkflow:
 async def test_hooks(client: Client):
     _AUDIT_LOG.clear()
     task_queue = "test_hooks"
-    plugin = StrandsPlugin(model=MODEL)
+    plugin = StrandsPlugin(
+        models={
+            "mock": lambda: MockModel(
+                [
+                    {"name": "echo", "input": {"text": "hi"}},
+                    "Done!",
+                ]
+            )
+        }
+    )
 
     async with Worker(
         client,

@@ -10,16 +10,14 @@ from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
 
-MODEL = TemporalModel(
-    model_factory=lambda: MockModel(["Done!"]),
-    start_to_close_timeout=timedelta(seconds=15),
-)
-
-
 @workflow.defn
 class ModelWorkflow:
     def __init__(self) -> None:
-        self.agent = Agent(model=MODEL)
+        model = TemporalModel(
+            model_name="mock",
+            start_to_close_timeout=timedelta(seconds=15),
+        )
+        self.agent = Agent(model=model)
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -29,7 +27,7 @@ class ModelWorkflow:
 
 async def test_model(client: Client):
     task_queue = "test_model"
-    plugin = StrandsPlugin(model=MODEL)
+    plugin = StrandsPlugin(models={"mock": lambda: MockModel(["Done!"])})
 
     async with Worker(
         client,

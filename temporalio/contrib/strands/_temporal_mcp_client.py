@@ -29,29 +29,29 @@ class _CallToolArgs:
     tool_use_id: str = ""
 
 
-# Server name -> cached tool list. Populated by TemporalMCPClient._populate_cache
-# at worker startup and read by TemporalMCPClient.load_tools() inside the
-# workflow sandbox. ``temporalio`` is in the SDK's default sandbox passthrough,
-# so this dict is shared between worker process and workflow execution.
+# Server name -> cached tool list. Populated by ``_populate_cache`` at worker
+# startup and read by ``TemporalMCPClient.load_tools()`` inside the workflow
+# sandbox. ``temporalio`` is in the SDK's default sandbox passthrough, so this
+# dict is shared between worker process and workflow execution.
 _TOOL_CACHE: dict[str, list[_MCPToolInfo]] = {}
 
 
 class TemporalMCPClient(ToolProvider):
-    """An MCP server reference for use in both worker and workflow contexts.
+    """Workflow-side handle to an MCP server registered on the worker.
 
-    Construct once at module level. Pass to ``StrandsPlugin(mcp_clients=[...])``
-    on the worker (which registers the ``{server}-call-tool`` activity and runs
-    ``list_tools`` at worker startup), and to ``Agent(tools=[...])`` inside the
-    workflow (which adds the discovered tools to the agent's registry).
+    The transport factory and tool discovery live worker-side via
+    ``StrandsPlugin(mcp_clients={"server": lambda: ...})``. This handle only
+    carries the server name (which selects the registered factory) and the
+    per-call activity options.
 
-    Construction does no I/O. The actual MCP connection happens worker-side at
-    plugin startup; each tool call later runs as a Temporal activity.
+    Construct once at module level and pass to ``Agent(tools=[...])`` inside
+    the workflow. Multiple handles may reference the same server name with
+    different activity options.
     """
 
     def __init__(
         self,
         server: str,
-        transport_factory: Callable[[], MCPTransport],
         *,
         task_queue: str | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -64,9 +64,8 @@ class TemporalMCPClient(ToolProvider):
         summary: str | None = None,
         priority: Priority = Priority.default,
     ) -> None:
-        """Configure the server name, transport factory, and activity options."""
+        """Configure the server name and activity options."""
         self._server = server
-        self._transport_factory = transport_factory
         self._options: dict[str, Any] = {
             "task_queue": task_queue,
             "schedule_to_close_timeout": schedule_to_close_timeout,
@@ -100,43 +99,48 @@ class TemporalMCPClient(ToolProvider):
         """No-op; consumer tracking is handled by the underlying MCP client."""
         return None
 
-    async def _populate_cache(self) -> None:
-        """Connect to the MCP server, list tools, fill ``_TOOL_CACHE``."""
-        client = MCPClient(self._transport_factory)
-        try:
-            infos: list[_MCPToolInfo] = []
-            for tool in await client.load_tools():
-                if not isinstance(tool, MCPAgentTool):
-                    continue
-                infos.append(
-                    _MCPToolInfo(
-                        name=tool.mcp_tool.name,
-                        description=tool.mcp_tool.description or "",
-                        input_schema=tool.mcp_tool.inputSchema,
-                        output_schema=tool.mcp_tool.outputSchema,
-                    )
+
+async def _populate_cache(
+    server: str, transport_factory: Callable[[], MCPTransport]
+) -> None:
+    """Connect to the MCP server, list tools, fill ``_TOOL_CACHE``."""
+    client = MCPClient(transport_factory)
+    try:
+        infos: list[_MCPToolInfo] = []
+        for tool in await client.load_tools():
+            if not isinstance(tool, MCPAgentTool):
+                continue
+            infos.append(
+                _MCPToolInfo(
+                    name=tool.mcp_tool.name,
+                    description=tool.mcp_tool.description or "",
+                    input_schema=tool.mcp_tool.inputSchema,
+                    output_schema=tool.mcp_tool.outputSchema,
                 )
-            _TOOL_CACHE[self._server] = infos
+            )
+        _TOOL_CACHE[server] = infos
+    finally:
+        client.stop(None, None, None)
+
+
+def _clear_cache(server: str) -> None:
+    _TOOL_CACHE.pop(server, None)
+
+
+def _build_call_tool_activity(
+    server: str, transport_factory: Callable[[], MCPTransport]
+) -> Callable:
+    @activity.defn(name=f"{server}-call-tool")
+    async def call_tool(args: _CallToolArgs) -> MCPToolResult:
+        client = MCPClient(transport_factory)
+        client.start()
+        try:
+            return await client.call_tool_async(
+                tool_use_id=args.tool_use_id,
+                name=args.tool_name,
+                arguments=args.arguments,
+            )
         finally:
             client.stop(None, None, None)
 
-    def _clear_cache(self) -> None:
-        _TOOL_CACHE.pop(self._server, None)
-
-    def _get_activities(self) -> Sequence[Callable]:
-        transport_factory = self._transport_factory
-
-        @activity.defn(name=f"{self._server}-call-tool")
-        async def call_tool(args: _CallToolArgs) -> MCPToolResult:
-            client = MCPClient(transport_factory)
-            client.start()
-            try:
-                return await client.call_tool_async(
-                    tool_use_id=args.tool_use_id,
-                    name=args.tool_name,
-                    arguments=args.arguments,
-                )
-            finally:
-                client.stop(None, None, None)
-
-        return [call_tool]
+    return call_tool

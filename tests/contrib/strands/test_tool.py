@@ -26,24 +26,15 @@ async def current_time_activity() -> str:
     return current_time.current_time()
 
 
-MODEL = TemporalModel(
-    model_factory=lambda: MockModel(
-        [
-            {"name": "current_time", "input": {}},
-            {"name": "calculator", "input": {"expression": "3111696 / 74088"}},
-            {"name": "letter_counter", "input": {"word": "strawberry", "letter": "R"}},
-            "Done!",
-        ]
-    ),
-    start_to_close_timeout=timedelta(seconds=15),
-)
-
-
 @workflow.defn
 class ToolWorkflow:
     def __init__(self) -> None:
+        model = TemporalModel(
+            model_name="mock",
+            start_to_close_timeout=timedelta(seconds=15),
+        )
         self.agent = Agent(
-            model=MODEL,
+            model=model,
             tools=[
                 calculator,
                 activity_as_tool(
@@ -62,7 +53,24 @@ class ToolWorkflow:
 
 async def test_tool(client: Client):
     task_queue = "test_tool"
-    plugin = StrandsPlugin(model=MODEL)
+    plugin = StrandsPlugin(
+        models={
+            "mock": lambda: MockModel(
+                [
+                    {"name": "current_time", "input": {}},
+                    {
+                        "name": "calculator",
+                        "input": {"expression": "3111696 / 74088"},
+                    },
+                    {
+                        "name": "letter_counter",
+                        "input": {"word": "strawberry", "letter": "R"},
+                    },
+                    "Done!",
+                ]
+            )
+        }
+    )
 
     async with Worker(
         client,

@@ -17,32 +17,18 @@ from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.common import get_activities
 from tests.contrib.strands.mock_model import MockModel
 
-ECHO = TemporalMCPClient(
-    server="echo",
-    transport_factory=lambda: stdio_client(
-        StdioServerParameters(
-            command=sys.executable,
-            args=[str(Path(__file__).parent / "echo_mcp_server.py")],
-        )
-    ),
-    start_to_close_timeout=timedelta(seconds=30),
-)
-
-MODEL = TemporalModel(
-    model_factory=lambda: MockModel(
-        [
-            {"name": "echo", "input": {"message": "hello"}},
-            "Done!",
-        ]
-    ),
-    start_to_close_timeout=timedelta(seconds=30),
-)
-
-
 @workflow.defn
 class MCPWorkflow:
     def __init__(self) -> None:
-        self.agent = Agent(model=MODEL, tools=[ECHO])
+        model = TemporalModel(
+            model_name="mock",
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        echo = TemporalMCPClient(
+            server="echo",
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        self.agent = Agent(model=model, tools=[echo])
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -52,7 +38,24 @@ class MCPWorkflow:
 
 async def test_mcp(client: Client):
     task_queue = "test_mcp"
-    plugin = StrandsPlugin(model=MODEL, mcp_clients=[ECHO])
+    plugin = StrandsPlugin(
+        models={
+            "mock": lambda: MockModel(
+                [
+                    {"name": "echo", "input": {"message": "hello"}},
+                    "Done!",
+                ]
+            )
+        },
+        mcp_clients={
+            "echo": lambda: stdio_client(
+                StdioServerParameters(
+                    command=sys.executable,
+                    args=[str(Path(__file__).parent / "echo_mcp_server.py")],
+                )
+            ),
+        },
+    )
 
     async with Worker(
         client,

@@ -5,6 +5,8 @@ from typing import Any
 
 import strands.agent.agent as _strands_agent
 import strands.models.model as _strands_model
+from strands.models import Model
+from strands.tools.mcp.mcp_types import MCPTransport
 
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
@@ -12,8 +14,12 @@ from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
-from ._temporal_mcp_client import TemporalMCPClient
-from ._temporal_model import TemporalModel
+from ._model_activity import ModelActivity
+from ._temporal_mcp_client import (
+    _build_call_tool_activity,
+    _clear_cache,
+    _populate_cache,
+)
 
 # Force Strands' base Model.count_tokens to avoid tiktoken, which lazily downloads
 # an encoding file. Use the default chars-per-token heuristic instead (deterministic).
@@ -67,46 +73,43 @@ class StrandsPlugin(SimplePlugin):
     workflow code), and swaps in ``pydantic_data_converter`` so structured
     outputs serialize.
 
-    When ``model`` is supplied, calls its ``model_factory`` once on the worker
-    to construct the real model, then registers the model invocation activities
-    against it. The same :class:`TemporalModel` is also passed to
-    ``Agent(model=...)`` inside the workflow.
+    When ``models`` is supplied, registers a single pair of model invocation
+    activities; each call carries the chosen ``model_name`` in its input and
+    the worker resolves it against the factories. Factories are called lazily
+    on first use, then cached for the worker's lifetime. Use the same name in
+    ``TemporalModel(model_name=...)`` inside the workflow.
 
-    When ``mcp_clients`` is supplied, registers per-server ``{server}-call-tool``
-    activities and, at worker startup, connects to each MCP server and caches
-    its tool list. Workflow-side ``TemporalMCPClient.load_tools()`` reads from
-    the cache. The plugin raises if any two clients share the same ``server``.
+    When ``mcp_clients`` is supplied, registers a per-server
+    ``{server}-call-tool`` activity for each entry and, at worker startup,
+    connects to each MCP server to cache its tool list. Workflow-side
+    ``TemporalMCPClient(server="...").load_tools()`` reads from the cache.
     """
 
     def __init__(
         self,
         *,
-        model: TemporalModel | None = None,
-        mcp_clients: list[TemporalMCPClient] = [],
+        models: dict[str, Callable[[], Model]] | None = None,
+        mcp_clients: dict[str, Callable[[], MCPTransport]] | None = None,
     ) -> None:
-        """Build the plugin from an optional model and MCP client list."""
+        """Build the plugin from optional model and MCP transport factories."""
         activities: list[Callable] = []
-        if model is not None:
-            ma = model._build_activity()
+        if models:
+            ma = ModelActivity(models)
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
 
-        names = [c.server for c in mcp_clients]
-        if len(names) != len(set(names)):
-            raise ValueError(
-                "Duplicate MCP server names in mcp_clients; each must be unique."
-            )
-        for c in mcp_clients:
-            activities.extend(c._get_activities())
+        mcp_clients = mcp_clients or {}
+        for server, transport_factory in mcp_clients.items():
+            activities.append(_build_call_tool_activity(server, transport_factory))
 
         @asynccontextmanager
         async def run_context() -> AsyncGenerator[None, None]:
-            for c in mcp_clients:
-                await c._populate_cache()
+            for server, transport_factory in mcp_clients.items():
+                await _populate_cache(server, transport_factory)
             try:
                 yield
             finally:
-                for c in mcp_clients:
-                    c._clear_cache()
+                for server in mcp_clients:
+                    _clear_cache(server)
 
         super().__init__(
             "aws.StrandsPlugin",

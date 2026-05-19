@@ -19,19 +19,20 @@ import asyncio
 from datetime import timedelta
 
 from strands import Agent
+from strands.models.bedrock import BedrockModel
 
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib.strands import StrandsPlugin, TemporalModel
 from temporalio.worker import Worker
 
-MODEL = TemporalModel(start_to_close_timeout=timedelta(seconds=60))
-
-
 @workflow.defn
 class MyWorkflow:
     def __init__(self) -> None:
-        self.agent = Agent(model=MODEL)
+        model = TemporalModel(
+            model_name="bedrock", start_to_close_timeout=timedelta(seconds=60)
+        )
+        self.agent = Agent(model=model)
 
     @workflow.run
     async def run(self, prompt: str) -> str:
@@ -45,7 +46,7 @@ async def main() -> None:
         client,
         task_queue="strands",
         workflows=[MyWorkflow],
-        plugins=[StrandsPlugin(model=MODEL)],
+        plugins=[StrandsPlugin(models={"bedrock": lambda: BedrockModel()})],
     )
     await worker.run()
 
@@ -81,18 +82,33 @@ if __name__ == "__main__":
 
 Note: Use `agent.invoke_async(message)` instead of `agent(message)`. The synchronous form spawns a worker thread, which the workflow sandbox blocks.
 
-## Model
+## Models
 
-`TemporalModel` defaults to `BedrockModel()`. To use a different model (or a different `BedrockModel` configuration), pass a `model_factory` lambda. The plugin calls it once at worker startup.
+`StrandsPlugin(models=...)` takes a mapping of `name → factory`. Each factory is called lazily on first use (on the worker, outside the workflow sandbox) and the constructed model is cached for the worker's lifetime. Each `TemporalModel(model_name=...)` selects which factory to invoke.
 
 ```python
 from strands.models.anthropic import AnthropicModel
+from strands.models.bedrock import BedrockModel
 
-MODEL = TemporalModel(
-    model_factory=lambda: AnthropicModel(client_args={"api_key": "..."}),
-    start_to_close_timeout=timedelta(seconds=60),
-)
+MODELS = {
+    "claude": lambda: AnthropicModel(client_args={"api_key": "..."}),
+    "bedrock": lambda: BedrockModel(),
+}
+
+# workflow
+@workflow.defn
+class MultiModelWorkflow:
+    def __init__(self) -> None:
+        claude = TemporalModel(model_name="claude", start_to_close_timeout=timedelta(seconds=60))
+        bedrock = TemporalModel(model_name="bedrock", start_to_close_timeout=timedelta(seconds=60))
+        self.agent_a = Agent(model=claude)
+        self.agent_b = Agent(model=bedrock)
+
+# worker
+Worker(..., plugins=[StrandsPlugin(models=MODELS)])
 ```
+
+`TemporalModel` is the per-call handle: each instance carries its own activity options (timeouts, retry policy, task queue, streaming topic) but dispatches to the shared model activity, which resolves `model_name` against the registered factories at runtime. A `model_name` not present in `models` raises `ValueError` inside the activity.
 
 ## Retries
 
@@ -101,7 +117,8 @@ The plugin disables Strands' built-in `ModelRetryStrategy` so retries are handle
 ```python
 from temporalio.common import RetryPolicy
 
-MODEL = TemporalModel(
+TemporalModel(
+    model_name="bedrock",
     start_to_close_timeout=timedelta(seconds=60),
     retry_policy=RetryPolicy(maximum_attempts=3),
 )
@@ -127,7 +144,8 @@ class PersonInfo(BaseModel):
 @workflow.defn
 class MyWorkflow:
     def __init__(self) -> None:
-        self.agent = Agent(model=MODEL, structured_output_model=PersonInfo)
+        model = TemporalModel(model_name="bedrock", start_to_close_timeout=timedelta(seconds=60))
+        self.agent = Agent(model=model, structured_output_model=PersonInfo)
 
     @workflow.run
     async def run(self, prompt: str) -> PersonInfo:
@@ -142,14 +160,13 @@ class MyWorkflow:
 To forward model chunks to external consumers, pass `streaming_topic="..."` to `TemporalModel` and host a `WorkflowStream` on the workflow. Each `StreamEvent` is published on the named topic from inside the model activity; subscribers read via `WorkflowStreamClient`. Chunks are batched on `streaming_batch_interval` (default 100ms).
 
 ```python
-MODEL = TemporalModel(streaming_topic="events")
-
 # workflow
 @workflow.defn
 class MyWorkflow:
     def __init__(self) -> None:
         self.stream = WorkflowStream()
-        self.agent = Agent(model=MODEL)
+        model = TemporalModel(model_name="bedrock", streaming_topic="events")
+        self.agent = Agent(model=model)
 
 # client
 async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
@@ -184,7 +201,7 @@ agent = Agent(tools=[
 Worker(
     ...,
     activities=[fetch_user, current_time_activity],
-    plugins=[StrandsPlugin(model=MODEL)],
+    plugins=[StrandsPlugin(models=MODELS)],
 )
 ```
 
@@ -250,7 +267,8 @@ class ApprovalHook(HookProvider):
 @workflow.defn
 class MyWorkflow:
     def __init__(self) -> None:
-        self.agent = Agent(model=MODEL, tools=[delete_thing], hooks=[ApprovalHook()])
+        model = TemporalModel(model_name="bedrock", start_to_close_timeout=timedelta(seconds=60))
+        self.agent = Agent(model=model, tools=[delete_thing], hooks=[ApprovalHook()])
         self._approval: str | None = None
 
     @workflow.signal
@@ -285,6 +303,7 @@ class ChatInput:
 @workflow.defn
 class ChatWorkflow:
     def __init__(self) -> None:
+        self._model = TemporalModel(model_name="bedrock", start_to_close_timeout=timedelta(seconds=60))
         self._pending: list[str] = []
         self._done = False
 
@@ -298,7 +317,7 @@ class ChatWorkflow:
 
     @workflow.run
     async def run(self, input: ChatInput) -> None:
-        agent = Agent(model=MODEL, messages=list(input.messages))
+        agent = Agent(model=self._model, messages=list(input.messages))
         while True:
             await workflow.wait_condition(lambda: self._pending or self._done)
             if self._done:
@@ -310,28 +329,33 @@ class ChatWorkflow:
 
 ## MCP
 
-Construct `TemporalMCPClient` once at module level and reference the same instance from both the plugin (which registers a per-server `{server}-call-tool` activity and connects at worker startup to discover tools) and `Agent(tools=[...])`:
+`StrandsPlugin(mcp_clients=...)` takes a mapping of `name → transport factory`, mirroring the `models=` pattern. The plugin registers a per-server `{name}-call-tool` activity and connects at worker startup to enumerate tools. Workflow-side, `TemporalMCPClient(server="name")` is a pure handle: it references the server by name and carries the per-call activity options.
 
 ```python
 from mcp import StdioServerParameters, stdio_client
 from temporalio.contrib.strands import TemporalMCPClient
 
-ECHO = TemporalMCPClient(
-    server="echo",
-    transport_factory=lambda: stdio_client(
-        StdioServerParameters(command="...", args=[...]),
-    ),
-    start_to_close_timeout=timedelta(seconds=30),
-)
-
 # workflow
-agent = Agent(tools=[ECHO])
+@workflow.defn
+class MyWorkflow:
+    def __init__(self) -> None:
+        echo = TemporalMCPClient(server="echo", start_to_close_timeout=timedelta(seconds=30))
+        self.agent = Agent(tools=[echo])
 
 # worker
-Worker(..., plugins=[StrandsPlugin(mcp_clients=[ECHO])])
+Worker(
+    ...,
+    plugins=[StrandsPlugin(
+        mcp_clients={
+            "echo": lambda: stdio_client(
+                StdioServerParameters(command="...", args=[...]),
+            ),
+        },
+    )],
+)
 ```
 
-The plugin connects to the MCP server once at worker startup to enumerate tools. The schema is frozen for the worker's lifetime; restart workers to pick up MCP-server changes. If the MCP server is unavailable at startup, the worker fails to start.
+The plugin connects to each MCP server once at worker startup to enumerate tools. The schema is frozen for the worker's lifetime; restart workers to pick up MCP-server changes. If a server is unavailable at startup, the worker fails to start.
 
 ## Observability
 
@@ -347,7 +371,7 @@ Worker(
     client,
     task_queue="strands",
     workflows=[MyWorkflow],
-    plugins=[StrandsPlugin(model=MODEL), OpenTelemetryPlugin()],
+    plugins=[StrandsPlugin(models=MODELS), OpenTelemetryPlugin()],
 )
 ```
 

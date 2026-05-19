@@ -34,21 +34,14 @@ class ApprovalHook(HookProvider):
             event.cancel_tool = "denied"
 
 
-MODEL = TemporalModel(
-    model_factory=lambda: MockModel(
-        [
-            {"name": "delete_thing", "input": {"name": "foo"}},
-            "Done!",
-        ]
-    ),
-    start_to_close_timeout=timedelta(seconds=15),
-)
-
-
 @workflow.defn
 class InterruptWorkflow:
     def __init__(self) -> None:
-        self.agent = Agent(model=MODEL, tools=[delete_thing], hooks=[ApprovalHook()])
+        model = TemporalModel(
+            model_name="mock",
+            start_to_close_timeout=timedelta(seconds=15),
+        )
+        self.agent = Agent(model=model, tools=[delete_thing], hooks=[ApprovalHook()])
         self._approval: str | None = None
 
     @workflow.signal
@@ -72,7 +65,16 @@ class InterruptWorkflow:
 
 async def test_interrupt(client: Client):
     task_queue = "test_interrupt"
-    plugin = StrandsPlugin(model=MODEL)
+    plugin = StrandsPlugin(
+        models={
+            "mock": lambda: MockModel(
+                [
+                    {"name": "delete_thing", "input": {"name": "foo"}},
+                    "Done!",
+                ]
+            )
+        }
+    )
 
     async with Worker(
         client,

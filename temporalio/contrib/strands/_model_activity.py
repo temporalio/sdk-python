@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -17,6 +17,7 @@ from temporalio.contrib.workflow_streams import WorkflowStreamClient
 # through unchanged to ``Model.stream`` which accepts the raw dicts.
 @dataclass
 class _InvokeModelInput:
+    model_name: str
     messages: Any
     tool_specs: Any = None
     system_prompt: str | None = None
@@ -31,31 +32,44 @@ class _StreamingInvokeModelInput(_InvokeModelInput):
 
 
 class ModelActivity:
-    """Holds the user-supplied model and exposes the model activities."""
+    """Holds the registered model factories and exposes the model activities."""
 
-    def __init__(self, model: Model) -> None:
-        """Store the model that activities will invoke."""
-        self._model = model
+    def __init__(self, factories: dict[str, Callable[[], Model]]) -> None:
+        """Store the factories; models are constructed lazily on first use."""
+        self._factories = factories
+        self._models: dict[str, Model] = {}
+
+    def _get_model(self, name: str) -> Model:
+        if name not in self._models:
+            if name not in self._factories:
+                raise ValueError(
+                    f"Unknown model name {name!r}. "
+                    f"Known: {sorted(self._factories)}"
+                )
+            self._models[name] = self._factories[name]()
+        return self._models[name]
 
     @activity.defn
     @auto_heartbeater
     async def invoke_model(self, input: _InvokeModelInput) -> list[StreamEvent]:
-        """Run the model and return its stream events as a list."""
-        return [event async for event in _stream(self._model, input)]
+        """Run the named model and return its stream events as a list."""
+        model = self._get_model(input.model_name)
+        return [event async for event in _stream(model, input)]
 
     @activity.defn
     @auto_heartbeater
     async def invoke_model_streaming(
         self, input: _StreamingInvokeModelInput
     ) -> list[StreamEvent]:
-        """Run the model and publish each stream event to a WorkflowStream."""
+        """Run the named model and publish each stream event to a WorkflowStream."""
+        model = self._get_model(input.model_name)
         events: list[StreamEvent] = []
         stream = WorkflowStreamClient.from_within_activity(
             batch_interval=timedelta(seconds=input.streaming_batch_interval_seconds),
         )
         topic = stream.topic(input.streaming_topic)
         async with stream:
-            async for event in _stream(self._model, input):
+            async for event in _stream(model, input):
                 events.append(event)
                 topic.publish(event)
         return events
