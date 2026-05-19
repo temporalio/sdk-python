@@ -35,21 +35,32 @@ class _StreamingInvokeModelInput(_InvokeModelInput):
 class ModelActivity:
     """Holds the registered model factories and exposes the model activities."""
 
-    def __init__(self, factories: dict[str, Callable[[], Model]]) -> None:
-        """Store the factories; models are constructed lazily on first use."""
+    def __init__(
+        self,
+        factories: dict[str, Callable[[], Model]],
+        *,
+        default_name: str | None = None,
+    ) -> None:
+        """Store the factories; models are constructed lazily on first use.
+
+        ``default_name`` is set only by the plugin's own auto-registered
+        ``BedrockModel`` default. User-supplied ``models`` leave it ``None``,
+        which forces every ``TemporalAgent`` to specify ``model=`` explicitly.
+        """
         self._factories = factories
+        self._default_name = default_name
         self._models: dict[str, Model] = {}
 
     def _get_model(self, name: str | None) -> Model:
         if name is None:
-            if len(self._factories) != 1:
+            if self._default_name is None:
                 raise ValueError(
-                    f"TemporalAgent constructed without an explicit `model`, "
-                    f"but the plugin has {len(self._factories)} models registered. "
-                    f"Pass model='...' to disambiguate. "
+                    f"TemporalAgent was constructed without an explicit `model`, "
+                    f"but the plugin was configured with user-supplied `models=`. "
+                    f"Pass model='...' to TemporalAgent. "
                     f"Known: {sorted(self._factories)}"
                 )
-            name = next(iter(self._factories))
+            name = self._default_name
         if name not in self._models:
             if name not in self._factories:
                 raise ValueError(

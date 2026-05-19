@@ -52,11 +52,13 @@ class StrandsPlugin(SimplePlugin):
         If ``models`` is omitted, registers a single ``BedrockModel()`` factory
         under the name ``"bedrock"``, matching Strands' own implicit default.
         """
+        default_name: str | None = None
         if models is None:
             models = {"bedrock": lambda: BedrockModel()}
+            default_name = "bedrock"
         activities: list[Callable] = []
         if models:
-            ma = ModelActivity(models)
+            ma = ModelActivity(models, default_name=default_name)
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
 
         mcp_clients = mcp_clients or {}

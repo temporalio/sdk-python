@@ -79,9 +79,7 @@ Note: Use `agent.invoke_async(message)` instead of `agent(message)`. The synchro
 
 ## Models
 
-`StrandsPlugin(models=...)` takes a mapping of `name → factory`. Each factory is called lazily on first use (on the worker, outside the workflow sandbox) and the constructed model is cached for the worker's lifetime. `TemporalAgent(model="name", ...)` selects which factory to invoke and carries the activity options for that agent's model calls.
-
-If `models` is omitted, the plugin registers a single `BedrockModel()` factory under the name `"bedrock"`, matching Strands' own implicit default. That's why the quickstart can drop `models=` entirely.
+`StrandsPlugin(models=...)` takes a mapping of `name → factory`. Each factory is called lazily on first use (on the worker, outside the workflow sandbox) and the constructed model is cached for the worker's lifetime. `TemporalAgent(model="name", ...)` selects which factory to invoke and carries the activity options for that agent's model calls. If `models` is omitted, the plugin registers a single `BedrockModel()` factory under the name `"bedrock"`, matching Strands' own implicit default.
 
 ```python
 from strands.models.anthropic import AnthropicModel
@@ -108,8 +106,6 @@ Worker(..., plugins=[StrandsPlugin(models={
 ```
 
 Each `TemporalAgent` carries its own activity options (timeouts, retry policy, task queue, streaming topic) and dispatches to the shared model activity, which resolves the model name against the registered factories at runtime. A name not present in `models` raises `ValueError` inside the activity.
-
-If `models` has a single entry, `TemporalAgent` may be constructed without an explicit `model=` and the sole factory is used automatically.
 
 ## Retries
 
