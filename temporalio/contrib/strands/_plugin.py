@@ -14,9 +14,9 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 from ._model_activity import ModelActivity
 from ._temporal_mcp_client import (
-    _build_call_tool_activity,
-    _clear_cache,
-    _populate_cache,
+    build_call_tool_activity,
+    clear_cache,
+    populate_cache,
 )
 
 # Force Strands' base Model.count_tokens to avoid tiktoken, which lazily downloads
@@ -53,17 +53,17 @@ class StrandsPlugin(SimplePlugin):
 
         mcp_clients = mcp_clients or {}
         for server, transport_factory in mcp_clients.items():
-            activities.append(_build_call_tool_activity(server, transport_factory))
+            activities.append(build_call_tool_activity(server, transport_factory))
 
         @asynccontextmanager
         async def run_context() -> AsyncGenerator[None, None]:
             for server, transport_factory in mcp_clients.items():
-                await _populate_cache(server, transport_factory)
+                await populate_cache(server, transport_factory)
             try:
                 yield
             finally:
                 for server in mcp_clients:
-                    _clear_cache(server)
+                    clear_cache(server)
 
         super().__init__(
             "aws.StrandsPlugin",

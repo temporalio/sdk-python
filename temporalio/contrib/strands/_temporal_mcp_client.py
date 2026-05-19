@@ -100,7 +100,7 @@ class TemporalMCPClient(ToolProvider):
         return None
 
 
-async def _populate_cache(
+async def populate_cache(
     server: str, transport_factory: Callable[[], MCPTransport]
 ) -> None:
     """Connect to the MCP server, list tools, fill ``_TOOL_CACHE``."""
@@ -123,13 +123,16 @@ async def _populate_cache(
         client.stop(None, None, None)
 
 
-def _clear_cache(server: str) -> None:
+def clear_cache(server: str) -> None:
+    """Drop the cached tool list for ``server``."""
     _TOOL_CACHE.pop(server, None)
 
 
-def _build_call_tool_activity(
+def build_call_tool_activity(
     server: str, transport_factory: Callable[[], MCPTransport]
 ) -> Callable:
+    """Return the per-server ``{server}-call-tool`` activity for registration."""
+
     @activity.defn(name=f"{server}-call-tool")
     async def call_tool(args: _CallToolArgs) -> MCPToolResult:
         client = MCPClient(transport_factory)

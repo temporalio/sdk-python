@@ -43,8 +43,7 @@ class ModelActivity:
         if name not in self._models:
             if name not in self._factories:
                 raise ValueError(
-                    f"Unknown model name {name!r}. "
-                    f"Known: {sorted(self._factories)}"
+                    f"Unknown model name {name!r}. Known: {sorted(self._factories)}"
                 )
             self._models[name] = self._factories[name]()
         return self._models[name]
