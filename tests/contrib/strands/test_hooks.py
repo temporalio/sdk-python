@@ -85,6 +85,7 @@ async def test_hooks(client: Client):
         workflows=[HooksWorkflow],
         activities=[audit_tool],
         plugins=[plugin],
+        max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             HooksWorkflow.run,

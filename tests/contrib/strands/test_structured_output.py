@@ -52,6 +52,7 @@ async def test_structured_output(client: Client):
         client,
         task_queue=task_queue,
         workflows=[StructuredOutputWorkflow],
+        max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             StructuredOutputWorkflow.run,

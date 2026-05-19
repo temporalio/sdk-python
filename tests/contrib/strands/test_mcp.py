@@ -62,6 +62,7 @@ async def test_mcp(client: Client):
         task_queue=task_queue,
         workflows=[MCPWorkflow],
         plugins=[plugin],
+        max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             MCPWorkflow.run,

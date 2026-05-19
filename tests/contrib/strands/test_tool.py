@@ -75,6 +75,7 @@ async def test_tool(client: Client):
         workflows=[ToolWorkflow],
         activities=[current_time_activity],
         plugins=[plugin],
+        max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             ToolWorkflow.run,

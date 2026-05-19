@@ -82,6 +82,7 @@ async def test_interrupt(client: Client):
         task_queue=task_queue,
         workflows=[InterruptWorkflow],
         plugins=[plugin],
+        max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             InterruptWorkflow.run,

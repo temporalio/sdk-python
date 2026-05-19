@@ -39,6 +39,7 @@ async def test_model_streaming(client: Client):
         task_queue=task_queue,
         workflows=[StreamingModelWorkflow],
         plugins=[plugin],
+        max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             StreamingModelWorkflow.run,

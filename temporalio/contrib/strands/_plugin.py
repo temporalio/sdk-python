@@ -27,11 +27,6 @@ setattr(_strands_model, "_get_encoding", lambda: None)
 class StrandsPlugin(SimplePlugin):
     """Temporal Worker plugin for the Strands Agents SDK.
 
-    Configures sandbox passthrough for ``strands``, ``strands_tools``, ``mcp``,
-    and ``temporalio.contrib.strands`` (so the MCP tool cache is visible to
-    workflow code), and swaps in ``pydantic_data_converter`` so structured
-    outputs serialize.
-
     When ``models`` is supplied, registers a single pair of model invocation
     activities; each call carries the chosen ``model_name`` in its input and
     the worker resolves it against the factories. Factories are called lazily
