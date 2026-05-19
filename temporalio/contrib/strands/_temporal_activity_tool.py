@@ -3,11 +3,15 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from strands.interrupt import Interrupt
 from strands.tools.decorator import FunctionToolMetadata
-from strands.types._events import ToolResultEvent
+from strands.types._events import ToolInterruptEvent, ToolResultEvent
 from strands.types.tools import AgentTool, ToolGenerator, ToolResult, ToolSpec, ToolUse
 
 from temporalio import activity, workflow
+from temporalio.exceptions import ActivityError, ApplicationError
+
+from ._failure_converter import STRANDS_INTERRUPT_TYPE
 
 
 class TemporalActivityTool(AgentTool):
@@ -51,18 +55,28 @@ class TemporalActivityTool(AgentTool):
         bound = self._signature.bind(**tool_use["input"])
         bound.apply_defaults()
         positional = list(bound.arguments.values())
-        if not positional:
-            result = await workflow.execute_activity(
-                self._activity_name, **self._options
-            )
-        elif len(positional) == 1:
-            result = await workflow.execute_activity(
-                self._activity_name, positional[0], **self._options
-            )
-        else:
-            result = await workflow.execute_activity(
-                self._activity_name, args=positional, **self._options
-            )
+        try:
+            if not positional:
+                result = await workflow.execute_activity(
+                    self._activity_name, **self._options
+                )
+            elif len(positional) == 1:
+                result = await workflow.execute_activity(
+                    self._activity_name, positional[0], **self._options
+                )
+            else:
+                result = await workflow.execute_activity(
+                    self._activity_name, args=positional, **self._options
+                )
+        except ActivityError as e:
+            cause = e.__cause__
+            if (
+                isinstance(cause, ApplicationError)
+                and cause.type == STRANDS_INTERRUPT_TYPE
+            ):
+                yield ToolInterruptEvent(tool_use, [Interrupt(**cause.details[0])])
+                return
+            raise
         yield ToolResultEvent(
             ToolResult(
                 toolUseId=tool_use["toolUseId"],

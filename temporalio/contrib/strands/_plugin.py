@@ -12,6 +12,7 @@ from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
+from ._failure_converter import StrandsFailureConverter
 from ._model_activity import ModelActivity
 from ._temporal_mcp_client import (
     build_call_tool_activity,
@@ -98,5 +99,8 @@ def _data_converter(converter: DataConverter | None) -> DataConverter:
         converter is None
         or converter.payload_converter_class is DefaultPayloadConverter
     ):
-        return pydantic_data_converter
+        return replace(
+            pydantic_data_converter,
+            failure_converter_class=StrandsFailureConverter,
+        )
     return converter

@@ -255,7 +255,11 @@ class AuditHook(HookProvider):
 
 ## Human-in-the-loop interrupts
 
-A hook on an interruptible event (e.g. `BeforeToolCallEvent`) can pause the agent by calling `event.interrupt(name, reason=...)`. When this fires, `agent.invoke_async()` returns `AgentResult(stop_reason="interrupt", interrupts=[...])` instead of raising. Pair this with a signal handler that supplies responses, then resume by calling `agent.invoke_async(responses)`:
+Strands offers two HITL surfaces; both work with the plugin. In each case, `agent.invoke_async()` returns `AgentResult(stop_reason="interrupt", interrupts=[...])` instead of raising. Pair this with a signal handler that supplies responses, then resume by calling `agent.invoke_async(responses)`.
+
+### Hook-based interrupts
+
+A hook on an interruptible event (e.g. `BeforeToolCallEvent`) can pause the agent by calling `event.interrupt(name, reason=...)`. The hook runs in workflow context, so it must be deterministic — no I/O.
 
 ```python
 from strands.hooks import HookProvider, HookRegistry
@@ -295,7 +299,52 @@ class MyWorkflow:
         return str(result)
 ```
 
-Interrupt hooks must be deterministic: branch on the activity result and call `event.interrupt(...)` on the workflow side. Tools wrapped via `workflow.activity_as_tool` cannot raise interrupts — the activity body has no agent reference — so hooks are the interrupt surface for this plugin.
+### Tool-body interrupts
+
+A `@strands.tool` function can raise `InterruptException(Interrupt(...))` directly. The agent stops with the interrupt, the workflow handles the resume the same way as for hooks.
+
+```python
+from strands import tool
+from strands.interrupt import Interrupt, InterruptException
+
+@tool
+def delete_thing(name: str) -> str:
+    raise InterruptException(
+        Interrupt(id=f"delete:{name}", name="approval", reason=f"delete {name}?")
+    )
+```
+
+The same works from an `activity_as_tool`-wrapped activity. The plugin's failure converter preserves the `Interrupt` payload across the activity boundary, so `AgentResult.interrupts` is populated just like the in-workflow case:
+
+```python
+from strands.interrupt import Interrupt, InterruptException
+from temporalio.contrib.strands.workflow import activity_as_tool
+
+@activity.defn
+async def delete_thing(name: str) -> str:
+    if not await policy.is_authorized(name):
+        raise InterruptException(
+            Interrupt(id=f"delete:{name}", name="approval", reason=f"delete {name}?")
+        )
+    await storage.delete(name)
+    return f"deleted {name}"
+
+@workflow.defn
+class MyWorkflow:
+    def __init__(self) -> None:
+        self.agent = TemporalAgent(
+            model="bedrock",
+            start_to_close_timeout=timedelta(seconds=60),
+            tools=[activity_as_tool(delete_thing, start_to_close_timeout=timedelta(seconds=10))],
+        )
+```
+
+This relies on the plugin's failure converter, which is installed via the client's data converter. **Attach `StrandsPlugin` to the client** (not just the worker) for activity-tool interrupts to work — workers built from that client pick up the plugin automatically.
+
+```python
+client = await Client.connect("localhost:7233", plugins=[StrandsPlugin(models=MODELS)])
+Worker(client, task_queue="strands", workflows=[MyWorkflow], activities=[delete_thing])
+```
 
 ## Continue-as-new
 
