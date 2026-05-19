@@ -18,10 +18,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_WORFKLOW_LINK_URL_PATH_REGEX = re.compile(
+_LINK_URL_PATH_REGEX = re.compile(
     r"^/namespaces/(?P<namespace>[^/]+)/workflows/(?P<workflow_id>[^/]+)/(?P<run_id>[^/]+)/history$"
 )
-
 LINK_EVENT_ID_PARAM_NAME = "eventID"
 LINK_EVENT_TYPE_PARAM_NAME = "eventType"
 LINK_REQUEST_ID_PARAM_NAME = "requestID"
@@ -95,10 +94,10 @@ def nexus_link_to_workflow_event(
     StartWorklow request.
     """
     url = urllib.parse.urlparse(link.url)
-    match = _WORFKLOW_LINK_URL_PATH_REGEX.match(url.path)
+    match = _LINK_URL_PATH_REGEX.match(url.path)
     if not match:
         logger.warning(
-            f"Invalid Nexus link: {link}. Expected path to match {_WORFKLOW_LINK_URL_PATH_REGEX.pattern}"
+            f"Invalid Nexus link: {link}. Expected path to match {_LINK_URL_PATH_REGEX.pattern}"
         )
         return None
     try:
