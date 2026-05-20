@@ -44,9 +44,9 @@ class TemporalMCPClient(ToolProvider):
     carries the server name (which selects the registered factory) and the
     per-call activity options.
 
-    Construct once at module level and pass to ``Agent(tools=[...])`` inside
-    the workflow. Multiple handles may reference the same server name with
-    different activity options.
+    Construct once at module level and pass to ``TemporalAgent(tools=[...])``
+    inside the workflow. Multiple handles may reference the same server name
+    with different activity options.
     """
 
     def __init__(

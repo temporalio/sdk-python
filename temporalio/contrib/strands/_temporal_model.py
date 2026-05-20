@@ -45,10 +45,6 @@ class TemporalModel(Model):
     :class:`TemporalModel` itself does no I/O, so it is safe to instantiate at
     module level.
 
-    Pass this instance to ``Agent(model=...)`` inside the workflow; each call
-    dispatches through the registered model activity with ``model_name`` in
-    the input, and the worker resolves it against the plugin's factories.
-
     When ``streaming_topic`` is set, each ``StreamEvent`` is also published to
     the named topic on the workflow's
     :class:`temporalio.contrib.workflow_streams.WorkflowStream` for external
@@ -98,11 +94,11 @@ class TemporalModel(Model):
         return {}
 
     def structured_output(self, *_args: Any, **_kwargs: Any) -> Any:
-        """Not supported; use ``Agent(structured_output_model=...)`` instead."""
+        """Not supported; use ``TemporalAgent(structured_output_model=...)`` instead."""
         raise NotImplementedError(
             "TemporalModel.structured_output is not supported. Use "
-            "Agent(structured_output_model=...) which routes structured output "
-            "through stream() via the structured_output_tool."
+            "TemporalAgent(structured_output_model=...) which routes structured "
+            "output through stream() via the structured_output_tool."
         )
 
     async def stream(

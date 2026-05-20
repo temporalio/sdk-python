@@ -1,11 +1,11 @@
+from datetime import timedelta
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
-from strands import Agent
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin
+from temporalio.contrib.strands import StrandsPlugin, TemporalAgent
 from temporalio.worker import Replayer, Worker
 from tests.contrib.strands.mock_model import MockModel
 
@@ -19,19 +19,11 @@ class PersonInfo(BaseModel):
 @workflow.defn
 class StructuredOutputWorkflow:
     def __init__(self) -> None:
-        model = MockModel(
-            [
-                {
-                    "name": "PersonInfo",
-                    "input": {
-                        "name": "John Smith",
-                        "age": 30,
-                        "occupation": "software engineer",
-                    },
-                },
-            ]
+        self.agent = TemporalAgent(
+            model="mock",
+            start_to_close_timeout=timedelta(seconds=15),
+            structured_output_model=PersonInfo,
         )
-        self.agent = Agent(model=model, structured_output_model=PersonInfo)
 
     @workflow.run
     async def run(self, prompt: str) -> PersonInfo:
@@ -42,16 +34,28 @@ class StructuredOutputWorkflow:
 
 async def test_structured_output(client: Client):
     task_queue = "test_structured_output"
-    plugin = StrandsPlugin()
-
-    config = client.config()
-    config["plugins"] = [*config["plugins"], plugin]
-    client = Client(**config)
+    plugin = StrandsPlugin(
+        models={
+            "mock": lambda: MockModel(
+                [
+                    {
+                        "name": "PersonInfo",
+                        "input": {
+                            "name": "John Smith",
+                            "age": 30,
+                            "occupation": "software engineer",
+                        },
+                    },
+                ]
+            )
+        }
+    )
 
     async with Worker(
         client,
         task_queue=task_queue,
         workflows=[StructuredOutputWorkflow],
+        plugins=[plugin],
         max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
