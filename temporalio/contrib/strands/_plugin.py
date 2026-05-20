@@ -2,7 +2,6 @@ from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
 
-import strands.models.model as _strands_model
 from strands.models import Model
 from strands.models.bedrock import BedrockModel
 from strands.tools.mcp.mcp_client import MCPClient
@@ -20,10 +19,6 @@ from ._temporal_mcp_client import (
     clear_cache,
     populate_cache,
 )
-
-# Force Strands' base Model.count_tokens to avoid tiktoken, which lazily downloads
-# an encoding file. Use the default chars-per-token heuristic instead (deterministic).
-setattr(_strands_model, "_get_encoding", lambda: None)
 
 
 class StrandsPlugin(SimplePlugin):
