@@ -593,7 +593,6 @@ class DescribeNexusOperationInput:
 
     operation_id: str
     run_id: str | None
-    long_poll_token: bytes | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 

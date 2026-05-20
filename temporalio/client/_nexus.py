@@ -250,9 +250,6 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     cancellation_info: NexusOperationExecutionCancellationInfo | None
     """Cancellation info if cancellation was requested."""
 
-    long_poll_token: bytes | None
-    """Token for follow-on long-poll requests. None if the operation is complete."""
-
     _data_converter: temporalio.converter.DataConverter = field(
         kw_only=True, compare=False, repr=False
     )
@@ -294,8 +291,6 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
         cls,
         info: temporalio.api.nexus.v1.NexusOperationExecutionInfo,
         data_converter: temporalio.converter.DataConverter,
-        *,
-        long_poll_token: bytes | None,
     ) -> Self:
         """Create from raw proto nexus operation execution info."""
         return cls(
@@ -386,7 +381,6 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
                 if info.HasField("cancellation_info")
                 else None
             ),
-            long_poll_token=long_poll_token,
         )
 
 
@@ -1035,7 +1029,6 @@ class NexusOperationHandle(Generic[ReturnType]):
     async def describe(
         self,
         *,
-        long_poll_token: bytes | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationExecutionDescription:
@@ -1045,8 +1038,6 @@ class NexusOperationHandle(Generic[ReturnType]):
            This API is experimental and unstable.
 
         Args:
-            long_poll_token: Token from a previous describe response. If provided,
-                the request will long-poll until the Nexus Operation state changes.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
@@ -1057,7 +1048,6 @@ class NexusOperationHandle(Generic[ReturnType]):
             DescribeNexusOperationInput(
                 operation_id=self._operation_id,
                 run_id=self._run_id,
-                long_poll_token=long_poll_token,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )

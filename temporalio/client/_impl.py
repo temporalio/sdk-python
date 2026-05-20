@@ -217,6 +217,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Server currently only supports workflow_event and batch_job
         # link types. This filter should be removed or adapted as
         # server-side support comes online.
+        # See https://github.com/temporalio/temporal/issues/10345
         links = [
             link
             for link in input.links
@@ -1503,8 +1504,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             operation_id=input.operation_id,
             run_id=input.run_id or "",
         )
-        if input.long_poll_token:
-            req.long_poll_token = input.long_poll_token
         resp = await self._client.workflow_service.describe_nexus_operation_execution(
             req=req,
             retry=True,
@@ -1514,7 +1513,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         return await NexusOperationExecutionDescription._from_execution_info(
             info=resp.info,
             data_converter=self._client.data_converter,
-            long_poll_token=resp.long_poll_token or None,
         )
 
     async def get_nexus_operation_result(
