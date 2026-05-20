@@ -236,7 +236,7 @@ class DefaultFailureConverter(FailureConverter):
     ) -> None:
         if error.original_failure:
             self._nexus_failure_to_temporal_failure(
-                error.original_failure, True, failure
+                error.original_failure, error.retryable, failure
             )
         else:
             failure.message = error.message

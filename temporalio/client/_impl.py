@@ -64,21 +64,26 @@ from ._helpers import _apply_headers, _encode_user_metadata
 from ._interceptor import (
     BackfillScheduleInput,
     CancelActivityInput,
+    CancelNexusOperationInput,
     CancelWorkflowInput,
     CompleteAsyncActivityInput,
     CountActivitiesInput,
+    CountNexusOperationsInput,
     CountWorkflowsInput,
     CreateScheduleInput,
     DeleteScheduleInput,
     DescribeActivityInput,
+    DescribeNexusOperationInput,
     DescribeScheduleInput,
     DescribeWorkflowInput,
     FailAsyncActivityInput,
     FetchWorkflowHistoryEventsInput,
+    GetNexusOperationResultInput,
     GetWorkerBuildIdCompatibilityInput,
     GetWorkerTaskReachabilityInput,
     HeartbeatAsyncActivityInput,
     ListActivitiesInput,
+    ListNexusOperationsInput,
     ListSchedulesInput,
     ListWorkflowsInput,
     OutboundInterceptor,
@@ -87,10 +92,12 @@ from ._interceptor import (
     ReportCancellationAsyncActivityInput,
     SignalWorkflowInput,
     StartActivityInput,
+    StartNexusOperationInput,
     StartWorkflowInput,
     StartWorkflowUpdateInput,
     StartWorkflowUpdateWithStartInput,
     TerminateActivityInput,
+    TerminateNexusOperationInput,
     TerminateWorkflowInput,
     TriggerScheduleInput,
     UnpauseScheduleInput,
@@ -98,6 +105,13 @@ from ._interceptor import (
     UpdateWithStartStartWorkflowInput,
     UpdateWithStartUpdateWorkflowInput,
     UpdateWorkerBuildIdCompatibilityInput,
+)
+from ._nexus import (
+    NexusOperationExecutionAsyncIterator,
+    NexusOperationExecutionCount,
+    NexusOperationExecutionDescription,
+    NexusOperationFailureError,
+    NexusOperationHandle,
 )
 from ._schedule import (
     ScheduleAsyncIterator,
@@ -200,10 +214,16 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if input.request_id:
             req.request_id = input.request_id
 
+        # Server currently only supports workflow_event and batch_job
+        # link types. This filter should be removed or adapted as
+        # server-side support comes online.
+        # See https://github.com/temporalio/temporal/issues/10345
         links = [
-            temporalio.api.common.v1.Link(workflow_event=link)
-            for link in input.workflow_event_links
+            link
+            for link in input.links
+            if link.HasField("workflow_event") or link.HasField("batch_job")
         ]
+
         req.completion_callbacks.extend(
             temporalio.api.common.v1.Callback(
                 nexus=temporalio.api.common.v1.Callback.Nexus(
@@ -1395,6 +1415,209 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
         return WorkerTaskReachability._from_proto(resp)
+
+    ### Nexus operation calls
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> NexusOperationHandle[Any]:
+        """Start a nexus operation and return a handle to it."""
+        req = temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest(
+            namespace=self._client.namespace,
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+            operation_id=input.id,
+            endpoint=input.endpoint,
+            service=input.service,
+            operation=input.operation,
+            id_reuse_policy=cast(
+                "temporalio.api.enums.v1.NexusOperationIdReusePolicy.ValueType",
+                int(input.id_reuse_policy),
+            ),
+            id_conflict_policy=cast(
+                "temporalio.api.enums.v1.NexusOperationIdConflictPolicy.ValueType",
+                int(input.id_conflict_policy),
+            ),
+        )
+
+        if input.schedule_to_close_timeout is not None:
+            req.schedule_to_close_timeout.FromTimedelta(input.schedule_to_close_timeout)
+        if input.schedule_to_start_timeout is not None:
+            req.schedule_to_start_timeout.FromTimedelta(input.schedule_to_start_timeout)
+        if input.start_to_close_timeout is not None:
+            req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
+
+        # Set input payload
+        encoded = await self._client.data_converter.encode([input.arg])
+        if encoded:
+            req.input.CopyFrom(encoded[0])
+
+        # Set search attributes
+        if input.search_attributes is not None:
+            temporalio.converter.encode_search_attributes(
+                input.search_attributes, req.search_attributes
+            )
+
+        # Set user metadata
+        metadata = await _encode_user_metadata(
+            self._client.data_converter, input.summary, None
+        )
+        if metadata is not None:
+            req.user_metadata.CopyFrom(metadata)
+
+        # Set nexus headers
+        if input.headers:
+            for k, v in input.headers.items():
+                req.nexus_header[k] = v
+
+        resp: temporalio.api.workflowservice.v1.StartNexusOperationExecutionResponse
+        try:
+            resp = await self._client.workflow_service.start_nexus_operation_execution(
+                req,
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        except RPCError as err:
+            if err.status == RPCStatusCode.ALREADY_EXISTS and err.grpc_status.details:
+                details = temporalio.api.errordetails.v1.NexusOperationExecutionAlreadyStartedFailure()
+                if err.grpc_status.details[0].Unpack(details):
+                    raise temporalio.exceptions.NexusOperationAlreadyStartedError(
+                        input.id, run_id=details.run_id
+                    )
+            raise
+        return NexusOperationHandle(
+            self._client,
+            input.id,
+            run_id=resp.run_id or None,
+            result_type=input.result_type,
+            endpoint=input.endpoint,
+            service=input.service,
+        )
+
+    async def describe_nexus_operation(
+        self, input: DescribeNexusOperationInput
+    ) -> NexusOperationExecutionDescription:
+        """Describe a nexus operation."""
+        req = temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionRequest(
+            namespace=self._client.namespace,
+            operation_id=input.operation_id,
+            run_id=input.run_id or "",
+        )
+        resp = await self._client.workflow_service.describe_nexus_operation_execution(
+            req=req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return await NexusOperationExecutionDescription._from_execution_info(
+            info=resp.info,
+            data_converter=self._client.data_converter,
+        )
+
+    async def get_nexus_operation_result(
+        self, input: GetNexusOperationResultInput
+    ) -> Any:
+        """Poll for nexus operation result until it's available."""
+        req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
+            namespace=self._client.namespace,
+            operation_id=input.operation_id,
+            run_id=input.run_id or "",
+            wait_stage=temporalio.api.enums.v1.NexusOperationWaitStage.NEXUS_OPERATION_WAIT_STAGE_CLOSED,
+        )
+
+        # Continue polling as long as we have no outcome
+        while True:
+            try:
+                res = (
+                    await self._client.workflow_service.poll_nexus_operation_execution(
+                        req,
+                        retry=True,
+                        metadata=input.rpc_metadata,
+                        timeout=input.rpc_timeout,
+                    )
+                )
+                match res.WhichOneof("outcome"):
+                    case "result":
+                        type_hints = [input.result_type] if input.result_type else None
+                        [result] = await self._client.data_converter.decode(
+                            [res.result], type_hints
+                        )
+                        return result
+
+                    case "failure":
+                        raise NexusOperationFailureError(
+                            cause=await self._client.data_converter.decode_failure(
+                                res.failure
+                            )
+                        )
+
+                    case None:
+                        # poll again
+                        pass
+            except RPCError as err:
+                match err.status:
+                    case RPCStatusCode.DEADLINE_EXCEEDED:
+                        # Deadline exceeded is expected with long polling; retry
+                        continue
+                    case RPCStatusCode.CANCELLED:
+                        raise asyncio.CancelledError() from err
+                    case _:
+                        raise
+
+    async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
+        """Cancel a nexus operation."""
+        await self._client.workflow_service.request_cancel_nexus_operation_execution(
+            temporalio.api.workflowservice.v1.RequestCancelNexusOperationExecutionRequest(
+                namespace=self._client.namespace,
+                operation_id=input.operation_id,
+                run_id=input.run_id or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                reason=input.reason or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def terminate_nexus_operation(
+        self, input: TerminateNexusOperationInput
+    ) -> None:
+        """Terminate a nexus operation."""
+        await self._client.workflow_service.terminate_nexus_operation_execution(
+            temporalio.api.workflowservice.v1.TerminateNexusOperationExecutionRequest(
+                namespace=self._client.namespace,
+                operation_id=input.operation_id,
+                run_id=input.run_id or "",
+                reason=input.reason or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    def list_nexus_operations(
+        self, input: ListNexusOperationsInput
+    ) -> NexusOperationExecutionAsyncIterator:
+        return NexusOperationExecutionAsyncIterator(self._client, input)
+
+    async def count_nexus_operations(
+        self, input: CountNexusOperationsInput
+    ) -> NexusOperationExecutionCount:
+        return NexusOperationExecutionCount._from_raw(
+            await self._client.workflow_service.count_nexus_operation_executions(
+                temporalio.api.workflowservice.v1.CountNexusOperationExecutionsRequest(
+                    namespace=self._client.namespace,
+                    query=input.query or "",
+                ),
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        )
 
     async def _apply_headers(
         self,
