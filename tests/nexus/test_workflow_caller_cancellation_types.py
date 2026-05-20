@@ -20,6 +20,7 @@ from temporalio.client import (
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+from tests.helpers import assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
@@ -40,12 +41,15 @@ test_context: TestContext
 class HandlerWorkflow:
     def __init__(self):
         self.caller_op_future_resolved = asyncio.Event()
+        self.cancel_requested = False
+        self.release_cancellation = asyncio.Event()
 
     @workflow.run
     async def run(self) -> None:
         try:
             await asyncio.Future()
         except asyncio.CancelledError:
+            self.cancel_requested = True
             if test_context.cancellation_type in [
                 workflow.NexusOperationCancellationType.TRY_CANCEL,
                 workflow.NexusOperationCancellationType.WAIT_REQUESTED,
@@ -53,11 +57,24 @@ class HandlerWorkflow:
                 # We want to prove that the caller op future can be resolved before the operation
                 # (i.e. its backing workflow) is cancelled.
                 await self.caller_op_future_resolved.wait()
+            elif (
+                test_context.cancellation_type
+                == workflow.NexusOperationCancellationType.WAIT_COMPLETED
+            ):
+                await self.release_cancellation.wait()
             raise
 
     @workflow.signal
     def set_caller_op_future_resolved(self) -> None:
         self.caller_op_future_resolved.set()
+
+    @workflow.signal
+    def set_release_cancellation(self) -> None:
+        self.release_cancellation.set()
+
+    @workflow.query
+    def has_cancel_requested(self) -> bool:
+        return self.cancel_requested
 
 
 @nexusrpc.service
@@ -150,6 +167,10 @@ class CallerWorkflow:
     @workflow.update
     async def wait_caller_op_future_resolved(self) -> None:
         await self.caller_op_future_resolved
+
+    @workflow.query
+    def has_caller_op_future_resolved(self) -> bool:
+        return self.caller_op_future_resolved.done()
 
     @workflow.run
     async def run(self, input: Input) -> CancellationResult:
@@ -408,6 +429,17 @@ async def check_behavior_for_wait_cancellation_completed(
     Check that a cancellation request is sent and the caller workflow nexus operation future is
     unblocked after the operation is canceled.
     """
+
+    async def assert_handler_cancel_requested() -> None:
+        assert await handler_wf.query(HandlerWorkflow.has_cancel_requested)
+
+    await assert_eventually(assert_handler_cancel_requested)
+
+    handler_status = (await handler_wf.describe()).status
+    assert handler_status == WorkflowExecutionStatus.RUNNING
+    assert not await caller_wf.query(CallerWorkflow.has_caller_op_future_resolved)
+
+    await handler_wf.signal(HandlerWorkflow.set_release_cancellation)
     try:
         await handler_wf.result()
     except WorkflowFailureError as err:
@@ -418,8 +450,13 @@ async def check_behavior_for_wait_cancellation_completed(
     handler_status = (await handler_wf.describe()).status
     assert handler_status == WorkflowExecutionStatus.CANCELED
 
+    async def assert_caller_op_future_resolved() -> None:
+        assert await caller_wf.query(CallerWorkflow.has_caller_op_future_resolved)
+
+    await assert_eventually(assert_caller_op_future_resolved)
+
     await caller_wf.signal(CallerWorkflow.release)
-    result = await caller_wf.result()
+    await caller_wf.result()
 
     await assert_event_subsequence(
         caller_wf,
@@ -429,14 +466,6 @@ async def check_behavior_for_wait_cancellation_completed(
             EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED,
             EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
         ],
-    )
-    handler_wf_canceled_event = await get_event_time(
-        handler_wf,
-        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED,
-    )
-    assert handler_wf_canceled_event <= result.caller_op_future_resolved, (
-        "expected caller op future resolved after handler workflow canceled, but got "
-        f"{result.caller_op_future_resolved} before {handler_wf_canceled_event}"
     )
 
 

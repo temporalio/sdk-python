@@ -17,6 +17,8 @@ from typing import (
     overload,
 )
 
+import nexusrpc
+from nexusrpc import OutputT
 from typing_extensions import Required, Self, TypedDict
 
 import temporalio.activity
@@ -47,6 +49,7 @@ from ..types import (
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
     MultiParamSpec,
+    NexusServiceType,
     ParamType,
     ReturnType,
     SelfType,
@@ -62,11 +65,13 @@ from ._callback import Callback
 from ._impl import _ClientImpl
 from ._interceptor import (
     CountActivitiesInput,
+    CountNexusOperationsInput,
     CountWorkflowsInput,
     CreateScheduleInput,
     GetWorkerBuildIdCompatibilityInput,
     GetWorkerTaskReachabilityInput,
     ListActivitiesInput,
+    ListNexusOperationsInput,
     ListSchedulesInput,
     ListWorkflowsInput,
     OutboundInterceptor,
@@ -75,6 +80,13 @@ from ._interceptor import (
     StartWorkflowUpdateWithStartInput,
     UpdateWithStartUpdateWorkflowInput,
     UpdateWorkerBuildIdCompatibilityInput,
+)
+from ._nexus import (
+    NexusClient,
+    NexusOperationExecutionAsyncIterator,
+    NexusOperationExecutionCount,
+    NexusOperationHandle,
+    _NexusClient,
 )
 from ._schedule import (
     Schedule,
@@ -541,9 +553,7 @@ class Client:
         # are deliberately not exposed in overloads, and are not subject to any
         # backwards compatibility guarantees.
         callbacks: Sequence[Callback] = [],
-        workflow_event_links: Sequence[
-            temporalio.api.common.v1.Link.WorkflowEvent
-        ] = [],
+        links: Sequence[temporalio.api.common.v1.Link] = [],
         request_id: str | None = None,
         stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
@@ -637,7 +647,7 @@ class Client:
                 request_eager_start=request_eager_start,
                 priority=priority,
                 callbacks=callbacks,
-                workflow_event_links=workflow_event_links,
+                links=links,
                 request_id=request_id,
             )
         )
@@ -2857,6 +2867,157 @@ class Client:
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
+        )
+
+    def create_nexus_client(
+        self,
+        service: type[NexusServiceType] | str,
+        endpoint: str,
+    ) -> NexusClient[NexusServiceType]:
+        """Create a client for starting standalone Nexus operations.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            service: The Nexus service type or service name string.
+            endpoint: Endpoint name, resolved to a URL via the cluster's
+                endpoint registry.
+
+        Returns:
+            A Nexus client for the given service and endpoint.
+        """
+        return _NexusClient(client=self, service=service, endpoint=endpoint)
+
+    def list_nexus_operations(
+        self,
+        query: str,
+        *,
+        limit: int | None = None,
+        page_size: int = 1000,
+        next_page_token: bytes | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationExecutionAsyncIterator:
+        """List standalone Nexus operations.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        This does not make a request until the first iteration is attempted.
+        Therefore any errors will not occur until then.
+
+        Args:
+            query: A Temporal visibility list filter for nexus operations. Required.
+            limit: Maximum number of operations to return. If unset, all
+                operations are returned. Only applies if using the
+                returned :py:class:`NexusOperationExecutionAsyncIterator`
+                as an async iterator.
+            page_size: Maximum number of results for each page.
+            next_page_token: A previously obtained next page token if doing
+                pagination. Usually not needed as the iterator automatically
+                starts from the beginning.
+            rpc_metadata: Headers used on each RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call.
+
+        Returns:
+            An async iterator that can be used with ``async for``.
+        """
+        return self._impl.list_nexus_operations(
+            ListNexusOperationsInput(
+                query=query,
+                page_size=page_size,
+                next_page_token=next_page_token,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                limit=limit,
+            )
+        )
+
+    async def count_nexus_operations(
+        self,
+        query: str | None = None,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationExecutionCount:
+        """Count standalone Nexus operations.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            query: A Temporal visibility filter for nexus operations.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            Count of nexus operations.
+        """
+        return await self._impl.count_nexus_operations(
+            CountNexusOperationsInput(
+                query=query, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            )
+        )
+
+    @overload
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        run_id: str | None = None,
+    ) -> NexusOperationHandle[Any]: ...
+
+    @overload
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        run_id: str | None = None,
+        result_type: type[ReturnType],
+    ) -> NexusOperationHandle[ReturnType]: ...
+
+    @overload
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        operation: nexusrpc.Operation[Any, OutputT],
+        run_id: str | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    def get_nexus_operation_handle(
+        self,
+        operation_id: str,
+        *,
+        operation: nexusrpc.Operation[Any, Any] | None = None,
+        run_id: str | None = None,
+        result_type: type | None = None,
+    ) -> NexusOperationHandle[Any]:
+        """Get a handle to an existing standalone Nexus operation.
+
+        .. warning::
+           This API is experimental and unstable.
+
+        Args:
+            operation_id: The operation ID.
+            operation: A ``nexusrpc.Operation`` from which the result type
+                is extracted. If both ``operation`` and ``result_type`` are
+                provided, the ``result_type`` takes precedence.
+            run_id: The operation run ID. If not provided, targets the latest run.
+            result_type: The result type to deserialize into.
+
+        Returns:
+            A handle to the operation.
+        """
+        result_type = result_type or (operation.output_type if operation else None)
+        return NexusOperationHandle(
+            self,
+            operation_id,
+            run_id=run_id,
+            result_type=result_type,
         )
 
 

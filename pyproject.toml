@@ -39,13 +39,8 @@ lambda-worker-otel = [
   "opentelemetry-semantic-conventions>=0.40b0,<1",
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
 ]
-aioboto3 = [
-  "aioboto3>=10.4.0",
-  "types-aioboto3[s3]>=10.4.0",
-]
-strands = [
-    "strands-agents>=1.39.0",
-]
+aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
+strands = ["strands-agents>=1.39.0"]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"
@@ -89,6 +84,7 @@ dev = [
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
+  "pytest-flakefinder>=1.1.0",
   "async-timeout>=4.0,<6; python_version < '3.11'",
   "strands-agents>=1.39.0",
   "strands-agents-tools>=0.5.2",
@@ -261,4 +257,3 @@ exclude = ["temporalio/bridge/target/**/*"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "1 week"
-exclude-newer-package = { openai-agents = false, openinference-instrumentation-google-adk = false }

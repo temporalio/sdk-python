@@ -23,7 +23,7 @@ from temporalio.contrib.aws.s3driver.aioboto3 import new_aioboto3_client
 from temporalio.converter import DataConverter, ExternalStorage
 
 session = aioboto3.Session()
-# To see how to set credentials and region via environment, config objects, or configuration files, 
+# To see how to set credentials and region via environment, config objects, or configuration files,
 # see:
 # https://docs.aws.amazon.com/boto3/latest/guide/configuration.html
 async with session.client("s3") as s3_client:
