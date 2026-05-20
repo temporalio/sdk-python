@@ -100,9 +100,7 @@ class TemporalMCPClient(ToolProvider):
         return None
 
 
-async def populate_cache(
-    server: str, client_factory: Callable[[], MCPClient]
-) -> None:
+async def populate_cache(server: str, client_factory: Callable[[], MCPClient]) -> None:
     """Connect to the MCP server, list tools, fill ``_TOOL_CACHE``."""
     client = client_factory()
     try:
