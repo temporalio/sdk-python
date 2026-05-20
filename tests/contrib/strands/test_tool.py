@@ -4,7 +4,7 @@ from uuid import uuid4
 from strands import tool
 from strands_tools import (  # pyright: ignore[reportMissingTypeStubs]
     calculator,
-    current_time,
+    shell,
 )
 
 from temporalio import activity, workflow
@@ -21,9 +21,9 @@ def letter_counter(word: str, letter: str) -> int:
     return word.lower().count(letter.lower())
 
 
-@activity.defn(name="current_time")
-async def current_time_activity() -> str:
-    return current_time.current_time()
+@activity.defn(name="shell")
+async def shell_activity(command: str) -> dict:
+    return shell.shell(command=command, non_interactive=True)
 
 
 @workflow.defn
@@ -35,7 +35,7 @@ class ToolWorkflow:
             tools=[
                 calculator,
                 activity_as_tool(
-                    current_time_activity,
+                    shell_activity,
                     start_to_close_timeout=timedelta(seconds=15),
                 ),
                 letter_counter,
@@ -54,7 +54,7 @@ async def test_tool(client: Client):
         models={
             "mock": lambda: MockModel(
                 [
-                    {"name": "current_time", "input": {}},
+                    {"name": "shell", "input": {"command": "echo hello"}},
                     {
                         "name": "calculator",
                         "input": {"expression": "3111696 / 74088"},
@@ -73,14 +73,14 @@ async def test_tool(client: Client):
         client,
         task_queue=task_queue,
         workflows=[ToolWorkflow],
-        activities=[current_time_activity],
+        activities=[shell_activity],
         plugins=[plugin],
         max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             ToolWorkflow.run,
-            "I have 4 requests:\n"
-            "1. What is the time right now?\n"
+            "I have 3 requests:\n"
+            "1. Run `echo hello` in a shell\n"
             "2. Calculate 3111696 / 74088\n"
             '3. Tell me how many letter R\'s are in the word "strawberry" 🍓',
             id=f"test_tool_{uuid4()}",
@@ -91,7 +91,7 @@ async def test_tool(client: Client):
     history = await handle.fetch_history()
     assert get_activities(history) == [
         "invoke_model",
-        "current_time",
+        "shell",
         "invoke_model",
         # calculator (in-workflow)
         "invoke_model",

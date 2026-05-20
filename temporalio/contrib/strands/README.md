@@ -175,30 +175,30 @@ async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
 Decorate non-deterministic tools with `@activity.defn`, or if you're importing tools from `strands_tools`, wrap them in a thin async function. Then, register the activity on the worker via `Worker(activities=[...])` and pass it to the agent with `workflow.activity_as_tool(activity, **options)` along with any activity options (e.g. `start_to_close_timeout`):
 
 ```python
-from strands_tools import current_time
+from strands_tools import shell
 from temporalio.contrib.strands import workflow as strands_workflow
 
 @activity.defn
 async def fetch_user(user_id: str) -> dict:
     ...
 
-@activity.defn(name="current_time")
-async def current_time_activity() -> str:
-    return current_time.current_time()
+@activity.defn(name="shell")
+async def shell_activity(command: str) -> dict:
+    return shell.shell(command=command, non_interactive=True)
 
 # workflow
 agent = TemporalAgent(
     start_to_close_timeout=timedelta(seconds=60),
     tools=[
         strands_workflow.activity_as_tool(fetch_user, start_to_close_timeout=timedelta(seconds=30)),
-        strands_workflow.activity_as_tool(current_time_activity, start_to_close_timeout=timedelta(seconds=15)),
+        strands_workflow.activity_as_tool(shell_activity, start_to_close_timeout=timedelta(seconds=15)),
     ],
 )
 
 # worker
 Worker(
     ...,
-    activities=[fetch_user, current_time_activity],
+    activities=[fetch_user, shell_activity],
     plugins=[StrandsPlugin(models=MODELS)],
 )
 ```
