@@ -5,7 +5,7 @@ from typing import Any
 
 from strands.tools.mcp.mcp_agent_tool import MCPAgentTool
 from strands.tools.mcp.mcp_client import MCPClient
-from strands.tools.mcp.mcp_types import MCPToolResult, MCPTransport
+from strands.tools.mcp.mcp_types import MCPToolResult
 from strands.tools.tool_provider import ToolProvider
 from strands.types.tools import AgentTool
 
@@ -101,10 +101,10 @@ class TemporalMCPClient(ToolProvider):
 
 
 async def populate_cache(
-    server: str, transport_factory: Callable[[], MCPTransport]
+    server: str, client_factory: Callable[[], MCPClient]
 ) -> None:
     """Connect to the MCP server, list tools, fill ``_TOOL_CACHE``."""
-    client = MCPClient(transport_factory)
+    client = client_factory()
     try:
         infos: list[_MCPToolInfo] = []
         for tool in await client.load_tools():
@@ -129,13 +129,13 @@ def clear_cache(server: str) -> None:
 
 
 def build_call_tool_activity(
-    server: str, transport_factory: Callable[[], MCPTransport]
+    server: str, client_factory: Callable[[], MCPClient]
 ) -> Callable:
     """Return the per-server ``{server}-call-tool`` activity for registration."""
 
     @activity.defn(name=f"{server}-call-tool")
     async def call_tool(args: _CallToolArgs) -> MCPToolResult:
-        client = MCPClient(transport_factory)
+        client = client_factory()
         client.start()
         try:
             return await client.call_tool_async(

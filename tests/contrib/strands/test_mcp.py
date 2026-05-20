@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from mcp import StdioServerParameters, stdio_client
+from strands.tools.mcp.mcp_client import MCPClient
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -48,10 +49,12 @@ async def test_mcp(client: Client):
             )
         },
         mcp_clients={
-            "echo": lambda: stdio_client(
-                StdioServerParameters(
-                    command=sys.executable,
-                    args=[str(Path(__file__).parent / "echo_mcp_server.py")],
+            "echo": lambda: MCPClient(
+                lambda: stdio_client(
+                    StdioServerParameters(
+                        command=sys.executable,
+                        args=[str(Path(__file__).parent / "echo_mcp_server.py")],
+                    )
                 )
             ),
         },

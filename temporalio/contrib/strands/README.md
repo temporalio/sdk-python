@@ -380,10 +380,11 @@ class ChatWorkflow:
 
 ## MCP
 
-`StrandsPlugin(mcp_clients=...)` takes a mapping of `name → transport factory`, mirroring the `models=` pattern. The plugin registers a per-server `{name}-call-tool` activity and connects at worker startup to enumerate tools. Workflow-side, `TemporalMCPClient(server="name")` is a pure handle: it references the server by name and carries the per-call activity options.
+`StrandsPlugin(mcp_clients=...)` takes a mapping of `name → MCPClient factory`, mirroring the `models=` pattern. The plugin registers a per-server `{name}-call-tool` activity and connects at worker startup to enumerate tools. Workflow-side, `TemporalMCPClient(server="name")` is a pure handle: it references the server by name and carries the per-call activity options.
 
 ```python
 from mcp import StdioServerParameters, stdio_client
+from strands.tools.mcp.mcp_client import MCPClient
 from temporalio.contrib.strands import TemporalMCPClient
 
 # workflow
@@ -401,15 +402,17 @@ Worker(
     ...,
     plugins=[StrandsPlugin(
         mcp_clients={
-            "echo": lambda: stdio_client(
-                StdioServerParameters(command="...", args=[...]),
+            "echo": lambda: MCPClient(
+                lambda: stdio_client(
+                    StdioServerParameters(command="...", args=[...]),
+                ),
             ),
         },
     )],
 )
 ```
 
-The plugin connects to each MCP server once at worker startup to enumerate tools. The schema is frozen for the worker's lifetime; restart workers to pick up MCP-server changes. If a server is unavailable at startup, the worker fails to start.
+Each factory returns a fully configured `MCPClient`, so you can pass options like `tool_filters`, `prefix`, `elicitation_callback`, or `tasks_config` to it. The plugin connects to each MCP server once at worker startup to enumerate tools. The schema is frozen for the worker's lifetime; restart workers to pick up MCP-server changes. If a server is unavailable at startup, the worker fails to start.
 
 ## Observability
 

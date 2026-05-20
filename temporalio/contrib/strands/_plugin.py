@@ -5,7 +5,7 @@ from dataclasses import replace
 import strands.models.model as _strands_model
 from strands.models import Model
 from strands.models.bedrock import BedrockModel
-from strands.tools.mcp.mcp_types import MCPTransport
+from strands.tools.mcp.mcp_client import MCPClient
 
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
@@ -45,7 +45,7 @@ class StrandsPlugin(SimplePlugin):
         self,
         *,
         models: dict[str, Callable[[], Model]] | None = None,
-        mcp_clients: dict[str, Callable[[], MCPTransport]] | None = None,
+        mcp_clients: dict[str, Callable[[], MCPClient]] | None = None,
     ) -> None:
         """Build the plugin from optional model and MCP transport factories.
 
@@ -62,13 +62,13 @@ class StrandsPlugin(SimplePlugin):
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
 
         mcp_clients = mcp_clients or {}
-        for server, transport_factory in mcp_clients.items():
-            activities.append(build_call_tool_activity(server, transport_factory))
+        for server, client_factory in mcp_clients.items():
+            activities.append(build_call_tool_activity(server, client_factory))
 
         @asynccontextmanager
         async def run_context() -> AsyncGenerator[None, None]:
-            for server, transport_factory in mcp_clients.items():
-                await populate_cache(server, transport_factory)
+            for server, client_factory in mcp_clients.items():
+                await populate_cache(server, client_factory)
             try:
                 yield
             finally:
