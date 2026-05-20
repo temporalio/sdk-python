@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Generator, Mapping
 from datetime import timedelta
 from enum import IntEnum
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, overload
 
 import nexusrpc
 import nexusrpc.handler
@@ -13,6 +13,7 @@ from nexusrpc import InputT, OutputT
 import temporalio.bridge.proto.nexus
 import temporalio.nexus
 from temporalio.nexus._util import ServiceHandlerT
+from temporalio.types import NexusServiceType
 
 from ._context import _Runtime
 
@@ -20,7 +21,6 @@ __all__ = [
     "NexusClient",
     "NexusOperationCancellationType",
     "NexusOperationHandle",
-    "ServiceT",
     "create_nexus_client",
 ]
 
@@ -42,9 +42,6 @@ class NexusOperationHandle(Generic[OutputT]):
     def operation_token(self) -> str | None:
         """The operation token for this handle."""
         raise NotImplementedError
-
-
-ServiceT = TypeVar("ServiceT")
 
 
 class NexusOperationCancellationType(IntEnum):
@@ -84,7 +81,7 @@ class NexusOperationCancellationType(IntEnum):
     :py:exc:`asyncio.CancelledError` resulting from the cancellation request)."""
 
 
-class NexusClient(ABC, Generic[ServiceT]):
+class NexusClient(ABC, Generic[NexusServiceType]):
     """A client for invoking Nexus operations.
 
     Example::
@@ -307,7 +304,7 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
+            [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             Awaitable[OutputT],
         ],
         input: InputT,
@@ -327,7 +324,7 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
+            [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
         ],
         input: InputT,
@@ -347,7 +344,7 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceT],
+            [NexusServiceType],
             nexusrpc.handler.OperationHandler[InputT, OutputT],
         ],
         input: InputT,
@@ -392,12 +389,12 @@ class NexusClient(ABC, Generic[ServiceT]):
         ...
 
 
-class _NexusClient(NexusClient[ServiceT]):
+class _NexusClient(NexusClient[NexusServiceType]):
     def __init__(
         self,
         *,
         endpoint: str,
-        service: type[ServiceT] | str,
+        service: type[NexusServiceType] | str,
     ) -> None:
         """Create a Nexus client.
 
@@ -476,9 +473,9 @@ class _NexusClient(NexusClient[ServiceT]):
 @overload
 def create_nexus_client(
     *,
-    service: type[ServiceT],
+    service: type[NexusServiceType],
     endpoint: str,
-) -> NexusClient[ServiceT]: ...
+) -> NexusClient[NexusServiceType]: ...
 
 
 @overload
@@ -491,9 +488,9 @@ def create_nexus_client(
 
 def create_nexus_client(
     *,
-    service: type[ServiceT] | str,
+    service: type[NexusServiceType] | str,
     endpoint: str,
-) -> NexusClient[ServiceT]:
+) -> NexusClient[NexusServiceType]:
     """Create a Nexus client.
 
     Args:

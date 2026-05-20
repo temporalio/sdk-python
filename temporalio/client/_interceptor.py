@@ -32,6 +32,12 @@ if TYPE_CHECKING:
         ActivityHandle,
         AsyncActivityIDReference,
     )
+    from ._nexus import (
+        NexusOperationExecutionAsyncIterator,
+        NexusOperationExecutionCount,
+        NexusOperationExecutionDescription,
+        NexusOperationHandle,
+    )
     from ._schedule import (
         Schedule,
         ScheduleAsyncIterator,
@@ -93,7 +99,7 @@ class StartWorkflowInput:
     priority: temporalio.common.Priority
     # The following options are experimental and unstable.
     callbacks: Sequence[Callback]
-    workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
+    links: Sequence[temporalio.api.common.v1.Link]
     request_id: str | None
     versioning_override: temporalio.common.VersioningOverride | None = None
 
@@ -552,6 +558,120 @@ class GetWorkerTaskReachabilityInput:
 
 
 @dataclass
+class StartNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.start_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation: str
+    arg: Any
+    id: str
+    endpoint: str
+    service: str
+    result_type: type | None
+    schedule_to_close_timeout: timedelta | None
+    schedule_to_start_timeout: timedelta | None
+    start_to_close_timeout: timedelta | None
+    id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy
+    id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy
+    search_attributes: temporalio.common.TypedSearchAttributes | None
+    summary: str | None
+    headers: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class DescribeNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.describe_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class GetNexusOperationResultInput:
+    """Input for :py:meth:`OutboundInterceptor.get_nexus_operation_result`.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    result_type: type[Any] | None
+
+
+@dataclass
+class CancelNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.cancel_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class TerminateNexusOperationInput:
+    """Input for :py:meth:`OutboundInterceptor.terminate_nexus_operation`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    operation_id: str
+    run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class ListNexusOperationsInput:
+    """Input for :py:meth:`OutboundInterceptor.list_nexus_operations`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    query: str | None
+    page_size: int
+    next_page_token: bytes | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    limit: int | None
+
+
+@dataclass
+class CountNexusOperationsInput:
+    """Input for :py:meth:`OutboundInterceptor.count_nexus_operations`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    query: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
 class Interceptor:
     """Interceptor for clients.
 
@@ -781,3 +901,73 @@ class OutboundInterceptor:
     ) -> WorkerTaskReachability:
         """Called for every :py:meth:`Client.get_worker_task_reachability` call."""
         return await self.next.get_worker_task_reachability(input)
+
+    ### Nexus operation calls
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> NexusOperationHandle[Any]:
+        """Called for every :py:meth:`NexusClient.start_operation` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.start_nexus_operation(input)
+
+    async def describe_nexus_operation(
+        self, input: DescribeNexusOperationInput
+    ) -> NexusOperationExecutionDescription:
+        """Called for every :py:meth:`NexusOperationHandle.describe` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.describe_nexus_operation(input)
+
+    async def get_nexus_operation_result(
+        self, input: GetNexusOperationResultInput
+    ) -> Any:
+        """Called for every :py:meth:`NexusOperationHandle.result` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.get_nexus_operation_result(input)
+
+    async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
+        """Called for every :py:meth:`NexusOperationHandle.cancel` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        await self.next.cancel_nexus_operation(input)
+
+    async def terminate_nexus_operation(
+        self, input: TerminateNexusOperationInput
+    ) -> None:
+        """Called for every :py:meth:`NexusOperationHandle.terminate` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        await self.next.terminate_nexus_operation(input)
+
+    def list_nexus_operations(
+        self, input: ListNexusOperationsInput
+    ) -> NexusOperationExecutionAsyncIterator:
+        """Called for every :py:meth:`Client.list_nexus_operations` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return self.next.list_nexus_operations(input)
+
+    async def count_nexus_operations(
+        self, input: CountNexusOperationsInput
+    ) -> NexusOperationExecutionCount:
+        """Called for every :py:meth:`Client.count_nexus_operations` call.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        return await self.next.count_nexus_operations(input)

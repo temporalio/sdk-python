@@ -4405,6 +4405,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-flakefinder"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ec/53/69c56a93ea057895b5761c5318455804873a6cd9d796d7c55d41c2358125/pytest-flakefinder-1.1.0.tar.gz", hash = "sha256:e2412a1920bdb8e7908783b20b3d57e9dad590cc39a93e8596ffdd493b403e0e", size = 6795, upload-time = "2022-10-26T18:27:54.243Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/8b/06787150d0fd0cbd3a8054262b56f91631c7778c1bc91bf4637e47f909ad/pytest_flakefinder-1.1.0-py2.py3-none-any.whl", hash = "sha256:741e0e8eea427052f5b8c89c2b3c3019a50c39a59ce4df6a305a2c2d9ba2bd13", size = 4644, upload-time = "2022-10-26T18:27:52.128Z" },
+]
+
+[[package]]
 name = "pytest-pretty"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5219,6 +5231,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+    { name = "pytest-flakefinder" },
     { name = "pytest-pretty" },
     { name = "pytest-rerunfailures" },
     { name = "pytest-timeout" },
@@ -5284,6 +5297,7 @@ dev = [
     { name = "pytest", specifier = "~=9.0" },
     { name = "pytest-asyncio", specifier = ">=0.21,<0.22" },
     { name = "pytest-cov", specifier = ">=6.1.1" },
+    { name = "pytest-flakefinder", specifier = ">=1.1.0" },
     { name = "pytest-pretty", specifier = ">=1.3.0" },
     { name = "pytest-rerunfailures", specifier = ">=16.1" },
     { name = "pytest-timeout", specifier = "~=2.2" },
