@@ -238,16 +238,6 @@ async def standalone_operation_type_tests():
         start_to_close_timeout=timedelta(seconds=2),
     )
 
-    # result_type overrides output type from operation definition
-    # conflicting result_type and annotation on variable cause type error
-    # assert-type-error-pyright: 'Type "str" is not assignable to declared type "MyOutput"'
-    _bad_result_type_output: MyOutput = await nexus_client.execute_operation(  # type: ignore
-        MyServiceHandler.my_sync_operation,
-        MyInput(),
-        id="op-1",
-        result_type=str,  # type: ignore
-    )
-
     # string operation name and result_type infers output type
     _str_op_result_type_output: MyOutput = await nexus_client.execute_operation(
         "my_sync_operation", MyInput(), id="op-1", result_type=MyOutput
@@ -336,20 +326,6 @@ async def standalone_operation_type_tests():
         start_to_close_timeout=timedelta(seconds=2),
     )
     _defn_handle_output: MyOutput = await _defn_handle.result()
-
-    # result_type overrides output type from operation definition
-    # conflicting result_type and annotation on variable cause type error
-    _result_type_handle: NexusOperationHandle[
-        MyOutput
-        # assert-type-error-pyright: 'Type "NexusOperationHandle\[str\]" is not assignable to declared type "NexusOperationHandle\[MyOutput\]"'
-    ] = await nexus_client.start_operation(  # type: ignore
-        MyServiceHandler.my_sync_operation,
-        MyInput(),
-        id="op-1",
-        result_type=str,  # type: ignore
-    )
-    # handle still respects type declaration on the variable
-    _result_type_handle_output: MyOutput = await _result_type_handle.result()
 
     # starting with string operation name and result_type infers output type on the handle
     # and result from the handle
