@@ -1,5 +1,14 @@
+import sys
 from datetime import timedelta
 from uuid import uuid4
+
+import pytest
+
+if sys.platform == "win32":
+    pytest.skip(
+        "strands_tools.shell uses Unix-only pty/termios",
+        allow_module_level=True,
+    )
 
 from strands import tool
 from strands_tools import (  # pyright: ignore[reportMissingTypeStubs]
