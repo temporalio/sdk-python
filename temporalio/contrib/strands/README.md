@@ -7,7 +7,7 @@ This Temporal [Plugin](https://docs.temporal.io/develop/plugins-guide) allows yo
 ## Installation
 
 ```sh
-uv add temporalio[strands]
+uv add temporalio[strands-agents]
 ```
 
 ## Quickstart

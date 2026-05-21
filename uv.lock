@@ -5453,7 +5453,7 @@ opentelemetry = [
 pydantic = [
     { name = "pydantic" },
 ]
-strands = [
+strands-agents = [
     { name = "strands-agents" },
 ]
 
@@ -5519,12 +5519,12 @@ requires-dist = [
     { name = "protobuf", specifier = ">=3.20,<7.0.0" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.0.0,<3" },
     { name = "python-dateutil", marker = "python_full_version < '3.11'", specifier = ">=2.8.2,<3" },
-    { name = "strands-agents", marker = "extra == 'strands'", specifier = ">=1.39.0" },
+    { name = "strands-agents", marker = "extra == 'strands-agents'", specifier = ">=1.39.0" },
     { name = "types-aioboto3", extras = ["s3"], marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
     { name = "types-protobuf", specifier = ">=3.20,<7.0.0" },
     { name = "typing-extensions", specifier = ">=4.2.0,<5" },
 ]
-provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "lambda-worker-otel", "aioboto3", "strands"]
+provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "lambda-worker-otel", "aioboto3", "strands-agents"]
 
 [package.metadata.requires-dev]
 dev = [
