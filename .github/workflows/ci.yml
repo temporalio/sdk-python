@@ -42,12 +42,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           components: "clippy"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        id: setup-python
+        with:
+          python-version: ${{ matrix.pythonOverride || matrix.python }}
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: temporalio/bridge -> target
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: ${{ matrix.pythonOverride || matrix.python }}
+          key: py-${{ steps.setup-python.outputs.python-version }}
       - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
@@ -107,12 +109,14 @@ jobs:
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        id: setup-python
+        with:
+          python-version: "3.10"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: temporalio/bridge -> target
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.10"
+          key: py-${{ steps.setup-python.outputs.python-version }}
       - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
@@ -143,12 +147,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           components: "clippy"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        id: setup-python
+        with:
+          python-version: "3.13"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: temporalio/bridge -> target
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.13"
+          key: py-${{ steps.setup-python.outputs.python-version }}
       - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
@@ -181,12 +187,14 @@ jobs:
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        id: setup-python
+        with:
+          python-version: "3.14"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: temporalio/bridge -> target
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.14"
+          key: py-${{ steps.setup-python.outputs.python-version }}
       - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
         with:
           # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
