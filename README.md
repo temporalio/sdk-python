@@ -1241,6 +1241,14 @@ my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_
 
 See the API for more details on exact fields and their meaning.
 
+##### Debugging Workflows in the Sandbox
+
+To attach an IDE debugger (e.g. the VSCode Python debugger or PyCharm) to workflow code running inside the
+sandbox, set `debug_mode=True` on the `Worker`, or set the `TEMPORAL_DEBUG` environment variable to a
+truthy value. This disables the workflow deadlock detector — which would otherwise interrupt a paused
+workflow at the 2-second timeout — and adds `_pydevd_bundle` (the module IDE debuggers inject at runtime)
+to the sandbox passthrough list so breakpoints in workflow code are hit.
+
 ##### Known Sandbox Issues
 
 Below are known sandbox issues. As the sandbox is developed and matures, some may be resolved.
