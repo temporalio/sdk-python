@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from typing import (
-    TypeVar,
     overload,
 )
 
@@ -13,26 +12,37 @@ from nexusrpc.handler import (
     StartOperationContext,
 )
 
-from ._operation_context import WorkflowRunOperationContext
-from ._operation_handlers import WorkflowRunOperationHandler
+from temporalio.nexus._temporal_client import (
+    TemporalNexusClient,
+    TemporalOperationResult,
+)
+from temporalio.types import NexusServiceType
+
+from ._operation_context import (
+    TemporalStartOperationContext,
+    WorkflowRunOperationContext,
+)
+from ._operation_handlers import (
+    TemporalNexusOperationHandler,
+    WorkflowRunOperationHandler,
+)
 from ._token import WorkflowHandle
 from ._util import (
     get_callable_name,
+    get_temporal_operation_start_method_input_and_output_type_annotations,
     get_workflow_run_start_method_input_and_output_type_annotations,
     set_operation_factory,
 )
-
-ServiceHandlerT = TypeVar("ServiceHandlerT")
 
 
 @overload
 def workflow_run_operation(
     start: Callable[
-        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+        [NexusServiceType, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> Callable[
-    [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+    [NexusServiceType, WorkflowRunOperationContext, InputT],
     Awaitable[WorkflowHandle[OutputT]],
 ]: ...
 
@@ -44,12 +54,12 @@ def workflow_run_operation(
 ) -> Callable[
     [
         Callable[
-            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+            [NexusServiceType, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ]
     ],
     Callable[
-        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+        [NexusServiceType, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ]: ...
@@ -59,7 +69,7 @@ def workflow_run_operation(
     start: None
     | (
         Callable[
-            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+            [NexusServiceType, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ]
     ) = None,
@@ -67,18 +77,18 @@ def workflow_run_operation(
     name: str | None = None,
 ) -> (
     Callable[
-        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+        [NexusServiceType, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ]
     | Callable[
         [
             Callable[
-                [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+                [NexusServiceType, WorkflowRunOperationContext, InputT],
                 Awaitable[WorkflowHandle[OutputT]],
             ]
         ],
         Callable[
-            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+            [NexusServiceType, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ],
     ]
@@ -87,11 +97,11 @@ def workflow_run_operation(
 
     def decorator(
         start: Callable[
-            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+            [NexusServiceType, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ],
     ) -> Callable[
-        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+        [NexusServiceType, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ]:
         (
@@ -100,7 +110,7 @@ def workflow_run_operation(
         ) = get_workflow_run_start_method_input_and_output_type_annotations(start)
 
         def operation_handler_factory(
-            self: ServiceHandlerT,
+            self: NexusServiceType,
         ) -> OperationHandler[InputT, OutputT]:
             async def _start(
                 ctx: StartOperationContext, input: InputT
@@ -113,6 +123,139 @@ def workflow_run_operation(
 
             _start.__doc__ = start.__doc__
             return WorkflowRunOperationHandler(_start)
+
+        method_name = get_callable_name(start)
+        op = nexusrpc.Operation(
+            name=name or method_name,
+            input_type=input_type,
+            output_type=output_type,
+        )
+        op.method_name = method_name
+        nexusrpc.set_operation(operation_handler_factory, op)
+
+        set_operation_factory(start, operation_handler_factory)
+        return start
+
+    if start is None:
+        return decorator
+
+    return decorator(start)
+
+
+@overload
+def temporal_operation(
+    start: Callable[
+        [NexusServiceType, TemporalStartOperationContext, TemporalNexusClient, InputT],
+        Awaitable[TemporalOperationResult[OutputT]],
+    ],
+) -> Callable[
+    [NexusServiceType, TemporalStartOperationContext, TemporalNexusClient, InputT],
+    Awaitable[TemporalOperationResult[OutputT]],
+]: ...
+
+
+@overload
+def temporal_operation(
+    *,
+    name: str | None = None,
+) -> Callable[
+    [
+        Callable[
+            [
+                NexusServiceType,
+                TemporalStartOperationContext,
+                TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[TemporalOperationResult[OutputT]],
+        ]
+    ],
+    Callable[
+        [NexusServiceType, TemporalStartOperationContext, TemporalNexusClient, InputT],
+        Awaitable[TemporalOperationResult[OutputT]],
+    ],
+]: ...
+
+
+def temporal_operation(
+    start: None
+    | (
+        Callable[
+            [
+                NexusServiceType,
+                TemporalStartOperationContext,
+                TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[TemporalOperationResult[OutputT]],
+        ]
+    ) = None,
+    *,
+    name: str | None = None,
+) -> (
+    Callable[
+        [NexusServiceType, TemporalStartOperationContext, TemporalNexusClient, InputT],
+        Awaitable[TemporalOperationResult[OutputT]],
+    ]
+    | Callable[
+        [
+            Callable[
+                [
+                    NexusServiceType,
+                    TemporalStartOperationContext,
+                    TemporalNexusClient,
+                    InputT,
+                ],
+                Awaitable[TemporalOperationResult[OutputT]],
+            ]
+        ],
+        Callable[
+            [
+                NexusServiceType,
+                TemporalStartOperationContext,
+                TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[TemporalOperationResult[OutputT]],
+        ],
+    ]
+):
+    """Decorator marking a method as the start method for an operation that interacts with Temporal."""
+
+    def decorator(
+        start: Callable[
+            [
+                NexusServiceType,
+                TemporalStartOperationContext,
+                TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[TemporalOperationResult[OutputT]],
+        ],
+    ) -> Callable[
+        [NexusServiceType, TemporalStartOperationContext, TemporalNexusClient, InputT],
+        Awaitable[TemporalOperationResult[OutputT]],
+    ]:
+        (
+            input_type,
+            output_type,
+        ) = get_temporal_operation_start_method_input_and_output_type_annotations(start)
+
+        def operation_handler_factory(
+            self: NexusServiceType,
+        ) -> OperationHandler[InputT, OutputT]:
+            async def _start(
+                ctx: StartOperationContext, client: TemporalNexusClient, input: InputT
+            ) -> TemporalOperationResult[OutputT]:
+                return await start(
+                    self,
+                    TemporalStartOperationContext._from_start_operation_context(ctx),
+                    client,
+                    input,
+                )
+
+            _start.__doc__ = start.__doc__
+            return TemporalNexusOperationHandler(_start)
 
         method_name = get_callable_name(start)
         op = nexusrpc.Operation(

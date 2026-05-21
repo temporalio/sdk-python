@@ -12,7 +12,6 @@ from nexusrpc import InputT, OutputT
 
 import temporalio.bridge.proto.nexus
 import temporalio.nexus
-from temporalio.nexus._util import ServiceHandlerT
 from temporalio.types import NexusServiceType
 
 from ._context import _Runtime
@@ -138,7 +137,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     async def start_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, temporalio.nexus.WorkflowRunOperationContext, InputT],
+            [NexusServiceType, temporalio.nexus.WorkflowRunOperationContext, InputT],
             Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
         ],
         input: InputT,
@@ -158,7 +157,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     async def start_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             Awaitable[OutputT],
         ],
         input: InputT,
@@ -178,7 +177,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     async def start_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
         ],
         input: InputT,
@@ -198,7 +197,32 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     async def start_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT], nexusrpc.handler.OperationHandler[InputT, OutputT]
+            [NexusServiceType], nexusrpc.handler.OperationHandler[InputT, OutputT]
+        ],
+        input: InputT,
+        *,
+        output_type: type[OutputT] | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Mapping[str, str] | None = None,
+        summary: str | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for temporal_operation methods
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [
+                NexusServiceType,
+                temporalio.nexus.TemporalStartOperationContext,
+                temporalio.nexus.TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
         ],
         input: InputT,
         *,
@@ -284,7 +308,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, temporalio.nexus.WorkflowRunOperationContext, InputT],
+            [NexusServiceType, temporalio.nexus.WorkflowRunOperationContext, InputT],
             Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
         ],
         input: InputT,
@@ -346,6 +370,31 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         operation: Callable[
             [NexusServiceType],
             nexusrpc.handler.OperationHandler[InputT, OutputT],
+        ],
+        input: InputT,
+        *,
+        output_type: type[OutputT] | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Mapping[str, str] | None = None,
+        summary: str | None = None,
+    ) -> OutputT: ...
+
+    # Overload for temporal_operation methods
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [
+                NexusServiceType,
+                temporalio.nexus.TemporalStartOperationContext,
+                temporalio.nexus.TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
         ],
         input: InputT,
         *,

@@ -1,0 +1,299 @@
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Concatenate,
+    Generic,
+    TypeVar,
+    cast,
+    overload,
+)
+
+from nexusrpc import HandlerError, HandlerErrorType
+from nexusrpc.handler import StartOperationResultAsync, StartOperationResultSync
+from typing_extensions import Self
+
+import temporalio.common
+from temporalio.nexus._operation_context import (
+    _start_nexus_backing_workflow,
+    _TemporalStartOperationContext,
+)
+from temporalio.types import (
+    MethodAsyncNoParam,
+    MethodAsyncSingleParam,
+    MultiParamSpec,
+    ParamType,
+    ReturnType,
+    SelfType,
+)
+
+if TYPE_CHECKING:
+    import temporalio.client
+
+
+_ResultT = TypeVar("_ResultT")
+
+
+@dataclass(frozen=True)
+class TemporalOperationResult(Generic[_ResultT]):
+    """Unified result: sync value or async token."""
+
+    value: _ResultT | object = temporalio.common._arg_unset
+    token: str | None = None
+
+    @classmethod
+    def sync(cls, value: _ResultT) -> "TemporalOperationResult[_ResultT]":
+        """Create a result that completes the Nexus operation synchronously."""
+        return cls(value=value)
+
+    @classmethod
+    def async_token(cls, token: str) -> Self:
+        """Create a result that completes the Nexus operation asynchronously."""
+        return cls(token=token)
+
+    def _to_nexus_result(
+        self,
+    ) -> StartOperationResultSync[_ResultT] | StartOperationResultAsync:
+        if self.token is not None:
+            return StartOperationResultAsync(self.token)
+        elif self.value is not temporalio.common._arg_unset:
+            return StartOperationResultSync(cast(_ResultT, self.value))
+        else:
+            raise RuntimeError(
+                "Invalid TemporalOperationResult. Neither token nor value are set."
+            )
+
+
+class TemporalNexusClient:
+    """Nexus-aware wrapper around a Temporal Client."""
+
+    def __init__(self) -> None:
+        """Initialize the client wrapper from the active Nexus operation context."""
+        self._temporal_context = _TemporalStartOperationContext.get()
+        self._started_async = False
+
+    @property
+    def client(self) -> temporalio.client.Client:
+        """Return the Temporal client for the active Nexus operation."""
+        return self._temporal_context.client
+
+    @contextmanager
+    def _reserve_async_start(self) -> Iterator[None]:
+        if self._started_async:
+            raise HandlerError(
+                "Only one async operation can be started per operation handler invocation. Use TemporalNexusClient.client for additional workflow interactions",
+                type=HandlerErrorType.BAD_REQUEST,
+            )
+
+        # Reserve the started flag before sending to prevent concurrent starts
+        self._started_async = True
+        try:
+            yield
+        except BaseException:
+            self._started_async = False
+            raise
+
+    # Overload for no-param workflow
+    @overload
+    async def start_workflow(
+        self,
+        workflow: MethodAsyncNoParam[SelfType, ReturnType],
+        *,
+        id: str,
+        task_queue: str | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # Overload for single-param workflow
+    @overload
+    async def start_workflow(
+        self,
+        workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # Overload for multi-param workflow
+    @overload
+    async def start_workflow(
+        self,
+        workflow: Callable[
+            Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
+        ],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # Overload for string-name workflow
+    @overload
+    async def start_workflow(
+        self,
+        workflow: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str | None = None,
+        result_type: type[ReturnType] | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    async def start_workflow(
+        self,
+        workflow: str | Callable[..., Awaitable[ReturnType]],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str | None = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> TemporalOperationResult[ReturnType]:
+        """Start a workflow as the backing asynchronous Nexus operation."""
+        with self._reserve_async_start():
+            wf_handle = await _start_nexus_backing_workflow(
+                temporal_context=self._temporal_context,
+                workflow=workflow,
+                arg=arg,
+                args=args,
+                id=id,
+                task_queue=task_queue,
+                result_type=result_type,
+                execution_timeout=execution_timeout,
+                run_timeout=run_timeout,
+                task_timeout=task_timeout,
+                id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
+                retry_policy=retry_policy,
+                cron_schedule=cron_schedule,
+                memo=memo,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                start_delay=start_delay,
+                start_signal=start_signal,
+                start_signal_args=start_signal_args,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                request_eager_start=request_eager_start,
+                priority=priority,
+                versioning_override=versioning_override,
+            )
+
+        return TemporalOperationResult.async_token(wf_handle.to_token())

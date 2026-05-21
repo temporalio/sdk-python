@@ -28,6 +28,7 @@ from nexusrpc.handler import (
     OperationContext,
     StartOperationContext,
 )
+from typing_extensions import Self
 
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
@@ -279,6 +280,26 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
         return workflow_handle
 
 
+class TemporalStartOperationContext(StartOperationContext):
+    """Context received by a Temporal operation."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the Temporal operation context."""
+        super().__init__(*args, **kwargs)
+        self._temporal_context = _TemporalStartOperationContext.get()
+
+    @classmethod
+    def _from_start_operation_context(cls, ctx: StartOperationContext) -> Self:
+        return cls(
+            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
+        )
+
+    @property
+    def metric_meter(self) -> temporalio.common.MetricMeter:
+        """The metric meter"""
+        return self._temporal_context.metric_meter
+
+
 class WorkflowRunOperationContext(StartOperationContext):
     """Context received by a workflow run operation."""
 
@@ -492,50 +513,34 @@ class WorkflowRunOperationContext(StartOperationContext):
             Nexus caller is itself a workflow, this means that the workflow in the caller
             namespace web UI will contain links to the started workflow, and vice versa.
         """
-        # We must pass nexus_completion_callbacks, event_links, and request_id,
-        # but these are deliberately not exposed in overloads, hence the type-check
-        # violation.
-
-        # Here we are starting a "nexus-backing" workflow. That means that the StartWorkflow request
-        # contains nexus-specific data such as a completion callback (used by the handler server
-        # namespace to deliver the result to the caller namespace when the workflow reaches a
-        # terminal state) and inbound links to the caller workflow (attached to history events of
-        # the workflow started in the handler namespace, and displayed in the UI).
-        with _nexus_backing_workflow_start_context():
-            wf_handle = await self._temporal_context.client.start_workflow(  # type: ignore
-                workflow=workflow,
-                arg=arg,
-                args=args,
-                id=id,
-                task_queue=task_queue or self._temporal_context.info().task_queue,
-                result_type=result_type,
-                execution_timeout=execution_timeout,
-                run_timeout=run_timeout,
-                task_timeout=task_timeout,
-                id_reuse_policy=id_reuse_policy,
-                id_conflict_policy=id_conflict_policy,
-                retry_policy=retry_policy,
-                cron_schedule=cron_schedule,
-                memo=memo,
-                search_attributes=search_attributes,
-                static_summary=static_summary,
-                static_details=static_details,
-                start_delay=start_delay,
-                start_signal=start_signal,
-                start_signal_args=start_signal_args,
-                rpc_metadata=rpc_metadata,
-                rpc_timeout=rpc_timeout,
-                request_eager_start=request_eager_start,
-                priority=priority,
-                versioning_override=versioning_override,
-                callbacks=self._temporal_context._get_callbacks(),
-                links=self._temporal_context._get_links(),
-                request_id=self._temporal_context.nexus_context.request_id,
-            )
-
-        self._temporal_context._add_outbound_links(wf_handle)
-
-        return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
+        return await _start_nexus_backing_workflow(
+            temporal_context=self._temporal_context,
+            workflow=workflow,
+            arg=arg,
+            args=args,
+            id=id,
+            task_queue=task_queue,
+            result_type=result_type,
+            execution_timeout=execution_timeout,
+            run_timeout=run_timeout,
+            task_timeout=task_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            cron_schedule=cron_schedule,
+            memo=memo,
+            search_attributes=search_attributes,
+            static_summary=static_summary,
+            static_details=static_details,
+            start_delay=start_delay,
+            start_signal=start_signal,
+            start_signal_args=start_signal_args,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+            request_eager_start=request_eager_start,
+            priority=priority,
+            versioning_override=versioning_override,
+        )
 
 
 @dataclass(frozen=True)
@@ -586,3 +591,81 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 logger = LoggerAdapter(logging.getLogger("temporalio.nexus"), None)
 """Logger that emits additional data describing the current Nexus operation."""
+
+
+async def _start_nexus_backing_workflow(
+    temporal_context: _TemporalStartOperationContext,
+    workflow: str | Callable[..., Awaitable[ReturnType]],
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Sequence[Any] = [],
+    id: str,
+    task_queue: str | None = None,
+    result_type: type | None = None,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+    ) = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    start_delay: timedelta | None = None,
+    start_signal: str | None = None,
+    start_signal_args: Sequence[Any] = [],
+    rpc_metadata: Mapping[str, str | bytes] = {},
+    rpc_timeout: timedelta | None = None,
+    request_eager_start: bool = False,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
+) -> WorkflowHandle[ReturnType]:
+    # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
+    # but these are deliberately not exposed in overloads, hence the type-check
+    # violation.
+
+    # Here we are starting a "nexus-backing" workflow. That means that the StartWorkflow request
+    # contains nexus-specific data such as a completion callback (used by the handler server
+    # namespace to deliver the result to the caller namespace when the workflow reaches a
+    # terminal state) and inbound links to the caller workflow (attached to history events of
+    # the workflow started in the handler namespace, and displayed in the UI).
+    with _nexus_backing_workflow_start_context():
+        wf_handle = await temporal_context.client.start_workflow(  # type: ignore
+            workflow=workflow,
+            arg=arg,
+            args=args,
+            id=id,
+            task_queue=task_queue or temporal_context.info().task_queue,
+            result_type=result_type,
+            execution_timeout=execution_timeout,
+            run_timeout=run_timeout,
+            task_timeout=task_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            cron_schedule=cron_schedule,
+            memo=memo,
+            search_attributes=search_attributes,
+            static_summary=static_summary,
+            static_details=static_details,
+            start_delay=start_delay,
+            start_signal=start_signal,
+            start_signal_args=start_signal_args,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+            request_eager_start=request_eager_start,
+            priority=priority,
+            versioning_override=versioning_override,
+            callbacks=temporal_context._get_callbacks(),
+            links=temporal_context._get_links(),
+            request_id=temporal_context.nexus_context.request_id,
+        )
+
+    temporal_context._add_outbound_links(wf_handle)
+
+    return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)

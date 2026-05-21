@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from temporalio.nexus._util import ServiceHandlerT
-
 from ..types import (
     AnyType,
     CallableAsyncNoParam,
@@ -293,7 +291,6 @@ __all__ = [
     "_sandbox_unrestricted",
     # Re-export Temporal-owned names that old temporalio/workflow.py imported
     # at module scope so explicit imports from temporalio.workflow keep working.
-    "ServiceHandlerT",
     "AnyType",
     "CallableAsyncNoParam",
     "CallableAsyncSingleParam",
