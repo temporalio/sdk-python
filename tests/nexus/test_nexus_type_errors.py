@@ -431,6 +431,10 @@ async def standalone_operation_type_tests():
         MyNoInputService,
         endpoint="fake-endpoint",
     )
+    handler_nexus_client = client.create_nexus_client(
+        MyServiceHandler,
+        endpoint="fake-endpoint",
+    )
 
     # execute with an operation definition infers output type
     _op_defn_output: MyOutput = await nexus_client.execute_operation(
@@ -453,6 +457,20 @@ async def standalone_operation_type_tests():
     # string operation name and result_type infers output type
     _str_op_result_type_output: MyOutput = await nexus_client.execute_operation(
         "my_sync_operation", MyInput(), id="op-1", result_type=MyOutput
+    )
+
+    # execute with workflow run handler infers output type
+    _workflow_run_output: MyOutput = await handler_nexus_client.execute_operation(
+        MyServiceHandler.my_workflow_run_operation,
+        MyInput(),
+        id="op-1",
+    )
+
+    # execute with temporal operation handler infers output type
+    _temporal_output: None = await handler_nexus_client.execute_operation(  # type: ignore[func-returns-value]
+        MyServiceHandler.my_temporal_operation,
+        0,
+        id="op-1",
     )
 
     # omitting arg for string operation names is not supported
@@ -557,6 +575,58 @@ async def standalone_operation_type_tests():
     )
     _str_op_result_type_handle_output: MyOutput = (
         await _str_op_result_type_handle.result()
+    )
+
+    # starting with workflow run handler infers output type on the handle
+    # and result from the handle
+    _workflow_run_handle: NexusOperationHandle[
+        MyOutput
+    ] = await handler_nexus_client.start_operation(
+        MyServiceHandler.my_workflow_run_operation,
+        MyInput(),
+        id="op-1",
+    )
+
+    # starting with temporal operation handler infers output type on the handle
+    # and result from the handle
+    _workflow_run_handle_output: MyOutput = await _workflow_run_handle.result()
+    _temporal_handle: NexusOperationHandle[
+        None
+    ] = await handler_nexus_client.start_operation(
+        MyServiceHandler.my_temporal_operation,
+        0,
+        id="op-1",
+    )
+    _temporal_handle_output: None = await _temporal_handle.result()  # type: ignore[func-returns-value]
+
+    # workflow run and temporal operation handlers reject wrong input types
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await handler_nexus_client.execute_operation(  # type: ignore
+        MyServiceHandler.my_workflow_run_operation,  # type: ignore[arg-type]
+        # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter "arg"'
+        "wrong-input-type",  # type: ignore
+        id="op-1",
+    )
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await handler_nexus_client.start_operation(  # type: ignore
+        MyServiceHandler.my_workflow_run_operation,  # type: ignore[arg-type]
+        # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter "arg"'
+        "wrong-input-type",  # type: ignore
+        id="op-1",
+    )
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await handler_nexus_client.execute_operation(  # type: ignore
+        MyServiceHandler.my_temporal_operation,  # type: ignore[arg-type]
+        # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter "arg"'
+        "wrong-input-type",  # type: ignore
+        id="op-1",
+    )
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await handler_nexus_client.start_operation(  # type: ignore
+        MyServiceHandler.my_temporal_operation,  # type: ignore[arg-type]
+        # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter "arg"'
+        "wrong-input-type",  # type: ignore
+        id="op-1",
     )
 
     # getting a handle with a string produces a handle to Any
