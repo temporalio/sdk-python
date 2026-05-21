@@ -20,9 +20,6 @@ jobs:
           - os: ubuntu-arm
             package-suffix: linux-aarch64
             runsOn: ubuntu-24.04-arm64-2-core
-          - os: macos-intel
-            package-suffix: macos-amd64
-            runsOn: macos-15-intel
           - os: macos-arm
             package-suffix: macos-aarch64
             runsOn: macos-14
