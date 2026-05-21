@@ -238,6 +238,15 @@ async def standalone_operation_type_tests():
         start_to_close_timeout=timedelta(seconds=2),
     )
 
+    # result_type is not allowed when an operation is provided
+    await nexus_client.execute_operation(
+        # assert-type-error-pyright: 'cannot be assigned to parameter "operation" of type "str"'
+        MyService.my_sync_operation,  # type: ignore
+        MyInput(),
+        id="op-1",
+        result_type=str,
+    )
+
     # string operation name and result_type infers output type
     _str_op_result_type_output: MyOutput = await nexus_client.execute_operation(
         "my_sync_operation", MyInput(), id="op-1", result_type=MyOutput
@@ -326,6 +335,15 @@ async def standalone_operation_type_tests():
         start_to_close_timeout=timedelta(seconds=2),
     )
     _defn_handle_output: MyOutput = await _defn_handle.result()
+
+    # result_type is not allowed when an operation is provided
+    await nexus_client.start_operation(
+        # assert-type-error-pyright: 'cannot be assigned to parameter "operation" of type "str"'
+        MyServiceHandler.my_sync_operation,  # type: ignore
+        MyInput(),
+        id="op-1",
+        result_type=str,
+    )
 
     # starting with string operation name and result_type infers output type on the handle
     # and result from the handle

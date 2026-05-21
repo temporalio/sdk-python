@@ -484,7 +484,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -531,7 +530,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -556,7 +554,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -581,7 +578,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -605,7 +601,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -647,7 +642,8 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             id: Unique identifier for this operation.
             id_reuse_policy: Policy for reusing operation IDs.
             id_conflict_policy: Policy for handling ID conflicts.
-            result_type: The result type to deserialize into.
+            result_type: For string operation names, this can set the specific
+                result type hint to deserialize into.
             schedule_to_close_timeout: End-to-end timeout for the Nexus
                 operation. If unset, defaults to the maximum allowed by the
                 Temporal server.
@@ -680,7 +676,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -727,7 +722,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -752,7 +746,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -777,7 +770,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -802,7 +794,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -846,7 +837,8 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             id: Unique identifier for this operation.
             id_reuse_policy: Policy for reusing operation IDs.
             id_conflict_policy: Policy for handling ID conflicts.
-            result_type: The result type to deserialize into.
+            result_type: For string operation names, this can set the specific
+                result type hint to deserialize into.
             schedule_to_close_timeout: End-to-end timeout for the Nexus
                 operation. If unset, defaults to the maximum allowed by the
                 Temporal server.
@@ -933,7 +925,9 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
            This API is experimental and unstable.
         """
         op_name, output_type = self._resolve_operation(operation)
-        final_result_type: type | None = result_type or output_type
+        final_result_type: type | None = (
+            result_type if isinstance(operation, str) else output_type
+        )
 
         return await self._client._impl.start_nexus_operation(
             StartNexusOperationInput(
