@@ -1,19 +1,11 @@
-import sys
 from datetime import timedelta
+from pathlib import Path
 from uuid import uuid4
-
-import pytest
-
-if sys.platform == "win32":
-    pytest.skip(
-        "strands_tools.shell uses Unix-only pty/termios",
-        allow_module_level=True,
-    )
 
 from strands import tool
 from strands_tools import (  # pyright: ignore[reportMissingTypeStubs]
     calculator,
-    shell,
+    file_read,
 )
 
 from temporalio import activity, workflow
@@ -30,9 +22,18 @@ def letter_counter(word: str, letter: str) -> int:
     return word.lower().count(letter.lower())
 
 
-@activity.defn(name="shell")
-async def shell_activity(command: str) -> dict:
-    return shell.shell(command=command, non_interactive=True)
+@activity.defn(name="read_file")
+async def read_file_activity(path: str) -> str:
+    result = file_read.file_read(
+        {
+            "toolUseId": "read_file",
+            "name": "file_read",
+            "input": {"path": path, "mode": "view"},
+        }
+    )
+    text = result["content"][0].get("text")
+    assert text is not None
+    return text
 
 
 @workflow.defn
@@ -44,7 +45,7 @@ class ToolWorkflow:
             tools=[
                 calculator,
                 activity_as_tool(
-                    shell_activity,
+                    read_file_activity,
                     start_to_close_timeout=timedelta(seconds=15),
                 ),
                 letter_counter,
@@ -57,13 +58,16 @@ class ToolWorkflow:
         return str(result)
 
 
-async def test_tool(client: Client):
+async def test_tool(client: Client, tmp_path: Path):
     task_queue = "test_tool"
+    fixture = tmp_path / "greeting.txt"
+    fixture.write_text("hello\n")
+
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(
                 [
-                    {"name": "shell", "input": {"command": "echo hello"}},
+                    {"name": "read_file", "input": {"path": str(fixture)}},
                     {
                         "name": "calculator",
                         "input": {"expression": "3111696 / 74088"},
@@ -82,16 +86,16 @@ async def test_tool(client: Client):
         client,
         task_queue=task_queue,
         workflows=[ToolWorkflow],
-        activities=[shell_activity],
+        activities=[read_file_activity],
         plugins=[plugin],
         max_cached_workflows=0,
     ):
         handle = await client.start_workflow(
             ToolWorkflow.run,
             "I have 3 requests:\n"
-            "1. Run `echo hello` in a shell\n"
+            f"1. Read the file at {fixture}\n"
             "2. Calculate 3111696 / 74088\n"
-            '3. Tell me how many letter R\'s are in the word "strawberry" 🍓',
+            '3. Tell me how many letter R\'s are in the word "strawberry"',
             id=f"test_tool_{uuid4()}",
             task_queue=task_queue,
         )
@@ -100,7 +104,7 @@ async def test_tool(client: Client):
     history = await handle.fetch_history()
     assert get_activities(history) == [
         "invoke_model",
-        "shell",
+        "read_file",
         "invoke_model",
         # calculator (in-workflow)
         "invoke_model",
