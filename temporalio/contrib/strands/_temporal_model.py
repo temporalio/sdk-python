@@ -38,11 +38,11 @@ def _filter_serializable(state: dict[str, Any]) -> dict[str, Any]:
 
 
 class TemporalModel(Model):
-    """A Strands :class:`Model` that runs ``stream()`` as a Temporal activity.
+    """A Strands ``Model`` that runs ``stream()`` as a Temporal activity.
 
     ``model_name`` selects which factory the plugin will invoke worker-side; it
     must match a key in ``StrandsPlugin(models={...})``. Construction of this
-    :class:`TemporalModel` itself does no I/O, so it is safe to instantiate at
+    ``TemporalModel`` itself does no I/O, so it is safe to instantiate at
     module level.
 
     When ``streaming_topic`` is set, each ``StreamEvent`` is also published to

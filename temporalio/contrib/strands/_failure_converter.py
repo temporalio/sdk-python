@@ -42,7 +42,7 @@ class StrandsFailureConverter(DefaultFailureConverter):
         payload_converter: PayloadConverter,
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
-        """Translate Strands exceptions to typed ``ApplicationError``s."""
+        """Translate Strands exceptions to typed ApplicationErrors."""
         if isinstance(exception, InterruptException):
             super().to_failure(
                 ApplicationError(

@@ -17,12 +17,12 @@ _SNAPSHOT_DISABLED = (
 
 
 class TemporalAgent(Agent):
-    """A Strands :class:`Agent` that routes model calls through a Temporal activity.
+    """A Strands ``Agent`` that routes model calls through a Temporal activity.
 
     ``model`` is the name of a factory registered in
     ``StrandsPlugin(models={...})``. The activity options apply to every model
     invocation this agent makes. All other keyword arguments are forwarded to
-    Strands' :class:`Agent` (``tools``, ``hooks``, ``system_prompt``,
+    Strands' ``Agent`` (``tools``, ``hooks``, ``system_prompt``,
     ``structured_output_model``, ``messages``, etc.).
 
     Strands' ``retry_strategy`` is disabled; configure retries via
