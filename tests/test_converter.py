@@ -16,6 +16,8 @@ from typing import (
     Dict,  # type:ignore[reportDeprecated]
     Literal,
     NewType,
+    get_args,
+    get_type_hints,
 )
 from uuid import UUID, uuid4
 
@@ -40,12 +42,12 @@ from temporalio.converter import (
     DefaultPayloadConverter,
     JSONPlainPayloadConverter,
     JSONTypeConverter,
+    JSONTypeConverterUnhandled,
     PayloadCodec,
     decode_search_attributes,
     encode_search_attribute_values,
     value_to_type,
 )
-from temporalio.converter._payload_converter import _JSONTypeConverterUnhandled
 from temporalio.exceptions import (
     ApplicationError,
     FailureError,
@@ -869,10 +871,20 @@ class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
 class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
         self, hint: type, value: Any
-    ) -> Any | None | _JSONTypeConverterUnhandled:
+    ) -> Any | None | JSONTypeConverterUnhandled:
         if inspect.isclass(hint) and issubclass(hint, ipaddress.IPv4Address):
             return ipaddress.IPv4Address(value)
         return JSONTypeConverter.Unhandled
+
+
+def test_json_type_converter_unhandled_type_public():
+    return_type = get_type_hints(JSONTypeConverter.to_typed_value)["return"]
+
+    assert JSONTypeConverterUnhandled.__name__ == "JSONTypeConverterUnhandled"
+    assert JSONTypeConverterUnhandled in get_args(return_type)
+    assert JSONTypeConverterUnhandled(JSONTypeConverter.Unhandled) is (
+        JSONTypeConverter.Unhandled
+    )
 
 
 async def test_json_type_converter():
