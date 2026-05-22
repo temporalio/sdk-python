@@ -253,4 +253,7 @@ exclude = ["temporalio/bridge/target/**/*"]
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
-exclude-newer = "1 week"
+exclude-newer = "2 weeks"
+# openai-agents>=0.17.1 is newer than the exclude-newer cooldown window;
+# bypass it since the minimum version pin already constrains the package.
+exclude-newer-package = { openai-agents = false }
