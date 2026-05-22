@@ -280,26 +280,6 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
         return workflow_handle
 
 
-class TemporalStartOperationContext(StartOperationContext):
-    """Context received by a Temporal operation."""
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize the Temporal operation context."""
-        super().__init__(*args, **kwargs)
-        self._temporal_context = _TemporalStartOperationContext.get()
-
-    @classmethod
-    def _from_start_operation_context(cls, ctx: StartOperationContext) -> Self:
-        return cls(
-            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
-        )
-
-    @property
-    def metric_meter(self) -> temporalio.common.MetricMeter:
-        """The metric meter"""
-        return self._temporal_context.metric_meter
-
-
 class WorkflowRunOperationContext(StartOperationContext):
     """Context received by a workflow run operation."""
 
@@ -567,6 +547,64 @@ class _TemporalCancelOperationContext(_TemporalOperationCtx[CancelOperationConte
 
     def set(self) -> None:
         _temporal_cancel_operation_context.set(self)
+
+
+class TemporalNexusStartOperationContext(StartOperationContext):
+    """Start context received by a Temporal operation.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the Temporal operation context."""
+        super().__init__(*args, **kwargs)
+        self._temporal_context = _TemporalStartOperationContext.get()
+
+    @classmethod
+    def _from_start_operation_context(cls, ctx: StartOperationContext) -> Self:
+        return cls(
+            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
+        )
+
+    @property
+    def metric_meter(self) -> temporalio.common.MetricMeter:
+        """The metric meter"""
+        return self._temporal_context.metric_meter
+
+    @property
+    def client(self) -> temporalio.client.Client:
+        """The Temporal client used by the worker handling the current Nexus operation."""
+        return self._temporal_context.client
+
+
+class TemporalNexusCancelOperationContext(CancelOperationContext):
+    """Cancellation context received by a Temporal operation.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the Temporal operation context."""
+        super().__init__(*args, **kwargs)
+        self._temporal_context = _TemporalCancelOperationContext.get()
+
+    @classmethod
+    def _from_cancel_operation_context(cls, ctx: CancelOperationContext) -> Self:
+        return cls(
+            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
+        )
+
+    @property
+    def metric_meter(self) -> temporalio.common.MetricMeter:
+        """The metric meter"""
+        return self._temporal_context.metric_meter
+
+    @property
+    def client(self) -> temporalio.client.Client:
+        """The Temporal client used by the worker handling the current Nexus operation."""
+        return self._temporal_context.client
 
 
 class LoggerAdapter(logging.LoggerAdapter):

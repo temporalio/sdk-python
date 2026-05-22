@@ -99,7 +99,7 @@ class MyServiceHandler:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
+        _ctx: temporalio.nexus.TemporalNexusStartOperationContext,
         client: temporalio.nexus.TemporalNexusClient,
         input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -179,7 +179,7 @@ class MyServiceHandler2:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
+        _ctx: temporalio.nexus.TemporalNexusStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -203,7 +203,7 @@ class MyServiceHandlerWithoutServiceDefinition:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
+        _ctx: temporalio.nexus.TemporalNexusStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -214,7 +214,7 @@ class MyUnsafeContextAnnotationServiceHandler:
     # A temporal operation receives TemporalStartOperationContext at runtime, so
     # requiring an arbitrary user subclass is not safe.
     class MyCustomTemporalStartOperationContext(
-        temporalio.nexus.TemporalStartOperationContext
+        temporalio.nexus.TemporalNexusStartOperationContext
     ):
         def custom_state(self) -> str:
             raise NotImplementedError

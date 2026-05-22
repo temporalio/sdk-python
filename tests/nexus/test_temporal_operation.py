@@ -5,17 +5,16 @@ from dataclasses import dataclass
 import nexusrpc
 import pytest
 from nexusrpc import HandlerErrorType, Operation, service
-from nexusrpc.handler import (
-    service_handler,
-)
+from nexusrpc.handler import operation_handler, service_handler
+from typing_extensions import override
 
 import temporalio.exceptions
 from temporalio import nexus, workflow
-from temporalio.client import Client, WorkflowFailureError
-from temporalio.common import WorkflowIDConflictPolicy
+from temporalio.client import Client, WorkflowExecutionStatus, WorkflowFailureError
+from temporalio.common import NexusOperationExecutionStatus, WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import EventType, assert_event_subsequence
+from tests.helpers import EventType, assert_event_subsequence, assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
@@ -40,14 +39,21 @@ class TestService:
     concurrent_start: Operation[Input, str]
     retry_after_failed_start: Operation[Input, str]
     sync_result: Operation[Input, str]
+    custom_cancel: Operation[str, None]
 
 
 @service_handler(service=TestService)
-class EchoServiceHandler:
+class TestServiceHandler:
+    # tell Pytest this is not a test class
+    __test__ = False
+
+    def __init__(self) -> None:
+        self.started_custom_cancel_workflow = asyncio.Event()
+
     @nexus.temporal_operation
     async def echo(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
@@ -58,7 +64,7 @@ class EchoServiceHandler:
     @nexus.temporal_operation
     async def blocking(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         _input: None,
     ) -> nexus.TemporalOperationResult[None]:
@@ -69,7 +75,7 @@ class EchoServiceHandler:
     @nexus.temporal_operation
     async def double_start(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[None]:
@@ -84,7 +90,7 @@ class EchoServiceHandler:
     @nexus.temporal_operation
     async def concurrent_start(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
@@ -129,7 +135,7 @@ class EchoServiceHandler:
     @nexus.temporal_operation
     async def retry_after_failed_start(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
@@ -151,11 +157,41 @@ class EchoServiceHandler:
     @nexus.temporal_operation
     async def sync_result(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         _client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
         return nexus.TemporalOperationResult.sync(input.value)
+
+    @operation_handler
+    def custom_cancel(self) -> nexus.TemporalNexusOperationHandler[str, None]:
+        event = self.started_custom_cancel_workflow
+
+        class CustomCancelNexusOpHandler(
+            nexus.TemporalNexusOperationHandler[str, None]
+        ):
+            @override
+            async def start_operation(
+                self,
+                ctx: nexus.TemporalNexusStartOperationContext,
+                client: nexus.TemporalNexusClient,
+                input: str,
+            ) -> nexus.TemporalOperationResult[None]:
+                result = await client.start_workflow(BlockingWorkflow.run, id=input)
+                event.set()
+                return result
+
+            @override
+            async def cancel_workflow_run(
+                self, ctx: nexus.TemporalNexusCancelOperationContext, workflow_id: str
+            ):
+                # get a handle to the workflow
+                handle = ctx.client.get_workflow_handle(workflow_id)
+
+                # cancel the workflow
+                await handle.cancel()
+
+        return CustomCancelNexusOpHandler()
 
 
 @workflow.defn
@@ -177,7 +213,7 @@ async def test_temporal_operation_start_workflow(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[EchoServiceHandler()],
+        nexus_service_handlers=[TestServiceHandler()],
         workflows=[EchoWorkflow, EchoWorkflowCaller],
     ):
         wf_handle = await client.start_workflow(
@@ -239,7 +275,7 @@ async def test_temporal_operation_cancel_workflow(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[EchoServiceHandler()],
+        nexus_service_handlers=[TestServiceHandler()],
         workflows=[BlockingWorkflow, CancelBlockingWorkflowCaller],
     ):
         wf_handle = await client.start_workflow(
@@ -263,6 +299,41 @@ async def test_temporal_operation_cancel_workflow(
                 EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED,
             ],
         )
+
+
+async def test_customized_temporal_operation_cancel_workflow(
+    client: Client, env: WorkflowEnvironment
+):
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+    service_handler = TestServiceHandler()
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        workflows=[BlockingWorkflow, CancelBlockingWorkflowCaller],
+    ):
+        nexus_client = client.create_nexus_client(TestService, endpoint_name)
+
+        wf_id = f"custom-cancel-{uuid.uuid4()}"
+        op_handle = await nexus_client.start_operation(
+            TestService.custom_cancel, wf_id, id=str(uuid.uuid4())
+        )
+
+        await service_handler.started_custom_cancel_workflow.wait()
+
+        await op_handle.cancel()
+
+        async def check_cancelled():
+            wf_handle = client.get_workflow_handle(wf_id)
+            wf_desc = await wf_handle.describe()
+            assert wf_desc.status is WorkflowExecutionStatus.CANCELED
+            op_desc = await op_handle.describe()
+            assert op_desc.status is NexusOperationExecutionStatus.CANCELED
+
+        await assert_eventually(check_cancelled)
 
 
 @workflow.defn
@@ -308,7 +379,7 @@ async def test_temporal_operation_double_start_raises_handler_err(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[EchoServiceHandler()],
+        nexus_service_handlers=[TestServiceHandler()],
         workflows=[EchoWorkflow, DoubleStartWorkflowCaller],
     ):
         with pytest.raises(WorkflowFailureError) as err:
@@ -337,7 +408,7 @@ async def test_temporal_operation_concurrent_start_raises_handler_err(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[EchoServiceHandler()],
+        nexus_service_handlers=[TestServiceHandler()],
         workflows=[EchoWorkflow, ConcurrentStartWorkflowCaller],
     ):
         result = await client.execute_workflow(
@@ -360,7 +431,7 @@ async def test_temporal_operation_failed_start_allows_retry(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[EchoServiceHandler()],
+        nexus_service_handlers=[TestServiceHandler()],
         workflows=[
             BlockingWorkflow,
             EchoWorkflow,
@@ -402,7 +473,7 @@ async def test_temporal_operation_sync_result(client: Client, env: WorkflowEnvir
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[EchoServiceHandler()],
+        nexus_service_handlers=[TestServiceHandler()],
         workflows=[SyncResultCaller],
     ):
         wf_handle = await client.start_workflow(
@@ -450,7 +521,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def no_param(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         _input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -462,7 +533,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def single_param(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -475,7 +546,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def multi_param(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -488,7 +559,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def by_name(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -502,7 +573,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def by_name_multi_param(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
+        _ctx: nexus.TemporalNexusStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:

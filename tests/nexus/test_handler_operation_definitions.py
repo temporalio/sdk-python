@@ -112,10 +112,10 @@ def test_unsafe_narrow_context_annotations_warn_and_drop_input_type():
 
     with pytest.warns(
         UserWarning,
-        match="Expected parameter 1 .* TemporalStartOperationContext",
+        match="Expected parameter 1 .* TemporalNexusStartOperationContext",
     ):
 
-        class MyTemporalOpCtx(nexus.TemporalStartOperationContext):
+        class MyTemporalOpCtx(nexus.TemporalNexusStartOperationContext):
             def custom_method(self):
                 raise NotImplementedError
 

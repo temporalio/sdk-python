@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -16,8 +17,11 @@ from nexusrpc.handler import (
     StartOperationResultAsync,
     StartOperationResultSync,
 )
+from typing_extensions import override
 
 from temporalio.nexus._operation_context import (
+    TemporalNexusCancelOperationContext,
+    TemporalNexusStartOperationContext,
     _temporal_cancel_operation_context,
     _TemporalCancelOperationContext,
 )
@@ -118,13 +122,85 @@ async def _cancel_workflow(
     await client_workflow_handle.cancel(**kwargs)
 
 
-class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT]):
-    """Operation handler for Nexus operations that interact with Temporal."""
+class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
+    """Operation handler for Nexus operations that interact with Temporal.
+    Implementations override the start_operation method.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    @abstractmethod
+    async def start_operation(
+        self,
+        ctx: TemporalNexusStartOperationContext,
+        client: TemporalNexusClient,
+        input: InputT,
+    ) -> TemporalOperationResult[OutputT]:
+        """Start the Temporal-backed Nexus operation."""
+        ...
+
+    async def start(
+        self, ctx: StartOperationContext, input: InputT
+    ) -> StartOperationResultSync[OutputT] | StartOperationResultAsync:
+        """Start the Nexus operation using a Nexus-aware Temporal client.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        nexus_client = TemporalNexusClient()
+        temporal_ctx = TemporalNexusStartOperationContext._from_start_operation_context(
+            ctx
+        )
+        result = await self.start_operation(temporal_ctx, nexus_client, input)
+        return result._to_nexus_result()
+
+    async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+        """Cancel a Nexus operation using its operation token.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        cancel_ctx = TemporalNexusCancelOperationContext._from_cancel_operation_context(
+            ctx
+        )
+
+        operation_token = OperationToken.decode(token)
+        if cancel_ctx.client.namespace != operation_token.namespace:
+            raise ValueError(
+                f"Client namespace {cancel_ctx.client.namespace} does not match "
+                f"operation token namespace {operation_token.namespace}"
+            )
+
+        match operation_token.type:
+            case OperationTokenType.WORKFLOW:
+                await self.cancel_workflow_run(cancel_ctx, operation_token.workflow_id)
+
+    async def cancel_workflow_run(
+        self, _ctx: TemporalNexusCancelOperationContext, workflow_id: str
+    ):
+        """Cancels the workflow identified by workflow_id.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        temporal_context = _TemporalCancelOperationContext.get()
+        workflow_handle = temporal_context.client.get_workflow_handle(workflow_id)
+        await workflow_handle.cancel()
+
+
+class _TemporalNexusOperationHandler(TemporalNexusOperationHandler[InputT, OutputT]):  # pyright: ignore[reportUnusedClass]
+    """Default implementation of TemporalNexusHandler that uses the provided callable
+    to start the Temporal operation.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
 
     def __init__(
         self,
         start: Callable[
-            [StartOperationContext, TemporalNexusClient, InputT],
+            [TemporalNexusStartOperationContext, TemporalNexusClient, InputT],
             Awaitable[TemporalOperationResult[OutputT]],
         ],
     ) -> None:
@@ -140,32 +216,11 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT]):
             if start_func := getattr(self.start, "__func__", None):
                 start_func.__doc__ = start.__doc__
 
-    async def start(
-        self, ctx: StartOperationContext, input: InputT
-    ) -> StartOperationResultSync[OutputT] | StartOperationResultAsync:
-        """Start the Nexus operation using a Nexus-aware Temporal client."""
-        nexus_client = TemporalNexusClient()
-        result = await self._start(ctx, nexus_client, input)
-        return result._to_nexus_result()
-
-    async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        """Cancel a Nexus operation using its operation token."""
-        temporal_context = _TemporalCancelOperationContext.get()
-        client = temporal_context.client
-
-        operation_token = OperationToken.decode(token)
-        if client.namespace != operation_token.namespace:
-            raise ValueError(
-                f"Client namespace {client.namespace} does not match "
-                f"operation token namespace {operation_token.namespace}"
-            )
-
-        match operation_token.type:
-            case OperationTokenType.WORKFLOW:
-                await self.cancel_workflow_run(ctx, operation_token.workflow_id)
-
-    async def cancel_workflow_run(self, _ctx: CancelOperationContext, workflow_id: str):
-        """Cancels the workflow identified by workflow_id"""
-        temporal_context = _TemporalCancelOperationContext.get()
-        workflow_handle = temporal_context.client.get_workflow_handle(workflow_id)
-        await workflow_handle.cancel()
+    @override
+    async def start_operation(
+        self,
+        ctx: TemporalNexusStartOperationContext,
+        client: TemporalNexusClient,
+        input: InputT,
+    ) -> TemporalOperationResult[OutputT]:
+        return await self._start(ctx, client, input)

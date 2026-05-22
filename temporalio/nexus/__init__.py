@@ -8,7 +8,8 @@ from ._operation_context import (
     Info,
     LoggerAdapter,
     NexusCallback,
-    TemporalStartOperationContext,
+    TemporalNexusCancelOperationContext,
+    TemporalNexusStartOperationContext,
     WorkflowRunOperationContext,
     client,
     in_operation,
@@ -19,6 +20,7 @@ from ._operation_context import (
     wait_for_worker_shutdown,
     wait_for_worker_shutdown_sync,
 )
+from ._operation_handlers import TemporalNexusOperationHandler
 from ._temporal_client import TemporalNexusClient, TemporalOperationResult
 from ._token import WorkflowHandle
 
@@ -28,7 +30,8 @@ __all__ = (
     "LoggerAdapter",
     "NexusCallback",
     "WorkflowRunOperationContext",
-    "TemporalStartOperationContext",
+    "TemporalNexusCancelOperationContext",
+    "TemporalNexusStartOperationContext",
     "client",
     "in_operation",
     "info",
@@ -39,6 +42,7 @@ __all__ = (
     "wait_for_worker_shutdown_sync",
     "WorkflowHandle",
     "TemporalNexusClient",
+    "TemporalNexusOperationHandler",
     "TemporalOperationResult",
     "temporal_operation",
 )
