@@ -304,6 +304,11 @@ async def test_temporal_operation_cancel_workflow(
 async def test_customized_temporal_operation_cancel_workflow(
     client: Client, env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
     await env.create_nexus_endpoint(endpoint_name, task_queue)
