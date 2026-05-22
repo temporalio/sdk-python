@@ -19,7 +19,7 @@ from temporalio.contrib.langgraph._plugin import (
 
 __all__ = [
     "LangGraphPlugin",
-    "entrypoint",
     "cache",
+    "entrypoint",
     "graph",
 ]
