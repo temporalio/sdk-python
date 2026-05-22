@@ -551,11 +551,19 @@ def _public_callables(parent: Any, *, exclude: set[str] = set()) -> set[str]:
 SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
     children={
         "__builtins__": SandboxMatcher(
-            use={
-                "breakpoint",
-                "input",
-                "open",
+            children={
+                "breakpoint": SandboxMatcher(
+                    match_self=True,
+                    only_runtime=True,
+                    leaf_message=(
+                        "breakpoint() inside workflow code requires "
+                        "debug_mode=True on the Worker (or the "
+                        "TEMPORAL_DEBUG environment variable). Without it, "
+                        "the call cannot reach the debugger."
+                    ),
+                ),
             },
+            use={"input", "open"},
             # Too many things use open() at import time, e.g. pytest's assertion
             # rewriter
             only_runtime=True,
