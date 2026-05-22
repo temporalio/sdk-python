@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
 
+from mcp import ClientSession
+from mcp.types import PaginatedRequestParams, Tool
 from strands.tools.mcp.mcp_agent_tool import MCPAgentTool
 from strands.tools.mcp.mcp_client import MCPClient
 from strands.tools.mcp.mcp_types import MCPToolResult
@@ -100,25 +102,56 @@ class TemporalMCPClient(ToolProvider):
         return None
 
 
+# Use MCP sessions directly instead of MCPClient's background-thread helpers.
+# Those helpers route calls through cross-loop futures that are unreliable on
+# Python 3.10 when invoked from Temporal's async worker/activity event loops.
+async def _list_mcp_tools(client: MCPClient) -> Sequence[Tool]:
+    async with client._transport_callable() as (read_stream, write_stream, *_):
+        async with ClientSession(
+            read_stream,
+            write_stream,
+            elicitation_callback=client._elicitation_callback,
+        ) as session:
+            await session.initialize()
+            tools: list[Tool] = []
+            pagination_token = None
+            while True:
+                page = await session.list_tools(
+                    params=PaginatedRequestParams(cursor=pagination_token)
+                    if pagination_token is not None
+                    else None
+                )
+                tools.extend(page.tools)
+                pagination_token = page.nextCursor
+                if pagination_token is None:
+                    return tools
+
+
+def _agent_tool_for_filtering(client: MCPClient, tool: Tool) -> MCPAgentTool:
+    if client._prefix:
+        return MCPAgentTool(tool, client, name_override=f"{client._prefix}_{tool.name}")
+    return MCPAgentTool(tool, client)
+
+
 async def populate_cache(server: str, client_factory: Callable[[], MCPClient]) -> None:
     """Connect to the MCP server, list tools, fill ``_TOOL_CACHE``."""
     client = client_factory()
-    try:
-        infos: list[_MCPToolInfo] = []
-        for tool in await client.load_tools():
-            if not isinstance(tool, MCPAgentTool):
-                continue
-            infos.append(
-                _MCPToolInfo(
-                    name=tool.mcp_tool.name,
-                    description=tool.mcp_tool.description or "",
-                    input_schema=tool.mcp_tool.inputSchema,
-                    output_schema=tool.mcp_tool.outputSchema,
-                )
+    infos: list[_MCPToolInfo] = []
+    for tool in await _list_mcp_tools(client):
+        if not client._should_include_tool_with_filters(
+            _agent_tool_for_filtering(client, tool),
+            client._tool_filters,
+        ):
+            continue
+        infos.append(
+            _MCPToolInfo(
+                name=tool.name,
+                description=tool.description or "",
+                input_schema=tool.inputSchema,
+                output_schema=tool.outputSchema,
             )
-        _TOOL_CACHE[server] = infos
-    finally:
-        client.stop(None, None, None)
+        )
+    _TOOL_CACHE[server] = infos
 
 
 def clear_cache(server: str) -> None:
@@ -134,14 +167,17 @@ def build_call_tool_activity(
     @activity.defn(name=f"{server}-call-tool")
     async def call_tool(args: _CallToolArgs) -> MCPToolResult:
         client = client_factory()
-        client.start()
         try:
-            return await client.call_tool_async(
-                tool_use_id=args.tool_use_id,
-                name=args.tool_name,
-                arguments=args.arguments,
-            )
-        finally:
-            client.stop(None, None, None)
+            async with client._transport_callable() as (read_stream, write_stream, *_):
+                async with ClientSession(
+                    read_stream,
+                    write_stream,
+                    elicitation_callback=client._elicitation_callback,
+                ) as session:
+                    await session.initialize()
+                    result = await session.call_tool(args.tool_name, args.arguments)
+                    return client._handle_tool_result(args.tool_use_id, result)
+        except Exception as err:
+            return client._handle_tool_execution_error(args.tool_use_id, err)
 
     return call_tool
