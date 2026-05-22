@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -41,13 +42,17 @@ _ResultT = TypeVar("_ResultT")
 
 @dataclass(frozen=True)
 class TemporalOperationResult(Generic[_ResultT]):
-    """Unified result: sync value or async token."""
+    """Unified result: sync value or async token.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
 
     value: _ResultT | object = temporalio.common._arg_unset
     token: str | None = None
 
     @classmethod
-    def sync(cls, value: _ResultT) -> "TemporalOperationResult[_ResultT]":
+    def sync(cls, value: _ResultT) -> Self:
         """Create a result that completes the Nexus operation synchronously."""
         return cls(value=value)
 
@@ -69,34 +74,22 @@ class TemporalOperationResult(Generic[_ResultT]):
             )
 
 
-class TemporalNexusClient:
-    """Nexus-aware wrapper around a Temporal Client."""
+class TemporalNexusClient(ABC):
+    """Nexus-aware wrapper around a Temporal Client.
 
-    def __init__(self) -> None:
-        """Initialize the client wrapper from the active Nexus operation context."""
-        self._temporal_context = _TemporalStartOperationContext.get()
-        self._started_async = False
+    .. warning::
+       This API is experimental and unstable.
+    """
 
     @property
+    @abstractmethod
     def client(self) -> temporalio.client.Client:
-        """Return the Temporal client for the active Nexus operation."""
-        return self._temporal_context.client
+        """The underlying Temporal Client
 
-    @contextmanager
-    def _reserve_async_start(self) -> Iterator[None]:
-        if self._started_async:
-            raise HandlerError(
-                "Only one async operation can be started per operation handler invocation. Use TemporalNexusClient.client for additional workflow interactions",
-                type=HandlerErrorType.BAD_REQUEST,
-            )
-
-        # Reserve the started flag before sending to prevent concurrent starts
-        self._started_async = True
-        try:
-            yield
-        except BaseException:
-            self._started_async = False
-            raise
+        .. warning::
+           This API is experimental and unstable.
+        """
+        ...
 
     # Overload for no-param workflow
     @overload
@@ -232,6 +225,80 @@ class TemporalNexusClient:
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> TemporalOperationResult[ReturnType]: ...
+
+    @abstractmethod
+    async def start_workflow(
+        self,
+        workflow: str | Callable[..., Awaitable[ReturnType]],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str | None = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> TemporalOperationResult[ReturnType]:
+        """Start a workflow as the backing asynchronous Nexus operation.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        ...
+
+
+class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnusedClass]
+    """Nexus-aware wrapper around a Temporal Client.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the client wrapper from the active Nexus operation context."""
+        self._temporal_context = _TemporalStartOperationContext.get()
+        self._started_async = False
+
+    @property
+    def client(self) -> temporalio.client.Client:
+        """Return the Temporal client for the active Nexus operation."""
+        return self._temporal_context.client
+
+    @contextmanager
+    def _reserve_async_start(self) -> Iterator[None]:
+        if self._started_async:
+            raise HandlerError(
+                "Only one async operation can be started per operation handler invocation. Use TemporalNexusClient.client for additional workflow interactions",
+                type=HandlerErrorType.BAD_REQUEST,
+            )
+
+        # Reserve the started flag before sending to prevent concurrent starts
+        self._started_async = True
+        try:
+            yield
+        except BaseException:
+            self._started_async = False
+            raise
 
     async def start_workflow(
         self,

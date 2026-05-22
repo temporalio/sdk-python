@@ -237,7 +237,8 @@ async def test_temporal_operation_start_workflow(
 
 @workflow.defn
 class BlockingWorkflow:
-    done: bool = False
+    def __init__(self) -> None:
+        self.done: bool = False
 
     @workflow.run
     async def run(self) -> None:
