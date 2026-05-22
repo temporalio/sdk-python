@@ -394,7 +394,7 @@ async def standalone_operation_type_tests():
 
     # functions with invalid signatures produce a type error
     class InvalidServiceHandler:
-        async def invalid(self, ctx: str, input: str) -> str:
+        async def invalid(self, _ctx: str, _input: str) -> str:
             raise NotImplementedError()
 
     # assert-type-error-pyright: 'No overloads for "start_operation" match'
