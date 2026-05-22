@@ -43,7 +43,7 @@ from openai.types.responses.tool_param import Mcp
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
-from temporalio.contrib.common._heartbeat_decorator import auto_heartbeater
+from temporalio.contrib.openai_agents._heartbeat_decorator import auto_heartbeater
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 

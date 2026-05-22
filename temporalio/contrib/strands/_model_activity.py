@@ -7,7 +7,7 @@ from strands.models import Model
 from strands.types.streaming import StreamEvent
 
 from temporalio import activity
-from temporalio.contrib.common._heartbeat_decorator import auto_heartbeater
+from temporalio.contrib.strands._heartbeat_decorator import auto_heartbeater
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 
 
