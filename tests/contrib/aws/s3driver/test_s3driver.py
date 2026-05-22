@@ -36,7 +36,7 @@ from temporalio.converter import (
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
 )
-from tests.contrib.aws.s3driver.conftest import BUCKET, REGION
+from tests.contrib.aws.s3driver.conftest import BUCKET, CLIENT_REGION
 
 _CONVERTER = JSONPlainPayloadConverter()
 
@@ -430,9 +430,9 @@ class TestS3StorageDriverStoreRetrieve:
         assert counting_driver_client.put_object_count == 1
 
         await driver.store(make_store_context(), [payload])
-        assert (
-            counting_driver_client.put_object_count == 1
-        ), "put_object should not be called for an existing key"
+        assert counting_driver_client.put_object_count == 1, (
+            "put_object should not be called for an existing key"
+        )
 
     async def test_skips_upload_preserves_data(
         self, driver_client: S3StorageDriverClient
@@ -620,7 +620,7 @@ class TestS3StorageDriverErrors:
             await driver.store(make_store_context(), [payload])
         assert (
             str(exc_info.value)
-            == f"S3StorageDriver store failed [bucket={bucket}, key={expected_key}, region={REGION}]"
+            == f"S3StorageDriver store failed [bucket={bucket}, key={expected_key}, client_region={CLIENT_REGION}]"
         )
         assert isinstance(exc_info.value.__cause__, ClientError)
         assert (
@@ -638,7 +638,7 @@ class TestS3StorageDriverErrors:
             await driver.retrieve(StorageDriverRetrieveContext(), [claim])
         assert (
             str(exc_info.value)
-            == f"S3StorageDriver retrieve failed [bucket={BUCKET}, key={key}, region={REGION}]"
+            == f"S3StorageDriver retrieve failed [bucket={BUCKET}, key={key}, client_region={CLIENT_REGION}]"
         )
         assert isinstance(exc_info.value.__cause__, ClientError)
         assert (
@@ -657,7 +657,7 @@ class TestS3StorageDriverErrors:
             await driver.retrieve(StorageDriverRetrieveContext(), [claim])
         assert (
             str(exc_info.value)
-            == f"S3StorageDriver retrieve failed [bucket={bucket}, key={key}, region={REGION}]"
+            == f"S3StorageDriver retrieve failed [bucket={bucket}, key={key}, client_region={CLIENT_REGION}]"
         )
         assert isinstance(exc_info.value.__cause__, ClientError)
         assert (
@@ -812,9 +812,9 @@ class TestS3StorageDriverConcurrency:
 
         assert isinstance(exc_info.value.__cause__, ConnectionError)
         assert str(exc_info.value.__cause__) == "S3 connection lost"
-        assert (
-            len(faulty_client.cancelled) == 2
-        ), "Expected 2 remaining tasks to be cancelled"
+        assert len(faulty_client.cancelled) == 2, (
+            "Expected 2 remaining tasks to be cancelled"
+        )
 
     async def test_retrieve_cancels_remaining_on_failure(
         self, driver_client: S3StorageDriverClient
@@ -838,9 +838,9 @@ class TestS3StorageDriverConcurrency:
 
         assert isinstance(exc_info.value.__cause__, ConnectionError)
         assert str(exc_info.value.__cause__) == "S3 connection lost"
-        assert (
-            len(faulty_client.cancelled) == 2
-        ), "Expected 2 remaining tasks to be cancelled"
+        assert len(faulty_client.cancelled) == 2, (
+            "Expected 2 remaining tasks to be cancelled"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -856,7 +856,7 @@ class TestAioboto3StorageDriverClientDescribe:
 
     def test_returns_region(self) -> None:
         client = self._make_client(region="ap-southeast-1")
-        assert client.describe() == {"region": "ap-southeast-1"}
+        assert client.describe() == {"client_region": "ap-southeast-1"}
 
     def test_omits_region_when_none(self) -> None:
         client = self._make_client(region=None)

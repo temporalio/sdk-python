@@ -124,8 +124,8 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
 
         self._impl.on_span_end(span)
 
-    def shutdown(self) -> None:
-        self._impl.shutdown()
+    def shutdown(self, timeout: float | None = None) -> None:
+        self._impl.shutdown(timeout)
 
     def force_flush(self) -> None:
         self._impl.force_flush()

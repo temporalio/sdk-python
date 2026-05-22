@@ -162,9 +162,9 @@ class TestDataConverterExternalStorage:
 
         options = ExternalStorage(
             drivers=[hot_driver, cold_driver],
-            driver_selector=lambda context, payload: hot_driver
-            if payload.ByteSize() < 500
-            else cold_driver,
+            driver_selector=lambda context, payload: (
+                hot_driver if payload.ByteSize() < 500 else cold_driver
+            ),
             payload_size_threshold=100,
         )
         converter = DataConverter(external_storage=options)

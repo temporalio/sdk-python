@@ -6,6 +6,37 @@ from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _clear_langsmith_env_cache() -> Any:  # pyright: ignore[reportUnusedFunction]
+    """Clear langsmith's lru_cache before and after each test.
+
+    Tests manipulate LANGSMITH_TRACING / LANGCHAIN_TRACING_V2 env vars.
+    langsmith.utils.get_env_var caches results, so stale values would
+    leak across tests (or into other test modules in the same session).
+    """
+    import langsmith.utils
+
+    langsmith.utils.get_env_var.cache_clear()  # type: ignore[attr-defined]
+    yield
+    langsmith.utils.get_env_var.cache_clear()  # type: ignore[attr-defined]
+
+
+@pytest.fixture(autouse=True)
+def _enable_langsmith_tracing(monkeypatch: pytest.MonkeyPatch) -> None:  # pyright: ignore[reportUnusedFunction]
+    """Enable LangSmith tracing by default for all tests in this directory.
+
+    The plugin defers to ``langsmith.utils.tracing_is_enabled()``, which
+    requires ``LANGSMITH_TRACING=true`` (or equivalent). Without this
+    fixture, tests that expect runs would see zero.
+
+    Individual tests can override with ``monkeypatch.setenv("LANGSMITH_TRACING", "false")``
+    to verify disabled behavior.
+    """
+    monkeypatch.setenv("LANGSMITH_TRACING", "true")
+
 
 @dataclass
 class _RunRecord:

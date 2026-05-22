@@ -46,12 +46,12 @@ from tests.contrib.langgraph.e2e_functional_entrypoints import (
     reset_task_execution_counts,
     simple_functional_entrypoint,
     slow_entrypoint,
-    slow_task,
     step_1,
     step_2,
     step_3,
     step_4,
     step_5,
+    waiting_task,
 )
 from tests.contrib.langgraph.e2e_functional_workflows import (
     ContinueAsNewFunctionalWorkflow,
@@ -219,15 +219,15 @@ class TestFunctionalAPIContinueAsNew:
         assert result["result"] == 260
 
         counts = get_task_execution_counts()
-        assert (
-            counts.get("task_a", 0) == 1
-        ), f"task_a executed {counts.get('task_a', 0)} times, expected 1"
-        assert (
-            counts.get("task_b", 0) == 1
-        ), f"task_b executed {counts.get('task_b', 0)} times, expected 1"
-        assert (
-            counts.get("task_c", 0) == 1
-        ), f"task_c executed {counts.get('task_c', 0)} times, expected 1"
+        assert counts.get("task_a", 0) == 1, (
+            f"task_a executed {counts.get('task_a', 0)} times, expected 1"
+        )
+        assert counts.get("task_b", 0) == 1, (
+            f"task_b executed {counts.get('task_b', 0)} times, expected 1"
+        )
+        assert counts.get("task_c", 0) == 1, (
+            f"task_c executed {counts.get('task_c', 0)} times, expected 1"
+        )
 
 
 class TestFunctionalAPIPartialExecution:
@@ -266,9 +266,9 @@ class TestFunctionalAPIPartialExecution:
 
         counts = get_task_execution_counts()
         for i in range(1, 6):
-            assert (
-                counts.get(f"step_{i}", 0) == 1
-            ), f"step_{i} executed {counts.get(f'step_{i}', 0)} times, expected 1"
+            assert counts.get(f"step_{i}", 0) == 1, (
+                f"step_{i} executed {counts.get(f'step_{i}', 0)} times, expected 1"
+            )
 
 
 class TestFunctionalAPIInterruptV2:
@@ -316,10 +316,10 @@ class TestFunctionalAPIPerTaskOptions:
             plugins=[
                 LangGraphPlugin(
                     entrypoints={"e2e_slow_functional": slow_entrypoint},
-                    tasks=[slow_task],
+                    tasks=[waiting_task],
                     default_activity_options=_DEFAULT_ACTIVITY_OPTIONS,
                     activity_options={
-                        "slow_task": {
+                        "waiting_task": {
                             "execute_in": "activity",
                             "start_to_close_timeout": timedelta(milliseconds=100),
                             "retry_policy": RetryPolicy(maximum_attempts=1),

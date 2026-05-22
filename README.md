@@ -1,4 +1,4 @@
-![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
+![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
 [![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
@@ -2102,6 +2102,11 @@ run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` 
 tests.
 
 ### Style
+
+```
+# runs ruff + cargo fmt
+poe format
+```
 
 * Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
   * We use [ruff](https://docs.astral.sh/ruff/) for formatting, so that takes precedence
