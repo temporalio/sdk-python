@@ -383,11 +383,30 @@ async def standalone_operation_type_tests():
         )
     )
 
-    # mismatched types on get_nexus_operation_handle produces type error
+    # mismatched types on get_nexus_operation_handle produce a type error
     # assert-type-error-pyright: 'Type "NexusOperationHandle\[str\]" is not assignable to declared type "NexusOperationHandle\[MyOutput\]"'
     _mismatch_handle: NexusOperationHandle[MyOutput] = (
         client.get_nexus_operation_handle(  # type: ignore
             "op-1",
             result_type=str,  # type: ignore
         )
+    )
+
+    # functions with invalid signatures produce a type error
+    class InvalidServiceHandler:
+        async def invalid(self, ctx: str, input: str) -> str:
+            raise NotImplementedError()
+
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    _invalid_handle: NexusOperationHandle[str] = await nexus_client.start_operation(
+        InvalidServiceHandler.invalid,  # type: ignore
+        "foo",
+        id="invalid",
+    )
+
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    _invalid_result: str = await nexus_client.execute_operation(
+        InvalidServiceHandler.invalid,  # type: ignore
+        "foo",
+        id="invalid",
     )
