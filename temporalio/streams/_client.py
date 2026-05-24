@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
+import temporalio.service
+
+from ._grpc import GrpcTransport
 from ._stream import Stream
 from ._transport import (
     CreateStreamRequest,
@@ -21,6 +25,9 @@ from ._types import (
     StreamDescription,
     StreamSummary,
 )
+
+if TYPE_CHECKING:
+    import temporalio.client
 
 
 class StreamClient:
@@ -44,6 +51,41 @@ class StreamClient:
     ) -> None:
         self._transport = transport
         self._namespace = namespace
+
+    @classmethod
+    def from_client(
+        cls,
+        client: temporalio.client.Client,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] | None = None,
+        rpc_timeout: timedelta | None = None,
+    ) -> StreamClient:
+        """Create a stream client from a Temporal client."""
+        return cls.from_service_client(
+            client.service_client,
+            namespace=client.namespace,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+    @classmethod
+    def from_service_client(
+        cls,
+        service_client: temporalio.service.ServiceClient,
+        *,
+        namespace: str = "default",
+        rpc_metadata: Mapping[str, str | bytes] | None = None,
+        rpc_timeout: timedelta | None = None,
+    ) -> StreamClient:
+        """Create a stream client from a low-level service client."""
+        return cls(
+            GrpcTransport.from_service_client(
+                service_client,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            ),
+            namespace=namespace,
+        )
 
     @property
     def namespace(self) -> str:

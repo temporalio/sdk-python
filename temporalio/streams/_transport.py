@@ -6,10 +6,8 @@ implementations live alongside:
 
 - :class:`FakeTransport` — in-process records calls and returns canned
   responses; for unit tests of the SDK API.
-- A future ``GrpcTransport`` (not in this milestone) will marshal these
-  calls onto the chasm-lib ``StreamService`` gRPC service via the
-  History service.  That implementation needs proto-binding generation
-  through the Rust bridge.
+- ``GrpcTransport`` marshals these calls onto the chasm-lib
+  ``StreamService`` gRPC service.
 
 Keeping the SDK pinned to this ABC means the API surface is stable
 across transport implementations.

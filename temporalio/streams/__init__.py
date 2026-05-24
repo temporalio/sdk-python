@@ -6,10 +6,9 @@ contrib :py:mod:`temporalio.contrib.workflow_streams` module's
 SDK-layer signal+update implementation with a direct gRPC interface to
 the server-side stream primitive.
 
-Status: in development.  The transport layer is currently a
-:py:class:`FakeTransport` for testing; production
-gRPC transport is a follow-up that depends on Rust-bridge proto
-generation.
+Status: in development.  The module includes a
+:py:class:`GrpcTransport` for the server StreamService and a
+:py:class:`FakeTransport` for SDK tests.
 
 See ``native-streams/design-overview.html`` for the design.
 """
@@ -19,6 +18,7 @@ from ._client import (
     compute_payload_hash,
     new_publisher_id,
 )
+from ._grpc import GrpcTransport
 from ._stream import Publisher, Stream
 from ._transport import (
     FakeTransport,
@@ -51,6 +51,7 @@ from ._types import (
 __all__ = [
     "CreateStreamOptions",
     "FakeTransport",
+    "GrpcTransport",
     "ListStreamsPage",
     "OffsetTruncated",
     "PublishAbortedByClose",

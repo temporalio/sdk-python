@@ -32,10 +32,12 @@ proto_paths.extend(test_proto_dir.glob("**/*.proto"))
 proto_paths.extend(additional_proto_dir.glob("**/*.proto"))
 
 api_out_dir = base_dir / "temporalio" / "api"
+server_out_dir = api_out_dir / "server"
 sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
 
 py_fixes = [
     partial(re.compile(r"from temporal\.api\.").sub, r"from temporalio.api."),
+    partial(re.compile(r"from temporal\.server\.").sub, r"from temporalio.api.server."),
     partial(
         re.compile(r"from dependencies\.").sub, r"from temporalio.api.dependencies."
     ),
@@ -50,10 +52,15 @@ py_fixes = [
         re.compile(r"'__module__' : 'temporal\.api\.").sub,
         r"'__module__' : 'temporalio.api.",
     ),
+    partial(
+        re.compile(r"'__module__' : 'temporal\.server\.").sub,
+        r"'__module__' : 'temporalio.api.server.",
+    ),
 ]
 
 pyi_fixes = [
     partial(re.compile(r"temporal\.api\.").sub, r"temporalio.api."),
+    partial(re.compile(r"temporal\.server\.").sub, r"temporalio.api.server."),
     partial(
         re.compile(r"protoc_gen_openapiv2\.").sub,
         r"temporalio.api.dependencies.protoc_gen_openapiv2.",
@@ -201,6 +208,9 @@ def generate_protos(output_dir: Path):
     for p in (output_dir / "temporal" / "api").iterdir():
         shutil.rmtree(api_out_dir / p.name, ignore_errors=True)
         p.replace(api_out_dir / p.name)
+    if (output_dir / "temporal" / "server").exists():
+        shutil.rmtree(server_out_dir, ignore_errors=True)
+        (output_dir / "temporal" / "server").replace(server_out_dir)
     for p in (output_dir / "temporal" / "sdk" / "core").iterdir():
         shutil.rmtree(sdk_out_dir / p.name, ignore_errors=True)
         p.replace(sdk_out_dir / p.name)
