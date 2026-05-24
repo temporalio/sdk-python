@@ -269,16 +269,24 @@ class ReadRangeResponse(google.protobuf.message.Message):
 
     ITEMS_FIELD_NUMBER: builtins.int
     NEXT_OFFSET_FIELD_NUMBER: builtins.int
+    OFFSETS_FIELD_NUMBER: builtins.int
     next_offset: builtins.int
     @property
     def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[Global___PublishItem]: ...
+    @property
+    def offsets(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """Absolute offsets corresponding one-for-one with items. Required when
+        topic filtering skips items inside the requested range.
+        """
+
     def __init__(
         self,
         *,
         items: collections.abc.Iterable[Global___PublishItem] | None = ...,
         next_offset: builtins.int = ...,
+        offsets: collections.abc.Iterable[builtins.int] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["items", b"items", "next_offset", b"next_offset"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items", "next_offset", b"next_offset", "offsets", b"offsets"]) -> None: ...
 
 Global___ReadRangeResponse: typing_extensions.TypeAlias = ReadRangeResponse
 

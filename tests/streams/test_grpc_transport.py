@@ -117,12 +117,16 @@ class _StreamService:
         scan_end = min(req.end_offset, st.head_offset)
         topics = set(req.topics)
         items = []
+        offsets = []
         for offset in range(req.start_offset, scan_end):
             item = st.items[offset]
             if topics and item.topic not in topics:
                 continue
             items.append(item)
-        return stream_pb2.ReadRangeResponse(items=items, next_offset=scan_end)
+            offsets.append(offset)
+        return stream_pb2.ReadRangeResponse(
+            items=items, offsets=offsets, next_offset=scan_end
+        )
 
     async def close(
         self, req: stream_pb2.CloseRequest, context: grpc.aio.ServicerContext
@@ -280,6 +284,30 @@ async def test_grpc_transport_create_publish_read_describe(
     assert desc.state.stream_id == "stream-1"
     assert desc.state.head_offset == 2
     assert desc.publisher_count == 1
+    await transport.close()
+
+
+async def test_grpc_transport_topic_filter_preserves_offsets(grpc_stream_target: str):
+    transport = streams.GrpcTransport.connect(grpc_stream_target)
+    client = streams.StreamClient(transport, namespace="ns-1")
+    stream = await client.create_stream("stream-1")
+
+    await stream.publish(
+        [
+            streams.PublishItem(data=b"a", topic="alpha"),
+            streams.PublishItem(data=b"b", topic="beta"),
+            streams.PublishItem(data=b"c", topic="alpha"),
+        ],
+        publisher_id="pub-1",
+        sequence=1,
+    )
+
+    got: list[tuple[int, bytes]] = []
+    async for offset, item in stream.read_range(
+        start_offset=0, end_offset=3, topics=["beta"]
+    ):
+        got.append((offset, item.data))
+    assert got == [(1, b"b")]
     await transport.close()
 
 

@@ -218,6 +218,7 @@ class GrpcTransport(Transport):
         )
         return ReadRangeResponse(
             items=[_publish_item_from_proto(item) for item in resp.items],
+            offsets=list(resp.offsets),
             next_offset=resp.next_offset,
         )
 

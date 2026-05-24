@@ -16,7 +16,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from temporalio.api.server.chasm.lib.stream.proto.v1 import message_pb2 as temporal_dot_server_dot_chasm_dot_lib_dot_stream_dot_proto_dot_v1_dot_message__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n@temporal/server/chasm/lib/stream/proto/v1/request_response.proto\x12)temporal.server.chasm.lib.stream.proto.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x37temporal/server/chasm/lib/stream/proto/v1/message.proto\"\xa5\x02\n\x13\x43reateStreamRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x1b\n\x13retention_max_bytes\x18\x03 \x01(\x03\x12\x1b\n\x13retention_max_items\x18\x04 \x01(\x03\x12\x19\n\x11segment_max_items\x18\x05 \x01(\x03\x12\x19\n\x11segment_max_bytes\x18\x06 \x01(\x03\x12\x30\n\rpublisher_ttl\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x19\n\x11owner_workflow_id\x18\x08 \x01(\t\x12\x14\n\x0cowner_run_id\x18\t \x01(\t\x12\x12\n\ncreated_by\x18\n \x01(\t\"@\n\x14\x43reateStreamResponse\x12\x15\n\rexecution_ref\x18\x01 \x01(\x0c\x12\x11\n\tstream_id\x18\x02 \x01(\t\"@\n\x15\x44\x65scribeStreamRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\"\xfa\x01\n\x16\x44\x65scribeStreamResponse\x12\x45\n\x05state\x18\x01 \x01(\x0b\x32\x36.temporal.server.chasm.lib.stream.proto.v1.StreamState\x12\x16\n\x0einflight_count\x18\x02 \x01(\x03\x12\x1a\n\x12subscription_count\x18\x03 \x01(\x03\x12\x17\n\x0fpublisher_count\x18\x04 \x01(\x03\x12 \n\x18stuck_subscription_count\x18\x05 \x01(\x03\x12*\n\"force_truncated_subscription_count\x18\x06 \x01(\x03\"\xbe\x01\n\x0ePublishRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x14\n\x0cpublisher_id\x18\x03 \x01(\t\x12\x10\n\x08sequence\x18\x04 \x01(\x04\x12\x45\n\x05items\x18\x05 \x03(\x0b\x32\x36.temporal.server.chasm.lib.stream.proto.v1.PublishItem\x12\x14\n\x0cpayload_hash\x18\x06 \x01(\x0c\"*\n\x0bPublishItem\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\r\n\x05topic\x18\x02 \x01(\t\";\n\x0fPublishResponse\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x03\x12\x12\n\nitem_count\x18\x02 \x01(\x03\"u\n\x10ReadRangeRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x14\n\x0cstart_offset\x18\x03 \x01(\x03\x12\x12\n\nend_offset\x18\x04 \x01(\x03\x12\x0e\n\x06topics\x18\x05 \x03(\t\"o\n\x11ReadRangeResponse\x12\x45\n\x05items\x18\x01 \x03(\x0b\x32\x36.temporal.server.chasm.lib.stream.proto.v1.PublishItem\x12\x13\n\x0bnext_offset\x18\x02 \x01(\x03\"\x9e\x01\n\x0c\x43loseRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x11\n\tclosed_by\x18\x03 \x01(\t\x12R\n\x0c\x63lose_reason\x18\x04 \x01(\x0e\x32<.temporal.server.chasm.lib.stream.proto.v1.StreamCloseReason\"\x0f\n\rCloseResponse\">\n\x13\x44\x65leteStreamRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\"\x16\n\x14\x44\x65leteStreamResponse\"_\n\x0fTruncateRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x14\n\x0cup_to_offset\x18\x03 \x01(\x03\x12\r\n\x05\x66orce\x18\x04 \x01(\x08\"W\n\x10TruncateResponse\x12\x17\n\x0fnew_base_offset\x18\x01 \x01(\x03\x12*\n\"force_truncated_subscription_count\x18\x02 \x01(\x03\"V\n\x12ListStreamsRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x11\n\tpage_size\x18\x03 \x01(\x05\"y\n\x13ListStreamsResponse\x12I\n\x07streams\x18\x01 \x03(\x0b\x32\x38.temporal.server.chasm.lib.stream.proto.v1.StreamSummary\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\"\xbf\x01\n\rStreamSummary\x12\x11\n\tstream_id\x18\x01 \x01(\t\x12\x13\n\x0bhead_offset\x18\x02 \x01(\x03\x12\x13\n\x0b\x62\x61se_offset\x18\x03 \x01(\x03\x12\x0e\n\x06\x63losed\x18\x04 \x01(\x08\x12\x30\n\x0c\x63reated_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0b\x63losed_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB>Z<go.temporal.io/server/chasm/lib/stream/gen/streampb;streampbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n@temporal/server/chasm/lib/stream/proto/v1/request_response.proto\x12)temporal.server.chasm.lib.stream.proto.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x37temporal/server/chasm/lib/stream/proto/v1/message.proto\"\xa5\x02\n\x13\x43reateStreamRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x1b\n\x13retention_max_bytes\x18\x03 \x01(\x03\x12\x1b\n\x13retention_max_items\x18\x04 \x01(\x03\x12\x19\n\x11segment_max_items\x18\x05 \x01(\x03\x12\x19\n\x11segment_max_bytes\x18\x06 \x01(\x03\x12\x30\n\rpublisher_ttl\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x19\n\x11owner_workflow_id\x18\x08 \x01(\t\x12\x14\n\x0cowner_run_id\x18\t \x01(\t\x12\x12\n\ncreated_by\x18\n \x01(\t\"@\n\x14\x43reateStreamResponse\x12\x15\n\rexecution_ref\x18\x01 \x01(\x0c\x12\x11\n\tstream_id\x18\x02 \x01(\t\"@\n\x15\x44\x65scribeStreamRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\"\xfa\x01\n\x16\x44\x65scribeStreamResponse\x12\x45\n\x05state\x18\x01 \x01(\x0b\x32\x36.temporal.server.chasm.lib.stream.proto.v1.StreamState\x12\x16\n\x0einflight_count\x18\x02 \x01(\x03\x12\x1a\n\x12subscription_count\x18\x03 \x01(\x03\x12\x17\n\x0fpublisher_count\x18\x04 \x01(\x03\x12 \n\x18stuck_subscription_count\x18\x05 \x01(\x03\x12*\n\"force_truncated_subscription_count\x18\x06 \x01(\x03\"\xbe\x01\n\x0ePublishRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x14\n\x0cpublisher_id\x18\x03 \x01(\t\x12\x10\n\x08sequence\x18\x04 \x01(\x04\x12\x45\n\x05items\x18\x05 \x03(\x0b\x32\x36.temporal.server.chasm.lib.stream.proto.v1.PublishItem\x12\x14\n\x0cpayload_hash\x18\x06 \x01(\x0c\"*\n\x0bPublishItem\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\r\n\x05topic\x18\x02 \x01(\t\";\n\x0fPublishResponse\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x03\x12\x12\n\nitem_count\x18\x02 \x01(\x03\"u\n\x10ReadRangeRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x14\n\x0cstart_offset\x18\x03 \x01(\x03\x12\x12\n\nend_offset\x18\x04 \x01(\x03\x12\x0e\n\x06topics\x18\x05 \x03(\t\"\x80\x01\n\x11ReadRangeResponse\x12\x45\n\x05items\x18\x01 \x03(\x0b\x32\x36.temporal.server.chasm.lib.stream.proto.v1.PublishItem\x12\x13\n\x0bnext_offset\x18\x02 \x01(\x03\x12\x0f\n\x07offsets\x18\x03 \x03(\x03\"\x9e\x01\n\x0c\x43loseRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x11\n\tclosed_by\x18\x03 \x01(\t\x12R\n\x0c\x63lose_reason\x18\x04 \x01(\x0e\x32<.temporal.server.chasm.lib.stream.proto.v1.StreamCloseReason\"\x0f\n\rCloseResponse\">\n\x13\x44\x65leteStreamRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\"\x16\n\x14\x44\x65leteStreamResponse\"_\n\x0fTruncateRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\x14\n\x0cup_to_offset\x18\x03 \x01(\x03\x12\r\n\x05\x66orce\x18\x04 \x01(\x08\"W\n\x10TruncateResponse\x12\x17\n\x0fnew_base_offset\x18\x01 \x01(\x03\x12*\n\"force_truncated_subscription_count\x18\x02 \x01(\x03\"V\n\x12ListStreamsRequest\x12\x14\n\x0cnamespace_id\x18\x01 \x01(\t\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x11\n\tpage_size\x18\x03 \x01(\x05\"y\n\x13ListStreamsResponse\x12I\n\x07streams\x18\x01 \x03(\x0b\x32\x38.temporal.server.chasm.lib.stream.proto.v1.StreamSummary\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\"\xbf\x01\n\rStreamSummary\x12\x11\n\tstream_id\x18\x01 \x01(\t\x12\x13\n\x0bhead_offset\x18\x02 \x01(\x03\x12\x13\n\x0b\x62\x61se_offset\x18\x03 \x01(\x03\x12\x0e\n\x06\x63losed\x18\x04 \x01(\x08\x12\x30\n\x0c\x63reated_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12/\n\x0b\x63losed_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB>Z<go.temporal.io/server/chasm/lib/stream/gen/streampb;streampbb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -40,24 +40,24 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_PUBLISHRESPONSE']._serialized_end=1210
   _globals['_READRANGEREQUEST']._serialized_start=1212
   _globals['_READRANGEREQUEST']._serialized_end=1329
-  _globals['_READRANGERESPONSE']._serialized_start=1331
-  _globals['_READRANGERESPONSE']._serialized_end=1442
-  _globals['_CLOSEREQUEST']._serialized_start=1445
-  _globals['_CLOSEREQUEST']._serialized_end=1603
-  _globals['_CLOSERESPONSE']._serialized_start=1605
-  _globals['_CLOSERESPONSE']._serialized_end=1620
-  _globals['_DELETESTREAMREQUEST']._serialized_start=1622
-  _globals['_DELETESTREAMREQUEST']._serialized_end=1684
-  _globals['_DELETESTREAMRESPONSE']._serialized_start=1686
-  _globals['_DELETESTREAMRESPONSE']._serialized_end=1708
-  _globals['_TRUNCATEREQUEST']._serialized_start=1710
-  _globals['_TRUNCATEREQUEST']._serialized_end=1805
-  _globals['_TRUNCATERESPONSE']._serialized_start=1807
-  _globals['_TRUNCATERESPONSE']._serialized_end=1894
-  _globals['_LISTSTREAMSREQUEST']._serialized_start=1896
-  _globals['_LISTSTREAMSREQUEST']._serialized_end=1982
-  _globals['_LISTSTREAMSRESPONSE']._serialized_start=1984
-  _globals['_LISTSTREAMSRESPONSE']._serialized_end=2105
-  _globals['_STREAMSUMMARY']._serialized_start=2108
-  _globals['_STREAMSUMMARY']._serialized_end=2299
+  _globals['_READRANGERESPONSE']._serialized_start=1332
+  _globals['_READRANGERESPONSE']._serialized_end=1460
+  _globals['_CLOSEREQUEST']._serialized_start=1463
+  _globals['_CLOSEREQUEST']._serialized_end=1621
+  _globals['_CLOSERESPONSE']._serialized_start=1623
+  _globals['_CLOSERESPONSE']._serialized_end=1638
+  _globals['_DELETESTREAMREQUEST']._serialized_start=1640
+  _globals['_DELETESTREAMREQUEST']._serialized_end=1702
+  _globals['_DELETESTREAMRESPONSE']._serialized_start=1704
+  _globals['_DELETESTREAMRESPONSE']._serialized_end=1726
+  _globals['_TRUNCATEREQUEST']._serialized_start=1728
+  _globals['_TRUNCATEREQUEST']._serialized_end=1823
+  _globals['_TRUNCATERESPONSE']._serialized_start=1825
+  _globals['_TRUNCATERESPONSE']._serialized_end=1912
+  _globals['_LISTSTREAMSREQUEST']._serialized_start=1914
+  _globals['_LISTSTREAMSREQUEST']._serialized_end=2000
+  _globals['_LISTSTREAMSRESPONSE']._serialized_start=2002
+  _globals['_LISTSTREAMSRESPONSE']._serialized_end=2123
+  _globals['_STREAMSUMMARY']._serialized_start=2126
+  _globals['_STREAMSUMMARY']._serialized_end=2317
 # @@protoc_insertion_point(module_scope)
