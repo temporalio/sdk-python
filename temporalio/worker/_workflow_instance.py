@@ -1926,10 +1926,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     handle._apply_cancel_command(self._add_command())
                     # Clear the cancellation counter on Python 3.11+ so the
                     # next await does not immediately re-raise CancelledError
-                    if (t := asyncio.current_task()) is not None and hasattr(
-                        t, "uncancel"
+                    if (
+                        sys.version_info >= (3, 11)
+                        and (t := asyncio.current_task()) is not None
                     ):
-                        t.uncancel()
+                        t.uncancel()  # type: ignore[union-attr]
 
         # Create the handle and set as pending
         handle = _ActivityHandle(self, input, run_activity())
@@ -2016,10 +2017,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     apply_child_cancel_error()
                     # Clear the cancellation counter on Python 3.11+ so the
                     # next await does not immediately re-raise CancelledError
-                    if (t := asyncio.current_task()) is not None and hasattr(
-                        t, "uncancel"
+                    if (
+                        sys.version_info >= (3, 11)
+                        and (t := asyncio.current_task()) is not None
                     ):
-                        t.uncancel()
+                        t.uncancel()  # type: ignore[union-attr]
 
         # Create the handle and set as pending
         handle = _ChildWorkflowHandle(
@@ -2039,8 +2041,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 apply_child_cancel_error()
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
-                if (t := asyncio.current_task()) is not None and hasattr(t, "uncancel"):
-                    t.uncancel()
+                if (
+                    sys.version_info >= (3, 11)
+                    and (t := asyncio.current_task()) is not None
+                ):
+                    t.uncancel()  # type: ignore[union-attr]
                 if self._cancel_requested:
                     raise
 
@@ -2071,10 +2076,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     handle._apply_cancel_command(cancel_command)
                     # Clear the cancellation counter on Python 3.11+ so the
                     # next await does not immediately re-raise CancelledError
-                    if (t := asyncio.current_task()) is not None and hasattr(
-                        t, "uncancel"
+                    if (
+                        sys.version_info >= (3, 11)
+                        and (t := asyncio.current_task()) is not None
                     ):
-                        t.uncancel()
+                        t.uncancel()  # type: ignore[union-attr]
 
         handle = _NexusOperationHandle(
             self, self._next_seq("nexus_operation"), input, operation_handle_fn()
@@ -2091,8 +2097,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 handle._apply_cancel_command(cancel_command)
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
-                if (t := asyncio.current_task()) is not None and hasattr(t, "uncancel"):
-                    t.uncancel()
+                if (
+                    sys.version_info >= (3, 11)
+                    and (t := asyncio.current_task()) is not None
+                ):
+                    t.uncancel()  # type: ignore[union-attr]
                 if self._cancel_requested:
                     raise
 
@@ -2627,8 +2636,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 cancel_command.cancel_signal_workflow.seq = seq
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
-                if (t := asyncio.current_task()) is not None and hasattr(t, "uncancel"):
-                    t.uncancel()
+                if (
+                    sys.version_info >= (3, 11)
+                    and (t := asyncio.current_task()) is not None
+                ):
+                    t.uncancel()  # type: ignore[union-attr]
 
     def _stack_trace(self) -> str:
         stacks = []
