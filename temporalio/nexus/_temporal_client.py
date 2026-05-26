@@ -52,6 +52,7 @@ class TemporalOperationResult(Generic[_ResultT]):
     token: str | None = None
 
     def __post_init__(self) -> None:
+        """Validate that the result represents exactly one completion mode."""
         has_value = self.value is not temporalio.common._arg_unset
         has_token = self.token is not None
         if has_value == has_token:
@@ -59,7 +60,9 @@ class TemporalOperationResult(Generic[_ResultT]):
                 "TemporalOperationResult must have exactly one of value or token set."
             )
         if has_token and (not isinstance(self.token, str) or not self.token):
-            raise ValueError("TemporalOperationResult token must be a non-empty string.")
+            raise ValueError(
+                "TemporalOperationResult token must be a non-empty string."
+            )
 
     @classmethod
     def sync(cls, value: _ResultT) -> Self:
