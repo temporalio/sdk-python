@@ -43,6 +43,53 @@ def test_workflow_handle_to_from_token_round_trip():
 
 
 @pytest.mark.parametrize(
+    ("token", "expected"),
+    [
+        (
+            _encode_json_token({"t": 1, "ns": "default", "wid": "workflow-id"}),
+            OperationToken(
+                type=OperationTokenType.WORKFLOW,
+                namespace="default",
+                workflow_id="workflow-id",
+            ),
+        ),
+        (
+            _encode_json_token({"t": 1, "ns": "", "wid": "workflow-id"}),
+            OperationToken(
+                type=OperationTokenType.WORKFLOW,
+                namespace="",
+                workflow_id="workflow-id",
+            ),
+        ),
+        (
+            _encode_json_token(
+                {"t": 1, "ns": "default", "wid": "workflow-id", "v": None}
+            ),
+            OperationToken(
+                type=OperationTokenType.WORKFLOW,
+                namespace="default",
+                workflow_id="workflow-id",
+            ),
+        ),
+        (
+            _encode_json_token({"t": 1, "ns": "default", "wid": "workflow-id", "v": 0}),
+            OperationToken(
+                type=OperationTokenType.WORKFLOW,
+                namespace="default",
+                workflow_id="workflow-id",
+                version=0,
+            ),
+        ),
+    ],
+)
+def test_operation_token_decode_accepts_valid_tokens(
+    token: str,
+    expected: OperationToken,
+):
+    assert OperationToken.decode(token) == expected
+
+
+@pytest.mark.parametrize(
     ("token", "message"),
     [
         ("", "invalid token: token is empty"),
@@ -75,15 +122,11 @@ def test_workflow_handle_to_from_token_round_trip():
         ),
         (
             _encode_json_token({"t": 1, "wid": "workflow-id"}),
-            "expected namespace to be a non-empty string",
+            "expected namespace to be a string",
         ),
         (
             _encode_json_token({"t": 1, "ns": 123, "wid": "workflow-id"}),
-            "expected namespace to be a non-empty string",
-        ),
-        (
-            _encode_json_token({"t": 1, "ns": "", "wid": "workflow-id"}),
-            "expected namespace to be a non-empty string",
+            "expected namespace to be a string",
         ),
         (
             _encode_json_token(

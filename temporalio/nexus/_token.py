@@ -94,9 +94,10 @@ class OperationToken:
             )
 
         namespace = token_details.get("ns")
-        if not isinstance(namespace, str) or not namespace:
+        if not isinstance(namespace, str):
+            # Allow empty string for ns, but it must be present and a string
             raise TypeError(
-                f"invalid token: expected namespace to be a non-empty string, got {type(namespace)}"
+                f"invalid token: expected namespace to be a string, got {type(namespace)}"
             )
 
         return cls(
@@ -170,12 +171,6 @@ class WorkflowHandle(Generic[OutputT]):
         if op_token.version is not None and op_token.version != 0:
             raise TypeError(
                 "invalid workflow token: 'v' field, if present, must be 0 or null/absent"
-            )
-
-        if not isinstance(op_token.namespace, str):
-            # Allow empty string for ns, but it must be present and a string
-            raise TypeError(
-                "invalid workflow token: missing or non-string namespace (ns)"
             )
 
         return cls(
