@@ -8,6 +8,7 @@ import inspect
 import sys
 import warnings
 from dataclasses import replace
+from datetime import timedelta
 from typing import Any, Callable
 
 from langgraph._internal._runnable import RunnableCallable
@@ -26,6 +27,7 @@ from temporalio.contrib.langgraph._task_cache import (
     set_task_cache,
     task_id,
 )
+from temporalio.contrib.langgraph._workflow import wrap_workflow
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -46,6 +48,49 @@ class LangGraphPlugin(SimplePlugin):
     and tasks as Temporal Activities, giving your AI agent workflows durable
     execution, automatic retries, and timeouts. It supports both the LangGraph Graph
     API (``StateGraph``) and Functional API (``@entrypoint`` / ``@task``).
+
+    Args:
+        graphs: Graph API graphs to make available to workflows, keyed by name.
+            Workflows retrieve them with :func:`graph` and call
+            ``.compile()`` to get a runnable. Each node's ``metadata`` must
+            include ``execute_in`` (``"activity"`` or ``"workflow"``) and
+            may include any kwarg accepted by
+            :func:`workflow.execute_activity` (e.g. ``start_to_close_timeout``,
+            ``retry_policy``).
+        entrypoints: Functional API entrypoints to make available to
+            workflows, keyed by name. Workflows retrieve them with
+            :func:`entrypoint`.
+        tasks: Functional API ``@task`` functions to wrap as Temporal
+            Activities.
+        activity_options: Per-task activity options for the Functional
+            API, keyed by task function name. Each entry must include
+            ``execute_in`` and may include any
+            :func:`workflow.execute_activity` kwarg. Used because LangGraph's
+            Functional API has no per-task ``metadata`` channel.
+        default_activity_options: Activity options applied to every
+            activity-bound node and task, overridable per-node (Graph API
+            ``metadata``) or per-task (``activity_options[name]``).
+        streaming_topic: When set, ``langgraph.config.get_stream_writer()``
+            inside a node publishes to this topic on the workflow's
+            :class:`WorkflowStream`. The workflow must construct
+            ``WorkflowStream()`` in its ``@workflow.init`` (the plugin's
+            interceptor verifies this on workflow start). Nodes with
+            ``execute_in='activity'`` publish through
+            :class:`WorkflowStreamClient` (signal); nodes with
+            ``execute_in='workflow'`` publish synchronously to the
+            in-workflow stream (no signal).
+        streaming_batch_interval: How often the activity-side stream
+            client flushes buffered publishes into a single
+            ``__temporal_workflow_stream_publish`` signal. Has no effect
+            on workflow-side nodes (their publishes are synchronous
+            in-memory log appends). Lower values reduce streaming
+            latency at the cost of more signals (more workflow history
+            events); higher values amortize signal cost but make
+            chunks arrive in larger bursts. Default 100ms suits
+            interactive token streaming; raise to 250–1000ms for
+            non-interactive aggregation, lower toward 10–50ms only if
+            you've measured the latency need and accept the history
+            cost.
     """
 
     def __init__(
@@ -58,8 +103,15 @@ class LangGraphPlugin(SimplePlugin):
         # TODO: Remove activity_options when we have support for @task(metadata=...)
         activity_options: dict[str, dict[str, Any]] | None = None,
         default_activity_options: dict[str, Any] | None = None,
+        streaming_topic: str | None = None,
+        streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ):
-        """Initialize the LangGraph plugin with graphs, entrypoints, and tasks."""
+        """Initialize the LangGraph plugin with graphs, entrypoints, and tasks.
+
+        .. warning::
+            Streaming support is experimental and may change in
+            future versions.
+        """
         if sys.version_info < (3, 11):
             warnings.warn(  # type: ignore[reportUnreachable]
                 "LangGraphPlugin requires Python >= 3.11 for full async support. "
@@ -79,6 +131,8 @@ class LangGraphPlugin(SimplePlugin):
             )
 
         self.activities: list = []
+        self._streaming_topic = streaming_topic
+        self._streaming_batch_interval = streaming_batch_interval
 
         # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
@@ -95,7 +149,7 @@ class LangGraphPlugin(SimplePlugin):
                     runnable = node.runnable
                     if not isinstance(runnable, RunnableCallable):
                         raise ValueError(f"Node {node_name} must be a RunnableCallable")
-                    user_func = runnable.afunc or runnable.func
+                    user_func = runnable.func or runnable.afunc
                     if user_func is None:
                         raise ValueError(f"Node {node_name} must have a function")
                     # Keep 'config' (for metadata/tags) and 'runtime' (for
@@ -183,7 +237,11 @@ class LangGraphPlugin(SimplePlugin):
             "langchain.LangGraphPlugin",
             activities=self.activities,
             workflow_runner=workflow_runner,
-            interceptors=[LangGraphInterceptor(graphs or {}, entrypoints or {})],
+            interceptors=[
+                LangGraphInterceptor(
+                    graphs or {}, entrypoints or {}, streaming_topic=streaming_topic
+                )
+            ],
         )
 
     def execute(
@@ -197,11 +255,16 @@ class LangGraphPlugin(SimplePlugin):
         execute_in = opts.pop("execute_in")
 
         if execute_in == "activity":
-            a = activity.defn(name=activity_name)(wrap_activity(func))
+            wrapped = wrap_activity(
+                func,
+                streaming_topic=self._streaming_topic,
+                streaming_batch_interval=self._streaming_batch_interval,
+            )
+            a = activity.defn(name=activity_name)(wrapped)
             self.activities.append(a)
             return wrap_execute_activity(a, task_id=task_id(func), **opts)
         elif execute_in == "workflow":
-            return func
+            return wrap_workflow(func, streaming_topic=self._streaming_topic)
         else:
             raise ValueError(f"Invalid execute_in value: {execute_in}")
 

@@ -119,6 +119,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "--dynamic-config-value",
                 "frontend.activityAPIsEnabled=true",
                 "--dynamic-config-value",
+                "frontend.enableCancelWorkerPollsOnShutdown=true",
+                "--dynamic-config-value",
                 "component.nexusoperations.recordCancelRequestCompletionEvents=true",
                 "--dynamic-config-value",
                 "activity.enableStandalone=true",

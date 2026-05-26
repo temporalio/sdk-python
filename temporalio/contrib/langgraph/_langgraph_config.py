@@ -3,7 +3,7 @@
 # pyright: reportMissingTypeStubs=false
 
 import dataclasses
-from typing import Any
+from typing import Any, Callable
 
 from langchain_core.runnables.config import var_child_runnable_config
 from langgraph._internal._constants import (
@@ -93,7 +93,11 @@ def get_langgraph_config() -> dict[str, Any]:
     }
 
 
-def set_langgraph_config(config: dict[str, Any]) -> Runtime:
+def set_langgraph_config(
+    config: dict[str, Any],
+    *,
+    stream_writer: Callable[[Any], None] | None = None,
+) -> Runtime:
     """Restore a LangGraph runnable config from a serialized dict.
 
     Returns the reconstructed Runtime so callers can re-inject it into the
@@ -112,7 +116,7 @@ def set_langgraph_config(config: dict[str, Any]) -> Runtime:
     execution_info_dict = config.get("execution_info")
     runtime = Runtime(
         context=config.get("context"),
-        stream_writer=lambda _: None,
+        stream_writer=stream_writer or (lambda _: None),
         previous=config.get("previous"),
         execution_info=(
             ExecutionInfo(**execution_info_dict) if execution_info_dict else None
