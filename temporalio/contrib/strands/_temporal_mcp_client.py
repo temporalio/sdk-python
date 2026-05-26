@@ -5,10 +5,9 @@ from typing import Any
 
 from mcp import ClientSession
 from mcp.types import PaginatedRequestParams, Tool
-from strands.tools.mcp.mcp_agent_tool import MCPAgentTool
-from strands.tools.mcp.mcp_client import MCPClient
+from strands.tools import ToolProvider
+from strands.tools.mcp import MCPAgentTool, MCPClient
 from strands.tools.mcp.mcp_types import MCPToolResult
-from strands.tools.tool_provider import ToolProvider
 from strands.types.tools import AgentTool
 
 from temporalio import activity

@@ -9,7 +9,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, TypeVar
 
-from strands.hooks.registry import BaseHookEvent, HookCallback
+from strands.hooks import BaseHookEvent, HookCallback
 from strands.types.tools import AgentTool
 
 from temporalio import workflow

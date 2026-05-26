@@ -2,9 +2,8 @@ from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
 
-from strands.models import Model
-from strands.models.bedrock import BedrockModel
-from strands.tools.mcp.mcp_client import MCPClient
+from strands.models import BedrockModel, Model
+from strands.tools.mcp import MCPClient
 
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
