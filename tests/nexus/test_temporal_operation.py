@@ -24,6 +24,28 @@ class Input:
     task_queue: str
 
 
+def test_temporal_operation_result_validates_single_result_kind() -> None:
+    assert nexus.TemporalOperationResult.sync(None).value is None
+    assert nexus.TemporalOperationResult.async_token("token").token == "token"
+
+    with pytest.raises(ValueError, match="exactly one of value or token"):
+        nexus.TemporalOperationResult()
+
+    with pytest.raises(ValueError, match="exactly one of value or token"):
+        nexus.TemporalOperationResult(value="value", token="token")
+
+
+def test_temporal_operation_result_validates_token() -> None:
+    with pytest.raises(ValueError, match="non-empty string"):
+        nexus.TemporalOperationResult.async_token("")
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        nexus.TemporalOperationResult(token="")
+
+    with pytest.raises(ValueError, match="non-empty string"):
+        nexus.TemporalOperationResult(token=123)  # type: ignore
+
+
 @workflow.defn
 class EchoWorkflow:
     @workflow.run
