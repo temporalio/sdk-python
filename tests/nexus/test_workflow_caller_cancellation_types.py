@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ import nexusrpc.handler._decorators
 import pytest
 
 import temporalio.nexus._operation_handlers
+import temporalio.worker._workflow_instance
 from temporalio import exceptions, nexus, workflow
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import (
@@ -20,7 +22,7 @@ from temporalio.client import (
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_event_subsequence, assert_eventually
+from tests.helpers import assert_event_subsequence, assert_eventually, LogCapturer
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
@@ -268,54 +270,72 @@ async def test_cancellation_type(
 
     client = env.client
 
-    async with Worker(
-        client,
-        task_queue=str(uuid.uuid4()),
-        workflows=[CallerWorkflow, HandlerWorkflow],
-        nexus_service_handlers=[ServiceHandler()],
-    ) as worker:
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(worker.task_queue), worker.task_queue
-        )
+    log_capturer = LogCapturer()
+    with log_capturer.logs_captured(
+        temporalio.worker._workflow_instance.logger, level=logging.WARNING
+    ):
+        async with Worker(
+            client,
+            task_queue=str(uuid.uuid4()),
+            workflows=[CallerWorkflow, HandlerWorkflow],
+            nexus_service_handlers=[ServiceHandler()],
+        ) as worker:
+            await env.create_nexus_endpoint(
+                make_nexus_endpoint_name(worker.task_queue), worker.task_queue
+            )
 
-        # Start the caller workflow, wait for the nexus op to have started and retrieve the nexus op
-        # token
-        with_start_workflow = WithStartWorkflowOperation(
-            CallerWorkflow.run,
-            Input(
-                endpoint=make_nexus_endpoint_name(worker.task_queue),
-                cancellation_type=cancellation_type,
-            ),
-            id=test_context.caller_workflow_id,
-            task_queue=worker.task_queue,
-            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
-        )
+            # Start the caller workflow, wait for the nexus op to have started and retrieve the nexus op
+            # token
+            with_start_workflow = WithStartWorkflowOperation(
+                CallerWorkflow.run,
+                Input(
+                    endpoint=make_nexus_endpoint_name(worker.task_queue),
+                    cancellation_type=cancellation_type,
+                ),
+                id=test_context.caller_workflow_id,
+                task_queue=worker.task_queue,
+                id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            )
 
-        operation_token = await client.execute_update_with_start_workflow(
-            CallerWorkflow.get_operation_token,
-            start_workflow_operation=with_start_workflow,
-        )
-        handler_wf = (
-            nexus.WorkflowHandle[None]
-            .from_token(operation_token)
-            ._to_client_workflow_handle(client)
-        )
-        caller_wf = await with_start_workflow.workflow_handle()
+            operation_token = await client.execute_update_with_start_workflow(
+                CallerWorkflow.get_operation_token,
+                start_workflow_operation=with_start_workflow,
+            )
+            handler_wf = (
+                nexus.WorkflowHandle[None]
+                .from_token(operation_token)
+                ._to_client_workflow_handle(client)
+            )
+            caller_wf = await with_start_workflow.workflow_handle()
 
-        if cancellation_type == workflow.NexusOperationCancellationType.ABANDON:
-            await check_behavior_for_abandon(caller_wf, handler_wf)
-        elif cancellation_type == workflow.NexusOperationCancellationType.TRY_CANCEL:
-            await check_behavior_for_try_cancel(caller_wf, handler_wf)
-        elif (
-            cancellation_type == workflow.NexusOperationCancellationType.WAIT_REQUESTED
-        ):
-            await check_behavior_for_wait_cancellation_requested(caller_wf, handler_wf)
-        elif (
-            cancellation_type == workflow.NexusOperationCancellationType.WAIT_COMPLETED
-        ):
-            await check_behavior_for_wait_cancellation_completed(caller_wf, handler_wf)
-        else:
-            pytest.fail(f"Invalid cancellation type: {cancellation_type}")
+            if cancellation_type == workflow.NexusOperationCancellationType.ABANDON:
+                await check_behavior_for_abandon(caller_wf, handler_wf)
+            elif (
+                cancellation_type == workflow.NexusOperationCancellationType.TRY_CANCEL
+            ):
+                await check_behavior_for_try_cancel(caller_wf, handler_wf)
+            elif (
+                cancellation_type
+                == workflow.NexusOperationCancellationType.WAIT_REQUESTED
+            ):
+                await check_behavior_for_wait_cancellation_requested(
+                    caller_wf, handler_wf
+                )
+            elif (
+                cancellation_type
+                == workflow.NexusOperationCancellationType.WAIT_COMPLETED
+            ):
+                await check_behavior_for_wait_cancellation_completed(
+                    caller_wf, handler_wf
+                )
+            else:
+                pytest.fail(f"Invalid cancellation type: {cancellation_type}")
+
+    # Verify no spurious "exception in shielded future" error logs
+    shielded_err = log_capturer.find_log("exception in shielded future")
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
 
 
 async def check_behavior_for_abandon(
