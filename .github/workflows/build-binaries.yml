@@ -47,6 +47,7 @@ jobs:
         with:
           cache-bin: false
           workspaces: temporalio/bridge -> target
+          key: ${{ env.pythonLocation }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv sync --all-extras
 
