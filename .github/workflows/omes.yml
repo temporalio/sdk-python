@@ -2,6 +2,7 @@ name: Omes Testing
 on:
   push:
     branches:
+      - fix/omes-docker-sdk-pat
       - main
       - "releases/*"
 
@@ -11,8 +12,10 @@ permissions:
 
 jobs:
   omes-image-build:
-    uses: temporalio/omes/.github/workflows/docker-images.yml@main
-    secrets: inherit
+    uses: temporalio/omes/.github/workflows/docker-images.yml@fix/docker-images-secret-contract
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PAT: ${{ secrets.DOCKER_SDK_PAT }}
     with:
       lang: python
       sdk-repo-url: ${{ github.event.pull_request.head.repo.full_name || 'temporalio/sdk-python' }}
@@ -20,3 +23,4 @@ jobs:
       # TODO: Remove once we have a good way of cleaning up sha-based pushed images
       docker-tag-ext: ci-latest
       do-push: true
+      omes-repo-ref: fix/docker-images-secret-contract
