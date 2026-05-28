@@ -150,7 +150,10 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
            This API is experimental and unstable.
         """
         nexus_client = _TemporalNexusClient()
-        result = await self.start_operation(ctx, nexus_client, input)
+        start_ctx = TemporalNexusStartOperationContext._from_start_operation_context(
+            ctx
+        )
+        result = await self.start_operation(start_ctx, nexus_client, input)
         return result._to_nexus_result()
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
@@ -167,9 +170,12 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
                 type=HandlerErrorType.INTERNAL,
             ) from err
 
+        cancel_ctx = TemporalNexusCancelOperationContext._from_cancel_operation_context(
+            ctx
+        )
         match operation_token.type:
             case OperationTokenType.WORKFLOW:
-                await self.cancel_workflow_run(ctx, operation_token.workflow_id)
+                await self.cancel_workflow_run(cancel_ctx, operation_token.workflow_id)
 
     async def cancel_workflow_run(
         self,

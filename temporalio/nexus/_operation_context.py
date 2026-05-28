@@ -19,7 +19,6 @@ from typing import (
     Any,
     Concatenate,
     Generic,
-    TypeAlias,
     TypeVar,
     overload,
 )
@@ -29,6 +28,7 @@ from nexusrpc.handler import (
     OperationContext,
     StartOperationContext,
 )
+from typing_extensions import Self
 
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
@@ -549,8 +549,32 @@ class _TemporalCancelOperationContext(_TemporalOperationCtx[CancelOperationConte
         _temporal_cancel_operation_context.set(self)
 
 
-TemporalNexusStartOperationContext: TypeAlias = StartOperationContext
-TemporalNexusCancelOperationContext: TypeAlias = CancelOperationContext
+class TemporalNexusStartOperationContext(StartOperationContext):
+    """Context received by a Temporal Nexus operation when it is started.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    @classmethod
+    def _from_start_operation_context(cls, ctx: StartOperationContext) -> Self:
+        return cls(
+            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
+        )
+
+
+class TemporalNexusCancelOperationContext(CancelOperationContext):
+    """Context received by a Temporal Nexus operation when it is canceled.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    @classmethod
+    def _from_cancel_operation_context(cls, ctx: CancelOperationContext) -> Self:
+        return cls(
+            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
+        )
 
 
 class LoggerAdapter(logging.LoggerAdapter):
