@@ -157,6 +157,20 @@ class _ActivityWorker:
                 )
                 if exception_task.done():
                     poll_task.cancel()
+                    # Drain the poll_task before re-raising the worker exception.
+                    # Without this await, the underlying Rust bridge future may
+                    # still have a pending call_soon_threadsafe callback scheduled
+                    # onto the event loop's _ready queue.  If the queue is not
+                    # flushed before loop.close() (which can happen when all
+                    # remaining Python tasks are already done by the time
+                    # asyncio.run() calls _cancel_all_tasks), that callback fires
+                    # against a closed loop and raises
+                    # RuntimeError("Event loop is closed").
+                    # asyncio.wait() yields to the event loop, allowing any
+                    # pending Rust-side callbacks to be processed while the loop
+                    # is still open, and does not raise even if the task was
+                    # cancelled.
+                    await asyncio.wait([poll_task])
                     await exception_task
                 task = await poll_task
 
