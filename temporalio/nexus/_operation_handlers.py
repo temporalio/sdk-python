@@ -18,7 +18,6 @@ from nexusrpc.handler import (
     StartOperationResultAsync,
     StartOperationResultSync,
 )
-from typing_extensions import override
 
 import temporalio.nexus
 from temporalio.nexus._operation_context import (
@@ -210,40 +209,3 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
             options.workflow_id
         )
         await workflow_handle.cancel()
-
-
-class _TemporalNexusOperationHandler(TemporalNexusOperationHandler[InputT, OutputT]):  # pyright: ignore[reportUnusedClass]
-    """Default implementation of TemporalNexusHandler that uses the provided callable
-    to start the Temporal operation.
-
-    .. warning::
-       This API is experimental and unstable.
-    """
-
-    def __init__(
-        self,
-        start: Callable[
-            [TemporalNexusStartOperationContext, TemporalNexusClient, InputT],
-            Awaitable[TemporalOperationResult[OutputT]],
-        ],
-    ) -> None:
-        """Initialize the Temporal operation handler."""
-        if not is_async_callable(start):
-            raise RuntimeError(
-                f"{start} is not an `async def` method. "
-                "TemporalNexusOperationHandler must be initialized with an "
-                "`async def` start method."
-            )
-        self._start = start
-        if start.__doc__:
-            if start_func := getattr(self.start, "__func__", None):
-                start_func.__doc__ = start.__doc__
-
-    @override
-    async def start_operation(
-        self,
-        ctx: TemporalNexusStartOperationContext,
-        client: TemporalNexusClient,
-        input: InputT,
-    ) -> TemporalOperationResult[OutputT]:
-        return await self._start(ctx, client, input)

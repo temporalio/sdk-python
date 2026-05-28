@@ -12,6 +12,7 @@ from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
 )
+from typing_extensions import override
 
 from temporalio.nexus._temporal_client import (
     TemporalNexusClient,
@@ -24,14 +25,15 @@ from ._operation_context import (
     WorkflowRunOperationContext,
 )
 from ._operation_handlers import (
+    TemporalNexusOperationHandler,
     WorkflowRunOperationHandler,
-    _TemporalNexusOperationHandler,
 )
 from ._token import WorkflowHandle
 from ._util import (
     get_callable_name,
     get_temporal_operation_start_method_input_and_output_type_annotations,
     get_workflow_run_start_method_input_and_output_type_annotations,
+    is_async_callable,
     set_operation_factory,
 )
 
@@ -193,6 +195,11 @@ def temporal_operation(
             NexusServiceType, InputT, OutputT
         ],
     ) -> TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]:
+        if not is_async_callable(start):
+            raise RuntimeError(
+                f"{start} is not an `async def` method. "
+                "@temporal_operation must decorate an `async def` start method."
+            )
         (
             input_type,
             output_type,
@@ -213,8 +220,18 @@ def temporal_operation(
                     input,
                 )
 
-            _start.__doc__ = start.__doc__
-            return _TemporalNexusOperationHandler(_start)
+            class _TemporalNexusOperationHandler(TemporalNexusOperationHandler):
+                @override
+                async def start_operation(
+                    self,
+                    ctx: TemporalNexusStartOperationContext,
+                    client: TemporalNexusClient,
+                    input: InputT,
+                ) -> TemporalOperationResult[OutputT]:
+                    return await _start(ctx, client, input)
+
+            _TemporalNexusOperationHandler.start_operation.__doc__ = start.__doc__
+            return _TemporalNexusOperationHandler()
 
         method_name = get_callable_name(start)
         op = nexusrpc.Operation(
