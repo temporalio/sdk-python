@@ -34,12 +34,13 @@ from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from temporalio.contrib.opentelemetry._tracer_provider import ReplaySafeTracerProvider
 from temporalio.contrib.pydantic import (
     PydanticJSONPlainPayloadConverter,
-    PydanticPayloadConverter,
     ToJsonOptions,
 )
 from temporalio.converter import (
+    CompositePayloadConverter,
     DataConverter,
     DefaultPayloadConverter,
+    JSONPlainPayloadConverter,
 )
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
@@ -123,14 +124,22 @@ class _OpenAIJSONPlainPayloadConverter(PydanticJSONPlainPayloadConverter):
             return _lenient_construct(type_hint, json.loads(payload.data))
 
 
-class OpenAIPayloadConverter(PydanticPayloadConverter):
+class OpenAIPayloadConverter(CompositePayloadConverter):
     """PayloadConverter for OpenAI agents."""
 
     def __init__(self) -> None:
         """Initialize a payload converter."""
-        super().__init__(ToJsonOptions(exclude_unset=True))
-        lenient = _OpenAIJSONPlainPayloadConverter(ToJsonOptions(exclude_unset=True))
-        self.converters = {**self.converters, lenient.encoding.encode(): lenient}
+        json_payload_converter = _OpenAIJSONPlainPayloadConverter(
+            ToJsonOptions(exclude_unset=True)
+        )
+        super().__init__(
+            *(
+                c
+                if not isinstance(c, JSONPlainPayloadConverter)
+                else json_payload_converter
+                for c in DefaultPayloadConverter.default_encoding_payload_converters
+            )
+        )
 
 
 def _data_converter(converter: DataConverter | None) -> DataConverter:
