@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from typing import (
+    TypeAlias,
     overload,
 )
 
@@ -142,21 +143,21 @@ def workflow_run_operation(
     return decorator(start)
 
 
+TemporalNexusOperationStartHandlerFunc: TypeAlias = Callable[
+    [
+        NexusServiceType,
+        TemporalNexusStartOperationContext,
+        TemporalNexusClient,
+        InputT,
+    ],
+    Awaitable[TemporalOperationResult[OutputT]],
+]
+
+
 @overload
 def temporal_operation(
-    start: Callable[
-        [
-            NexusServiceType,
-            TemporalNexusStartOperationContext,
-            TemporalNexusClient,
-            InputT,
-        ],
-        Awaitable[TemporalOperationResult[OutputT]],
-    ],
-) -> Callable[
-    [NexusServiceType, TemporalNexusStartOperationContext, TemporalNexusClient, InputT],
-    Awaitable[TemporalOperationResult[OutputT]],
-]: ...
+    start: TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
+) -> TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]: ...
 
 
 @overload
@@ -164,75 +165,21 @@ def temporal_operation(
     *,
     name: str | None = None,
 ) -> Callable[
-    [
-        Callable[
-            [
-                NexusServiceType,
-                TemporalNexusStartOperationContext,
-                TemporalNexusClient,
-                InputT,
-            ],
-            Awaitable[TemporalOperationResult[OutputT]],
-        ]
-    ],
-    Callable[
-        [
-            NexusServiceType,
-            TemporalNexusStartOperationContext,
-            TemporalNexusClient,
-            InputT,
-        ],
-        Awaitable[TemporalOperationResult[OutputT]],
-    ],
+    [TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
+    TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
 ]: ...
 
 
 def temporal_operation(
     start: None
-    | (
-        Callable[
-            [
-                NexusServiceType,
-                TemporalNexusStartOperationContext,
-                TemporalNexusClient,
-                InputT,
-            ],
-            Awaitable[TemporalOperationResult[OutputT]],
-        ]
-    ) = None,
+    | TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT] = None,
     *,
     name: str | None = None,
 ) -> (
-    Callable[
-        [
-            NexusServiceType,
-            TemporalNexusStartOperationContext,
-            TemporalNexusClient,
-            InputT,
-        ],
-        Awaitable[TemporalOperationResult[OutputT]],
-    ]
+    TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]
     | Callable[
-        [
-            Callable[
-                [
-                    NexusServiceType,
-                    TemporalNexusStartOperationContext,
-                    TemporalNexusClient,
-                    InputT,
-                ],
-                Awaitable[TemporalOperationResult[OutputT]],
-            ]
-        ],
-        Callable[
-            [
-                NexusServiceType,
-                TemporalNexusStartOperationContext,
-                TemporalNexusClient,
-                InputT,
-            ],
-            Awaitable[TemporalOperationResult[OutputT]],
-        ],
+        [TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
+        TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
     ]
 ):
     """Decorator marking a method as the start method for an operation that interacts with Temporal.
@@ -242,24 +189,10 @@ def temporal_operation(
     """
 
     def decorator(
-        start: Callable[
-            [
-                NexusServiceType,
-                TemporalNexusStartOperationContext,
-                TemporalNexusClient,
-                InputT,
-            ],
-            Awaitable[TemporalOperationResult[OutputT]],
+        start: TemporalNexusOperationStartHandlerFunc[
+            NexusServiceType, InputT, OutputT
         ],
-    ) -> Callable[
-        [
-            NexusServiceType,
-            TemporalNexusStartOperationContext,
-            TemporalNexusClient,
-            InputT,
-        ],
-        Awaitable[TemporalOperationResult[OutputT]],
-    ]:
+    ) -> TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]:
         (
             input_type,
             output_type,

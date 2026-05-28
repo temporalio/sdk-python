@@ -19,6 +19,7 @@ from nexusrpc.handler import (
 )
 from typing_extensions import override
 
+import temporalio.nexus
 from temporalio.nexus._operation_context import (
     TemporalNexusCancelOperationContext,
     TemporalNexusStartOperationContext,
@@ -149,10 +150,7 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
            This API is experimental and unstable.
         """
         nexus_client = _TemporalNexusClient()
-        temporal_ctx = TemporalNexusStartOperationContext._from_start_operation_context(
-            ctx
-        )
-        result = await self.start_operation(temporal_ctx, nexus_client, input)
+        result = await self.start_operation(ctx, nexus_client, input)
         return result._to_nexus_result()
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
@@ -161,10 +159,6 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
         .. warning::
            This API is experimental and unstable.
         """
-        cancel_ctx = TemporalNexusCancelOperationContext._from_cancel_operation_context(
-            ctx
-        )
-
         try:
             operation_token = OperationToken.decode(token)
         except Exception as err:
@@ -173,26 +167,21 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
                 type=HandlerErrorType.INTERNAL,
             ) from err
 
-        if cancel_ctx.client.namespace != operation_token.namespace:
-            raise HandlerError(
-                f"Client namespace {cancel_ctx.client.namespace} does not match "
-                f"operation token namespace {operation_token.namespace}",
-                type=HandlerErrorType.BAD_REQUEST,
-            )
-
         match operation_token.type:
             case OperationTokenType.WORKFLOW:
-                await self.cancel_workflow_run(cancel_ctx, operation_token.workflow_id)
+                await self.cancel_workflow_run(ctx, operation_token.workflow_id)
 
     async def cancel_workflow_run(
-        self, ctx: TemporalNexusCancelOperationContext, workflow_id: str
+        self,
+        ctx: TemporalNexusCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
+        workflow_id: str,
     ):
         """Cancels the workflow identified by workflow_id.
 
         .. warning::
            This API is experimental and unstable.
         """
-        workflow_handle = ctx.client.get_workflow_handle(workflow_id)
+        workflow_handle = temporalio.nexus.client().get_workflow_handle(workflow_id)
         await workflow_handle.cancel()
 
 

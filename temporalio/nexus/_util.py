@@ -5,6 +5,7 @@ import inspect
 import typing
 import warnings
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import (
     Any,
 )
@@ -30,6 +31,16 @@ from ._token import (
 )
 
 
+@dataclass(frozen=True)
+class _ExpectedParamType:
+    runtime_type: type[Any]
+    display_name: str | None = None
+
+    @property
+    def name(self) -> str:
+        return self.display_name or self.runtime_type.__name__
+
+
 def get_workflow_run_start_method_input_and_output_type_annotations(
     start: Callable[
         [NexusServiceType, WorkflowRunOperationContext, InputT],
@@ -46,7 +57,7 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     """
     return _get_wrapped_start_method_input_and_output_type_annotations(
         start,
-        expected_param_types=(WorkflowRunOperationContext,),
+        expected_param_types=(_ExpectedParamType(WorkflowRunOperationContext),),
         expected_return_origin=WorkflowHandle,
     )
 
@@ -72,7 +83,13 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
     """
     return _get_wrapped_start_method_input_and_output_type_annotations(
         start,
-        expected_param_types=(TemporalNexusStartOperationContext, TemporalNexusClient),
+        expected_param_types=(
+            _ExpectedParamType(
+                TemporalNexusStartOperationContext,
+                "TemporalNexusStartOperationContext",
+            ),
+            _ExpectedParamType(TemporalNexusClient),
+        ),
         expected_return_origin=TemporalOperationResult,
     )
 
@@ -80,7 +97,7 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
 def _get_wrapped_start_method_input_and_output_type_annotations(
     start: Callable[..., Any],
     *,
-    expected_param_types: tuple[type[Any], ...],
+    expected_param_types: tuple[_ExpectedParamType, ...],
     expected_return_origin: type[Any],
 ) -> tuple[
     type[Any] | None,
@@ -93,7 +110,7 @@ def _get_wrapped_start_method_input_and_output_type_annotations(
     origin_type = typing.get_origin(output_type)
     if not origin_type:
         output_type = None
-    elif not _is_subclass(origin_type, expected_return_origin):
+    elif not issubclass(origin_type, expected_return_origin):
         warnings.warn(
             f"Expected return type of {start.__name__} to be a subclass of "
             f"{expected_return_origin.__name__}, "
@@ -118,7 +135,7 @@ def _get_wrapped_start_method_input_and_output_type_annotations(
 def _get_start_method_input_and_output_type_annotations(
     start: Callable[..., Any],
     *,
-    expected_param_types: tuple[type[Any], ...],
+    expected_param_types: tuple[_ExpectedParamType, ...],
 ) -> tuple[
     type[Any] | None,
     type[Any] | None,
@@ -147,21 +164,14 @@ def _get_start_method_input_and_output_type_annotations(
         for index, (param_type, expected_param_type) in enumerate(
             zip(param_types, expected_param_types), start=1
         ):
-            if not _is_subclass(expected_param_type, param_type):
+            if not issubclass(expected_param_type.runtime_type, param_type):
                 warnings.warn(
                     f"Expected parameter {index} of {start} to be an instance of "
-                    f"{expected_param_type.__name__}, but is {param_type}."
+                    f"{expected_param_type.name}, but is {param_type}."
                 )
                 input_type = None
 
     return input_type, output_type
-
-
-def _is_subclass(cls: Any, class_or_tuple: type[Any]) -> bool:
-    try:
-        return issubclass(cls, class_or_tuple)
-    except TypeError:
-        return False
 
 
 def get_callable_name(fn: Callable[..., Any]) -> str:

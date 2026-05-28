@@ -5,7 +5,7 @@ It doesn't contain any test functions.
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypeAlias
 from unittest.mock import Mock
 
 import nexusrpc
@@ -13,6 +13,7 @@ import nexusrpc
 import temporalio.nexus
 from temporalio import workflow
 from temporalio.client import Client, NexusOperationHandle
+from temporalio.nexus import TemporalNexusOperationStartHandlerFunc
 from temporalio.service import ServiceClient
 
 
@@ -208,6 +209,26 @@ class MyServiceHandlerWithoutServiceDefinition:
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
         raise NotImplementedError
+
+
+_handler: TemporalNexusOperationStartHandlerFunc[
+    MyServiceHandler,
+    int,
+    None,
+] = MyServiceHandler.my_temporal_operation
+
+_BadHandler: TypeAlias = temporalio.nexus.TemporalNexusOperationStartHandlerFunc[
+    MyServiceHandler,
+    str,
+    None,
+]
+
+_bad_handler: TemporalNexusOperationStartHandlerFunc[
+    MyServiceHandler,
+    str,
+    None,
+    # assert-type-error-pyright: 'is not assignable to declared type'
+] = MyServiceHandler.my_temporal_operation  # type: ignore
 
 
 class MyUnsafeContextAnnotationServiceHandler:

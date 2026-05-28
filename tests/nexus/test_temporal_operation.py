@@ -208,7 +208,7 @@ class TestServiceHandler:
                 self, ctx: nexus.TemporalNexusCancelOperationContext, workflow_id: str
             ):
                 # get a handle to the workflow
-                handle = ctx.client.get_workflow_handle(workflow_id)
+                handle = nexus.client().get_workflow_handle(workflow_id)
 
                 # cancel the workflow
                 await handle.cancel()
