@@ -31,6 +31,7 @@ from temporalio.converter._payload_converter import (
     JSONPlainPayloadConverter,
     JSONProtoPayloadConverter,
     JSONTypeConverter,
+    JSONTypeConverterUnhandled,
     PayloadConverter,
     value_to_type,
 )
@@ -76,6 +77,7 @@ __all__ = [
     "JSONPlainPayloadConverter",
     "JSONProtoPayloadConverter",
     "JSONTypeConverter",
+    "JSONTypeConverterUnhandled",
     "PayloadCodec",
     "PayloadConverter",
     "PayloadLimitsConfig",
