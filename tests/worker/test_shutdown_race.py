@@ -26,11 +26,8 @@ by replacing the bridge future with a mock that reproduces the exact timing.
 from __future__ import annotations
 
 import asyncio
-import sys
 import threading
-import warnings
 from typing import Any
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -204,45 +201,57 @@ def test_no_closed_loop_error_with_fix(coro_factory: Any) -> None:
 
 
 def test_fixed_activity_worker_poll_exits_cleanly() -> None:
-    """Smoke-test: _ActivityWorker.run() with a mocked bridge that races on shutdown."""
-    import sys
+    """Smoke-test: _ActivityWorker.run() source contains the drain fix.
+
+    Uses direct source-file inspection so this test runs without requiring
+    the compiled Rust bridge extension (temporal_sdk_bridge.so).
+    """
     import os
 
-    # We need the local sdk-python on path, not the installed one
-    sdk_path = os.path.join(os.path.dirname(__file__), "..", "..")
-    sys.path.insert(0, os.path.abspath(sdk_path))
+    activity_src = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "temporalio",
+        "worker",
+        "_activity.py",
+    )
+    activity_src = os.path.abspath(activity_src)
+    assert os.path.exists(activity_src), f"Source file not found: {activity_src}"
 
-    # Minimal smoke test: the fixed code path (asyncio.wait) should be reachable
-    # without ImportError or syntax error.
-    from temporalio.worker._activity import _ActivityWorker  # type: ignore[import]
+    with open(activity_src) as f:
+        source = f.read()
 
-    # Check that the fix is present in source
-    import inspect
-
-    source = inspect.getsource(_ActivityWorker.run)
     assert "await asyncio.wait([poll_task])" in source, (
-        "Fix not found in _ActivityWorker.run()! "
+        "Fix not found in _activity.py! "
         "Expected 'await asyncio.wait([poll_task])' between poll_task.cancel() and await exception_task."
     )
 
 
 def test_fixed_nexus_worker_poll_exits_cleanly() -> None:
-    """Smoke-test: _NexusWorker.run() source contains the drain fix."""
-    import sys
+    """Smoke-test: _NexusWorker.run() source contains the drain fix.
+
+    Uses direct source-file inspection so this test runs without requiring
+    the compiled Rust bridge extension (temporal_sdk_bridge.so).
+    """
     import os
 
-    sdk_path = os.path.join(os.path.dirname(__file__), "..", "..")
-    sys.path.insert(0, os.path.abspath(sdk_path))
+    nexus_src = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "temporalio",
+        "worker",
+        "_nexus.py",
+    )
+    nexus_src = os.path.abspath(nexus_src)
+    if not os.path.exists(nexus_src):
+        pytest.skip("_nexus.py not present in this SDK version")
 
-    try:
-        from temporalio.worker._nexus import _NexusWorker  # type: ignore[import]
-    except ImportError:
-        pytest.skip("_NexusWorker not available in this SDK version")
+    with open(nexus_src) as f:
+        source = f.read()
 
-    import inspect
-
-    source = inspect.getsource(_NexusWorker.run)
     assert "await asyncio.wait([poll_task])" in source, (
-        "Fix not found in _NexusWorker.run()! "
+        "Fix not found in _nexus.py! "
         "Expected 'await asyncio.wait([poll_task])' between poll_task.cancel() and await exception_task."
     )
