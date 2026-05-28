@@ -547,7 +547,9 @@ def research_mock_model():
                         id="",
                         status="completed",
                         type="web_search_call",
-                        action=ActionSearch(query="", type="search"),
+                        action=ActionSearch.model_construct(
+                            type="search", queries=[""]
+                        ),
                     ),
                     ResponseBuilders.response_output_message("Granada"),
                 ],
