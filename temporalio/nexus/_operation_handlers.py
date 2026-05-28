@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 
 from nexusrpc import (
@@ -123,6 +124,22 @@ async def _cancel_workflow(
     await client_workflow_handle.cancel(**kwargs)
 
 
+@dataclass(frozen=True)
+class CancelWorkflowRunOptions:
+    """Options for cancelling the workflow backing a Nexus operation.
+
+    These options are built by :py:class:`TemporalNexusOperationHandler` and passed to
+    :py:meth:`TemporalNexusOperationHandler.cancel_workflow_run`. Fields may be added in
+    the future; overrides should consume the fields they need.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    workflow_id: str
+    """The ID of the workflow to cancel."""
+
+
 class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
     """Operation handler for Nexus operations that interact with Temporal.
     Implementations override the start_operation method.
@@ -175,19 +192,24 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
         )
         match operation_token.type:
             case OperationTokenType.WORKFLOW:
-                await self.cancel_workflow_run(cancel_ctx, operation_token.workflow_id)
+                options = CancelWorkflowRunOptions(
+                    workflow_id=operation_token.workflow_id
+                )
+                await self.cancel_workflow_run(cancel_ctx, options)
 
     async def cancel_workflow_run(
         self,
         ctx: TemporalNexusCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
-        workflow_id: str,
-    ):
-        """Cancels the workflow identified by workflow_id.
+        options: CancelWorkflowRunOptions,
+    ) -> None:
+        """Cancels the workflow backing the Nexus operation.
 
         .. warning::
            This API is experimental and unstable.
         """
-        workflow_handle = temporalio.nexus.client().get_workflow_handle(workflow_id)
+        workflow_handle = temporalio.nexus.client().get_workflow_handle(
+            options.workflow_id
+        )
         await workflow_handle.cancel()
 
 

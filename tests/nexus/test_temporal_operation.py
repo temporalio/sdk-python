@@ -205,10 +205,12 @@ class TestServiceHandler:
 
             @override
             async def cancel_workflow_run(
-                self, ctx: nexus.TemporalNexusCancelOperationContext, workflow_id: str
+                self,
+                ctx: nexus.TemporalNexusCancelOperationContext,
+                options: nexus.CancelWorkflowRunOptions,
             ):
                 # get a handle to the workflow
-                handle = nexus.client().get_workflow_handle(workflow_id)
+                handle = nexus.client().get_workflow_handle(options.workflow_id)
 
                 # cancel the workflow
                 await handle.cancel()
