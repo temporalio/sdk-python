@@ -9,6 +9,9 @@ from datetime import timedelta
 
 import pydantic
 from agents import ModelProvider, Trace, set_trace_provider
+from agents.run import get_default_agent_runner, set_default_agent_runner
+from agents.tracing import get_trace_provider
+from agents.tracing.provider import DefaultTraceProvider
 
 # construct_type is OpenAI's lenient (non-validating) model builder, the same
 # one the SDK uses to parse live API responses. It is in a private module but
@@ -16,10 +19,6 @@ from agents import ModelProvider, Trace, set_trace_provider
 from openai._models import construct_type
 
 import temporalio.api.common.v1
-from agents.run import get_default_agent_runner, set_default_agent_runner
-from agents.tracing import get_trace_provider
-from agents.tracing.provider import DefaultTraceProvider
-
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import (
