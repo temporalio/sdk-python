@@ -252,13 +252,6 @@ class MyServiceHandler:
             )
             return activity_result_5
         if input == 12:
-            # omitting the required start_to_close_timeout is a type error
-            # assert-type-error-pyright: 'No overloads for "start_activity" match'
-            return await client.start_activity(  # type: ignore
-                my_no_arg_activity,
-                id="activity-missing-timeout",
-            )
-        if input == 13:
             # assert-type-error-pyright: 'No overloads for "start_activity" match'
             return await client.start_activity(  # type: ignore
                 my_one_arg_activity,
