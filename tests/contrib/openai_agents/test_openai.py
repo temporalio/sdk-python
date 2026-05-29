@@ -2587,7 +2587,7 @@ def test_custom_tool_with_defer_loading_round_trips_through_activity_input():
         _build_tool,
     )
 
-    async def stub(ctx, payload):
+    async def stub(_ctx: Any, _payload: str) -> str:
         return ""
 
     tool = CustomTool(
