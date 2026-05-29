@@ -22,7 +22,7 @@ from temporalio.client import (
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import LogCapturer, assert_eventually
+from tests.helpers import LogCapturer, assert_event_subsequence, assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
@@ -505,38 +505,3 @@ async def get_event_time(
             return event.event_time.ToDatetime().replace(tzinfo=timezone.utc)
     event_type_name = EventType.Name(event_type).removeprefix("EVENT_TYPE_")
     assert False, f"Event {event_type_name} not found in {wf_handle.id}"
-
-
-async def assert_event_subsequence(
-    wf_handle: WorkflowHandle,
-    expected_events: list[EventType.ValueType],
-) -> None:
-    """
-    Given a workflow handle and a sequence of event types, assert that the workflow's history
-    contains that subsequence of events in the order specified.
-    """
-    all_events = []
-    async for e in wf_handle.fetch_history_events():
-        all_events.append(e)
-
-    _all_events = iter(all_events)
-    _expected_events = iter(expected_events)
-
-    previous_expected_event_type_name = None
-    for expected_event_type in _expected_events:
-        expected_event_type_name = EventType.Name(expected_event_type).removeprefix(
-            "EVENT_TYPE_"
-        )
-        has_expected = next(
-            (e for e in _all_events if e.event_type == expected_event_type),
-            None,
-        )
-        if not has_expected:
-            if previous_expected_event_type_name is not None:
-                prefix = f"After {previous_expected_event_type_name}, "
-            else:
-                prefix = ""
-            pytest.fail(
-                f"{prefix}expected {expected_event_type_name} in workflow {wf_handle.id}"
-            )
-        previous_expected_event_type_name = expected_event_type_name

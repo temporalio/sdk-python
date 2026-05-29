@@ -46,7 +46,6 @@ EXPECTED_WORKFLOW_EXPORTS = [
     "RootInfo",
     "SandboxImportNotificationPolicy",
     "SelfType",
-    "ServiceHandlerT",
     "UnfinishedSignalHandlersWarning",
     "UnfinishedUpdateHandlersWarning",
     "UpdateInfo",
