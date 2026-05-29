@@ -35,23 +35,6 @@ from tests.helpers import EventType, assert_event_subsequence, assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
-class FakeNexusTaskCancellation(OperationTaskCancellation):
-    def is_cancelled(self) -> bool:
-        return False
-
-    def cancellation_reason(self) -> str | None:
-        return None
-
-    def wait_until_cancelled_sync(self, timeout: float | None = None) -> bool:
-        return False
-
-    async def wait_until_cancelled(self) -> None:
-        return None
-
-    def cancel(self, _reason: str) -> bool:
-        return False
-
-
 @dataclass
 class Input:
     value: str
@@ -449,10 +432,21 @@ async def test_temporal_operation_start_workflow(
 
 
 async def test_temporal_operation_cancel_rejects_unknown_tokens():
-    service_handler = TestServiceHandler()
+    class FakeNexusTaskCancellation(OperationTaskCancellation):
+        def is_cancelled(self) -> bool:
+            return False
 
-    # Use a factory style operation form the handler to allow calling cancel directly
-    op_handler = service_handler.custom_cancel()
+        def cancellation_reason(self) -> str | None:
+            return None
+
+        def wait_until_cancelled_sync(self, timeout: float | None = None) -> bool:
+            return False
+
+        async def wait_until_cancelled(self) -> None:
+            return None
+
+        def cancel(self, _reason: str) -> bool:
+            return False
 
     cancel_ctx = CancelOperationContext(
         service="TestService",
@@ -460,6 +454,11 @@ async def test_temporal_operation_cancel_rejects_unknown_tokens():
         headers={},
         task_cancellation=FakeNexusTaskCancellation(),
     )
+
+    service_handler = TestServiceHandler()
+
+    # Use a factory style operation form the handler to allow calling cancel directly
+    op_handler = service_handler.custom_cancel()
 
     # Invalid token type
     token = OperationToken(type=30, namespace="default")  # type: ignore

@@ -1,4 +1,3 @@
-import base64
 import json
 from typing import Any
 
@@ -8,20 +7,15 @@ from temporalio.nexus._token import (
     OperationToken,
     OperationTokenType,
     WorkflowHandle,
+    _base64url_decode_no_padding,
+    _base64url_encode_no_padding,
 )
 
 
 def _encode_json_token(value: Any) -> str:
-    return _encode_bytes(json.dumps(value, separators=(",", ":")).encode("utf-8"))
-
-
-def _encode_bytes(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value).decode("utf-8").rstrip("=")
-
-
-def _decode_bytes(value: str) -> bytes:
-    padding = "=" * (-len(value) % 4)
-    return base64.urlsafe_b64decode(value + padding)
+    return _base64url_encode_no_padding(
+        json.dumps(value, separators=(",", ":")).encode("utf-8")
+    )
 
 
 def test_operation_token_encode_decode_round_trip():
@@ -65,7 +59,7 @@ def test_operation_token_activity_encode_uses_activity_id_and_omits_workflow_id(
         activity_id="activity-id",
     ).encode()
 
-    assert json.loads(_decode_bytes(token)) == {
+    assert json.loads(_base64url_decode_no_padding(token)) == {
         "t": 2,
         "ns": "default",
         "aid": "activity-id",
@@ -166,7 +160,10 @@ def test_operation_token_decode_accepts_valid_tokens(
     [
         ("", "invalid token: token is empty"),
         ("not+a-base64url-token", "failed to decode token as base64url"),
-        (_encode_bytes(b"not json"), "failed to unmarshal operation token"),
+        (
+            _base64url_encode_no_padding(b"not json"),
+            "failed to unmarshal operation token",
+        ),
         (_encode_json_token(["not", "a", "dict"]), "expected dict"),
         (
             _encode_json_token({"ns": "default", "wid": "workflow-id"}),
