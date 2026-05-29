@@ -526,7 +526,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 extra=extra,
             )
         else:
-            logger.debug(
+            # TODO: Undo this before merging
+            logger.log(
+                5,
                 f"[TMPRL1104] {log_id} Workflow task duration information (%s)",
                 msg_details,
                 extra=extra,
