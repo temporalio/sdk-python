@@ -30,6 +30,7 @@ from agents import (
 from agents.items import TResponseStreamEvent
 from agents.tool import (
     ApplyPatchTool,
+    CustomTool,
     LocalShellTool,
     ShellTool,
     ShellToolEnvironment,
@@ -39,6 +40,7 @@ from openai import (
     APIStatusError,
     AsyncOpenAI,
 )
+from openai.types.responses import CustomToolParam
 from openai.types.responses.tool_param import Mcp
 from typing_extensions import Required, TypedDict
 
@@ -112,6 +114,15 @@ class ApplyPatchToolInput:
     name: str = "apply_patch"
 
 
+@dataclass
+class CustomToolInput:
+    """Data conversion friendly representation of a CustomTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
+
+    tool_config: CustomToolParam
+
+
 ToolInput = (
     FunctionToolInput
     | FileSearchTool
@@ -122,6 +133,7 @@ ToolInput = (
     | ShellToolInput
     | LocalShellTool
     | ApplyPatchToolInput
+    | CustomToolInput
     | ToolSearchTool
 )
 
@@ -235,6 +247,14 @@ def _build_tool(tool: ToolInput) -> Tool:
         return ApplyPatchTool(name=tool.name, editor=_NoopApplyPatchEditor())
     elif isinstance(tool, HostedMCPToolInput):
         return HostedMCPTool(tool_config=tool.tool_config)
+    elif isinstance(tool, CustomToolInput):
+        return CustomTool(
+            name=tool.tool_config["name"],
+            description=tool.tool_config.get("description", ""),
+            on_invoke_tool=_empty_on_invoke_tool,
+            format=tool.tool_config.get("format"),
+            defer_loading=tool.tool_config.get("defer_loading", False),
+        )
     elif isinstance(tool, FunctionToolInput):
         return FunctionTool(
             name=tool.name,

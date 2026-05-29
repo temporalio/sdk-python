@@ -2580,6 +2580,50 @@ def test_sandbox_apply_patch_tool_round_trips_through_activity_input():
     assert rebuilt.tool_config == tool.tool_config
 
 
+def test_custom_tool_with_defer_loading_round_trips_through_activity_input():
+    from agents.tool import CustomTool
+
+    from temporalio.contrib.openai_agents._invoke_model_activity import (
+        _build_tool,
+    )
+
+    async def stub(ctx, payload):
+        return ""
+
+    tool = CustomTool(
+        name="deferred_tool",
+        description="A custom tool with defer_loading enabled",
+        on_invoke_tool=stub,
+        defer_loading=True,
+    )
+
+    stub_model = _TemporalModelStub(
+        model_name="gpt-5",
+        model_params=ModelActivityParameters(),
+        agent=None,
+    )
+
+    activity_input, _summary = stub_model._build_activity_input(
+        system_instructions=None,
+        input="hi",
+        model_settings=ModelSettings(),
+        tools=[tool],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        conversation_id=None,
+        prompt=None,
+    )
+
+    tool_inputs = activity_input.get("tools") or []
+    assert len(tool_inputs) == 1
+    rebuilt = _build_tool(tool_inputs[0])
+    assert isinstance(rebuilt, CustomTool)
+    assert rebuilt.tool_config == tool.tool_config
+    assert rebuilt.defer_loading is True
+
+
 async def test_local_hello_world_agent(client: Client):
     async with AgentEnvironment(
         model=hello_mock_model(),
