@@ -20,11 +20,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _NEXUS_OPERATION_LINK_URL_PATH_REGEX = re.compile(
-    r"^/namespaces/(?P<namespace>[^/]+)/nexus-operations/(?P<operation_id>[^/]+)$"
+    r"^/namespaces/(?P<namespace>[^/]+)/nexus-operations/(?P<operation_id>[^/]+)/(?P<run_id>[^/]+)/details$"
 )
 
 _ACTIVITY_LINK_URL_PATH_REGEX = re.compile(
-    r"^/namespaces/(?P<namespace>[^/]+)/activities/(?P<activity_id>[^/]+)$"
+    r"^/namespaces/(?P<namespace>[^/]+)/activities/(?P<activity_id>[^/]+)/(?P<run_id>[^/]+)/details$"
 )
 
 _WORFKLOW_LINK_URL_PATH_REGEX = re.compile(
@@ -42,7 +42,6 @@ LINK_EVENT_ID_PARAM_NAME = "eventID"
 LINK_EVENT_TYPE_PARAM_NAME = "eventType"
 LINK_REQUEST_ID_PARAM_NAME = "requestID"
 LINK_REFERENCE_TYPE_PARAM_NAME = "referenceType"
-LINK_RUN_ID_PARAM_NAME = "runID"
 
 EVENT_REFERENCE_TYPE = "EventReference"
 REQUEST_ID_REFERENCE_TYPE = "RequestIdReference"
@@ -160,18 +159,11 @@ def nexus_operation_to_nexus_link(
     scheme = "temporal"
     namespace = urllib.parse.quote(op_link.namespace, safe="")
     operation_id = urllib.parse.quote(op_link.operation_id, safe="")
-    path = f"/namespaces/{namespace}/nexus-operations/{operation_id}"
-
-    query_params = ""
-    if op_link.run_id:
-        query_params = urllib.parse.urlencode(
-            {
-                LINK_RUN_ID_PARAM_NAME: op_link.run_id,
-            },
-        )
+    run_id = urllib.parse.quote(op_link.run_id, safe="")
+    path = f"/namespaces/{namespace}/nexus-operations/{operation_id}/{run_id}/details"
 
     # urllib will omit '//' from the url if netloc is empty so we add the scheme manually
-    url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', query_params, ''))}"
+    url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', '', ''))}"
 
     return nexusrpc.Link(url=url, type=_LinkType.NEXUS_OPERATION.value)
 
@@ -183,14 +175,10 @@ def activity_link_to_nexus_link(
     scheme = "temporal"
     namespace = urllib.parse.quote(activity.namespace, safe="")
     activity_id = urllib.parse.quote(activity.activity_id, safe="")
-    path = f"/namespaces/{namespace}/activities/{activity_id}"
+    run_id = urllib.parse.quote(activity.run_id, safe="")
+    path = f"/namespaces/{namespace}/activities/{activity_id}/{run_id}/details"
 
-    if activity.run_id:
-        query_params = urllib.parse.urlencode({LINK_RUN_ID_PARAM_NAME: activity.run_id})
-    else:
-        query_params = ""
-
-    url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', query_params, ''))}"
+    url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', '', ''))}"
 
     return nexusrpc.Link(url=url, type=_LinkType.ACTIVITY.value)
 
@@ -258,24 +246,11 @@ def nexus_link_to_nexus_operation_link(
         )
         return None
 
-    query_params = urllib.parse.parse_qs(url.query)
-
-    match query_params.get(LINK_RUN_ID_PARAM_NAME):
-        case [run_id_param]:
-            run_id = run_id_param
-        case [] | None:
-            run_id = ""
-        case _:
-            logger.warning(
-                f"Invalid Nexus link: {nexus_link}. Expected {LINK_RUN_ID_PARAM_NAME} to have at most 1 value"
-            )
-            return None
-
     groups = match.groupdict()
     nexus_op_link = temporalio.api.common.v1.Link.NexusOperation(
         namespace=urllib.parse.unquote(groups["namespace"]),
         operation_id=urllib.parse.unquote(groups["operation_id"]),
-        run_id=run_id,
+        run_id=urllib.parse.unquote(groups["run_id"]),
     )
     return temporalio.api.common.v1.Link(nexus_operation=nexus_op_link)
 
@@ -292,22 +267,11 @@ def nexus_link_to_activity_link(
         )
         return None
 
-    query_params = urllib.parse.parse_qs(url.query, keep_blank_values=True)
-
-    match query_params.get(LINK_RUN_ID_PARAM_NAME):
-        case [run_id_param]:
-            run_id = run_id_param
-        case _:
-            logger.warning(
-                f"Invalid Nexus link: {nexus_link}. Expected {LINK_RUN_ID_PARAM_NAME} to have exactly 1 value"
-            )
-            return None
-
     groups = match.groupdict()
     activity_link = temporalio.api.common.v1.Link.Activity(
         namespace=urllib.parse.unquote(groups["namespace"]),
         activity_id=urllib.parse.unquote(groups["activity_id"]),
-        run_id=run_id,
+        run_id=urllib.parse.unquote(groups["run_id"]),
     )
     return temporalio.api.common.v1.Link(activity=activity_link)
 

@@ -222,19 +222,7 @@ def test_link_conversion_workflow_event_to_link_and_back(
             ),
             nexusrpc.Link(
                 type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns/nexus-operations/op-id?runID=run-id",
-            ),
-        ),
-        (
-            temporalio.api.common.v1.Link(
-                nexus_operation=temporalio.api.common.v1.Link.NexusOperation(
-                    namespace="ns",
-                    operation_id="op-id",
-                )
-            ),
-            nexusrpc.Link(
-                type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns/nexus-operations/op-id",
+                url="temporal:///namespaces/ns/nexus-operations/op-id/run-id/details",
             ),
         ),
         (
@@ -242,11 +230,12 @@ def test_link_conversion_workflow_event_to_link_and_back(
                 nexus_operation=temporalio.api.common.v1.Link.NexusOperation(
                     namespace="ns",
                     operation_id="op/id",
+                    run_id="run/id",
                 )
             ),
             nexusrpc.Link(
                 type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns/nexus-operations/op%2Fid",
+                url="temporal:///namespaces/ns/nexus-operations/op%2Fid/run%2Fid/details",
             ),
         ),
     ],
@@ -277,21 +266,13 @@ def test_link_conversion_nexus_operation_to_link_and_back(
     )
 
 
-def test_nexus_operation_link_with_duplicate_run_id_is_ignored():
-    link = nexusrpc.Link(
-        type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-        url="temporal:///namespaces/ns/nexus-operations/op-id?runID=one&runID=two",
-    )
-    assert temporalio.nexus._link_conversion.nexus_link_to_temporal_link(link) is None
-
-
 @pytest.mark.parametrize(
     ["link", "expected_link"],
     [
         (
             nexusrpc.Link(
                 type=temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns/activities/act-id?runID=run-id",
+                url="temporal:///namespaces/ns/activities/act-id/run-id/details",
             ),
             temporalio.api.common.v1.Link(
                 activity=temporalio.api.common.v1.Link.Activity(
@@ -304,7 +285,7 @@ def test_nexus_operation_link_with_duplicate_run_id_is_ignored():
         (
             nexusrpc.Link(
                 type=temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns%2F/activities/act-id%2F?runID=run-id%3E",
+                url="temporal:///namespaces/ns%2F/activities/act-id%2F/run-id%3E/details",
             ),
             temporalio.api.common.v1.Link(
                 activity=temporalio.api.common.v1.Link.Activity(
