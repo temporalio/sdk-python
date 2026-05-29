@@ -43,9 +43,8 @@ from temporalio.types import (
 )
 
 from ._link_conversion import (
-    activity_link_to_nexus_link,
     nexus_link_to_temporal_link,
-    workflow_event_to_nexus_link,
+    temporal_link_to_nexus_link,
     workflow_execution_started_event_link_from_workflow_handle,
 )
 from ._token import WorkflowHandle
@@ -253,71 +252,65 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
     def _add_outbound_workflow_links(
         self, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
     ):
-        # If links were not sent in StartWorkflowExecutionResponse then construct them.
-        wf_event_links: list[temporalio.api.common.v1.Link.WorkflowEvent] = []
-        try:
-            if isinstance(
-                workflow_handle._start_workflow_response,
-                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-            ):
-                if workflow_handle._start_workflow_response.HasField("link"):
-                    if link := workflow_handle._start_workflow_response.link:
-                        if link.HasField("workflow_event"):
-                            wf_event_links.append(link.workflow_event)
-            if not wf_event_links:
-                wf_event_links = [
-                    workflow_execution_started_event_link_from_workflow_handle(
-                        workflow_handle,
-                        self.nexus_context.request_id,
-                    )
-                ]
-            self.nexus_context.outbound_links.extend(
-                workflow_event_to_nexus_link(link) for link in wf_event_links
+        response = workflow_handle._start_workflow_response
+        if isinstance(
+            response, temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse
+        ) and response.HasField("link"):
+            link = response.link
+        elif isinstance(
+            response,
+            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
+        ) and response.HasField("signal_link"):
+            link = response.signal_link
+        else:
+            # If a link was not sent in response then construct it.
+            link = temporalio.api.common.v1.Link(
+                workflow_event=workflow_execution_started_event_link_from_workflow_handle(
+                    workflow_handle,
+                    self.nexus_context.request_id,
+                )
             )
+
+        try:
+            if nexus_link := temporal_link_to_nexus_link(link):
+                self.nexus_context.outbound_links.append(nexus_link)
         except Exception as e:
             logger.warning(
-                f"Failed to create WorkflowExecutionStarted event links for workflow {workflow_handle}: {e}"
+                f"Failed to create event links for workflow {workflow_handle}: {e}"
             )
-        return workflow_handle
 
     def _add_outbound_activity_links(
         self, activity_handle: temporalio.client.ActivityHandle[Any]
     ):
-        activity_links: list[temporalio.api.common.v1.Link.Activity] = []
-        try:
-            if isinstance(
-                activity_handle._start_activity_response,
-                temporalio.api.workflowservice.v1.StartActivityExecutionResponse,
-            ):
-                if activity_handle._start_activity_response.HasField("link"):
-                    if activity_handle._start_activity_response.link.HasField(
-                        "activity"
-                    ):
-                        activity_links.append(
-                            activity_handle._start_activity_response.link.activity
-                        )
-            if not activity_links:
-                activity_run_id = activity_handle.run_id
-                if activity_run_id is None:
-                    raise ValueError(
-                        f"Activity handle {activity_handle} has no run ID. "
-                        "Cannot create Activity link."
-                    )
-                activity_links.append(
-                    temporalio.api.common.v1.Link.Activity(
-                        namespace=activity_handle._client.namespace,
-                        activity_id=activity_handle.id,
-                        run_id=activity_run_id,
-                    )
+
+        if (
+            activity_handle._start_activity_response
+            and activity_handle._start_activity_response.HasField("link")
+        ):
+            link = activity_handle._start_activity_response.link
+        else:
+            activity_run_id = activity_handle.run_id
+            if activity_run_id is None:
+                logger.warning(
+                    "Failed to create Activity link. "
+                    f"Activity handle {activity_handle} has no run ID. "
                 )
-            self.nexus_context.outbound_links.extend(
-                activity_link_to_nexus_link(link) for link in activity_links
+                return
+            link = temporalio.api.common.v1.Link(
+                activity=temporalio.api.common.v1.Link.Activity(
+                    namespace=activity_handle._client.namespace,
+                    activity_id=activity_handle.id,
+                    run_id=activity_run_id,
+                ),
             )
+
+        try:
+            if nexus_link := temporal_link_to_nexus_link(link):
+                self.nexus_context.outbound_links.append(nexus_link)
         except Exception as e:
             logger.warning(
                 f"Failed to create Activity link for activity {activity_handle}: {e}"
             )
-        return activity_handle
 
 
 class WorkflowRunOperationContext(StartOperationContext):
