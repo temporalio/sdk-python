@@ -607,7 +607,7 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
         See :py:meth:`temporalio.client.Client.start_activity` for all other arguments.
         """
         with self._reserve_async_start():
-            # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
+            # We must pass nexus_completion_callbacks, links, and request_id,
             # but these are deliberately not exposed in overloads, hence the type-check
             # violation.
 

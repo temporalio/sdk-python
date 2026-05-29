@@ -666,7 +666,7 @@ async def _start_nexus_backing_workflow(
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
     versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> WorkflowHandle[ReturnType]:
-    # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
+    # We must pass nexus_completion_callbacks, links, and request_id,
     # but these are deliberately not exposed in overloads, hence the type-check
     # violation.
 
