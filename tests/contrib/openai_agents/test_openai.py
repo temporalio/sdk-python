@@ -2538,6 +2538,48 @@ async def test_model_conversion_loops():
     assert isinstance(triage_agent.model, _TemporalModelStub)
 
 
+def test_sandbox_apply_patch_tool_round_trips_through_activity_input():
+    from agents.sandbox.capabilities.tools import SandboxApplyPatchTool
+    from agents.tool import CustomTool
+
+    from temporalio.contrib.openai_agents._invoke_model_activity import (
+        _build_tool,
+    )
+
+    class FakeSandboxSession:
+        pass
+
+    tool = SandboxApplyPatchTool(session=FakeSandboxSession())  # type: ignore[arg-type]
+
+    stub = _TemporalModelStub(
+        model_name="gpt-5",
+        model_params=ModelActivityParameters(),
+        agent=None,
+    )
+
+    activity_input, _summary = stub._build_activity_input(
+        system_instructions=None,
+        input="hi",
+        model_settings=ModelSettings(),
+        tools=[tool],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        conversation_id=None,
+        prompt=None,
+    )
+
+    tool_inputs = activity_input.get("tools") or []
+    assert len(tool_inputs) == 1
+    rebuilt = _build_tool(tool_inputs[0])
+    assert isinstance(rebuilt, CustomTool)
+    assert rebuilt.name == tool.name
+    assert rebuilt.description == tool.description
+    assert rebuilt.format == tool.format
+    assert rebuilt.tool_config == tool.tool_config
+
+
 async def test_local_hello_world_agent(client: Client):
     async with AgentEnvironment(
         model=hello_mock_model(),
