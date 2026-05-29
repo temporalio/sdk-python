@@ -14,6 +14,7 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from ._failure_converter import StrandsFailureConverter
 from ._model_activity import ModelActivity
 from ._temporal_mcp_client import (
+    _evict_connection,
     build_call_tool_activity,
     clear_cache,
     populate_cache,
@@ -67,6 +68,7 @@ class StrandsPlugin(SimplePlugin):
                 yield
             finally:
                 for server in mcp_clients:
+                    await _evict_connection(server)
                     clear_cache(server)
 
         super().__init__(
