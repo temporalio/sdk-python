@@ -111,7 +111,7 @@ def temporal_link_to_nexus_link(
             return activity_link_to_nexus_link(temporal_link.activity)
 
         case "batch_job":
-            raise NotImplementedError("only workflow links are supported")
+            raise NotImplementedError("batch_job links are not supported")
 
         case None:
             logger.warning("Invalid Temporal link: missing variant")
