@@ -21,10 +21,16 @@ from typing_extensions import Self
 
 import temporalio.common
 from temporalio.nexus._operation_context import (
+    _nexus_backing_start_context,
     _start_nexus_backing_workflow,
     _TemporalStartOperationContext,
 )
+from temporalio.nexus._token import OperationToken, OperationTokenType
 from temporalio.types import (
+    CallableAsyncNoParam,
+    CallableAsyncSingleParam,
+    CallableSyncNoParam,
+    CallableSyncSingleParam,
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
     MultiParamSpec,
@@ -279,6 +285,199 @@ class TemporalNexusClient(ABC):
         """
         ...
 
+    # async no-param activity
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableAsyncNoParam[ReturnType],
+        *,
+        id: str,
+        task_queue: str | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # sync no-param activity
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableSyncNoParam[ReturnType],
+        *,
+        id: str,
+        task_queue: str | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # async single-param activity
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableAsyncSingleParam[ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # sync single-param activity
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableSyncSingleParam[ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # async multi-param activity
+    @overload
+    async def start_activity(
+        self,
+        activity: Callable[..., Awaitable[ReturnType]],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # sync multi-param activity
+    @overload
+    async def start_activity(
+        self,
+        activity: Callable[..., ReturnType],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # string-name activity
+    @overload
+    async def start_activity(
+        self,
+        activity: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str | None = None,
+        result_type: type[ReturnType] | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    @abstractmethod
+    async def start_activity(
+        self,
+        activity: (
+            str | Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType]
+        ),
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str | None = None,
+        result_type: type | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]:
+        """Start a standalone activity that will deliver the Nexus operation result.
+
+        If ``task_queue`` is not specified, the Nexus worker's task queue is used.
+        See :py:meth:`temporalio.client.Client.start_activity` for all other arguments.
+        """
+        ...
+
 
 class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnusedClass]
     """Nexus-aware wrapper around a Temporal Client.
@@ -377,3 +576,77 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
             )
 
         return TemporalOperationResult.async_token(wf_handle.to_token())
+
+    async def start_activity(
+        self,
+        activity: (
+            str | Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType]
+        ),
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str | None = None,
+        result_type: type | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]:
+        """Start a standalone activity that will deliver the Nexus operation result.
+
+        If ``task_queue`` is not specified, the Nexus worker's task queue is used.
+        See :py:meth:`temporalio.client.Client.start_activity` for all other arguments.
+        """
+        with self._reserve_async_start():
+            # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
+            # but these are deliberately not exposed in overloads, hence the type-check
+            # violation.
+
+            # Here we are starting a "nexus-backing" standalone activity. The start request
+            # carries the Nexus completion callback so the activity result is delivered to
+            # the Nexus caller when the activity reaches a terminal state.
+            with _nexus_backing_start_context():
+                activity_handle: temporalio.client.ActivityHandle[
+                    ReturnType
+                ] = await self._temporal_context.client.start_activity(  # type: ignore
+                    activity=activity,
+                    arg=arg,
+                    args=args,
+                    id=id,
+                    task_queue=task_queue or self._temporal_context.info().task_queue,
+                    result_type=result_type,
+                    schedule_to_start_timeout=schedule_to_start_timeout,
+                    schedule_to_close_timeout=schedule_to_close_timeout,
+                    start_to_close_timeout=start_to_close_timeout,
+                    heartbeat_timeout=heartbeat_timeout,
+                    id_reuse_policy=id_reuse_policy,
+                    id_conflict_policy=id_conflict_policy,
+                    retry_policy=retry_policy,
+                    search_attributes=search_attributes,
+                    summary=summary,
+                    priority=priority,
+                    rpc_metadata=rpc_metadata,
+                    rpc_timeout=rpc_timeout,
+                    callbacks=self._temporal_context._get_callbacks(),
+                    links=self._temporal_context._get_links(),
+                    request_id=self._temporal_context.nexus_context.request_id,
+                )
+
+        self._temporal_context._add_outbound_activity_links(activity_handle)
+
+        activity_token = OperationToken(
+            type=OperationTokenType.ACTIVITY,
+            namespace=self._temporal_context.client.namespace,
+            activity_id=activity_handle.id,
+        )
+
+        return TemporalOperationResult.async_token(activity_token.encode())

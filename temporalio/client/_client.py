@@ -1484,6 +1484,12 @@ class Client:
         start_delay: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
+        # The following options should not be considered part of the public API. They
+        # are deliberately not exposed in overloads, and are not subject to any
+        # backwards compatibility guarantees.
+        callbacks: Sequence[Callback] = [],
+        links: Sequence[temporalio.api.common.v1.Link] = [],
+        request_id: str | None = None,
     ) -> ActivityHandle[ReturnType]:
         """Start an activity and return its handle.
 
@@ -1542,6 +1548,9 @@ class Client:
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 priority=priority,
+                callbacks=callbacks,
+                links=links,
+                request_id=request_id,
             )
         )
 

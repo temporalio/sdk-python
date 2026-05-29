@@ -19,6 +19,11 @@ def _encode_bytes(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("utf-8").rstrip("=")
 
 
+def _decode_bytes(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(value + padding)
+
+
 def test_operation_token_encode_decode_round_trip():
     token = OperationToken(
         type=OperationTokenType.WORKFLOW,
@@ -34,6 +39,37 @@ def test_operation_token_encode_decode_round_trip():
         workflow_id="workflow-id",
         version=0,
     )
+
+
+def test_operation_token_activity_encode_decode_round_trip():
+    token = OperationToken(
+        type=OperationTokenType.ACTIVITY,
+        namespace="default",
+        activity_id="activity-id",
+        version=0,
+    ).encode()
+
+    assert "=" not in token
+    assert OperationToken.decode(token) == OperationToken(
+        type=OperationTokenType.ACTIVITY,
+        namespace="default",
+        activity_id="activity-id",
+        version=0,
+    )
+
+
+def test_operation_token_activity_encode_uses_activity_id_and_omits_workflow_id():
+    token = OperationToken(
+        type=OperationTokenType.ACTIVITY,
+        namespace="default",
+        activity_id="activity-id",
+    ).encode()
+
+    assert json.loads(_decode_bytes(token)) == {
+        "t": 2,
+        "ns": "default",
+        "aid": "activity-id",
+    }
 
 
 def test_workflow_handle_to_from_token_round_trip():
@@ -80,6 +116,42 @@ def test_workflow_handle_to_from_token_round_trip():
                 version=0,
             ),
         ),
+        # Activity tokens
+        (
+            _encode_json_token({"t": 2, "ns": "default", "aid": "activity-id"}),
+            OperationToken(
+                type=OperationTokenType.ACTIVITY,
+                namespace="default",
+                activity_id="activity-id",
+            ),
+        ),
+        (
+            _encode_json_token({"t": 2, "ns": "", "aid": "activity-id"}),
+            OperationToken(
+                type=OperationTokenType.ACTIVITY,
+                namespace="",
+                activity_id="activity-id",
+            ),
+        ),
+        (
+            _encode_json_token(
+                {"t": 2, "ns": "default", "aid": "activity-id", "v": None}
+            ),
+            OperationToken(
+                type=OperationTokenType.ACTIVITY,
+                namespace="default",
+                activity_id="activity-id",
+            ),
+        ),
+        (
+            _encode_json_token({"t": 2, "ns": "default", "aid": "activity-id", "v": 0}),
+            OperationToken(
+                type=OperationTokenType.ACTIVITY,
+                namespace="default",
+                activity_id="activity-id",
+                version=0,
+            ),
+        ),
     ],
 )
 def test_operation_token_decode_accepts_valid_tokens(
@@ -110,7 +182,7 @@ def test_operation_token_decode_accepts_valid_tokens(
         ),
         (
             _encode_json_token({"t": 1, "ns": "default"}),
-            "expected workflow id to be a string",
+            "expected non-empty workflow id for token type `WORKFLOW`",
         ),
         (
             _encode_json_token({"t": 1, "ns": "default", "wid": 123}),
@@ -118,7 +190,7 @@ def test_operation_token_decode_accepts_valid_tokens(
         ),
         (
             _encode_json_token({"t": 1, "ns": "default", "wid": ""}),
-            "expected non-empty workflow id",
+            "expected non-empty workflow id for token type `WORKFLOW`",
         ),
         (
             _encode_json_token({"t": 1, "wid": "workflow-id"}),
@@ -131,6 +203,29 @@ def test_operation_token_decode_accepts_valid_tokens(
         (
             _encode_json_token(
                 {"t": 1, "ns": "default", "wid": "workflow-id", "v": "0"}
+            ),
+            "expected version to be an int or null",
+        ),
+        # Activity tokens
+        (
+            _encode_json_token({"t": 2, "ns": "default"}),
+            "expected non-empty activity id for token type `ACTIVITY`",
+        ),
+        (
+            _encode_json_token({"t": 2, "ns": "default", "aid": ""}),
+            "expected non-empty activity id for token type `ACTIVITY`",
+        ),
+        (
+            _encode_json_token({"t": 2, "ns": "default", "aid": 123}),
+            "expected activity id to be a string",
+        ),
+        (
+            _encode_json_token({"t": 2, "aid": "activity-id"}),
+            "expected namespace to be a string",
+        ),
+        (
+            _encode_json_token(
+                {"t": 2, "ns": "default", "aid": "activity-id", "v": "0"}
             ),
             "expected version to be an int or null",
         ),

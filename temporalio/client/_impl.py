@@ -237,7 +237,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Links are duplicated on request for compatibility with older server versions.
         req.links.extend(links)
 
-        if temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+        if temporalio.nexus._operation_context._in_nexus_backing_start_context():
             req.on_conflict_options.attach_request_id = True
             req.on_conflict_options.attach_completion_callbacks = True
             req.on_conflict_options.attach_links = True
@@ -566,6 +566,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             input.id,
             run_id=resp.run_id,
             result_type=input.result_type,
+            start_activity_response=resp,
         )
 
     async def _build_start_activity_execution_request(
@@ -609,6 +610,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             ),
         )
 
+        if input.request_id:
+            req.request_id = input.request_id
         if input.schedule_to_close_timeout is not None:
             req.schedule_to_close_timeout.FromTimedelta(input.schedule_to_close_timeout)
         if input.start_to_close_timeout is not None:
@@ -643,6 +646,23 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
         # Set priority
         req.priority.CopyFrom(input.priority._to_proto())
+
+        req.completion_callbacks.extend(
+            temporalio.api.common.v1.Callback(
+                nexus=temporalio.api.common.v1.Callback.Nexus(
+                    url=callback.url,
+                    header=callback.headers,
+                ),
+                links=input.links,
+            )
+            for callback in input.callbacks
+        )
+        req.links.extend(input.links)
+
+        if temporalio.nexus._operation_context._in_nexus_backing_start_context():
+            req.on_conflict_options.attach_request_id = True
+            req.on_conflict_options.attach_completion_callbacks = True
+            req.on_conflict_options.attach_links = True
 
         return req
 

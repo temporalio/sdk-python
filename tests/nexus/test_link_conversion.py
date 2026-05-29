@@ -285,6 +285,62 @@ def test_nexus_operation_link_with_duplicate_run_id_is_ignored():
     assert temporalio.nexus._link_conversion.nexus_link_to_temporal_link(link) is None
 
 
+@pytest.mark.parametrize(
+    ["link", "expected_link"],
+    [
+        (
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns/activities/act-id?runID=run-id",
+            ),
+            temporalio.api.common.v1.Link(
+                activity=temporalio.api.common.v1.Link.Activity(
+                    namespace="ns",
+                    activity_id="act-id",
+                    run_id="run-id",
+                ),
+            ),
+        ),
+        (
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns%2F/activities/act-id%2F?runID=run-id%3E",
+            ),
+            temporalio.api.common.v1.Link(
+                activity=temporalio.api.common.v1.Link.Activity(
+                    namespace="ns/",
+                    activity_id="act-id/",
+                    run_id="run-id>",
+                ),
+            ),
+        ),
+    ],
+)
+def test_link_conversion_nexus_link_to_activity_link(
+    link: nexusrpc.Link,
+    expected_link: temporalio.api.common.v1.Link,
+):
+    from_activity_link = temporalio.nexus._link_conversion.activity_link_to_nexus_link(
+        expected_link.activity
+    )
+    assert link == from_activity_link
+
+    from_temporal_link = temporalio.nexus._link_conversion.temporal_link_to_nexus_link(
+        expected_link
+    )
+    assert link == from_temporal_link
+
+    actual_activity = temporalio.nexus._link_conversion.nexus_link_to_activity_link(
+        link
+    )
+    assert expected_link == actual_activity
+
+    actual_temporal_link = (
+        temporalio.nexus._link_conversion.nexus_link_to_temporal_link(link)
+    )
+    assert expected_link == actual_temporal_link
+
+
 def test_link_conversion_utilities():
     p2c = temporalio.nexus._link_conversion._event_type_pascal_case_to_constant_case
     c2p = temporalio.nexus._link_conversion._event_type_constant_case_to_pascal_case

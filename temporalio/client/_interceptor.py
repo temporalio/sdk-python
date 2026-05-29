@@ -230,6 +230,10 @@ class StartActivityInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    # The following options are experimental and unstable.
+    callbacks: Sequence[Callback]
+    links: Sequence[temporalio.api.common.v1.Link]
+    request_id: str | None
 
 
 @dataclass

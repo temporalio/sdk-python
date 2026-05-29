@@ -14,6 +14,7 @@ class OperationTokenType(IntEnum):
     """Type discriminator for Nexus operation tokens."""
 
     WORKFLOW = 1
+    ACTIVITY = 2
 
 
 if TYPE_CHECKING:
@@ -27,15 +28,19 @@ class OperationToken:
     version: int | None = None
     type: OperationTokenType
     namespace: str
-    workflow_id: str
+    workflow_id: str | None = None
+    activity_id: str | None = None
 
     def encode(self) -> str:
         """Convert handle to a base64url-encoded token string."""
         token_details: dict[str, Any] = {
             "t": self.type,
             "ns": self.namespace,
-            "wid": self.workflow_id,
         }
+        if self.workflow_id is not None:
+            token_details["wid"] = self.workflow_id
+        if self.activity_id is not None:
+            token_details["aid"] = self.activity_id
         if self.version is not None:
             token_details["v"] = self.version
         return _base64url_encode_no_padding(
@@ -83,7 +88,7 @@ class OperationToken:
             )
 
         workflow_id = token_details.get("wid")
-        if not isinstance(workflow_id, str):
+        if workflow_id is not None and not isinstance(workflow_id, str):
             raise TypeError(
                 f"invalid token: expected workflow id to be a string, got {type(workflow_id)}"
             )
@@ -91,6 +96,17 @@ class OperationToken:
         if token_type == OperationTokenType.WORKFLOW and not workflow_id:
             raise TypeError(
                 "invalid token: expected non-empty workflow id for token type `WORKFLOW`"
+            )
+
+        activity_id = token_details.get("aid")
+        if activity_id is not None and not isinstance(activity_id, str):
+            raise TypeError(
+                f"invalid token: expected activity id to be a string, got {type(activity_id)}"
+            )
+
+        if token_type == OperationTokenType.ACTIVITY and not activity_id:
+            raise TypeError(
+                "invalid token: expected non-empty activity id for token type `ACTIVITY`"
             )
 
         namespace = token_details.get("ns")
@@ -104,6 +120,7 @@ class OperationToken:
             type=OperationTokenType(token_type),
             namespace=namespace,
             workflow_id=workflow_id,
+            activity_id=activity_id,
             version=version,
         )
 
@@ -167,6 +184,9 @@ class WorkflowHandle(Generic[OutputT]):
             raise TypeError(
                 f"invalid workflow token type: {op_token.type}, expected: {OperationTokenType.WORKFLOW}"
             )
+
+        if not op_token.workflow_id:
+            raise TypeError("invalid workflow token: missing workflow id.")
 
         if op_token.version is not None and op_token.version != 0:
             raise TypeError(

@@ -691,6 +691,8 @@ class ActivityHandle(Generic[ReturnType]):
         *,
         run_id: str | None = None,
         result_type: type | None = None,
+        start_activity_response: None
+        | temporalio.api.workflowservice.v1.StartActivityExecutionResponse = None,
     ) -> None:
         """Create activity handle."""
         self._client = client
@@ -700,6 +702,7 @@ class ActivityHandle(Generic[ReturnType]):
         self._known_outcome: (
             temporalio.api.activity.v1.ActivityExecutionOutcome | None
         ) = None
+        self._start_activity_response = start_activity_response
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:
