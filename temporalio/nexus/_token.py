@@ -30,6 +30,7 @@ class OperationToken:
     namespace: str
     workflow_id: str | None = None
     activity_id: str | None = None
+    run_id: str | None = None
 
     def encode(self) -> str:
         """Convert handle to a base64url-encoded token string."""
@@ -41,6 +42,8 @@ class OperationToken:
             token_details["wid"] = self.workflow_id
         if self.activity_id is not None:
             token_details["aid"] = self.activity_id
+        if self.run_id is not None:
+            token_details["rid"] = self.run_id
         if self.version is not None:
             token_details["v"] = self.version
         return _base64url_encode_no_padding(
@@ -104,6 +107,12 @@ class OperationToken:
                 f"invalid token: expected activity id to be a string, got {type(activity_id)}"
             )
 
+        run_id = token_details.get("rid")
+        if run_id is not None and not isinstance(run_id, str):
+            raise TypeError(
+                f"invalid token: expected run id to be a string, got {type(run_id)}"
+            )
+
         if token_type == OperationTokenType.ACTIVITY and not activity_id:
             raise TypeError(
                 "invalid token: expected non-empty activity id for token type `ACTIVITY`"
@@ -121,6 +130,7 @@ class OperationToken:
             namespace=namespace,
             workflow_id=workflow_id,
             activity_id=activity_id,
+            run_id=run_id,
             version=version,
         )
 

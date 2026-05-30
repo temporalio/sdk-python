@@ -647,6 +647,7 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
             type=OperationTokenType.ACTIVITY,
             namespace=self._temporal_context.client.namespace,
             activity_id=activity_handle.id,
+            run_id=activity_handle.run_id,
         )
 
         return TemporalOperationResult.async_token(activity_token.encode())

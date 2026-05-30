@@ -64,7 +64,7 @@ _temporal_cancel_operation_context: ContextVar[_TemporalCancelOperationContext] 
     ContextVar("temporal-cancel-operation-context")
 )
 
-# A Nexus start handler might start zero or async Temporal actions as usual using a Temporal client. In
+# A Nexus start handler might start zero or more async Temporal actions as usual using a Temporal client. In
 # addition, it may start one "nexus-backing" async Temporal action, using
 # WorkflowRunOperationContext.start_workflow or methods from TemporalNexusClient. This context is active while the latter is being done.
 # It is thus a narrower context than _temporal_start_operation_context.
@@ -282,7 +282,6 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
     def _add_outbound_activity_links(
         self, activity_handle: temporalio.client.ActivityHandle[Any]
     ):
-
         if (
             activity_handle._start_activity_response
             and activity_handle._start_activity_response.HasField("link")

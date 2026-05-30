@@ -150,7 +150,10 @@ class CancelActivityOptions:
     """
 
     activity_id: str
-    """The ID of the activity to cancel."""
+    """The activity ID of the activity to cancel."""
+
+    run_id: str | None
+    """The run ID of the activity to cancel."""
 
 
 class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
@@ -223,7 +226,8 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
                         type=HandlerErrorType.NOT_FOUND,
                     )
                 activity_cancel_opts = CancelActivityOptions(
-                    activity_id=operation_token.activity_id
+                    activity_id=operation_token.activity_id,
+                    run_id=operation_token.run_id,
                 )
                 await self.cancel_activity(cancel_ctx, activity_cancel_opts)
 
@@ -246,9 +250,13 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
         self,
         ctx: TemporalNexusCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
         options: CancelActivityOptions,
-    ):
-        """Requests cancellation of the standalone activity identified by activity_id."""
+    ) -> None:
+        """Requests cancellation of the standalone activity identified by activity_id.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
         activity_handle = temporalio.nexus.client().get_activity_handle(
-            options.activity_id
+            options.activity_id, run_id=options.run_id
         )
         await activity_handle.cancel()
