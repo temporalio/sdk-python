@@ -1,0 +1,76 @@
+package temporal:nexus@1.0.0;
+
+world system {
+  export workflow-service;
+}
+
+/// @nexus.endpoint "temporal-system"
+interface workflow-service {
+  use nexus:temporal-types/model@1.0.0.{
+    duration,
+    memo,
+    payloads,
+    placeholder,
+    priority,
+    retry-policy,
+    search-attributes,
+    signal-function,
+    task-queue,
+    user-metadata,
+    versioning-override,
+    workflow-function,
+    workflow-id-conflict-policy,
+    workflow-id-reuse-policy,
+  };
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest"
+  record signal-with-start-workflow-execution-request {
+    /// @nexus.proto-field "workflow_type"
+    workflow: workflow-function,
+    workflow-id: string,
+    task-queue: task-queue,
+    /// @nexus.proto-field "signal_name"
+    signal: signal-function,
+    workflow-execution-timeout: option<duration>,
+    workflow-run-timeout: option<duration>,
+    workflow-task-timeout: option<duration>,
+    identity: option<string>,
+    request-id: option<string>,
+    workflow-id-reuse-policy: option<workflow-id-reuse-policy>,
+    workflow-id-conflict-policy: option<workflow-id-conflict-policy>,
+    retry-policy: option<retry-policy>,
+    cron-schedule: option<string>,
+    memo: option<memo>,
+    search-attributes: option<search-attributes>,
+    priority: option<priority>,
+    versioning-override: option<versioning-override>,
+    workflow-start-delay: option<duration>,
+    user-metadata: option<user-metadata>,
+    /// @nexus.source python="workflow_namespace" typescript="workflowNamespace"
+    namespace: string,
+    /// @nexus.omit
+    control: placeholder,
+    /// @nexus.omit
+    header: placeholder,
+    /// @nexus.omit
+    links: placeholder,
+    /// @nexus.omit
+    time-skipping-config: placeholder,
+  }
+
+  /// @nexus.proto "temporal.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse"
+  record signal-with-start-workflow-execution-response {
+    run-id: option<string>,
+    started: option<bool>,
+    /// @nexus.omit
+    signal-link: placeholder,
+  }
+
+  /// @nexus.output-transform
+  ///   python-type="workflow.ExternalWorkflowHandle[typing.Any]"
+  ///   python="workflow.get_external_workflow_handle(request.workflow_id, run_id=result.run_id)"
+  /// @nexus.operation name="SignalWithStartWorkflowExecution"
+  signal-with-start-workflow: func(
+    request: signal-with-start-workflow-execution-request,
+  ) -> signal-with-start-workflow-execution-response;
+}

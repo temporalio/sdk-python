@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import cast
+
+from temporalio.nexus._system import workflow_service as _workflow_service
+from temporalio.nexus._util import ServiceHandlerT
+
 from ..types import (
     AnyType,
     CallableAsyncNoParam,
@@ -167,7 +172,20 @@ from ._workflow_ops import (
     start_child_workflow,
 )
 
-__all__ = [
+_nexus_system_generated_exports = cast(
+    "list[str]", getattr(_workflow_service, "__all__")
+)
+_nexus_system_workflow_exports = [
+    name
+    for name in _nexus_system_generated_exports
+    if name not in {"models", "__nexus_operation_registry__"}
+    and not name.startswith("_")
+]
+globals().update(
+    {name: getattr(_workflow_service, name) for name in _nexus_system_workflow_exports}
+)
+
+__all__ = [  # pyright: ignore[reportUnsupportedDunderAll]
     "ActivityCancellationType",
     "ActivityConfig",
     "ActivityHandle",
@@ -240,6 +258,7 @@ __all__ = [
     "NexusOperationCancellationType",
     "NexusOperationHandle",
     "create_nexus_client",
+    *_nexus_system_workflow_exports,
     "LoggerAdapter",
     "SandboxImportNotificationPolicy",
     "logger",
