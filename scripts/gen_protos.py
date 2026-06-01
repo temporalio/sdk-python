@@ -10,7 +10,7 @@ from pathlib import Path
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
-    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "common" / "protos"
+    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "protos" / "protos"
 )
 api_proto_dir = proto_dir / "api_upstream"
 api_cloud_proto_dir = proto_dir / "api_cloud_upstream"
