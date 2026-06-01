@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -177,3 +178,75 @@ async def test_mcp_reuses_connection(client: Client):
         workflows=[MCPReuseWorkflow],
         plugins=[plugin],
     ).replay_workflow(history)
+
+
+@workflow.defn
+class MCPIdleWorkflow:
+    def __init__(self) -> None:
+        echo = TemporalMCPClient(
+            server="echo_idle",
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        self.agent = TemporalAgent(
+            model="mock",
+            start_to_close_timeout=timedelta(seconds=30),
+            tools=[echo],
+        )
+
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        result = await self.agent.invoke_async(prompt)
+        return str(result)
+
+
+async def test_mcp_connection_idle_timeout(client: Client):
+    """A short idle timeout evicts the cached connection while the worker runs."""
+    task_queue = "test_mcp_connection_idle_timeout"
+    factory_calls = [0]
+
+    def counting_factory() -> MCPClient:
+        factory_calls[0] += 1
+        return _echo_client_factory()
+
+    plugin = StrandsPlugin(
+        models={
+            "mock": lambda: MockModel(
+                [
+                    {"name": "echo", "input": {"message": "hello"}},
+                    "Done!",
+                ]
+            )
+        },
+        mcp_clients={"echo_idle": counting_factory},
+        # Short window so the cached call connection is evicted mid-run rather
+        # than only at worker shutdown. The idle timer only arms once the call
+        # releases the connection, so this can't tear it down mid-call.
+        mcp_connection_idle_timeout=timedelta(milliseconds=100),
+    )
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[MCPIdleWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await client.start_workflow(
+            MCPIdleWorkflow.run,
+            "echo hello",
+            id=f"test_mcp_connection_idle_timeout_{uuid4()}",
+            task_queue=task_queue,
+        )
+        assert await handle.result() == "Done!\n"
+
+        # The call opened a second connection (startup discovery was the first).
+        assert factory_calls[0] == 2
+
+        # Still inside the worker context: the short idle timer evicts the
+        # cached call connection on its own. Asserting eviction here -- with the
+        # worker alive -- proves it came from the idle timer, not shutdown.
+        for _ in range(100):
+            if "echo_idle" not in _temporal_mcp_client._CONNECTIONS:
+                break
+            await asyncio.sleep(0.1)
+        assert "echo_idle" not in _temporal_mcp_client._CONNECTIONS

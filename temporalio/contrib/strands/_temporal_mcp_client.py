@@ -161,7 +161,9 @@ def clear_cache(server: str) -> None:
     _TOOL_CACHE.pop(server, None)
 
 
-# How long an idle MCP connection stays open before it is disconnected.
+# Default for how long an idle MCP connection stays open before it is
+# disconnected. The timer resets on every call that reuses the connection.
+# Override per worker via ``StrandsPlugin(mcp_connection_idle_timeout=...)``.
 _MCP_CONNECTION_IDLE = timedelta(minutes=5)
 
 # Server name -> live connection held open in the activity worker process.
@@ -179,15 +181,22 @@ class _ConnectionRecord:
     ``session.call_tool`` directly (MCP multiplexes concurrent requests by id).
     """
 
-    def __init__(self, server: str, client_factory: Callable[[], MCPClient]) -> None:
+    def __init__(
+        self,
+        server: str,
+        client_factory: Callable[[], MCPClient],
+        idle_timeout: timedelta,
+    ) -> None:
         loop = asyncio.get_running_loop()
         self._server = server
+        self._idle_timeout = idle_timeout
         self._stop = asyncio.Event()
         self._ready: asyncio.Future[tuple[MCPClient, ClientSession]] = (
             loop.create_future()
         )
         self._idle_handle: asyncio.TimerHandle | None = None
         self._idle_task: asyncio.Task[None] | None = None
+        self._inflight = 0
         self._owner = asyncio.create_task(self._run(client_factory))
 
     async def _run(self, client_factory: Callable[[], MCPClient]) -> None:
@@ -210,17 +219,33 @@ class _ConnectionRecord:
             _CONNECTIONS.pop(self._server, None)
             raise
 
-    def touch(self) -> None:
-        """Restart the idle-eviction timer because the connection was used."""
+    def acquire(self) -> None:
+        """Mark a call in flight; pause idle eviction while calls are active."""
+        self._inflight += 1
         if self._idle_handle is not None:
             self._idle_handle.cancel()
-        loop = asyncio.get_running_loop()
-        self._idle_handle = loop.call_later(
-            _MCP_CONNECTION_IDLE.total_seconds(), self._on_idle
-        )
+            self._idle_handle = None
+
+    def release(self) -> None:
+        """Mark a call done; arm idle eviction once no calls remain in flight."""
+        self._inflight -= 1
+        # Only the record still cached under this server arms a timer; a record
+        # already evicted or never cached must not schedule one, or it could
+        # later evict a different, healthy connection for the same server.
+        if self._inflight == 0 and _CONNECTIONS.get(self._server) is self:
+            loop = asyncio.get_running_loop()
+            self._idle_handle = loop.call_later(
+                self._idle_timeout.total_seconds(), self._on_idle
+            )
 
     def _on_idle(self) -> None:
-        self._idle_task = asyncio.ensure_future(_evict_connection(self._server))
+        self._idle_task = asyncio.ensure_future(self._maybe_evict())
+
+    async def _maybe_evict(self) -> None:
+        # A call may have acquired the connection between the timer firing and
+        # this task running; only evict if it is still idle.
+        if self._inflight == 0:
+            await _evict_connection(self._server)
 
     async def aclose(self) -> None:
         """Signal the owner task to exit its context managers and wait for it."""
@@ -239,19 +264,25 @@ class _ConnectionRecord:
 
 
 async def get_connection(
-    server: str, client_factory: Callable[[], MCPClient]
-) -> tuple[MCPClient, ClientSession]:
+    server: str, client_factory: Callable[[], MCPClient], idle_timeout: timedelta
+) -> tuple[MCPClient, ClientSession, _ConnectionRecord]:
     """Return the cached session for ``server``, opening one lazily if needed.
 
     Concurrent first-callers dedupe onto a single connect handshake by awaiting
-    the same record.
+    the same record. The returned record is acquired; the caller must
+    ``release()`` it once the call completes so idle eviction can resume.
     """
     record = _CONNECTIONS.get(server)
     if record is None:
-        record = _ConnectionRecord(server, client_factory)
+        record = _ConnectionRecord(server, client_factory, idle_timeout)
         _CONNECTIONS[server] = record
-    record.touch()
-    return await record.session()
+    record.acquire()
+    try:
+        client, session = await record.session()
+    except BaseException:
+        record.release()
+        raise
+    return client, session, record
 
 
 async def _evict_connection(server: str) -> None:
@@ -261,17 +292,22 @@ async def _evict_connection(server: str) -> None:
 
 
 def build_call_tool_activity(
-    server: str, client_factory: Callable[[], MCPClient]
+    server: str,
+    client_factory: Callable[[], MCPClient],
+    idle_timeout: timedelta | None = None,
 ) -> Callable:
     """Return the per-server ``{server}-call-tool`` activity for registration.
 
     Reuses a worker-process MCP session opened lazily through ``client_factory``.
+    Idle connections are disconnected after ``idle_timeout`` (defaults to
+    ``_MCP_CONNECTION_IDLE``).
     """
+    idle = idle_timeout if idle_timeout is not None else _MCP_CONNECTION_IDLE
 
     @activity.defn(name=f"{server}-call-tool")
     async def call_tool(args: _CallToolArgs) -> MCPToolResult:
         try:
-            client, session = await get_connection(server, client_factory)
+            client, session, record = await get_connection(server, client_factory, idle)
         except Exception as err:
             # Connecting failed; map to a tool error result like a call would.
             return client_factory()._handle_tool_execution_error(args.tool_use_id, err)
@@ -282,5 +318,9 @@ def build_call_tool_activity(
             # The session may be broken; drop it so the next call reconnects.
             await _evict_connection(server)
             return client._handle_tool_execution_error(args.tool_use_id, err)
+        finally:
+            # No more in-flight call on this connection; let idle eviction
+            # resume (no-op if the connection was just evicted above).
+            record.release()
 
     return call_tool

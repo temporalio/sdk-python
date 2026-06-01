@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from datetime import timedelta
 
 from strands.models import BedrockModel, Model
 from strands.tools.mcp import MCPClient
@@ -34,6 +35,10 @@ class StrandsPlugin(SimplePlugin):
     ``{server}-call-tool`` activity for each entry and, at worker startup,
     connects to each MCP server to cache its tool list. Workflow-side
     ``TemporalMCPClient(server="...").load_tools()`` reads from the cache.
+
+    ``mcp_connection_idle_timeout`` controls how long a worker-process MCP
+    connection is kept open between ``call-tool`` activities before it is
+    disconnected; the timer resets on every reuse. Defaults to 5 minutes.
     """
 
     def __init__(
@@ -41,6 +46,7 @@ class StrandsPlugin(SimplePlugin):
         *,
         models: dict[str, Callable[[], Model]] | None = None,
         mcp_clients: dict[str, Callable[[], MCPClient]] | None = None,
+        mcp_connection_idle_timeout: timedelta | None = None,
     ) -> None:
         """Build the plugin from optional model and MCP transport factories.
 
@@ -58,7 +64,11 @@ class StrandsPlugin(SimplePlugin):
 
         mcp_clients = mcp_clients or {}
         for server, client_factory in mcp_clients.items():
-            activities.append(build_call_tool_activity(server, client_factory))
+            activities.append(
+                build_call_tool_activity(
+                    server, client_factory, mcp_connection_idle_timeout
+                )
+            )
 
         @asynccontextmanager
         async def run_context() -> AsyncGenerator[None, None]:

@@ -414,6 +414,15 @@ Worker(
 
 Each factory returns a fully configured `MCPClient`, so you can pass options like `tool_filters`, `prefix`, `elicitation_callback`, or `tasks_config` to it. The plugin connects to each MCP server once at worker startup to enumerate tools. The schema is frozen for the worker's lifetime; restart workers to pick up MCP-server changes. If a server is unavailable at startup, the worker fails to start.
 
+To amortize connection setup, the `{name}-call-tool` activity keeps a worker-process MCP connection open between calls and reuses it. The connection is disconnected after it sits idle for `mcp_connection_idle_timeout` (default 5 minutes); the timer resets on every reuse:
+
+```python
+StrandsPlugin(
+    mcp_clients={"echo": lambda: MCPClient(...)},
+    mcp_connection_idle_timeout=timedelta(seconds=30),
+)
+```
+
 ## Observability
 
 `StrandsPlugin` composes cleanly with [`OpenTelemetryPlugin`](../opentelemetry). Register `OpenTelemetryPlugin` on the client (workers built from that client pick it up automatically) and `StrandsPlugin` on the worker. You'll get OTel spans around the model, tool, and MCP activities the plugin schedules, plus any spans Strands itself emits inside `invoke_async`:
