@@ -58,9 +58,13 @@ from agents.items import (
     TResponseStreamEvent,
 )
 from agents.mcp import MCPServer, MCPServerStdio
+from agents.sandbox.capabilities.tools import SandboxApplyPatchTool
+from agents.tool import CustomTool
+from agents.tool_context import ToolContext
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseCodeInterpreterToolCall,
+    ResponseCustomToolCall,
     ResponseFileSearchToolCall,
     ResponseFunctionWebSearch,
 )
@@ -83,6 +87,7 @@ from temporalio.contrib.openai_agents import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
 )
+from temporalio.contrib.openai_agents._invoke_model_activity import _build_tool
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import _convert_agent
 from temporalio.contrib.openai_agents._temporal_model_stub import (
@@ -1996,6 +2001,66 @@ async def test_hosted_mcp_tool(client: Client):
             assert result == "Some language"
 
 
+def custom_tool_mock_model():
+    return TestModel.returning_responses(
+        [
+            ModelResponse(
+                output=[
+                    ResponseCustomToolCall(
+                        call_id="c1",
+                        input="ping",
+                        name="echo",
+                        type="custom_tool_call",
+                    )
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+            ResponseBuilders.output_message("done"),
+        ]
+    )
+
+
+@workflow.defn
+class CustomToolWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        captured: list[str] = []
+
+        async def echo(ctx: ToolContext[Any], input: str) -> str:  # type: ignore[reportUnusedParameter]
+            captured.append(input)
+            return input
+
+        agent = Agent[str](
+            name="custom-tool-agent",
+            instructions="Use the echo tool.",
+            tools=[
+                CustomTool(
+                    name="echo",
+                    description="Echo the input string back.",
+                    on_invoke_tool=echo,
+                )
+            ],
+        )
+        result = await Runner.run(starting_agent=agent, input="say something")
+        return f"{result.final_output}:{captured[0]}"
+
+
+async def test_custom_tool_workflow(client: Client):
+    async with AgentEnvironment(model=custom_tool_mock_model()) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(client, CustomToolWorkflow) as worker:
+            workflow_handle = await client.start_workflow(
+                CustomToolWorkflow.run,
+                id=f"custom-tool-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
+            assert result == "done:ping"
+
+
 class AssertDifferentModelProvider(ModelProvider):
     model_names: set[str | None]
 
@@ -2539,13 +2604,6 @@ async def test_model_conversion_loops():
 
 
 def test_sandbox_apply_patch_tool_round_trips_through_activity_input():
-    from agents.sandbox.capabilities.tools import SandboxApplyPatchTool
-    from agents.tool import CustomTool
-
-    from temporalio.contrib.openai_agents._invoke_model_activity import (
-        _build_tool,
-    )
-
     class FakeSandboxSession:
         pass
 
@@ -2581,12 +2639,6 @@ def test_sandbox_apply_patch_tool_round_trips_through_activity_input():
 
 
 def test_custom_tool_with_defer_loading_round_trips_through_activity_input():
-    from agents.tool import CustomTool
-
-    from temporalio.contrib.openai_agents._invoke_model_activity import (
-        _build_tool,
-    )
-
     async def stub(_ctx: Any, _payload: str) -> str:
         return ""
 
