@@ -380,7 +380,7 @@ class ChatWorkflow:
 
 ## MCP
 
-`StrandsPlugin(mcp_clients=...)` takes a mapping of `name → MCPClient factory`, mirroring the `models=` pattern. The plugin registers a per-server `{name}-call-tool` activity and connects at worker startup to enumerate tools. Workflow-side, `TemporalMCPClient(server="name")` is a pure handle: it references the server by name and carries the per-call activity options.
+`StrandsPlugin(mcp_clients=...)` takes a mapping of `name → MCPClient factory`, mirroring the `models=` pattern. The plugin registers per-server `{name}-call-tool` and `{name}-list-tools` activities. Workflow-side, `TemporalMCPClient(server="name")` is a pure handle: it references the server by name, discovers tools by running `{name}-list-tools`, and carries the per-call activity options.
 
 ```python
 from mcp import StdioServerParameters, stdio_client
@@ -412,9 +412,15 @@ Worker(
 )
 ```
 
-Each factory returns a fully configured `MCPClient`, so you can pass options like `tool_filters`, `prefix`, `elicitation_callback`, or `tasks_config` to it. The plugin connects to each MCP server once at worker startup to enumerate tools. The schema is frozen for the worker's lifetime; restart workers to pick up MCP-server changes. If a server is unavailable at startup, the worker fails to start.
+Each factory returns a fully configured `MCPClient`, so you can pass options like `tool_filters`, `prefix`, `elicitation_callback`, or `tasks_config` to it.
 
-To amortize connection setup, the `{name}-call-tool` activity keeps a worker-process MCP connection open between calls and reuses it. The connection is disconnected after it sits idle for `mcp_connection_idle_timeout` (default 5 minutes); the timer resets on every reuse:
+By default, `TemporalMCPClient` lists the server's tools once at the beginning of the workflow (via `{name}-list-tools`) and reuses that schema for the workflow's lifetime. To pick up an MCP server that is restarted mid-workflow — with tools added, removed, or renamed — set `cache_tools=False`, and the tools are re-listed on every agent turn instead:
+
+```python
+echo = TemporalMCPClient(server="echo", cache_tools=False, start_to_close_timeout=timedelta(seconds=30))
+```
+
+To amortize connection setup, the `{name}-call-tool` and `{name}-list-tools` activities share a worker-process MCP connection that is opened lazily and reused across calls. The connection is disconnected after it sits idle for `mcp_connection_idle_timeout` (default 5 minutes); the timer resets on every reuse:
 
 ```python
 StrandsPlugin(

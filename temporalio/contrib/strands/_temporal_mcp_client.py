@@ -13,7 +13,7 @@ from strands.tools.mcp import MCPAgentTool, MCPClient
 from strands.tools.mcp.mcp_types import MCPToolResult
 from strands.types.tools import AgentTool
 
-from temporalio import activity
+from temporalio import activity, workflow
 from temporalio.common import Priority, RetryPolicy
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
@@ -33,20 +33,21 @@ class _CallToolArgs:
     tool_use_id: str = ""
 
 
-# Server name -> cached tool list. Populated by ``_populate_cache`` at worker
-# startup and read by ``TemporalMCPClient.load_tools()`` inside the workflow
-# sandbox. ``temporalio`` is in the SDK's default sandbox passthrough, so this
-# dict is shared between worker process and workflow execution.
-_TOOL_CACHE: dict[str, list[_MCPToolInfo]] = {}
-
-
 class TemporalMCPClient(ToolProvider):
     """Workflow-side handle to an MCP server registered on the worker.
 
-    The transport factory and tool discovery live worker-side via
-    ``StrandsPlugin(mcp_clients={"server": lambda: ...})``. This handle only
-    carries the server name (which selects the registered factory) and the
-    per-call activity options.
+    The transport factory lives worker-side via
+    ``StrandsPlugin(mcp_clients={"server": lambda: ...})``. This handle carries
+    the server name (which selects the registered factory) and the per-call
+    activity options. Tool discovery runs as the ``{server}-list-tools``
+    activity, dispatched from inside the workflow by ``TemporalAgent`` before
+    each model call.
+
+    ``cache_tools`` controls how often that listing happens. When ``True`` (the
+    default) the tools are listed once at the beginning of the workflow and
+    reused for its lifetime. When ``False`` the tools are re-listed on every
+    agent turn, so an MCP server restarted mid-workflow (with tools added,
+    removed, or renamed) is picked up.
 
     Construct once at module level and pass to ``TemporalAgent(tools=[...])``
     inside the workflow. Multiple handles may reference the same server name
@@ -57,6 +58,7 @@ class TemporalMCPClient(ToolProvider):
         self,
         server: str,
         *,
+        cache_tools: bool = True,
         task_queue: str | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -70,6 +72,9 @@ class TemporalMCPClient(ToolProvider):
     ) -> None:
         """Configure the server name and activity options."""
         self._server = server
+        self._cache_tools = cache_tools
+        self._tools: list[AgentTool] = []
+        self._fetched = False
         self._options: dict[str, Any] = {
             "task_queue": task_queue,
             "schedule_to_close_timeout": schedule_to_close_timeout,
@@ -89,11 +94,33 @@ class TemporalMCPClient(ToolProvider):
         return self._server
 
     async def load_tools(self, **_kwargs: Any) -> Sequence[AgentTool]:
-        """Return TemporalMCPTool wrappers for tools cached at worker startup."""
+        """Return the tools fetched by the most recent ``_refresh``.
+
+        This must stay free of any ``workflow`` API: Strands invokes it once at
+        ``Agent`` construction on a separate ``run_async`` thread that has no
+        workflow runtime. ``TemporalAgent`` populates the tools by calling
+        ``_refresh`` from a ``BeforeModelCallEvent`` hook before the registry is
+        first read.
+        """
+        return list(self._tools)
+
+    async def _refresh(self) -> None:
+        """List the server's tools via the ``{server}-list-tools`` activity.
+
+        Runs on the workflow event loop (dispatched from ``TemporalAgent``'s
+        hook), so the activity result is recorded in history and replay-safe.
+        """
         from ._temporal_mcp_tool import TemporalMCPTool
 
-        infos = _TOOL_CACHE.get(self._server, [])
-        return [TemporalMCPTool(self._server, info, self._options) for info in infos]
+        infos: list[_MCPToolInfo] = await workflow.execute_activity(
+            f"{self._server}-list-tools",
+            result_type=list[_MCPToolInfo],
+            **self._options,
+        )
+        self._tools = [
+            TemporalMCPTool(self._server, info, self._options) for info in infos
+        ]
+        self._fetched = True
 
     def add_consumer(self, consumer_id: Any, **_kwargs: Any) -> None:
         """No-op; consumer tracking is handled by the underlying MCP client."""
@@ -104,45 +131,37 @@ class TemporalMCPClient(ToolProvider):
         return None
 
 
-# Use MCP sessions directly instead of MCPClient's background-thread helpers.
-# Those helpers route calls through cross-loop futures that are unreliable on
-# Python 3.10 when invoked from Temporal's async worker/activity event loops.
-async def _list_mcp_tools(client: MCPClient) -> Sequence[Tool]:
-    async with client._transport_callable() as (read_stream, write_stream, *_):
-        async with ClientSession(
-            read_stream,
-            write_stream,
-            elicitation_callback=client._elicitation_callback,
-        ) as session:
-            await session.initialize()
-            tools: list[Tool] = []
-            pagination_token = None
-            while True:
-                page = await session.list_tools(
-                    params=PaginatedRequestParams(cursor=pagination_token)
-                    if pagination_token is not None
-                    else None
-                )
-                tools.extend(page.tools)
-                pagination_token = page.nextCursor
-                if pagination_token is None:
-                    return tools
+# Use the MCP session directly instead of MCPClient's background-thread
+# helpers. Those helpers route calls through cross-loop futures that are
+# unreliable on Python 3.10 when invoked from Temporal's async worker/activity
+# event loops.
+async def _paginate_list_tools(session: ClientSession) -> list[Tool]:
+    tools: list[Tool] = []
+    pagination_token = None
+    while True:
+        page = await session.list_tools(
+            params=PaginatedRequestParams(cursor=pagination_token)
+            if pagination_token is not None
+            else None
+        )
+        tools.extend(page.tools)
+        pagination_token = page.nextCursor
+        if pagination_token is None:
+            return tools
 
 
-def _agent_tool_for_filtering(client: MCPClient, tool: Tool) -> MCPAgentTool:
-    if client._prefix:
-        return MCPAgentTool(tool, client, name_override=f"{client._prefix}_{tool.name}")
-    return MCPAgentTool(tool, client)
-
-
-async def populate_cache(server: str, client_factory: Callable[[], MCPClient]) -> None:
-    """Connect to the MCP server, list tools, fill ``_TOOL_CACHE``."""
-    client = client_factory()
+def _tool_infos(client: MCPClient, tools: Sequence[Tool]) -> list[_MCPToolInfo]:
+    """Apply the client's tool filters and project to serializable records."""
     infos: list[_MCPToolInfo] = []
-    for tool in await _list_mcp_tools(client):
+    for tool in tools:
+        if client._prefix:
+            agent_tool = MCPAgentTool(
+                tool, client, name_override=f"{client._prefix}_{tool.name}"
+            )
+        else:
+            agent_tool = MCPAgentTool(tool, client)
         if not client._should_include_tool_with_filters(
-            _agent_tool_for_filtering(client, tool),
-            client._tool_filters,
+            agent_tool, client._tool_filters
         ):
             continue
         infos.append(
@@ -153,12 +172,7 @@ async def populate_cache(server: str, client_factory: Callable[[], MCPClient]) -
                 output_schema=tool.outputSchema,
             )
         )
-    _TOOL_CACHE[server] = infos
-
-
-def clear_cache(server: str) -> None:
-    """Drop the cached tool list for ``server``."""
-    _TOOL_CACHE.pop(server, None)
+    return infos
 
 
 # Default for how long an idle MCP connection stays open before it is
@@ -324,3 +338,31 @@ def build_call_tool_activity(
             record.release()
 
     return call_tool
+
+
+def build_list_tools_activity(
+    server: str,
+    client_factory: Callable[[], MCPClient],
+    idle_timeout: timedelta | None = None,
+) -> Callable:
+    """Return the per-server ``{server}-list-tools`` activity for registration.
+
+    Lists the server's tools (applying the client's tool filters) and reuses
+    the same lazily-opened, idle-evicted worker-process MCP session as
+    ``{server}-call-tool``.
+    """
+    idle = idle_timeout if idle_timeout is not None else _MCP_CONNECTION_IDLE
+
+    @activity.defn(name=f"{server}-list-tools")
+    async def list_tools() -> list[_MCPToolInfo]:
+        client, session, record = await get_connection(server, client_factory, idle)
+        try:
+            return _tool_infos(client, await _paginate_list_tools(session))
+        except Exception:
+            # The session may be broken; drop it so the next call reconnects.
+            await _evict_connection(server)
+            raise
+        finally:
+            record.release()
+
+    return list_tools
