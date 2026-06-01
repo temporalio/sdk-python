@@ -1,0 +1,152 @@
+/// @nexus.support
+///   python="python/model_overrides.py"
+///   typescript="typescript/model_overrides.ts"
+package nexus:temporal-types@1.0.0;
+
+interface model {
+  /// String-shaped placeholder for semantic types that generators reinterpret.
+  type placeholder = string;
+
+  /// @nexus.proto "temporal.api.common.v1.Payload" typescript-package="@temporalio/proto"
+  /// @nexus.type python="typing.Any" typescript="common.Payload" typescript-package="@temporalio/common"
+  type payload = placeholder;
+
+  /// @nexus.proto "temporal.api.common.v1.Payloads"
+  ///   typescript-package="@temporalio/proto"
+  type payloads = list<payload>;
+
+  /// Callable result annotation for workflow functions.
+  /// @nexus.type
+  ///   python="collections.abc.Awaitable[WorkflowResult]"
+  ///   typescript="Promise<any>"
+  type workflow-result = placeholder;
+
+  /// Receiver/context argument for workflow callable method forms.
+  /// @nexus.type python="typing.Any" typescript="any"
+  type callable-prefix = placeholder;
+
+  /// @nexus.function-args
+  ///   varargs=true
+  ///   param="args"
+  ///   typescript-drop-prefix=true
+  workflow-call: async func(callable-prefix: callable-prefix, args: payloads) -> workflow-result;
+
+  /// Callable result annotation for signal functions.
+  /// @nexus.type python="None | collections.abc.Awaitable[None]" typescript="void"
+  type signal-result = placeholder;
+
+  /// @nexus.function-args
+  ///   varargs=true
+  ///   param="signal-args"
+  ///   typescript-drop-prefix=true
+  signal-call: func(callable-prefix: callable-prefix, signal-args: payloads) -> signal-result;
+
+  /// @nexus.proto "temporal.api.common.v1.WorkflowType" typescript-package="@temporalio/proto"
+  /// @nexus.type python="str" typescript="string"
+  type workflow-type = placeholder;
+
+  /// @nexus.function
+  ///   primary=true
+  ///   signature="workflow-call"
+  ///   args-field="input"
+  ///   result-type-parameter="WorkflowResult"
+  ///   alternate-type="workflow-type"
+  /// @nexus.add-rpc-compatible-with "workflow-type"
+  type workflow-function = placeholder;
+
+  /// @nexus.function
+  ///   signature="signal-call"
+  ///   args-field="signal-input"
+  ///   alternate-type="string"
+  ///   python-converter="signal_function_to_proto"
+  ///   typescript-converter="signalFunctionToProto"
+  /// @nexus.add-rpc-compatible-with "string"
+  /// @nexus.typescript-with-arguments
+  ///   signature="signal-call"
+  ///   args-field="signal-input"
+  ///   alternate-type="string"
+  ///   value-type="workflow.SignalDefinition<any[]>"
+  ///   args-type="Value extends workflow.SignalDefinition<infer Args, any> ? Args : never"
+  ///   name-expr="value.name"
+  ///   typescript-package="@temporalio/workflow"
+  type signal-function = placeholder;
+
+  /// @nexus.proto "temporal.api.common.v1.RetryPolicy" typescript-package="@temporalio/proto"
+  /// @nexus.type
+  ///   python="temporalio.common.RetryPolicy"
+  ///   typescript="common.RetryPolicy"
+  ///   typescript-package="@temporalio/common"
+  type retry-policy = placeholder;
+
+  /// @nexus.proto "temporal.api.taskqueue.v1.TaskQueue" typescript-package="@temporalio/proto"
+  /// @nexus.type python="str" typescript="string"
+  type task-queue = placeholder;
+
+  /// @nexus.proto "temporal.api.common.v1.Memo" typescript-package="@temporalio/proto"
+  /// @nexus.type python="collections.abc.Mapping[str, typing.Any]" typescript="Record<string, unknown>"
+  type memo = placeholder;
+
+  /// @nexus.proto "temporal.api.common.v1.SearchAttributes" typescript-package="@temporalio/proto"
+  /// @nexus.type
+  ///   python="temporalio.common.TypedSearchAttributes"
+  ///   typescript="common.TypedSearchAttributes"
+  ///   typescript-package="@temporalio/common"
+  type search-attributes = placeholder;
+
+  /// @nexus.proto "temporal.api.common.v1.Priority" typescript-package="@temporalio/proto"
+  /// @nexus.type
+  ///   python="temporalio.common.Priority"
+  ///   typescript="common.Priority"
+  ///   typescript-package="@temporalio/common"
+  type priority = placeholder;
+
+  /// @nexus.proto "temporal.api.workflow.v1.VersioningOverride" typescript-package="@temporalio/proto"
+  /// @nexus.type
+  ///   python="temporalio.common.VersioningOverride"
+  ///   typescript="common.VersioningOverride"
+  ///   typescript-package="@temporalio/common"
+  type versioning-override = placeholder;
+
+  /// @nexus.proto "google.protobuf.Duration" typescript-package="@temporalio/proto"
+  /// @nexus.type
+  ///   python="datetime.timedelta"
+  ///   typescript="common.Duration"
+  ///   typescript-package="@temporalio/common"
+  type duration = placeholder;
+
+  /// @nexus.proto "temporal.api.enums.v1.WorkflowIdReusePolicy" typescript-package="@temporalio/proto"
+  /// @nexus.type
+  ///   python="temporalio.common.WorkflowIDReusePolicy"
+  ///   typescript="common.WorkflowIdReusePolicy"
+  ///   typescript-package="@temporalio/common"
+  enum workflow-id-reuse-policy {
+    allow-duplicate,
+    allow-duplicate-failed-only,
+    reject-duplicate,
+    terminate-if-running,
+  }
+
+  /// @nexus.proto "temporal.api.enums.v1.WorkflowIdConflictPolicy" typescript-package="@temporalio/proto"
+  /// @nexus.type
+  ///   python="temporalio.common.WorkflowIDConflictPolicy"
+  ///   typescript="common.WorkflowIdConflictPolicy"
+  ///   typescript-package="@temporalio/common"
+  enum workflow-id-conflict-policy {
+    fail,
+    use-existing,
+    terminate-existing,
+  }
+
+  /// @nexus.proto "temporal.api.sdk.v1.UserMetadata" typescript-package="@temporalio/proto"
+  /// @nexus.flatten-in-api
+  record user-metadata {
+    /// @nexus.doc "Single-line fixed summary for the workflow execution that may appear in UI and CLI. This can be in single-line Temporal Markdown format."
+    /// @nexus.proto-field "summary"
+    /// @nexus.flattened-type python="str" typescript="string"
+    static-summary: option<payload>,
+    /// @nexus.doc "General fixed details for the workflow execution that may appear in UI and CLI. This can be in Temporal Markdown format and can span multiple lines. This value is fixed on the workflow execution and cannot be updated."
+    /// @nexus.proto-field "details"
+    /// @nexus.flattened-type python="str" typescript="string"
+    static-details: option<payload>,
+  }
+}

@@ -1,16 +1,16 @@
+# pyright: reportAny=false, reportExplicitAny=false
+
 import collections.abc
-import typing
 from datetime import timedelta
+import typing
 
 import google.protobuf.duration_pb2
-
 import temporalio.api.common.v1.message_pb2 as common_pb2
-import temporalio.api.deployment.v1.message_pb2 as deployment_pb2
 import temporalio.api.enums.v1.workflow_pb2 as workflow_enums_pb2
 import temporalio.api.taskqueue.v1.message_pb2 as taskqueue_pb2
-import temporalio.api.workflow.v1.message_pb2 as workflow_pb2
-import temporalio.common
+import temporalio.api.workflow.v1
 import temporalio.converter
+import temporalio.common
 import temporalio.workflow
 
 
@@ -152,14 +152,11 @@ def workflow_id_conflict_policy_from_proto(
 def workflow_id_conflict_policy_to_proto(
     policy: temporalio.common.WorkflowIDConflictPolicy,
 ) -> workflow_enums_pb2.WorkflowIdConflictPolicy.ValueType:
-    return typing.cast(
-        workflow_enums_pb2.WorkflowIdConflictPolicy.ValueType, int(policy)
-    )
+    return typing.cast(workflow_enums_pb2.WorkflowIdConflictPolicy.ValueType, int(policy))
 
 
 def search_attributes_to_proto(
-    search_attributes: temporalio.common.TypedSearchAttributes
-    | temporalio.common.SearchAttributes,
+    search_attributes: temporalio.common.TypedSearchAttributes,
 ) -> common_pb2.SearchAttributes:
     proto = common_pb2.SearchAttributes()
     temporalio.converter.encode_search_attributes(search_attributes, proto)
@@ -169,47 +166,16 @@ def search_attributes_to_proto(
 def priority_from_proto(
     proto: common_pb2.Priority,
 ) -> temporalio.common.Priority:
-    return temporalio.common.Priority(
-        priority_key=proto.priority_key if proto.priority_key else None,
-        fairness_key=proto.fairness_key if proto.fairness_key else None,
-        fairness_weight=proto.fairness_weight if proto.fairness_weight else None,
-    )
+    return temporalio.common.Priority._from_proto(proto)  # pyright: ignore[reportPrivateUsage]
 
 
 def priority_to_proto(
     priority: temporalio.common.Priority,
 ) -> common_pb2.Priority:
-    proto = common_pb2.Priority(
-        priority_key=priority.priority_key or 0,
-    )
-    if priority.fairness_key is not None:
-        proto.fairness_key = priority.fairness_key
-    if priority.fairness_weight is not None:
-        proto.fairness_weight = priority.fairness_weight
-    return proto
+    return priority._to_proto()  # pyright: ignore[reportPrivateUsage]
 
 
 def versioning_override_to_proto(
     versioning_override: temporalio.common.VersioningOverride,
-) -> workflow_pb2.VersioningOverride:
-    if isinstance(versioning_override, temporalio.common.PinnedVersioningOverride):
-        version = versioning_override.version
-        return workflow_pb2.VersioningOverride(
-            behavior=workflow_enums_pb2.VERSIONING_BEHAVIOR_PINNED,
-            pinned_version=version.to_canonical_string(),
-            pinned=workflow_pb2.VersioningOverride.PinnedOverride(
-                version=deployment_pb2.WorkerDeploymentVersion(
-                    deployment_name=version.deployment_name,
-                    build_id=version.build_id,
-                ),
-                behavior=workflow_pb2.VersioningOverride.PINNED_OVERRIDE_BEHAVIOR_PINNED,
-            ),
-        )
-    if isinstance(versioning_override, temporalio.common.AutoUpgradeVersioningOverride):
-        return workflow_pb2.VersioningOverride(
-            behavior=workflow_enums_pb2.VERSIONING_BEHAVIOR_AUTO_UPGRADE,
-            auto_upgrade=True,
-        )
-    raise TypeError(
-        f"unsupported versioning override type: {type(versioning_override)!r}"
-    )
+) -> temporalio.api.workflow.v1.VersioningOverride:
+    return versioning_override._to_proto()  # pyright: ignore[reportPrivateUsage]

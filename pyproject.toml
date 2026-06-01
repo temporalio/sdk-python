@@ -173,7 +173,7 @@ exclude = [
 [tool.pydocstyle]
 convention = "google"
 # https://github.com/PyCQA/pydocstyle/issues/363#issuecomment-625563088
-match_dir = "^(?!(docs|scripts|tests|api|proto|_system|\\.)).*"
+match_dir = "^(?!(docs|scripts|tests|api|proto|system|\\.)).*"
 add_ignore = [
   # We like to wrap at a certain number of chars, even long summary sentences.
   # https://github.com/PyCQA/pydocstyle/issues/184
