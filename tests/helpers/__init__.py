@@ -254,6 +254,44 @@ async def assert_pending_activity_exists_eventually(
     return await assert_eventually(check, timeout=timeout)
 
 
+async def assert_event_subsequence(
+    wf_handle: WorkflowHandle,
+    expected_events: list[EventType.ValueType],
+    timeout: timedelta = timedelta(seconds=5),
+) -> None:
+    """
+    Given a workflow handle and a sequence of event types, assert that the workflow's history
+    contains that subsequence of events in the order specified.
+    """
+
+    async def check():
+        history = await wf_handle.fetch_history()
+
+        _all_events = iter(history.events)
+        _expected_events = iter(expected_events)
+
+        previous_expected_event_type_name = None
+        for expected_event_type in _expected_events:
+            expected_event_type_name = EventType.Name(expected_event_type).removeprefix(
+                "EVENT_TYPE_"
+            )
+            has_expected = next(
+                (e for e in _all_events if e.event_type == expected_event_type),
+                None,
+            )
+            if not has_expected:
+                if previous_expected_event_type_name is not None:
+                    prefix = f"After {previous_expected_event_type_name}, "
+                else:
+                    prefix = ""
+                raise AssertionError(
+                    f"{prefix}expected {expected_event_type_name} in workflow {wf_handle.id}"
+                )
+            previous_expected_event_type_name = expected_event_type_name
+
+    await assert_eventually(check, timeout=timeout)
+
+
 async def get_pending_activity_info(
     handle: WorkflowHandle,
     activity_id: str,
