@@ -8849,9 +8849,9 @@ async def test_workflow_uncancel_shield_activity(client: Client):
 
     # Verify no spurious "exception in shielded future" error logs
     shielded_err = log_capturer.find_log("exception in shielded future")
-    assert (
-        shielded_err is None
-    ), f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
 
 
 @workflow.defn
@@ -8935,9 +8935,9 @@ async def test_workflow_uncancel_shield_child_workflow(client: Client):
 
     # Verify no spurious "exception in shielded future" error logs
     shielded_err = log_capturer.find_log("exception in shielded future")
-    assert (
-        shielded_err is None
-    ), f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
 
 
 @workflow.defn
@@ -9003,6 +9003,6 @@ async def test_workflow_uncancel_shield_signal_external(client: Client):
 
     # Verify no spurious error logs
     shielded_err = log_capturer.find_log("exception in shielded future")
-    assert (
-        shielded_err is None
-    ), f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
