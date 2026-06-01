@@ -127,8 +127,8 @@ async def _cancel_workflow(
 class CancelWorkflowRunOptions:
     """Options for cancelling the workflow backing a Nexus operation.
 
-    These options are built by :py:class:`TemporalNexusOperationHandler` and passed to
-    :py:meth:`TemporalNexusOperationHandler.cancel_workflow_run`.
+    These options are built by :py:class:`TemporalOperationHandler` and passed to
+    :py:meth:`TemporalOperationHandler.cancel_workflow_run`.
 
     .. warning::
        This API is experimental and unstable.
