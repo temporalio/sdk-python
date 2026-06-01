@@ -13,7 +13,7 @@ import nexusrpc
 import temporalio.nexus
 from temporalio import workflow
 from temporalio.client import Client, NexusOperationHandle
-from temporalio.nexus import TemporalNexusOperationStartHandlerFunc
+from temporalio.nexus import TemporalOperationStartHandlerFunc
 from temporalio.service import ServiceClient
 
 
@@ -100,7 +100,7 @@ class MyServiceHandler:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalNexusStartOperationContext,
+        _ctx: temporalio.nexus.TemporalStartOperationContext,
         client: temporalio.nexus.TemporalNexusClient,
         input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -180,7 +180,7 @@ class MyServiceHandler2:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalNexusStartOperationContext,
+        _ctx: temporalio.nexus.TemporalStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -204,26 +204,26 @@ class MyServiceHandlerWithoutServiceDefinition:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalNexusStartOperationContext,
+        _ctx: temporalio.nexus.TemporalStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
         raise NotImplementedError
 
 
-_handler: TemporalNexusOperationStartHandlerFunc[
+_handler: TemporalOperationStartHandlerFunc[
     MyServiceHandler,
     int,
     None,
 ] = MyServiceHandler.my_temporal_operation
 
-_BadHandler: TypeAlias = temporalio.nexus.TemporalNexusOperationStartHandlerFunc[
+_BadHandler: TypeAlias = temporalio.nexus.TemporalOperationStartHandlerFunc[
     MyServiceHandler,
     str,
     None,
 ]
 
-_bad_handler: TemporalNexusOperationStartHandlerFunc[
+_bad_handler: TemporalOperationStartHandlerFunc[
     MyServiceHandler,
     str,
     None,
@@ -235,7 +235,7 @@ class MyUnsafeContextAnnotationServiceHandler:
     # A temporal operation receives TemporalStartOperationContext at runtime, so
     # requiring an arbitrary user subclass is not safe.
     class MyCustomTemporalStartOperationContext(
-        temporalio.nexus.TemporalNexusStartOperationContext
+        temporalio.nexus.TemporalStartOperationContext
     ):
         def custom_state(self) -> str:
             raise NotImplementedError

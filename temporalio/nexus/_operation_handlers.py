@@ -21,8 +21,8 @@ from nexusrpc.handler import (
 
 import temporalio.nexus
 from temporalio.nexus._operation_context import (
-    TemporalNexusCancelOperationContext,
-    TemporalNexusStartOperationContext,
+    TemporalCancelOperationContext,
+    TemporalStartOperationContext,
     _temporal_cancel_operation_context,
 )
 from temporalio.nexus._temporal_client import (
@@ -138,7 +138,7 @@ class CancelWorkflowRunOptions:
     """The ID of the workflow to cancel."""
 
 
-class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
+class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
     """Operation handler for Nexus operations that interact with Temporal.
     Implementations override the start_operation method.
 
@@ -149,7 +149,7 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
     @abstractmethod
     async def start_operation(
         self,
-        ctx: TemporalNexusStartOperationContext,
+        ctx: TemporalStartOperationContext,
         client: TemporalNexusClient,
         input: InputT,
     ) -> TemporalOperationResult[OutputT]:
@@ -165,9 +165,7 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
            This API is experimental and unstable.
         """
         nexus_client = _TemporalNexusClient()
-        start_ctx = TemporalNexusStartOperationContext._from_start_operation_context(
-            ctx
-        )
+        start_ctx = TemporalStartOperationContext._from_start_operation_context(ctx)
         result = await self.start_operation(start_ctx, nexus_client, input)
         return result._to_nexus_result()
 
@@ -185,9 +183,7 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
                 type=HandlerErrorType.INTERNAL,
             ) from err
 
-        cancel_ctx = TemporalNexusCancelOperationContext._from_cancel_operation_context(
-            ctx
-        )
+        cancel_ctx = TemporalCancelOperationContext._from_cancel_operation_context(ctx)
         match operation_token.type:
             case OperationTokenType.WORKFLOW:
                 options = CancelWorkflowRunOptions(
@@ -197,7 +193,7 @@ class TemporalNexusOperationHandler(OperationHandler[InputT, OutputT], ABC):
 
     async def cancel_workflow_run(
         self,
-        ctx: TemporalNexusCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
+        ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
         options: CancelWorkflowRunOptions,
     ) -> None:
         """Cancels the workflow backing the Nexus operation.
