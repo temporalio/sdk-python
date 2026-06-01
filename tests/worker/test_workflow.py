@@ -963,9 +963,6 @@ class CancelActivityWorkflow:
             self._activity_result = await handle
         except ActivityError as err:
             self._activity_result = f"Error: {err.cause.__class__.__name__}"
-        # TODO(cretz): Remove when https://github.com/temporalio/sdk-rust/issues/323 is fixed
-        except CancelledError as err:
-            self._activity_result = f"Error: {err.__class__.__name__}"
         # Wait forever
         await asyncio.Future()
 
