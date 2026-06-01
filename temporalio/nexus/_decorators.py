@@ -218,7 +218,7 @@ def temporal_operation(
                     input,
                 )
 
-            class _TemporalNexusOperationHandler(TemporalOperationHandler):
+            class _TemporalOperationHandler(TemporalOperationHandler):
                 @override
                 async def start_operation(
                     self,
@@ -228,8 +228,8 @@ def temporal_operation(
                 ) -> TemporalOperationResult[OutputT]:
                     return await _start(ctx, client, input)
 
-            _TemporalNexusOperationHandler.start_operation.__doc__ = start.__doc__
-            return _TemporalNexusOperationHandler()
+            _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
+            return _TemporalOperationHandler()
 
         method_name = get_callable_name(start)
         op = nexusrpc.Operation(
