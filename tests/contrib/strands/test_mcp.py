@@ -36,6 +36,7 @@ class MCPWorkflow:
     def __init__(self) -> None:
         echo = TemporalMCPClient(
             server="echo",
+            cache_tools=True,
             start_to_close_timeout=timedelta(seconds=30),
         )
         self.agent = TemporalAgent(
@@ -107,6 +108,7 @@ class MCPReuseWorkflow:
     def __init__(self) -> None:
         echo = TemporalMCPClient(
             server="echo_cached",
+            cache_tools=True,
             start_to_close_timeout=timedelta(seconds=30),
         )
         self.agent = TemporalAgent(
@@ -187,6 +189,7 @@ class MCPIdleWorkflow:
     def __init__(self) -> None:
         echo = TemporalMCPClient(
             server="echo_idle",
+            cache_tools=True,
             start_to_close_timeout=timedelta(seconds=30),
         )
         self.agent = TemporalAgent(

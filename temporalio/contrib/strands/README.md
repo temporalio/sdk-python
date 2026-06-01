@@ -414,10 +414,10 @@ Worker(
 
 Each factory returns a fully configured `MCPClient`, so you can pass options like `tool_filters`, `prefix`, `elicitation_callback`, or `tasks_config` to it.
 
-By default, `TemporalMCPClient` lists the server's tools once at the beginning of the workflow (via `{name}-list-tools`) and reuses that schema for the workflow's lifetime. To pick up an MCP server that is restarted mid-workflow — with tools added, removed, or renamed — set `cache_tools=False`, and the tools are re-listed on every agent turn instead:
+By default, `TemporalMCPClient` re-lists the server's tools (via `{name}-list-tools`) on every agent turn, so an MCP server that is restarted mid-workflow — with tools added, removed, or renamed — is picked up. To list the tools just once at the beginning of the workflow and reuse that schema for the workflow's lifetime (one fewer activity per turn), set `cache_tools=True`:
 
 ```python
-echo = TemporalMCPClient(server="echo", cache_tools=False, start_to_close_timeout=timedelta(seconds=30))
+echo = TemporalMCPClient(server="echo", cache_tools=True, start_to_close_timeout=timedelta(seconds=30))
 ```
 
 To amortize connection setup, the `{name}-call-tool` and `{name}-list-tools` activities share a worker-process MCP connection that is opened lazily and reused across calls. The connection is disconnected after it sits idle for `mcp_connection_idle_timeout` (default 5 minutes); the timer resets on every reuse:

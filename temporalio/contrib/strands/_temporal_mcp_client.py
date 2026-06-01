@@ -43,11 +43,11 @@ class TemporalMCPClient(ToolProvider):
     activity, dispatched from inside the workflow by ``TemporalAgent`` before
     each model call.
 
-    ``cache_tools`` controls how often that listing happens. When ``True`` (the
-    default) the tools are listed once at the beginning of the workflow and
-    reused for its lifetime. When ``False`` the tools are re-listed on every
-    agent turn, so an MCP server restarted mid-workflow (with tools added,
-    removed, or renamed) is picked up.
+    ``cache_tools`` controls how often that listing happens. When ``False``
+    (the default) the tools are re-listed on every agent turn, so an MCP server
+    restarted mid-workflow (with tools added, removed, or renamed) is picked up.
+    When ``True`` the tools are listed once at the beginning of the workflow and
+    reused for its lifetime.
 
     Construct once at module level and pass to ``TemporalAgent(tools=[...])``
     inside the workflow. Multiple handles may reference the same server name
@@ -58,7 +58,7 @@ class TemporalMCPClient(ToolProvider):
         self,
         server: str,
         *,
-        cache_tools: bool = True,
+        cache_tools: bool = False,
         task_queue: str | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
