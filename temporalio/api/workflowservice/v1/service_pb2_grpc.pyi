@@ -1091,6 +1091,61 @@ class WorkflowServiceStub:
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
+    PauseActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
+    ]
+    """PauseActivityExecution pauses the execution of an activity specified by its ID.
+    This API can be used to target a workflow activity or a standalone activity
+
+    Pausing an activity means:
+    - If the activity is currently waiting for a retry or is running and subsequently fails,
+      it will not be rescheduled until it is unpaused.
+    - If the activity is already paused, calling this method will have no effect.
+    - If the activity is running and finishes successfully, the activity will be completed.
+    - If the activity is running and finishes with failure:
+      * if there is no retry left - the activity will be completed.
+      * if there are more retries left - the activity will be paused.
+    For long-running activities:
+    - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID
+    """
+    ResetActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
+    ]
+    """ResetActivityExecution resets the execution of an activity specified by its ID.
+    This API can be used to target a workflow activity or a standalone activity.
+
+    Resetting an activity means:
+    * number of attempts will be reset to 0.
+    * activity timeouts will be reset.
+    * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+       it will be scheduled immediately (* see 'jitter' flag)
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+    """
+    UnpauseActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
+    ]
+    """UnpauseActivityExecution unpauses the execution of an activity specified by its ID.
+    This API can be used to target a workflow activity or a standalone activity.
+
+    If activity is not paused, this call will have no effect.
+    If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
+    Once the activity is unpaused, all timeout timers will be regenerated.
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID
+    """
+    UpdateActivityExecutionOptions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
+    ]
+    """UpdateActivityExecutionOptions is called by the client to update the options of an activity by its ID.
+    This API can be used to target a workflow activity or a standalone activity.
+    """
     TerminateNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
@@ -2434,6 +2489,69 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
 
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
+        """
+    @abc.abstractmethod
+    def PauseActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse:
+        """PauseActivityExecution pauses the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity
+
+        Pausing an activity means:
+        - If the activity is currently waiting for a retry or is running and subsequently fails,
+          it will not be rescheduled until it is unpaused.
+        - If the activity is already paused, calling this method will have no effect.
+        - If the activity is running and finishes successfully, the activity will be completed.
+        - If the activity is running and finishes with failure:
+          * if there is no retry left - the activity will be completed.
+          * if there are more retries left - the activity will be paused.
+        For long-running activities:
+        - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID
+        """
+    @abc.abstractmethod
+    def ResetActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse:
+        """ResetActivityExecution resets the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+
+        Resetting an activity means:
+        * number of attempts will be reset to 0.
+        * activity timeouts will be reset.
+        * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+           it will be scheduled immediately (* see 'jitter' flag)
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+        """
+    @abc.abstractmethod
+    def UnpauseActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse:
+        """UnpauseActivityExecution unpauses the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+
+        If activity is not paused, this call will have no effect.
+        If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
+        Once the activity is unpaused, all timeout timers will be regenerated.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID
+        """
+    @abc.abstractmethod
+    def UpdateActivityExecutionOptions(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse:
+        """UpdateActivityExecutionOptions is called by the client to update the options of an activity by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
         """
     @abc.abstractmethod
     def TerminateNexusOperationExecution(

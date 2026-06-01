@@ -25,10 +25,51 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 class BillingReportSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class _BillingReportGranularity:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _BillingReportGranularityEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            BillingReportSpec._BillingReportGranularity.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        BILLING_REPORT_GRANULARITY_UNSPECIFIED: (
+            BillingReportSpec._BillingReportGranularity.ValueType
+        )  # 0
+        BILLING_REPORT_GRANULARITY_HOURLY: (
+            BillingReportSpec._BillingReportGranularity.ValueType
+        )  # 1
+        BILLING_REPORT_GRANULARITY_DAILY: (
+            BillingReportSpec._BillingReportGranularity.ValueType
+        )  # 2
+        BILLING_REPORT_GRANULARITY_MONTHLY: (
+            BillingReportSpec._BillingReportGranularity.ValueType
+        )  # 3
+
+    class BillingReportGranularity(
+        _BillingReportGranularity, metaclass=_BillingReportGranularityEnumTypeWrapper
+    ): ...
+    BILLING_REPORT_GRANULARITY_UNSPECIFIED: (
+        BillingReportSpec.BillingReportGranularity.ValueType
+    )  # 0
+    BILLING_REPORT_GRANULARITY_HOURLY: (
+        BillingReportSpec.BillingReportGranularity.ValueType
+    )  # 1
+    BILLING_REPORT_GRANULARITY_DAILY: (
+        BillingReportSpec.BillingReportGranularity.ValueType
+    )  # 2
+    BILLING_REPORT_GRANULARITY_MONTHLY: (
+        BillingReportSpec.BillingReportGranularity.ValueType
+    )  # 3
+
     START_TIME_INCLUSIVE_FIELD_NUMBER: builtins.int
     END_TIME_EXCLUSIVE_FIELD_NUMBER: builtins.int
     DOWNLOAD_URL_EXPIRATION_DURATION_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
+    GRANULARITY_FIELD_NUMBER: builtins.int
     @property
     def start_time_inclusive(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The start time of the billing report (in UTC)."""
@@ -44,6 +85,11 @@ class BillingReportSpec(google.protobuf.message.Message):
     """The description for the billing report.
     Optional, default is empty.
     """
+    granularity: global___BillingReportSpec.BillingReportGranularity.ValueType
+    """The data granularity of the billing report.
+    Optional, default is hourly.
+    temporal:versioning:min_version=v0.16.0
+    """
     def __init__(
         self,
         *,
@@ -52,6 +98,7 @@ class BillingReportSpec(google.protobuf.message.Message):
         download_url_expiration_duration: google.protobuf.duration_pb2.Duration
         | None = ...,
         description: builtins.str = ...,
+        granularity: global___BillingReportSpec.BillingReportGranularity.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -73,6 +120,8 @@ class BillingReportSpec(google.protobuf.message.Message):
             b"download_url_expiration_duration",
             "end_time_exclusive",
             b"end_time_exclusive",
+            "granularity",
+            b"granularity",
             "start_time_inclusive",
             b"start_time_inclusive",
         ],
