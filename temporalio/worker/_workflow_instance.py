@@ -265,7 +265,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
         self._primary_task: asyncio.Task[None] | None = None
         self._time_ns = 0
-        self._cancel_requested = False
+        self._cancel_reason: str | None = None
         self._deployment_version_for_current_task: None | (
             temporalio.bridge.proto.common.WorkerDeploymentVersion
         ) = None
@@ -595,10 +595,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise RuntimeError(f"Unrecognized job: {job.WhichOneof('variant')}")
 
     def _apply_cancel_workflow(
-        self, _job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
+        self, job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
     ) -> None:
-        self._cancel_requested = True
-        # TODO(cretz): Details or cancel message or whatever?
+        self._cancel_reason = job.reason
         if self._primary_task:
             # The primary task may not have started yet and we want to give the
             # workflow the ability to receive the cancellation, so we must defer
@@ -799,7 +798,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self, _job: temporalio.bridge.proto.workflow_activation.RemoveFromCache
     ) -> None:
         self._deleting = True
-        self._cancel_requested = True
         # We consider eviction to be under replay so that certain code like
         # logging that avoids replaying doesn't run during eviction either
         self._is_replaying = True
@@ -1188,6 +1186,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 initial_versioning_behavior=initial_versioning_behavior,
             )
         )
+
+    def workflow_cancellation_reason(self) -> str | None:
+        return self._cancel_reason
 
     def workflow_extern_functions(self) -> Mapping[str, Callable]:
         return self._extern_functions
@@ -2046,7 +2047,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     and (t := asyncio.current_task()) is not None
                 ):
                     t.uncancel()  # type: ignore[union-attr]
-                if self._cancel_requested:
+                if self._cancel_reason is not None or self._deleting:
                     raise
 
     async def _outbound_start_nexus_operation(
@@ -2102,7 +2103,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     and (t := asyncio.current_task()) is not None
                 ):
                     t.uncancel()  # type: ignore[union-attr]
-                if self._cancel_requested:
+                if self._cancel_reason is not None or self._deleting:
                     raise
 
     #### Miscellaneous helpers ####
@@ -2588,8 +2589,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # cancel later on will show the workflow as cancelled. But this is
             # a Temporal limitation in that cancellation is a state not an
             # event.
-            if self._cancel_requested and temporalio.exceptions.is_cancelled_exception(
-                err
+            if (
+                self._cancel_reason is not None
+                and temporalio.exceptions.is_cancelled_exception(err)
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
             elif self.workflow_is_failure_exception(err):

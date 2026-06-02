@@ -1094,6 +1094,74 @@ async def test_workflow_simple_cancel(client: Client):
 
 
 @workflow.defn
+class CancelReasonWorkflow:
+    def __init__(self) -> None:
+        self._started = False
+        # Reason observed when the inner task was cancelled (no external
+        # workflow cancel has happened yet at that point).
+        self._reason_inner: str | None = "unset"
+        # Reason observed in the outer CancelledError handler after the
+        # external workflow cancel has been delivered.
+        self._reason_outer: str | None = "unset"
+
+    @workflow.run
+    async def run(self) -> NoReturn:
+        self._started = True
+        task = asyncio.create_task(asyncio.sleep(1000))
+        try:
+            task.cancel()
+            await task
+        except asyncio.CancelledError:
+            self._reason_inner = workflow.cancellation_reason()
+        try:
+            await asyncio.sleep(1000)
+        except asyncio.CancelledError:
+            self._reason_outer = workflow.cancellation_reason()
+            raise
+        raise RuntimeError("unreachable")
+
+    @workflow.query
+    def started(self) -> bool:
+        return self._started
+
+    @workflow.query
+    def reason_inner(self) -> str | None:
+        return self._reason_inner
+
+    @workflow.query
+    def reason_outer(self) -> str | None:
+        return self._reason_outer
+
+
+async def test_workflow_cancellation_reason(client: Client):
+    async with new_worker(client, CancelReasonWorkflow) as worker:
+        handle = await client.start_workflow(
+            CancelReasonWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def started() -> bool:
+            return await handle.query(CancelReasonWorkflow.started)
+
+        await assert_eq_eventually(True, started)
+        # Before any external cancel, reason is None even though an inner task
+        # cancel has already been observed.
+        assert await handle.query(CancelReasonWorkflow.reason_inner) is None
+
+        await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+        # After external cancel, reason is a string (empty since the Python
+        # client does not send one) — non-None is the load-bearing distinction.
+        outer = await handle.query(CancelReasonWorkflow.reason_outer)
+        assert outer is not None
+        assert isinstance(outer, str)
+
+
+@workflow.defn
 class TrapCancelWorkflow:
     @workflow.run
     async def run(self) -> str:
