@@ -8,6 +8,7 @@ from .message_pb2 import (
     Endpoints,
     ExportSink,
     ExportSinkSpec,
+    FairnessSpec,
     HighAvailabilitySpec,
     LifecycleSpec,
     Limits,
@@ -17,6 +18,8 @@ from .message_pb2 import (
     NamespaceRegionStatus,
     NamespaceSpec,
     PrivateConnectivity,
+    Replica,
+    ReplicaSpec,
 )
 
 __all__ = [
@@ -29,6 +32,7 @@ __all__ = [
     "Endpoints",
     "ExportSink",
     "ExportSinkSpec",
+    "FairnessSpec",
     "HighAvailabilitySpec",
     "LifecycleSpec",
     "Limits",
@@ -38,4 +42,6 @@ __all__ = [
     "NamespaceRegionStatus",
     "NamespaceSpec",
     "PrivateConnectivity",
+    "Replica",
+    "ReplicaSpec",
 ]

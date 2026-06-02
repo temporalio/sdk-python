@@ -123,7 +123,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def echo(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
@@ -134,7 +134,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def blocking(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         _input: None,
     ) -> nexus.TemporalOperationResult[None]:
@@ -145,7 +145,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def double_start(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[None]:
@@ -160,7 +160,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def concurrent_start(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
@@ -205,7 +205,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def retry_after_failed_start(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
@@ -227,23 +227,21 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def sync_result(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         _client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
         return nexus.TemporalOperationResult.sync(input.value)
 
     @operation_handler
-    def custom_cancel(self) -> nexus.TemporalNexusOperationHandler[str, None]:
+    def custom_cancel(self) -> nexus.TemporalOperationHandler[str, None]:
         event = self.started_custom_cancel_workflow
 
-        class CustomCancelNexusOpHandler(
-            nexus.TemporalNexusOperationHandler[str, None]
-        ):
+        class CustomCancelNexusOpHandler(nexus.TemporalOperationHandler[str, None]):
             @override
             async def start_operation(
                 self,
-                ctx: nexus.TemporalNexusStartOperationContext,
+                ctx: nexus.TemporalStartOperationContext,
                 client: nexus.TemporalNexusClient,
                 input: str,
             ) -> nexus.TemporalOperationResult[None]:
@@ -254,7 +252,7 @@ class TestServiceHandler:
             @override
             async def cancel_workflow_run(
                 self,
-                ctx: nexus.TemporalNexusCancelOperationContext,
+                ctx: nexus.TemporalCancelOperationContext,
                 options: nexus.CancelWorkflowRunOptions,
             ):
                 # get a handle to the workflow
@@ -268,7 +266,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def echo_activity(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
@@ -282,7 +280,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def error_activity(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         _input: Input,
     ) -> nexus.TemporalOperationResult[None]:
@@ -298,7 +296,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def blocking_activity(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: str,
     ) -> nexus.TemporalOperationResult[None]:
@@ -312,7 +310,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def double_start_activity(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[None]:
@@ -333,7 +331,7 @@ class TestServiceHandler:
     @nexus.temporal_operation
     async def mixed_start(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[None]:
@@ -351,17 +349,17 @@ class TestServiceHandler:
         return nexus.TemporalOperationResult.sync(None)
 
     @operation_handler
-    def custom_cancel_activity(self) -> nexus.TemporalNexusOperationHandler[str, None]:
+    def custom_cancel_activity(self) -> nexus.TemporalOperationHandler[str, None]:
         started = self.started_custom_cancel_activity
         cancel_called = self.custom_cancel_activity_called
 
         class CustomCancelActivityNexusOpHandler(
-            nexus.TemporalNexusOperationHandler[str, None]
+            nexus.TemporalOperationHandler[str, None]
         ):
             @override
             async def start_operation(
                 self,
-                ctx: nexus.TemporalNexusStartOperationContext,
+                ctx: nexus.TemporalStartOperationContext,
                 client: nexus.TemporalNexusClient,
                 input: str,
             ) -> nexus.TemporalOperationResult[None]:
@@ -377,7 +375,7 @@ class TestServiceHandler:
             @override
             async def cancel_activity(
                 self,
-                ctx: nexus.TemporalNexusCancelOperationContext,
+                ctx: nexus.TemporalCancelOperationContext,
                 options: nexus.CancelActivityOptions,
             ):
                 # record that the custom override ran
@@ -996,7 +994,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def no_param(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         _input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -1008,7 +1006,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def single_param(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -1021,7 +1019,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def multi_param(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -1034,7 +1032,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def by_name(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:
@@ -1048,7 +1046,7 @@ class TemporalOperationOverloadTestServiceHandler:
     @nexus.temporal_operation
     async def by_name_multi_param(
         self,
-        _ctx: nexus.TemporalNexusStartOperationContext,
+        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: TemporalOperationOverloadTestValue,
     ) -> nexus.TemporalOperationResult[TemporalOperationOverloadTestValue]:

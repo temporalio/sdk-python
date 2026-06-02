@@ -581,7 +581,7 @@ class _TemporalCancelOperationContext(_TemporalOperationCtx[CancelOperationConte
         _temporal_cancel_operation_context.set(self)
 
 
-class TemporalNexusStartOperationContext(StartOperationContext):
+class TemporalStartOperationContext(StartOperationContext):
     """Context received by a Temporal Nexus operation when it is started.
 
     .. warning::
@@ -595,7 +595,7 @@ class TemporalNexusStartOperationContext(StartOperationContext):
         )
 
 
-class TemporalNexusCancelOperationContext(CancelOperationContext):
+class TemporalCancelOperationContext(CancelOperationContext):
     """Context received by a Temporal Nexus operation when it is canceled.
 
     .. warning::
