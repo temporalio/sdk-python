@@ -461,8 +461,30 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             for index, job_set in enumerate(job_sets):
                 if not job_set:
                     continue
+                # Separate local-activity resolutions from other jobs.
+                # Local activity results may arrive in non-deterministic
+                # order (completion order varies between first-execution
+                # and replay). Sort them by sequence number so coroutines
+                # always resume in scheduling order, ensuring deterministic
+                # interleaving regardless of execution mode.
+                local_activity_jobs = []
+                other_jobs = []
                 for job in job_set:
-                    # Let errors bubble out of these to the caller to fail the task
+                    if (
+                        job.HasField("resolve_activity")
+                        and job.resolve_activity.is_local
+                    ):
+                        local_activity_jobs.append(job)
+                    else:
+                        other_jobs.append(job)
+
+                # Apply non-local-activity jobs first
+                for job in other_jobs:
+                    self._apply(job)
+
+                # Apply local activity resolutions sorted by seq number.
+                local_activity_jobs.sort(key=lambda j: j.resolve_activity.seq)
+                for job in local_activity_jobs:
                     self._apply(job)
 
                 # Run one iteration of the loop. We do not allow conditions to
