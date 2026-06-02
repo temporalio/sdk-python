@@ -12,7 +12,7 @@ __all__ = [
 
 __nexus_operation_registry__ = {
     (
-        "WorkflowService",
+        "temporal.api.workflowservice.v1.WorkflowService",
         "SignalWithStartWorkflowExecution",
     ): _service.WorkflowService.signal_with_start_workflow,
 }

@@ -13,10 +13,6 @@ from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.converter import BinaryProtoPayloadConverter, CompositePayloadConverter
 from temporalio.nexus.system import workflow_service
 
-_SERVICE_ALIASES = {
-    "WorkflowService": "temporal.api.workflowservice.v1.WorkflowService",
-}
-
 
 class SystemNexusPayloadConverter(CompositePayloadConverter):
     """Payload converter for system Nexus outer envelopes."""
@@ -26,23 +22,10 @@ class SystemNexusPayloadConverter(CompositePayloadConverter):
         super().__init__(BinaryProtoPayloadConverter())
 
 
-def _operation_registry() -> dict[
-    tuple[str, str], nexusrpc.Operation[typing.Any, typing.Any]
-]:
-    registry = dict(workflow_service.__nexus_operation_registry__)
-    for (
-        service,
-        operation,
-    ), operation_def in workflow_service.__nexus_operation_registry__.items():
-        if alias := _SERVICE_ALIASES.get(service):
-            registry[(alias, operation)] = operation_def
-    return registry
-
-
 def _operation(
     service: str, operation: str
 ) -> nexusrpc.Operation[typing.Any, typing.Any] | None:
-    return _operation_registry().get((service, operation))
+    return workflow_service.__nexus_operation_registry__.get((service, operation))
 
 
 async def visit_payload(
