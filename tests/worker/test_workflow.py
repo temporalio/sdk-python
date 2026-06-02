@@ -1133,7 +1133,8 @@ class CancelReasonWorkflow:
         return self._reason_outer
 
 
-async def test_workflow_cancellation_reason(client: Client):
+@pytest.mark.parametrize("reason", ["user-supplied reason", ""])
+async def test_workflow_cancellation_reason(client: Client, reason: str):
     async with new_worker(client, CancelReasonWorkflow) as worker:
         handle = await client.start_workflow(
             CancelReasonWorkflow.run,
@@ -1149,13 +1150,21 @@ async def test_workflow_cancellation_reason(client: Client):
         # cancel has already been observed.
         assert await handle.query(CancelReasonWorkflow.reason_inner) is None
 
-        await handle.cancel(reason="user-supplied reason")
+        # When reason is "", cancel without providing the kwarg at all to
+        # exercise the default path.
+        if reason:
+            await handle.cancel(reason=reason)
+        else:
+            await handle.cancel()
         with pytest.raises(WorkflowFailureError) as err:
             await handle.result()
         assert isinstance(err.value.cause, CancelledError)
 
         outer = await handle.query(CancelReasonWorkflow.reason_outer)
-        assert outer == "user-supplied reason"
+        # Load-bearing: a cancel with no reason still produces an empty string,
+        # not None — None means "no external cancel happened".
+        assert outer is not None
+        assert outer == reason
 
 
 @workflow.defn
