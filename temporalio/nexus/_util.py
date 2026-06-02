@@ -16,7 +16,7 @@ from nexusrpc import (
 )
 
 from temporalio.nexus._operation_context import (
-    TemporalNexusStartOperationContext,
+    TemporalStartOperationContext,
     WorkflowRunOperationContext,
 )
 from temporalio.nexus._temporal_client import (
@@ -55,7 +55,7 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
     start: Callable[
         [
             NexusServiceType,
-            TemporalNexusStartOperationContext,
+            TemporalStartOperationContext,
             TemporalNexusClient,
             InputT,
         ],
@@ -73,7 +73,7 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
     return _get_wrapped_start_method_input_and_output_type_annotations(
         start,
         expected_param_types=(
-            TemporalNexusStartOperationContext,
+            TemporalStartOperationContext,
             TemporalNexusClient,
         ),
         expected_return_origin=TemporalOperationResult,

@@ -21,11 +21,11 @@ from temporalio.nexus._temporal_client import (
 from temporalio.types import NexusServiceType
 
 from ._operation_context import (
-    TemporalNexusStartOperationContext,
+    TemporalStartOperationContext,
     WorkflowRunOperationContext,
 )
 from ._operation_handlers import (
-    TemporalNexusOperationHandler,
+    TemporalOperationHandler,
     WorkflowRunOperationHandler,
 )
 from ._token import WorkflowHandle
@@ -145,10 +145,10 @@ def workflow_run_operation(
     return decorator(start)
 
 
-TemporalNexusOperationStartHandlerFunc: TypeAlias = Callable[
+TemporalOperationStartHandlerFunc: TypeAlias = Callable[
     [
         NexusServiceType,
-        TemporalNexusStartOperationContext,
+        TemporalStartOperationContext,
         TemporalNexusClient,
         InputT,
     ],
@@ -158,8 +158,8 @@ TemporalNexusOperationStartHandlerFunc: TypeAlias = Callable[
 
 @overload
 def temporal_operation(
-    start: TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
-) -> TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]: ...
+    start: TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
+) -> TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]: ...
 
 
 @overload
@@ -167,21 +167,21 @@ def temporal_operation(
     *,
     name: str | None = None,
 ) -> Callable[
-    [TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
-    TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
+    [TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
+    TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
 ]: ...
 
 
 def temporal_operation(
     start: None
-    | TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT] = None,
+    | TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT] = None,
     *,
     name: str | None = None,
 ) -> (
-    TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]
+    TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]
     | Callable[
-        [TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
-        TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
+        [TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
+        TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
     ]
 ):
     """Decorator marking a method as the start method for an operation that interacts with Temporal.
@@ -191,10 +191,8 @@ def temporal_operation(
     """
 
     def decorator(
-        start: TemporalNexusOperationStartHandlerFunc[
-            NexusServiceType, InputT, OutputT
-        ],
-    ) -> TemporalNexusOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]:
+        start: TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
+    ) -> TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]:
         if not is_async_callable(start):
             raise RuntimeError(
                 f"{start} is not an `async def` method. "
@@ -209,7 +207,7 @@ def temporal_operation(
             self: NexusServiceType,
         ) -> OperationHandler[InputT, OutputT]:
             async def _start(
-                ctx: TemporalNexusStartOperationContext,
+                ctx: TemporalStartOperationContext,
                 client: TemporalNexusClient,
                 input: InputT,
             ) -> TemporalOperationResult[OutputT]:
@@ -220,18 +218,18 @@ def temporal_operation(
                     input,
                 )
 
-            class _TemporalNexusOperationHandler(TemporalNexusOperationHandler):
+            class _TemporalOperationHandler(TemporalOperationHandler):
                 @override
                 async def start_operation(
                     self,
-                    ctx: TemporalNexusStartOperationContext,
+                    ctx: TemporalStartOperationContext,
                     client: TemporalNexusClient,
                     input: InputT,
                 ) -> TemporalOperationResult[OutputT]:
                     return await _start(ctx, client, input)
 
-            _TemporalNexusOperationHandler.start_operation.__doc__ = start.__doc__
-            return _TemporalNexusOperationHandler()
+            _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
+            return _TemporalOperationHandler()
 
         method_name = get_callable_name(start)
         op = nexusrpc.Operation(
