@@ -1988,10 +1988,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         handle: _ChildWorkflowHandle
 
         # Common code for handling cancel for start and run
-        def apply_child_cancel_error() -> None:
-            # Send a cancel request to the child
+        def apply_child_cancel_error(err: asyncio.CancelledError) -> None:
+            # Send a cancel request to the child, forwarding the msg passed to
+            # Task.cancel(msg) (if any) as the cancellation reason.
+            reason = err.args[0] if err.args and isinstance(err.args[0], str) else ""
             cancel_command = self._add_command()
-            handle._apply_cancel_command(cancel_command)
+            handle._apply_cancel_command(cancel_command, reason=reason)
             # If the cancel command is for external workflow, we
             # have to add a seq and mark it pending
             if cancel_command.HasField("request_cancel_external_workflow_execution"):
@@ -2014,8 +2016,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     # We have to shield because we don't want the future itself
                     # to be cancelled
                     return await asyncio.shield(handle._result_fut)
-                except asyncio.CancelledError:
-                    apply_child_cancel_error()
+                except asyncio.CancelledError as err:
+                    apply_child_cancel_error(err)
                     # Clear the cancellation counter on Python 3.11+ so the
                     # next await does not immediately re-raise CancelledError
                     if (
@@ -2038,8 +2040,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # to be cancelled
                 await asyncio.shield(handle._start_fut)
                 return handle
-            except asyncio.CancelledError:
-                apply_child_cancel_error()
+            except asyncio.CancelledError as err:
+                apply_child_cancel_error(err)
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
                 if (
@@ -3383,8 +3385,12 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def _apply_cancel_command(
         self,
         command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+        *,
+        reason: str = "",
     ) -> None:
-        command.cancel_child_workflow_execution.child_workflow_seq = self._seq
+        v = command.cancel_child_workflow_execution
+        v.child_workflow_seq = self._seq
+        v.reason = reason
 
 
 class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
@@ -3428,7 +3434,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
             )
         )
 
-    async def cancel(self) -> None:
+    async def cancel(self, *, reason: str = "") -> None:
         self._instance._assert_not_read_only("cancel external handle")
         command = self._instance._add_command()
         v = command.request_cancel_external_workflow_execution
@@ -3436,6 +3442,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         v.workflow_execution.workflow_id = self._id
         if self._run_id:
             v.workflow_execution.run_id = self._run_id
+        v.reason = reason
         await self._instance._cancel_external_workflow(command)
 
 
