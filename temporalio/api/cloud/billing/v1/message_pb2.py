@@ -18,13 +18,16 @@ from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n+temporal/api/cloud/billing/v1/message.proto\x12\x1dtemporal.api.cloud.billing.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xdf\x01\n\x11\x42illingReportSpec\x12\x38\n\x14start_time_inclusive\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12\x65nd_time_exclusive\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x43\n download_url_expiration_duration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t"\xa8\x06\n\rBillingReport\x12\n\n\x02id\x18\x01 \x01(\t\x12N\n\x05state\x18\x02 \x01(\x0e\x32?.temporal.api.cloud.billing.v1.BillingReport.BillingReportState\x12>\n\x04spec\x18\x03 \x01(\x0b\x32\x30.temporal.api.cloud.billing.v1.BillingReportSpec\x12L\n\rdownload_info\x18\x04 \x03(\x0b\x32\x35.temporal.api.cloud.billing.v1.BillingReport.Download\x12\x32\n\x0erequested_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x32\n\x0egenerated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1a\n\x12\x61sync_operation_id\x18\x07 \x01(\t\x1a\x80\x02\n\x08\x44ownload\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x37\n\x13url_expiration_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12U\n\x0b\x66ile_format\x18\x03 \x01(\x0e\x32@.temporal.api.cloud.billing.v1.BillingReport.Download.FileFormat\x12\x17\n\x0f\x66ile_size_bytes\x18\x04 \x01(\x03">\n\nFileFormat\x12\x1b\n\x17\x46ILE_FORMAT_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x46ILE_FORMAT_CSV\x10\x01"\xa5\x01\n\x12\x42illingReportState\x12$\n BILLING_REPORT_STATE_UNSPECIFIED\x10\x00\x12$\n BILLING_REPORT_STATE_IN_PROGRESS\x10\x01\x12"\n\x1e\x42ILLING_REPORT_STATE_GENERATED\x10\x02\x12\x1f\n\x1b\x42ILLING_REPORT_STATE_FAILED\x10\x03\x42\xa7\x01\n io.temporal.api.cloud.billing.v1B\x0cMessageProtoP\x01Z+go.temporal.io/api/cloud/billing/v1;billing\xaa\x02\x1fTemporalio.Api.Cloud.Billing.V1\xea\x02#Temporalio::Api::Cloud::Billing::V1b\x06proto3'
+    b'\n+temporal/api/cloud/billing/v1/message.proto\x12\x1dtemporal.api.cloud.billing.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xfd\x03\n\x11\x42illingReportSpec\x12\x38\n\x14start_time_inclusive\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12\x65nd_time_exclusive\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x43\n download_url_expiration_duration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12^\n\x0bgranularity\x18\x05 \x01(\x0e\x32I.temporal.api.cloud.billing.v1.BillingReportSpec.BillingReportGranularity"\xbb\x01\n\x18\x42illingReportGranularity\x12*\n&BILLING_REPORT_GRANULARITY_UNSPECIFIED\x10\x00\x12%\n!BILLING_REPORT_GRANULARITY_HOURLY\x10\x01\x12$\n BILLING_REPORT_GRANULARITY_DAILY\x10\x02\x12&\n"BILLING_REPORT_GRANULARITY_MONTHLY\x10\x03"\xa8\x06\n\rBillingReport\x12\n\n\x02id\x18\x01 \x01(\t\x12N\n\x05state\x18\x02 \x01(\x0e\x32?.temporal.api.cloud.billing.v1.BillingReport.BillingReportState\x12>\n\x04spec\x18\x03 \x01(\x0b\x32\x30.temporal.api.cloud.billing.v1.BillingReportSpec\x12L\n\rdownload_info\x18\x04 \x03(\x0b\x32\x35.temporal.api.cloud.billing.v1.BillingReport.Download\x12\x32\n\x0erequested_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x32\n\x0egenerated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1a\n\x12\x61sync_operation_id\x18\x07 \x01(\t\x1a\x80\x02\n\x08\x44ownload\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x37\n\x13url_expiration_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12U\n\x0b\x66ile_format\x18\x03 \x01(\x0e\x32@.temporal.api.cloud.billing.v1.BillingReport.Download.FileFormat\x12\x17\n\x0f\x66ile_size_bytes\x18\x04 \x01(\x03">\n\nFileFormat\x12\x1b\n\x17\x46ILE_FORMAT_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x46ILE_FORMAT_CSV\x10\x01"\xa5\x01\n\x12\x42illingReportState\x12$\n BILLING_REPORT_STATE_UNSPECIFIED\x10\x00\x12$\n BILLING_REPORT_STATE_IN_PROGRESS\x10\x01\x12"\n\x1e\x42ILLING_REPORT_STATE_GENERATED\x10\x02\x12\x1f\n\x1b\x42ILLING_REPORT_STATE_FAILED\x10\x03\x42\xa7\x01\n io.temporal.api.cloud.billing.v1B\x0cMessageProtoP\x01Z+go.temporal.io/api/cloud/billing/v1;billing\xaa\x02\x1fTemporalio.Api.Cloud.Billing.V1\xea\x02#Temporalio::Api::Cloud::Billing::V1b\x06proto3'
 )
 
 
 _BILLINGREPORTSPEC = DESCRIPTOR.message_types_by_name["BillingReportSpec"]
 _BILLINGREPORT = DESCRIPTOR.message_types_by_name["BillingReport"]
 _BILLINGREPORT_DOWNLOAD = _BILLINGREPORT.nested_types_by_name["Download"]
+_BILLINGREPORTSPEC_BILLINGREPORTGRANULARITY = _BILLINGREPORTSPEC.enum_types_by_name[
+    "BillingReportGranularity"
+]
 _BILLINGREPORT_DOWNLOAD_FILEFORMAT = _BILLINGREPORT_DOWNLOAD.enum_types_by_name[
     "FileFormat"
 ]
@@ -67,13 +70,15 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n io.temporal.api.cloud.billing.v1B\014MessageProtoP\001Z+go.temporal.io/api/cloud/billing/v1;billing\252\002\037Temporalio.Api.Cloud.Billing.V1\352\002#Temporalio::Api::Cloud::Billing::V1"
     _BILLINGREPORTSPEC._serialized_start = 144
-    _BILLINGREPORTSPEC._serialized_end = 367
-    _BILLINGREPORT._serialized_start = 370
-    _BILLINGREPORT._serialized_end = 1178
-    _BILLINGREPORT_DOWNLOAD._serialized_start = 754
-    _BILLINGREPORT_DOWNLOAD._serialized_end = 1010
-    _BILLINGREPORT_DOWNLOAD_FILEFORMAT._serialized_start = 948
-    _BILLINGREPORT_DOWNLOAD_FILEFORMAT._serialized_end = 1010
-    _BILLINGREPORT_BILLINGREPORTSTATE._serialized_start = 1013
-    _BILLINGREPORT_BILLINGREPORTSTATE._serialized_end = 1178
+    _BILLINGREPORTSPEC._serialized_end = 653
+    _BILLINGREPORTSPEC_BILLINGREPORTGRANULARITY._serialized_start = 466
+    _BILLINGREPORTSPEC_BILLINGREPORTGRANULARITY._serialized_end = 653
+    _BILLINGREPORT._serialized_start = 656
+    _BILLINGREPORT._serialized_end = 1464
+    _BILLINGREPORT_DOWNLOAD._serialized_start = 1040
+    _BILLINGREPORT_DOWNLOAD._serialized_end = 1296
+    _BILLINGREPORT_DOWNLOAD_FILEFORMAT._serialized_start = 1234
+    _BILLINGREPORT_DOWNLOAD_FILEFORMAT._serialized_end = 1296
+    _BILLINGREPORT_BILLINGREPORTSTATE._serialized_start = 1299
+    _BILLINGREPORT_BILLINGREPORTSTATE._serialized_end = 1464
 # @@protoc_insertion_point(module_scope)
