@@ -603,6 +603,26 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionResponse.FromString,
         )
+        self.PauseActivityExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/PauseActivityExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityExecutionResponse.FromString,
+        )
+        self.ResetActivityExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ResetActivityExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityExecutionResponse.FromString,
+        )
+        self.UnpauseActivityExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseActivityExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityExecutionResponse.FromString,
+        )
+        self.UpdateActivityExecutionOptions = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateActivityExecutionOptions",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityExecutionOptionsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityExecutionOptionsResponse.FromString,
+        )
         self.TerminateNexusOperationExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/TerminateNexusOperationExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TerminateNexusOperationExecutionRequest.SerializeToString,
@@ -1811,6 +1831,65 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def PauseActivityExecution(self, request, context):
+        """PauseActivityExecution pauses the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity
+
+        Pausing an activity means:
+        - If the activity is currently waiting for a retry or is running and subsequently fails,
+        it will not be rescheduled until it is unpaused.
+        - If the activity is already paused, calling this method will have no effect.
+        - If the activity is running and finishes successfully, the activity will be completed.
+        - If the activity is running and finishes with failure:
+        * if there is no retry left - the activity will be completed.
+        * if there are more retries left - the activity will be paused.
+        For long-running activities:
+        - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ResetActivityExecution(self, request, context):
+        """ResetActivityExecution resets the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+
+        Resetting an activity means:
+        * number of attempts will be reset to 0.
+        * activity timeouts will be reset.
+        * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+        it will be scheduled immediately (* see 'jitter' flag)
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UnpauseActivityExecution(self, request, context):
+        """UnpauseActivityExecution unpauses the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+
+        If activity is not paused, this call will have no effect.
+        If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
+        Once the activity is unpaused, all timeout timers will be regenerated.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateActivityExecutionOptions(self, request, context):
+        """UpdateActivityExecutionOptions is called by the client to update the options of an activity by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def TerminateNexusOperationExecution(self, request, context):
         """TerminateNexusOperationExecution terminates an existing Nexus operation immediately.
 
@@ -2410,6 +2489,26 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.DeleteActivityExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionResponse.SerializeToString,
+        ),
+        "PauseActivityExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.PauseActivityExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityExecutionResponse.SerializeToString,
+        ),
+        "ResetActivityExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.ResetActivityExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityExecutionResponse.SerializeToString,
+        ),
+        "UnpauseActivityExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.UnpauseActivityExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityExecutionResponse.SerializeToString,
+        ),
+        "UpdateActivityExecutionOptions": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateActivityExecutionOptions,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityExecutionOptionsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityExecutionOptionsResponse.SerializeToString,
         ),
         "TerminateNexusOperationExecution": grpc.unary_unary_rpc_method_handler(
             servicer.TerminateNexusOperationExecution,
@@ -5768,6 +5867,122 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/DeleteActivityExecution",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DeleteActivityExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def PauseActivityExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/PauseActivityExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseActivityExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ResetActivityExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ResetActivityExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ResetActivityExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UnpauseActivityExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseActivityExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseActivityExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateActivityExecutionOptions(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateActivityExecutionOptions",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityExecutionOptionsRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateActivityExecutionOptionsResponse.FromString,
             options,
             channel_credentials,
             insecure,

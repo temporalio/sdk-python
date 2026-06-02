@@ -4298,3 +4298,298 @@ class GetBillingReportResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___GetBillingReportResponse = GetBillingReportResponse
+
+class GetCustomRolesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    page_size: builtins.int
+    """The requested size of the page to retrieve.
+    Cannot exceed 1000. Defaults to 100.
+    """
+    page_token: builtins.str
+    """The page token if this is continuing from another response."""
+    def __init__(
+        self,
+        *,
+        page_size: builtins.int = ...,
+        page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "page_size", b"page_size", "page_token", b"page_token"
+        ],
+    ) -> None: ...
+
+global___GetCustomRolesRequest = GetCustomRolesRequest
+
+class GetCustomRolesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CUSTOM_ROLES_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def custom_roles(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.identity.v1.message_pb2.CustomRole
+    ]:
+        """The list of custom roles in ascending ID order."""
+    next_page_token: builtins.str
+    """The next page token."""
+    def __init__(
+        self,
+        *,
+        custom_roles: collections.abc.Iterable[
+            temporalio.api.cloud.identity.v1.message_pb2.CustomRole
+        ]
+        | None = ...,
+        next_page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "custom_roles", b"custom_roles", "next_page_token", b"next_page_token"
+        ],
+    ) -> None: ...
+
+global___GetCustomRolesResponse = GetCustomRolesResponse
+
+class GetCustomRoleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROLE_ID_FIELD_NUMBER: builtins.int
+    role_id: builtins.str
+    """The ID of the custom role to retrieve."""
+    def __init__(
+        self,
+        *,
+        role_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["role_id", b"role_id"]
+    ) -> None: ...
+
+global___GetCustomRoleRequest = GetCustomRoleRequest
+
+class GetCustomRoleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CUSTOM_ROLE_FIELD_NUMBER: builtins.int
+    @property
+    def custom_role(self) -> temporalio.api.cloud.identity.v1.message_pb2.CustomRole:
+        """The custom role retrieved."""
+    def __init__(
+        self,
+        *,
+        custom_role: temporalio.api.cloud.identity.v1.message_pb2.CustomRole
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["custom_role", b"custom_role"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["custom_role", b"custom_role"]
+    ) -> None: ...
+
+global___GetCustomRoleResponse = GetCustomRoleResponse
+
+class CreateCustomRoleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPEC_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    @property
+    def spec(self) -> temporalio.api.cloud.identity.v1.message_pb2.CustomRoleSpec:
+        """The specification for the custom role to create."""
+    async_operation_id: builtins.str
+    """The ID to use for this async operation.
+    Optional, if not provided a random ID will be generated.
+    """
+    def __init__(
+        self,
+        *,
+        spec: temporalio.api.cloud.identity.v1.message_pb2.CustomRoleSpec | None = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id", b"async_operation_id", "spec", b"spec"
+        ],
+    ) -> None: ...
+
+global___CreateCustomRoleRequest = CreateCustomRoleRequest
+
+class CreateCustomRoleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROLE_ID_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    role_id: builtins.str
+    """The ID of the custom role created."""
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        role_id: builtins.str = ...,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation", b"async_operation", "role_id", b"role_id"
+        ],
+    ) -> None: ...
+
+global___CreateCustomRoleResponse = CreateCustomRoleResponse
+
+class UpdateCustomRoleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROLE_ID_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    role_id: builtins.str
+    """The ID of the custom role to update."""
+    @property
+    def spec(self) -> temporalio.api.cloud.identity.v1.message_pb2.CustomRoleSpec:
+        """The new custom role specification."""
+    resource_version: builtins.str
+    """The version of the custom role for which this update is intended.
+    The latest version can be found in the GetCustomRole operation response.
+    """
+    async_operation_id: builtins.str
+    """The ID to use for this async operation.
+    Optional, if not provided a random ID will be generated.
+    """
+    def __init__(
+        self,
+        *,
+        role_id: builtins.str = ...,
+        spec: temporalio.api.cloud.identity.v1.message_pb2.CustomRoleSpec | None = ...,
+        resource_version: builtins.str = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "resource_version",
+            b"resource_version",
+            "role_id",
+            b"role_id",
+            "spec",
+            b"spec",
+        ],
+    ) -> None: ...
+
+global___UpdateCustomRoleRequest = UpdateCustomRoleRequest
+
+class UpdateCustomRoleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___UpdateCustomRoleResponse = UpdateCustomRoleResponse
+
+class DeleteCustomRoleRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROLE_ID_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    role_id: builtins.str
+    """The ID of the custom role to delete."""
+    resource_version: builtins.str
+    """The version of the custom role for which this delete is intended.
+    The latest version can be found in the GetCustomRole operation response.
+    """
+    async_operation_id: builtins.str
+    """The ID to use for this async operation.
+    Optional, if not provided a random ID will be generated.
+    """
+    def __init__(
+        self,
+        *,
+        role_id: builtins.str = ...,
+        resource_version: builtins.str = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "resource_version",
+            b"resource_version",
+            "role_id",
+            b"role_id",
+        ],
+    ) -> None: ...
+
+global___DeleteCustomRoleRequest = DeleteCustomRoleRequest
+
+class DeleteCustomRoleResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___DeleteCustomRoleResponse = DeleteCustomRoleResponse

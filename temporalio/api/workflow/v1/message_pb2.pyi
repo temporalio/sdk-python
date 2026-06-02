@@ -1850,8 +1850,8 @@ class WorkflowExecutionOptions(google.protobuf.message.Message):
     @property
     def time_skipping_config(self) -> global___TimeSkippingConfig:
         """Time-skipping configuration for this workflow execution.
-        If not set, the time-skipping configuration is not updated by this request;
-        the existing configuration is preserved.
+        If not set, the time-skipping conf will not get updated upon request,
+        i.e. the existing time-skipping conf will be preserved.
         """
     def __init__(
         self,
@@ -1892,26 +1892,23 @@ class TimeSkippingConfig(google.protobuf.message.Message):
     and possibly other features added in the future.
     User timers are not classified as in-flight work and will be skipped over.
     When time advances, it skips to the earlier of the next user timer or the configured bound, if either exists.
-
-    Propagation behavior of time skipping:
-    The enabled flag, bound fields, and accumulated skipped duration are propagated to related executions as follows:
-    (1) Child workflows and continue-as-new: both the configuration and the accumulated skipped duration are
-        inherited from the current execution. The configured bound is shared between the inherited skipped
-        duration and any additional duration skipped by the new run.
-    (2) Retry and cron: the configuration and accumulated skipped duration are inherited as recorded when the
-        current workflow started; the accumulated skipped duration of the current run is not propagated.
-    (3) Reset: the new run retains the time-skipping configuration of the current execution. Because reset replays
-        all events up to the reset point and re-applies any UpdateWorkflowExecutionOptions changes made after that
-        point, the resulting run ends up with the same final time-skipping configuration as the previous run.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ENABLED_FIELD_NUMBER: builtins.int
+    DISABLE_PROPAGATION_FIELD_NUMBER: builtins.int
     MAX_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
     MAX_ELAPSED_DURATION_FIELD_NUMBER: builtins.int
+    MAX_TARGET_TIME_FIELD_NUMBER: builtins.int
     enabled: builtins.bool
-    """Enables or disables time skipping for this workflow execution."""
+    """Enables or disables time skipping for this workflow execution.
+    By default, this field is propagated to transitively related workflows (child workflows/start-as-new/reset) 
+    at the time they are started.
+    Changes made after a transitively related workflow has started are not propagated.
+    """
+    disable_propagation: builtins.bool
+    """If set, the enabled field is not propagated to transitively related workflows."""
     @property
     def max_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
         """Maximum total virtual time that can be skipped."""
@@ -1921,12 +1918,19 @@ class TimeSkippingConfig(google.protobuf.message.Message):
         This includes both skipped time and real time elapsing.
         (-- api-linter: core::0142::time-field-names=disabled --)
         """
+    @property
+    def max_target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Absolute virtual timestamp at which time skipping is disabled.
+        Time skipping will not advance beyond this point.
+        """
     def __init__(
         self,
         *,
         enabled: builtins.bool = ...,
+        disable_propagation: builtins.bool = ...,
         max_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
         max_elapsed_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        max_target_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1937,6 +1941,8 @@ class TimeSkippingConfig(google.protobuf.message.Message):
             b"max_elapsed_duration",
             "max_skipped_duration",
             b"max_skipped_duration",
+            "max_target_time",
+            b"max_target_time",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -1944,18 +1950,25 @@ class TimeSkippingConfig(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "bound",
             b"bound",
+            "disable_propagation",
+            b"disable_propagation",
             "enabled",
             b"enabled",
             "max_elapsed_duration",
             b"max_elapsed_duration",
             "max_skipped_duration",
             b"max_skipped_duration",
+            "max_target_time",
+            b"max_target_time",
         ],
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["bound", b"bound"]
     ) -> (
-        typing_extensions.Literal["max_skipped_duration", "max_elapsed_duration"] | None
+        typing_extensions.Literal[
+            "max_skipped_duration", "max_elapsed_duration", "max_target_time"
+        ]
+        | None
     ): ...
 
 global___TimeSkippingConfig = TimeSkippingConfig
