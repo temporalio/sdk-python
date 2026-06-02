@@ -32,6 +32,11 @@ from ._support import (
 
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SignalWithStartWorkflowRequest:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[typing.Any]]
     args: list[typing.Any] | None = None
     id: str

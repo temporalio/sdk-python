@@ -1,6 +1,6 @@
 /// @nexus.support
-///   python="python/model_overrides.py"
-///   typescript="typescript/model_overrides.ts"
+///   python="python/temporal_model_converters.py"
+///   typescript="typescript/temporal_model_converters.ts"
 package nexus:temporal-types@1.0.0;
 
 interface model {

@@ -3,18 +3,19 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from typing import cast
 
 import gen_protos
 
 base_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(base_dir))
 wit_input_dir = base_dir / "scripts" / "_nexus"
 wit_path = wit_input_dir / "temporal-system.wit"
 wit_deps_dir = wit_input_dir / "deps"
 output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
-default_nex_gen_install_root = (
-    Path(tempfile.gettempdir()) / "temporal-sdk-python-nex-gen"
-)
+workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
 workflowservice_request_response_proto = (
     gen_protos.api_proto_dir
     / "temporal"
@@ -29,30 +30,9 @@ def nex_gen_command() -> list[str]:
     if bin_path := os.environ.get("NEX_GEN_BIN"):
         return [bin_path]
 
-    return [str(install_published_nex_gen())]
-
-
-def install_published_nex_gen() -> Path:
-    install_root = Path(
-        os.environ.get(
-            "NEX_GEN_INSTALL_ROOT",
-            str(default_nex_gen_install_root),
-        )
-    )
-    bin_name = "nex-gen.exe" if os.name == "nt" else "nex-gen"
-    bin_path = install_root / "bin" / bin_name
-    if not bin_path.exists():
-        subprocess.check_call(
-            [
-                "cargo",
-                "install",
-                "--locked",
-                "--root",
-                str(install_root),
-                "nex-gen",
-            ]
-        )
-    return bin_path
+    if shutil.which("nex-gen") is None:
+        subprocess.check_call(["cargo", "install", "--locked", "nex-gen"])
+    return ["nex-gen"]
 
 
 def build_descriptor_set(descriptor_path: Path) -> None:
@@ -77,6 +57,42 @@ def strip_unsupported_pyright_comments() -> None:
             "# pyright: reportAny=false, reportExplicitAny=false\n", ""
         )
         path.write_text(content)
+
+
+def generate_workflow_exports() -> None:
+    spec = spec_from_file_location(
+        "temporalio_nexus_system_workflow_service_exports",
+        output_dir / "__init__.py",
+        submodule_search_locations=[str(output_dir)],
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load generated workflow service from {output_dir}")
+    module = module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    exports = cast(list[str], module.__all__)
+
+    import_block = [
+        "# BEGIN GENERATED NEXUS SYSTEM EXPORTS\n",
+        "from temporalio.nexus.system.workflow_service import (\n",
+        *[f"    {export},\n" for export in exports],
+        ")\n",
+        "# END GENERATED NEXUS SYSTEM EXPORTS\n",
+    ]
+    all_block = [
+        "    # BEGIN GENERATED NEXUS SYSTEM __ALL__\n",
+        *[f'    "{export}",\n' for export in exports],
+        "    # END GENERATED NEXUS SYSTEM __ALL__\n",
+    ]
+    content = workflow_init_path.read_text()
+    start = content.index("# BEGIN GENERATED NEXUS SYSTEM EXPORTS")
+    end = content.index("# END GENERATED NEXUS SYSTEM EXPORTS", start)
+    end = content.index("\n", end) + 1
+    content = content[:start] + "".join(import_block) + content[end:]
+    start = content.index("    # BEGIN GENERATED NEXUS SYSTEM __ALL__")
+    end = content.index("    # END GENERATED NEXUS SYSTEM __ALL__", start)
+    end = content.index("\n", end) + 1
+    workflow_init_path.write_text(content[:start] + "".join(all_block) + content[end:])
 
 
 def generate_nexus_system_api() -> None:
@@ -111,6 +127,7 @@ def generate_nexus_system_api() -> None:
 
     (output_dir.parent / "__init__.py").touch()
     strip_unsupported_pyright_comments()
+    generate_workflow_exports()
     subprocess.check_call(
         [
             sys.executable,
@@ -121,6 +138,7 @@ def generate_nexus_system_api() -> None:
             "I",
             "--fix",
             str(output_dir),
+            str(workflow_init_path),
         ]
     )
     subprocess.check_call(
@@ -130,6 +148,7 @@ def generate_nexus_system_api() -> None:
             "ruff",
             "format",
             str(output_dir),
+            str(workflow_init_path),
         ]
     )
 

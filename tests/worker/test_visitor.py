@@ -15,7 +15,8 @@ from temporalio.api.common.v1.message_pb2 import (
     SearchAttributes,
 )
 from temporalio.api.sdk.v1.user_metadata_pb2 import UserMetadata
-from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
+from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     InitializeWorkflow,
     WorkflowActivation,

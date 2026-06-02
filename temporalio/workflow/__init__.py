@@ -1,10 +1,9 @@
 """Utilities that can decorate or be called inside workflows."""
 
+# ruff: noqa: I001
+
 from __future__ import annotations
 
-from typing import cast
-
-from temporalio.nexus.system import workflow_service as _workflow_service
 from temporalio.nexus._util import ServiceHandlerT
 
 from ..types import (
@@ -172,14 +171,13 @@ from ._workflow_ops import (
     start_child_workflow,
 )
 
-_nexus_system_generated_exports = cast(
-    "list[str]", getattr(_workflow_service, "__all__")
+# BEGIN GENERATED NEXUS SYSTEM EXPORTS
+from temporalio.nexus.system.workflow_service import (
+    signal_with_start_workflow,
 )
-globals().update(
-    {name: getattr(_workflow_service, name) for name in _nexus_system_generated_exports}
-)
+# END GENERATED NEXUS SYSTEM EXPORTS
 
-__all__ = [  # pyright: ignore[reportUnsupportedDunderAll]
+__all__ = [
     "ActivityCancellationType",
     "ActivityConfig",
     "ActivityHandle",
@@ -252,7 +250,6 @@ __all__ = [  # pyright: ignore[reportUnsupportedDunderAll]
     "NexusOperationCancellationType",
     "NexusOperationHandle",
     "create_nexus_client",
-    *_nexus_system_generated_exports,
     "LoggerAdapter",
     "SandboxImportNotificationPolicy",
     "logger",
@@ -327,4 +324,7 @@ __all__ = [  # pyright: ignore[reportUnsupportedDunderAll]
     "ProtocolReturnType",
     "ReturnType",
     "SelfType",
+    # BEGIN GENERATED NEXUS SYSTEM __ALL__
+    "signal_with_start_workflow",
+    # END GENERATED NEXUS SYSTEM __ALL__
 ]

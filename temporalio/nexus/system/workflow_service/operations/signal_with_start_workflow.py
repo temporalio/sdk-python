@@ -10,7 +10,9 @@ import typing_extensions
 
 import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.common
-import temporalio.workflow
+
+if typing.TYPE_CHECKING:
+    from temporalio.workflow import ExternalWorkflowHandle
 
 from ..models import (
     SignalWithStartWorkflowRequest,
@@ -24,9 +26,14 @@ WorkflowArgs = typing_extensions.TypeVarTuple("WorkflowArgs")
 
 async def _signal_with_start_workflow(
     request: SignalWithStartWorkflowRequest,
-) -> temporalio.workflow.ExternalWorkflowHandle[typing.Any]:
+) -> ExternalWorkflowHandle[typing.Any]:
+    from temporalio.workflow import (
+        create_nexus_client,
+        get_external_workflow_handle,
+    )
+
     request_proto = request.to_proto()
-    nexus_client = temporalio.workflow.create_nexus_client(
+    nexus_client = create_nexus_client(
         service="temporal.api.workflowservice.v1.WorkflowService",
         endpoint="temporal-system",
     )
@@ -36,9 +43,7 @@ async def _signal_with_start_workflow(
         output_type=temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
     )
     result = await handle
-    return temporalio.workflow.get_external_workflow_handle(
-        request.id, run_id=result.run_id
-    )
+    return get_external_workflow_handle(request.id, run_id=result.run_id)
 
 
 @typing.overload
@@ -65,7 +70,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[typing.Any]: ...
 
 
 @typing.overload
@@ -94,7 +99,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 @typing.overload
@@ -121,7 +126,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 @typing.overload
@@ -149,7 +154,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[typing.Any]: ...
 
 
 @typing.overload
@@ -179,7 +184,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 @typing.overload
@@ -207,7 +212,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 @typing.overload
@@ -236,7 +241,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[typing.Any]: ...
 
 
 @typing.overload
@@ -267,7 +272,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 @typing.overload
@@ -296,7 +301,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 @typing.overload
@@ -323,7 +328,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[typing.Any]: ...
 
 
 @typing.overload
@@ -352,7 +357,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 @typing.overload
@@ -379,7 +384,7 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> temporalio.workflow.ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[WorkflowResult]: ...
 
 
 async def signal_with_start_workflow(
@@ -408,8 +413,11 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
-) -> temporalio.workflow.ExternalWorkflowHandle[typing.Any]:
+) -> ExternalWorkflowHandle[typing.Any]:
     """Signal a workflow, starting it first if needed.
+
+    .. warning::
+        This API is experimental and subject to change.
 
     Args:
         workflow: Workflow type name or callable identifying the workflow to start.
