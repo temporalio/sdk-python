@@ -40,9 +40,7 @@ def _checked_in_version() -> str:
         )
     if pyproject_version.startswith("v"):
         raise RuntimeError("Checked-in version must not start with 'v'")
-    if not re.fullmatch(
-        r"[0-9]+(?:\.[0-9]+)+(?:[a-zA-Z0-9_.+-]+)?", pyproject_version
-    ):
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)+(?:[a-zA-Z0-9_.+-]+)?", pyproject_version):
         raise RuntimeError(f"Invalid checked-in version: {pyproject_version!r}")
     return pyproject_version
 
@@ -77,7 +75,9 @@ def verify_dist(args: argparse.Namespace) -> None:
     if sdists != [expected_sdist]:
         raise RuntimeError(f"Expected only sdist {expected_sdist!r}, found {sdists!r}")
     if len(wheels) != 5:
-        raise RuntimeError(f"Expected 5 platform wheels, found {len(wheels)}: {wheels!r}")
+        raise RuntimeError(
+            f"Expected 5 platform wheels, found {len(wheels)}: {wheels!r}"
+        )
 
     for name in files:
         if not name.startswith(f"temporalio-{args.version}"):
@@ -99,7 +99,9 @@ def verify_dist(args: argparse.Namespace) -> None:
         if not any(predicate(name) for name in wheels)
     ]
     if missing:
-        raise RuntimeError(f"Missing expected platform wheels: {missing!r}; found {wheels!r}")
+        raise RuntimeError(
+            f"Missing expected platform wheels: {missing!r}; found {wheels!r}"
+        )
 
     print("Verified release artifacts:")
     for name in files:
