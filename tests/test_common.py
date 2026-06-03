@@ -9,6 +9,7 @@ import pytest
 
 from temporalio.api.common.v1 import Payload
 from temporalio.api.common.v1 import RetryPolicy as RetryPolicyProto
+from temporalio.api.common.v1 import SearchAttributes as SearchAttributesProto
 from temporalio.common import (
     Priority,
     RawValue,
@@ -17,6 +18,11 @@ from temporalio.common import (
     SearchAttributePair,
     TypedSearchAttributes,
     _type_hints_from_func,
+)
+from temporalio.converter import (
+    decode_typed_search_attributes,
+    encode_search_attributes,
+    encode_typed_search_attribute_value,
 )
 
 
@@ -98,6 +104,54 @@ def test_typed_search_attribute_duplicates():
         TypedSearchAttributes(
             [SearchAttributePair(key1, "some-val"), SearchAttributePair(key1_dupe, 123)]
         )
+
+
+def test_keyword_list_search_attribute_null_value_rejected():
+    key = SearchAttributeKey.for_keyword_list("my-keyword-list")
+    with pytest.raises(TypeError):
+        key.value_set(None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        TypedSearchAttributes([SearchAttributePair(key, None)])  # type: ignore[arg-type]
+
+
+def test_keyword_list_search_attribute_null_element_rejected():
+    key = SearchAttributeKey.for_keyword_list("my-keyword-list")
+    attrs = TypedSearchAttributes(
+        [SearchAttributePair(key, ["keyword", None])]  # type: ignore[list-item]
+    )
+    with pytest.raises(TypeError, match="keyword list"):
+        encode_search_attributes(attrs, SearchAttributesProto())
+
+
+def test_keyword_list_search_attribute_unset_serializes_without_type_metadata():
+    key = SearchAttributeKey.for_keyword_list("my-keyword-list")
+    payload = encode_typed_search_attribute_value(key, key.value_unset().value)
+
+    assert payload.metadata["encoding"] == b"binary/null"
+    assert "type" not in payload.metadata
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        Payload(metadata={"encoding": b"binary/null"}),
+        Payload(metadata={"encoding": b"binary/null", "type": b"KeywordList"}),
+        Payload(
+            metadata={"encoding": b"json/plain", "type": b"KeywordList"},
+            data=b"null",
+        ),
+    ],
+)
+def test_keyword_list_search_attribute_null_payload_decodes_as_absent(
+    payload: Payload,
+):
+    key = SearchAttributeKey.for_keyword_list("my-keyword-list")
+    api = SearchAttributesProto(indexed_fields={key.name: payload})
+
+    attrs = decode_typed_search_attributes(api)
+
+    assert key not in attrs
+    assert attrs.get(key) is None
 
 
 def test_typed_search_attributes_contains_with_falsy_value():
