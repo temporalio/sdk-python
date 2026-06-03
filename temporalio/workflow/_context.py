@@ -36,6 +36,7 @@ __all__ = [
     "ParentInfo",
     "RootInfo",
     "UpdateInfo",
+    "cancellation_reason",
     "current_update_info",
     "deprecate_patch",
     "extern_functions",
@@ -294,6 +295,9 @@ class _Runtime(ABC):
         versioning_intent: VersioningIntent | None,
         initial_versioning_behavior: ContinueAsNewVersioningBehavior | None,
     ) -> NoReturn: ...
+
+    @abstractmethod
+    def workflow_cancellation_reason(self) -> str | None: ...
 
     @abstractmethod
     def workflow_extern_functions(self) -> Mapping[str, Callable]: ...
@@ -589,6 +593,27 @@ def instance() -> Any:
 def in_workflow() -> bool:
     """Whether the code is currently running in a workflow."""
     return _Runtime.maybe_current() is not None
+
+
+def cancellation_reason() -> str | None:
+    """Reason the workflow was cancelled, or None if no external cancellation
+    request has been received.
+
+    A non-None value (including an empty string) indicates that the workflow
+    received an explicit cancellation request from the server. This can be used
+    when catching an :py:class:`asyncio.CancelledError` to distinguish a
+    workflow-level cancel from a cancel that originated from inner asyncio task
+    cancellation.
+
+    Note, this only reflects cancellation requested via the server; it is not
+    set for cache eviction or for cancels of inner tasks/scopes.
+
+    Returns:
+        The reason string sent with the workflow cancellation request (which
+        may be empty), or ``None`` if the workflow has not been cancelled via
+        an external request.
+    """
+    return _Runtime.current().workflow_cancellation_reason()
 
 
 def memo() -> Mapping[str, Any]:
