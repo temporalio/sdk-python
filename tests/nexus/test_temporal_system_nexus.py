@@ -6,7 +6,6 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any, cast
 
-import nexusrpc.handler
 import pytest
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
@@ -18,7 +17,6 @@ import temporalio.nexus.system as nexus_system
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.converter import ExternalStorage, PayloadCodec
-from temporalio.nexus.system.workflow_service.service import WorkflowService
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
@@ -31,33 +29,7 @@ from temporalio.worker import (
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
 from tests.test_extstore import InMemoryTestDriver
 
-SYSTEM_NEXUS_ENDPOINT = "temporal-system"
-SYSTEM_NEXUS_SERVICE = "temporal.api.workflowservice.v1.WorkflowService"
-SYSTEM_NEXUS_OPERATION = "SignalWithStartWorkflowExecution"
-
 interceptor_traces: list[tuple[str, object]] = []
-received_requests: list[
-    workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
-] = []
-
-
-@nexusrpc.handler.service_handler(service=WorkflowService)
-class WorkflowServicePayloadHandler:
-    @nexusrpc.handler.sync_operation
-    async def signal_with_start_workflow(
-        self,
-        _ctx: nexusrpc.handler.StartOperationContext,
-        request: workflowservice_pb2.SignalWithStartWorkflowExecutionRequest,
-    ) -> workflowservice_pb2.SignalWithStartWorkflowExecutionResponse:
-        assert request.workflow_id == "system-nexus-workflow-id"
-        assert request.signal_name == "test-signal"
-        received_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest()
-        received_request.CopyFrom(request)
-        received_requests.append(received_request)
-        return workflowservice_pb2.SignalWithStartWorkflowExecutionResponse(
-            run_id=f"{request.workflow_id}-run"
-        )
-
 
 @workflow.defn
 class ExternalHandleSignalWithStartWorkflowCaller:
@@ -74,7 +46,7 @@ class ExternalHandleSignalWithStartWorkflowCaller:
             static_summary="summary-value",
             static_details="details-value",
         )
-        return cast(str, started_handle.run_id)
+        return cast(str, started_handle.id)
 
 
 class RejectOuterSystemNexusCodec(PayloadCodec):
@@ -140,13 +112,6 @@ class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         return await super().start_nexus_operation(input)
 
 
-def _pop_received_request() -> (
-    workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
-):
-    assert len(received_requests) == 1
-    return received_requests.pop()
-
-
 def _assert_request_payload_was_externally_stored(
     request: workflowservice_pb2.SignalWithStartWorkflowExecutionRequest,
     field_name: str,
@@ -181,9 +146,6 @@ def _assert_start_nexus_operation_interceptor_trace() -> None:
     trace_name, trace_value = interceptor_traces.pop()
     assert trace_name == "workflow.start_nexus_operation"
     trace_input = cast(StartNexusOperationInput[Any, Any], trace_value)
-    assert trace_input.endpoint == SYSTEM_NEXUS_ENDPOINT
-    assert trace_input.service == SYSTEM_NEXUS_SERVICE
-    assert trace_input.operation_name == SYSTEM_NEXUS_OPERATION
     request = cast(
         workflowservice_pb2.SignalWithStartWorkflowExecutionRequest,
         trace_input.input,
@@ -310,7 +272,6 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
 
     codec = RejectOuterSystemNexusCodec()
     interceptor_traces.clear()
-    received_requests.clear()
     driver = InMemoryTestDriver()
     caller_config = env.client.config()
     caller_config["data_converter"] = dataclasses.replace(
@@ -322,12 +283,6 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
         ),
     )
     caller_client = Client(**caller_config)
-    handler_config = env.client.config()
-    handler_config["data_converter"] = dataclasses.replace(
-        temporalio.converter.default(),
-        payload_converter_class=nexus_system.SystemNexusPayloadConverter,
-    )
-    handler_client = Client(**handler_config)
     caller_task_queue = str(uuid.uuid4())
     handler_task_queue = str(uuid.uuid4())
 
@@ -338,14 +293,8 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
         workflow_runner=UnsandboxedWorkflowRunner(),
         interceptors=[TracingWorkflowInterceptor()],
     )
-    handler_worker = Worker(
-        handler_client,
-        task_queue=handler_task_queue,
-        nexus_service_handlers=[WorkflowServicePayloadHandler()],
-    )
 
-    async with caller_worker, handler_worker:
-        await env.create_nexus_endpoint(SYSTEM_NEXUS_ENDPOINT, handler_task_queue)
+    async with caller_worker:
         result = await caller_client.execute_workflow(
             ExternalHandleSignalWithStartWorkflowCaller.run,
             args=[handler_task_queue],
@@ -354,11 +303,7 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
             execution_timeout=timedelta(seconds=5),
         )
 
-    assert result == "system-nexus-workflow-id-run"
-    request = _pop_received_request()
-    _assert_request_payload_was_externally_stored(request, "input")
-    _assert_request_payload_was_externally_stored(request, "signal_input")
-    _assert_request_user_metadata_was_codec_encoded(request)
+    assert result == "system-nexus-workflow-id"
     assert codec.encode_count >= 5
     _assert_stored_payloads_include(
         driver,

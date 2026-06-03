@@ -4,7 +4,7 @@ world system {
   export workflow-service;
 }
 
-/// @nexus.endpoint "temporal-system"
+/// @nexus.endpoint "__temporal_system"
 /// @nexus.service-name "temporal.api.workflowservice.v1.WorkflowService"
 /// @nexus.delay-load-temporalio-workflow
 /// @nexus.experimental

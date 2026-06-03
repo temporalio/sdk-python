@@ -35,7 +35,7 @@ async def _signal_with_start_workflow(
     request_proto = request.to_proto()
     nexus_client = create_nexus_client(
         service="temporal.api.workflowservice.v1.WorkflowService",
-        endpoint="temporal-system",
+        endpoint="__temporal_system",
     )
     handle = await nexus_client.start_operation(
         operation="SignalWithStartWorkflowExecution",
