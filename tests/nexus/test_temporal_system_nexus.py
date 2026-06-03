@@ -31,6 +31,7 @@ from tests.test_extstore import InMemoryTestDriver
 
 interceptor_traces: list[tuple[str, object]] = []
 
+
 @workflow.defn
 class ExternalHandleSignalWithStartWorkflowCaller:
     @workflow.run
@@ -46,7 +47,7 @@ class ExternalHandleSignalWithStartWorkflowCaller:
             static_summary="summary-value",
             static_details="details-value",
         )
-        return cast(str, started_handle.id)
+        return started_handle.id
 
 
 class RejectOuterSystemNexusCodec(PayloadCodec):
@@ -110,23 +111,6 @@ class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
     ) -> workflow.NexusOperationHandle[Any]:
         interceptor_traces.append(("workflow.start_nexus_operation", input))
         return await super().start_nexus_operation(input)
-
-
-def _assert_request_payload_was_externally_stored(
-    request: workflowservice_pb2.SignalWithStartWorkflowExecutionRequest,
-    field_name: str,
-) -> None:
-    payloads = getattr(request, field_name).payloads
-    assert len(payloads) == 1
-    assert payloads[0].external_payloads
-
-
-def _assert_request_user_metadata_was_codec_encoded(
-    request: workflowservice_pb2.SignalWithStartWorkflowExecutionRequest,
-) -> None:
-    assert request.HasField("user_metadata")
-    assert request.user_metadata.summary.metadata["test-codec"] == b"true"
-    assert request.user_metadata.details.metadata["test-codec"] == b"true"
 
 
 def _assert_stored_payloads_include(
