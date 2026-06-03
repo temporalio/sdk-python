@@ -318,6 +318,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     async def cancel(
         self,
         *,
+        reason: str = "",
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> None:
@@ -334,6 +335,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             workflow ID even if it is unrelated to the started workflow.
 
         Args:
+            reason: Reason recorded with the cancellation request. Available
+                inside the workflow via :py:func:`temporalio.workflow.cancellation_reason`.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
@@ -346,6 +349,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 id=self._id,
                 run_id=self._run_id,
                 first_execution_run_id=self._first_execution_run_id,
+                reason=reason,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )

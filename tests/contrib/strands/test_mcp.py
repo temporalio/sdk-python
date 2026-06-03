@@ -36,6 +36,7 @@ class MCPWorkflow:
     def __init__(self) -> None:
         echo = TemporalMCPClient(
             server="echo",
+            cache_tools=True,
             start_to_close_timeout=timedelta(seconds=30),
         )
         self.agent = TemporalAgent(
@@ -90,6 +91,7 @@ async def test_mcp(client: Client):
 
     history = await handle.fetch_history()
     assert get_activities(history) == [
+        "echo-list-tools",
         "invoke_model",
         "echo-call-tool",
         "invoke_model",
@@ -106,6 +108,7 @@ class MCPReuseWorkflow:
     def __init__(self) -> None:
         echo = TemporalMCPClient(
             server="echo_cached",
+            cache_tools=True,
             start_to_close_timeout=timedelta(seconds=30),
         )
         self.agent = TemporalAgent(
@@ -123,9 +126,9 @@ class MCPReuseWorkflow:
 async def test_mcp_reuses_connection(client: Client):
     """Successive MCP tool calls reuse one cached worker-side connection."""
     task_queue = "test_mcp_reuses_connection"
-    # Count how often the worker opens a connection. With caching this is one
-    # startup-discovery connection plus one cached call connection serving both
-    # tool calls (2); reconnecting per call would make it 3.
+    # Count how often the worker opens a connection. One lazily-opened
+    # connection serves the list-tools discovery and both tool calls (1);
+    # reconnecting per call would make it more.
     factory_calls = [0]
 
     def counting_factory() -> MCPClient:
@@ -163,10 +166,11 @@ async def test_mcp_reuses_connection(client: Client):
     # The worker context has exited, so its run_context finally evicted the
     # cached connection.
     assert "echo_cached" not in _temporal_mcp_client._CONNECTIONS
-    assert factory_calls[0] == 2
+    assert factory_calls[0] == 1
 
     history = await handle.fetch_history()
     assert get_activities(history) == [
+        "echo_cached-list-tools",
         "invoke_model",
         "echo_cached-call-tool",
         "invoke_model",
@@ -185,6 +189,7 @@ class MCPIdleWorkflow:
     def __init__(self) -> None:
         echo = TemporalMCPClient(
             server="echo_idle",
+            cache_tools=True,
             start_to_close_timeout=timedelta(seconds=30),
         )
         self.agent = TemporalAgent(
@@ -239,8 +244,11 @@ async def test_mcp_connection_idle_timeout(client: Client):
         )
         assert await handle.result() == "Done!\n"
 
-        # The call opened a second connection (startup discovery was the first).
-        assert factory_calls[0] == 2
+        # A connection was opened lazily (on the first list-tools/call-tool).
+        # How many times depends on whether the short idle timer fires between
+        # activities, so this only asserts that at least one was opened; the
+        # eviction-while-alive behavior is what the polling loop below checks.
+        assert factory_calls[0] >= 1
 
         # Still inside the worker context: the short idle timer evicts the
         # cached call connection on its own. Asserting eviction here -- with the
@@ -250,3 +258,69 @@ async def test_mcp_connection_idle_timeout(client: Client):
                 break
             await asyncio.sleep(0.1)
         assert "echo_idle" not in _temporal_mcp_client._CONNECTIONS
+
+
+@workflow.defn
+class MCPNoCacheWorkflow:
+    def __init__(self) -> None:
+        echo = TemporalMCPClient(
+            server="echo_nocache",
+            cache_tools=False,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        self.agent = TemporalAgent(
+            model="mock",
+            start_to_close_timeout=timedelta(seconds=30),
+            tools=[echo],
+        )
+
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        result = await self.agent.invoke_async(prompt)
+        return str(result)
+
+
+async def test_mcp_lists_tools_each_turn_when_uncached(client: Client):
+    """With cache_tools=False the tool list is re-fetched on every model call."""
+    task_queue = "test_mcp_lists_tools_each_turn_when_uncached"
+    plugin = StrandsPlugin(
+        models={
+            "mock": lambda: MockModel(
+                [
+                    {"name": "echo", "input": {"message": "one"}},
+                    {"name": "echo", "input": {"message": "two"}},
+                    "Done!",
+                ]
+            )
+        },
+        mcp_clients={"echo_nocache": _echo_client_factory},
+    )
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[MCPNoCacheWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await client.start_workflow(
+            MCPNoCacheWorkflow.run,
+            "echo twice",
+            id=f"test_mcp_lists_tools_each_turn_when_uncached_{uuid4()}",
+            task_queue=task_queue,
+        )
+        assert await handle.result() == "Done!\n"
+
+    history = await handle.fetch_history()
+    activities = get_activities(history)
+    # One list-tools per model call -- the tools are re-listed every turn rather
+    # than once for the workflow.
+    assert activities.count("echo_nocache-list-tools") == activities.count(
+        "invoke_model"
+    )
+    assert activities.count("echo_nocache-list-tools") == 3
+
+    await Replayer(
+        workflows=[MCPNoCacheWorkflow],
+        plugins=[plugin],
+    ).replay_workflow(history)
