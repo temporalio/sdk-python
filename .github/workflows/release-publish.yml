@@ -2,12 +2,6 @@ name: Release Publish
 run-name: Release from main
 
 on:
-  pull_request:
-    paths:
-      - ".github/actions/release-smoke-package/action.yml"
-      - ".github/scripts/release_smoke_package.py"
-      - ".github/scripts/release_verify.py"
-      - ".github/workflows/release-publish.yml"
   workflow_dispatch:
 
 permissions:
@@ -196,7 +190,7 @@ jobs:
         with:
           version: ${{ needs.verify_artifacts.outputs.version }}
           index-url: https://test.pypi.org/simple/
-          extra-index-url: https://pypi.org/simple/
+          dependency-index-url: https://pypi.org/simple/
 
   publish_pypi:
     name: Publish to PyPI

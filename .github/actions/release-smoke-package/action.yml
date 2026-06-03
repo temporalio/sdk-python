@@ -7,8 +7,8 @@ inputs:
   index-url:
     description: "Primary package index URL"
     required: true
-  extra-index-url:
-    description: "Optional fallback package index URL"
+  dependency-index-url:
+    description: "Optional dependency package index URL"
     required: false
     default: ""
 runs:
@@ -22,18 +22,18 @@ runs:
       env:
         VERSION: ${{ inputs.version }}
         INDEX_URL: ${{ inputs.index-url }}
-        EXTRA_INDEX_URL: ${{ inputs.extra-index-url }}
+        DEPENDENCY_INDEX_URL: ${{ inputs.dependency-index-url }}
       run: |
         set -euo pipefail
         python -m venv .venv
         .venv/bin/python -m pip install --upgrade pip
 
-        install_args=(--prefer-binary --index-url "$INDEX_URL")
-        if [[ -n "$EXTRA_INDEX_URL" ]]; then
-          install_args+=(--extra-index-url "$EXTRA_INDEX_URL")
+        install_args=(--version "$VERSION" --index-url "$INDEX_URL")
+        if [[ -n "$DEPENDENCY_INDEX_URL" ]]; then
+          install_args+=(--dependency-index-url "$DEPENDENCY_INDEX_URL")
         fi
 
-        .venv/bin/python -m pip install "${install_args[@]}" "temporalio==$VERSION"
+        .venv/bin/python .github/scripts/install_release_package.py "${install_args[@]}"
     - name: Run SDK smoke test
       shell: bash
       env:
