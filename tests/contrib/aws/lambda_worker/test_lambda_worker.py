@@ -247,11 +247,13 @@ def _make_test_deps(
         load_config=lambda: ClientConfigProfile(),
         getenv={"TEMPORAL_TASK_QUEUE": "test-queue"}.get,  # type: ignore[arg-type]
         extract_lambda_ctx=lambda ctx: (
-            ctx.aws_request_id,
-            ctx.invoked_function_arn,
-        )
-        if hasattr(ctx, "aws_request_id")
-        else None,
+            (
+                ctx.aws_request_id,
+                ctx.invoked_function_arn,
+            )
+            if hasattr(ctx, "aws_request_id")
+            else None
+        ),
     )
 
 

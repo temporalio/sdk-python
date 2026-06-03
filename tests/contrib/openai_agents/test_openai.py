@@ -547,7 +547,9 @@ def research_mock_model():
                         id="",
                         status="completed",
                         type="web_search_call",
-                        action=ActionSearch(query="", type="search"),
+                        action=ActionSearch.model_construct(
+                            type="search", queries=[""]
+                        ),
                     ),
                     ResponseBuilders.response_output_message("Granada"),
                 ],
@@ -1359,6 +1361,7 @@ class WorkflowToolWorkflow:
         agent: Agent = Agent(
             name="Assistant",
             instructions="You are a helpful assistant.",
+            model="gpt-4o",
             tools=[function_tool(self.run_tool)],
         )
         await Runner.run(

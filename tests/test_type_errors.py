@@ -86,7 +86,7 @@ def _test_type_errors(
 
 def _has_type_error_assertions(test_file: Path) -> bool:
     """Check if a file contains any type error assertions."""
-    with open(test_file) as f:
+    with open(test_file, encoding="utf-8") as f:
         return any(re.search(r"# assert-type-error-\w+:", line) for line in f)
 
 
@@ -94,7 +94,7 @@ def _get_expected_errors(test_file: Path, type_checker: str) -> dict[int, str]:
     """Parse expected type errors from comments in a file for the specified type checker."""
     expected_errors = {}
 
-    with open(test_file) as f:
+    with open(test_file, encoding="utf-8") as f:
         lines = zip(itertools.count(1), f)
         for line_num, line in lines:
             if match := re.search(

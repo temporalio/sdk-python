@@ -19,25 +19,25 @@ from . import DEV_SERVER_DOWNLOAD_VERSION
 # If there is an integration test environment variable set, we must remove the
 # first path from the sys.path so we can import the wheel instead
 if os.getenv("TEMPORAL_INTEGRATION_TEST"):
-    assert (
-        sys.path[0] == os.getcwd()
-    ), "Expected first sys.path to be the current working dir"
+    assert sys.path[0] == os.getcwd(), (
+        "Expected first sys.path to be the current working dir"
+    )
     sys.path.pop(0)
     # Import temporalio and confirm it is prefixed with virtual env
     import temporalio
 
-    assert temporalio.__file__.startswith(
-        sys.prefix
-    ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
+    assert temporalio.__file__.startswith(sys.prefix), (
+        f"Expected {temporalio.__file__} to be in {sys.prefix}"
+    )
 
 # Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x lib
 import google.protobuf
 
 protobuf_version = google.protobuf.__version__
 if os.getenv("TEMPORAL_TEST_PROTO3"):
-    assert protobuf_version.startswith(
-        "3."
-    ), f"Expected protobuf 3.x, got {protobuf_version}"
+    assert protobuf_version.startswith("3."), (
+        f"Expected protobuf 3.x, got {protobuf_version}"
+    )
 else:
     assert (
         protobuf_version.startswith("4.")
@@ -119,13 +119,23 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "--dynamic-config-value",
                 "frontend.activityAPIsEnabled=true",
                 "--dynamic-config-value",
+                "frontend.enableCancelWorkerPollsOnShutdown=true",
+                "--dynamic-config-value",
                 "component.nexusoperations.recordCancelRequestCompletionEvents=true",
                 "--dynamic-config-value",
                 "activity.enableStandalone=true",
                 "--dynamic-config-value",
+                "activity.startDelayEnabled=true",
+                "--dynamic-config-value",
                 "history.enableChasm=true",
                 "--dynamic-config-value",
                 "history.enableTransitionHistory=true",
+                "--dynamic-config-value",
+                "history.enableChasmCallbacks=true",
+                "--dynamic-config-value",
+                "nexusoperation.enableStandalone=true",
+                "--dynamic-config-value",
+                'system.system.refreshNexusEndpointsMinWait="0s"',
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
