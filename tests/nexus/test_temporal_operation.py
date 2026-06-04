@@ -1132,7 +1132,7 @@ async def test_temporal_operation_overloads(
         )
 
 
-async def test_temporal_operation_includes_token_in_callback(
+async def test_temporal_operation_includes_workflow_token_in_callback(
     client: Client, env: WorkflowEnvironment
 ):
     task_queue = str(uuid.uuid4())
@@ -1165,6 +1165,62 @@ async def test_temporal_operation_includes_token_in_callback(
             type=OperationTokenType.WORKFLOW,
             namespace=client.namespace,
             workflow_id=target_handle.id,
+        ).encode()
+
+        assert token == expected_token
+
+
+async def test_temporal_operation_includes_activity_token_in_callback(
+    client: Client, env: WorkflowEnvironment
+):
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+    @service_handler
+    class ActivityTokenHandler:
+        @nexus.temporal_operation
+        async def echo_activity(
+            self,
+            _ctx: nexus.TemporalStartOperationContext,
+            client: nexus.TemporalNexusClient,
+            input: Input,
+        ) -> nexus.TemporalOperationResult[str]:
+            return await client.start_activity(
+                echo_activity,
+                input,
+                id=input.value,
+                start_to_close_timeout=timedelta(seconds=10),
+            )
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[ActivityTokenHandler()],
+        activities=[echo_activity],
+    ):
+        input_value = f"test-{uuid.uuid4()}"
+
+        nexus_client = client.create_nexus_client(ActivityTokenHandler, endpoint_name)
+
+        result = await nexus_client.execute_operation(
+            ActivityTokenHandler.echo_activity,
+            Input(value=input_value, task_queue=task_queue),
+            id=str(uuid.uuid4()),
+        )
+        assert result == input_value
+
+        activity_handle = client.get_activity_handle(input_value)
+
+        desc = await activity_handle.describe()
+        token = desc.raw_callbacks[0].info.callback.nexus.header[
+            "nexus-operation-token"
+        ]
+
+        expected_token = OperationToken(
+            type=OperationTokenType.ACTIVITY,
+            namespace=client.namespace,
+            activity_id=input_value,
         ).encode()
 
         assert token == expected_token

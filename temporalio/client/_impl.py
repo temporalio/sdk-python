@@ -723,6 +723,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     workflow_id=input.activity_id,  # Using activity_id as workflow_id for activities not started by a workflow
                 )
             ),
+            callbacks=resp.callbacks,
         )
 
     def list_activities(
