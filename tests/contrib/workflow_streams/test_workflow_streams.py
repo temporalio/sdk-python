@@ -28,6 +28,7 @@ import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import (
     Client,
+    WorkflowExecutionStatus,
     WorkflowHandle,
     WorkflowUpdateFailedError,
     WorkflowUpdateStage,
@@ -2004,6 +2005,63 @@ async def test_continue_as_new_helper(client: Client) -> None:
         items_after = await collect_items(client, new_handle, None, 0, 2)
         assert [i.data for i in items_after] == [b"item-0", b"item-1"]
         assert [i.offset for i in items_after] == [0, 1]
+
+        await new_handle.signal(ContinueAsNewHelperWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_follow_continue_as_new_describes_polled_run(client: Client) -> None:
+    """Regression test for continue-as-new detection.
+
+    ``_follow_continue_as_new`` must describe the *specific run the poll was
+    admitted to* — a rolled-over run is closed with status CONTINUED_AS_NEW,
+    whereas the latest (successor) run reports RUNNING. The previous
+    implementation described the latest run, so the check never fired and a poll
+    failure during a rollover stopped the subscription instead of following it.
+
+    Driving the exact poll-failure race deterministically is impractical (the
+    workflow drains in-flight polls before continuing-as-new), so this asserts
+    the helper's decision directly against a real post-rollover run.
+    """
+    async with new_worker(client, ContinueAsNewHelperWorkflow) as worker:
+        handle = await client.start_workflow(
+            ContinueAsNewHelperWorkflow.run,
+            CANWorkflowInputTyped(),
+            id=f"workflow-stream-can-follow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(
+            "__temporal_workflow_stream_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"item-0"))],
+                publisher_id="pub",
+                sequence=1,
+            ),
+        )
+        old_run_id = handle.result_run_id
+
+        await handle.signal(ContinueAsNewHelperWorkflow.trigger_continue)
+        new_handle = client.get_workflow_handle(handle.id)
+        await assert_eq_eventually(True, lambda: _is_different_run(handle, new_handle))
+
+        # The fix's premise: the polled (old) run reports CONTINUED_AS_NEW; the
+        # latest run reports RUNNING.
+        old_desc = await client.get_workflow_handle(
+            handle.id, run_id=old_run_id
+        ).describe()
+        assert old_desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW
+        latest_desc = await client.get_workflow_handle(handle.id).describe()
+        assert latest_desc.status == WorkflowExecutionStatus.RUNNING
+
+        # The client follows the rollover when it describes the polled run, but
+        # the previous latest-run behavior (polled_run_id unset) would not.
+        following = WorkflowStreamClient.create(client, handle.id)
+        following._polled_run_id = old_run_id
+        assert await following._follow_continue_as_new() is True
+
+        latest_only = WorkflowStreamClient.create(client, handle.id)
+        latest_only._polled_run_id = None  # describes the latest run, as the bug did
+        assert await latest_only._follow_continue_as_new() is False
 
         await new_handle.signal(ContinueAsNewHelperWorkflow.close)
 
