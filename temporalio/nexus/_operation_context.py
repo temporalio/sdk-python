@@ -47,7 +47,7 @@ from ._link_conversion import (
     workflow_event_to_nexus_link,
     workflow_execution_started_event_link_from_workflow_handle,
 )
-from ._token import WorkflowHandle
+from ._token import OperationToken, OperationTokenType, WorkflowHandle
 
 if TYPE_CHECKING:
     import temporalio.client
@@ -225,15 +225,14 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
     def set(self) -> None:
         _temporal_start_operation_context.set(self)
 
-    def _get_callbacks(
-        self,
-    ) -> list[temporalio.client.Callback]:
+    def _get_callbacks(self, token: str) -> list[temporalio.client.Callback]:
         ctx = self.nexus_context
+        callback_headers = {**ctx.callback_headers, "nexus-operation-token": token}
         return (
             [
                 NexusCallback(
                     url=ctx.callback_url,
-                    headers=ctx.callback_headers,
+                    headers=callback_headers,
                 )
             ]
             if ctx.callback_url
@@ -643,6 +642,11 @@ async def _start_nexus_backing_workflow(
     # terminal state) and inbound links to the caller workflow (attached to history events of
     # the workflow started in the handler namespace, and displayed in the UI).
     with _nexus_backing_workflow_start_context():
+        token = OperationToken(
+            type=OperationTokenType.WORKFLOW,
+            namespace=temporal_context.client.namespace,
+            workflow_id=id,
+        ).encode()
         wf_handle = await temporal_context.client.start_workflow(  # type: ignore
             workflow=workflow,
             arg=arg,
@@ -669,7 +673,7 @@ async def _start_nexus_backing_workflow(
             request_eager_start=request_eager_start,
             priority=priority,
             versioning_override=versioning_override,
-            callbacks=temporal_context._get_callbacks(),
+            callbacks=temporal_context._get_callbacks(token),
             links=temporal_context._get_links(),
             request_id=temporal_context.nexus_context.request_id,
         )
