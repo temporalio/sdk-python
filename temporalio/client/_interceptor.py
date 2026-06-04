@@ -111,6 +111,7 @@ class CancelWorkflowInput:
     id: str
     run_id: str | None
     first_execution_run_id: str | None
+    reason: str
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 

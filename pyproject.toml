@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.27.2"
+version = "1.28.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -257,6 +257,3 @@ exclude = ["temporalio/bridge/target/**/*"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
-# openai-agents>=0.17.1 is newer than the exclude-newer cooldown window;
-# bypass it since the minimum version pin already constrains the package.
-exclude-newer-package = { openai-agents = false }

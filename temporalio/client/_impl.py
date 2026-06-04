@@ -352,6 +352,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 identity=self._client.identity,
                 request_id=str(uuid.uuid4()),
                 first_execution_run_id=input.first_execution_run_id or "",
+                reason=input.reason,
             ),
             retry=True,
             metadata=input.rpc_metadata,

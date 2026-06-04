@@ -614,7 +614,14 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
             # Here we are starting a "nexus-backing" standalone activity. The start request
             # carries the Nexus completion callback so the activity result is delivered to
             # the Nexus caller when the activity reaches a terminal state.
+
             with _nexus_backing_start_context():
+                token = OperationToken(
+                    type=OperationTokenType.ACTIVITY,
+                    namespace=self._temporal_context.client.namespace,
+                    activity_id=id,
+                ).encode()
+
                 activity_handle: temporalio.client.ActivityHandle[
                     ReturnType
                 ] = await self._temporal_context.client.start_activity(  # type: ignore
@@ -636,7 +643,7 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
                     priority=priority,
                     rpc_metadata=rpc_metadata,
                     rpc_timeout=rpc_timeout,
-                    callbacks=self._temporal_context._get_callbacks(),
+                    callbacks=self._temporal_context._get_callbacks(token),
                     links=self._temporal_context._get_links(),
                     request_id=self._temporal_context.nexus_context.request_id,
                 )
