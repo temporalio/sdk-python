@@ -460,9 +460,18 @@ class WorkflowStream:
         )
 
     def _validate_poll(self, _payload: PollInput) -> None:
-        """Reject new polls when pollers are detached for continue-as-new."""
+        """Reject new polls when pollers are detached for continue-as-new.
+
+        Uses the well-known ``StreamDraining`` type so a subscriber recognizes
+        the rollover-in-progress and retries until its poll lands on the
+        successor run, rather than surfacing the rejection as an error.
+        """
         if self._detaching:
-            raise RuntimeError("Workflow pollers are detached for continue-as-new")
+            raise ApplicationError(
+                "Workflow pollers are detached for continue-as-new",
+                type="StreamDraining",
+                non_retryable=True,
+            )
 
     def _on_offset(self) -> int:
         """Return the current global offset (base_offset + log length)."""

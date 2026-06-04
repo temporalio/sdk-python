@@ -556,6 +556,14 @@ class WorkflowStreamClient:
                     # base_offset).
                     offset = 0
                     continue
+                if cause_type == "StreamDraining":
+                    # Workflow is detaching for continue-as-new. Back off and
+                    # retry; the poll lands on the successor run once the
+                    # rollover completes.
+                    cooldown_secs = poll_cooldown.total_seconds()
+                    if cooldown_secs > 0:
+                        await asyncio.sleep(cooldown_secs)
+                    continue
                 if cause_type == "AcceptedUpdateCompletedWorkflow":
                     # Workflow returned (or continued-as-new) before
                     # this poll's update completed. Either follow the
