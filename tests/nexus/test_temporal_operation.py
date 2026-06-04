@@ -1173,6 +1173,10 @@ async def test_temporal_operation_includes_workflow_token_in_callback(
 async def test_temporal_operation_includes_activity_token_in_callback(
     client: Client, env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
     await env.create_nexus_endpoint(endpoint_name, task_queue)
