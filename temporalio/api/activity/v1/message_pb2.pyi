@@ -209,7 +209,6 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     TOTAL_HEARTBEAT_COUNT_FIELD_NUMBER: builtins.int
     SDK_NAME_FIELD_NUMBER: builtins.int
     SDK_VERSION_FIELD_NUMBER: builtins.int
-    START_DELAY_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """Unique identifier of this activity within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -342,9 +341,6 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     """The version of the SDK of the worker that most recently picked up an attempt of this activity.
     Overwritten on each new attempt. Empty if unknown.
     """
-    @property
-    def start_delay(self) -> google.protobuf.duration_pb2.Duration:
-        """Time to wait before dispatching the first activity task. This delay is not applied to retry attempts."""
     def __init__(
         self,
         *,
@@ -390,7 +386,6 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         total_heartbeat_count: builtins.int = ...,
         sdk_name: builtins.str = ...,
         sdk_version: builtins.str = ...,
-        start_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
