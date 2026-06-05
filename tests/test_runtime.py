@@ -4,10 +4,11 @@ import queue
 import re
 import uuid
 from datetime import timedelta
-from typing import cast
+from typing import Any, cast
 from urllib.request import urlopen
 
 import pytest
+
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.runtime import (
@@ -21,7 +22,6 @@ from temporalio.runtime import (
     _RuntimeRef,
 )
 from temporalio.worker import Worker
-
 from tests.helpers import (
     LogHandler,
     assert_eq_eventually,
@@ -290,7 +290,7 @@ async def test_opentelemetry_histogram_bucket_overrides(client: Client):
     lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: Any):
             pass  # silence default stderr logging
 
         def do_POST(self):
