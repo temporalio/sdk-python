@@ -1415,6 +1415,43 @@ async def test_response_serialization():
     await pydantic_data_converter.encode([model_response])
 
 
+def test_openai_converter_serialization_fallback(monkeypatch: pytest.MonkeyPatch):
+    import pydantic_core
+    from openai.types.responses import ResponseOutputMessage, ResponseOutputText
+
+    from temporalio.contrib.openai_agents._temporal_openai_agents import (
+        _OpenAIJSONPlainPayloadConverter,
+    )
+    from temporalio.contrib.pydantic import ToJsonOptions
+
+    converter = _OpenAIJSONPlainPayloadConverter(ToJsonOptions(exclude_unset=True))
+
+    class _RaisingSerializer:
+        def to_json(self, *_args: Any, **_kwargs: Any) -> bytes:
+            raise pydantic_core.PydanticSerializationError("forced")
+
+    monkeypatch.setattr(converter, "_schema_serializer", _RaisingSerializer())
+
+    value = ResponseOutputMessage(
+        id="",
+        content=[ResponseOutputText(text="hello", annotations=[], type="output_text")],
+        role="assistant",
+        status="completed",
+        type="message",
+    )
+    payload = converter.to_payload(value)
+    assert payload is not None
+    assert payload.metadata["encoding"] == b"json/plain"
+    assert payload.data == value.model_dump_json(exclude_unset=True).encode()
+
+    decoded = converter.from_payload(payload, type(value))
+    assert decoded == value
+
+    # A non-model value has no model_dump_json, so the error propagates.
+    with pytest.raises(pydantic_core.PydanticSerializationError):
+        converter.to_payload(object())
+
+
 async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
     def status_error(status: int):
         with workflow.unsafe.imports_passed_through():
