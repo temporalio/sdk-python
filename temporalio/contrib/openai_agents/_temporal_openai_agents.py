@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 
 import pydantic
-import pydantic_core
 from agents import ModelProvider, Trace, set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
@@ -112,19 +111,16 @@ class _OpenAIJSONPlainPayloadConverter(PydanticJSONPlainPayloadConverter):
     """
 
     def to_payload(self, value: typing.Any) -> temporalio.api.common.v1.Payload | None:
-        try:
-            return super().to_payload(value)
-        except pydantic_core.PydanticSerializationError:
-            dump = getattr(value, "model_dump_json", None)
-            if dump is None:
-                raise
+        """See base class."""
+        if isinstance(value, pydantic.BaseModel):
             exclude_unset = (
                 self._to_json_options.exclude_unset if self._to_json_options else False
             )
             return temporalio.api.common.v1.Payload(
                 metadata={"encoding": self.encoding.encode()},
-                data=dump(exclude_unset=exclude_unset).encode(),
+                data=value.model_dump_json(exclude_unset=exclude_unset).encode(),
             )
+        return super().to_payload(value)
 
     def from_payload(
         self,

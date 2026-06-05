@@ -1415,7 +1415,11 @@ async def test_response_serialization():
     await pydantic_data_converter.encode([model_response])
 
 
-def test_openai_converter_serialization_fallback(monkeypatch: pytest.MonkeyPatch):
+def test_openai_converter_uses_model_serializer(monkeypatch: pytest.MonkeyPatch):
+    # OpenAI models set defer_build=True, so the generic any-schema serializer
+    # trips on their MockValSer placeholder. The converter must route pydantic
+    # models through their own serializer instead. Prove the routing by making
+    # the generic serializer raise: models still serialize, non-models don't.
     import pydantic_core
     from openai.types.responses import ResponseOutputMessage, ResponseOutputText
 
@@ -1428,7 +1432,7 @@ def test_openai_converter_serialization_fallback(monkeypatch: pytest.MonkeyPatch
 
     class _RaisingSerializer:
         def to_json(self, *_args: Any, **_kwargs: Any) -> bytes:
-            raise pydantic_core.PydanticSerializationError("forced")
+            raise pydantic_core.PydanticSerializationError("generic serializer used")
 
     monkeypatch.setattr(converter, "_schema_serializer", _RaisingSerializer())
 
@@ -1439,6 +1443,7 @@ def test_openai_converter_serialization_fallback(monkeypatch: pytest.MonkeyPatch
         status="completed",
         type="message",
     )
+    # A pydantic model bypasses the generic serializer and uses its own.
     payload = converter.to_payload(value)
     assert payload is not None
     assert payload.metadata["encoding"] == b"json/plain"
@@ -1447,9 +1452,9 @@ def test_openai_converter_serialization_fallback(monkeypatch: pytest.MonkeyPatch
     decoded = converter.from_payload(payload, type(value))
     assert decoded == value
 
-    # A non-model value has no model_dump_json, so the error propagates.
+    # Non-model values still route through the generic serializer.
     with pytest.raises(pydantic_core.PydanticSerializationError):
-        converter.to_payload(object())
+        converter.to_payload({"not": "a model"})
 
 
 async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
