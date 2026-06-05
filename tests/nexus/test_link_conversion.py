@@ -210,6 +210,61 @@ def test_link_conversion_workflow_event_to_link_and_back(
 
 
 @pytest.mark.parametrize(
+    ["workflow_link", "expected_link"],
+    [
+        (
+            temporalio.api.common.v1.Link(
+                workflow=temporalio.api.common.v1.Link.Workflow(
+                    namespace="ns",
+                    workflow_id="wid",
+                    run_id="rid",
+                    reason="query",
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns/workflows/wid/rid?reason=query",
+            ),
+        ),
+        (
+            temporalio.api.common.v1.Link(
+                workflow=temporalio.api.common.v1.Link.Workflow(
+                    namespace="ns2",
+                    workflow_id="wid/2",
+                    run_id="rid2",
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns2/workflows/wid%2F2/rid2",
+            ),
+        ),
+    ],
+)
+def test_link_conversion_workflow_to_link_and_back(
+    workflow_link: temporalio.api.common.v1.Link, expected_link: nexusrpc.Link
+):
+    actual_link = temporalio.nexus._link_conversion.workflow_to_nexus_link(
+        workflow_link.workflow
+    )
+    assert expected_link == actual_link
+
+    actual_workflow = temporalio.nexus._link_conversion.nexus_link_to_workflow_link(
+        actual_link
+    )
+    assert workflow_link == actual_workflow
+
+    assert (
+        expected_link
+        == temporalio.nexus._link_conversion.temporal_link_to_nexus_link(workflow_link)
+    )
+    assert (
+        workflow_link
+        == temporalio.nexus._link_conversion.nexus_link_to_temporal_link(expected_link)
+    )
+
+
+@pytest.mark.parametrize(
     ["operation_link", "expected_link"],
     [
         (
