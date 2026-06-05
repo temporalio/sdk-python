@@ -110,18 +110,6 @@ class _OpenAIJSONPlainPayloadConverter(PydanticJSONPlainPayloadConverter):
     side does not, so fall back to lenient construction when validation fails.
     """
 
-    def to_payload(self, value: typing.Any) -> temporalio.api.common.v1.Payload | None:
-        """See base class."""
-        if isinstance(value, pydantic.BaseModel):
-            exclude_unset = (
-                self._to_json_options.exclude_unset if self._to_json_options else False
-            )
-            return temporalio.api.common.v1.Payload(
-                metadata={"encoding": self.encoding.encode()},
-                data=value.model_dump_json(exclude_unset=exclude_unset).encode(),
-            )
-        return super().to_payload(value)
-
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
