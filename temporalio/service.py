@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
-from enum import Enum, IntEnum
+from enum import IntEnum
 from typing import ClassVar, TypeVar
 
 import google.protobuf.message
@@ -158,14 +158,38 @@ class DnsLoadBalancingConfig:
 DnsLoadBalancingConfig.default = DnsLoadBalancingConfig()
 
 
-class GrpcCompression(Enum):
-    """Transport-level gRPC compression mode."""
+class GrpcCompression(ABC):
+    """Transport-level gRPC compression mode.
 
-    NONE = "none"
+    This is a base type for concrete compression modes. Current modes are
+    available as singleton constants on this class.
+    """
+
+    NONE: ClassVar[GrpcCompression]
     """Do not compress gRPC requests or advertise support for compressed responses."""
 
-    GZIP = "gzip"
+    GZIP: ClassVar[GrpcCompression]
     """Gzip-compress gRPC requests and accept gzip-compressed responses."""
+
+    @abstractmethod
+    def _to_bridge_config(self) -> str:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class _NoGrpcCompression(GrpcCompression):
+    def _to_bridge_config(self) -> str:
+        return "none"
+
+
+@dataclass(frozen=True)
+class _GzipGrpcCompression(GrpcCompression):
+    def _to_bridge_config(self) -> str:
+        return "gzip"
+
+
+GrpcCompression.NONE = _NoGrpcCompression()
+GrpcCompression.GZIP = _GzipGrpcCompression()
 
 
 @dataclass
@@ -246,7 +270,7 @@ class ConnectConfig:
                 if self.dns_load_balancing_config
                 else None
             ),
-            grpc_compression=self.grpc_compression.value,
+            grpc_compression=self.grpc_compression._to_bridge_config(),
         )
 
 
