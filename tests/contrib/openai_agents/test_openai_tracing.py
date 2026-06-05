@@ -369,20 +369,20 @@ async def test_external_trace_to_workflow_spans(
     assert workflow_span is not None, "Workflow span should exist"
 
     # Verify parenting: External trace should be root, workflow span should be child of external trace
-    assert (
-        external_span.parent is None
-    ), "External trace should have no parent (be root)"
+    assert external_span.parent is None, (
+        "External trace should have no parent (be root)"
+    )
     assert workflow_span.parent is not None, "Workflow span should have a parent"
     assert external_span.context is not None, "External span should have context"
-    assert (
-        workflow_span.parent.span_id == external_span.context.span_id
-    ), "Workflow span should be child of external trace"
+    assert workflow_span.parent.span_id == external_span.context.span_id, (
+        "Workflow span should be child of external trace"
+    )
 
     # Verify all spans have unique IDs
     span_ids = [span.context.span_id for span in spans if span.context]
-    assert len(span_ids) == len(
-        set(span_ids)
-    ), f"All spans should have unique IDs, got: {span_ids}"
+    assert len(span_ids) == len(set(span_ids)), (
+        f"All spans should have unique IDs, got: {span_ids}"
+    )
 
 
 async def test_external_trace_and_span_to_workflow_spans(
@@ -462,27 +462,27 @@ async def test_external_trace_and_span_to_workflow_spans(
     assert workflow_span is not None, "Workflow span should exist"
 
     # Verify parenting: External span should be child of trace, workflow span should be child of external span
-    assert (
-        external_trace_span.parent is None
-    ), "External trace should have no parent (be root)"
+    assert external_trace_span.parent is None, (
+        "External trace should have no parent (be root)"
+    )
     assert external_span.parent is not None, "External span should have a parent"
-    assert (
-        external_trace_span.context is not None
-    ), "External trace span should have context"
-    assert (
-        external_span.parent.span_id == external_trace_span.context.span_id
-    ), "External span should be child of external trace"
+    assert external_trace_span.context is not None, (
+        "External trace span should have context"
+    )
+    assert external_span.parent.span_id == external_trace_span.context.span_id, (
+        "External span should be child of external trace"
+    )
     assert workflow_span.parent is not None, "Workflow span should have a parent"
     assert external_span.context is not None, "External span should have context"
-    assert (
-        workflow_span.parent.span_id == external_span.context.span_id
-    ), "Workflow span should be child of external span"
+    assert workflow_span.parent.span_id == external_span.context.span_id, (
+        "Workflow span should be child of external span"
+    )
 
     # Verify all spans have unique IDs
     span_ids = [span.context.span_id for span in spans if span.context]
-    assert len(span_ids) == len(
-        set(span_ids)
-    ), f"All spans should have unique IDs, got: {span_ids}"
+    assert len(span_ids) == len(set(span_ids)), (
+        f"All spans should have unique IDs, got: {span_ids}"
+    )
 
 
 async def test_workflow_only_trace_to_spans(
@@ -556,16 +556,16 @@ async def test_workflow_only_trace_to_spans(
     assert workflow_span is not None, "Workflow span should exist"
 
     # Verify parenting: Workflow trace should be root, workflow span should be child of workflow trace
-    assert (
-        workflow_trace_span.parent is None
-    ), "Workflow trace should have no parent (be root)"
+    assert workflow_trace_span.parent is None, (
+        "Workflow trace should have no parent (be root)"
+    )
     assert workflow_span.parent is not None, "Workflow span should have a parent"
-    assert (
-        workflow_trace_span.context is not None
-    ), "Workflow trace span should have context"
-    assert (
-        workflow_span.parent.span_id == workflow_trace_span.context.span_id
-    ), "Workflow span should be child of workflow trace"
+    assert workflow_trace_span.context is not None, (
+        "Workflow trace span should have context"
+    )
+    assert workflow_span.parent.span_id == workflow_trace_span.context.span_id, (
+        "Workflow span should be child of workflow trace"
+    )
 
 
 @workflow.defn
@@ -611,14 +611,14 @@ async def test_custom_span_without_trace_context(
         if "Should not appear" in span.name or "Neither should this" in span.name
     ]
 
-    assert (
-        len(custom_spans) == 0
-    ), f"Expected no custom spans without trace context, but found: {[s.name for s in custom_spans]}"
+    assert len(custom_spans) == 0, (
+        f"Expected no custom spans without trace context, but found: {[s.name for s in custom_spans]}"
+    )
 
     # Should have no spans at all since no trace was started and spans should be dropped
-    assert (
-        len(spans) == 0
-    ), f"Expected no spans without trace context, but found: {[s.name for s in spans]}"
+    assert len(spans) == 0, (
+        f"Expected no spans without trace context, but found: {[s.name for s in spans]}"
+    )
 
 
 async def test_otel_tracing_in_runner(
@@ -696,35 +696,35 @@ async def test_otel_tracing_in_runner(
     span_ids = {span.context.span_id for span in spans if span.context}
     for span in spans:
         if span.parent:
-            assert (
-                span.parent.span_id in span_ids
-            ), f"Span '{span.name}' has invalid parent reference - parent span doesn't exist"
+            assert span.parent.span_id in span_ids, (
+                f"Span '{span.name}' has invalid parent reference - parent span doesn't exist"
+            )
 
     # Validate logical parent-child relationships match user code structure
     workflow_trace_spans = [span for span in spans if "Research workflow" in span.name]
-    assert (
-        len(workflow_trace_spans) == 1
-    ), f"Expected exactly one 'Research workflow' trace, got {len(workflow_trace_spans)}"
+    assert len(workflow_trace_spans) == 1, (
+        f"Expected exactly one 'Research workflow' trace, got {len(workflow_trace_spans)}"
+    )
     workflow_span = workflow_trace_spans[0]
     assert workflow_span.context is not None
 
     # Research manager should be child of workflow trace
     research_span = research_manager_spans[0]
     assert research_span.context is not None
-    assert (
-        research_span.parent is not None
-    ), "Research manager span should have a parent"
-    assert (
-        research_span.parent.span_id == workflow_span.context.span_id
-    ), "Expected 'Research manager' to be child of 'Research workflow' trace"
+    assert research_span.parent is not None, (
+        "Research manager span should have a parent"
+    )
+    assert research_span.parent.span_id == workflow_span.context.span_id, (
+        "Expected 'Research manager' to be child of 'Research workflow' trace"
+    )
 
     # Search the web should be child of research manager
     search_span = search_web_spans[0]
     assert search_span.context is not None
     assert search_span.parent is not None, "Search the web span should have a parent"
-    assert (
-        search_span.parent.span_id == research_span.context.span_id
-    ), "Expected 'Search the web' to be child of 'Research manager' span"
+    assert search_span.parent.span_id == research_span.context.span_id, (
+        "Expected 'Search the web' to be child of 'Research manager' span"
+    )
 
     # All search agent spans should be descendants of "Search the web"
     # (the SDK now inserts a "task" span between "Search the web" and the agent)
@@ -741,12 +741,12 @@ async def test_otel_tracing_in_runner(
         return False
 
     for search_agent_span in search_agent_spans:
-        assert (
-            search_agent_span.parent is not None
-        ), f"Search agent span '{search_agent_span.name}' should have a parent"
-        assert is_descendant_of(
-            search_agent_span, search_span.context.span_id
-        ), f"Expected all 'Search agent' spans to be descendants of 'Search the web' span"
+        assert search_agent_span.parent is not None, (
+            f"Search agent span '{search_agent_span.name}' should have a parent"
+        )
+        assert is_descendant_of(search_agent_span, search_span.context.span_id), (
+            f"Expected all 'Search agent' spans to be descendants of 'Search the web' span"
+        )
 
     # PlannerAgent and WriterAgent should be descendants of research manager
     planner_spans = [span for span in spans if "PlannerAgent" in span.name]
@@ -754,15 +754,15 @@ async def test_otel_tracing_in_runner(
 
     for planner_span in planner_spans:
         assert planner_span.parent is not None, "PlannerAgent span should have a parent"
-        assert is_descendant_of(
-            planner_span, research_span.context.span_id
-        ), "Expected 'PlannerAgent' to be descendant of 'Research manager' span"
+        assert is_descendant_of(planner_span, research_span.context.span_id), (
+            "Expected 'PlannerAgent' to be descendant of 'Research manager' span"
+        )
 
     for writer_span in writer_spans:
         assert writer_span.parent is not None, "WriterAgent span should have a parent"
-        assert is_descendant_of(
-            writer_span, research_span.context.span_id
-        ), "Expected 'WriterAgent' to be descendant of 'Research manager' span"
+        assert is_descendant_of(writer_span, research_span.context.span_id), (
+            "Expected 'WriterAgent' to be descendant of 'Research manager' span"
+        )
 
 
 @workflow.defn
@@ -879,32 +879,32 @@ async def test_sdk_trace_to_otel_span_parenting(
     assert direct_otel_span is not None, "Direct OTEL span should exist"
 
     # Verify parenting chain: Client SDK trace -> Workflow SDK span -> Direct OTEL span
-    assert (
-        client_sdk_trace_span.parent is None
-    ), "Client SDK trace should have no parent (be root)"
+    assert client_sdk_trace_span.parent is None, (
+        "Client SDK trace should have no parent (be root)"
+    )
 
-    assert (
-        workflow_sdk_span.parent is not None
-    ), "Workflow SDK span should have a parent"
-    assert (
-        client_sdk_trace_span.context is not None
-    ), "Client SDK trace span should have context"
-    assert (
-        workflow_sdk_span.parent.span_id == client_sdk_trace_span.context.span_id
-    ), "Workflow SDK span should be child of Client SDK trace"
+    assert workflow_sdk_span.parent is not None, (
+        "Workflow SDK span should have a parent"
+    )
+    assert client_sdk_trace_span.context is not None, (
+        "Client SDK trace span should have context"
+    )
+    assert workflow_sdk_span.parent.span_id == client_sdk_trace_span.context.span_id, (
+        "Workflow SDK span should be child of Client SDK trace"
+    )
 
     assert direct_otel_span.parent is not None, "Direct OTEL span should have a parent"
-    assert (
-        workflow_sdk_span.context is not None
-    ), "Workflow SDK span should have context"
-    assert (
-        direct_otel_span.parent.span_id == workflow_sdk_span.context.span_id
-    ), "Direct OTEL span should be child of Workflow SDK span"
+    assert workflow_sdk_span.context is not None, (
+        "Workflow SDK span should have context"
+    )
+    assert direct_otel_span.parent.span_id == workflow_sdk_span.context.span_id, (
+        "Direct OTEL span should be child of Workflow SDK span"
+    )
 
     # Verify all spans belong to the same trace
-    assert (
-        workflow_sdk_span.context is not None
-    ), "Workflow SDK span should have context"
+    assert workflow_sdk_span.context is not None, (
+        "Workflow SDK span should have context"
+    )
     assert direct_otel_span.context is not None, "Direct OTEL span should have context"
     assert (
         client_sdk_trace_span.context.trace_id
@@ -914,6 +914,6 @@ async def test_sdk_trace_to_otel_span_parenting(
 
     # Verify all spans have unique IDs
     span_ids = [span.context.span_id for span in spans if span.context]
-    assert len(span_ids) == len(
-        set(span_ids)
-    ), f"All spans should have unique IDs, got: {span_ids}"
+    assert len(span_ids) == len(set(span_ids)), (
+        f"All spans should have unique IDs, got: {span_ids}"
+    )

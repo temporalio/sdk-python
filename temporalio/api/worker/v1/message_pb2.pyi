@@ -592,3 +592,96 @@ class StorageDriverInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___StorageDriverInfo = StorageDriverInfo
+
+class WorkerCommand(google.protobuf.message.Message):
+    """A command sent from the server to a worker."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CANCEL_ACTIVITY_FIELD_NUMBER: builtins.int
+    @property
+    def cancel_activity(self) -> global___CancelActivityCommand: ...
+    def __init__(
+        self,
+        *,
+        cancel_activity: global___CancelActivityCommand | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["type", b"type"]
+    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
+
+global___WorkerCommand = WorkerCommand
+
+class CancelActivityCommand(google.protobuf.message.Message):
+    """Cancel an activity if it is still running. Otherwise, do nothing."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_TOKEN_FIELD_NUMBER: builtins.int
+    task_token: builtins.bytes
+    def __init__(
+        self,
+        *,
+        task_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["task_token", b"task_token"]
+    ) -> None: ...
+
+global___CancelActivityCommand = CancelActivityCommand
+
+class WorkerCommandResult(google.protobuf.message.Message):
+    """The result of executing a WorkerCommand."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CANCEL_ACTIVITY_FIELD_NUMBER: builtins.int
+    @property
+    def cancel_activity(self) -> global___CancelActivityResult: ...
+    def __init__(
+        self,
+        *,
+        cancel_activity: global___CancelActivityResult | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["type", b"type"]
+    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
+
+global___WorkerCommandResult = WorkerCommandResult
+
+class CancelActivityResult(google.protobuf.message.Message):
+    """Result of a CancelActivityCommand.
+    Treat both successful cancellation and no-op (activity is no longer running) as success.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___CancelActivityResult = CancelActivityResult

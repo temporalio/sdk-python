@@ -4,8 +4,10 @@ import asyncio
 import concurrent.futures
 import multiprocessing
 import multiprocessing.context
+import os
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
+from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any
 from urllib.request import urlopen
@@ -57,6 +59,7 @@ from temporalio.worker import (
     WorkerTuner,
     WorkflowSlotInfo,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from temporalio.workflow import DynamicWorkflowConfig, VersioningIntent
 from tests.helpers import (
     assert_eventually,
@@ -1456,6 +1459,40 @@ class ContinueAsNewWithVersionUpgradeV2:
         return "v2.0"
 
 
+@workflow.defn(
+    name="ContinueAsNewWithRampingVersion",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithRampingVersionV1:
+    def __init__(self) -> None:
+        self._should_continue_as_new = False
+
+    @workflow.run
+    async def run(self, attempt: int) -> str:
+        if attempt > 0:
+            return "v1.0"
+
+        await workflow.wait_condition(lambda: self._should_continue_as_new)
+        workflow.continue_as_new(
+            arg=attempt + 1,
+            initial_versioning_behavior=workflow.ContinueAsNewVersioningBehavior.USE_RAMPING_VERSION,
+        )
+
+    @workflow.signal
+    def do_continue_as_new(self) -> None:
+        self._should_continue_as_new = True
+
+
+@workflow.defn(
+    name="ContinueAsNewWithRampingVersion",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithRampingVersionV2:
+    @workflow.run
+    async def run(self, attempt: int) -> str:  # type:ignore[reportUnusedParameter]
+        return "v2.0"
+
+
 async def wait_for_workflow_running_on_version(
     handle: WorkflowHandle[Any, Any], expected_build_id: str
 ) -> None:
@@ -1545,6 +1582,64 @@ async def test_continue_as_new_with_version_upgrade(
         assert result == "v2.0"
 
 
+async def test_continue_as_new_with_ramping_version(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"deployment-can-ramping-{uuid.uuid4()}"
+    v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+    v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
+
+    async with (
+        new_worker(
+            client,
+            ContinueAsNewWithRampingVersionV1,
+            deployment_config=WorkerDeploymentConfig(
+                version=v1,
+                use_worker_versioning=True,
+            ),
+        ) as w1,
+        new_worker(
+            client,
+            ContinueAsNewWithRampingVersionV2,
+            deployment_config=WorkerDeploymentConfig(
+                version=v2,
+                use_worker_versioning=True,
+            ),
+            task_queue=w1.task_queue,
+        ),
+    ):
+        describe_resp = await wait_until_worker_deployment_visible(client, v1)
+
+        resp2 = await set_current_deployment_version(
+            client, describe_resp.conflict_token, v1
+        )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id
+        )
+
+        handle = await client.start_workflow(
+            "ContinueAsNewWithRampingVersion",
+            0,
+            id=f"test-can-ramping-version-{uuid.uuid4()}",
+            task_queue=w1.task_queue,
+        )
+        await wait_for_workflow_running_on_version(handle, v1.build_id)
+
+        await wait_until_worker_deployment_visible(client, v2)
+        await set_ramping_version(client, resp2.conflict_token, v2, 0)
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id
+        )
+
+        await handle.signal(ContinueAsNewWithRampingVersionV1.do_continue_as_new)
+
+        result = await handle.result()
+        assert result == "v2.0"
+
+
 def test_worker_config_matches_init_params():
     """WorkerConfig TypedDict keys must match Worker.__init__ kwargs."""
     import inspect
@@ -1558,3 +1653,57 @@ def test_worker_config_matches_init_params():
         f"Missing from config: {init_params - config_keys}. "
         f"Extra in config: {config_keys - init_params}."
     )
+
+
+async def test_worker_debug_mode(client: Client):
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds == 2
+    assert isinstance(worker._workflow_worker._workflow_runner, SandboxedWorkflowRunner)
+    assert (
+        "_pydevd_bundle"
+        not in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+    )
+
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        debug_mode=True,
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds is None
+    assert isinstance(worker._workflow_worker._workflow_runner, SandboxedWorkflowRunner)
+    assert (
+        "_pydevd_bundle"
+        in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+    )
+
+    @contextmanager
+    def debug_envvar():
+        os.environ["TEMPORAL_DEBUG"] = "true"
+        try:
+            yield
+        finally:
+            os.environ.pop("TEMPORAL_DEBUG")
+
+    with debug_envvar():
+        worker = Worker(
+            client,
+            workflows=[SimpleWorkflow],
+            task_queue=f"task-queue-{uuid.uuid4()}",
+        )
+        assert worker._workflow_worker
+        assert worker._workflow_worker._deadlock_timeout_seconds is None
+        assert isinstance(
+            worker._workflow_worker._workflow_runner,
+            SandboxedWorkflowRunner,
+        )
+        assert (
+            "_pydevd_bundle"
+            in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+        )

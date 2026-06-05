@@ -130,12 +130,14 @@ from tests.helpers import (
     assert_pending_activity_exists_eventually,
     assert_task_fail_eventually,
     assert_workflow_exists_eventually,
+    async_wait_for_pause_event,
     ensure_search_attributes_present,
     find_free_port,
     get_pending_activity_info,
     new_worker,
     pause_and_assert,
     unpause_and_assert,
+    wait_for_pause_event,
     workflow_update_exists,
 )
 from tests.helpers.cache_eviction import (
@@ -327,6 +329,24 @@ async def test_workflow_history_info(
         await handle.signal(
             HistoryInfoWorkflow.bunch_of_events, continue_as_new_suggest_history_count
         )
+
+        # Wait for the first signal's timers to be committed so the next
+        # signal creates a post-timer workflow task with updated workflow.info().
+        # This avoids a race where both signals are accepted before the worker
+        # processes the first one and both make it into the same activation.
+        # If that occurs, the query will have the stale history that the
+        # final signal is intended to avoid.
+        async def timer_events_recorded() -> None:
+            timer_started_count = 0
+            async for event in handle.fetch_history_events():
+                if event.HasField("timer_started_event_attributes"):
+                    timer_started_count += 1
+                    if timer_started_count >= continue_as_new_suggest_history_count:
+                        return
+            assert timer_started_count >= continue_as_new_suggest_history_count
+
+        await assert_eventually(timer_events_recorded)
+
         # Send one more event to trigger the WFT update. We have to do this
         # because just a query will have a stale representation of history
         # counts, but signal forces a new WFT.
@@ -943,9 +963,6 @@ class CancelActivityWorkflow:
             self._activity_result = await handle
         except ActivityError as err:
             self._activity_result = f"Error: {err.cause.__class__.__name__}"
-        # TODO(cretz): Remove when https://github.com/temporalio/sdk-core/issues/323 is fixed
-        except CancelledError as err:
-            self._activity_result = f"Error: {err.__class__.__name__}"
         # Wait forever
         await asyncio.Future()
 
@@ -1074,6 +1091,148 @@ async def test_workflow_simple_cancel(client: Client):
             await handle.result()
         assert isinstance(err.value.cause, CancelledError)
         assert (await handle.describe()).status == WorkflowExecutionStatus.CANCELED
+
+
+@workflow.defn
+class CancelReasonWorkflow:
+    def __init__(self) -> None:
+        self._started = False
+        # Reason observed when the inner task was cancelled (no external
+        # workflow cancel has happened yet at that point).
+        self._reason_inner: str | None = "unset"
+        # Reason observed in the outer CancelledError handler after the
+        # external workflow cancel has been delivered.
+        self._reason_outer: str | None = "unset"
+
+    @workflow.run
+    async def run(self) -> NoReturn:
+        self._started = True
+        task = asyncio.create_task(asyncio.sleep(1000))
+        try:
+            task.cancel()
+            await task
+        except asyncio.CancelledError:
+            self._reason_inner = workflow.cancellation_reason()
+        try:
+            await asyncio.sleep(1000)
+        except asyncio.CancelledError:
+            self._reason_outer = workflow.cancellation_reason()
+            raise
+        raise RuntimeError("unreachable")
+
+    @workflow.query
+    def started(self) -> bool:
+        return self._started
+
+    @workflow.query
+    def reason_inner(self) -> str | None:
+        return self._reason_inner
+
+    @workflow.query
+    def reason_outer(self) -> str | None:
+        return self._reason_outer
+
+
+@pytest.mark.parametrize("reason", ["user-supplied reason", ""])
+async def test_workflow_cancellation_reason(client: Client, reason: str):
+    async with new_worker(client, CancelReasonWorkflow) as worker:
+        handle = await client.start_workflow(
+            CancelReasonWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def started() -> bool:
+            return await handle.query(CancelReasonWorkflow.started)
+
+        await assert_eq_eventually(True, started)
+        # Before any external cancel, reason is None even though an inner task
+        # cancel has already been observed.
+        assert await handle.query(CancelReasonWorkflow.reason_inner) is None
+
+        # When reason is "", cancel without providing the kwarg at all to
+        # exercise the default path.
+        if reason:
+            await handle.cancel(reason=reason)
+        else:
+            await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+        outer = await handle.query(CancelReasonWorkflow.reason_outer)
+        # Load-bearing: a cancel with no reason still produces an empty string,
+        # not None — None means "no external cancel happened".
+        assert outer is not None
+        assert outer == reason
+
+
+@workflow.defn
+class CancelReasonReporter:
+    """Workflow that swallows a cancel and returns the observed reason."""
+
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            await asyncio.sleep(1000)
+        except asyncio.CancelledError:
+            return workflow.cancellation_reason() or ""
+        raise RuntimeError("unreachable")
+
+
+@workflow.defn
+class ChildCancelReasonWorkflow:
+    @workflow.run
+    async def run(self, msg: str) -> str:
+        child = await workflow.start_child_workflow(
+            CancelReasonReporter.run,
+            id=f"{workflow.info().workflow_id}_child",
+        )
+        child.cancel(msg)
+        return await child
+
+
+async def test_workflow_child_cancel_reason(client: Client):
+    async with new_worker(
+        client, ChildCancelReasonWorkflow, CancelReasonReporter
+    ) as worker:
+        result = await client.execute_workflow(
+            ChildCancelReasonWorkflow.run,
+            "from-parent",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "from-parent"
+
+
+@workflow.defn
+class ExternalCancelReasonWorkflow:
+    @workflow.run
+    async def run(self, target_id: str) -> None:
+        await workflow.get_external_workflow_handle(target_id).cancel(
+            reason="from-external-caller"
+        )
+
+
+async def test_workflow_external_cancel_reason(client: Client):
+    async with new_worker(
+        client, ExternalCancelReasonWorkflow, CancelReasonReporter
+    ) as worker:
+        target_id = f"workflow-{uuid.uuid4()}"
+        target = await client.start_workflow(
+            CancelReasonReporter.run,
+            id=target_id,
+            task_queue=worker.task_queue,
+        )
+        await client.execute_workflow(
+            ExternalCancelReasonWorkflow.run,
+            target_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Server wraps the user-supplied reason with metadata about the caller
+        # when one workflow cancels another, so check for substring.
+        assert "from-external-caller" in await target.result()
 
 
 @workflow.defn
@@ -1209,9 +1368,58 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
         assert isinstance(err.value.cause.cause, CancelledError)
 
 
-@pytest.mark.skip(reason="unable to easily prevent child start currently")
-async def test_workflow_cancel_child_unstarted(_client: Client):
-    raise NotImplementedError
+@workflow.defn
+class CancelDuringChildStartWorkflow:
+    def __init__(self) -> None:
+        self._proceed = False
+
+    @workflow.signal
+    def proceed(self) -> None:
+        self._proceed = True
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._proceed)
+        # Start a child on a task queue with no worker. The child's first WFT
+        # never starts, so _start_fut remains unresolved and the start loop
+        # blocks forever.
+        await workflow.start_child_workflow(
+            LongSleepWorkflow.run,
+            id=f"{workflow.info().workflow_id}_child",
+            task_queue="nonexistent-task-queue-no-worker-abc123",
+        )
+        await workflow.sleep(1000)
+
+
+async def test_workflow_cancel_child_unstarted(client: Client):
+    # Regression test for https://github.com/temporalio/sdk-python/issues/1445
+    #
+    # When cancellation arrived while the parent was waiting for a child
+    # workflow to start, the CancelledError was caught in the start loop
+    # to send a cancel command to the child — but was not re-raised.
+    # Because _start_fut never resolves (child on a queue with no worker),
+    # the loop would keep waiting forever, hanging the parent workflow.
+    #
+    # The fix: re-raise only when self._cancel_requested is True, which
+    # distinguishes Temporal workflow cancellation from other CancelledError
+    # sources such as asyncio.wait_for timeouts.
+    async with new_worker(
+        client,
+        CancelDuringChildStartWorkflow,
+        # Deliberately not registering LongSleepWorkflow and not starting
+        # a worker on the child's task queue.
+    ) as worker:
+        handle = await client.start_workflow(
+            CancelDuringChildStartWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        await handle.signal(CancelDuringChildStartWorkflow.proceed)
+        await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
 
 
 @workflow.defn
@@ -1636,6 +1844,9 @@ class CustomWorkflowInstance(WorkflowInstance):
         command_info: temporalio.worker._command_aware_visitor.CommandInfo | None,
     ) -> temporalio.converter._extstore.StorageDriverStoreContext:
         return self._unsandboxed.get_external_store_context(command_info)
+
+    def get_info(self) -> temporalio.workflow.Info:
+        return self._unsandboxed.get_info()
 
 
 async def test_workflow_with_custom_runner(client: Client):
@@ -2427,7 +2638,7 @@ async def test_workflow_dataclass_typed(client: Client, env: WorkflowEnvironment
     # TODO(cretz): Fix
     if env.supports_time_skipping:
         pytest.skip(
-            "Java test server: https://github.com/temporalio/sdk-core/issues/390"
+            "Java test server: https://github.com/temporalio/sdk-rust/issues/390"
         )
     async with new_worker(
         client, DataClassTypedWorkflow, activities=[data_class_typed_activity]
@@ -7243,7 +7454,7 @@ async def test_workflow_deadlock_interruptible(client: Client):
     # TODO(cretz): Improve this test and other deadlock/eviction tests by
     # checking slot counts with Core. There are a couple of bugs where used slot
     # counts are off by one and slots are released before eviction (see
-    # https://github.com/temporalio/sdk-core/issues/894).
+    # https://github.com/temporalio/sdk-rust/issues/894).
 
     # This worker used to not be able to shutdown because we hung evictions on
     # deadlock
@@ -7779,6 +7990,7 @@ async def heartbeat_activity(
     except (CancelledError, asyncio.CancelledError) as err:
         if not catch_err:
             raise err
+        await async_wait_for_pause_event(activity.info().activity_id)
         return activity.cancellation_details()
     finally:
         activity.heartbeat("finally-complete")
@@ -7798,6 +8010,7 @@ def sync_heartbeat_activity(
     except (CancelledError, asyncio.CancelledError) as err:
         if not catch_err:
             raise err
+        wait_for_pause_event(activity.info().activity_id)
         return activity.cancellation_details()
     finally:
         activity.heartbeat("finally-complete")
@@ -8716,3 +8929,222 @@ async def test_random_seed_functionality(
         assert isinstance(result["seed_changes"], list)
         assert len(result["auto_values"]) == 2
         assert len(result["seed_changes"]) == 1
+
+
+# Tests for task.uncancel() fix in shield loops (Python 3.11+)
+# See https://github.com/temporalio/sdk-python/pull/1523
+
+
+@workflow.defn
+class UncancelShieldActivityWorkflow:
+    """Workflow that cancels a shielded activity and checks for duplicate commands."""
+
+    def __init__(self) -> None:
+        self._activity_result = "<none>"
+        self._cancel_count = 0
+
+    @workflow.run
+    async def run(self) -> str:
+        handle = workflow.start_activity(
+            wait_cancel,
+            schedule_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=2),
+            cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+        )
+        # Let activity start
+        await asyncio.sleep(0.01)
+        # Cancel the activity task
+        handle.cancel()
+        try:
+            self._activity_result = await handle
+        except ActivityError as err:
+            self._activity_result = f"Error: {err.cause.__class__.__name__}"
+        except CancelledError:
+            self._activity_result = "CancelledError"
+        return self._activity_result
+
+    @workflow.query
+    def activity_result(self) -> str:
+        return self._activity_result
+
+
+async def test_workflow_uncancel_shield_activity(client: Client):
+    """Verify that cancelling a shielded activity does not produce duplicate
+    cancel commands or spurious error logs due to elevated cancellation counter.
+    """
+    log_capturer = LogCapturer()
+    with log_capturer.logs_captured(
+        temporalio.worker._workflow_instance.logger, level=logging.WARNING
+    ):
+        async with new_worker(
+            client,
+            UncancelShieldActivityWorkflow,
+            activities=[wait_cancel],
+        ) as worker:
+            result = await client.execute_workflow(
+                UncancelShieldActivityWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+    # The activity should have been cancelled successfully
+    assert result == "Got cancelled error, cancelled? True"
+
+    # Verify no spurious "exception in shielded future" error logs
+    shielded_err = log_capturer.find_log("exception in shielded future")
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
+
+
+@workflow.defn
+class UncancelShieldChildWorkflow:
+    """Workflow that starts a child workflow, cancels it via task cancel,
+    and returns information about the cancellation."""
+
+    def __init__(self) -> None:
+        self._ready = False
+
+    @workflow.run
+    async def run(self) -> str:
+        # Start a child workflow via execute (which internally uses shield loops)
+        child_task = asyncio.create_task(
+            workflow.execute_child_workflow(
+                LongSleepWorkflow.run,
+                id=f"{workflow.info().workflow_id}_child",
+            )
+        )
+        self._ready = True
+        # Let the child start
+        await asyncio.sleep(0.01)
+        # Cancel the child task — this triggers the shield loop's CancelledError
+        child_task.cancel()
+        try:
+            await child_task
+            return "completed"
+        except ChildWorkflowError as err:
+            if isinstance(err.cause, CancelledError):
+                return "child_cancelled"
+            return f"child_error: {err.cause}"
+        except CancelledError:
+            return "task_cancelled"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+
+async def test_workflow_uncancel_shield_child_workflow(client: Client):
+    """Verify that cancelling a shielded child workflow task does not produce
+    duplicate RequestCancelExternalWorkflowExecution commands in history.
+    This was the primary symptom of the bug fixed by task.uncancel().
+    """
+    log_capturer = LogCapturer()
+    with log_capturer.logs_captured(
+        temporalio.worker._workflow_instance.logger, level=logging.WARNING
+    ):
+        async with new_worker(
+            client,
+            UncancelShieldChildWorkflow,
+            LongSleepWorkflow,
+        ) as worker:
+            handle = await client.start_workflow(
+                UncancelShieldChildWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            result = await handle.result()
+
+    assert result == "child_cancelled"
+
+    # Check history for duplicate cancel commands
+    resp = await client.workflow_service.get_workflow_execution_history(
+        GetWorkflowExecutionHistoryRequest(
+            namespace=client.namespace,
+            execution=WorkflowExecution(workflow_id=handle.id),
+        )
+    )
+    cancel_events = [
+        e
+        for e in resp.history.events
+        if e.event_type
+        == EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED
+    ]
+    # There should be exactly one cancel request, not duplicates
+    assert len(cancel_events) == 1, (
+        f"Expected exactly 1 RequestCancelExternalWorkflowExecution event, "
+        f"got {len(cancel_events)}"
+    )
+
+    # Verify no spurious "exception in shielded future" error logs
+    shielded_err = log_capturer.find_log("exception in shielded future")
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
+
+
+@workflow.defn
+class UncancelShieldSignalExternalWorkflow:
+    """Workflow that signals an external workflow from a task that gets
+    cancelled, exercising the shield loop in _signal_external_workflow."""
+
+    def __init__(self) -> None:
+        self._ready = False
+
+    @workflow.run
+    async def run(self, target_workflow_id: str) -> str:
+        # Start a signal task
+        signal_task = asyncio.create_task(
+            workflow.get_external_workflow_handle(target_workflow_id).signal(
+                ReturnSignalWorkflow.my_signal, "test_value"
+            )
+        )
+        self._ready = True
+        # The signal should complete quickly, but we test the path where
+        # the workflow itself gets cancelled while the signal is pending
+        try:
+            await signal_task
+            return "signal_sent"
+        except CancelledError:
+            return "signal_cancelled"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+
+async def test_workflow_uncancel_shield_signal_external(client: Client):
+    """Verify that signal external workflow completes without spurious errors
+    when the shield loop properly resets the cancellation counter.
+    """
+    log_capturer = LogCapturer()
+    with log_capturer.logs_captured(
+        temporalio.worker._workflow_instance.logger, level=logging.WARNING
+    ):
+        async with new_worker(
+            client,
+            UncancelShieldSignalExternalWorkflow,
+            ReturnSignalWorkflow,
+        ) as worker:
+            # Start the target workflow that waits for a signal
+            target_handle = await client.start_workflow(
+                ReturnSignalWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            # Start the signaler workflow
+            result = await client.execute_workflow(
+                UncancelShieldSignalExternalWorkflow.run,
+                target_handle.id,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert result == "signal_sent"
+            # Confirm the target received the signal
+            target_result = await target_handle.result()
+            assert target_result == "test_value"
+
+    # Verify no spurious error logs
+    shielded_err = log_capturer.find_log("exception in shielded future")
+    assert shielded_err is None, (
+        f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )

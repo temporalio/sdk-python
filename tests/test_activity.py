@@ -220,6 +220,7 @@ async def test_start_activity_calls_interceptor(
 
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
+    start_delay = timedelta(seconds=3)
 
     await intercepted_client.start_activity(
         increment,
@@ -227,6 +228,7 @@ async def test_start_activity_calls_interceptor(
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
+        start_delay=start_delay,
     )
 
     assert len(interceptor.start_activity_calls) == 1
@@ -234,6 +236,7 @@ async def test_start_activity_calls_interceptor(
     assert call.id == activity_id
     assert call.task_queue == task_queue
     assert call.activity_type == "increment"
+    assert call.start_delay == start_delay
 
 
 async def test_describe_activity_calls_interceptor(
@@ -413,6 +416,18 @@ async def test_count_activities_calls_interceptor(
     assert call.query == query
 
 
+async def test_start_activity_rejects_negative_start_delay(client: Client):
+    with pytest.raises(ValueError, match="start_delay must be non-negative"):
+        await client.start_activity(
+            increment,
+            args=(1,),
+            id=str(uuid.uuid4()),
+            task_queue=str(uuid.uuid4()),
+            start_to_close_timeout=timedelta(seconds=5),
+            start_delay=timedelta(seconds=-1),
+        )
+
+
 async def test_get_result(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(
@@ -444,6 +459,38 @@ async def test_get_result(client: Client, env: WorkflowEnvironment):
     ):
         assert await activity_handle.result() == 2
         assert await result_via_execute_activity == 2
+
+
+async def test_start_activity_start_delay(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
+    activity_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+    start_delay = timedelta(seconds=2)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[increment],
+    ):
+        activity_handle = await client.start_activity(
+            increment,
+            args=(1,),
+            id=activity_id,
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=5),
+            start_delay=start_delay,
+        )
+
+        assert await activity_handle.result() == 2
+        desc = await activity_handle.describe()
+        assert desc.last_started_time is not None
+        assert (
+            desc.last_started_time - desc.scheduled_time
+        ).total_seconds() >= start_delay.total_seconds() - 0.5
 
 
 async def test_get_activity_handle(client: Client, env: WorkflowEnvironment):
@@ -852,9 +899,9 @@ async def test_id_conflict_policy_fail(client: Client, env: WorkflowEnvironment)
             id_conflict_policy=ActivityIDConflictPolicy.FAIL,
         )
     assert err.value.activity_id == activity_id
-    assert "Activity" in str(
-        err.value
-    ), f"Expected 'Activity' in error message, got: {err.value}"
+    assert "Activity" in str(err.value), (
+        f"Expected 'Activity' in error message, got: {err.value}"
+    )
 
 
 async def test_id_conflict_policy_use_existing(

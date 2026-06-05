@@ -45,6 +45,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def count_nexus_operation_executions(
+        self,
+        req: temporalio.api.workflowservice.v1.CountNexusOperationExecutionsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.CountNexusOperationExecutionsResponse:
+        """Invokes the WorkflowService.count_nexus_operation_executions rpc method."""
+        return await self._client._rpc_call(
+            rpc="count_nexus_operation_executions",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.CountNexusOperationExecutionsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def count_schedules(
         self,
         req: temporalio.api.workflowservice.v1.CountSchedulesRequest,
@@ -99,6 +117,42 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def create_worker_deployment(
+        self,
+        req: temporalio.api.workflowservice.v1.CreateWorkerDeploymentRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.CreateWorkerDeploymentResponse:
+        """Invokes the WorkflowService.create_worker_deployment rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_worker_deployment",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.CreateWorkerDeploymentResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def create_worker_deployment_version(
+        self,
+        req: temporalio.api.workflowservice.v1.CreateWorkerDeploymentVersionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.CreateWorkerDeploymentVersionResponse:
+        """Invokes the WorkflowService.create_worker_deployment_version rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_worker_deployment_version",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.CreateWorkerDeploymentVersionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def create_workflow_rule(
         self,
         req: temporalio.api.workflowservice.v1.CreateWorkflowRuleRequest,
@@ -130,6 +184,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.DeleteActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_nexus_operation_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.DeleteNexusOperationExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.DeleteNexusOperationExecutionResponse:
+        """Invokes the WorkflowService.delete_nexus_operation_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_nexus_operation_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.DeleteNexusOperationExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -310,6 +382,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.DescribeNamespaceResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def describe_nexus_operation_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionResponse:
+        """Invokes the WorkflowService.describe_nexus_operation_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="describe_nexus_operation_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -765,6 +855,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def list_nexus_operation_executions(
+        self,
+        req: temporalio.api.workflowservice.v1.ListNexusOperationExecutionsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.ListNexusOperationExecutionsResponse:
+        """Invokes the WorkflowService.list_nexus_operation_executions rpc method."""
+        return await self._client._rpc_call(
+            rpc="list_nexus_operation_executions",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.ListNexusOperationExecutionsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def list_open_workflow_executions(
         self,
         req: temporalio.api.workflowservice.v1.ListOpenWorkflowExecutionsRequest,
@@ -945,6 +1053,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def pause_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.PauseActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.PauseActivityExecutionResponse:
+        """Invokes the WorkflowService.pause_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="pause_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.PauseActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def pause_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.PauseWorkflowExecutionRequest,
@@ -994,6 +1120,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.PollActivityTaskQueueResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def poll_nexus_operation_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse:
+        """Invokes the WorkflowService.poll_nexus_operation_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="poll_nexus_operation_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -1161,6 +1305,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def request_cancel_nexus_operation_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.RequestCancelNexusOperationExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.RequestCancelNexusOperationExecutionResponse:
+        """Invokes the WorkflowService.request_cancel_nexus_operation_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="request_cancel_nexus_operation_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.RequestCancelNexusOperationExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def request_cancel_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest,
@@ -1192,6 +1354,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.ResetActivityResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def reset_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.ResetActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.ResetActivityExecutionResponse:
+        """Invokes the WorkflowService.reset_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="reset_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.ResetActivityExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -1611,6 +1791,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def start_nexus_operation_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.StartNexusOperationExecutionResponse:
+        """Invokes the WorkflowService.start_nexus_operation_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="start_nexus_operation_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.StartNexusOperationExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def start_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
@@ -1660,6 +1858,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.TerminateActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def terminate_nexus_operation_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.TerminateNexusOperationExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.TerminateNexusOperationExecutionResponse:
+        """Invokes the WorkflowService.terminate_nexus_operation_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="terminate_nexus_operation_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.TerminateNexusOperationExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -1719,6 +1935,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def unpause_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.UnpauseActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse:
+        """Invokes the WorkflowService.unpause_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="unpause_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def unpause_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.UnpauseWorkflowExecutionRequest,
@@ -1732,6 +1966,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.UnpauseWorkflowExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_activity_execution_options(
+        self,
+        req: temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse:
+        """Invokes the WorkflowService.update_activity_execution_options rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_activity_execution_options",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -1845,6 +2097,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def update_worker_deployment_version_compute_config(
+        self,
+        req: temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionComputeConfigRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionComputeConfigResponse:
+        """Invokes the WorkflowService.update_worker_deployment_version_compute_config rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_worker_deployment_version_compute_config",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionComputeConfigResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def update_worker_deployment_version_metadata(
         self,
         req: temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionMetadataRequest,
@@ -1914,6 +2184,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.UpdateWorkflowExecutionOptionsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def validate_worker_deployment_version_compute_config(
+        self,
+        req: temporalio.api.workflowservice.v1.ValidateWorkerDeploymentVersionComputeConfigRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.ValidateWorkerDeploymentVersionComputeConfigResponse:
+        """Invokes the WorkflowService.validate_worker_deployment_version_compute_config rpc method."""
+        return await self._client._rpc_call(
+            rpc="validate_worker_deployment_version_compute_config",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.ValidateWorkerDeploymentVersionComputeConfigResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2261,6 +2549,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def create_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.CreateCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.CreateCustomRoleResponse:
+        """Invokes the CloudService.create_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.CreateCustomRoleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def create_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateNamespaceRequest,
@@ -2418,6 +2724,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.DeleteConnectivityRuleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleResponse:
+        """Invokes the CloudService.delete_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2760,6 +3084,42 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.GetCurrentIdentityResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCustomRoleResponse:
+        """Invokes the CloudService.get_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCustomRoleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_custom_roles(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCustomRolesRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCustomRolesResponse:
+        """Invokes the CloudService.get_custom_roles rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_custom_roles",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCustomRolesResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3210,6 +3570,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.UpdateApiKeyResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleResponse:
+        """Invokes the CloudService.update_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,

@@ -1,4 +1,4 @@
-![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
+![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
 [![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
@@ -432,7 +432,7 @@ class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
 class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
         self, hint: Type, value: Any
-    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+    ) -> Union[Optional[Any], JSONTypeConverterUnhandled]:
         if issubclass(hint, ipaddress.IPv4Address):
             return ipaddress.IPv4Address(value)
         return JSONTypeConverter.Unhandled
@@ -1937,7 +1937,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 # Development
 
 The Python SDK is built to work with Python 3.9 and newer. It is built using
-[SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
+[SDK Core](https://github.com/temporalio/sdk-rust/) which is written in Rust.
 
 ### Building
 
@@ -2059,27 +2059,32 @@ The environment is now ready to develop in.
 
 #### Testing
 
-To execute tests:
+To execute tests (in parallel if possible):
 
 ```bash
 poe test
 ```
 
-`poe test` spreads tests across multiple worker processes by default. If you
-need a serial run for debugging, invoke pytest directly:
+To execute tests serially:
 
 ```bash
 uv run pytest
 ```
 
-This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
-server, pass `--workflow-environment time-skipping`. To run against the `default` namespace of an already-running
-server, pass the `host:port` to `--workflow-environment`. Can also use regular pytest arguments. For example, here's how
-to run a single test with debug logs on the console:
+To execute a single test:
 
 ```bash
 poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 ```
+
+**Temporal Server**
+
+- Tests that use the workflow test environment run against the [Temporal CLI dev server](https://docs.temporal.io/cli#start-dev-server).
+- By default, workflow-environment tests automatically start a local dev server.
+- On first run, the dev server binary may be downloaded so network access is required if no server is currently running.
+- To run workflow-environment tests against the time-skipping test server, pass `--workflow-environment time-skipping`. 
+- To run workflow-environment tests against the `default` namespace of an already-running server, pass the `host:port` to `--workflow-environment`.
+- Unit tests that do not use the workflow environment do not start a dev server.
 
 #### Proto Generation and Testing
 
@@ -2097,6 +2102,11 @@ run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` 
 tests.
 
 ### Style
+
+```
+# runs ruff + cargo fmt
+poe format
+```
 
 * Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
   * We use [ruff](https://docs.astral.sh/ruff/) for formatting, so that takes precedence

@@ -7,7 +7,6 @@ import warnings
 from collections.abc import Awaitable, Callable
 from typing import (
     Any,
-    TypeVar,
 )
 
 import nexusrpc
@@ -16,18 +15,24 @@ from nexusrpc import (
     OutputT,
 )
 
-from temporalio.nexus._operation_context import WorkflowRunOperationContext
+from temporalio.nexus._operation_context import (
+    TemporalStartOperationContext,
+    WorkflowRunOperationContext,
+)
+from temporalio.nexus._temporal_client import (
+    TemporalNexusClient,
+    TemporalOperationResult,
+)
+from temporalio.types import NexusServiceType
 
 from ._token import (
     WorkflowHandle as WorkflowHandle,
 )
 
-ServiceHandlerT = TypeVar("ServiceHandlerT")
-
 
 def get_workflow_run_start_method_input_and_output_type_annotations(
     start: Callable[
-        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
+        [NexusServiceType, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> tuple[
@@ -39,13 +44,62 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     ``start`` must be a type-annotated start method that returns a
     :py:class:`temporalio.nexus.WorkflowHandle`.
     """
-    input_type, output_type = _get_start_method_input_and_output_type_annotations(start)
+    return _get_wrapped_start_method_input_and_output_type_annotations(
+        start,
+        expected_param_types=(WorkflowRunOperationContext,),
+        expected_return_origin=WorkflowHandle,
+    )
+
+
+def get_temporal_operation_start_method_input_and_output_type_annotations(
+    start: Callable[
+        [
+            NexusServiceType,
+            TemporalStartOperationContext,
+            TemporalNexusClient,
+            InputT,
+        ],
+        Awaitable[TemporalOperationResult[OutputT]],
+    ],
+) -> tuple[
+    type[InputT] | None,
+    type[OutputT] | None,
+]:
+    """Return operation input and output types.
+
+    ``start`` must be a type-annotated start method that returns a
+    :py:class:`temporalio.nexus.TemporalOperationResult`.
+    """
+    return _get_wrapped_start_method_input_and_output_type_annotations(
+        start,
+        expected_param_types=(
+            TemporalStartOperationContext,
+            TemporalNexusClient,
+        ),
+        expected_return_origin=TemporalOperationResult,
+    )
+
+
+def _get_wrapped_start_method_input_and_output_type_annotations(
+    start: Callable[..., Any],
+    *,
+    expected_param_types: tuple[type[Any], ...],
+    expected_return_origin: type[Any],
+) -> tuple[
+    type[Any] | None,
+    type[Any] | None,
+]:
+    input_type, output_type = _get_start_method_input_and_output_type_annotations(
+        start,
+        expected_param_types=expected_param_types,
+    )
     origin_type = typing.get_origin(output_type)
     if not origin_type:
         output_type = None
-    elif not issubclass(origin_type, WorkflowHandle):
+    elif not issubclass(origin_type, expected_return_origin):
         warnings.warn(
-            f"Expected return type of {start.__name__} to be a subclass of WorkflowHandle, "
+            f"Expected return type of {start.__name__} to be a subclass of "
+            f"{expected_return_origin.__name__}, "
             f"but is {output_type}"
         )
         output_type = None
@@ -65,13 +119,12 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
 
 
 def _get_start_method_input_and_output_type_annotations(
-    start: Callable[
-        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
-        Awaitable[WorkflowHandle[OutputT]],
-    ],
+    start: Callable[..., Any],
+    *,
+    expected_param_types: tuple[type[Any], ...],
 ) -> tuple[
-    type[InputT] | None,
-    type[OutputT] | None,
+    type[Any] | None,
+    type[Any] | None,
 ]:
     try:
         type_annotations = typing.get_type_hints(start)
@@ -81,23 +134,28 @@ def _get_start_method_input_and_output_type_annotations(
         )
         return None, None
     output_type = type_annotations.pop("return", None)
+    expected_parameter_count = len(expected_param_types) + 1
 
-    if len(type_annotations) != 2:
+    if len(type_annotations) != expected_parameter_count:
         suffix = f": {type_annotations}" if type_annotations else ""
         warnings.warn(
-            f"Expected decorated start method {start} to have exactly 2 "
-            f"type-annotated parameters (ctx and input), but it has {len(type_annotations)}"
+            f"Expected decorated start method {start} to have exactly "
+            f"{expected_parameter_count} type-annotated parameters, "
+            f"but it has {len(type_annotations)}"
             f"{suffix}."
         )
         input_type = None
     else:
-        ctx_type, input_type = type_annotations.values()
-        if not issubclass(ctx_type, WorkflowRunOperationContext):
-            warnings.warn(
-                f"Expected first parameter of {start} to be an instance of "
-                f"WorkflowRunOperationContext, but is {ctx_type}."
-            )
-            input_type = None
+        *param_types, input_type = type_annotations.values()
+        for index, (param_type, expected_param_type) in enumerate(
+            zip(param_types, expected_param_types), start=1
+        ):
+            if not issubclass(expected_param_type, param_type):
+                warnings.warn(
+                    f"Expected parameter {index} of {start} to be an instance of "
+                    f"{expected_param_type.__name__}, but is {param_type}."
+                )
+                input_type = None
 
     return input_type, output_type
 

@@ -123,9 +123,9 @@ async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: An
 
     # Verify the span hierarchy matches expectations
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 @workflow.defn
@@ -382,9 +382,9 @@ async def test_opentelemetry_comprehensive_tracing(
 
     # Verify the span hierarchy matches expectations
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 async def test_otel_tracing_with_added_spans(
@@ -439,9 +439,9 @@ async def test_otel_tracing_with_added_spans(
 
     # Verify the span hierarchy matches expectations
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 task_fail_once_workflow_has_failed = False
@@ -507,9 +507,9 @@ async def test_otel_tracing_workflow_task_failure(
     ]
 
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 @workflow.defn
@@ -562,9 +562,60 @@ async def test_otel_tracing_workflow_failure(
     ]
 
     actual_hierarchy = dump_spans(spans, with_attributes=False)
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
+
+
+async def test_otel_standalone_activity_tracing(
+    client: Client,
+    env: WorkflowEnvironment,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    activity_id = f"activity_{uuid.uuid4()}"
+    async with new_worker(
+        new_client,
+        activities=[simple_no_context_activity],
+    ) as worker:
+        handle = await new_client.start_activity(
+            simple_no_context_activity,
+            id=activity_id,
+            task_queue=worker.task_queue,
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        await handle.result()
+
+    finished_spans = exporter.get_finished_spans()
+    assert dump_spans(finished_spans, with_attributes=False) == [
+        "StartActivity:simple_no_context_activity",
+        "  RunActivity:simple_no_context_activity",
+        "    Activity",
+    ]
+    start_activity_span = next(
+        s
+        for s in finished_spans
+        if s.name == "StartActivity:simple_no_context_activity"
+        and s.attributes is not None
+        and s.attributes.get("temporalActivityID") == activity_id
+    )
+    assert start_activity_span.attributes is not None
     assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+        start_activity_span.attributes["temporalActivityType"]
+        == "simple_no_context_activity"
+    )
 
 
 def test_replay_safe_span_delegates_extra_attributes():

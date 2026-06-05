@@ -219,6 +219,29 @@ def test_connect_config_tls_explicit_config_preserved():
     assert config.tls == tls_config
 
 
+def test_connect_config_dns_load_balancing_custom():
+    """Custom DnsLoadBalancingConfig is forwarded to the bridge unchanged."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        dns_load_balancing_config=temporalio.service.DnsLoadBalancingConfig(
+            resolution_interval_millis=5000,
+        ),
+    )
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.dns_load_balancing_config is not None
+    assert bridge_config.dns_load_balancing_config.resolution_interval_millis == 5000
+
+
+def test_connect_config_dns_load_balancing_disabled():
+    """Setting dns_load_balancing_config=None forwards None to the bridge."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        dns_load_balancing_config=None,
+    )
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.dns_load_balancing_config is None
+
+
 async def test_rpc_execution_not_unknown(client: Client):
     """
     Execute each rpc method and expect a failure, but ensure the failure is not that the rpc method is unknown
@@ -249,9 +272,9 @@ async def test_rpc_execution_not_unknown(client: Client):
         try:
             await rpc_call(request, timeout=timedelta(milliseconds=1))
         except ValueError as err:
-            assert (
-                "Unknown RPC call" not in str(err)
-            ), f"Unexpected unknown-RPC error for {target_service_name}.{method_name}: {err}"
+            assert "Unknown RPC call" not in str(err), (
+                f"Unexpected unknown-RPC error for {target_service_name}.{method_name}: {err}"
+            )
         except temporalio.service.RPCError:
             pass
 

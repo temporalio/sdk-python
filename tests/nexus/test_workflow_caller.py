@@ -440,13 +440,13 @@ class CallerWorkflow:
             self._nexus_operation_start_resolved = True
         if not input.op_input.response_type.exception_in_operation_start:
             if isinstance(input.op_input.response_type, SyncResponse):
-                assert (
-                    op_handle.operation_token is None
-                ), "operation_token should be absent after a sync response"
+                assert op_handle.operation_token is None, (
+                    "operation_token should be absent after a sync response"
+                )
             else:
-                assert (
-                    op_handle.operation_token
-                ), "operation_token should be present after an async response"
+                assert op_handle.operation_token, (
+                    "operation_token should be present after an async response"
+                )
 
         if request_cancel:
             # Even for SyncResponse, the op_handle future is not done at this point; that
@@ -1191,10 +1191,10 @@ async def test_async_response(
             handler_wf_info = await handler_wf_handle.describe()
             assert handler_wf_info.status == WorkflowExecutionStatus.CANCELED
         else:
-            handler_wf_info = await handler_wf_handle.describe()
-            assert handler_wf_info.status == WorkflowExecutionStatus.COMPLETED
             result = await caller_wf_handle.result()
             assert result.op_output.value == "workflow result"
+            handler_wf_info = await handler_wf_handle.describe()
+            assert handler_wf_info.status == WorkflowExecutionStatus.COMPLETED
 
 
 async def _start_wf_and_nexus_op(
@@ -2302,16 +2302,16 @@ async def test_request_deadline_is_accessible_in_operation(
 
         assert len(service_handler.start_deadlines_received) == 1
         deadline = service_handler.start_deadlines_received[0]
-        assert (
-            deadline is not None
-        ), "request_deadline should be set in StartOperationContext"
+        assert deadline is not None, (
+            "request_deadline should be set in StartOperationContext"
+        )
         assert deadline.tzinfo is timezone.utc, "request_deadline should be in utc"
 
         await asyncio.wait_for(service_handler.cancel_received.wait(), 1)
 
         assert len(service_handler.cancel_deadlines_received) == 1
         deadline = service_handler.cancel_deadlines_received[0]
-        assert (
-            deadline is not None
-        ), "request_deadline should be set in CancelOperationContext"
+        assert deadline is not None, (
+            "request_deadline should be set in CancelOperationContext"
+        )
         assert deadline.tzinfo is timezone.utc, "request_deadline should be in utc"

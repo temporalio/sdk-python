@@ -52,6 +52,12 @@ class _TaskQueueKindEnumTypeWrapper(
 
     Sticky queues are only for workflow tasks. There are no sticky task queues for activities.
     """
+    TASK_QUEUE_KIND_WORKER_COMMANDS: _TaskQueueKind.ValueType  # 3
+    """A worker-commands task queue is used for server-to-worker communication (e.g. activity
+    cancellations). These queues are ephemeral and per-worker-process — they exist only for
+    the lifetime of the worker process. Used with TASK_QUEUE_TYPE_NEXUS and polled via
+    PollNexusTaskQueue.
+    """
 
 class TaskQueueKind(_TaskQueueKind, metaclass=_TaskQueueKindEnumTypeWrapper): ...
 
@@ -78,6 +84,12 @@ for the lifetime of the worker process. Tasks in a sticky task queue are only av
 the worker that created the sticky queue.
 
 Sticky queues are only for workflow tasks. There are no sticky task queues for activities.
+"""
+TASK_QUEUE_KIND_WORKER_COMMANDS: TaskQueueKind.ValueType  # 3
+"""A worker-commands task queue is used for server-to-worker communication (e.g. activity
+cancellations). These queues are ephemeral and per-worker-process — they exist only for
+the lifetime of the worker process. Used with TASK_QUEUE_TYPE_NEXUS and polled via
+PollNexusTaskQueue.
 """
 global___TaskQueueKind = TaskQueueKind
 

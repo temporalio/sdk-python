@@ -24,7 +24,7 @@ import temporalio.exceptions
 import temporalio.runtime
 from temporalio.bridge.client import RPCError as BridgeRPCError
 
-__version__ = "1.26.0"
+__version__ = "1.28.0"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
@@ -132,6 +132,32 @@ class HttpConnectProxyConfig:
         )
 
 
+@dataclass(frozen=True)
+class DnsLoadBalancingConfig:
+    """DNS load balancing configuration for client connections.
+
+    When enabled, Core periodically re-resolves the target host's DNS records
+    and round-robins requests across the resolved addresses. Cannot be used
+    together with :py:class:`HttpConnectProxyConfig` -- DNS load balancing is
+    silently disabled when an HTTP CONNECT proxy is configured.
+    """
+
+    resolution_interval_millis: int = 30000
+    """How often to re-resolve DNS, in milliseconds."""
+    default: ClassVar[DnsLoadBalancingConfig]
+    """Default DNS load balancing config."""
+
+    def _to_bridge_config(
+        self,
+    ) -> temporalio.bridge.client.ClientDnsLoadBalancingConfig:
+        return temporalio.bridge.client.ClientDnsLoadBalancingConfig(
+            resolution_interval_millis=self.resolution_interval_millis,
+        )
+
+
+DnsLoadBalancingConfig.default = DnsLoadBalancingConfig()
+
+
 @dataclass
 class ConnectConfig:
     """Config for connecting to the server."""
@@ -146,6 +172,7 @@ class ConnectConfig:
     lazy: bool = False
     runtime: temporalio.runtime.Runtime | None = None
     http_connect_proxy_config: HttpConnectProxyConfig | None = None
+    dns_load_balancing_config: DnsLoadBalancingConfig | None = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -201,6 +228,11 @@ class ConnectConfig:
             http_connect_proxy_config=(
                 self.http_connect_proxy_config._to_bridge_config()
                 if self.http_connect_proxy_config
+                else None
+            ),
+            dns_load_balancing_config=(
+                self.dns_load_balancing_config._to_bridge_config()
+                if self.dns_load_balancing_config
                 else None
             ),
         )

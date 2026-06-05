@@ -547,7 +547,9 @@ def research_mock_model():
                         id="",
                         status="completed",
                         type="web_search_call",
-                        action=ActionSearch(query="", type="search"),
+                        action=ActionSearch.model_construct(
+                            type="search", queries=[""]
+                        ),
                     ),
                     ResponseBuilders.response_output_message("Granada"),
                 ],
@@ -1016,7 +1018,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
                 CustomerServiceWorkflow.run,
                 id=f"customer-service-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
+                execution_timeout=timedelta(seconds=60),
             )
             history: list[Any] = []
             for q in questions:
@@ -1359,6 +1361,7 @@ class WorkflowToolWorkflow:
         agent: Agent = Agent(
             name="Assistant",
             instructions="You are a helpful assistant.",
+            model="gpt-4o",
             tools=[function_tool(self.run_tool)],
         )
         await Runner.run(

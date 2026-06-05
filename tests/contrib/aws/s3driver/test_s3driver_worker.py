@@ -25,7 +25,7 @@ from temporalio.contrib.aws.s3driver.aioboto3 import new_aioboto3_client
 from temporalio.converter import ExternalStorage, JSONPlainPayloadConverter
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing import WorkflowEnvironment
-from tests.contrib.aws.s3driver.conftest import BUCKET, REGION
+from tests.contrib.aws.s3driver.conftest import BUCKET, CLIENT_REGION
 from tests.contrib.aws.s3driver.workflows import (
     LARGE,
     ChildWorkflow,
@@ -463,7 +463,7 @@ async def test_s3_store_failure_surfaces_in_workflow_history(
     session = aioboto3.Session()
     async with session.client(
         "s3",
-        region_name=REGION,
+        region_name=CLIENT_REGION,
         endpoint_url=moto_server_url,
         aws_access_key_id="testing",
         aws_secret_access_key="testing",
@@ -506,4 +506,4 @@ async def test_s3_store_failure_surfaces_in_workflow_history(
     msg = app_error.message
     assert f"S3StorageDriver store failed [bucket={bad_bucket}, key=" in msg
     assert f"/wt/LargeOutputNoRetryWorkflow/wi/{workflow_id}/ri/" in msg
-    assert f"/d/sha256/{expected_hash}]" in msg
+    assert f"/d/sha256/{expected_hash}, client_region={CLIENT_REGION}]" in msg

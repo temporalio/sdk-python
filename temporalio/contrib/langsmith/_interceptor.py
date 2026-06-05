@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from typing import Any, ClassVar, NoReturn, Protocol
 
 import langsmith
+import langsmith.utils
 import nexusrpc.handler
 from langsmith import tracing_context
 from langsmith.run_helpers import get_current_run_tree
@@ -42,6 +43,7 @@ _BUILTIN_QUERIES: frozenset[str] = frozenset(
         "__enhanced_stack_trace",
     }
 )
+
 
 # ---------------------------------------------------------------------------
 # Context helpers
@@ -152,48 +154,46 @@ def _get_current_run_for_propagation() -> RunTree | None:
 
 
 # ---------------------------------------------------------------------------
-# Workflow event loop safety: patch @traceable's aio_to_thread
+# Workflow event loop safety: override @traceable's aio_to_thread
 # ---------------------------------------------------------------------------
 
-_aio_to_thread_patched = False
+_aio_to_thread_override_installed = False
 
 
-def _patch_aio_to_thread() -> None:
-    """Patch langsmith's ``aio_to_thread`` to run synchronously in workflows.
+async def _temporal_aio_to_thread(
+    default_aio_to_thread: Callable[..., Any],
+    ctx: Any,
+    func: Callable[..., Any],
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    """Run LangSmith's ``aio_to_thread`` synchronously inside Temporal workflows.
 
     The ``@traceable`` decorator on async functions uses ``aio_to_thread()`` →
     ``loop.run_in_executor()`` for run setup/teardown.  The Temporal workflow
-    event loop does not support ``run_in_executor``.  This patch runs those
-    functions synchronously on the workflow thread when inside a workflow.
-    Functions passed here must not perform blocking I/O.
+    event loop does not support ``run_in_executor``.  This override runs those
+    functions synchronously on the workflow thread when inside a workflow,
+    and delegates to the default implementation outside workflows.
 
+    Registered via ``langsmith.set_runtime_overrides(aio_to_thread=...)``.
     """
-    global _aio_to_thread_patched  # noqa: PLW0603
-    if _aio_to_thread_patched:
+    if not temporalio.workflow.in_workflow():
+        return await default_aio_to_thread(ctx, func, *args, **kwargs)
+    with temporalio.workflow.unsafe.sandbox_unrestricted():
+        return ctx.run(func, *args, **kwargs)
+
+
+def _install_aio_to_thread_override() -> None:
+    """Install the ``aio_to_thread`` override via LangSmith's official API.
+
+    Safe to call multiple times; the override is only installed once.
+    """
+    global _aio_to_thread_override_installed  # noqa: PLW0603
+    if _aio_to_thread_override_installed:
         return
-
-    import langsmith._internal._aiter as _aiter
-
-    _original = _aiter.aio_to_thread
-
-    import contextvars
-
-    async def _safe_aio_to_thread(
-        func: Callable[..., Any],
-        /,
-        *args: Any,
-        __ctx: contextvars.Context | None = None,
-        **kwargs: Any,
-    ) -> Any:
-        if not temporalio.workflow.in_workflow():
-            return await _original(func, *args, __ctx=__ctx, **kwargs)
-        with temporalio.workflow.unsafe.sandbox_unrestricted():
-            # Run without ctx.run() so context var changes propagate
-            # to the caller. Safe because workflows are single-threaded.
-            return func(*args, **kwargs)
-
-    _aiter.aio_to_thread = _safe_aio_to_thread  # type: ignore[assignment]
-    _aio_to_thread_patched = True
+    langsmith.set_runtime_overrides(aio_to_thread=_temporal_aio_to_thread)
+    _aio_to_thread_override_installed = True
 
 
 # ---------------------------------------------------------------------------
@@ -457,13 +457,23 @@ def _maybe_run(
 ) -> Iterator[None]:
     """Create a LangSmith run, handling errors.
 
-    - If add_temporal_runs is False, yields None (no run created).
+    - If add_temporal_runs is False **or** ``langsmith.utils.tracing_is_enabled()``
+      returns False, yields None (no run created).
       Context propagation is handled unconditionally by callers.
     - When a run IS created, uses :class:`_ReplaySafeRunTree` for
       replay and event loop safety, then sets it as ambient context via
       ``tracing_context(parent=run_tree)`` so ``get_current_run_tree()``
       returns it and ``_inject_current_context()`` can inject it.
     - On exception: marks run as errored (unless benign ApplicationError), re-raises.
+
+    Note on ``tracing_is_enabled()`` and cross-process traces:
+    ``tracing_is_enabled()`` checks for an active run tree in context
+    *before* consulting the ``LANGSMITH_TRACING`` env var (langsmith
+    semantics).  If a parent run is propagated into this worker via
+    headers from an upstream tracer, tracing continues regardless of
+    ``LANGSMITH_TRACING=false``.  This matches langsmith's "continue
+    mid-trace" model: the env var suppresses *new* local traces but
+    does not break an inbound parent trace.
 
     Args:
         client: LangSmith client instance.
@@ -477,7 +487,7 @@ def _maybe_run(
         project_name: LangSmith project name override.
         executor: ThreadPoolExecutor for background I/O.
     """
-    if not add_temporal_runs:
+    if not add_temporal_runs or not langsmith.utils.tracing_is_enabled():
         yield None
         return
 
@@ -599,7 +609,7 @@ class LangSmithInterceptor(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
     ) -> type[_LangSmithWorkflowInboundInterceptor]:
         """Return the workflow interceptor class with config bound."""
-        _patch_aio_to_thread()
+        _install_aio_to_thread_override()
         config = self
 
         class InterceptorWithConfig(_LangSmithWorkflowInboundInterceptor):
@@ -717,12 +727,8 @@ class _LangSmithActivityInboundInterceptor(
             "temporalRunID": info.workflow_run_id or "",
             "temporalActivityID": info.activity_id or "",
         }
-        # Unconditionally set tracing context so @traceable functions inside
-        # activities inherit the plugin's client and parent, regardless of
-        # the add_temporal_runs toggle.
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": parent,
         }
@@ -786,7 +792,6 @@ class _LangSmithWorkflowInboundInterceptor(
         )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": tracing_parent,
         }
@@ -947,7 +952,6 @@ class _LangSmithNexusOperationInboundInterceptor(
         )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": parent,
         }
@@ -967,7 +971,6 @@ class _LangSmithNexusOperationInboundInterceptor(
         )
         tracing_args: dict[str, Any] = {
             "client": self._config._client,
-            "enabled": True,
             "project_name": self._config._project_name,
             "parent": parent,
         }
