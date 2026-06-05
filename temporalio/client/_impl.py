@@ -693,9 +693,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        activity_type = (
-            resp.info.activity_type.name if resp.info.HasField("activity_type") else ""
-        )
         return await ActivityExecutionDescription._from_execution_info(
             info=resp.info,
             long_poll_token=resp.long_poll_token or None,
@@ -705,7 +702,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     namespace=self._client.namespace,
                     activity_id=resp.info.activity_id,
                     activity_task_queue=resp.info.task_queue,
-                    activity_type=activity_type,
+                    activity_type=resp.info.activity_type.name,
                     workflow_id=None,
                     workflow_type=None,
                     is_local=False,
