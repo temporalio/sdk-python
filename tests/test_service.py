@@ -242,6 +242,24 @@ def test_connect_config_dns_load_balancing_disabled():
     assert bridge_config.dns_load_balancing_config is None
 
 
+def test_connect_config_grpc_compression_default():
+    """gRPC compression defaults to gzip and is forwarded to the bridge."""
+    config = temporalio.service.ConnectConfig(target_host="localhost:7233")
+    bridge_config = config._to_bridge_config()
+    assert config.grpc_compression == temporalio.service.GrpcCompression.GZIP
+    assert bridge_config.grpc_compression == "gzip"
+
+
+def test_connect_config_grpc_compression_none():
+    """gRPC compression can be disabled and is forwarded to the bridge."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        grpc_compression=temporalio.service.GrpcCompression.NONE,
+    )
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.grpc_compression == "none"
+
+
 async def test_rpc_execution_not_unknown(client: Client):
     """
     Execute each rpc method and expect a failure, but ensure the failure is not that the rpc method is unknown

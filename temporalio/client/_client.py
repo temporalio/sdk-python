@@ -32,6 +32,7 @@ import temporalio.workflow
 from temporalio.service import (
     ConnectConfig,
     DnsLoadBalancingConfig,
+    GrpcCompression,
     HttpConnectProxyConfig,
     KeepAliveConfig,
     RetryConfig,
@@ -152,6 +153,7 @@ class Client:
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
         dns_load_balancing_config: DnsLoadBalancingConfig | None = None,
+        grpc_compression: GrpcCompression = GrpcCompression.GZIP,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> Self:
         """Connect to a Temporal server.
@@ -212,6 +214,9 @@ class Client:
                 be set to ``None`` to disable. Silently disabled when
                 ``http_connect_proxy_config`` is set, since the two are mutually
                 exclusive.
+            grpc_compression: Transport-level gRPC compression for the client
+                connection. Default is gzip. Set to
+                :py:attr:`GrpcCompression.NONE` to disable compression.
             header_codec_behavior: Encoding behavior for headers sent by the client.
         """
         connect_config = temporalio.service.ConnectConfig(
@@ -226,6 +231,7 @@ class Client:
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
             dns_load_balancing_config=dns_load_balancing_config,
+            grpc_compression=grpc_compression,
         )
 
         def make_lambda(
@@ -3042,6 +3048,7 @@ class ClientConnectConfig(TypedDict, total=False):
     runtime: temporalio.runtime.Runtime | None
     http_connect_proxy_config: HttpConnectProxyConfig | None
     dns_load_balancing_config: DnsLoadBalancingConfig | None
+    grpc_compression: GrpcCompression
     header_codec_behavior: HeaderCodecBehavior
 
 

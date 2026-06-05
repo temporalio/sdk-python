@@ -16,6 +16,7 @@ from temporalio.converter import (
 from temporalio.service import (
     ConnectConfig,
     DnsLoadBalancingConfig,
+    GrpcCompression,
     HttpConnectProxyConfig,
     KeepAliveConfig,
     RetryConfig,
@@ -355,6 +356,7 @@ __all__ = [
     "WorkflowSerializationContext",
     "ConnectConfig",
     "DnsLoadBalancingConfig",
+    "GrpcCompression",
     "HttpConnectProxyConfig",
     "KeepAliveConfig",
     "RetryConfig",

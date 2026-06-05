@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
-from enum import IntEnum
+from enum import Enum, IntEnum
 from typing import ClassVar, TypeVar
 
 import google.protobuf.message
@@ -158,6 +158,16 @@ class DnsLoadBalancingConfig:
 DnsLoadBalancingConfig.default = DnsLoadBalancingConfig()
 
 
+class GrpcCompression(Enum):
+    """Transport-level gRPC compression mode."""
+
+    NONE = "none"
+    """Do not compress gRPC requests or advertise support for compressed responses."""
+
+    GZIP = "gzip"
+    """Gzip-compress gRPC requests and accept gzip-compressed responses."""
+
+
 @dataclass
 class ConnectConfig:
     """Config for connecting to the server."""
@@ -173,6 +183,7 @@ class ConnectConfig:
     runtime: temporalio.runtime.Runtime | None = None
     http_connect_proxy_config: HttpConnectProxyConfig | None = None
     dns_load_balancing_config: DnsLoadBalancingConfig | None = None
+    grpc_compression: GrpcCompression = GrpcCompression.GZIP
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -235,6 +246,7 @@ class ConnectConfig:
                 if self.dns_load_balancing_config
                 else None
             ),
+            grpc_compression=self.grpc_compression.value,
         )
 
 
