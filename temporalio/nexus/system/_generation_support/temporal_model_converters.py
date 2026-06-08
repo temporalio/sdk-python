@@ -1,5 +1,3 @@
-# pyright: reportAny=false, reportExplicitAny=false
-
 import collections.abc
 import typing
 from datetime import timedelta

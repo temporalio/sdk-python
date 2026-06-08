@@ -11,9 +11,27 @@ import gen_protos
 
 base_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(base_dir))
-wit_input_dir = base_dir / "scripts" / "_nexus"
-wit_path = wit_input_dir / "temporal-system.wit"
+wit_input_dir = (
+    base_dir
+    / "temporalio"
+    / "bridge"
+    / "sdk-core"
+    / "crates"
+    / "protos"
+    / "protos"
+    / "api_upstream"
+    / "nexus"
+)
+wit_path = wit_input_dir / "workflow-service.wit"
 wit_deps_dir = wit_input_dir / "deps"
+python_support_path = (
+    base_dir
+    / "temporalio"
+    / "nexus"
+    / "system"
+    / "_generation_support"
+    / "temporal_model_converters.py"
+)
 output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
 workflowservice_request_response_proto = (
@@ -95,14 +113,42 @@ def generate_workflow_exports() -> None:
     workflow_init_path.write_text(content[:start] + "".join(all_block) + content[end:])
 
 
+def prepare_wit_workspace(temp_dir: Path) -> tuple[Path, Path]:
+    workspace_input_dir = temp_dir / "nexus"
+    shutil.copytree(wit_input_dir, workspace_input_dir)
+
+    model_path = workspace_input_dir / "deps" / "nexus-temporal-types" / "model.wit"
+    model_content = model_path.read_text()
+    if "@nexus.support" not in model_content:
+        support_path = (
+            workspace_input_dir
+            / "deps"
+            / "nexus-temporal-types"
+            / "python"
+            / python_support_path.name
+        )
+        support_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(python_support_path, support_path)
+        model_path.write_text(
+            '/// @nexus.support python="python/temporal_model_converters.py"\n'
+            + model_content
+        )
+
+    return workspace_input_dir / "workflow-service.wit", workspace_input_dir / "deps"
+
+
 def generate_nexus_system_api() -> None:
     if not wit_path.exists():
         raise RuntimeError(f"missing WIT source: {wit_path}")
     if not wit_deps_dir.exists():
         raise RuntimeError(f"missing WIT dependency directory: {wit_deps_dir}")
+    if not python_support_path.exists():
+        raise RuntimeError(f"missing Python support source: {python_support_path}")
 
     with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
-        descriptor_path = Path(temp_dir) / "temporal_api.bin"
+        temp_path = Path(temp_dir)
+        descriptor_path = temp_path / "temporal_api.bin"
+        workspace_wit_path, workspace_wit_deps_dir = prepare_wit_workspace(temp_path)
         build_descriptor_set(descriptor_path)
         command = nex_gen_command()
 
@@ -115,9 +161,9 @@ def generate_nexus_system_api() -> None:
                 "--lang",
                 "python",
                 "--input",
-                str(wit_path),
+                str(workspace_wit_path),
                 "--input",
-                str(wit_deps_dir),
+                str(workspace_wit_deps_dir),
                 "--descriptors",
                 str(descriptor_path),
                 "--output",
