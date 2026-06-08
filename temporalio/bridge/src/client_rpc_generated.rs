@@ -1639,6 +1639,15 @@ impl ClientRef {
                         get_service_account
                     )
                 }
+                "get_service_account_namespace_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_service_account_namespace_assignments
+                    )
+                }
                 "get_service_accounts" => {
                     rpc_call!(
                         connection,
@@ -1672,6 +1681,15 @@ impl ClientRef {
                         get_user_group_members
                     )
                 }
+                "get_user_group_namespace_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_user_group_namespace_assignments
+                    )
+                }
                 "get_user_groups" => {
                     rpc_call!(
                         connection,
@@ -1679,6 +1697,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         get_user_groups
+                    )
+                }
+                "get_user_namespace_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_user_namespace_assignments
                     )
                 }
                 "get_users" => {

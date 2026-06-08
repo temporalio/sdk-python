@@ -841,6 +841,7 @@ class ScheduleInfo(google.protobuf.message.Message):
     CREATE_TIME_FIELD_NUMBER: builtins.int
     UPDATE_TIME_FIELD_NUMBER: builtins.int
     INVALID_SCHEDULE_ERROR_FIELD_NUMBER: builtins.int
+    STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
     action_count: builtins.int
     """Number of actions taken so far."""
     missed_catchup_window: builtins.int
@@ -887,6 +888,8 @@ class ScheduleInfo(google.protobuf.message.Message):
     def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     invalid_schedule_error: builtins.str
     """Deprecated."""
+    state_size_bytes: builtins.int
+    """Size of the schedule's internal state (including payloads) in bytes."""
     def __init__(
         self,
         *,
@@ -908,6 +911,7 @@ class ScheduleInfo(google.protobuf.message.Message):
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         invalid_schedule_error: builtins.str = ...,
+        state_size_bytes: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -938,6 +942,8 @@ class ScheduleInfo(google.protobuf.message.Message):
             b"recent_actions",
             "running_workflows",
             b"running_workflows",
+            "state_size_bytes",
+            b"state_size_bytes",
             "update_time",
             b"update_time",
         ],
@@ -1010,6 +1016,7 @@ class ScheduleListInfo(google.protobuf.message.Message):
     PAUSED_FIELD_NUMBER: builtins.int
     RECENT_ACTIONS_FIELD_NUMBER: builtins.int
     FUTURE_ACTION_TIMES_FIELD_NUMBER: builtins.int
+    STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
     @property
     def spec(self) -> global___ScheduleSpec:
         """From spec:
@@ -1037,6 +1044,8 @@ class ScheduleListInfo(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         google.protobuf.timestamp_pb2.Timestamp
     ]: ...
+    state_size_bytes: builtins.int
+    """Size of the schedule's internal state (including payloads) in bytes."""
     def __init__(
         self,
         *,
@@ -1050,6 +1059,7 @@ class ScheduleListInfo(google.protobuf.message.Message):
             google.protobuf.timestamp_pb2.Timestamp
         ]
         | None = ...,
+        state_size_bytes: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1070,6 +1080,8 @@ class ScheduleListInfo(google.protobuf.message.Message):
             b"recent_actions",
             "spec",
             b"spec",
+            "state_size_bytes",
+            b"state_size_bytes",
             "workflow_type",
             b"workflow_type",
         ],
