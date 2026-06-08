@@ -1216,6 +1216,8 @@ class Client:
         input = StartWorkflowUpdateWithStartInput(
             start_workflow_input=start_workflow_operation._start_workflow_input,
             update_workflow_input=update_input,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
             _on_start=on_start,
             _on_start_error=on_start_error,
         )

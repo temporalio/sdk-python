@@ -374,10 +374,20 @@ class UpdateWithStartStartWorkflowInput:
 
 @dataclass
 class StartWorkflowUpdateWithStartInput:
-    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
+    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
+
+    The top-level ``rpc_metadata`` and ``rpc_timeout`` fields are authoritative
+    for the ``execute_multi_operation`` gRPC call.  The sub-inputs
+    (``start_workflow_input`` and ``update_workflow_input``) also carry their own
+    ``rpc_metadata`` / ``rpc_timeout`` for interceptor introspection, but those
+    values are **not** forwarded to the gRPC call.  Interceptors that wish to set
+    RPC metadata should modify :py:attr:`rpc_metadata` on this object.
+    """
 
     start_workflow_input: UpdateWithStartStartWorkflowInput
     update_workflow_input: UpdateWithStartUpdateWorkflowInput
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
     _on_start: Callable[
         [temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse], None
     ]
