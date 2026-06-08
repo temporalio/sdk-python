@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from temporalio.nexus._util import ServiceHandlerT
-
 from ..types import (
     AnyType,
     CallableAsyncNoParam,
