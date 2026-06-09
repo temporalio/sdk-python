@@ -1,9 +1,13 @@
 """Utilities that can decorate or be called inside workflows."""
 
-# ruff: noqa: I001
-
 from __future__ import annotations
 
+# BEGIN GENERATED NEXUS SYSTEM EXPORTS
+from temporalio.nexus.system.workflow_service import (
+    signal_with_start_workflow,
+)
+
+# END GENERATED NEXUS SYSTEM EXPORTS
 from ..types import (
     AnyType,
     CallableAsyncNoParam,
@@ -168,12 +172,6 @@ from ._workflow_ops import (
     set_update_handler,
     start_child_workflow,
 )
-
-# BEGIN GENERATED NEXUS SYSTEM EXPORTS
-from temporalio.nexus.system.workflow_service import (
-    signal_with_start_workflow,
-)
-# END GENERATED NEXUS SYSTEM EXPORTS
 
 __all__ = [
     "ActivityCancellationType",

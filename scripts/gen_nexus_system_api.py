@@ -49,7 +49,7 @@ def nex_gen_command() -> list[str]:
         return [bin_path]
 
     if shutil.which("nex-gen") is None:
-        subprocess.check_call(["cargo", "install", "--locked", "nex-gen"])
+        subprocess.check_call(["cargo", "install", "--locked", "nex-gen", "--force"])
     return ["nex-gen"]
 
 
@@ -113,30 +113,6 @@ def generate_workflow_exports() -> None:
     workflow_init_path.write_text(content[:start] + "".join(all_block) + content[end:])
 
 
-def prepare_wit_workspace(temp_dir: Path) -> tuple[Path, Path]:
-    workspace_input_dir = temp_dir / "nexus"
-    shutil.copytree(wit_input_dir, workspace_input_dir)
-
-    model_path = workspace_input_dir / "deps" / "nexus-temporal-types" / "model.wit"
-    model_content = model_path.read_text()
-    if "@nexus.support" not in model_content:
-        support_path = (
-            workspace_input_dir
-            / "deps"
-            / "nexus-temporal-types"
-            / "python"
-            / python_support_path.name
-        )
-        support_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(python_support_path, support_path)
-        model_path.write_text(
-            '/// @nexus.support python="python/temporal_model_converters.py"\n'
-            + model_content
-        )
-
-    return workspace_input_dir / "workflow-service.wit", workspace_input_dir / "deps"
-
-
 def generate_nexus_system_api() -> None:
     if not wit_path.exists():
         raise RuntimeError(f"missing WIT source: {wit_path}")
@@ -146,9 +122,7 @@ def generate_nexus_system_api() -> None:
         raise RuntimeError(f"missing Python support source: {python_support_path}")
 
     with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
-        temp_path = Path(temp_dir)
-        descriptor_path = temp_path / "temporal_api.bin"
-        workspace_wit_path, workspace_wit_deps_dir = prepare_wit_workspace(temp_path)
+        descriptor_path = Path(temp_dir) / "temporal_api.bin"
         build_descriptor_set(descriptor_path)
         command = nex_gen_command()
 
@@ -161,9 +135,11 @@ def generate_nexus_system_api() -> None:
                 "--lang",
                 "python",
                 "--input",
-                str(workspace_wit_path),
+                str(wit_path),
                 "--input",
-                str(workspace_wit_deps_dir),
+                str(wit_deps_dir),
+                "--support-file",
+                str(python_support_path),
                 "--descriptors",
                 str(descriptor_path),
                 "--output",
