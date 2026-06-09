@@ -107,14 +107,14 @@ class PayloadVisitor:
         finally:
             await bounded.drain()
 
-    async def _visit_system_nexus_payload(
+    async def _visit_nexus_operation_input_payload(
         self,
         fs: VisitorFunctions,
         service: str,
         operation: str,
         payload: Payload,
     ) -> None:
-        new_payload = await temporalio.nexus.system.visit_payload(
+        new_payload = await temporalio.nexus.system.maybe_visit_payload(
             service,
             operation,
             payload,
@@ -528,7 +528,9 @@ class PayloadVisitor:
         self, fs: VisitorFunctions, o: Any
     ):
         if o.HasField("input"):
-            await self._visit_system_nexus_payload(fs, o.service, o.operation, o.input)
+            await self._visit_nexus_operation_input_payload(
+                fs, o.service, o.operation, o.input
+            )
 
     async def _visit_coresdk_workflow_commands_WorkflowCommand(
         self, fs: VisitorFunctions, o: Any

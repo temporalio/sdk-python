@@ -28,14 +28,14 @@ def _operation(
     return workflow_service.__nexus_operation_registry__.get((service, operation))
 
 
-async def visit_payload(
+async def maybe_visit_payload(
     service: str,
     operation: str,
     payload: temporalio.api.common.v1.Payload,
     visitor_functions: VisitorFunctions,
     skip_search_attributes: bool,
 ) -> temporalio.api.common.v1.Payload | None:
-    """Visit nested payloads inside a recognized system Nexus envelope."""
+    """Visit nested payloads if the payload is a recognized system Nexus envelope."""
     operation_def = _operation(service, operation)
     if operation_def is None:
         return None
@@ -69,6 +69,6 @@ def get_payload_converter() -> temporalio.converter.PayloadConverter:
 __all__ = [
     "get_payload_converter",
     "is_system_operation",
+    "maybe_visit_payload",
     "SystemNexusPayloadConverter",
-    "visit_payload",
 ]
