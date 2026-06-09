@@ -67,16 +67,6 @@ def build_descriptor_set(descriptor_path: Path) -> None:
     )
 
 
-def strip_unsupported_pyright_comments() -> None:
-    for path in output_dir.rglob("*.py"):
-        content = path.read_text()
-        content = content.replace("# pyright: reportAny=false\n", "")
-        content = content.replace(
-            "# pyright: reportAny=false, reportExplicitAny=false\n", ""
-        )
-        path.write_text(content)
-
-
 def generate_workflow_exports() -> None:
     spec = spec_from_file_location(
         "temporalio_nexus_system_workflow_service_exports",
@@ -148,7 +138,6 @@ def generate_nexus_system_api() -> None:
         )
 
     (output_dir.parent / "__init__.py").touch()
-    strip_unsupported_pyright_comments()
     generate_workflow_exports()
     subprocess.check_call(
         [
