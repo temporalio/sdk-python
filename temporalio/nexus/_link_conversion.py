@@ -107,7 +107,7 @@ def temporal_link_to_nexus_link(
         case "nexus_operation":
             return nexus_operation_to_nexus_link(temporal_link.nexus_operation)
 
-        case "activity" | "batch_job" | "workflow":
+        case "activity" | "batch_job":
             raise NotImplementedError(
                 "only workflow_event and nexus operation links are supported"
             )
