@@ -334,8 +334,6 @@ class UpdateWithStartUpdateWorkflowInput:
     wait_for_stage: WorkflowUpdateStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: type | None
-    rpc_metadata: Mapping[str, str | bytes]
-    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -366,8 +364,6 @@ class UpdateWithStartStartWorkflowInput:
     static_details: str | None
     # Type may be absent
     ret_type: type | None
-    rpc_metadata: Mapping[str, str | bytes]
-    rpc_timeout: timedelta | None
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None = None
 
@@ -376,12 +372,9 @@ class UpdateWithStartStartWorkflowInput:
 class StartWorkflowUpdateWithStartInput:
     """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
 
-    The top-level ``rpc_metadata`` and ``rpc_timeout`` fields are authoritative
-    for the ``execute_multi_operation`` gRPC call.  The sub-inputs
-    (``start_workflow_input`` and ``update_workflow_input``) also carry their own
-    ``rpc_metadata`` / ``rpc_timeout`` for interceptor introspection, but those
-    values are **not** forwarded to the gRPC call.  Interceptors that wish to set
-    RPC metadata should modify :py:attr:`rpc_metadata` on this object.
+    The ``rpc_metadata`` and ``rpc_timeout`` fields are authoritative for the
+    ``execute_multi_operation`` gRPC call.  Interceptors that wish to set RPC
+    metadata should modify :py:attr:`rpc_metadata` on this object.
     """
 
     start_workflow_input: UpdateWithStartStartWorkflowInput

@@ -1190,8 +1190,6 @@ class Client:
             args=temporalio.common._arg_or_args(arg, args),
             headers={},
             ret_type=result_type or result_type_from_type_hint,
-            rpc_metadata=rpc_metadata,
-            rpc_timeout=rpc_timeout,
             wait_for_stage=wait_for_stage,
         )
 
