@@ -3305,6 +3305,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_service_account_namespace_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetServiceAccountNamespaceAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetServiceAccountNamespaceAssignmentsResponse:
+        """Invokes the CloudService.get_service_account_namespace_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_service_account_namespace_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetServiceAccountNamespaceAssignmentsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_service_accounts(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetServiceAccountsRequest,
@@ -3395,6 +3413,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_user_group_namespace_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetUserGroupNamespaceAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetUserGroupNamespaceAssignmentsResponse:
+        """Invokes the CloudService.get_user_group_namespace_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_user_group_namespace_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetUserGroupNamespaceAssignmentsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_user_groups(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUserGroupsRequest,
@@ -3408,6 +3444,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.GetUserGroupsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_user_namespace_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetUserNamespaceAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetUserNamespaceAssignmentsResponse:
+        """Invokes the CloudService.get_user_namespace_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_user_namespace_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetUserNamespaceAssignmentsResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,

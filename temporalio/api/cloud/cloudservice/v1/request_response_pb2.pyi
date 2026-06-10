@@ -4593,3 +4593,215 @@ class DeleteCustomRoleResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___DeleteCustomRoleResponse = DeleteCustomRoleResponse
+
+class GetUserNamespaceAssignmentsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """The namespace to get users for."""
+    page_size: builtins.int
+    """The requested size of the page to retrieve - optional.
+    Cannot exceed 1000. Defaults to 100.
+    """
+    page_token: builtins.str
+    """The page token if this is continuing from another response - optional."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        page_size: builtins.int = ...,
+        page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace",
+            b"namespace",
+            "page_size",
+            b"page_size",
+            "page_token",
+            b"page_token",
+        ],
+    ) -> None: ...
+
+global___GetUserNamespaceAssignmentsRequest = GetUserNamespaceAssignmentsRequest
+
+class GetUserNamespaceAssignmentsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    USERS_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def users(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.identity.v1.message_pb2.UserNamespaceAssignment
+    ]:
+        """The list of users with access to the namespace."""
+    next_page_token: builtins.str
+    """The next page's token."""
+    def __init__(
+        self,
+        *,
+        users: collections.abc.Iterable[
+            temporalio.api.cloud.identity.v1.message_pb2.UserNamespaceAssignment
+        ]
+        | None = ...,
+        next_page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "next_page_token", b"next_page_token", "users", b"users"
+        ],
+    ) -> None: ...
+
+global___GetUserNamespaceAssignmentsResponse = GetUserNamespaceAssignmentsResponse
+
+class GetServiceAccountNamespaceAssignmentsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """The namespace to get service accounts for."""
+    page_size: builtins.int
+    """The requested size of the page to retrieve - optional.
+    Cannot exceed 1000. Defaults to 100.
+    """
+    page_token: builtins.str
+    """The page token if this is continuing from another response - optional."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        page_size: builtins.int = ...,
+        page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace",
+            b"namespace",
+            "page_size",
+            b"page_size",
+            "page_token",
+            b"page_token",
+        ],
+    ) -> None: ...
+
+global___GetServiceAccountNamespaceAssignmentsRequest = (
+    GetServiceAccountNamespaceAssignmentsRequest
+)
+
+class GetServiceAccountNamespaceAssignmentsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERVICE_ACCOUNTS_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def service_accounts(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.identity.v1.message_pb2.ServiceAccountNamespaceAssignment
+    ]:
+        """The list of service accounts with access to the namespace."""
+    next_page_token: builtins.str
+    """The next page's token."""
+    def __init__(
+        self,
+        *,
+        service_accounts: collections.abc.Iterable[
+            temporalio.api.cloud.identity.v1.message_pb2.ServiceAccountNamespaceAssignment
+        ]
+        | None = ...,
+        next_page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "next_page_token",
+            b"next_page_token",
+            "service_accounts",
+            b"service_accounts",
+        ],
+    ) -> None: ...
+
+global___GetServiceAccountNamespaceAssignmentsResponse = (
+    GetServiceAccountNamespaceAssignmentsResponse
+)
+
+class GetUserGroupNamespaceAssignmentsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """The namespace to get user groups for."""
+    page_size: builtins.int
+    """The requested size of the page to retrieve - optional.
+    Cannot exceed 1000. Defaults to 100.
+    """
+    page_token: builtins.str
+    """The page token if this is continuing from another response - optional."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        page_size: builtins.int = ...,
+        page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace",
+            b"namespace",
+            "page_size",
+            b"page_size",
+            "page_token",
+            b"page_token",
+        ],
+    ) -> None: ...
+
+global___GetUserGroupNamespaceAssignmentsRequest = (
+    GetUserGroupNamespaceAssignmentsRequest
+)
+
+class GetUserGroupNamespaceAssignmentsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    GROUPS_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def groups(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.identity.v1.message_pb2.UserGroupNamespaceAssignment
+    ]:
+        """The list of user groups with access to the namespace."""
+    next_page_token: builtins.str
+    """The next page's token."""
+    def __init__(
+        self,
+        *,
+        groups: collections.abc.Iterable[
+            temporalio.api.cloud.identity.v1.message_pb2.UserGroupNamespaceAssignment
+        ]
+        | None = ...,
+        next_page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "groups", b"groups", "next_page_token", b"next_page_token"
+        ],
+    ) -> None: ...
+
+global___GetUserGroupNamespaceAssignmentsResponse = (
+    GetUserGroupNamespaceAssignmentsResponse
+)

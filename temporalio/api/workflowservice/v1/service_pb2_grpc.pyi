@@ -510,6 +510,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
     ]
     """Deprecated. Use `UpdateWorkerVersioningRules`.
+    Will be removed in server version v1.32.0.
 
     Allows users to specify sets of worker build id versions on a per task queue basis. Versions
     are ordered, and may be either compatible with some extant version, or a new incompatible
@@ -532,6 +533,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
     ]
     """Deprecated. Use `GetWorkerVersioningRules`.
+    Will be removed in server version v1.32.0.
     Fetches the worker build id versioning sets for a task queue.
     """
     UpdateWorkerVersioningRules: grpc.UnaryUnaryMultiCallable[
@@ -559,7 +561,7 @@ class WorkflowServiceStub:
     the target Build ID of a redirect rule is able to process event histories made by the source
     Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
 
-    WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+    Will be removed in server version v1.32.0.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
     """
@@ -568,13 +570,14 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
     ]
     """Fetches the Build ID assignment and redirect rules for a Task Queue.
-    WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+    Will be removed in server version v1.32.0.
     """
     GetWorkerTaskReachability: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
     ]
     """Deprecated. Use `DescribeTaskQueue`.
+    Will be removed in server version v1.32.0.
 
     Fetches task reachability to determine whether a worker may be retired.
     The request may specify task queues to query for or let the server fetch all task queues mapped to the given
@@ -1779,6 +1782,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse:
         """Deprecated. Use `UpdateWorkerVersioningRules`.
+        Will be removed in server version v1.32.0.
 
         Allows users to specify sets of worker build id versions on a per task queue basis. Versions
         are ordered, and may be either compatible with some extant version, or a new incompatible
@@ -1803,6 +1807,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse:
         """Deprecated. Use `GetWorkerVersioningRules`.
+        Will be removed in server version v1.32.0.
         Fetches the worker build id versioning sets for a task queue.
         """
     @abc.abstractmethod
@@ -1832,7 +1837,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         the target Build ID of a redirect rule is able to process event histories made by the source
         Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
 
-        WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+        Will be removed in server version v1.32.0.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
         """
@@ -1843,7 +1848,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse:
         """Fetches the Build ID assignment and redirect rules for a Task Queue.
-        WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+        Will be removed in server version v1.32.0.
         """
     @abc.abstractmethod
     def GetWorkerTaskReachability(
@@ -1852,6 +1857,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse:
         """Deprecated. Use `DescribeTaskQueue`.
+        Will be removed in server version v1.32.0.
 
         Fetches task reachability to determine whether a worker may be retired.
         The request may specify task queues to query for or let the server fetch all task queues mapped to the given

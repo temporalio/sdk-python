@@ -384,6 +384,21 @@ class CloudServiceStub(object):
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCustomRoleRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCustomRoleResponse.FromString,
         )
+        self.GetUserNamespaceAssignments = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserNamespaceAssignments",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserNamespaceAssignmentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserNamespaceAssignmentsResponse.FromString,
+        )
+        self.GetServiceAccountNamespaceAssignments = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetServiceAccountNamespaceAssignments",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountNamespaceAssignmentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountNamespaceAssignmentsResponse.FromString,
+        )
+        self.GetUserGroupNamespaceAssignments = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupNamespaceAssignments",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsResponse.FromString,
+        )
 
 
 class CloudServiceServicer(object):
@@ -839,6 +854,24 @@ class CloudServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def GetUserNamespaceAssignments(self, request, context):
+        """Get users with access to a namespace"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetServiceAccountNamespaceAssignments(self, request, context):
+        """Get service accounts with access to a namespace"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetUserGroupNamespaceAssignments(self, request, context):
+        """Get user groups with access to a namespace"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_CloudServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1206,6 +1239,21 @@ def add_CloudServiceServicer_to_server(servicer, server):
             servicer.DeleteCustomRole,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCustomRoleRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCustomRoleResponse.SerializeToString,
+        ),
+        "GetUserNamespaceAssignments": grpc.unary_unary_rpc_method_handler(
+            servicer.GetUserNamespaceAssignments,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserNamespaceAssignmentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserNamespaceAssignmentsResponse.SerializeToString,
+        ),
+        "GetServiceAccountNamespaceAssignments": grpc.unary_unary_rpc_method_handler(
+            servicer.GetServiceAccountNamespaceAssignments,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountNamespaceAssignmentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountNamespaceAssignmentsResponse.SerializeToString,
+        ),
+        "GetUserGroupNamespaceAssignments": grpc.unary_unary_rpc_method_handler(
+            servicer.GetUserGroupNamespaceAssignments,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3327,6 +3375,93 @@ class CloudService(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteCustomRole",
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCustomRoleRequest.SerializeToString,
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCustomRoleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetUserNamespaceAssignments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserNamespaceAssignments",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserNamespaceAssignmentsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserNamespaceAssignmentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetServiceAccountNamespaceAssignments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetServiceAccountNamespaceAssignments",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountNamespaceAssignmentsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountNamespaceAssignmentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetUserGroupNamespaceAssignments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupNamespaceAssignments",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsResponse.FromString,
             options,
             channel_credentials,
             insecure,
