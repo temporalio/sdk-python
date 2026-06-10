@@ -152,7 +152,7 @@ class CancelActivityOptions:
     activity_id: str
     """The activity ID of the activity to cancel."""
 
-    run_id: str | None
+    run_id: str
     """The run ID of the activity to cancel."""
 
 
@@ -219,6 +219,11 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
                 if not operation_token.activity_id:
                     raise HandlerError(
                         "Invalid activity operation token: missing activity ID",
+                        type=HandlerErrorType.NOT_FOUND,
+                    )
+                if not operation_token.run_id:
+                    raise HandlerError(
+                        "Invalid activity operation token: missing run ID",
                         type=HandlerErrorType.NOT_FOUND,
                     )
                 activity_cancel_opts = CancelActivityOptions(
