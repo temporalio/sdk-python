@@ -133,6 +133,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "--dynamic-config-value",
                 "history.enableChasmCallbacks=true",
                 "--dynamic-config-value",
+                "history.enableCHASMSignalBacklinks=true",
+                "--dynamic-config-value",
                 "nexusoperation.enableStandalone=true",
                 "--dynamic-config-value",
                 'system.system.refreshNexusEndpointsMinWait="0s"',
