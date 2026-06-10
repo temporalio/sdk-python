@@ -963,9 +963,6 @@ class CancelActivityWorkflow:
             self._activity_result = await handle
         except ActivityError as err:
             self._activity_result = f"Error: {err.cause.__class__.__name__}"
-        # TODO(cretz): Remove when https://github.com/temporalio/sdk-rust/issues/323 is fixed
-        except CancelledError as err:
-            self._activity_result = f"Error: {err.__class__.__name__}"
         # Wait forever
         await asyncio.Future()
 
@@ -1094,6 +1091,148 @@ async def test_workflow_simple_cancel(client: Client):
             await handle.result()
         assert isinstance(err.value.cause, CancelledError)
         assert (await handle.describe()).status == WorkflowExecutionStatus.CANCELED
+
+
+@workflow.defn
+class CancelReasonWorkflow:
+    def __init__(self) -> None:
+        self._started = False
+        # Reason observed when the inner task was cancelled (no external
+        # workflow cancel has happened yet at that point).
+        self._reason_inner: str | None = "unset"
+        # Reason observed in the outer CancelledError handler after the
+        # external workflow cancel has been delivered.
+        self._reason_outer: str | None = "unset"
+
+    @workflow.run
+    async def run(self) -> NoReturn:
+        self._started = True
+        task = asyncio.create_task(asyncio.sleep(1000))
+        try:
+            task.cancel()
+            await task
+        except asyncio.CancelledError:
+            self._reason_inner = workflow.cancellation_reason()
+        try:
+            await asyncio.sleep(1000)
+        except asyncio.CancelledError:
+            self._reason_outer = workflow.cancellation_reason()
+            raise
+        raise RuntimeError("unreachable")
+
+    @workflow.query
+    def started(self) -> bool:
+        return self._started
+
+    @workflow.query
+    def reason_inner(self) -> str | None:
+        return self._reason_inner
+
+    @workflow.query
+    def reason_outer(self) -> str | None:
+        return self._reason_outer
+
+
+@pytest.mark.parametrize("reason", ["user-supplied reason", ""])
+async def test_workflow_cancellation_reason(client: Client, reason: str):
+    async with new_worker(client, CancelReasonWorkflow) as worker:
+        handle = await client.start_workflow(
+            CancelReasonWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def started() -> bool:
+            return await handle.query(CancelReasonWorkflow.started)
+
+        await assert_eq_eventually(True, started)
+        # Before any external cancel, reason is None even though an inner task
+        # cancel has already been observed.
+        assert await handle.query(CancelReasonWorkflow.reason_inner) is None
+
+        # When reason is "", cancel without providing the kwarg at all to
+        # exercise the default path.
+        if reason:
+            await handle.cancel(reason=reason)
+        else:
+            await handle.cancel()
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+        outer = await handle.query(CancelReasonWorkflow.reason_outer)
+        # Load-bearing: a cancel with no reason still produces an empty string,
+        # not None — None means "no external cancel happened".
+        assert outer is not None
+        assert outer == reason
+
+
+@workflow.defn
+class CancelReasonReporter:
+    """Workflow that swallows a cancel and returns the observed reason."""
+
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            await asyncio.sleep(1000)
+        except asyncio.CancelledError:
+            return workflow.cancellation_reason() or ""
+        raise RuntimeError("unreachable")
+
+
+@workflow.defn
+class ChildCancelReasonWorkflow:
+    @workflow.run
+    async def run(self, msg: str) -> str:
+        child = await workflow.start_child_workflow(
+            CancelReasonReporter.run,
+            id=f"{workflow.info().workflow_id}_child",
+        )
+        child.cancel(msg)
+        return await child
+
+
+async def test_workflow_child_cancel_reason(client: Client):
+    async with new_worker(
+        client, ChildCancelReasonWorkflow, CancelReasonReporter
+    ) as worker:
+        result = await client.execute_workflow(
+            ChildCancelReasonWorkflow.run,
+            "from-parent",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "from-parent"
+
+
+@workflow.defn
+class ExternalCancelReasonWorkflow:
+    @workflow.run
+    async def run(self, target_id: str) -> None:
+        await workflow.get_external_workflow_handle(target_id).cancel(
+            reason="from-external-caller"
+        )
+
+
+async def test_workflow_external_cancel_reason(client: Client):
+    async with new_worker(
+        client, ExternalCancelReasonWorkflow, CancelReasonReporter
+    ) as worker:
+        target_id = f"workflow-{uuid.uuid4()}"
+        target = await client.start_workflow(
+            CancelReasonReporter.run,
+            id=target_id,
+            task_queue=worker.task_queue,
+        )
+        await client.execute_workflow(
+            ExternalCancelReasonWorkflow.run,
+            target_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Server wraps the user-supplied reason with metadata about the caller
+        # when one workflow cancels another, so check for substring.
+        assert "from-external-caller" in await target.result()
 
 
 @workflow.defn

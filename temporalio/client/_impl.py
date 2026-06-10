@@ -352,6 +352,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 identity=self._client.identity,
                 request_id=str(uuid.uuid4()),
                 first_execution_run_id=input.first_execution_run_id or "",
+                reason=input.reason,
             ),
             retry=True,
             metadata=input.rpc_metadata,
@@ -697,9 +698,14 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             long_poll_token=resp.long_poll_token or None,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
-                WorkflowSerializationContext(
+                ActivitySerializationContext(
                     namespace=self._client.namespace,
-                    workflow_id=input.activity_id,  # Using activity_id as workflow_id for activities not started by a workflow
+                    activity_id=resp.info.activity_id,
+                    activity_task_queue=resp.info.task_queue,
+                    activity_type=resp.info.activity_type.name,
+                    workflow_id=None,
+                    workflow_type=None,
+                    is_local=False,
                 )
             ),
         )

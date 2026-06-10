@@ -94,12 +94,16 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
     ]
-    """Add a new region to a namespace"""
+    """Add a new region to a namespace
+    Deprecated: Use the UpdateNamespace() to add new replica in the namespace spec instead.
+    """
     DeleteNamespaceRegion: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
     ]
-    """Delete a region from a namespace"""
+    """Delete a region from a namespace
+    Deprecated: Use the UpdateNamespace() to delete a replica in the namespace spec instead.
+    """
     GetRegions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
@@ -360,6 +364,46 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
     ]
     """Get a billing report"""
+    GetCustomRoles: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
+    ]
+    """Get custom roles"""
+    GetCustomRole: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
+    ]
+    """Get a custom role"""
+    CreateCustomRole: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
+    ]
+    """Create a custom role"""
+    UpdateCustomRole: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
+    ]
+    """Update a custom role"""
+    DeleteCustomRole: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
+    ]
+    """Delete a custom role"""
+    GetUserNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
+    ]
+    """Get users with access to a namespace"""
+    GetServiceAccountNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
+    ]
+    """Get service accounts with access to a namespace"""
+    GetUserGroupNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
+    ]
+    """Get user groups with access to a namespace"""
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
@@ -479,14 +523,18 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse:
-        """Add a new region to a namespace"""
+        """Add a new region to a namespace
+        Deprecated: Use the UpdateNamespace() to add new replica in the namespace spec instead.
+        """
     @abc.abstractmethod
     def DeleteNamespaceRegion(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse:
-        """Delete a region from a namespace"""
+        """Delete a region from a namespace
+        Deprecated: Use the UpdateNamespace() to delete a replica in the namespace spec instead.
+        """
     @abc.abstractmethod
     def GetRegions(
         self,
@@ -853,6 +901,66 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse:
         """Get a billing report"""
+    @abc.abstractmethod
+    def GetCustomRoles(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse
+    ):
+        """Get custom roles"""
+    @abc.abstractmethod
+    def GetCustomRole(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse
+    ):
+        """Get a custom role"""
+    @abc.abstractmethod
+    def CreateCustomRole(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse:
+        """Create a custom role"""
+    @abc.abstractmethod
+    def UpdateCustomRole(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse:
+        """Update a custom role"""
+    @abc.abstractmethod
+    def DeleteCustomRole(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse:
+        """Delete a custom role"""
+    @abc.abstractmethod
+    def GetUserNamespaceAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse:
+        """Get users with access to a namespace"""
+    @abc.abstractmethod
+    def GetServiceAccountNamespaceAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse:
+        """Get service accounts with access to a namespace"""
+    @abc.abstractmethod
+    def GetUserGroupNamespaceAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse:
+        """Get user groups with access to a namespace"""
 
 def add_CloudServiceServicer_to_server(
     servicer: CloudServiceServicer, server: grpc.Server

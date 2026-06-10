@@ -29,6 +29,7 @@ import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
+from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
 
 from . import _command_aware_visitor
 from ._interceptor import (
@@ -85,6 +86,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
     ) -> None:
+        # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
+        debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
+
         self._bridge_worker = bridge_worker
         self._namespace = namespace
         self._task_queue = task_queue
@@ -96,7 +100,19 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
         )
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
+
+        # If debug mode is enabled, ensure that the debugpy (https://github.com/microsoft/debugpy)
+        # import is added as a passthrough
+        if debug_mode and isinstance(workflow_runner, SandboxedWorkflowRunner):
+            workflow_runner = dataclasses.replace(
+                workflow_runner,
+                restrictions=workflow_runner.restrictions.with_passthrough_modules(
+                    "_pydevd_bundle"
+                ),
+            )
+
         self._workflow_runner = workflow_runner
+
         self._unsandboxed_workflow_runner = unsandboxed_workflow_runner
         self._data_converter = data_converter
         # Build the interceptor classes and collect extern functions
@@ -127,11 +143,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
         self._throw_after_activation: Exception | None = None
 
-        # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
-        # deadlock detection, otherwise set to 2 seconds
-        self._deadlock_timeout_seconds = (
-            None if debug_mode or os.environ.get("TEMPORAL_DEBUG") else 2
-        )
+        # If debug mode is enabled, disable deadlock detection
+        # otherwise set to 2 seconds
+        self._deadlock_timeout_seconds = None if debug_mode else 2
 
         # Keep track of workflows that could not be evicted
         self._could_not_evict_count = 0

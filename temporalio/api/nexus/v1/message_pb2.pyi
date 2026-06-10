@@ -972,6 +972,7 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
     USER_METADATA_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
+    STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
     operation_id: builtins.str
     """Unique identifier of this Nexus operation within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -1068,6 +1069,8 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
         """Links attached by the handler of this operation on start or completion."""
     identity: builtins.str
     """The identity of the client who started this operation."""
+    state_size_bytes: builtins.int
+    """Updated once on scheduled and once on terminal status."""
     def __init__(
         self,
         *,
@@ -1106,6 +1109,7 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
         links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
         identity: builtins.str = ...,
+        state_size_bytes: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1191,6 +1195,8 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
             b"start_to_close_timeout",
             "state",
             b"state",
+            "state_size_bytes",
+            b"state_size_bytes",
             "state_transition_count",
             b"state_transition_count",
             "status",
@@ -1221,6 +1227,7 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
     EXECUTION_DURATION_FIELD_NUMBER: builtins.int
+    STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
     operation_id: builtins.str
     """A unique identifier of this operation within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -1251,6 +1258,8 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
         """The difference between close time and scheduled time.
         This field is only populated if the operation is closed.
         """
+    state_size_bytes: builtins.int
+    """Updated once on scheduled and once on terminal status."""
     def __init__(
         self,
         *,
@@ -1266,6 +1275,7 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
         | None = ...,
         state_transition_count: builtins.int = ...,
         execution_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        state_size_bytes: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1301,6 +1311,8 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
             b"search_attributes",
             "service",
             b"service",
+            "state_size_bytes",
+            b"state_size_bytes",
             "state_transition_count",
             b"state_transition_count",
             "status",

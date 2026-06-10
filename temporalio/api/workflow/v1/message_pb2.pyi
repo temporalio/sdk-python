@@ -1465,32 +1465,70 @@ class CallbackInfo(google.protobuf.message.Message):
             self,
         ) -> None: ...
 
+    class UpdateWorkflowExecutionCompleted(google.protobuf.message.Message):
+        """Trigger for when a workflow update is completed."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        UPDATE_ID_FIELD_NUMBER: builtins.int
+        update_id: builtins.str
+        def __init__(
+            self,
+            *,
+            update_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["update_id", b"update_id"]
+        ) -> None: ...
+
     class Trigger(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         WORKFLOW_CLOSED_FIELD_NUMBER: builtins.int
+        UPDATE_WORKFLOW_EXECUTION_COMPLETED_FIELD_NUMBER: builtins.int
         @property
         def workflow_closed(self) -> global___CallbackInfo.WorkflowClosed: ...
+        @property
+        def update_workflow_execution_completed(
+            self,
+        ) -> global___CallbackInfo.UpdateWorkflowExecutionCompleted: ...
         def __init__(
             self,
             *,
             workflow_closed: global___CallbackInfo.WorkflowClosed | None = ...,
+            update_workflow_execution_completed: global___CallbackInfo.UpdateWorkflowExecutionCompleted
+            | None = ...,
         ) -> None: ...
         def HasField(
             self,
             field_name: typing_extensions.Literal[
-                "variant", b"variant", "workflow_closed", b"workflow_closed"
+                "update_workflow_execution_completed",
+                b"update_workflow_execution_completed",
+                "variant",
+                b"variant",
+                "workflow_closed",
+                b"workflow_closed",
             ],
         ) -> builtins.bool: ...
         def ClearField(
             self,
             field_name: typing_extensions.Literal[
-                "variant", b"variant", "workflow_closed", b"workflow_closed"
+                "update_workflow_execution_completed",
+                b"update_workflow_execution_completed",
+                "variant",
+                b"variant",
+                "workflow_closed",
+                b"workflow_closed",
             ],
         ) -> None: ...
         def WhichOneof(
             self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-        ) -> typing_extensions.Literal["workflow_closed"] | None: ...
+        ) -> (
+            typing_extensions.Literal[
+                "workflow_closed", "update_workflow_execution_completed"
+            ]
+            | None
+        ): ...
 
     CALLBACK_FIELD_NUMBER: builtins.int
     TRIGGER_FIELD_NUMBER: builtins.int

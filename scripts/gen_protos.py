@@ -10,7 +10,7 @@ from pathlib import Path
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
-    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "common" / "protos"
+    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "protos" / "protos"
 )
 api_proto_dir = proto_dir / "api_upstream"
 api_cloud_proto_dir = proto_dir / "api_cloud_upstream"
@@ -44,6 +44,10 @@ py_fixes = [
         r"from temporalio.api.dependencies.protoc_gen_openapiv2.",
     ),
     partial(
+        re.compile(r"from nexusannotations\.").sub,
+        r"from temporalio.api.dependencies.nexusannotations.",
+    ),
+    partial(
         re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
     ),
     partial(
@@ -57,6 +61,10 @@ pyi_fixes = [
     partial(
         re.compile(r"protoc_gen_openapiv2\.").sub,
         r"temporalio.api.dependencies.protoc_gen_openapiv2.",
+    ),
+    partial(
+        re.compile(r"nexusannotations\.").sub,
+        r"temporalio.api.dependencies.nexusannotations.",
     ),
     partial(re.compile(r"temporal\.sdk\.core\.").sub, r"temporalio.bridge.proto."),
 ]
@@ -191,11 +199,12 @@ def generate_protos(output_dir: Path):
             grpc_file.unlink()
     # Apply fixes before moving code
     fix_generated_output(output_dir)
-    # Move openapiv2 dependency protos
+    # Move dependency protos
     deps_out_dir = api_out_dir / "dependencies"
-    shutil.rmtree(deps_out_dir / "protoc_gen_openapiv2", ignore_errors=True)
     deps_out_dir.mkdir(exist_ok=True)
-    (output_dir / "protoc_gen_openapiv2").replace(deps_out_dir / "protoc_gen_openapiv2")
+    for dep in ["protoc_gen_openapiv2", "nexusannotations"]:
+        shutil.rmtree(deps_out_dir / dep, ignore_errors=True)
+        (output_dir / dep).replace(deps_out_dir / dep)
     (deps_out_dir / "__init__.py").touch()
     # Move protos
     for p in (output_dir / "temporal" / "api").iterdir():

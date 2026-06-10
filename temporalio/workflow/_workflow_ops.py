@@ -604,11 +604,15 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         """
         raise NotImplementedError
 
-    async def cancel(self) -> None:
+    async def cancel(self, *, reason: str = "") -> None:  # pyright: ignore[reportUnusedParameter]
         """Send a cancellation request to this external workflow.
 
         This will fail if the workflow cannot accept the request (e.g. if the
         workflow is not found).
+
+        Args:
+            reason: Reason recorded with the cancellation request. Available in
+                the target workflow via :py:func:`cancellation_reason`.
         """
         raise NotImplementedError
 

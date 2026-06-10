@@ -413,6 +413,9 @@ class ModelActivity:
                     conversation_id=input.get("conversation_id"),
                     prompt=input.get("prompt"),
                 ):
+                    # OpenAI models set defer_build=True, so an event's pydantic
+                    # schema may still be an unbuilt placeholder.
+                    type(event).model_rebuild()
                     events.append(event)
                     events_topic.publish(event)
             except APIStatusError as e:

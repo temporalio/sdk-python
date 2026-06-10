@@ -2,10 +2,12 @@ from datetime import timedelta
 from typing import Any
 
 from strands import Agent
+from strands.hooks import BeforeModelCallEvent, HookCallback
 
 from temporalio.common import Priority, RetryPolicy
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
+from ._temporal_mcp_client import TemporalMCPClient
 from ._temporal_model import TemporalModel
 
 _SNAPSHOT_DISABLED = (
@@ -75,6 +77,51 @@ class TemporalAgent(Agent):
             streaming_batch_interval=streaming_batch_interval,
         )
         super().__init__(model=temporal_model, **agent_kwargs)
+
+        # Strands invokes ToolProvider.load_tools() once at construction on a
+        # separate run_async thread that has no workflow runtime, so a
+        # TemporalMCPClient cannot list its tools there. Instead refresh from a
+        # BeforeModelCallEvent hook, which runs on the workflow loop just before
+        # the registry is read each turn. cache_tools=True lists once (guarded
+        # by _fetched); cache_tools=False re-lists every turn.
+        for provider in self.tool_registry._tool_providers:
+            if isinstance(provider, TemporalMCPClient):
+                self.hooks.add_callback(
+                    BeforeModelCallEvent, self._make_mcp_refresh_hook(provider)
+                )
+
+    def _make_mcp_refresh_hook(
+        self, provider: TemporalMCPClient
+    ) -> HookCallback[BeforeModelCallEvent]:
+        async def hook(event: BeforeModelCallEvent) -> None:
+            if provider._cache_tools and provider._fetched:
+                return
+            old_names = {tool.tool_name for tool in provider._tools}
+            await provider._refresh()
+            self._reconcile_mcp_tools(event, provider, old_names)
+
+        return hook
+
+    def _reconcile_mcp_tools(
+        self,
+        event: BeforeModelCallEvent,
+        provider: TemporalMCPClient,
+        old_names: set[str],
+    ) -> None:
+        reg = event.agent.tool_registry
+        new = {tool.tool_name: tool for tool in provider._tools}
+        # Tools the server dropped or renamed since the last listing. There is
+        # no public unregister, so remove them from the registry directly.
+        for name in old_names - set(new):
+            reg.registry.pop(name, None)
+            reg.dynamic_tools.pop(name, None)
+        # replace() swaps an existing tool in place (no hot-reload guard);
+        # register_tool() adds a newly-discovered one.
+        for name, tool in new.items():
+            if name in reg.registry:
+                reg.replace(tool)
+            else:
+                reg.register_tool(tool)
 
     def take_snapshot(self, *_args: Any, **_kwargs: Any) -> Any:
         """Disabled; Temporal's event history is the source of truth."""

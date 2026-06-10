@@ -4,7 +4,7 @@ See https://github.com/temporalio/sdk-python/tree/main#nexus
 """
 
 from ._decorators import (
-    TemporalNexusOperationStartHandlerFunc,
+    TemporalOperationStartHandlerFunc,
     temporal_operation,
     workflow_run_operation,
 )
@@ -12,8 +12,8 @@ from ._operation_context import (
     Info,
     LoggerAdapter,
     NexusCallback,
-    TemporalNexusCancelOperationContext,
-    TemporalNexusStartOperationContext,
+    TemporalCancelOperationContext,
+    TemporalStartOperationContext,
     WorkflowRunOperationContext,
     client,
     in_operation,
@@ -26,7 +26,7 @@ from ._operation_context import (
 )
 from ._operation_handlers import (
     CancelWorkflowRunOptions,
-    TemporalNexusOperationHandler,
+    TemporalOperationHandler,
 )
 from ._temporal_client import TemporalNexusClient, TemporalOperationResult
 from ._token import WorkflowHandle
@@ -38,8 +38,8 @@ __all__ = (
     "LoggerAdapter",
     "NexusCallback",
     "WorkflowRunOperationContext",
-    "TemporalNexusCancelOperationContext",
-    "TemporalNexusStartOperationContext",
+    "TemporalCancelOperationContext",
+    "TemporalStartOperationContext",
     "client",
     "in_operation",
     "info",
@@ -50,8 +50,8 @@ __all__ = (
     "wait_for_worker_shutdown_sync",
     "WorkflowHandle",
     "TemporalNexusClient",
-    "TemporalNexusOperationStartHandlerFunc",
-    "TemporalNexusOperationHandler",
+    "TemporalOperationStartHandlerFunc",
+    "TemporalOperationHandler",
     "TemporalOperationResult",
     "temporal_operation",
 )

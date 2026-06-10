@@ -57,6 +57,9 @@ class NamespaceInfo(google.protobuf.message.Message):
         STANDALONE_ACTIVITIES_FIELD_NUMBER: builtins.int
         WORKER_POLL_COMPLETE_ON_SHUTDOWN_FIELD_NUMBER: builtins.int
         POLLER_AUTOSCALING_FIELD_NUMBER: builtins.int
+        WORKER_COMMANDS_FIELD_NUMBER: builtins.int
+        STANDALONE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+        WORKFLOW_UPDATE_CALLBACKS_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -80,6 +83,12 @@ class NamespaceInfo(google.protobuf.message.Message):
         """
         poller_autoscaling: builtins.bool
         """True if the namespace supports poller autoscaling"""
+        worker_commands: builtins.bool
+        """True if the namespace supports worker commands (server-to-worker communication via control queues)."""
+        standalone_nexus_operation: builtins.bool
+        """True if the namespace supports standalone Nexus operations."""
+        workflow_update_callbacks: builtins.bool
+        """True if the namespace supports attaching callbacks on workflow updates"""
         def __init__(
             self,
             *,
@@ -92,6 +101,9 @@ class NamespaceInfo(google.protobuf.message.Message):
             standalone_activities: builtins.bool = ...,
             worker_poll_complete_on_shutdown: builtins.bool = ...,
             poller_autoscaling: builtins.bool = ...,
+            worker_commands: builtins.bool = ...,
+            standalone_nexus_operation: builtins.bool = ...,
+            workflow_update_callbacks: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -106,14 +118,20 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"reported_problems_search_attribute",
                 "standalone_activities",
                 b"standalone_activities",
+                "standalone_nexus_operation",
+                b"standalone_nexus_operation",
                 "sync_update",
                 b"sync_update",
+                "worker_commands",
+                b"worker_commands",
                 "worker_heartbeats",
                 b"worker_heartbeats",
                 "worker_poll_complete_on_shutdown",
                 b"worker_poll_complete_on_shutdown",
                 "workflow_pause",
                 b"workflow_pause",
+                "workflow_update_callbacks",
+                b"workflow_update_callbacks",
             ],
         ) -> None: ...
 
