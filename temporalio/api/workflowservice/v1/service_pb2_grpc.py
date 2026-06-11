@@ -1183,6 +1183,7 @@ class WorkflowServiceServicer(object):
 
     def UpdateWorkerBuildIdCompatibility(self, request, context):
         """Deprecated. Use `UpdateWorkerVersioningRules`.
+        Will be removed in server version v1.32.0.
 
         Allows users to specify sets of worker build id versions on a per task queue basis. Versions
         are ordered, and may be either compatible with some extant version, or a new incompatible
@@ -1206,6 +1207,7 @@ class WorkflowServiceServicer(object):
 
     def GetWorkerBuildIdCompatibility(self, request, context):
         """Deprecated. Use `GetWorkerVersioningRules`.
+        Will be removed in server version v1.32.0.
         Fetches the worker build id versioning sets for a task queue.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1234,7 +1236,7 @@ class WorkflowServiceServicer(object):
         the target Build ID of a redirect rule is able to process event histories made by the source
         Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
 
-        WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+        Will be removed in server version v1.32.0.
         (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
         """
@@ -1244,7 +1246,7 @@ class WorkflowServiceServicer(object):
 
     def GetWorkerVersioningRules(self, request, context):
         """Fetches the Build ID assignment and redirect rules for a Task Queue.
-        WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+        Will be removed in server version v1.32.0.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1252,6 +1254,7 @@ class WorkflowServiceServicer(object):
 
     def GetWorkerTaskReachability(self, request, context):
         """Deprecated. Use `DescribeTaskQueue`.
+        Will be removed in server version v1.32.0.
 
         Fetches task reachability to determine whether a worker may be retired.
         The request may specify task queues to query for or let the server fetch all task queues mapped to the given
