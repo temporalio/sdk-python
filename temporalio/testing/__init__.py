@@ -1,9 +1,12 @@
 """Test framework for workflows and activities."""
 
 from ._activity import ActivityEnvironment
+from ._timeskipping import WorkflowTimeSkipper, WorkflowTimeSkippingConfig
 from ._workflow import WorkflowEnvironment
 
 __all__ = [
     "ActivityEnvironment",
     "WorkflowEnvironment",
+    "WorkflowTimeSkipper",
+    "WorkflowTimeSkippingConfig",
 ]

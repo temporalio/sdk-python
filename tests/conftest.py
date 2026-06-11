@@ -136,6 +136,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "nexusoperation.enableStandalone=true",
                 "--dynamic-config-value",
                 'system.system.refreshNexusEndpointsMinWait="0s"',
+                "--dynamic-config-value",
+                "frontend.TimeSkippingEnabled=true",
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )

@@ -10,6 +10,7 @@ from collections.abc import (
     Callable,
     Mapping,
 )
+from contextvars import ContextVar
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
@@ -26,6 +27,7 @@ import temporalio.api.failure.v1
 import temporalio.api.schedule.v1
 import temporalio.api.taskqueue.v1
 import temporalio.api.update.v1
+import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
@@ -134,6 +136,14 @@ from ._workflow import (
 
 if TYPE_CHECKING:
     from ._client import Client
+
+
+# Set by WorkflowTimeSkipper's outbound interceptor before super().start_workflow(input),
+# read in _populate_start_workflow_execution_request to stamp time_skipping_config onto
+# the outgoing request. Reset in the interceptor's finally block.
+_start_workflow_time_skipping_config: ContextVar[
+    temporalio.api.workflow.v1.TimeSkippingConfig | None
+] = ContextVar("_start_workflow_time_skipping_config", default=None)
 
 
 class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
@@ -340,6 +350,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.priority.CopyFrom(input.priority._to_proto())
         if input.versioning_override is not None:
             req.versioning_override.CopyFrom(input.versioning_override._to_proto())
+        ts_config = _start_workflow_time_skipping_config.get()
+        if ts_config is not None:
+            req.time_skipping_config.CopyFrom(ts_config)
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         await self._client.workflow_service.request_cancel_workflow_execution(
