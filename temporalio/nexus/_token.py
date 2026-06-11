@@ -113,10 +113,16 @@ class OperationToken:
                 f"invalid token: expected run id to be a string, got {type(run_id)}"
             )
 
-        if token_type == OperationTokenType.ACTIVITY and not activity_id:
-            raise TypeError(
-                "invalid token: expected non-empty activity id for token type `ACTIVITY`"
-            )
+        if token_type == OperationTokenType.ACTIVITY:
+            if not activity_id:
+                raise TypeError(
+                    "invalid token: expected non-empty activity id for token type `ACTIVITY`"
+                )
+
+            if not run_id:
+                raise TypeError(
+                    "invalid token: expected non-empty run id for token type `ACTIVITY`"
+                )
 
         namespace = token_details.get("ns")
         if not isinstance(namespace, str):

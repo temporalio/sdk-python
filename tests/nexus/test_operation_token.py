@@ -125,14 +125,6 @@ def test_workflow_handle_to_from_token_round_trip():
             ),
         ),
         (
-            _encode_json_token({"t": 2, "ns": "", "aid": "activity-id"}),
-            OperationToken(
-                type=OperationTokenType.ACTIVITY,
-                namespace="",
-                activity_id="activity-id",
-            ),
-        ),
-        (
             _encode_json_token(
                 {"t": 2, "ns": "", "aid": "activity-id", "rid": "run-id"}
             ),

@@ -208,7 +208,8 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
                 if not operation_token.workflow_id:
                     raise HandlerError(
                         "Invalid workflow run operation token: missing workflow ID",
-                        type=HandlerErrorType.NOT_FOUND,
+                        type=HandlerErrorType.INTERNAL,
+                        retryable_override=False,
                     )
                 wf_cancel_opts = CancelWorkflowRunOptions(
                     workflow_id=operation_token.workflow_id
@@ -219,12 +220,14 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
                 if not operation_token.activity_id:
                     raise HandlerError(
                         "Invalid activity operation token: missing activity ID",
-                        type=HandlerErrorType.NOT_FOUND,
+                        type=HandlerErrorType.INTERNAL,
+                        retryable_override=False,
                     )
                 if not operation_token.run_id:
                     raise HandlerError(
                         "Invalid activity operation token: missing run ID",
-                        type=HandlerErrorType.NOT_FOUND,
+                        type=HandlerErrorType.INTERNAL,
+                        retryable_override=False,
                     )
                 activity_cancel_opts = CancelActivityOptions(
                     activity_id=operation_token.activity_id,

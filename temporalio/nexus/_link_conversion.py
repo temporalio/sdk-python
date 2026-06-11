@@ -99,7 +99,8 @@ def temporal_link_to_nexus_link(
 
     Returns None when the Temporal link variant is missing.
     """
-    match temporal_link.WhichOneof("variant"):
+    variant = temporal_link.WhichOneof("variant")
+    match variant:
         case "workflow_event":
             return workflow_event_to_nexus_link(temporal_link.workflow_event)
 
@@ -111,7 +112,7 @@ def temporal_link_to_nexus_link(
 
         case "batch_job" | "workflow":
             raise NotImplementedError(
-                "only workflow_event, activity and nexus_operation links are supported"
+                f"only workflow_event, activity and nexus_operation links are supported, got {variant}"
             )
 
         case None:
