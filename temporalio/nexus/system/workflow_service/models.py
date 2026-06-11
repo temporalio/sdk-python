@@ -37,7 +37,7 @@ class SignalWithStartWorkflowRequest:
         This API is experimental and subject to change.
     """
 
-    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[typing.Any]]
+    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]]
     args: list[typing.Any] | None = None
     id: str
     task_queue: str

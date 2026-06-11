@@ -19,6 +19,7 @@ from ..models import (
     UserMetadata,
 )
 
+SelfType = typing.TypeVar("SelfType")
 SignalArg = typing.TypeVar("SignalArg")
 WorkflowResult = typing.TypeVar("WorkflowResult")
 WorkflowArgs = typing_extensions.TypeVarTuple("WorkflowArgs")
@@ -46,10 +47,42 @@ async def _signal_with_start_workflow(
     return get_external_workflow_handle(request.id, run_id=result.run_id)
 
 
+# Overload case:
+# - workflow name with positional workflow arguments
+# - signal name with optional list-form signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: str,
-    *positional_args: object,
+    *args: object,
+    id: str,
+    task_queue: str,
+    signal: str,
+    signal_args: list[typing.Any] | None = ...,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    request_id: str | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[object]: ...
+
+
+# Overload case:
+# - workflow name with optional list-form workflow arguments
+# - signal name with optional list-form signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: str,
+    *,
     args: list[typing.Any] | None = ...,
     id: str,
     task_queue: str,
@@ -70,16 +103,19 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[object]: ...
 
 
+# Overload case:
+# - workflow method callable with typed positional workflow arguments
+# - signal name with optional list-form signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: collections.abc.Callable[
-        [typing.Any, typing_extensions.Unpack[WorkflowArgs]],
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
         collections.abc.Awaitable[WorkflowResult],
     ],
-    *positional_args: typing_extensions.Unpack[WorkflowArgs],
+    *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
     task_queue: str,
     signal: str,
@@ -99,12 +135,18 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow method callable with list-form workflow arguments
+# - signal name with optional list-form signal arguments
 @typing.overload
 async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[..., collections.abc.Awaitable[WorkflowResult]],
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
     *,
     args: list[typing.Any],
     id: str,
@@ -126,18 +168,51 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow name with positional workflow arguments
+# - signal method callable with no signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: str,
-    *positional_args: object,
+    *args: object,
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType], None | collections.abc.Awaitable[None]
+    ],
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    request_id: str | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow name with optional list-form workflow arguments
+# - signal method callable with no signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: str,
+    *,
     args: list[typing.Any] | None = ...,
     id: str,
     task_queue: str,
     signal: collections.abc.Callable[
-        [typing.Any], None | collections.abc.Awaitable[None]
+        [SelfType], None | collections.abc.Awaitable[None]
     ],
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
@@ -154,20 +229,23 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow method callable with typed positional workflow arguments
+# - signal method callable with no signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: collections.abc.Callable[
-        [typing.Any, typing_extensions.Unpack[WorkflowArgs]],
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
         collections.abc.Awaitable[WorkflowResult],
     ],
-    *positional_args: typing_extensions.Unpack[WorkflowArgs],
+    *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
     task_queue: str,
     signal: collections.abc.Callable[
-        [typing.Any], None | collections.abc.Awaitable[None]
+        [SelfType], None | collections.abc.Awaitable[None]
     ],
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
@@ -184,18 +262,24 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow method callable with list-form workflow arguments
+# - signal method callable with no signal arguments
 @typing.overload
 async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[..., collections.abc.Awaitable[WorkflowResult]],
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
     *,
     args: list[typing.Any],
     id: str,
     task_queue: str,
     signal: collections.abc.Callable[
-        [typing.Any], None | collections.abc.Awaitable[None]
+        [SelfType], None | collections.abc.Awaitable[None]
     ],
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
@@ -212,18 +296,52 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow name with positional workflow arguments
+# - signal method callable with a typed single signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: str,
-    *positional_args: object,
+    *args: object,
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
+    ],
+    signal_args: SignalArg,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    request_id: str | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow name with optional list-form workflow arguments
+# - signal method callable with a typed single signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: str,
+    *,
     args: list[typing.Any] | None = ...,
     id: str,
     task_queue: str,
     signal: collections.abc.Callable[
-        [typing.Any, SignalArg], None | collections.abc.Awaitable[None]
+        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
     ],
     signal_args: SignalArg,
     execution_timeout: datetime.timedelta | None = ...,
@@ -241,20 +359,23 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow method callable with typed positional workflow arguments
+# - signal method callable with a typed single signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: collections.abc.Callable[
-        [typing.Any, typing_extensions.Unpack[WorkflowArgs]],
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
         collections.abc.Awaitable[WorkflowResult],
     ],
-    *positional_args: typing_extensions.Unpack[WorkflowArgs],
+    *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
     task_queue: str,
     signal: collections.abc.Callable[
-        [typing.Any, SignalArg], None | collections.abc.Awaitable[None]
+        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
     ],
     signal_args: SignalArg,
     execution_timeout: datetime.timedelta | None = ...,
@@ -272,18 +393,24 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow method callable with list-form workflow arguments
+# - signal method callable with a typed single signal arguments
 @typing.overload
 async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[..., collections.abc.Awaitable[WorkflowResult]],
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
     *,
     args: list[typing.Any],
     id: str,
     task_queue: str,
     signal: collections.abc.Callable[
-        [typing.Any, SignalArg], None | collections.abc.Awaitable[None]
+        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
     ],
     signal_args: SignalArg,
     execution_timeout: datetime.timedelta | None = ...,
@@ -301,13 +428,45 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow name with positional workflow arguments
+# - signal callable with list-form signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: str,
-    *positional_args: object,
+    *args: object,
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[..., None | collections.abc.Awaitable[None]],
+    signal_args: list[typing.Any],
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    request_id: str | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[object]: ...
+
+
+# Overload case:
+# - workflow name with optional list-form workflow arguments
+# - signal callable with list-form signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: str,
+    *,
     args: list[typing.Any] | None = ...,
     id: str,
     task_queue: str,
@@ -328,16 +487,19 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[typing.Any]: ...
+) -> ExternalWorkflowHandle[object]: ...
 
 
+# Overload case:
+# - workflow method callable with typed positional workflow arguments
+# - signal callable with list-form signal arguments
 @typing.overload
 async def signal_with_start_workflow(
     workflow: collections.abc.Callable[
-        [typing.Any, typing_extensions.Unpack[WorkflowArgs]],
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
         collections.abc.Awaitable[WorkflowResult],
     ],
-    *positional_args: typing_extensions.Unpack[WorkflowArgs],
+    *args: typing_extensions.Unpack[WorkflowArgs],
     id: str,
     task_queue: str,
     signal: collections.abc.Callable[..., None | collections.abc.Awaitable[None]],
@@ -357,12 +519,18 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
+# Overload case:
+# - workflow method callable with list-form workflow arguments
+# - signal callable with list-form signal arguments
 @typing.overload
 async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[..., collections.abc.Awaitable[WorkflowResult]],
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
     *,
     args: list[typing.Any],
     id: str,
@@ -384,12 +552,11 @@ async def signal_with_start_workflow(
     start_delay: datetime.timedelta | None = ...,
     static_summary: str | None = ...,
     static_details: str | None = ...,
-) -> ExternalWorkflowHandle[WorkflowResult]: ...
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
 async def signal_with_start_workflow(
-    workflow: str
-    | collections.abc.Callable[..., collections.abc.Awaitable[typing.Any]],
+    workflow: str | collections.abc.Callable[..., collections.abc.Awaitable[object]],
     *positional_args: object,
     args: list[typing.Any] | None = None,
     id: str,
