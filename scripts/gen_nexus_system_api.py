@@ -24,14 +24,7 @@ wit_input_dir = (
 )
 wit_path = wit_input_dir / "workflow-service.wit"
 wit_deps_dir = wit_input_dir / "deps"
-python_support_path = (
-    base_dir
-    / "temporalio"
-    / "nexus"
-    / "system"
-    / "_generation_support"
-    / "temporal_model_converters.py"
-)
+python_support_path = base_dir / "scripts" / "nex_gen_support.py"
 output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
 workflowservice_request_response_proto = (
