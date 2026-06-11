@@ -309,6 +309,9 @@ class ActivityExecutionDescription(ActivityExecution):
     long_poll_token: bytes | None
     """Token for follow-on long-poll requests. None if the activity is complete."""
 
+    raw_callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo]
+    """Underlying protobuf callbacks"""
+
     @classmethod
     async def _from_execution_info(
         cls,
@@ -316,6 +319,7 @@ class ActivityExecutionDescription(ActivityExecution):
         long_poll_token: bytes | None,
         namespace: str,
         data_converter: temporalio.converter.DataConverter,
+        callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo],
     ) -> Self:
         """Create from raw proto activity execution info."""
         # Decode heartbeat details if present
@@ -409,6 +413,7 @@ class ActivityExecutionDescription(ActivityExecution):
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
                 info.search_attributes
             ),
+            raw_callbacks=callbacks,
         )
 
 
@@ -691,6 +696,8 @@ class ActivityHandle(Generic[ReturnType]):
         *,
         run_id: str | None = None,
         result_type: type | None = None,
+        start_activity_response: None
+        | temporalio.api.workflowservice.v1.StartActivityExecutionResponse = None,
     ) -> None:
         """Create activity handle."""
         self._client = client
@@ -700,6 +707,7 @@ class ActivityHandle(Generic[ReturnType]):
         self._known_outcome: (
             temporalio.api.activity.v1.ActivityExecutionOutcome | None
         ) = None
+        self._start_activity_response = start_activity_response
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:

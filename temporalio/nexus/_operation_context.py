@@ -44,7 +44,7 @@ from temporalio.types import (
 
 from ._link_conversion import (
     nexus_link_to_temporal_link,
-    workflow_event_to_nexus_link,
+    temporal_link_to_nexus_link,
     workflow_execution_started_event_link_from_workflow_handle,
 )
 from ._token import OperationToken, OperationTokenType, WorkflowHandle
@@ -64,12 +64,12 @@ _temporal_cancel_operation_context: ContextVar[_TemporalCancelOperationContext] 
     ContextVar("temporal-cancel-operation-context")
 )
 
-# A Nexus start handler might start zero or more workflows as usual using a Temporal client. In
-# addition, it may start one "nexus-backing" workflow, using
-# WorkflowRunOperationContext.start_workflow. This context is active while the latter is being done.
+# A Nexus start handler might start zero or more async Temporal actions as usual using a Temporal client. In
+# addition, it may start one "nexus-backing" async Temporal action, using
+# WorkflowRunOperationContext.start_workflow or methods from TemporalNexusClient. This context is active while the latter is being done.
 # It is thus a narrower context than _temporal_start_operation_context.
-_temporal_nexus_backing_workflow_start_context: ContextVar[bool] = ContextVar(
-    "temporal-nexus-backing-workflow-start-context"
+_temporal_nexus_backing_start_context: ContextVar[bool] = ContextVar(
+    "temporal-nexus-backing-start-context"
 )
 
 
@@ -168,16 +168,16 @@ def _try_temporal_context() -> (
 
 
 @contextmanager
-def _nexus_backing_workflow_start_context() -> Generator[None]:
-    token = _temporal_nexus_backing_workflow_start_context.set(True)
+def _nexus_backing_start_context() -> Generator[None]:
+    token = _temporal_nexus_backing_start_context.set(True)
     try:
         yield
     finally:
-        _temporal_nexus_backing_workflow_start_context.reset(token)
+        _temporal_nexus_backing_start_context.reset(token)
 
 
-def _in_nexus_backing_workflow_start_context() -> bool:  # type:ignore[reportUnusedClass]
-    return _temporal_nexus_backing_workflow_start_context.get(False)
+def _in_nexus_backing_start_context() -> bool:  # type:ignore[reportUnusedClass]
+    return _temporal_nexus_backing_start_context.get(False)
 
 
 _OperationCtxT = TypeVar("_OperationCtxT", bound=OperationContext)
@@ -242,41 +242,73 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
     def _get_links(
         self,
     ) -> list[temporalio.api.common.v1.Link]:
-        event_links: list[temporalio.api.common.v1.Link] = []
+        links: list[temporalio.api.common.v1.Link] = []
         for inbound_link in self.nexus_context.inbound_links:
             if link := nexus_link_to_temporal_link(inbound_link):
-                event_links.append(link)
-        return event_links
+                links.append(link)
+        return links
 
-    def _add_outbound_links(
+    def _add_outbound_workflow_links(
         self, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
     ):
-        # If links were not sent in StartWorkflowExecutionResponse then construct them.
-        wf_event_links: list[temporalio.api.common.v1.Link.WorkflowEvent] = []
-        try:
-            if isinstance(
-                workflow_handle._start_workflow_response,
-                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-            ):
-                if workflow_handle._start_workflow_response.HasField("link"):
-                    if link := workflow_handle._start_workflow_response.link:
-                        if link.HasField("workflow_event"):
-                            wf_event_links.append(link.workflow_event)
-            if not wf_event_links:
-                wf_event_links = [
-                    workflow_execution_started_event_link_from_workflow_handle(
-                        workflow_handle,
-                        self.nexus_context.request_id,
-                    )
-                ]
-            self.nexus_context.outbound_links.extend(
-                workflow_event_to_nexus_link(link) for link in wf_event_links
+        response = workflow_handle._start_workflow_response
+        if isinstance(
+            response, temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse
+        ) and response.HasField("link"):
+            link = response.link
+        elif isinstance(
+            response,
+            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
+        ) and response.HasField("signal_link"):
+            link = response.signal_link
+        else:
+            # If a link was not sent in response then construct it.
+            link = temporalio.api.common.v1.Link(
+                workflow_event=workflow_execution_started_event_link_from_workflow_handle(
+                    workflow_handle,
+                    self.nexus_context.request_id,
+                )
             )
+
+        try:
+            if nexus_link := temporal_link_to_nexus_link(link):
+                self.nexus_context.outbound_links.append(nexus_link)
         except Exception as e:
             logger.warning(
-                f"Failed to create WorkflowExecutionStarted event links for workflow {workflow_handle}: {e}"
+                f"Failed to create event links for workflow {workflow_handle}: {e}"
             )
-        return workflow_handle
+
+    def _add_outbound_activity_links(
+        self, activity_handle: temporalio.client.ActivityHandle[Any]
+    ):
+        if (
+            activity_handle._start_activity_response
+            and activity_handle._start_activity_response.HasField("link")
+        ):
+            link = activity_handle._start_activity_response.link
+        else:
+            activity_run_id = activity_handle.run_id
+            if activity_run_id is None:
+                logger.warning(
+                    "Failed to create Activity link. "
+                    f"Activity handle {activity_handle} has no run ID. "
+                )
+                return
+            link = temporalio.api.common.v1.Link(
+                activity=temporalio.api.common.v1.Link.Activity(
+                    namespace=activity_handle._client.namespace,
+                    activity_id=activity_handle.id,
+                    run_id=activity_run_id,
+                ),
+            )
+
+        try:
+            if nexus_link := temporal_link_to_nexus_link(link):
+                self.nexus_context.outbound_links.append(nexus_link)
+        except Exception as e:
+            logger.warning(
+                f"Failed to create Activity link for activity {activity_handle}: {e}"
+            )
 
 
 class WorkflowRunOperationContext(StartOperationContext):
@@ -632,7 +664,7 @@ async def _start_nexus_backing_workflow(
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
     versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> WorkflowHandle[ReturnType]:
-    # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
+    # We must pass nexus_completion_callbacks, links, and request_id,
     # but these are deliberately not exposed in overloads, hence the type-check
     # violation.
 
@@ -641,7 +673,7 @@ async def _start_nexus_backing_workflow(
     # namespace to deliver the result to the caller namespace when the workflow reaches a
     # terminal state) and inbound links to the caller workflow (attached to history events of
     # the workflow started in the handler namespace, and displayed in the UI).
-    with _nexus_backing_workflow_start_context():
+    with _nexus_backing_start_context():
         token = OperationToken(
             type=OperationTokenType.WORKFLOW,
             namespace=temporal_context.client.namespace,
@@ -678,6 +710,6 @@ async def _start_nexus_backing_workflow(
             request_id=temporal_context.nexus_context.request_id,
         )
 
-    temporal_context._add_outbound_links(wf_handle)
+    temporal_context._add_outbound_workflow_links(wf_handle)
 
     return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)

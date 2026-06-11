@@ -138,6 +138,24 @@ class CancelWorkflowRunOptions:
     """The ID of the workflow to cancel."""
 
 
+@dataclass(frozen=True)
+class CancelActivityOptions:
+    """Options for cancelling the activity backing a Nexus operation.
+
+    These options are built by :py:class:`TemporalNexusOperationHandler` and passed to
+    :py:meth:`TemporalNexusOperationHandler.cancel_activity`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    activity_id: str
+    """The activity ID of the activity to cancel."""
+
+    run_id: str
+    """The run ID of the activity to cancel."""
+
+
 class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
     """Operation handler for Nexus operations that interact with Temporal.
     Implementations override the start_operation method.
@@ -181,15 +199,41 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
             raise HandlerError(
                 "Unable to decode operation token to cancel",
                 type=HandlerErrorType.INTERNAL,
+                retryable_override=False,
             ) from err
 
         cancel_ctx = TemporalCancelOperationContext._from_cancel_operation_context(ctx)
         match operation_token.type:
             case OperationTokenType.WORKFLOW:
-                options = CancelWorkflowRunOptions(
+                if not operation_token.workflow_id:
+                    raise HandlerError(
+                        "Invalid workflow run operation token: missing workflow ID",
+                        type=HandlerErrorType.INTERNAL,
+                        retryable_override=False,
+                    )
+                wf_cancel_opts = CancelWorkflowRunOptions(
                     workflow_id=operation_token.workflow_id
                 )
-                await self.cancel_workflow_run(cancel_ctx, options)
+                await self.cancel_workflow_run(cancel_ctx, wf_cancel_opts)
+
+            case OperationTokenType.ACTIVITY:
+                if not operation_token.activity_id:
+                    raise HandlerError(
+                        "Invalid activity operation token: missing activity ID",
+                        type=HandlerErrorType.INTERNAL,
+                        retryable_override=False,
+                    )
+                if not operation_token.run_id:
+                    raise HandlerError(
+                        "Invalid activity operation token: missing run ID",
+                        type=HandlerErrorType.INTERNAL,
+                        retryable_override=False,
+                    )
+                activity_cancel_opts = CancelActivityOptions(
+                    activity_id=operation_token.activity_id,
+                    run_id=operation_token.run_id,
+                )
+                await self.cancel_activity(cancel_ctx, activity_cancel_opts)
 
     async def cancel_workflow_run(
         self,
@@ -205,3 +249,18 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
             options.workflow_id
         )
         await workflow_handle.cancel()
+
+    async def cancel_activity(
+        self,
+        ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
+        options: CancelActivityOptions,
+    ) -> None:
+        """Requests cancellation of the standalone activity identified by activity_id.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        activity_handle = temporalio.nexus.client().get_activity_handle(
+            options.activity_id, run_id=options.run_id
+        )
+        await activity_handle.cancel()
