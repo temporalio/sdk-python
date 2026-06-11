@@ -6,8 +6,10 @@ from collections.abc import MutableSequence
 import pytest
 from google.protobuf.duration_pb2 import Duration
 
+import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice_pb2
 import temporalio.bridge.worker
 import temporalio.converter
+import temporalio.nexus.system as nexus_system
 from temporalio.api.common.v1.message_pb2 import (
     Payload,
     Payloads,
@@ -26,6 +28,7 @@ from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
     ContinueAsNewWorkflowExecution,
     ScheduleActivity,
     ScheduleLocalActivity,
+    ScheduleNexusOperation,
     SignalExternalWorkflowExecution,
     StartChildWorkflowExecution,
     UpdateResponse,
@@ -325,6 +328,68 @@ async def test_cancel_drains_background_tasks():
     # All started tasks ran their finally blocks before drain() returned.
     assert tasks_started > 0
     assert tasks_cleaned_up == tasks_started
+
+
+async def test_system_nexus_envelope_visit_is_bounded():
+    active_visits = 0
+    max_active_visits = 0
+    two_visits_started = asyncio.Event()
+    release_visits = asyncio.Event()
+
+    class SlowVisitor(VisitorFunctions):
+        async def visit_payload(self, payload: Payload) -> None:
+            await self._visit()
+
+        async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+            await self._visit()
+
+        async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+            await self._visit()
+
+        async def _visit(self) -> None:
+            nonlocal active_visits, max_active_visits
+            active_visits += 1
+            max_active_visits = max(max_active_visits, active_visits)
+            if active_visits == 2:
+                two_visits_started.set()
+            try:
+                await release_visits.wait()
+            finally:
+                active_visits -= 1
+
+    payload_converter = nexus_system.get_payload_converter()
+    system_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest(
+        input=Payloads(payloads=[Payload(data=b"workflow-input")]),
+        signal_input=Payloads(payloads=[Payload(data=b"signal-input")]),
+    )
+    payload = payload_converter.to_payload(system_request)
+    assert payload is not None
+    completion = WorkflowActivationCompletion(
+        run_id="1",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    schedule_nexus_operation=ScheduleNexusOperation(
+                        seq=1,
+                        service="temporal.api.workflowservice.v1.WorkflowService",
+                        operation="SignalWithStartWorkflowExecution",
+                        input=payload,
+                    ),
+                )
+            ],
+        ),
+    )
+
+    task = asyncio.create_task(
+        PayloadVisitor(concurrency_limit=2).visit(SlowVisitor(), completion)
+    )
+    await two_visits_started.wait()
+    await asyncio.sleep(0)
+    assert max_active_visits == 2
+
+    release_visits.set()
+    await task
+    assert max_active_visits == 2
 
 
 async def test_bridge_encoding():
