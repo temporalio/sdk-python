@@ -33,11 +33,13 @@ class BoundedVisitorFunctions(VisitorFunctions):
     """
 
     def __init__(self, inner: VisitorFunctions, concurrency_limit: int) -> None:
+        """Create a bounded wrapper around the given visitor functions."""
         self._inner = inner
         self._sem = asyncio.Semaphore(concurrency_limit)
         self._tasks: list[asyncio.Task[None]] = []
 
     async def visit_payload(self, payload: Payload) -> None:
+        """Visit a single payload once capacity is available."""
         await self._sem.acquire()
 
         async def _run() -> None:
@@ -49,6 +51,7 @@ class BoundedVisitorFunctions(VisitorFunctions):
         self._tasks.append(asyncio.create_task(_run()))
 
     async def visit_payloads(self, payloads: PayloadSequence) -> None:
+        """Visit a sequence of payloads once capacity is available."""
         await self._sem.acquire()
 
         async def _run() -> None:
@@ -60,6 +63,7 @@ class BoundedVisitorFunctions(VisitorFunctions):
         self._tasks.append(asyncio.create_task(_run()))
 
     async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+        """Visit a system Nexus envelope payload once capacity is available."""
         await self._sem.acquire()
 
         async def _run() -> None:
