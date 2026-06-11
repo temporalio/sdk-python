@@ -37,7 +37,6 @@ from temporalio.client._interceptor import (
     SignalWorkflowInput,
     StartWorkflowInput,
 )
-from temporalio.nexus._link_conversion import _LinkType
 from temporalio.worker._nexus import _NexusTaskCancellation, _NexusWorker
 
 NAMESPACE = "test-namespace"
@@ -316,7 +315,9 @@ async def test_signal_with_start_against_older_server_captures_no_backlink(
 # ── start ─────────────────────────────────────────────────────────────────────────────────
 
 
-async def test_start_uses_server_link_when_present(nexus_ctx: Any) -> None:
+async def test_start_forwards_inbound_links_and_captures_no_backlink(
+    nexus_ctx: Any,
+) -> None:
     server_link = _workflow_event_link(
         WORKFLOW_ID,
         "target-run",
@@ -333,15 +334,18 @@ async def test_start_uses_server_link_when_present(nexus_ctx: Any) -> None:
 
     await impl.start_workflow(_start_input())
 
-    assert len(nexus_ctx.nexus_context.outbound_links) == 1
-    [link] = nexus_ctx.nexus_context.outbound_links
-    assert link.type == _LinkType.WORKFLOW.value
-    assert "wf-target" in link.url
-    # WorkflowExecutionStarted event type round-trips through the URL.
-    assert "WorkflowExecutionStarted" in link.url
+    # Forward: the start request carries the single inbound link.
+    sent = workflow_service.start_workflow_execution.call_args.args[0]
+    assert len(sent.links) == 1
+    assert sent.links[0] == _inbound_nexus_link()
+
+    # Backward: a plain start does not capture a backlink, even when the server returns one.
+    assert nexus_ctx.nexus_context.outbound_links == []
 
 
-async def test_start_fabricates_link_when_server_omits_it(nexus_ctx: Any) -> None:
+async def test_start_against_older_server_captures_no_backlink(
+    nexus_ctx: Any,
+) -> None:
     workflow_service = mock.MagicMock()
     workflow_service.start_workflow_execution = mock.AsyncMock(
         return_value=temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse(
@@ -352,12 +356,13 @@ async def test_start_fabricates_link_when_server_omits_it(nexus_ctx: Any) -> Non
 
     await impl.start_workflow(_start_input())
 
-    assert len(nexus_ctx.nexus_context.outbound_links) == 1
-    [link] = nexus_ctx.nexus_context.outbound_links
-    # Fabricated link points at the started workflow's WorkflowExecutionStarted event.
-    assert "wf-target" in link.url
-    assert "target-run" in link.url
-    assert "WorkflowExecutionStarted" in link.url
+    # Forward direction still works regardless of server version.
+    sent = workflow_service.start_workflow_execution.call_args.args[0]
+    assert len(sent.links) == 1
+    assert sent.links[0] == _inbound_nexus_link()
+
+    # Backward: a plain start never fabricates a backlink.
+    assert nexus_ctx.nexus_context.outbound_links == []
 
 
 async def test_start_outside_nexus_context_does_not_touch_links() -> None:
