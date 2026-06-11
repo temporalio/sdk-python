@@ -852,7 +852,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
         try:
             return await self._start_workflow_update_with_start(
-                input.start_workflow_input, input.update_workflow_input, on_start
+                input.start_workflow_input,
+                input.update_workflow_input,
+                input.rpc_metadata,
+                input.rpc_timeout,
+                on_start,
             )
         except asyncio.CancelledError as _err:
             err = _err
@@ -914,6 +918,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self,
         start_input: UpdateWithStartStartWorkflowInput,
         update_input: UpdateWithStartUpdateWorkflowInput,
+        rpc_metadata: Mapping[str, str | bytes],
+        rpc_timeout: timedelta | None,
         on_start: Callable[
             [temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse], None
         ],
@@ -941,7 +947,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Repeatedly try to invoke ExecuteMultiOperation until the update is durable
         while True:
             multiop_response = (
-                await self._client.workflow_service.execute_multi_operation(multiop_req)
+                await self._client.workflow_service.execute_multi_operation(
+                    multiop_req,
+                    retry=True,
+                    metadata=rpc_metadata,
+                    timeout=rpc_timeout,
+                )
             )
             start_response = multiop_response.responses[0].start_workflow
             update_response = multiop_response.responses[1].update_workflow

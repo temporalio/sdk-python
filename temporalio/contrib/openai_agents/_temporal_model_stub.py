@@ -22,7 +22,13 @@ from agents import (
     WebSearchTool,
 )
 from agents.items import TResponseStreamEvent
-from agents.tool import ApplyPatchTool, LocalShellTool, ShellTool, ToolSearchTool
+from agents.tool import (
+    ApplyPatchTool,
+    CustomTool,
+    LocalShellTool,
+    ShellTool,
+    ToolSearchTool,
+)
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 
 from temporalio import workflow
@@ -30,6 +36,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     ActivityModelInput,
     AgentOutputSchemaInput,
     ApplyPatchToolInput,
+    CustomToolInput,
     FunctionToolInput,
     HandoffInput,
     HostedMCPToolInput,
@@ -92,6 +99,8 @@ class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
                 return ApplyPatchToolInput(name=tool.name)
             elif isinstance(tool, HostedMCPTool):
                 return HostedMCPToolInput(tool_config=tool.tool_config)
+            elif isinstance(tool, CustomTool):
+                return CustomToolInput(tool_config=tool.tool_config)
             elif isinstance(tool, FunctionTool):
                 return FunctionToolInput(
                     name=tool.name,
