@@ -1218,3 +1218,153 @@ class CustomRole(google.protobuf.message.Message):
     ) -> None: ...
 
 global___CustomRole = CustomRole
+
+class UserNamespaceAssignment(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    EMAIL_FIELD_NUMBER: builtins.int
+    NAMESPACE_ACCESS_FIELD_NUMBER: builtins.int
+    INHERITED_ACCESS_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The ID of the user."""
+    email: builtins.str
+    """The email of the user."""
+    @property
+    def namespace_access(self) -> global___NamespaceAccess:
+        """The access assigned to the user at the namespace level."""
+    inherited_access: builtins.bool
+    """True if the user has inherited access to the namespace through an account or project role."""
+    resource_version: builtins.str
+    """The current resource version of the user."""
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        email: builtins.str = ...,
+        namespace_access: global___NamespaceAccess | None = ...,
+        inherited_access: builtins.bool = ...,
+        resource_version: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["namespace_access", b"namespace_access"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "email",
+            b"email",
+            "id",
+            b"id",
+            "inherited_access",
+            b"inherited_access",
+            "namespace_access",
+            b"namespace_access",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___UserNamespaceAssignment = UserNamespaceAssignment
+
+class ServiceAccountNamespaceAssignment(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    NAMESPACE_ACCESS_FIELD_NUMBER: builtins.int
+    INHERITED_ACCESS_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The ID of the service account."""
+    name: builtins.str
+    """The name of the service account."""
+    @property
+    def namespace_access(self) -> global___NamespaceAccess:
+        """The access assigned to the service account at the namespace level."""
+    inherited_access: builtins.bool
+    """True if the service account has inherited access to the namespace through an account or project role."""
+    resource_version: builtins.str
+    """The current resource version of the service account."""
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        name: builtins.str = ...,
+        namespace_access: global___NamespaceAccess | None = ...,
+        inherited_access: builtins.bool = ...,
+        resource_version: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["namespace_access", b"namespace_access"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "id",
+            b"id",
+            "inherited_access",
+            b"inherited_access",
+            "name",
+            b"name",
+            "namespace_access",
+            b"namespace_access",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___ServiceAccountNamespaceAssignment = ServiceAccountNamespaceAssignment
+
+class UserGroupNamespaceAssignment(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    DISPLAY_NAME_FIELD_NUMBER: builtins.int
+    NAMESPACE_ACCESS_FIELD_NUMBER: builtins.int
+    INHERITED_ACCESS_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The ID of the group."""
+    display_name: builtins.str
+    """The display name of the group."""
+    @property
+    def namespace_access(self) -> global___NamespaceAccess:
+        """The access assigned to the group at the namespace level."""
+    inherited_access: builtins.bool
+    """True if the group has inherited access to the namespace through an account or project role."""
+    resource_version: builtins.str
+    """The current resource version of the group."""
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        display_name: builtins.str = ...,
+        namespace_access: global___NamespaceAccess | None = ...,
+        inherited_access: builtins.bool = ...,
+        resource_version: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["namespace_access", b"namespace_access"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "display_name",
+            b"display_name",
+            "id",
+            b"id",
+            "inherited_access",
+            b"inherited_access",
+            "namespace_access",
+            b"namespace_access",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___UserGroupNamespaceAssignment = UserGroupNamespaceAssignment
