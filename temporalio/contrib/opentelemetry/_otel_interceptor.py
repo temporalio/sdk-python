@@ -200,7 +200,7 @@ class OpenTelemetryInterceptor(
         provider = get_tracer_provider()
         if not isinstance(provider, ReplaySafeTracerProvider):
             raise ValueError(
-                "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use init_tracer_provider to create one."
+                "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use create_tracer_provider to create one."
             )
 
         class InterceptorWithState(_TracingWorkflowInboundInterceptor):
