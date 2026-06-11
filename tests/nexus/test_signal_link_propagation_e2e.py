@@ -59,7 +59,7 @@ class SignalingService:
 
 
 @workflow.defn
-class SignalCalleeWorkflow:
+class CalleeWorkflow:
     def __init__(self) -> None:
         self._received: list[str] = []
         self._expected = 1
@@ -79,7 +79,7 @@ class SignalCalleeWorkflow:
 
 
 @workflow.defn
-class SignalCallerWorkflow:
+class CallerWorkflow:
     @workflow.run
     async def run(self, mode: str, callee_id: str, task_queue: str) -> str:
         client = workflow.create_nexus_client(
@@ -133,7 +133,7 @@ class SignalingServiceHandler:
         await (
             nexus.client()
             .get_workflow_handle(callee_id)
-            .signal(SignalCalleeWorkflow.ping, "second")
+            .signal(CalleeWorkflow.ping, "second")
         )
         return "ok:sync"
 
@@ -155,7 +155,7 @@ async def _signal_with_start(callee_id: str, payload: str) -> None:
     # signal-with-start exercises the SignalWithStartWorkflowExecutionResponse.signal_link
     # backlink path in temporalio.client._impl.
     await nexus.client().start_workflow(
-        SignalCalleeWorkflow.run,
+        CalleeWorkflow.run,
         2 if payload == "first" else 1,
         id=callee_id,
         task_queue=nexus.info().task_queue,
@@ -251,17 +251,17 @@ async def test_sync_signal_operation_links(
 
     task_queue = str(uuid.uuid4())
     await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
-    callee_id = f"sync-callee-{uuid.uuid4()}"
-    caller_id = f"sync-caller-{uuid.uuid4()}"
+    callee_id = f"callee-{uuid.uuid4()}"
+    caller_id = f"caller-{uuid.uuid4()}"
 
     async with Worker(
         client,
         task_queue=task_queue,
         nexus_service_handlers=[SignalingServiceHandler()],
-        workflows=[SignalCallerWorkflow, SignalCalleeWorkflow],
+        workflows=[CallerWorkflow, CalleeWorkflow],
     ):
         caller_handle = await client.start_workflow(
-            SignalCallerWorkflow.run,
+            CallerWorkflow.run,
             args=[MODE_SYNC, callee_id, task_queue],
             id=caller_id,
             task_queue=task_queue,
@@ -307,7 +307,7 @@ async def test_async_signal_operation_links(
         client,
         task_queue=task_queue,
         nexus_service_handlers=[AsyncSignalingServiceHandler()],
-        workflows=[AsyncSignalCallerWorkflow, SignalCalleeWorkflow],
+        workflows=[AsyncSignalCallerWorkflow, CalleeWorkflow],
     ):
         caller_handle = await client.start_workflow(
             AsyncSignalCallerWorkflow.run,

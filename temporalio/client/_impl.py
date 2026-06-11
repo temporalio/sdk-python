@@ -200,42 +200,25 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
-        # If this start / signal-with-start is issued from inside a Nexus operation handler (but
-        # not as the nexus-backing workflow, whose links are handled separately by
-        # WorkflowRunOperationContext.start_workflow), capture the backlink the server returned so
-        # the caller workflow's Nexus history event links to the callee event.
+        # If this signal-with-start is issued from inside a Nexus operation handler (but not as the
+        # nexus-backing workflow, whose links are handled separately by
+        # WorkflowRunOperationContext.start_workflow), capture the signal backlink the server
+        # returned so the caller workflow's Nexus history event links to the signaled event. A
+        # plain start does not capture a backlink: it only forwards the inbound links onto the
+        # start request.
         nexus_ctx = self._try_nexus_start_operation_context()
         if (
             nexus_ctx is not None
             and not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context()
-        ):
-            if isinstance(
+            and isinstance(
                 resp,
                 temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
-            ):
-                # Server >= 1.31 with EnableCHASMSignalBacklinks returns signal_link pointing at
-                # the WorkflowExecutionSignaled event; older servers leave it unset.
-                if resp.HasField("signal_link"):
-                    nexus_ctx._add_backlink(resp.signal_link)
-            else:
-                if resp.HasField("link"):
-                    nexus_ctx._add_backlink(resp.link)
-                else:
-                    # Older servers (pre-1.31) don't return a link on the start response.
-                    # Fabricate one pointing at the started workflow's WorkflowExecutionStarted
-                    # event so the caller still gets a backlink.
-                    nexus_ctx._add_backlink(
-                        temporalio.api.common.v1.Link(
-                            workflow_event=temporalio.api.common.v1.Link.WorkflowEvent(
-                                namespace=self._client.namespace,
-                                workflow_id=req.workflow_id,
-                                run_id=resp.run_id,
-                                event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
-                                    event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
-                                ),
-                            )
-                        )
-                    )
+            )
+        ):
+            # Server >= 1.31 with EnableCHASMSignalBacklinks returns signal_link pointing at
+            # the WorkflowExecutionSignaled event; older servers leave it unset.
+            if resp.HasField("signal_link"):
+                nexus_ctx._add_backlink(resp.signal_link)
         return handle
 
     async def _build_start_workflow_execution_request(
