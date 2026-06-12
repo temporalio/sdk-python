@@ -30,6 +30,7 @@ from agents import (
 from agents.items import TResponseStreamEvent
 from agents.tool import (
     ApplyPatchTool,
+    CustomTool,
     LocalShellTool,
     ShellTool,
     ShellToolEnvironment,
@@ -39,11 +40,12 @@ from openai import (
     APIStatusError,
     AsyncOpenAI,
 )
+from openai.types.responses import CustomToolParam
 from openai.types.responses.tool_param import Mcp
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
-from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
+from temporalio.contrib.openai_agents._heartbeat_decorator import auto_heartbeater
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
@@ -112,6 +114,15 @@ class ApplyPatchToolInput:
     name: str = "apply_patch"
 
 
+@dataclass
+class CustomToolInput:
+    """Data conversion friendly representation of a CustomTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
+
+    tool_config: CustomToolParam
+
+
 ToolInput = (
     FunctionToolInput
     | FileSearchTool
@@ -122,6 +133,7 @@ ToolInput = (
     | ShellToolInput
     | LocalShellTool
     | ApplyPatchToolInput
+    | CustomToolInput
     | ToolSearchTool
 )
 
@@ -235,6 +247,14 @@ def _build_tool(tool: ToolInput) -> Tool:
         return ApplyPatchTool(name=tool.name, editor=_NoopApplyPatchEditor())
     elif isinstance(tool, HostedMCPToolInput):
         return HostedMCPTool(tool_config=tool.tool_config)
+    elif isinstance(tool, CustomToolInput):
+        return CustomTool(
+            name=tool.tool_config["name"],
+            description=tool.tool_config.get("description", ""),
+            on_invoke_tool=_empty_on_invoke_tool,
+            format=tool.tool_config.get("format"),
+            defer_loading=tool.tool_config.get("defer_loading", False),
+        )
     elif isinstance(tool, FunctionToolInput):
         return FunctionTool(
             name=tool.name,
@@ -314,7 +334,7 @@ class ModelActivity:
         )
 
     @activity.defn
-    @_auto_heartbeater
+    @auto_heartbeater
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
         model = self._model_provider.get_model(input.get("model_name"))
@@ -337,7 +357,7 @@ class ModelActivity:
             _raise_for_openai_status(e)
 
     @activity.defn
-    @_auto_heartbeater
+    @auto_heartbeater
     async def invoke_model_activity_streaming(
         self, input: StreamingActivityModelInput
     ) -> list[TResponseStreamEvent]:
@@ -357,7 +377,7 @@ class ModelActivity:
         ``streaming_topic`` so external consumers (UIs, tracing,
         etc.) can observe events as they arrive.
 
-        Heartbeats run on a background task via ``_auto_heartbeater`` so
+        Heartbeats run on a background task via ``auto_heartbeater`` so
         long initial-token latency or long pauses between chunks do not
         trip ``heartbeat_timeout``.
         """
@@ -393,6 +413,9 @@ class ModelActivity:
                     conversation_id=input.get("conversation_id"),
                     prompt=input.get("prompt"),
                 ):
+                    # OpenAI models set defer_build=True, so an event's pydantic
+                    # schema may still be an unbuilt placeholder.
+                    type(event).model_rebuild()
                     events.append(event)
                     events_topic.publish(event)
             except APIStatusError as e:

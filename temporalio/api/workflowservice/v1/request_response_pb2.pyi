@@ -265,17 +265,32 @@ class DescribeNamespaceRequest(google.protobuf.message.Message):
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
+    WEAK_CONSISTENCY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     id: builtins.str
+    weak_consistency: builtins.bool
+    """If true, the server may serve the response from an eventually-consistent
+    source instead of reading through to persistence. Defaults to false,
+    which preserves read-after-write consistency. SDKs should set this when
+    fetching namespace capabilities on worker/client startup.
+    """
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         id: builtins.str = ...,
+        weak_consistency: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["id", b"id", "namespace", b"namespace"],
+        field_name: typing_extensions.Literal[
+            "id",
+            b"id",
+            "namespace",
+            b"namespace",
+            "weak_consistency",
+            b"weak_consistency",
+        ],
     ) -> None: ...
 
 global___DescribeNamespaceRequest = DescribeNamespaceRequest
@@ -289,6 +304,7 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
     FAILOVER_VERSION_FIELD_NUMBER: builtins.int
     IS_GLOBAL_NAMESPACE_FIELD_NUMBER: builtins.int
     FAILOVER_HISTORY_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
     @property
     def namespace_info(
         self,
@@ -310,6 +326,16 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
         """Contains the historical state of failover_versions for the cluster, truncated to contain only the last N
         states to ensure that the list does not grow unbounded.
         """
+    @property
+    def poller_group_infos(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+    ]:
+        """The initial info that client should use for poller group assignment. This information is
+        updated through poll response. Client is supposed to use the info received in the latest
+        poll response.
+        """
     def __init__(
         self,
         *,
@@ -322,6 +348,10 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
         is_global_namespace: builtins.bool = ...,
         failover_history: collections.abc.Iterable[
             temporalio.api.replication.v1.message_pb2.FailoverStatus
+        ]
+        | None = ...,
+        poller_group_infos: collections.abc.Iterable[
+            temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
         ]
         | None = ...,
     ) -> None: ...
@@ -349,6 +379,8 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
             b"is_global_namespace",
             "namespace_info",
             b"namespace_info",
+            "poller_group_infos",
+            b"poller_group_infos",
             "replication_config",
             b"replication_config",
         ],
@@ -1095,7 +1127,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
     `poller_group_infos` of the last the PollWorkflowTaskQueueResponse according to the
-    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    instructions. If not set, the poll is routed randomly which can cause it to be blocked
     without receiving a task while the queue actually has tasks in another server location.
     """
     identity: builtins.str
@@ -1889,7 +1921,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
     `poller_group_infos` of the last the PollActivityTaskQueueResponse according to the
-    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    instructions. If not set, the poll is routed randomly which can cause it to be blocked
     without receiving a task while the queue actually has tasks in another server location.
     """
     identity: builtins.str
@@ -6937,6 +6969,7 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
     UPDATE_REF_FIELD_NUMBER: builtins.int
     OUTCOME_FIELD_NUMBER: builtins.int
     STAGE_FIELD_NUMBER: builtins.int
+    LINK_FIELD_NUMBER: builtins.int
     @property
     def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
         """Enough information for subsequent poll calls if needed. Never null."""
@@ -6958,23 +6991,34 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
     request WaitPolicy, and before the context deadline expired; clients may
     may then retry the call as needed.
     """
+    @property
+    def link(self) -> temporalio.api.common.v1.message_pb2.Link:
+        """Link to the update event. May be null if the update has not yet been accepted."""
     def __init__(
         self,
         *,
         update_ref: temporalio.api.update.v1.message_pb2.UpdateRef | None = ...,
         outcome: temporalio.api.update.v1.message_pb2.Outcome | None = ...,
         stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType = ...,
+        link: temporalio.api.common.v1.message_pb2.Link | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "outcome", b"outcome", "update_ref", b"update_ref"
+            "link", b"link", "outcome", b"outcome", "update_ref", b"update_ref"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "outcome", b"outcome", "stage", b"stage", "update_ref", b"update_ref"
+            "link",
+            b"link",
+            "outcome",
+            b"outcome",
+            "stage",
+            b"stage",
+            "update_ref",
+            b"update_ref",
         ],
     ) -> None: ...
 
@@ -7524,7 +7568,7 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
     `poller_group_infos` of the last the PollNexusTaskQueueResponse according to the
-    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    instructions. If not set, the poll is routed randomly which can cause it to be blocked
     without receiving a task while the queue actually has tasks in another server location.
     """
     identity: builtins.str
@@ -7977,7 +8021,9 @@ class ExecuteMultiOperationResponse(google.protobuf.message.Message):
 global___ExecuteMultiOperationResponse = ExecuteMultiOperationResponse
 
 class UpdateActivityOptionsRequest(google.protobuf.message.Message):
-    """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationUpdateActivityOptions"""
+    """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationUpdateActivityOptions
+    Deprecated. Use `UpdateActivityExecutionOptionsRequest`.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8014,7 +8060,7 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
     restore_original: builtins.bool
     """If set, the activity options will be restored to the default.
     Default options are then options activity was created with.
-    They are part of the first SCHEDULE event.
+    They are part of the first schedule event.
     This flag cannot be combined with any other option; if you supply
     restore_original together with other options, the request will be rejected.
     """
@@ -8082,7 +8128,96 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
 
 global___UpdateActivityOptionsRequest = UpdateActivityOptionsRequest
 
+class UpdateActivityExecutionOptionsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    ACTIVITY_OPTIONS_FIELD_NUMBER: builtins.int
+    UPDATE_MASK_FIELD_NUMBER: builtins.int
+    RESTORE_ORIGINAL_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity"""
+    workflow_id: builtins.str
+    """If provided, targets a workflow activity for the given workflow ID.
+    If empty, targets a standalone activity.
+    """
+    activity_id: builtins.str
+    """The ID of the activity to target."""
+    run_id: builtins.str
+    """Run ID of the workflow or standalone activity."""
+    identity: builtins.str
+    """The identity of the client who initiated this request"""
+    @property
+    def activity_options(
+        self,
+    ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
+        """Activity options. Partial updates are accepted and controlled by update_mask"""
+    @property
+    def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
+        """Controls which fields from `activity_options` will be applied"""
+    restore_original: builtins.bool
+    """If set, the activity options will be restored to the default.
+    Default options are then options activity was created with.
+    They are part of the first schedule event.
+    This flag cannot be combined with any other option; if you supply
+    restore_original together with other options, the request will be rejected.
+    """
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        activity_options: temporalio.api.activity.v1.message_pb2.ActivityOptions
+        | None = ...,
+        update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
+        restore_original: builtins.bool = ...,
+        resource_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_options", b"activity_options", "update_mask", b"update_mask"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "activity_options",
+            b"activity_options",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "resource_id",
+            b"resource_id",
+            "restore_original",
+            b"restore_original",
+            "run_id",
+            b"run_id",
+            "update_mask",
+            b"update_mask",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___UpdateActivityExecutionOptionsRequest = UpdateActivityExecutionOptionsRequest
+
 class UpdateActivityOptionsResponse(google.protobuf.message.Message):
+    """Deprecated. Use `UpdateActivityExecutionOptionsResponse`."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ACTIVITY_OPTIONS_FIELD_NUMBER: builtins.int
@@ -8108,7 +8243,35 @@ class UpdateActivityOptionsResponse(google.protobuf.message.Message):
 
 global___UpdateActivityOptionsResponse = UpdateActivityOptionsResponse
 
+class UpdateActivityExecutionOptionsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACTIVITY_OPTIONS_FIELD_NUMBER: builtins.int
+    @property
+    def activity_options(
+        self,
+    ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
+        """Activity options after an update"""
+    def __init__(
+        self,
+        *,
+        activity_options: temporalio.api.activity.v1.message_pb2.ActivityOptions
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["activity_options", b"activity_options"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["activity_options", b"activity_options"],
+    ) -> None: ...
+
+global___UpdateActivityExecutionOptionsResponse = UpdateActivityExecutionOptionsResponse
+
 class PauseActivityRequest(google.protobuf.message.Message):
+    """Deprecated. Use `PauseActivityExecutionRequest`."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
@@ -8117,6 +8280,7 @@ class PauseActivityRequest(google.protobuf.message.Message):
     ID_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity."""
     @property
@@ -8132,6 +8296,8 @@ class PauseActivityRequest(google.protobuf.message.Message):
     """
     reason: builtins.str
     """Reason to pause the activity."""
+    request_id: builtins.str
+    """Used to de-dupe pause requests."""
     def __init__(
         self,
         *,
@@ -8141,6 +8307,7 @@ class PauseActivityRequest(google.protobuf.message.Message):
         id: builtins.str = ...,
         type: builtins.str = ...,
         reason: builtins.str = ...,
+        request_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -8170,6 +8337,8 @@ class PauseActivityRequest(google.protobuf.message.Message):
             b"namespace",
             "reason",
             b"reason",
+            "request_id",
+            b"request_id",
             "type",
             b"type",
         ],
@@ -8180,7 +8349,74 @@ class PauseActivityRequest(google.protobuf.message.Message):
 
 global___PauseActivityRequest = PauseActivityRequest
 
+class PauseActivityExecutionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity."""
+    workflow_id: builtins.str
+    """If provided, pause a workflow activity (or activities) for the given workflow ID.
+    If empty, targets a standalone activity.
+    """
+    activity_id: builtins.str
+    """The ID of the activity to target."""
+    run_id: builtins.str
+    """Run ID of the workflow or standalone activity."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    reason: builtins.str
+    """Reason to pause the activity."""
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
+    request_id: builtins.str
+    """Used to de-dupe pause requests."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+        resource_id: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
+            "request_id",
+            b"request_id",
+            "resource_id",
+            b"resource_id",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___PauseActivityExecutionRequest = PauseActivityExecutionRequest
+
 class PauseActivityResponse(google.protobuf.message.Message):
+    """Deprecated. Use `PauseActivityExecutionResponse`."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
@@ -8189,7 +8425,18 @@ class PauseActivityResponse(google.protobuf.message.Message):
 
 global___PauseActivityResponse = PauseActivityResponse
 
+class PauseActivityExecutionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PauseActivityExecutionResponse = PauseActivityExecutionResponse
+
 class UnpauseActivityRequest(google.protobuf.message.Message):
+    """Deprecated. Use `UnpauseActivityExecutionRequest`."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
@@ -8282,7 +8529,90 @@ class UnpauseActivityRequest(google.protobuf.message.Message):
 
 global___UnpauseActivityRequest = UnpauseActivityRequest
 
+class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    RESET_ATTEMPTS_FIELD_NUMBER: builtins.int
+    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    JITTER_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity."""
+    workflow_id: builtins.str
+    """If provided, targets a workflow activity for the given workflow ID.
+    If empty, targets a standalone activity.
+    """
+    activity_id: builtins.str
+    """The ID of the activity to target."""
+    run_id: builtins.str
+    """Run ID of the workflow or standalone activity."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    reset_attempts: builtins.bool
+    """Providing this flag will also reset the number of attempts."""
+    reset_heartbeat: builtins.bool
+    """Providing this flag will also reset the heartbeat details."""
+    reason: builtins.str
+    """Reason to unpause the activity."""
+    @property
+    def jitter(self) -> google.protobuf.duration_pb2.Duration:
+        """If set, the activity will start at a random time within the specified jitter duration."""
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        reset_attempts: builtins.bool = ...,
+        reset_heartbeat: builtins.bool = ...,
+        reason: builtins.str = ...,
+        jitter: google.protobuf.duration_pb2.Duration | None = ...,
+        resource_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["jitter", b"jitter"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "identity",
+            b"identity",
+            "jitter",
+            b"jitter",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
+            "reset_attempts",
+            b"reset_attempts",
+            "reset_heartbeat",
+            b"reset_heartbeat",
+            "resource_id",
+            b"resource_id",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___UnpauseActivityExecutionRequest = UnpauseActivityExecutionRequest
+
 class UnpauseActivityResponse(google.protobuf.message.Message):
+    """Deprecated. Use `UnpauseActivityExecutionResponse`."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
@@ -8291,8 +8621,19 @@ class UnpauseActivityResponse(google.protobuf.message.Message):
 
 global___UnpauseActivityResponse = UnpauseActivityResponse
 
+class UnpauseActivityExecutionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___UnpauseActivityExecutionResponse = UnpauseActivityExecutionResponse
+
 class ResetActivityRequest(google.protobuf.message.Message):
-    """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationResetActivities"""
+    """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationResetActivities
+    Deprecated. Use `ResetActivityExecutionRequest`.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8333,7 +8674,7 @@ class ResetActivityRequest(google.protobuf.message.Message):
     restore_original_options: builtins.bool
     """If set, the activity options will be restored to the defaults.
     Default options are then options activity was created with.
-    They are part of the first SCHEDULE event.
+    They are part of the first schedule event.
     """
     def __init__(
         self,
@@ -8399,7 +8740,97 @@ class ResetActivityRequest(google.protobuf.message.Message):
 
 global___ResetActivityRequest = ResetActivityRequest
 
+class ResetActivityExecutionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
+    KEEP_PAUSED_FIELD_NUMBER: builtins.int
+    JITTER_FIELD_NUMBER: builtins.int
+    RESTORE_ORIGINAL_OPTIONS_FIELD_NUMBER: builtins.int
+    RESOURCE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow which scheduled this activity."""
+    workflow_id: builtins.str
+    """If provided, targets a workflow activity for the given workflow ID.
+    If empty, targets a standalone activity.
+    """
+    activity_id: builtins.str
+    """The ID of the activity to target."""
+    run_id: builtins.str
+    """Run ID of the workflow or standalone activity."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    reset_heartbeat: builtins.bool
+    """Indicates that activity should reset heartbeat details.
+    This flag will be applied only to the new instance of the activity.
+    """
+    keep_paused: builtins.bool
+    """If activity is paused, it will remain paused after reset"""
+    @property
+    def jitter(self) -> google.protobuf.duration_pb2.Duration:
+        """If set, and activity is in backoff, the activity will start at a random time within the specified jitter duration.
+        (unless it is paused and keep_paused is set)
+        """
+    restore_original_options: builtins.bool
+    """If set, the activity options will be restored to the defaults.
+    Default options are then options activity was created with.
+    They are part of the first schedule event.
+    """
+    resource_id: builtins.str
+    """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        reset_heartbeat: builtins.bool = ...,
+        keep_paused: builtins.bool = ...,
+        jitter: google.protobuf.duration_pb2.Duration | None = ...,
+        restore_original_options: builtins.bool = ...,
+        resource_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["jitter", b"jitter"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "identity",
+            b"identity",
+            "jitter",
+            b"jitter",
+            "keep_paused",
+            b"keep_paused",
+            "namespace",
+            b"namespace",
+            "reset_heartbeat",
+            b"reset_heartbeat",
+            "resource_id",
+            b"resource_id",
+            "restore_original_options",
+            b"restore_original_options",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___ResetActivityExecutionRequest = ResetActivityExecutionRequest
+
 class ResetActivityResponse(google.protobuf.message.Message):
+    """Deprecated. Use `ResetActivityExecutionRequest`."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
@@ -8407,6 +8838,15 @@ class ResetActivityResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ResetActivityResponse = ResetActivityResponse
+
+class ResetActivityExecutionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ResetActivityExecutionResponse = ResetActivityExecutionResponse
 
 class UpdateWorkflowExecutionOptionsRequest(google.protobuf.message.Message):
     """Keep the parameters in sync with:
@@ -10620,6 +11060,7 @@ class ListWorkersRequest(google.protobuf.message.Message):
     PAGE_SIZE_FIELD_NUMBER: builtins.int
     NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
     QUERY_FIELD_NUMBER: builtins.int
+    INCLUDE_SYSTEM_WORKERS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     page_size: builtins.int
     next_page_token: builtins.bytes
@@ -10637,6 +11078,10 @@ class ListWorkersRequest(google.protobuf.message.Message):
     * StartTime
     * Status
     """
+    include_system_workers: builtins.bool
+    """When true, the response will include system workers that are created implicitly
+    by the server and not by the user. By default, system workers are excluded.
+    """
     def __init__(
         self,
         *,
@@ -10644,10 +11089,13 @@ class ListWorkersRequest(google.protobuf.message.Message):
         page_size: builtins.int = ...,
         next_page_token: builtins.bytes = ...,
         query: builtins.str = ...,
+        include_system_workers: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "include_system_workers",
+            b"include_system_workers",
             "namespace",
             b"namespace",
             "next_page_token",
@@ -11510,6 +11958,8 @@ class DescribeActivityExecutionRequest(google.protobuf.message.Message):
     INCLUDE_INPUT_FIELD_NUMBER: builtins.int
     INCLUDE_OUTCOME_FIELD_NUMBER: builtins.int
     LONG_POLL_TOKEN_FIELD_NUMBER: builtins.int
+    INCLUDE_HEARTBEAT_DETAILS_FIELD_NUMBER: builtins.int
+    INCLUDE_LAST_FAILURE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     activity_id: builtins.str
     run_id: builtins.str
@@ -11526,6 +11976,10 @@ class DescribeActivityExecutionRequest(google.protobuf.message.Message):
     guaranteed that a client making a sequence of long-poll requests will see a complete
     sequence of state changes.
     """
+    include_heartbeat_details: builtins.bool
+    """Include the heartbeat_details field inside info in the response if available."""
+    include_last_failure: builtins.bool
+    """Include the last_failure field inside info in the response if available."""
     def __init__(
         self,
         *,
@@ -11535,14 +11989,20 @@ class DescribeActivityExecutionRequest(google.protobuf.message.Message):
         include_input: builtins.bool = ...,
         include_outcome: builtins.bool = ...,
         long_poll_token: builtins.bytes = ...,
+        include_heartbeat_details: builtins.bool = ...,
+        include_last_failure: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "activity_id",
             b"activity_id",
+            "include_heartbeat_details",
+            b"include_heartbeat_details",
             "include_input",
             b"include_input",
+            "include_last_failure",
+            b"include_last_failure",
             "include_outcome",
             b"include_outcome",
             "long_poll_token",
@@ -11569,7 +12029,9 @@ class DescribeActivityExecutionResponse(google.protobuf.message.Message):
     """The run ID of the activity, useful when run_id was not specified in the request."""
     @property
     def info(self) -> temporalio.api.activity.v1.message_pb2.ActivityExecutionInfo:
-        """Information about the activity execution."""
+        """Information about the activity execution. Fields heartbeat_details and last_failure are omitted unless
+        the request has include_heartbeat_details or include_last_failure set to true, respectively.
+        """
     @property
     def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized activity input, passed as arguments to the activity function.

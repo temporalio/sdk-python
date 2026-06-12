@@ -58,9 +58,13 @@ from agents.items import (
     TResponseStreamEvent,
 )
 from agents.mcp import MCPServer, MCPServerStdio
+from agents.sandbox.capabilities.tools import SandboxApplyPatchTool
+from agents.tool import CustomTool
+from agents.tool_context import ToolContext
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseCodeInterpreterToolCall,
+    ResponseCustomToolCall,
     ResponseFileSearchToolCall,
     ResponseFunctionWebSearch,
 )
@@ -83,6 +87,7 @@ from temporalio.contrib.openai_agents import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
 )
+from temporalio.contrib.openai_agents._invoke_model_activity import _build_tool
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import _convert_agent
 from temporalio.contrib.openai_agents._temporal_model_stub import (
@@ -547,7 +552,9 @@ def research_mock_model():
                         id="",
                         status="completed",
                         type="web_search_call",
-                        action=ActionSearch(query="", type="search"),
+                        action=ActionSearch.model_construct(
+                            type="search", queries=[""]
+                        ),
                     ),
                     ResponseBuilders.response_output_message("Granada"),
                 ],
@@ -1994,6 +2001,66 @@ async def test_hosted_mcp_tool(client: Client):
             assert result == "Some language"
 
 
+def custom_tool_mock_model():
+    return TestModel.returning_responses(
+        [
+            ModelResponse(
+                output=[
+                    ResponseCustomToolCall(
+                        call_id="c1",
+                        input="ping",
+                        name="echo",
+                        type="custom_tool_call",
+                    )
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+            ResponseBuilders.output_message("done"),
+        ]
+    )
+
+
+@workflow.defn
+class CustomToolWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        captured: list[str] = []
+
+        async def echo(ctx: ToolContext[Any], input: str) -> str:  # type: ignore[reportUnusedParameter]
+            captured.append(input)
+            return input
+
+        agent = Agent[str](
+            name="custom-tool-agent",
+            instructions="Use the echo tool.",
+            tools=[
+                CustomTool(
+                    name="echo",
+                    description="Echo the input string back.",
+                    on_invoke_tool=echo,
+                )
+            ],
+        )
+        result = await Runner.run(starting_agent=agent, input="say something")
+        return f"{result.final_output}:{captured[0]}"
+
+
+async def test_custom_tool_workflow(client: Client):
+    async with AgentEnvironment(model=custom_tool_mock_model()) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(client, CustomToolWorkflow) as worker:
+            workflow_handle = await client.start_workflow(
+                CustomToolWorkflow.run,
+                id=f"custom-tool-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
+            assert result == "done:ping"
+
+
 class AssertDifferentModelProvider(ModelProvider):
     model_names: set[str | None]
 
@@ -2534,6 +2601,79 @@ async def test_model_conversion_loops():
     triage_agent = seat_booking_agent.handoffs[0]
     assert isinstance(triage_agent, Agent)
     assert isinstance(triage_agent.model, _TemporalModelStub)
+
+
+def test_sandbox_apply_patch_tool_round_trips_through_activity_input():
+    class FakeSandboxSession:
+        pass
+
+    tool = SandboxApplyPatchTool(session=FakeSandboxSession())  # type: ignore[arg-type]
+
+    stub = _TemporalModelStub(
+        model_name="gpt-5",
+        model_params=ModelActivityParameters(),
+        agent=None,
+    )
+
+    activity_input, _summary = stub._build_activity_input(
+        system_instructions=None,
+        input="hi",
+        model_settings=ModelSettings(),
+        tools=[tool],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        conversation_id=None,
+        prompt=None,
+    )
+
+    tool_inputs = activity_input.get("tools") or []
+    assert len(tool_inputs) == 1
+    rebuilt = _build_tool(tool_inputs[0])
+    assert isinstance(rebuilt, CustomTool)
+    assert rebuilt.name == tool.name
+    assert rebuilt.description == tool.description
+    assert rebuilt.format == tool.format
+    assert rebuilt.tool_config == tool.tool_config
+
+
+def test_custom_tool_with_defer_loading_round_trips_through_activity_input():
+    async def stub(_ctx: Any, _payload: str) -> str:
+        return ""
+
+    tool = CustomTool(
+        name="deferred_tool",
+        description="A custom tool with defer_loading enabled",
+        on_invoke_tool=stub,
+        defer_loading=True,
+    )
+
+    stub_model = _TemporalModelStub(
+        model_name="gpt-5",
+        model_params=ModelActivityParameters(),
+        agent=None,
+    )
+
+    activity_input, _summary = stub_model._build_activity_input(
+        system_instructions=None,
+        input="hi",
+        model_settings=ModelSettings(),
+        tools=[tool],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        conversation_id=None,
+        prompt=None,
+    )
+
+    tool_inputs = activity_input.get("tools") or []
+    assert len(tool_inputs) == 1
+    rebuilt = _build_tool(tool_inputs[0])
+    assert isinstance(rebuilt, CustomTool)
+    assert rebuilt.tool_config == tool.tool_config
+    assert rebuilt.defer_loading is True
 
 
 async def test_local_hello_world_agent(client: Client):

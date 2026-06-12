@@ -123,9 +123,9 @@ async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: An
 
     # Verify the span hierarchy matches expectations
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 @workflow.defn
@@ -382,9 +382,9 @@ async def test_opentelemetry_comprehensive_tracing(
 
     # Verify the span hierarchy matches expectations
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 async def test_otel_tracing_with_added_spans(
@@ -439,9 +439,9 @@ async def test_otel_tracing_with_added_spans(
 
     # Verify the span hierarchy matches expectations
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 task_fail_once_workflow_has_failed = False
@@ -507,9 +507,9 @@ async def test_otel_tracing_workflow_task_failure(
     ]
 
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 @workflow.defn
@@ -562,9 +562,9 @@ async def test_otel_tracing_workflow_failure(
     ]
 
     actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert (
-        actual_hierarchy == expected_hierarchy
-    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
 
 
 async def test_otel_standalone_activity_tracing(

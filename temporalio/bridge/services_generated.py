@@ -1053,6 +1053,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def pause_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.PauseActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.PauseActivityExecutionResponse:
+        """Invokes the WorkflowService.pause_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="pause_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.PauseActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def pause_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.PauseWorkflowExecutionRequest,
@@ -1336,6 +1354,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.ResetActivityResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def reset_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.ResetActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.ResetActivityExecutionResponse:
+        """Invokes the WorkflowService.reset_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="reset_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.ResetActivityExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -1899,6 +1935,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def unpause_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.UnpauseActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse:
+        """Invokes the WorkflowService.unpause_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="unpause_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def unpause_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.UnpauseWorkflowExecutionRequest,
@@ -1912,6 +1966,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.UnpauseWorkflowExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_activity_execution_options(
+        self,
+        req: temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse:
+        """Invokes the WorkflowService.update_activity_execution_options rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_activity_execution_options",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2477,6 +2549,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def create_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.CreateCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.CreateCustomRoleResponse:
+        """Invokes the CloudService.create_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.CreateCustomRoleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def create_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateNamespaceRequest,
@@ -2634,6 +2724,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.DeleteConnectivityRuleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleResponse:
+        """Invokes the CloudService.delete_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.DeleteCustomRoleResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2981,6 +3089,42 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCustomRoleResponse:
+        """Invokes the CloudService.get_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCustomRoleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_custom_roles(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCustomRolesRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCustomRolesResponse:
+        """Invokes the CloudService.get_custom_roles rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_custom_roles",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCustomRolesResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetNamespaceRequest,
@@ -3161,6 +3305,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_service_account_namespace_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetServiceAccountNamespaceAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetServiceAccountNamespaceAssignmentsResponse:
+        """Invokes the CloudService.get_service_account_namespace_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_service_account_namespace_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetServiceAccountNamespaceAssignmentsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_service_accounts(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetServiceAccountsRequest,
@@ -3251,6 +3413,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_user_group_namespace_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetUserGroupNamespaceAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetUserGroupNamespaceAssignmentsResponse:
+        """Invokes the CloudService.get_user_group_namespace_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_user_group_namespace_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetUserGroupNamespaceAssignmentsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_user_groups(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUserGroupsRequest,
@@ -3264,6 +3444,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.GetUserGroupsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_user_namespace_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetUserNamespaceAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetUserNamespaceAssignmentsResponse:
+        """Invokes the CloudService.get_user_namespace_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_user_namespace_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetUserNamespaceAssignmentsResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3426,6 +3624,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.UpdateApiKeyResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_custom_role(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleResponse:
+        """Invokes the CloudService.update_custom_role rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_custom_role",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.UpdateCustomRoleResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,

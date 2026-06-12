@@ -65,13 +65,13 @@ def test_command_aware_visitor_has_methods_for_all_seq_protos_with_payloads():
 
     # Sanity check: we should have fewer overrides than total protos with seq
     # (because some don't have payloads)
-    assert len(commands_with_payloads) < len(
-        command_protos
-    ), "Should have some commands without payloads"
+    assert len(commands_with_payloads) < len(command_protos), (
+        "Should have some commands without payloads"
+    )
     # All activation jobs except FireTimer have payloads
-    assert (
-        len(jobs_with_payloads) == len(job_protos) - 1
-    ), "Should have exactly one activation job without payloads (FireTimer)"
+    assert len(jobs_with_payloads) == len(job_protos) - 1, (
+        "Should have exactly one activation job without payloads (FireTimer)"
+    )
 
 
 def _get_workflow_command_protos_with_seq() -> Iterator[type[Any]]:

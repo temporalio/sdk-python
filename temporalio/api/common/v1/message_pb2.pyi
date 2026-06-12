@@ -943,10 +943,49 @@ class Link(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    class Workflow(google.protobuf.message.Message):
+        """A link to a workflow execution. This is a more general version of WorkflowEvent that doesn't specify a
+        particular event within the workflow, useful when you want to link to a workflow but there is no particular event to link to,
+        such as a Query or a Rejected Update.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        WORKFLOW_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        REASON_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        workflow_id: builtins.str
+        run_id: builtins.str
+        reason: builtins.str
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            workflow_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+            reason: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "namespace",
+                b"namespace",
+                "reason",
+                b"reason",
+                "run_id",
+                b"run_id",
+                "workflow_id",
+                b"workflow_id",
+            ],
+        ) -> None: ...
+
     WORKFLOW_EVENT_FIELD_NUMBER: builtins.int
     BATCH_JOB_FIELD_NUMBER: builtins.int
     ACTIVITY_FIELD_NUMBER: builtins.int
     NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+    WORKFLOW_FIELD_NUMBER: builtins.int
     @property
     def workflow_event(self) -> global___Link.WorkflowEvent: ...
     @property
@@ -955,6 +994,8 @@ class Link(google.protobuf.message.Message):
     def activity(self) -> global___Link.Activity: ...
     @property
     def nexus_operation(self) -> global___Link.NexusOperation: ...
+    @property
+    def workflow(self) -> global___Link.Workflow: ...
     def __init__(
         self,
         *,
@@ -962,6 +1003,7 @@ class Link(google.protobuf.message.Message):
         batch_job: global___Link.BatchJob | None = ...,
         activity: global___Link.Activity | None = ...,
         nexus_operation: global___Link.NexusOperation | None = ...,
+        workflow: global___Link.Workflow | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -974,6 +1016,8 @@ class Link(google.protobuf.message.Message):
             b"nexus_operation",
             "variant",
             b"variant",
+            "workflow",
+            b"workflow",
             "workflow_event",
             b"workflow_event",
         ],
@@ -989,6 +1033,8 @@ class Link(google.protobuf.message.Message):
             b"nexus_operation",
             "variant",
             b"variant",
+            "workflow",
+            b"workflow",
             "workflow_event",
             b"workflow_event",
         ],
@@ -997,7 +1043,7 @@ class Link(google.protobuf.message.Message):
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
     ) -> (
         typing_extensions.Literal[
-            "workflow_event", "batch_job", "activity", "nexus_operation"
+            "workflow_event", "batch_job", "activity", "nexus_operation", "workflow"
         ]
         | None
     ): ...

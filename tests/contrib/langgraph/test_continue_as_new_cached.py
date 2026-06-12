@@ -120,12 +120,12 @@ async def test_graph_continue_as_new_cached(client: Client):
     assert result == {"value": 260}
 
     # Each node should execute exactly once — phases 2 and 3 use cached results.
-    assert (
-        _execution_counts.get("multiply", 0) == 1
-    ), f"multiply executed {_execution_counts.get('multiply', 0)} times, expected 1"
-    assert (
-        _execution_counts.get("add", 0) == 1
-    ), f"add executed {_execution_counts.get('add', 0)} times, expected 1"
-    assert (
-        _execution_counts.get("double", 0) == 1
-    ), f"double executed {_execution_counts.get('double', 0)} times, expected 1"
+    assert _execution_counts.get("multiply", 0) == 1, (
+        f"multiply executed {_execution_counts.get('multiply', 0)} times, expected 1"
+    )
+    assert _execution_counts.get("add", 0) == 1, (
+        f"add executed {_execution_counts.get('add', 0)} times, expected 1"
+    )
+    assert _execution_counts.get("double", 0) == 1, (
+        f"double executed {_execution_counts.get('double', 0)} times, expected 1"
+    )

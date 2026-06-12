@@ -548,7 +548,10 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-_JSONTypeConverterUnhandled = NewType("_JSONTypeConverterUnhandled", object)
+JSONTypeConverterUnhandled = NewType("JSONTypeConverterUnhandled", object)
+"""Type of :py:attr:`JSONTypeConverter.Unhandled`."""
+
+_JSONTypeConverterUnhandled = JSONTypeConverterUnhandled
 
 
 class JSONTypeConverter(ABC):
@@ -556,7 +559,9 @@ class JSONTypeConverter(ABC):
     result (e.g. scalar, list, or dict) to a known type.
     """
 
-    Unhandled = _JSONTypeConverterUnhandled(object())
+    Unhandled: ClassVar[JSONTypeConverterUnhandled] = JSONTypeConverterUnhandled(
+        object()
+    )
     """Sentinel value that must be used as the result of
     :py:meth:`to_typed_value` to say the given type is not handled by this
     converter."""
@@ -564,7 +569,7 @@ class JSONTypeConverter(ABC):
     @abstractmethod
     def to_typed_value(
         self, hint: type, value: Any
-    ) -> Any | None | _JSONTypeConverterUnhandled:
+    ) -> Any | None | JSONTypeConverterUnhandled:
         """Convert the given value to a type based on the given hint.
 
         Args:

@@ -1,4 +1,4 @@
-![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
+![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
 [![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
@@ -432,7 +432,7 @@ class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
 class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
         self, hint: Type, value: Any
-    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+    ) -> Union[Optional[Any], JSONTypeConverterUnhandled]:
         if issubclass(hint, ipaddress.IPv4Address):
             return ipaddress.IPv4Address(value)
         return JSONTypeConverter.Unhandled

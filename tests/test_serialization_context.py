@@ -1600,7 +1600,7 @@ class PayloadEncryptionWorkflow:
     @workflow.run
     async def run(self, _data: str) -> str:
         await workflow.wait_condition(
-            lambda: (self.received_signal and self.received_update)
+            lambda: self.received_signal and self.received_update
         )
         # Run them in parallel to check that data converter operations do not mix up contexts when
         # there are multiple concurrent payload types.
