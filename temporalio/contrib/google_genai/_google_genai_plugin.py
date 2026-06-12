@@ -34,7 +34,7 @@ class GoogleGenAIPlugin(SimplePlugin):
 
     This plugin registers the ``gemini_api_client_async_request`` activity
     using the provided ``genai.Client`` with real credentials.  Workflows use
-    :func:`~temporalio.contrib.google_genai.workflow.google_genai_client` to
+    :func:`google_genai_client` to
     get an ``AsyncClient`` backed by a ``TemporalApiClient`` that routes all
     API calls through this activity.
 

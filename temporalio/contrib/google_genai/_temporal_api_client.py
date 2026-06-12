@@ -6,6 +6,7 @@ direct calls.  The real ``genai.Client`` with real credentials only exists
 on the worker side inside the activity.
 
 This ensures:
+
 - No credential fetching or refreshing happens in the workflow.
 - No auth material (tokens, API keys) appears in Temporal event history.
 - The SDK's AFC (automatic function calling) loop runs in the workflow,
