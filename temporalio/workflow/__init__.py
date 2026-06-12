@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+# BEGIN GENERATED NEXUS SYSTEM EXPORTS
+from temporalio.nexus.system.workflow_service import (
+    signal_with_start_workflow,
+)
+
+# END GENERATED NEXUS SYSTEM EXPORTS
 from ..types import (
     AnyType,
     CallableAsyncNoParam,
@@ -314,4 +320,7 @@ __all__ = [
     "ProtocolReturnType",
     "ReturnType",
     "SelfType",
+    # BEGIN GENERATED NEXUS SYSTEM __ALL__
+    "signal_with_start_workflow",
+    # END GENERATED NEXUS SYSTEM __ALL__
 ]
