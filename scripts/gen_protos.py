@@ -54,6 +54,10 @@ py_fixes = [
         re.compile(r"'__module__' : 'temporal\.api\.").sub,
         r"'__module__' : 'temporalio.api.",
     ),
+    partial(
+        re.compile(r"'__module__' : 'nexusannotations\.").sub,
+        r"'__module__' : 'temporalio.api.dependencies.nexusannotations.",
+    ),
 ]
 
 pyi_fixes = [
@@ -201,10 +205,11 @@ def generate_protos(output_dir: Path):
     fix_generated_output(output_dir)
     # Move dependency protos
     deps_out_dir = api_out_dir / "dependencies"
+    shutil.rmtree(deps_out_dir / "protoc_gen_openapiv2", ignore_errors=True)
+    shutil.rmtree(deps_out_dir / "nexusannotations", ignore_errors=True)
     deps_out_dir.mkdir(exist_ok=True)
-    for dep in ["protoc_gen_openapiv2", "nexusannotations"]:
-        shutil.rmtree(deps_out_dir / dep, ignore_errors=True)
-        (output_dir / dep).replace(deps_out_dir / dep)
+    (output_dir / "protoc_gen_openapiv2").replace(deps_out_dir / "protoc_gen_openapiv2")
+    (output_dir / "nexusannotations").replace(deps_out_dir / "nexusannotations")
     (deps_out_dir / "__init__.py").touch()
     # Move protos
     for p in (output_dir / "temporal" / "api").iterdir():

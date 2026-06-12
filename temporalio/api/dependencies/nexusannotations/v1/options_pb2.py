@@ -33,7 +33,7 @@ OperationOptions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _OPERATIONOPTIONS,
-        "__module__": "nexusannotations.v1.options_pb2",
+        "__module__": "temporalio.api.dependencies.nexusannotations.v1.options_pb2",
         # @@protoc_insertion_point(class_scope:nexusannotations.v1.OperationOptions)
     },
 )
@@ -44,7 +44,7 @@ ServiceOptions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SERVICEOPTIONS,
-        "__module__": "nexusannotations.v1.options_pb2",
+        "__module__": "temporalio.api.dependencies.nexusannotations.v1.options_pb2",
         # @@protoc_insertion_point(class_scope:nexusannotations.v1.ServiceOptions)
     },
 )

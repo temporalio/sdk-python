@@ -158,6 +158,40 @@ class DnsLoadBalancingConfig:
 DnsLoadBalancingConfig.default = DnsLoadBalancingConfig()
 
 
+class GrpcCompression(ABC):
+    """Transport-level gRPC compression mode.
+
+    This is a base type for concrete compression modes. Current modes are
+    available as singleton constants on this class.
+    """
+
+    NONE: ClassVar[GrpcCompression]
+    """Do not compress gRPC requests or advertise support for compressed responses."""
+
+    GZIP: ClassVar[GrpcCompression]
+    """Gzip-compress gRPC requests and accept gzip-compressed responses."""
+
+    @abstractmethod
+    def _to_bridge_config(self) -> str:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class _NoGrpcCompression(GrpcCompression):
+    def _to_bridge_config(self) -> str:
+        return "none"
+
+
+@dataclass(frozen=True)
+class _GzipGrpcCompression(GrpcCompression):
+    def _to_bridge_config(self) -> str:
+        return "gzip"
+
+
+GrpcCompression.NONE = _NoGrpcCompression()
+GrpcCompression.GZIP = _GzipGrpcCompression()
+
+
 @dataclass
 class ConnectConfig:
     """Config for connecting to the server."""
@@ -173,6 +207,7 @@ class ConnectConfig:
     runtime: temporalio.runtime.Runtime | None = None
     http_connect_proxy_config: HttpConnectProxyConfig | None = None
     dns_load_balancing_config: DnsLoadBalancingConfig | None = None
+    grpc_compression: GrpcCompression = GrpcCompression.GZIP
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -235,6 +270,7 @@ class ConnectConfig:
                 if self.dns_load_balancing_config
                 else None
             ),
+            grpc_compression=self.grpc_compression._to_bridge_config(),
         )
 
 
