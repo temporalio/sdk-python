@@ -9,7 +9,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-05-20T23:41:58.595699Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P2W"
 
 [[package]]
@@ -5427,6 +5427,9 @@ aioboto3 = [
 google-adk = [
     { name = "google-adk" },
 ]
+google-genai = [
+    { name = "google-genai" },
+]
 grpc = [
     { name = "grpcio" },
 ]
@@ -5504,6 +5507,7 @@ dev = [
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
     { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=1.27.0,<2" },
+    { name = "google-genai", marker = "extra == 'google-genai'", specifier = ">=1.66.0,<2.0.0" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=1.1.0" },
     { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.7.34,<0.9" },
@@ -5525,7 +5529,7 @@ requires-dist = [
     { name = "types-protobuf", specifier = ">=3.20,<7.0.0" },
     { name = "typing-extensions", specifier = ">=4.2.0,<5" },
 ]
-provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "lambda-worker-otel", "aioboto3", "strands-agents"]
+provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "lambda-worker-otel", "aioboto3", "google-genai", "strands-agents"]
 
 [package.metadata.requires-dev]
 dev = [
