@@ -1224,9 +1224,11 @@ class QueryFilteringWorkflow:
 class TestBuiltinQueryFiltering:
     """Verifies __temporal_ prefixed queries are not traced."""
 
+    @pytest.mark.parametrize("_iteration", range(1000))
     async def test_temporal_prefixed_query_not_traced(
         self,
         client: Client,
+        _iteration: int,
     ) -> None:
         """__temporal_workflow_metadata query should not produce a trace,
         but user-defined queries should still be traced.
@@ -1235,6 +1237,7 @@ class TestBuiltinQueryFiltering:
         client-side QueryWorkflow traces, isolating the test to
         worker-side HandleQuery traces only.
         """
+        del _iteration
 
         task_queue = f"query-filter-{uuid.uuid4()}"
         collector = InMemoryRunCollector()
