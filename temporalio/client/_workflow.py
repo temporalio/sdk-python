@@ -1065,8 +1065,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: str | None = None,
         static_details: str | None = None,
         start_delay: timedelta | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
@@ -1095,8 +1093,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: str | None = None,
         static_details: str | None = None,
         start_delay: timedelta | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
@@ -1127,8 +1123,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: str | None = None,
         static_details: str | None = None,
         start_delay: timedelta | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
@@ -1159,8 +1153,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: str | None = None,
         static_details: str | None = None,
         start_delay: timedelta | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
@@ -1189,8 +1181,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: str | None = None,
         static_details: str | None = None,
         start_delay: timedelta | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
         stack_level: int = 2,
@@ -1228,8 +1218,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
             start_delay=start_delay,
             headers={},
             ret_type=result_type or result_type_from_run_fn,
-            rpc_metadata=rpc_metadata,
-            rpc_timeout=rpc_timeout,
             priority=priority,
             versioning_override=versioning_override,
         )
