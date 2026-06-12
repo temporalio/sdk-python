@@ -256,15 +256,15 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
             metrics_output = f.read().decode("utf-8")
 
             for key, buckets in histogram_overrides.items():
-                assert (
-                    key in metrics_output
-                ), f"Missing {key} in full output: {metrics_output}"
+                assert key in metrics_output, (
+                    f"Missing {key} in full output: {metrics_output}"
+                )
                 for bucket in buckets:
                     # expect to have {key}_bucket and le={bucket} in the same line with arbitrary strings between them
                     regex = re.compile(f'{key}_bucket.*le="{bucket}"')
-                    assert regex.search(
-                        metrics_output
-                    ), f"Missing bucket for {key} in full output: {metrics_output}"
+                    assert regex.search(metrics_output), (
+                        f"Missing bucket for {key} in full output: {metrics_output}"
+                    )
 
     # Wait for metrics to appear and match the expected buckets
     await assert_eventually(check_metrics)
@@ -358,12 +358,12 @@ async def test_opentelemetry_histogram_bucket_overrides(client: Client):
             with lock:
                 snapshot = dict(captured)
             for key, buckets in histogram_overrides.items():
-                assert (
-                    key in snapshot
-                ), f"Missing {key} in captured metrics: {list(snapshot)}"
-                assert snapshot[key] == pytest.approx(
-                    buckets
-                ), f"Bucket mismatch for {key}: got {snapshot[key]} expected {buckets}"
+                assert key in snapshot, (
+                    f"Missing {key} in captured metrics: {list(snapshot)}"
+                )
+                assert snapshot[key] == pytest.approx(buckets), (
+                    f"Bucket mismatch for {key}: got {snapshot[key]} expected {buckets}"
+                )
 
         await assert_eventually(check_metrics)
     finally:
