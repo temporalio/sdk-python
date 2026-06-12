@@ -200,7 +200,7 @@ class OpenTelemetryInterceptor(
         provider = get_tracer_provider()
         if not isinstance(provider, ReplaySafeTracerProvider):
             raise ValueError(
-                "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use init_tracer_provider to create one."
+                "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use create_tracer_provider to create one."
             )
 
         class InterceptorWithState(_TracingWorkflowInboundInterceptor):
@@ -302,6 +302,22 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
                 input.update_workflow_input.headers
             )
             return await super().start_update_with_start_workflow(input)
+
+    async def start_activity(
+        self, input: temporalio.client.StartActivityInput
+    ) -> temporalio.client.ActivityHandle[Any]:
+        with _maybe_span(
+            get_tracer(__name__),
+            f"StartActivity:{input.activity_type}",
+            add_temporal_spans=self._add_temporal_spans,
+            attributes={
+                "temporalActivityID": input.id,
+                "temporalActivityType": input.activity_type,
+            },
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            input.headers = _context_to_headers(input.headers)
+            return await super().start_activity(input)
 
 
 class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterceptor):

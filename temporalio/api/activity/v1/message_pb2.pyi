@@ -4,13 +4,16 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import sys
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
+import temporalio.api.callback.v1.message_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.deployment.v1.message_pb2
 import temporalio.api.enums.v1.activity_pb2
@@ -202,6 +205,11 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     HEADER_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
     CANCELED_REASON_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
+    TOTAL_HEARTBEAT_COUNT_FIELD_NUMBER: builtins.int
+    SDK_NAME_FIELD_NUMBER: builtins.int
+    SDK_VERSION_FIELD_NUMBER: builtins.int
+    START_DELAY_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """Unique identifier of this activity within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -246,7 +254,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """The retry policy for the activity. Will never exceed `schedule_to_close_timeout`."""
     @property
     def heartbeat_details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
-        """Details provided in the last recorded activity heartbeat."""
+        """Details provided in the last recorded activity heartbeat.
+        DescribeActivityExecution does not set this field unless include_heartbeat_details was true in the request.
+        """
     @property
     def last_heartbeat_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time the last heartbeat was recorded."""
@@ -269,7 +279,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """Time when the activity transitioned to a closed state."""
     @property
     def last_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """Failure details from the last failed attempt."""
+        """Failure details from the last failed attempt.
+        DescribeActivityExecution does not set this field unless include_last_failure was true in the request.
+        """
     last_worker_identity: builtins.str
     @property
     def current_retry_interval(self) -> google.protobuf.duration_pb2.Duration:
@@ -313,6 +325,26 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """Metadata for use by user interfaces to display the fixed as-of-start summary and details of the activity."""
     canceled_reason: builtins.str
     """Set if activity cancelation was requested."""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to related entities, such as the entity that started this activity."""
+    total_heartbeat_count: builtins.int
+    """Total number of heartbeats recorded across all attempts of this activity, including retries."""
+    sdk_name: builtins.str
+    """The name of the SDK of the worker that most recently picked up an attempt of this activity.
+    Overwritten on each new attempt. Empty if unknown.
+    """
+    sdk_version: builtins.str
+    """The version of the SDK of the worker that most recently picked up an attempt of this activity.
+    Overwritten on each new attempt. Empty if unknown.
+    """
+    @property
+    def start_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """Time to wait before dispatching the first activity task. This delay is not applied to retry attempts."""
     def __init__(
         self,
         *,
@@ -353,6 +385,12 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
         | None = ...,
         canceled_reason: builtins.str = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
+        total_heartbeat_count: builtins.int = ...,
+        sdk_name: builtins.str = ...,
+        sdk_version: builtins.str = ...,
+        start_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -397,6 +435,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"schedule_to_start_timeout",
             "search_attributes",
             b"search_attributes",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "user_metadata",
@@ -440,6 +480,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"last_started_time",
             "last_worker_identity",
             b"last_worker_identity",
+            "links",
+            b"links",
             "next_attempt_schedule_time",
             b"next_attempt_schedule_time",
             "priority",
@@ -456,8 +498,14 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "sdk_name",
+            b"sdk_name",
+            "sdk_version",
+            b"sdk_version",
             "search_attributes",
             b"search_attributes",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "state_size_bytes",
@@ -468,6 +516,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"status",
             "task_queue",
             b"task_queue",
+            "total_heartbeat_count",
+            b"total_heartbeat_count",
             "user_metadata",
             b"user_metadata",
         ],
@@ -587,3 +637,69 @@ class ActivityExecutionListInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ActivityExecutionListInfo = ActivityExecutionListInfo
+
+class CallbackInfo(google.protobuf.message.Message):
+    """CallbackInfo contains the state of an attached activity callback."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class ActivityClosed(google.protobuf.message.Message):
+        """Trigger for when the activity is closed."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        def __init__(
+            self,
+        ) -> None: ...
+
+    class Trigger(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        ACTIVITY_CLOSED_FIELD_NUMBER: builtins.int
+        @property
+        def activity_closed(self) -> global___CallbackInfo.ActivityClosed: ...
+        def __init__(
+            self,
+            *,
+            activity_closed: global___CallbackInfo.ActivityClosed | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "activity_closed", b"activity_closed", "variant", b"variant"
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "activity_closed", b"activity_closed", "variant", b"variant"
+            ],
+        ) -> None: ...
+        def WhichOneof(
+            self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+        ) -> typing_extensions.Literal["activity_closed"] | None: ...
+
+    TRIGGER_FIELD_NUMBER: builtins.int
+    INFO_FIELD_NUMBER: builtins.int
+    @property
+    def trigger(self) -> global___CallbackInfo.Trigger:
+        """Trigger for this callback."""
+    @property
+    def info(self) -> temporalio.api.callback.v1.message_pb2.CallbackInfo:
+        """Common callback info."""
+    def __init__(
+        self,
+        *,
+        trigger: global___CallbackInfo.Trigger | None = ...,
+        info: temporalio.api.callback.v1.message_pb2.CallbackInfo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["info", b"info", "trigger", b"trigger"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["info", b"info", "trigger", b"trigger"],
+    ) -> None: ...
+
+global___CallbackInfo = CallbackInfo

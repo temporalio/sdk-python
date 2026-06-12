@@ -510,6 +510,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
     ]
     """Deprecated. Use `UpdateWorkerVersioningRules`.
+    Will be removed in server version v1.32.0.
 
     Allows users to specify sets of worker build id versions on a per task queue basis. Versions
     are ordered, and may be either compatible with some extant version, or a new incompatible
@@ -532,6 +533,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
     ]
     """Deprecated. Use `GetWorkerVersioningRules`.
+    Will be removed in server version v1.32.0.
     Fetches the worker build id versioning sets for a task queue.
     """
     UpdateWorkerVersioningRules: grpc.UnaryUnaryMultiCallable[
@@ -559,7 +561,7 @@ class WorkflowServiceStub:
     the target Build ID of a redirect rule is able to process event histories made by the source
     Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
 
-    WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+    Will be removed in server version v1.32.0.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
     """
@@ -568,13 +570,14 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
     ]
     """Fetches the Build ID assignment and redirect rules for a Task Queue.
-    WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+    Will be removed in server version v1.32.0.
     """
     GetWorkerTaskReachability: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
     ]
     """Deprecated. Use `DescribeTaskQueue`.
+    Will be removed in server version v1.32.0.
 
     Fetches task reachability to determine whether a worker may be retired.
     The request may specify task queues to query for or let the server fetch all task queues mapped to the given
@@ -691,6 +694,38 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
     ]
     """Lists all Worker Deployments that are tracked in the Namespace.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    CreateWorkerDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
+    ]
+    """Creates a new Worker Deployment.
+
+    Experimental. This API might significantly change or be removed in a
+    future release.
+    """
+    CreateWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
+    ]
+    """Creates a new Worker Deployment Version.
+
+    Experimental. This API might significantly change or be removed in a
+    future release.
+    """
+    UpdateWorkerDeploymentVersionComputeConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
+    ]
+    """Updates the compute config attached to a Worker Deployment Version.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    ValidateWorkerDeploymentVersionComputeConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
+    ]
+    """Validates the compute config without attaching it to a Worker Deployment Version.
     Experimental. This API might significantly change or be removed in a future release.
     """
     UpdateWorkerDeploymentVersionMetadata: grpc.UnaryUnaryMultiCallable[
@@ -954,6 +989,15 @@ class WorkflowServiceStub:
     Returns an `ActivityExecutionAlreadyStarted` error if an instance already exists with same activity ID in this namespace
     unless permitted by the specified ID conflict policy.
     """
+    StartNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
+    ]
+    """StartNexusOperationExecution starts a new Nexus operation.
+
+    Returns a `NexusOperationExecutionAlreadyStarted` error if an instance already exists with same operation ID in this
+    namespace unless permitted by the specified ID conflict policy.
+    """
     DescribeActivityExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
@@ -964,6 +1008,16 @@ class WorkflowServiceStub:
     - Long-poll for next state change and return new activity info
     Response can optionally include activity input or outcome (if the activity has completed).
     """
+    DescribeNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
+    ]
+    """DescribeNexusOperationExecution returns information about a Nexus operation.
+    Supported use cases include:
+    - Get current operation info without waiting
+    - Long-poll for next state change and return new operation info
+    Response can optionally include operation input or outcome (if the operation has completed).
+    """
     PollActivityExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
@@ -971,16 +1025,33 @@ class WorkflowServiceStub:
     """PollActivityExecution long-polls for an activity execution to complete and returns the
     outcome (result or failure).
     """
+    PollNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
+    ]
+    """PollNexusOperationExecution long-polls for a Nexus operation for a given wait stage to complete and returns
+    the outcome (result or failure).
+    """
     ListActivityExecutions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
     ]
     """ListActivityExecutions is a visibility API to list activity executions in a specific namespace."""
+    ListNexusOperationExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
+    ]
+    """ListNexusOperationExecutions is a visibility API to list Nexus operations in a specific namespace."""
     CountActivityExecutions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
     ]
     """CountActivityExecutions is a visibility API to count activity executions in a specific namespace."""
+    CountNexusOperationExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
+    ]
+    """CountNexusOperationExecutions is a visibility API to count Nexus operations in a specific namespace."""
     RequestCancelActivityExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
@@ -991,6 +1062,16 @@ class WorkflowServiceStub:
     acknowledge it for the activity to reach CANCELED status. The cancellation signal is
     delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
     language-idiomatic mechanisms (context cancellation, exceptions, abort signals).
+    """
+    RequestCancelNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
+    ]
+    """RequestCancelNexusOperationExecution requests cancellation of a Nexus operation.
+
+    Requesting to cancel an operation does not automatically transition the operation to canceled status.
+    The operation will only transition to canceled status if it supports cancellation and the handler
+    processes the cancellation request.
     """
     TerminateActivityExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
@@ -1012,6 +1093,81 @@ class WorkflowServiceStub:
 
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
+    """
+    PauseActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
+    ]
+    """PauseActivityExecution pauses the execution of an activity specified by its ID.
+    This API can be used to target a workflow activity or a standalone activity
+
+    Pausing an activity means:
+    - If the activity is currently waiting for a retry or is running and subsequently fails,
+      it will not be rescheduled until it is unpaused.
+    - If the activity is already paused, calling this method will have no effect.
+    - If the activity is running and finishes successfully, the activity will be completed.
+    - If the activity is running and finishes with failure:
+      * if there is no retry left - the activity will be completed.
+      * if there are more retries left - the activity will be paused.
+    For long-running activities:
+    - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID
+    """
+    ResetActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
+    ]
+    """ResetActivityExecution resets the execution of an activity specified by its ID.
+    This API can be used to target a workflow activity or a standalone activity.
+
+    Resetting an activity means:
+    * number of attempts will be reset to 0.
+    * activity timeouts will be reset.
+    * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+       it will be scheduled immediately (* see 'jitter' flag)
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+    """
+    UnpauseActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
+    ]
+    """UnpauseActivityExecution unpauses the execution of an activity specified by its ID.
+    This API can be used to target a workflow activity or a standalone activity.
+
+    If activity is not paused, this call will have no effect.
+    If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
+    Once the activity is unpaused, all timeout timers will be regenerated.
+
+    Returns a `NotFound` error if there is no pending activity with the provided ID
+    """
+    UpdateActivityExecutionOptions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
+    ]
+    """UpdateActivityExecutionOptions is called by the client to update the options of an activity by its ID.
+    This API can be used to target a workflow activity or a standalone activity.
+    """
+    TerminateNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
+    ]
+    """TerminateNexusOperationExecution terminates an existing Nexus operation immediately.
+
+    Termination happens immediately and the operation handler cannot react to it. A terminated operation will have
+    its outcome set to a failure with a termination reason.
+    """
+    DeleteNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
+    ]
+    """DeleteNexusOperationExecution asynchronously deletes a specific Nexus operation run (when
+    run_id is provided) or the latest run (when run_id is not provided). If the operation
+    is running, it will be terminated before deletion.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: Nexus operation deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
@@ -1626,6 +1782,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse:
         """Deprecated. Use `UpdateWorkerVersioningRules`.
+        Will be removed in server version v1.32.0.
 
         Allows users to specify sets of worker build id versions on a per task queue basis. Versions
         are ordered, and may be either compatible with some extant version, or a new incompatible
@@ -1650,6 +1807,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse:
         """Deprecated. Use `GetWorkerVersioningRules`.
+        Will be removed in server version v1.32.0.
         Fetches the worker build id versioning sets for a task queue.
         """
     @abc.abstractmethod
@@ -1679,7 +1837,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         the target Build ID of a redirect rule is able to process event histories made by the source
         Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
 
-        WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+        Will be removed in server version v1.32.0.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
         """
@@ -1690,7 +1848,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse:
         """Fetches the Build ID assignment and redirect rules for a Task Queue.
-        WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
+        Will be removed in server version v1.32.0.
         """
     @abc.abstractmethod
     def GetWorkerTaskReachability(
@@ -1699,6 +1857,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse:
         """Deprecated. Use `DescribeTaskQueue`.
+        Will be removed in server version v1.32.0.
 
         Fetches task reachability to determine whether a worker may be retired.
         The request may specify task queues to query for or let the server fetch all task queues mapped to the given
@@ -1839,6 +1998,46 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse:
         """Lists all Worker Deployments that are tracked in the Namespace.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def CreateWorkerDeployment(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse:
+        """Creates a new Worker Deployment.
+
+        Experimental. This API might significantly change or be removed in a
+        future release.
+        """
+    @abc.abstractmethod
+    def CreateWorkerDeploymentVersion(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse:
+        """Creates a new Worker Deployment Version.
+
+        Experimental. This API might significantly change or be removed in a
+        future release.
+        """
+    @abc.abstractmethod
+    def UpdateWorkerDeploymentVersionComputeConfig(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse:
+        """Updates the compute config attached to a Worker Deployment Version.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
+    def ValidateWorkerDeploymentVersionComputeConfig(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse:
+        """Validates the compute config without attaching it to a Worker Deployment Version.
         Experimental. This API might significantly change or be removed in a future release.
         """
     @abc.abstractmethod
@@ -2167,6 +2366,17 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         unless permitted by the specified ID conflict policy.
         """
     @abc.abstractmethod
+    def StartNexusOperationExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse:
+        """StartNexusOperationExecution starts a new Nexus operation.
+
+        Returns a `NexusOperationExecutionAlreadyStarted` error if an instance already exists with same operation ID in this
+        namespace unless permitted by the specified ID conflict policy.
+        """
+    @abc.abstractmethod
     def DescribeActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
@@ -2179,6 +2389,18 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Response can optionally include activity input or outcome (if the activity has completed).
         """
     @abc.abstractmethod
+    def DescribeNexusOperationExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse:
+        """DescribeNexusOperationExecution returns information about a Nexus operation.
+        Supported use cases include:
+        - Get current operation info without waiting
+        - Long-poll for next state change and return new operation info
+        Response can optionally include operation input or outcome (if the operation has completed).
+        """
+    @abc.abstractmethod
     def PollActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
@@ -2188,6 +2410,15 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         outcome (result or failure).
         """
     @abc.abstractmethod
+    def PollNexusOperationExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse:
+        """PollNexusOperationExecution long-polls for a Nexus operation for a given wait stage to complete and returns
+        the outcome (result or failure).
+        """
+    @abc.abstractmethod
     def ListActivityExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
@@ -2195,12 +2426,26 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse:
         """ListActivityExecutions is a visibility API to list activity executions in a specific namespace."""
     @abc.abstractmethod
+    def ListNexusOperationExecutions(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse:
+        """ListNexusOperationExecutions is a visibility API to list Nexus operations in a specific namespace."""
+    @abc.abstractmethod
     def CountActivityExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse:
         """CountActivityExecutions is a visibility API to count activity executions in a specific namespace."""
+    @abc.abstractmethod
+    def CountNexusOperationExecutions(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse:
+        """CountNexusOperationExecutions is a visibility API to count Nexus operations in a specific namespace."""
     @abc.abstractmethod
     def RequestCancelActivityExecution(
         self,
@@ -2213,6 +2458,18 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         acknowledge it for the activity to reach CANCELED status. The cancellation signal is
         delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
         language-idiomatic mechanisms (context cancellation, exceptions, abort signals).
+        """
+    @abc.abstractmethod
+    def RequestCancelNexusOperationExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse:
+        """RequestCancelNexusOperationExecution requests cancellation of a Nexus operation.
+
+        Requesting to cancel an operation does not automatically transition the operation to canceled status.
+        The operation will only transition to canceled status if it supports cancellation and the handler
+        processes the cancellation request.
         """
     @abc.abstractmethod
     def TerminateActivityExecution(
@@ -2238,6 +2495,93 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
 
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
+        """
+    @abc.abstractmethod
+    def PauseActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse:
+        """PauseActivityExecution pauses the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity
+
+        Pausing an activity means:
+        - If the activity is currently waiting for a retry or is running and subsequently fails,
+          it will not be rescheduled until it is unpaused.
+        - If the activity is already paused, calling this method will have no effect.
+        - If the activity is running and finishes successfully, the activity will be completed.
+        - If the activity is running and finishes with failure:
+          * if there is no retry left - the activity will be completed.
+          * if there are more retries left - the activity will be paused.
+        For long-running activities:
+        - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID
+        """
+    @abc.abstractmethod
+    def ResetActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse:
+        """ResetActivityExecution resets the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+
+        Resetting an activity means:
+        * number of attempts will be reset to 0.
+        * activity timeouts will be reset.
+        * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
+           it will be scheduled immediately (* see 'jitter' flag)
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+        """
+    @abc.abstractmethod
+    def UnpauseActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse:
+        """UnpauseActivityExecution unpauses the execution of an activity specified by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+
+        If activity is not paused, this call will have no effect.
+        If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
+        Once the activity is unpaused, all timeout timers will be regenerated.
+
+        Returns a `NotFound` error if there is no pending activity with the provided ID
+        """
+    @abc.abstractmethod
+    def UpdateActivityExecutionOptions(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse:
+        """UpdateActivityExecutionOptions is called by the client to update the options of an activity by its ID.
+        This API can be used to target a workflow activity or a standalone activity.
+        """
+    @abc.abstractmethod
+    def TerminateNexusOperationExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse:
+        """TerminateNexusOperationExecution terminates an existing Nexus operation immediately.
+
+        Termination happens immediately and the operation handler cannot react to it. A terminated operation will have
+        its outcome set to a failure with a termination reason.
+        """
+    @abc.abstractmethod
+    def DeleteNexusOperationExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse:
+        """DeleteNexusOperationExecution asynchronously deletes a specific Nexus operation run (when
+        run_id is provided) or the latest run (when run_id is not provided). If the operation
+        is running, it will be terminated before deletion.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: Nexus operation deletion not exposed to HTTP, users should use cancel or terminate. --)
         """
 
 def add_WorkflowServiceServicer_to_server(

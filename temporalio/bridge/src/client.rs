@@ -9,8 +9,9 @@ use temporalio_client::tonic::{
 };
 use temporalio_client::{
     ClientKeepAliveOptions as CoreClientKeepAliveConfig, Connection, ConnectionOptions,
-    HttpConnectProxyOptions, RetryOptions,
+    DnsLoadBalancingOptions, GrpcCompression, HttpConnectProxyOptions, RetryOptions,
 };
+use tracing::warn;
 use url::Url;
 
 use crate::runtime;
@@ -35,6 +36,8 @@ pub struct ClientConfig {
     retry_config: Option<ClientRetryConfig>,
     keep_alive_config: Option<ClientKeepAliveConfig>,
     http_connect_proxy_config: Option<ClientHttpConnectProxyConfig>,
+    dns_load_balancing_config: Option<ClientDnsLoadBalancingConfig>,
+    grpc_compression: String,
 }
 
 #[derive(FromPyObject)]
@@ -65,6 +68,11 @@ struct ClientKeepAliveConfig {
 struct ClientHttpConnectProxyConfig {
     pub target_host: String,
     pub basic_auth: Option<(String, String)>,
+}
+
+#[derive(FromPyObject)]
+struct ClientDnsLoadBalancingConfig {
+    pub resolution_interval_millis: u64,
 }
 
 #[derive(FromPyObject)]
@@ -235,6 +243,16 @@ impl ClientConfig {
         metrics_meter: Option<temporalio_common::telemetry::metrics::TemporalMeter>,
     ) -> PyResult<ConnectionOptions> {
         let (ascii_headers, binary_headers) = partition_headers(self.metadata);
+        let has_proxy = self.http_connect_proxy_config.is_some();
+        // Core rejects DNS load balancing alongside an HTTP CONNECT proxy, so
+        // suppress DNS LB whenever a proxy is configured to keep the
+        // pre-existing behavior even if a caller leaves the default.
+        let dns_load_balancing = if has_proxy {
+            warn!("Disabling DNS load balancing because http_connect_proxy_config is set");
+            None
+        } else {
+            self.dns_load_balancing_config.map(Into::into)
+        };
         let conn_opts = ConnectionOptions::new(
             Url::parse(&self.target_url)
                 .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
@@ -248,6 +266,8 @@ impl ClientConfig {
         )
         .keep_alive(self.keep_alive_config.map(Into::into))
         .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
+        .dns_load_balancing(dns_load_balancing)
+        .grpc_compression(grpc_compression_from_str(&self.grpc_compression)?)
         .headers(ascii_headers)
         .binary_headers(binary_headers)
         .maybe_api_key(self.api_key)
@@ -258,6 +278,16 @@ impl ClientConfig {
         })
         .maybe_metrics_meter(metrics_meter);
         Ok(conn_opts.build())
+    }
+}
+
+fn grpc_compression_from_str(value: &str) -> PyResult<GrpcCompression> {
+    match value {
+        "none" => Ok(GrpcCompression::None),
+        "gzip" => Ok(GrpcCompression::Gzip),
+        _ => Err(PyValueError::new_err(format!(
+            "invalid grpc_compression: {value}"
+        ))),
     }
 }
 
@@ -282,6 +312,7 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
                     ))
                 }
             },
+            server_cert_verifier: None,
         })
     }
 }
@@ -314,5 +345,13 @@ impl From<ClientHttpConnectProxyConfig> for HttpConnectProxyOptions {
             target_addr: conf.target_host,
             basic_auth: conf.basic_auth,
         }
+    }
+}
+
+impl From<ClientDnsLoadBalancingConfig> for DnsLoadBalancingOptions {
+    fn from(conf: ClientDnsLoadBalancingConfig) -> Self {
+        let mut opts = DnsLoadBalancingOptions::default();
+        opts.resolution_interval = Duration::from_millis(conf.resolution_interval_millis);
+        opts
     }
 }

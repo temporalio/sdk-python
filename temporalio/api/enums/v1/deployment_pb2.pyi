@@ -101,7 +101,6 @@ class VersionDrainageStatus(
         aip.dev/not-precedent: Call this status because it is . --)
     Specify the drainage status for a Worker Deployment Version so users can decide whether they
     can safely decommission the version.
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
     """
 
 VERSION_DRAINAGE_STATUS_UNSPECIFIED: VersionDrainageStatus.ValueType  # 0
@@ -160,7 +159,6 @@ class WorkerVersioningMode(
     - Whether or not Temporal Server considers this worker's version (Build ID) when dispatching
       tasks to it.
     - Whether or not the workflows processed by this worker are versioned using the worker's version.
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
     """
 
 WORKER_VERSIONING_MODE_UNSPECIFIED: WorkerVersioningMode.ValueType  # 0
@@ -234,6 +232,12 @@ class _WorkerDeploymentVersionStatusEnumTypeWrapper(
     not query closed workflows. If the user does query closed workflows for some time x after
     workflows are closed, they should decommission the version after it has been drained for that duration.
     """
+    WORKER_DEPLOYMENT_VERSION_STATUS_CREATED: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 6
+    """The Worker Deployment Version is created by user (via `CreateWorkerDeploymentVersion` API)
+    but server has not seen any poller for it yet.
+    """
 
 class WorkerDeploymentVersionStatus(
     _WorkerDeploymentVersionStatus,
@@ -242,7 +246,6 @@ class WorkerDeploymentVersionStatus(
     """(-- api-linter: core::0216::synonyms=disabled
         aip.dev/not-precedent: Call this status because it is . --)
     Specify the status of a Worker Deployment Version.
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
     """
 
 WORKER_DEPLOYMENT_VERSION_STATUS_UNSPECIFIED: (
@@ -270,5 +273,9 @@ WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED: WorkerDeploymentVersionStatus.ValueTyp
 Queries sent to closed workflows. The version can be decommissioned safely if user does
 not query closed workflows. If the user does query closed workflows for some time x after
 workflows are closed, they should decommission the version after it has been drained for that duration.
+"""
+WORKER_DEPLOYMENT_VERSION_STATUS_CREATED: WorkerDeploymentVersionStatus.ValueType  # 6
+"""The Worker Deployment Version is created by user (via `CreateWorkerDeploymentVersion` API)
+but server has not seen any poller for it yet.
 """
 global___WorkerDeploymentVersionStatus = WorkerDeploymentVersionStatus

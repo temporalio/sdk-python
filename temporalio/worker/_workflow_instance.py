@@ -57,6 +57,7 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.service import __version__
@@ -198,6 +199,11 @@ class WorkflowInstance(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_info(self) -> temporalio.workflow.Info:
+        """Return the workflow info for this instance."""
+        raise NotImplementedError
+
     def get_thread_id(self) -> int | None:
         """Return the thread identifier that this workflow is running on.
 
@@ -260,7 +266,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
         self._primary_task: asyncio.Task[None] | None = None
         self._time_ns = 0
-        self._cancel_requested = False
+        self._cancel_reason: str | None = None
         self._deployment_version_for_current_task: None | (
             temporalio.bridge.proto.common.WorkerDeploymentVersion
         ) = None
@@ -590,10 +596,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise RuntimeError(f"Unrecognized job: {job.WhichOneof('variant')}")
 
     def _apply_cancel_workflow(
-        self, _job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
+        self, job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
     ) -> None:
-        self._cancel_requested = True
-        # TODO(cretz): Details or cancel message or whatever?
+        self._cancel_reason = job.reason
         if self._primary_task:
             # The primary task may not have started yet and we want to give the
             # workflow the ability to receive the cancellation, so we must defer
@@ -794,7 +799,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self, _job: temporalio.bridge.proto.workflow_activation.RemoveFromCache
     ) -> None:
         self._deleting = True
-        self._cancel_requested = True
         # We consider eviction to be under replay so that certain code like
         # logging that avoids replaying doesn't run during eviction either
         self._is_replaying = True
@@ -1184,6 +1188,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
 
+    def workflow_cancellation_reason(self) -> str | None:
+        return self._cancel_reason
+
     def workflow_extern_functions(self) -> Mapping[str, Callable]:
         return self._extern_functions
 
@@ -1201,6 +1208,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             build_id=self._deployment_version_for_current_task.build_id,
             deployment_name=self._deployment_version_for_current_task.deployment_name,
         )
+
+    def get_info(self) -> temporalio.workflow.Info:
+        return self._info
 
     def workflow_get_current_history_length(self) -> int:
         return self._current_history_length
@@ -1916,6 +1926,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                             raise
                     # Send a cancel request to the activity
                     handle._apply_cancel_command(self._add_command())
+                    # Clear the cancellation counter on Python 3.11+ so the
+                    # next await does not immediately re-raise CancelledError
+                    if (
+                        sys.version_info >= (3, 11)
+                        and (t := asyncio.current_task()) is not None
+                    ):
+                        t.uncancel()  # type: ignore[union-attr]
 
         # Create the handle and set as pending
         handle = _ActivityHandle(self, input, run_activity())
@@ -1972,10 +1989,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         handle: _ChildWorkflowHandle
 
         # Common code for handling cancel for start and run
-        def apply_child_cancel_error() -> None:
-            # Send a cancel request to the child
+        def apply_child_cancel_error(err: asyncio.CancelledError) -> None:
+            # Send a cancel request to the child, forwarding the msg passed to
+            # Task.cancel(msg) (if any) as the cancellation reason.
+            reason = err.args[0] if err.args and isinstance(err.args[0], str) else ""
             cancel_command = self._add_command()
-            handle._apply_cancel_command(cancel_command)
+            handle._apply_cancel_command(cancel_command, reason=reason)
             # If the cancel command is for external workflow, we
             # have to add a seq and mark it pending
             if cancel_command.HasField("request_cancel_external_workflow_execution"):
@@ -1998,8 +2017,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     # We have to shield because we don't want the future itself
                     # to be cancelled
                     return await asyncio.shield(handle._result_fut)
-                except asyncio.CancelledError:
-                    apply_child_cancel_error()
+                except asyncio.CancelledError as err:
+                    apply_child_cancel_error(err)
+                    # Clear the cancellation counter on Python 3.11+ so the
+                    # next await does not immediately re-raise CancelledError
+                    if (
+                        sys.version_info >= (3, 11)
+                        and (t := asyncio.current_task()) is not None
+                    ):
+                        t.uncancel()  # type: ignore[union-attr]
 
         # Create the handle and set as pending
         handle = _ChildWorkflowHandle(
@@ -2015,8 +2041,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # to be cancelled
                 await asyncio.shield(handle._start_fut)
                 return handle
-            except asyncio.CancelledError:
-                apply_child_cancel_error()
+            except asyncio.CancelledError as err:
+                apply_child_cancel_error(err)
+                # Clear the cancellation counter on Python 3.11+ so the
+                # next await does not immediately re-raise CancelledError
+                if (
+                    sys.version_info >= (3, 11)
+                    and (t := asyncio.current_task()) is not None
+                ):
+                    t.uncancel()  # type: ignore[union-attr]
+                if self._cancel_reason is not None or self._deleting:
+                    raise
 
     async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
@@ -2043,9 +2078,27 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 except asyncio.CancelledError:
                     cancel_command = self._add_command()
                     handle._apply_cancel_command(cancel_command)
+                    # Clear the cancellation counter on Python 3.11+ so the
+                    # next await does not immediately re-raise CancelledError
+                    if (
+                        sys.version_info >= (3, 11)
+                        and (t := asyncio.current_task()) is not None
+                    ):
+                        t.uncancel()  # type: ignore[union-attr]
 
+        payload_converter = (
+            temporalio.nexus.system.get_payload_converter()
+            if temporalio.nexus.system.is_system_operation(
+                input.service, input.operation_name
+            )
+            else self._context_free_payload_converter
+        )
         handle = _NexusOperationHandle(
-            self, self._next_seq("nexus_operation"), input, operation_handle_fn()
+            self,
+            self._next_seq("nexus_operation"),
+            input,
+            operation_handle_fn(),
+            payload_converter,
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
@@ -2057,6 +2110,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             except asyncio.CancelledError:
                 cancel_command = self._add_command()
                 handle._apply_cancel_command(cancel_command)
+                # Clear the cancellation counter on Python 3.11+ so the
+                # next await does not immediately re-raise CancelledError
+                if (
+                    sys.version_info >= (3, 11)
+                    and (t := asyncio.current_task()) is not None
+                ):
+                    t.uncancel()  # type: ignore[union-attr]
+                if self._cancel_reason is not None or self._deleting:
+                    raise
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
@@ -2541,8 +2603,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # cancel later on will show the workflow as cancelled. But this is
             # a Temporal limitation in that cancellation is a state not an
             # event.
-            if self._cancel_requested and temporalio.exceptions.is_cancelled_exception(
-                err
+            if (
+                self._cancel_reason is not None
+                and temporalio.exceptions.is_cancelled_exception(err)
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
             elif self.workflow_is_failure_exception(err):
@@ -2587,6 +2650,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             except asyncio.CancelledError:
                 cancel_command = self._add_command()
                 cancel_command.cancel_signal_workflow.seq = seq
+                # Clear the cancellation counter on Python 3.11+ so the
+                # next await does not immediately re-raise CancelledError
+                if (
+                    sys.version_info >= (3, 11)
+                    and (t := asyncio.current_task()) is not None
+                ):
+                    t.uncancel()  # type: ignore[union-attr]
 
     def _stack_trace(self) -> str:
         stacks = []
@@ -3327,8 +3397,12 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def _apply_cancel_command(
         self,
         command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+        *,
+        reason: str = "",
     ) -> None:
-        command.cancel_child_workflow_execution.child_workflow_seq = self._seq
+        v = command.cancel_child_workflow_execution
+        v.child_workflow_seq = self._seq
+        v.reason = reason
 
 
 class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
@@ -3372,7 +3446,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
             )
         )
 
-    async def cancel(self) -> None:
+    async def cancel(self, *, reason: str = "") -> None:
         self._instance._assert_not_read_only("cancel external handle")
         command = self._instance._add_command()
         v = command.request_cancel_external_workflow_execution
@@ -3380,6 +3454,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         v.workflow_execution.workflow_id = self._id
         if self._run_id:
             v.workflow_execution.run_id = self._run_id
+        v.reason = reason
         await self._instance._cancel_external_workflow(command)
 
 
@@ -3390,6 +3465,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         seq: int,
         input: StartNexusOperationInput[Any, OutputT],
         fn: Coroutine[Any, Any, OutputT],
+        payload_converter: temporalio.converter.PayloadConverter,
     ):
         self._instance = instance
         self._seq = seq
@@ -3397,7 +3473,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._task = asyncio.Task(fn)
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
-        self._payload_converter = self._instance._context_free_payload_converter
+        self._payload_converter = payload_converter
         self._failure_converter = self._instance._context_free_failure_converter
 
     @property

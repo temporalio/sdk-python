@@ -114,18 +114,25 @@ class CanceledFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DETAILS_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    identity: builtins.str
+    """The identity of the worker or client that requested the cancellation."""
     def __init__(
         self,
         *,
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+        identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["details", b"details"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
+        self,
+        field_name: typing_extensions.Literal[
+            "details", b"details", "identity", b"identity"
+        ],
     ) -> None: ...
 
 global___CanceledFailureInfo = CanceledFailureInfo
@@ -133,8 +140,16 @@ global___CanceledFailureInfo = CanceledFailureInfo
 class TerminatedFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    IDENTITY_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker or client that requested the termination."""
     def __init__(
         self,
+        *,
+        identity: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["identity", b"identity"]
     ) -> None: ...
 
 global___TerminatedFailureInfo = TerminatedFailureInfo

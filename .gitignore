@@ -2,6 +2,7 @@
 __pycache__
 /build
 /dist
+temporalio/bridge/libtemporal_sdk_bridge.dylib.dSYM/
 temporalio/bridge/target/
 temporalio/bridge/temporal_sdk_bridge*
 /tests/helpers/golangserver/golangserver

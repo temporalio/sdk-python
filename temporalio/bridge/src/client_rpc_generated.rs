@@ -29,6 +29,15 @@ impl ClientRef {
                         count_activity_executions
                     )
                 }
+                "count_nexus_operation_executions" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        count_nexus_operation_executions
+                    )
+                }
                 "count_schedules" => {
                     rpc_call!(
                         connection,
@@ -56,6 +65,24 @@ impl ClientRef {
                         create_schedule
                     )
                 }
+                "create_worker_deployment" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        create_worker_deployment
+                    )
+                }
+                "create_worker_deployment_version" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        create_worker_deployment_version
+                    )
+                }
                 "create_workflow_rule" => {
                     rpc_call!(
                         connection,
@@ -72,6 +99,15 @@ impl ClientRef {
                         WorkflowService,
                         workflow_service,
                         delete_activity_execution
+                    )
+                }
+                "delete_nexus_operation_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        delete_nexus_operation_execution
                     )
                 }
                 "delete_schedule" => {
@@ -162,6 +198,15 @@ impl ClientRef {
                         WorkflowService,
                         workflow_service,
                         describe_namespace
+                    )
+                }
+                "describe_nexus_operation_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        describe_nexus_operation_execution
                     )
                 }
                 "describe_schedule" => {
@@ -389,6 +434,15 @@ impl ClientRef {
                         list_namespaces
                     )
                 }
+                "list_nexus_operation_executions" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        list_nexus_operation_executions
+                    )
+                }
                 "list_open_workflow_executions" => {
                     rpc_call!(
                         connection,
@@ -479,6 +533,15 @@ impl ClientRef {
                         pause_activity
                     )
                 }
+                "pause_activity_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        pause_activity_execution
+                    )
+                }
                 "pause_workflow_execution" => {
                     rpc_call!(
                         connection,
@@ -504,6 +567,15 @@ impl ClientRef {
                         WorkflowService,
                         workflow_service,
                         poll_activity_task_queue
+                    )
+                }
+                "poll_nexus_operation_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        poll_nexus_operation_execution
                     )
                 }
                 "poll_nexus_task_queue" => {
@@ -587,6 +659,15 @@ impl ClientRef {
                         request_cancel_activity_execution
                     )
                 }
+                "request_cancel_nexus_operation_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        request_cancel_nexus_operation_execution
+                    )
+                }
                 "request_cancel_workflow_execution" => {
                     rpc_call!(
                         connection,
@@ -603,6 +684,15 @@ impl ClientRef {
                         WorkflowService,
                         workflow_service,
                         reset_activity
+                    )
+                }
+                "reset_activity_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        reset_activity_execution
                     )
                 }
                 "reset_sticky_task_queue" => {
@@ -812,6 +902,15 @@ impl ClientRef {
                         start_batch_operation
                     )
                 }
+                "start_nexus_operation_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        start_nexus_operation_execution
+                    )
+                }
                 "start_workflow_execution" => {
                     rpc_call!(
                         connection,
@@ -837,6 +936,15 @@ impl ClientRef {
                         WorkflowService,
                         workflow_service,
                         terminate_activity_execution
+                    )
+                }
+                "terminate_nexus_operation_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        terminate_nexus_operation_execution
                     )
                 }
                 "terminate_workflow_execution" => {
@@ -866,6 +974,15 @@ impl ClientRef {
                         unpause_activity
                     )
                 }
+                "unpause_activity_execution" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        unpause_activity_execution
+                    )
+                }
                 "unpause_workflow_execution" => {
                     rpc_call!(
                         connection,
@@ -873,6 +990,15 @@ impl ClientRef {
                         WorkflowService,
                         workflow_service,
                         unpause_workflow_execution
+                    )
+                }
+                "update_activity_execution_options" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        update_activity_execution_options
                     )
                 }
                 "update_activity_options" => {
@@ -929,6 +1055,15 @@ impl ClientRef {
                         update_worker_config
                     )
                 }
+                "update_worker_deployment_version_compute_config" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        update_worker_deployment_version_compute_config
+                    )
+                }
                 "update_worker_deployment_version_metadata" => {
                     rpc_call!(
                         connection,
@@ -963,6 +1098,15 @@ impl ClientRef {
                         WorkflowService,
                         workflow_service,
                         update_workflow_execution_options
+                    )
+                }
+                "validate_worker_deployment_version_compute_config" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        validate_worker_deployment_version_compute_config
                     )
                 }
                 _ => {
@@ -1165,6 +1309,15 @@ impl ClientRef {
                         create_connectivity_rule
                     )
                 }
+                "create_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        create_custom_role
+                    )
+                }
                 "create_namespace" => {
                     rpc_call!(
                         connection,
@@ -1238,6 +1391,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         delete_connectivity_rule
+                    )
+                }
+                "delete_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        delete_custom_role
                     )
                 }
                 "delete_namespace" => {
@@ -1387,6 +1549,24 @@ impl ClientRef {
                         get_current_identity
                     )
                 }
+                "get_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_custom_role
+                    )
+                }
+                "get_custom_roles" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_custom_roles
+                    )
+                }
                 "get_namespace" => {
                     rpc_call!(connection, call, CloudService, cloud_service, get_namespace)
                 }
@@ -1459,6 +1639,15 @@ impl ClientRef {
                         get_service_account
                     )
                 }
+                "get_service_account_namespace_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_service_account_namespace_assignments
+                    )
+                }
                 "get_service_accounts" => {
                     rpc_call!(
                         connection,
@@ -1492,6 +1681,15 @@ impl ClientRef {
                         get_user_group_members
                     )
                 }
+                "get_user_group_namespace_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_user_group_namespace_assignments
+                    )
+                }
                 "get_user_groups" => {
                     rpc_call!(
                         connection,
@@ -1499,6 +1697,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         get_user_groups
+                    )
+                }
+                "get_user_namespace_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_user_namespace_assignments
                     )
                 }
                 "get_users" => {
@@ -1574,6 +1781,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         update_api_key
+                    )
+                }
+                "update_custom_role" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        update_custom_role
                     )
                 }
                 "update_namespace" => {

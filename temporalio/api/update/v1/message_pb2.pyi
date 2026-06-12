@@ -4,9 +4,11 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import sys
 
 import google.protobuf.descriptor
+import google.protobuf.internal.containers
 import google.protobuf.message
 
 import temporalio.api.common.v1.message_pb2
@@ -183,21 +185,59 @@ class Request(google.protobuf.message.Message):
 
     META_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     @property
     def meta(self) -> global___Meta: ...
     @property
     def input(self) -> global___Input: ...
+    request_id: builtins.str
+    """The request ID of the request."""
+    @property
+    def completion_callbacks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Callback
+    ]:
+        """Callbacks to be called by the server when this update reaches a terminal state."""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with this update."""
     def __init__(
         self,
         *,
         meta: global___Meta | None = ...,
         input: global___Input | None = ...,
+        request_id: builtins.str = ...,
+        completion_callbacks: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Callback
+        ]
+        | None = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["input", b"input", "meta", b"meta"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["input", b"input", "meta", b"meta"]
+        self,
+        field_name: typing_extensions.Literal[
+            "completion_callbacks",
+            b"completion_callbacks",
+            "input",
+            b"input",
+            "links",
+            b"links",
+            "meta",
+            b"meta",
+            "request_id",
+            b"request_id",
+        ],
     ) -> None: ...
 
 global___Request = Request

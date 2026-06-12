@@ -29,6 +29,7 @@ import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
+from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
 
 from . import _command_aware_visitor
 from ._interceptor import (
@@ -85,6 +86,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
     ) -> None:
+        # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
+        debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
+
         self._bridge_worker = bridge_worker
         self._namespace = namespace
         self._task_queue = task_queue
@@ -96,7 +100,19 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
         )
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
+
+        # If debug mode is enabled, ensure that the debugpy (https://github.com/microsoft/debugpy)
+        # import is added as a passthrough
+        if debug_mode and isinstance(workflow_runner, SandboxedWorkflowRunner):
+            workflow_runner = dataclasses.replace(
+                workflow_runner,
+                restrictions=workflow_runner.restrictions.with_passthrough_modules(
+                    "_pydevd_bundle"
+                ),
+            )
+
         self._workflow_runner = workflow_runner
+
         self._unsandboxed_workflow_runner = unsandboxed_workflow_runner
         self._data_converter = data_converter
         # Build the interceptor classes and collect extern functions
@@ -127,11 +143,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
         self._throw_after_activation: Exception | None = None
 
-        # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
-        # deadlock detection, otherwise set to 2 seconds
-        self._deadlock_timeout_seconds = (
-            None if debug_mode or os.environ.get("TEMPORAL_DEBUG") else 2
-        )
+        # If debug mode is enabled, disable deadlock detection
+        # otherwise set to 2 seconds
+        self._deadlock_timeout_seconds = None if debug_mode else 2
 
         # Keep track of workflows that could not be evicted
         self._could_not_evict_count = 0
@@ -302,7 +316,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                         id=workflow_id,
                         run_id=act.run_id,
                         type=(
-                            workflow.workflow_type
+                            workflow.get_info().workflow_type
                             if workflow
                             else (init_job.workflow_type if init_job else None)
                         ),
@@ -326,9 +340,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             if not workflow:
                 assert init_job
                 workflow = _RunningWorkflow(
-                    self._create_workflow_instance(act, init_job),
-                    workflow_id,
-                    workflow_type=init_job.workflow_type,
+                    self._create_workflow_instance(act, init_job), workflow_id
                 )
                 self._running_workflows[act.run_id] = workflow
 
@@ -461,8 +473,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             act, task_start_time, download_metrics, upload_metrics
         )
 
-    @staticmethod
     def _log_workflow_task_duration(
+        self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
         task_start_time: float,
         download_metrics: temporalio.converter._extstore.StorageOperationMetrics,
@@ -476,47 +488,60 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 return f"{secs:.3f}s"
             return f"{secs * 1000:.3f}ms"
 
-        msg_details: dict[str, object] = {
-            "event_id": act.history_length,
-            "workflow_task_duration": _fmt_duration(task_duration),
-        }
-        extra: dict[str, object] = {
-            "event_id": act.history_length,
-            "workflow_task_duration": task_duration,
-        }
+        completed_event_id = act.history_length + 1
+        _running = self._running_workflows.get(act.run_id)
+        _info = _running.get_info() if _running is not None else None
+        attempt = _info.attempt if _info is not None else "unknown"
+        log_id = f"{act.run_id}:{completed_event_id}:{attempt}"
+        msg_details, extra = temporalio.workflow._build_log_context(
+            _info._logger_details() if _info is not None else None,
+            full_workflow_info=_info,
+        )
+        msg_details["event_id"] = completed_event_id
+        msg_details["workflow_task_duration"] = _fmt_duration(task_duration)
+        msg_details["workflow_history_size"] = act.history_size_bytes
+        extra["event_id"] = completed_event_id
+        extra["workflow_task_duration"] = task_duration
+        extra["workflow_history_size"] = act.history_size_bytes
         if download_metrics.payload_count > 0:
             msg_details["payload_download_count"] = download_metrics.payload_count
             msg_details["payload_download_size"] = download_metrics.total_size
             msg_details["payload_download_duration"] = _fmt_duration(
                 download_metrics.total_duration
             )
+            msg_details["payload_download_drivers"] = sorted(
+                download_metrics.driver_names
+            )
             extra["payload_download_count"] = download_metrics.payload_count
             extra["payload_download_size"] = download_metrics.total_size
             extra["payload_download_duration"] = download_metrics.total_duration
+            extra["payload_download_drivers"] = sorted(download_metrics.driver_names)
         if upload_metrics.payload_count > 0:
             msg_details["payload_upload_count"] = upload_metrics.payload_count
             msg_details["payload_upload_size"] = upload_metrics.total_size
             msg_details["payload_upload_duration"] = _fmt_duration(
                 upload_metrics.total_duration
             )
+            msg_details["payload_upload_drivers"] = sorted(upload_metrics.driver_names)
             extra["payload_upload_count"] = upload_metrics.payload_count
             extra["payload_upload_size"] = upload_metrics.total_size
             extra["payload_upload_duration"] = upload_metrics.total_duration
+            extra["payload_upload_drivers"] = sorted(upload_metrics.driver_names)
         if task_duration.total_seconds() > 10:
             logger.warning(
-                "[TMPRL1104] Workflow task exceeded 10 seconds (%s)",
+                f"[TMPRL1104] {log_id} Workflow task exceeded 10 seconds (%s)",
                 msg_details,
                 extra=extra,
             )
         elif task_duration.total_seconds() > 5:
             logger.info(
-                "[TMPRL1104] Workflow task exceeded 5 seconds (%s)",
+                f"[TMPRL1104] {log_id} Workflow task exceeded 5 seconds (%s)",
                 msg_details,
                 extra=extra,
             )
         else:
             logger.debug(
-                "[TMPRL1104] Workflow task duration information (%s)",
+                f"[TMPRL1104] {log_id} Workflow task duration information (%s)",
                 msg_details,
                 extra=extra,
             )
@@ -822,14 +847,15 @@ class _RunningWorkflow:
         self,
         instance: WorkflowInstance,
         workflow_id: str,
-        workflow_type: str | None = None,
     ):
         self.instance = instance
         self.workflow_id = workflow_id
-        self.workflow_type = workflow_type
         self.deadlocked_activation_task: Awaitable | None = None
         self._deadlock_can_be_interrupted_lock = threading.Lock()
         self._deadlock_can_be_interrupted = False
+
+    def get_info(self) -> temporalio.workflow.Info:
+        return self.instance.get_info()
 
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation

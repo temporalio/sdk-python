@@ -62,7 +62,7 @@ async def test_nexus_client_updates_when_worker_client_changes(
     handler_task_queue = f"handler-{uuid.uuid4()}"
 
     # Create Nexus endpoint
-    endpoint_name = "test-endpoint"
+    endpoint_name = f"test-endpoint-{uuid.uuid4()}"
     await env.create_nexus_endpoint(endpoint_name, handler_task_queue)
 
     # Caller worker

@@ -11,6 +11,7 @@ SelfType = TypeVar("SelfType")
 ParamType = TypeVar("ParamType")
 ReturnType = TypeVar("ReturnType", covariant=True)
 LocalReturnType = TypeVar("LocalReturnType", covariant=True)
+NexusServiceType = TypeVar("NexusServiceType")
 CallableType = TypeVar("CallableType", bound=Callable[..., Any])
 CallableAsyncType = TypeVar("CallableAsyncType", bound=Callable[..., Awaitable[Any]])
 CallableSyncOrAsyncType = TypeVar(
