@@ -23,13 +23,14 @@ _NEXUS_OPERATION_LINK_URL_PATH_REGEX = re.compile(
     r"^/namespaces/(?P<namespace>[^/]+)/nexus-operations/(?P<operation_id>[^/]+)$"
 )
 
-_WORFKLOW_LINK_URL_PATH_REGEX = re.compile(
-    r"^/namespaces/(?P<namespace>[^/]+)/workflows/(?P<workflow_id>[^/]+)/(?P<run_id>[^/]+)/history$"
+_WORKFLOW_LINK_URL_PATH_REGEX = re.compile(
+    r"^/namespaces/(?P<namespace>[^/]+)/workflows/(?P<workflow_id>[^/]+)/(?P<run_id>[^/]+)(?P<history>/history)?$"
 )
 
 
 class _LinkType(str, Enum):
-    WORKFLOW = temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name
+    WORKFLOW_EVENT = temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name
+    WORKFLOW = temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name
     NEXUS_OPERATION = temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name
 
 
@@ -38,6 +39,7 @@ LINK_EVENT_TYPE_PARAM_NAME = "eventType"
 LINK_REQUEST_ID_PARAM_NAME = "requestID"
 LINK_REFERENCE_TYPE_PARAM_NAME = "referenceType"
 LINK_RUN_ID_PARAM_NAME = "runID"
+LINK_REASON_PARAM_NAME = "reason"
 
 EVENT_REFERENCE_TYPE = "EventReference"
 REQUEST_ID_REFERENCE_TYPE = "RequestIdReference"
@@ -78,8 +80,11 @@ def nexus_link_to_temporal_link(
         return None
 
     match link_type:
-        case _LinkType.WORKFLOW:
+        case _LinkType.WORKFLOW_EVENT:
             return nexus_link_to_workflow_event_link(nexus_link)
+
+        case _LinkType.WORKFLOW:
+            return nexus_link_to_workflow_link(nexus_link)
 
         case _LinkType.NEXUS_OPERATION:
             return nexus_link_to_nexus_operation_link(nexus_link)
@@ -96,10 +101,13 @@ def temporal_link_to_nexus_link(
         case "workflow_event":
             return workflow_event_to_nexus_link(temporal_link.workflow_event)
 
+        case "workflow":
+            return workflow_to_nexus_link(temporal_link.workflow)
+
         case "nexus_operation":
             return nexus_operation_to_nexus_link(temporal_link.nexus_operation)
 
-        case "activity" | "batch_job" | "workflow":
+        case "activity" | "batch_job":
             raise NotImplementedError(
                 "only workflow_event and nexus operation links are supported"
             )
@@ -117,12 +125,6 @@ def workflow_event_to_nexus_link(
     Used when propagating links from a StartWorkflow response to a Nexus start operation
     response.
     """
-    scheme = "temporal"
-    namespace = urllib.parse.quote(workflow_event.namespace, safe="")
-    workflow_id = urllib.parse.quote(workflow_event.workflow_id, safe="")
-    run_id = urllib.parse.quote(workflow_event.run_id, safe="")
-    path = f"/namespaces/{namespace}/workflows/{workflow_id}/{run_id}/history"
-
     query_params = None
     match workflow_event.WhichOneof("reference"):
         case "event_ref":
@@ -134,10 +136,40 @@ def workflow_event_to_nexus_link(
         case _:
             pass
 
-    # urllib will omit '//' from the url if netloc is empty so we add the scheme manually
-    url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', query_params, ''))}"
+    return nexusrpc.Link(
+        url=_workflow_nexus_url(
+            workflow_event.namespace,
+            workflow_event.workflow_id,
+            workflow_event.run_id,
+            history=True,
+            query_params=query_params,
+        ),
+        type=_LinkType.WORKFLOW_EVENT.value,
+    )
 
-    return nexusrpc.Link(url=url, type=_LinkType.WORKFLOW.value)
+
+def workflow_to_nexus_link(
+    workflow: temporalio.api.common.v1.Link.Workflow,
+) -> nexusrpc.Link:
+    """Convert a Workflow link into a nexusrpc link."""
+    query_params = ""
+    if workflow.reason:
+        query_params = urllib.parse.urlencode(
+            {
+                LINK_REASON_PARAM_NAME: workflow.reason,
+            },
+        )
+
+    return nexusrpc.Link(
+        url=_workflow_nexus_url(
+            workflow.namespace,
+            workflow.workflow_id,
+            workflow.run_id,
+            history=False,
+            query_params=query_params,
+        ),
+        type=_LinkType.WORKFLOW.value,
+    )
 
 
 def nexus_operation_to_nexus_link(
@@ -148,7 +180,6 @@ def nexus_operation_to_nexus_link(
     Used when propagating links from a StartNexusOperation response to a Nexus start operation
     response.
     """
-    scheme = "temporal"
     namespace = urllib.parse.quote(op_link.namespace, safe="")
     operation_id = urllib.parse.quote(op_link.operation_id, safe="")
     path = f"/namespaces/{namespace}/nexus-operations/{operation_id}"
@@ -161,10 +192,65 @@ def nexus_operation_to_nexus_link(
             },
         )
 
-    # urllib will omit '//' from the url if netloc is empty so we add the scheme manually
-    url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', query_params, ''))}"
+    return nexusrpc.Link(
+        url=_temporal_nexus_url(path, query_params=query_params),
+        type=_LinkType.NEXUS_OPERATION.value,
+    )
 
-    return nexusrpc.Link(url=url, type=_LinkType.NEXUS_OPERATION.value)
+
+def _workflow_nexus_url(
+    namespace: str,
+    workflow_id: str,
+    run_id: str,
+    *,
+    history: bool,
+    query_params: str | None = "",
+) -> str:
+    namespace = urllib.parse.quote(namespace, safe="")
+    workflow_id = urllib.parse.quote(workflow_id, safe="")
+    run_id = urllib.parse.quote(run_id, safe="")
+    path = f"/namespaces/{namespace}/workflows/{workflow_id}/{run_id}"
+    if history:
+        path += "/history"
+    return _temporal_nexus_url(path, query_params=query_params)
+
+
+def _temporal_nexus_url(path: str, *, query_params: str | None = "") -> str:
+    # urllib will omit '//' from the url if netloc is empty so we add the scheme manually
+    return f"temporal://{urllib.parse.urlunparse(('', '', path, '', query_params or '', ''))}"
+
+
+def _parse_workflow_nexus_url(
+    link: nexusrpc.Link, *, history: bool
+) -> tuple[dict[str, str], dict[str, list[str]]] | None:
+    url = urllib.parse.urlparse(link.url)
+    match = _WORKFLOW_LINK_URL_PATH_REGEX.match(url.path)
+    if not match or bool(match.group("history")) != history:
+        expected_suffix = "/history" if history else ""
+        logger.warning(
+            f"Invalid Nexus link: {link}. Expected path to match "
+            f"/namespaces/{{namespace}}/workflows/{{workflow_id}}/{{run_id}}{expected_suffix}"
+        )
+        return None
+
+    groups = {
+        name: urllib.parse.unquote(value)
+        for name, value in match.groupdict().items()
+        if name != "history" and value is not None
+    }
+    return groups, urllib.parse.parse_qs(url.query)
+
+
+def _optional_single_query_param(
+    query_params: dict[str, list[str]], param_name: str
+) -> str:
+    match query_params.get(param_name):
+        case [param]:
+            return param
+        case [] | None:
+            return ""
+        case _:
+            raise ValueError(f"Expected {param_name} to have at most 1 value")
 
 
 def nexus_link_to_workflow_event_link(
@@ -175,16 +261,11 @@ def nexus_link_to_workflow_event_link(
     This is used when propagating links from a Nexus start operation request to a
     StartWorklow request.
     """
-    url = urllib.parse.urlparse(link.url)
-    match = _WORFKLOW_LINK_URL_PATH_REGEX.match(url.path)
-    if not match:
-        logger.warning(
-            f"Invalid Nexus link: {link}. Expected path to match {_WORFKLOW_LINK_URL_PATH_REGEX.pattern}"
-        )
+    parsed = _parse_workflow_nexus_url(link, history=True)
+    if parsed is None:
         return None
+    groups, query_params = parsed
     try:
-        query_params = urllib.parse.parse_qs(url.query)
-
         request_id_ref = None
         event_ref = None
         match query_params.get(LINK_REFERENCE_TYPE_PARAM_NAME):
@@ -203,15 +284,37 @@ def nexus_link_to_workflow_event_link(
         )
         return None
 
-    groups = match.groupdict()
     workflow_event_link = temporalio.api.common.v1.Link.WorkflowEvent(
-        namespace=urllib.parse.unquote(groups["namespace"]),
-        workflow_id=urllib.parse.unquote(groups["workflow_id"]),
-        run_id=urllib.parse.unquote(groups["run_id"]),
+        namespace=groups["namespace"],
+        workflow_id=groups["workflow_id"],
+        run_id=groups["run_id"],
         event_ref=event_ref,
         request_id_ref=request_id_ref,
     )
     return temporalio.api.common.v1.Link(workflow_event=workflow_event_link)
+
+
+def nexus_link_to_workflow_link(
+    link: nexusrpc.Link,
+) -> temporalio.api.common.v1.Link | None:
+    """Convert a nexus link into a Temporal Workflow link."""
+    parsed = _parse_workflow_nexus_url(link, history=False)
+    if parsed is None:
+        return None
+    groups, query_params = parsed
+    try:
+        reason = _optional_single_query_param(query_params, LINK_REASON_PARAM_NAME)
+    except ValueError as err:
+        logger.warning(f"Invalid Nexus link: {link}. {err}")
+        return None
+
+    workflow_link = temporalio.api.common.v1.Link.Workflow(
+        namespace=groups["namespace"],
+        workflow_id=groups["workflow_id"],
+        run_id=groups["run_id"],
+        reason=reason,
+    )
+    return temporalio.api.common.v1.Link(workflow=workflow_link)
 
 
 def nexus_link_to_nexus_operation_link(
@@ -232,16 +335,11 @@ def nexus_link_to_nexus_operation_link(
 
     query_params = urllib.parse.parse_qs(url.query)
 
-    match query_params.get(LINK_RUN_ID_PARAM_NAME):
-        case [run_id_param]:
-            run_id = run_id_param
-        case [] | None:
-            run_id = ""
-        case _:
-            logger.warning(
-                f"Invalid Nexus link: {nexus_link}. Expected {LINK_RUN_ID_PARAM_NAME} to have at most 1 value"
-            )
-            return None
+    try:
+        run_id = _optional_single_query_param(query_params, LINK_RUN_ID_PARAM_NAME)
+    except ValueError as err:
+        logger.warning(f"Invalid Nexus link: {nexus_link}. {err}")
+        return None
 
     groups = match.groupdict()
     nexus_op_link = temporalio.api.common.v1.Link.NexusOperation(
