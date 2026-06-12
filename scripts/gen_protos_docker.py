@@ -17,16 +17,28 @@ result = subprocess.run(
 )
 image_id = result.stdout.strip()
 
-subprocess.run(
+docker_run_command = [
+    "docker",
+    "run",
+    "--rm",
+]
+
+getuid = getattr(os, "getuid", None)
+getgid = getattr(os, "getgid", None)
+if callable(getuid) and callable(getgid):
+    docker_run_command.extend(["--user", f"{getuid()}:{getgid()}"])
+
+docker_run_command.extend(
     [
-        "docker",
-        "run",
-        "--rm",
         "-v",
         os.path.join(os.getcwd(), "temporalio", "api") + ":/api_new",
         "-v",
         os.path.join(os.getcwd(), "temporalio", "bridge", "proto") + ":/bridge_new",
         image_id,
-    ],
+    ]
+)
+
+subprocess.run(
+    docker_run_command,
     check=True,
 )

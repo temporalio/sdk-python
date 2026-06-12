@@ -81,6 +81,7 @@ class ClientConfig:
     client_version: str
     http_connect_proxy_config: ClientHttpConnectProxyConfig | None
     dns_load_balancing_config: ClientDnsLoadBalancingConfig | None
+    grpc_compression: str
 
 
 @dataclass
