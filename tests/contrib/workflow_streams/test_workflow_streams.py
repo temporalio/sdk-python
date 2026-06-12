@@ -28,6 +28,7 @@ import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import (
     Client,
+    WorkflowExecutionStatus,
     WorkflowHandle,
     WorkflowUpdateFailedError,
     WorkflowUpdateStage,
@@ -2006,6 +2007,175 @@ async def test_continue_as_new_helper(client: Client) -> None:
         assert [i.offset for i in items_after] == [0, 1]
 
         await new_handle.signal(ContinueAsNewHelperWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_follow_continue_as_new_describes_polled_run(client: Client) -> None:
+    """Regression test for continue-as-new detection.
+
+    ``_follow_continue_as_new`` must describe the *specific run the poll was
+    admitted to* — a rolled-over run is closed with status CONTINUED_AS_NEW,
+    whereas the latest (successor) run reports RUNNING. The previous
+    implementation described the latest run, so the check never fired and a poll
+    failure during a rollover stopped the subscription instead of following it.
+
+    Driving the exact poll-failure race deterministically is impractical (the
+    workflow drains in-flight polls before continuing-as-new), so this asserts
+    the helper's decision directly against a real post-rollover run.
+    """
+    async with new_worker(client, ContinueAsNewHelperWorkflow) as worker:
+        handle = await client.start_workflow(
+            ContinueAsNewHelperWorkflow.run,
+            CANWorkflowInputTyped(),
+            id=f"workflow-stream-can-follow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(
+            "__temporal_workflow_stream_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"item-0"))],
+                publisher_id="pub",
+                sequence=1,
+            ),
+        )
+        old_run_id = handle.result_run_id
+
+        await handle.signal(ContinueAsNewHelperWorkflow.trigger_continue)
+        new_handle = client.get_workflow_handle(handle.id)
+        await assert_eq_eventually(True, lambda: _is_different_run(handle, new_handle))
+
+        # The fix's premise: the polled (old) run reports CONTINUED_AS_NEW; the
+        # latest run reports RUNNING.
+        old_desc = await client.get_workflow_handle(
+            handle.id, run_id=old_run_id
+        ).describe()
+        assert old_desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW
+        latest_desc = await client.get_workflow_handle(handle.id).describe()
+        assert latest_desc.status == WorkflowExecutionStatus.RUNNING
+
+        # The client follows the rollover when it describes the polled run, but
+        # the previous latest-run behavior (polled_run_id unset) would not.
+        following = WorkflowStreamClient.create(client, handle.id)
+        following._polled_run_id = old_run_id
+        assert await following._follow_continue_as_new() is True
+
+        latest_only = WorkflowStreamClient.create(client, handle.id)
+        latest_only._polled_run_id = None  # describes the latest run, as the bug did
+        assert await latest_only._follow_continue_as_new() is False
+
+        await new_handle.signal(ContinueAsNewHelperWorkflow.close)
+
+
+@workflow.defn
+class DrainingGateWorkflow:
+    """CAN workflow that detaches pollers and then *holds* in the draining state
+    until released, so a subscriber deterministically hits the draining poll
+    rejection before the rollover completes."""
+
+    @workflow.init
+    def __init__(self, input: CANWorkflowInputTyped) -> None:
+        self.stream = WorkflowStream(prior_state=input.stream_state)
+        self._should_continue = False
+        self._release = False
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.signal
+    def trigger_continue(self) -> None:
+        self._should_continue = True
+
+    @workflow.signal
+    def release(self) -> None:
+        self._release = True
+
+    @workflow.run
+    async def run(self, _input: CANWorkflowInputTyped) -> None:
+        del _input
+        await workflow.wait_condition(lambda: self._should_continue or self._closed)
+        if self._closed:
+            return
+        # Detach but stay open until released, so new polls are rejected with
+        # StreamDraining for a deterministic window.
+        self.stream.detach_pollers()
+        await workflow.wait_condition(lambda: self._release)
+        await workflow.wait_condition(workflow.all_handlers_finished)
+        workflow.continue_as_new(
+            args=[CANWorkflowInputTyped(stream_state=self.stream.get_state())]
+        )
+
+
+@pytest.mark.asyncio
+async def test_subscribe_retries_while_draining(client: Client) -> None:
+    """A poll rejected because the stream is draining for continue-as-new must
+    be retried, not surfaced as an error: the subscription stays alive through
+    the rollover and resumes on the successor run."""
+    async with new_worker(client, DrainingGateWorkflow) as worker:
+        handle = await client.start_workflow(
+            DrainingGateWorkflow.run,
+            CANWorkflowInputTyped(),
+            id=f"workflow-stream-draining-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(
+            "__temporal_workflow_stream_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"item-0"))],
+                publisher_id="pub",
+                sequence=1,
+            ),
+        )
+
+        stream = WorkflowStreamClient.create(client, handle.id)
+        received: list[WorkflowStreamItem] = []
+
+        async def consume() -> None:
+            async for item in stream.subscribe(
+                from_offset=0, poll_cooldown=timedelta(0), result_type=bytes
+            ):
+                received.append(item)
+
+        async def received_count() -> int:
+            return len(received)
+
+        task = asyncio.create_task(consume())
+        new_handle = client.get_workflow_handle(handle.id)
+        try:
+            await assert_eq_eventually(1, received_count)
+
+            # Detach; the subscriber's polls are now rejected with StreamDraining.
+            await handle.signal(DrainingGateWorkflow.trigger_continue)
+            # The subscription must keep retrying, not error out.
+            await asyncio.sleep(1.0)
+            assert not task.done(), "draining rejection must not end the subscription"
+
+            # Release: the workflow continues-as-new; the subscription resumes on
+            # the successor run and receives an item published there.
+            await handle.signal(DrainingGateWorkflow.release)
+            await assert_eq_eventually(
+                True, lambda: _is_different_run(handle, new_handle)
+            )
+            await new_handle.signal(
+                "__temporal_workflow_stream_publish",
+                PublishInput(
+                    items=[PublishEntry(topic="events", data=_wire_bytes(b"item-1"))],
+                    publisher_id="pub",
+                    sequence=2,
+                ),
+            )
+
+            await assert_eq_eventually(2, received_count)
+            assert [i.data for i in received] == [b"item-0", b"item-1"]
+            assert [i.offset for i in received] == [0, 1]
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            await new_handle.signal(DrainingGateWorkflow.close)
 
 
 # ---------------------------------------------------------------------------
