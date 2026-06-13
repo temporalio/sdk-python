@@ -47,7 +47,7 @@ pub struct TelemetryConfig {
 #[derive(FromPyObject)]
 pub struct LoggingConfig {
     filter: String,
-    forward_to: Option<PyObject>,
+    forward_to: Option<Py<PyAny>>,
 }
 
 #[pyclass]
@@ -105,7 +105,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
     let telemetry_build = TelemetryOptions::builder();
 
     // Build logging config, capturing forwarding info to start later
-    let mut log_forwarding: Option<(Receiver<CoreLog>, PyObject)> = None;
+    let mut log_forwarding: Option<(Receiver<CoreLog>, Py<PyAny>)> = None;
     let maybe_logging = if let Some(logging_conf) = logging {
         Some(if let Some(forward_to) = logging_conf.forward_to {
             // Note, actual log forwarding is started later
@@ -177,7 +177,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
                     .collect::<Vec<_>>();
                 // We silently swallow errors here because logging them could
                 // cause a bad loop and we don't want to assume console presence
-                let _ = Python::with_gil(|py| callback.call1(py, (entries,)));
+                let _ = Python::attach(|py| callback.call1(py, (entries,)));
             }
         }))
     });
@@ -204,7 +204,7 @@ impl Runtime {
     pub fn future_into_py<'a, F, T>(&self, py: Python<'a>, fut: F) -> PyResult<Bound<'a, PyAny>>
     where
         F: Future<Output = PyResult<T>> + Send + 'static,
-        T: for<'py> IntoPyObject<'py>,
+        T: for<'py> IntoPyObject<'py> + Send + 'static,
     {
         let _guard = self.core.tokio_handle().enter();
         pyo3_async_runtimes::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
@@ -310,7 +310,7 @@ impl BufferedLogEntry {
     }
 
     #[getter]
-    fn fields(&self, py: Python<'_>) -> PyResult<HashMap<&str, PyObject>> {
+    fn fields(&self, py: Python<'_>) -> PyResult<HashMap<&str, Py<PyAny>>> {
         self.core_log
             .fields
             .iter()
@@ -413,6 +413,13 @@ impl pyo3_async_runtimes::generic::Runtime for TokioRuntime {
     {
         tokio::runtime::Handle::current().spawn(fut)
     }
+
+    fn spawn_blocking<F>(f: F) -> Self::JoinHandle
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        tokio::runtime::Handle::current().spawn_blocking(f)
+    }
 }
 
 impl pyo3_async_runtimes::generic::ContextExt for TokioRuntime {
@@ -431,10 +438,7 @@ impl pyo3_async_runtimes::generic::ContextExt for TokioRuntime {
 
     fn get_task_locals() -> Option<pyo3_async_runtimes::TaskLocals> {
         TASK_LOCALS
-            .try_with(|c| {
-                c.get()
-                    .map(|locals| Python::with_gil(|py| locals.clone_ref(py)))
-            })
+            .try_with(|c| c.get().cloned())
             .unwrap_or_default()
     }
 }
