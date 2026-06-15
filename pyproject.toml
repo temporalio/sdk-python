@@ -257,3 +257,4 @@ exclude = ["temporalio/bridge/target/**/*"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
+exclude-newer-package = { openai-agents = false }
