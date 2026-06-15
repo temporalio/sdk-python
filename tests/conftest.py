@@ -2,11 +2,13 @@ import asyncio
 import multiprocessing.context
 import os
 import sys
+import tempfile
 from collections.abc import AsyncGenerator, Iterator
 
 import opentelemetry.trace
 import pytest
 import pytest_asyncio
+from filelock import FileLock
 from opentelemetry.util._once import Once
 
 from temporalio.client import Client
@@ -100,47 +102,57 @@ def env_type(request: pytest.FixtureRequest) -> str:
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
-        env = await WorkflowEnvironment.start_local(
-            dev_server_extra_args=[
-                "--dynamic-config-value",
-                "system.forceSearchAttributesCacheRefreshOnRead=true",
-                "--dynamic-config-value",
-                f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
-                "--dynamic-config-value",
-                "system.enableEagerWorkflowStart=true",
-                "--dynamic-config-value",
-                "frontend.enableExecuteMultiOperation=true",
-                "--dynamic-config-value",
-                "frontend.workerVersioningWorkflowAPIs=true",
-                "--dynamic-config-value",
-                "frontend.workerVersioningDataAPIs=true",
-                "--dynamic-config-value",
-                "system.enableDeploymentVersions=true",
-                "--dynamic-config-value",
-                "frontend.activityAPIsEnabled=true",
-                "--dynamic-config-value",
-                "frontend.enableCancelWorkerPollsOnShutdown=true",
-                "--dynamic-config-value",
-                "component.nexusoperations.recordCancelRequestCompletionEvents=true",
-                "--dynamic-config-value",
-                "activity.enableStandalone=true",
-                "--dynamic-config-value",
-                "activity.startDelayEnabled=true",
-                "--dynamic-config-value",
-                "history.enableChasm=true",
-                "--dynamic-config-value",
-                "history.enableTransitionHistory=true",
-                "--dynamic-config-value",
-                "history.enableChasmCallbacks=true",
-                "--dynamic-config-value",
-                "nexusoperation.enableStandalone=true",
-                "--dynamic-config-value",
-                'system.system.refreshNexusEndpointsMinWait="0s"',
-                "--dynamic-config-value",
-                "history.enableSignalWithStartFromWorkflow=true",
-            ],
-            dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+        # Under xdist each worker starts its own server, so they race to
+        # download the dev server binary into a shared temp dir and collide on
+        # the bridge's download lock. Serialize via a file lock and a stable
+        # download dir so only the first worker downloads and the rest reuse it.
+        download_dir = os.path.join(
+            tempfile.gettempdir(), f"temporal-dev-server-{DEV_SERVER_DOWNLOAD_VERSION}"
         )
+        os.makedirs(download_dir, exist_ok=True)
+        with FileLock(os.path.join(download_dir, "download.lock")):
+            env = await WorkflowEnvironment.start_local(
+                download_dest_dir=download_dir,
+                dev_server_extra_args=[
+                    "--dynamic-config-value",
+                    "system.forceSearchAttributesCacheRefreshOnRead=true",
+                    "--dynamic-config-value",
+                    f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
+                    "--dynamic-config-value",
+                    "system.enableEagerWorkflowStart=true",
+                    "--dynamic-config-value",
+                    "frontend.enableExecuteMultiOperation=true",
+                    "--dynamic-config-value",
+                    "frontend.workerVersioningWorkflowAPIs=true",
+                    "--dynamic-config-value",
+                    "frontend.workerVersioningDataAPIs=true",
+                    "--dynamic-config-value",
+                    "system.enableDeploymentVersions=true",
+                    "--dynamic-config-value",
+                    "frontend.activityAPIsEnabled=true",
+                    "--dynamic-config-value",
+                    "frontend.enableCancelWorkerPollsOnShutdown=true",
+                    "--dynamic-config-value",
+                    "component.nexusoperations.recordCancelRequestCompletionEvents=true",
+                    "--dynamic-config-value",
+                    "activity.enableStandalone=true",
+                    "--dynamic-config-value",
+                    "activity.startDelayEnabled=true",
+                    "--dynamic-config-value",
+                    "history.enableChasm=true",
+                    "--dynamic-config-value",
+                    "history.enableTransitionHistory=true",
+                    "--dynamic-config-value",
+                    "history.enableChasmCallbacks=true",
+                    "--dynamic-config-value",
+                    "nexusoperation.enableStandalone=true",
+                    "--dynamic-config-value",
+                    'system.system.refreshNexusEndpointsMinWait="0s"',
+                    "--dynamic-config-value",
+                    "history.enableSignalWithStartFromWorkflow=true",
+                ],
+                dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+            )
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
     else:
