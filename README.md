@@ -82,6 +82,7 @@ informal introduction to the features and their implementation.
         - [Customizing the Sandbox](#customizing-the-sandbox)
           - [Passthrough Modules](#passthrough-modules)
           - [Invalid Module Members](#invalid-module-members)
+        - [Debugging Workflows with `breakpoint()` / `pdb`](#debugging-workflows-with-breakpoint--pdb)
         - [Known Sandbox Issues](#known-sandbox-issues)
           - [Global Import/Builtins](#global-importbuiltins)
           - [Sandbox is not Secure](#sandbox-is-not-secure)
@@ -1240,6 +1241,80 @@ my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_
 ```
 
 See the API for more details on exact fields and their meaning.
+
+##### Debugging Workflows with `breakpoint()` / `pdb`
+
+Setting `debug_mode=True` on the `Worker` (or `TEMPORAL_DEBUG=1` in the environment) routes workflow activations
+onto the asyncio main thread instead of a worker thread pool. This lets `breakpoint()` and `pdb.set_trace()`
+inside workflow code open an interactive REPL — without it, pdb hangs because its `input()` call would run on a
+thread that does not own the controlling TTY.
+
+A minimal runnable example:
+
+```python
+import asyncio
+from datetime import timedelta
+
+from temporalio import workflow
+from temporalio.client import Client
+from temporalio.worker import Worker
+
+
+@workflow.defn
+class DebugMeWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        x = 42
+        breakpoint()  # interactive pdb prompt opens at this line
+        return f"x was {x}"
+
+
+async def main() -> None:
+    client = await Client.connect("localhost:7233")
+    async with Worker(
+        client,
+        task_queue="debug-me",
+        workflows=[DebugMeWorkflow],
+        debug_mode=True,
+    ):
+        result = await client.execute_workflow(
+            DebugMeWorkflow.run,
+            id="debug-me-wf",
+            task_queue="debug-me",
+            task_timeout=timedelta(minutes=10),  # see caveat below
+        )
+        print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run with `python debug_me.py`, or under pytest with `pytest -s` (the `-s` flag disables pytest's stdin
+capture). At the `(Pdb)` prompt you'll land at the line where `breakpoint()` was called, with workflow
+locals in scope. Try `p x`, `n`, `c`, `q`.
+
+**Quitting cleanly.** Typing `q` or hitting Ctrl-D continues the workflow rather than raising `BdbQuit`
+(which would fail the workflow task). To genuinely abort, kill the outer process with Ctrl-C.
+
+Two caveats when pausing at a breakpoint inside a workflow:
+
+1. **Workflow task timeout.** Temporal expires a workflow task after ~10 seconds by default. If you sit at the
+   `(Pdb)` prompt longer than that, the server reassigns the task and your workflow replays from the start when
+   you continue — re-hitting the breakpoint. Pass `task_timeout=timedelta(minutes=N)` to `execute_workflow` /
+   `start_workflow` to give yourself debugging headroom:
+
+   ```python
+   await client.execute_workflow(MyWorkflow.run, ..., task_timeout=timedelta(minutes=10))
+   ```
+
+2. **Deterministic replay.** Workflows are deterministic and replay from history; any wall-clock pause violates
+   that contract. For post-mortem debugging without these caveats, use the [Replayer](#replayer) on a recorded
+   history instead of live debugging.
+
+Calling `breakpoint()` from sandboxed workflow code without `debug_mode` raises a sandbox
+`RestrictedWorkflowAccessError` with a message pointing at `debug_mode=True`, so the failure mode is loud
+and the fix is obvious.
 
 ##### Known Sandbox Issues
 
