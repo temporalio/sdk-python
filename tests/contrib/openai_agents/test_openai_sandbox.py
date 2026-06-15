@@ -630,6 +630,61 @@ async def test_exec_unclassified_error_propagates_unchanged():
         await _exec_with_error(ExecTransportError(command=["boom"], retryable=None))
 
 
+class _ShutdownRaisingSession(_MockSandboxSession):
+    """Mock session whose shutdown() raises a chosen SandboxError."""
+
+    def __init__(self, error: SandboxError) -> None:
+        super().__init__()
+        self._error = error
+
+    async def shutdown(self) -> None:
+        raise self._error
+
+
+async def _create_shutdown_raising(
+    error: SandboxError,
+) -> tuple[dict[str, Any], SandboxClientProvider, StopArgs, str]:
+    provider = SandboxClientProvider(
+        "mock", _MockSandboxClient(_ShutdownRaisingSession(error))
+    )
+    acts = _activity_map(provider)
+    state = (
+        await acts["mock-sandbox_client_create"](
+            CreateSessionArgs(
+                snapshot_spec=None, manifest=Manifest(), client_options=None
+            )
+        )
+    ).state
+    key = str(state.session_id)
+    assert key in provider._sessions
+    return acts, provider, StopArgs(state=state), key
+
+
+async def test_shutdown_terminal_error_evicts_session_and_raises():
+    """A terminal shutdown error maps to a non-retryable ApplicationError and
+    evicts the dead session from the cache."""
+    acts, provider, args, key = await _create_shutdown_raising(
+        ExecTransportError(command=["shutdown"], retryable=False)
+    )
+
+    with pytest.raises(ApplicationError) as exc_info:
+        await acts["mock-sandbox_session_shutdown"](args)
+    assert exc_info.value.non_retryable is True
+    assert key not in provider._sessions
+
+
+async def test_shutdown_retryable_error_keeps_session_cached():
+    """A retryable shutdown error propagates unchanged and leaves the session
+    cached so the activity's retry can still shut it down."""
+    acts, provider, args, key = await _create_shutdown_raising(
+        ExecTransportError(command=["shutdown"], retryable=True)
+    )
+
+    with pytest.raises(ExecTransportError):
+        await acts["mock-sandbox_session_shutdown"](args)
+    assert key in provider._sessions
+
+
 class _RunningRaisingSession(_MockSandboxSession):
     """Mock session whose running() raises a chosen SandboxError."""
 

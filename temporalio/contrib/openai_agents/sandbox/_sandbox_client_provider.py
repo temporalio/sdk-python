@@ -251,13 +251,21 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_session_shutdown")
         async def session_shutdown(args: StopArgs) -> None:
-            with _translate_sandbox_errors():
-                key = str(args.state.session_id)
-                session = self._sessions.get(key)
-                if session is not None:
-                    await session.shutdown()
-                    del self._sessions[key]
+            key = str(args.state.session_id)
+            session = self._sessions.get(key)
+            if session is None:
                 return None
+            try:
+                with _translate_sandbox_errors():
+                    await session.shutdown()
+            except ApplicationError:
+                # Terminal failure: the session is dead, so evict it before
+                # re-raising. A retryable error instead propagates with the
+                # entry kept so the activity's retry can still shut it down.
+                del self._sessions[key]
+                raise
+            del self._sessions[key]
+            return None
 
         return [
             create_session,
