@@ -383,8 +383,8 @@ async def test_start_outside_nexus_context_does_not_touch_links() -> None:
 
 # ── handler-level: backlinks land on the StartOperationResponse ──────────────────────────────
 
-# A backlink that a handler stashes on ctx.outbound_links, mimicking what a signal RPC inside the
-# handler would do via _add_backlink.
+# A response link that a handler stashes on ctx.outbound_links, mimicking what a signal RPC inside
+# the handler would do via _add_response_link.
 _BACKLINK = temporalio.nexus._link_conversion.workflow_event_to_nexus_link(
     temporalio.api.common.v1.Link.WorkflowEvent(
         namespace=NAMESPACE,

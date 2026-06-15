@@ -278,17 +278,18 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
             )
         return workflow_handle
 
-    def _get_outgoing_request_links(self) -> list[temporalio.api.common.v1.Link]:
-        """Inbound Nexus task links to attach to RPCs the operation handler issues.
+    def _get_request_links(self) -> list[temporalio.api.common.v1.Link]:
+        """Request links to attach to RPCs the operation handler issues.
 
-        When the operation handler signals, signal-with-starts, or starts a workflow, these
-        links are added to the request's ``links`` field so the callee's history event links
-        back to the caller workflow that scheduled this Nexus operation.
+        These are the inbound Nexus task links. When the operation handler signals,
+        signal-with-starts, or starts a workflow, these links are added to the request's
+        ``links`` field so the callee's history event links back to the caller workflow that
+        scheduled this Nexus operation.
         """
         return self._get_links()
 
-    def _add_backlink(self, link: temporalio.api.common.v1.Link | None) -> None:
-        """Append a backlink returned by an RPC the operation handler issued.
+    def _add_response_link(self, link: temporalio.api.common.v1.Link | None) -> None:
+        """Append a response link returned by an RPC the operation handler issued.
 
         ``link`` is the ``common.v1.Link`` returned on a signal, signal-with-start, or start
         response (or ``None`` against a server that did not return one). When present and of the
