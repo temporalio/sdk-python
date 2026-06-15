@@ -157,9 +157,9 @@ def run_worker(
                 configure,
             )
 
-        Async generator configure, bracketing an ``aioboto3`` S3 client that backs the
-        external-storage data converter (opened before connect, closed after the worker
-        stops)::
+        Async generator configure, bracketing an ``aioboto3`` S3 client. The session
+        lives at module scope (it is not event-loop-bound and caches credentials across
+        warm invocations); only the loop-bound client is opened per invocation::
 
             import aioboto3
             import dataclasses
@@ -167,10 +167,12 @@ def run_worker(
             from temporalio.contrib.aws.s3driver.aioboto3 import new_aioboto3_client
             from temporalio.converter import DataConverter, ExternalStorage
 
+            session = aioboto3.Session()
+
             async def configure(config: LambdaWorkerConfig):
                 config.worker_config["task_queue"] = "my-task-queue"
                 config.worker_config["workflows"] = [MyWorkflow]
-                async with aioboto3.Session().client("s3") as s3_client:
+                async with session.client("s3") as s3_client:
                     driver = S3StorageDriver(
                         client=new_aioboto3_client(s3_client), bucket="my-payloads",
                     )
