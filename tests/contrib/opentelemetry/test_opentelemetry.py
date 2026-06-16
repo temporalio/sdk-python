@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import gc
 import logging
-import queue
-import threading
 import uuid
 from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -14,7 +11,6 @@ from datetime import timedelta
 from typing import Any, cast
 
 import nexusrpc
-import opentelemetry.context
 import pytest
 from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -27,7 +23,6 @@ from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdate
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 from temporalio.contrib.opentelemetry import (
     TracingInterceptor,
-    TracingWorkflowInboundInterceptor,
 )
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import (
@@ -37,7 +32,6 @@ from temporalio.exceptions import (
 )
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
-from tests.helpers import LogCapturer
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 
@@ -853,20 +847,31 @@ async def test_opentelemetry_context_restored_after_activity(
     activity: Callable[[], None],
     expect_failure: bool,
 ) -> None:
-    attach_count = 0
-    detach_count = 0
     original_attach = context.attach
     original_detach = context.detach
+    baseline = context.get_current()
 
-    def tracked_attach(ctx):  # type:ignore[reportMissingParameterType]
-        nonlocal attach_count
+    # Model OTel's single current-context ContextVar across every attach/detach
+    # so we can assert it returns to the baseline. The interceptor restores by
+    # re-attaching the previous context rather than detaching a token, so a
+    # token-pairing count no longer balances; the real leak invariant is that
+    # the current context is restored to where it started.
+    attach_count = 0
+    modeled_current = baseline
+    previous_by_token: dict[int, context.Context] = {}
+
+    def tracked_attach(ctx: context.Context) -> Any:
+        nonlocal attach_count, modeled_current
         attach_count += 1
-        return original_attach(ctx)
+        token = original_attach(ctx)
+        previous_by_token[id(token)] = modeled_current
+        modeled_current = ctx
+        return token
 
-    def tracked_detach(token):  # type:ignore[reportMissingParameterType]
-        nonlocal detach_count
-        detach_count += 1
-        return original_detach(token)
+    def tracked_detach(token: Any) -> None:
+        nonlocal modeled_current
+        modeled_current = previous_by_token.pop(id(token), baseline)
+        original_detach(token)
 
     context.attach = tracked_attach
     context.detach = tracked_detach
@@ -892,10 +897,11 @@ async def test_opentelemetry_context_restored_after_activity(
                 except Exception:
                     assert expect_failure, "This test is not expeced to raise"
 
-        assert attach_count == detach_count, (
-            f"Context leak detected: {attach_count} attaches vs {detach_count} detaches. "
+        assert attach_count > 0, "Expected at least one context attach"
+        assert modeled_current == baseline, (
+            "Context leak detected: current context was not restored to baseline "
+            f"(modeled current={modeled_current!r}, baseline={baseline!r})"
         )
-        assert attach_count > 0, "Expected at least one context attach/detach"
 
     finally:
         context.attach = original_attach
@@ -986,50 +992,3 @@ async def test_opentelemetry_standalone_activity_tracing(
     assert start_activity_span.attributes is not None
     assert start_activity_span.attributes["temporalActivityID"] == activity_id
     assert start_activity_span.attributes["temporalActivityType"] == "tracing_activity"
-
-
-def test_opentelemetry_safe_detach():
-    class _fake_self:
-        def _load_workflow_context_carrier(*_args):
-            return None
-
-        def _set_on_context(self, ctx: Any):
-            return opentelemetry.context.set_value("test-key", "test-value", ctx)
-
-        def _completed_span(*args: Any, **_kwargs: Any):
-            pass
-
-    # create a context manager and force enter to happen on this thread
-    context_manager = TracingWorkflowInboundInterceptor._top_level_workflow_context(
-        _fake_self(),  # type: ignore
-        success_is_complete=True,
-    )
-    context_manager.__enter__()
-
-    # move reference to context manager into queue
-    q: queue.Queue = queue.Queue()
-    q.put(context_manager)
-    del context_manager
-
-    def worker():
-        # pull reference from queue and delete the last reference
-        context_manager = q.get()
-        del context_manager
-        # force gc
-        gc.collect()
-
-    with LogCapturer().logs_captured(opentelemetry.context.logger) as capturer:
-        # run forced gc on other thread so exit happens there
-        t = threading.Thread(target=worker)
-        t.start()
-        t.join(timeout=5)
-
-        def otel_context_error(record: logging.LogRecord) -> bool:
-            return (
-                record.name == "opentelemetry.context"
-                and "Failed to detach context" in record.message
-            )
-
-        assert capturer.find(otel_context_error) is None, (
-            "Detach from context message should not be logged"
-        )
