@@ -95,8 +95,8 @@ def run_worker(
     connects to the Temporal server, starts a worker with Lambda-tuned defaults, polls for
     tasks until the invocation deadline approaches, and then gracefully shuts down.
 
-    The *configure* callback is invoked **once per invocation**, inside that invocation's
-    event loop, before the client connects. It may be synchronous or asynchronous:
+    The *configure* callback is invoked **once per invocation** and may be synchronous or
+    asynchronous:
 
     * **Synchronous** ``def configure(config) -> None`` — runs per invocation. Use for
       static worker definition (task queue, registrations, option tuning) and resources
@@ -108,7 +108,10 @@ def run_worker(
       equivalent ``@contextlib.asynccontextmanager``-decorated function) — entered per
       invocation. Statements before the single ``yield`` run before the client connects;
       the worker runs while the generator is suspended at the ``yield``; statements after
-      the ``yield`` run as teardown once the worker has stopped. This is the recommended
+      the ``yield`` run as teardown once the worker has stopped. Any ``shutdown_hooks``
+      registered before the ``yield`` run after the worker stops but *before* the
+      post-``yield`` teardown, so this resource outlives the hooks (e.g. a telemetry
+      flush hook can still emit before the resource is closed). This is the recommended
       shape for event-loop-bound resources that must live for the duration of the
       invocation, such as an ``aioboto3`` S3 client backing the external-storage data
       converter (see the async example below).
