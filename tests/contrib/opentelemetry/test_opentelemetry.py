@@ -13,6 +13,7 @@ from typing import Any, cast
 import nexusrpc
 import pytest
 from opentelemetry import baggage, context
+from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -858,14 +859,14 @@ async def test_opentelemetry_context_restored_after_activity(
     # the current context is restored to where it started.
     attach_count = 0
     modeled_current = baseline
-    previous_by_token: dict[int, context.Context] = {}
+    previous_by_token: dict[int, Context] = {}
 
-    def tracked_attach(ctx: context.Context) -> Any:
+    def tracked_attach(context: Context) -> Any:
         nonlocal attach_count, modeled_current
         attach_count += 1
-        token = original_attach(ctx)
+        token = original_attach(context)
         previous_by_token[id(token)] = modeled_current
-        modeled_current = ctx
+        modeled_current = context
         return token
 
     def tracked_detach(token: Any) -> None:
