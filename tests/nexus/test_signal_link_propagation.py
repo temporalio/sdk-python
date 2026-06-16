@@ -1,10 +1,9 @@
 """Unit tests for Nexus signal-backlink propagation.
 
-These mirror the Java SDK's RootWorkflowClientInvokerLinkPropagationTest. They exercise the
-in/out link propagation that happens when a Nexus operation handler issues a signal,
-signal-with-start, or start-workflow RPC, against a mocked workflow service. The corresponding
-end-to-end behavior requires a real server with EnableCHASMSignalBacklinks=true and is therefore
-not covered here.
+These exercise the in/out link propagation that happens when a Nexus operation handler issues a
+signal, signal-with-start, or start-workflow RPC, against a mocked workflow service.
+The corresponding end-to-end behavior requires a real server with EnableCHASMSignalBacklinks=true and is therefore
+and is therefore not covered here.
 """
 
 from __future__ import annotations

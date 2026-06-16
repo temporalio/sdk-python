@@ -239,9 +239,14 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
             else []
         )
 
-    def _get_links(
-        self,
-    ) -> list[temporalio.api.common.v1.Link]:
+    def _get_request_links(self) -> list[temporalio.api.common.v1.Link]:
+        """Request links to attach to RPCs the operation handler issues.
+
+        These are the inbound Nexus task links. When the operation handler signals,
+        signal-with-starts, or starts a workflow, these links are added to the request's
+        ``links`` field so the callee's history event links back to whatever scheduled this
+        Nexus operation.
+        """
         event_links: list[temporalio.api.common.v1.Link] = []
         for inbound_link in self.nexus_context.inbound_links:
             if link := nexus_link_to_temporal_link(inbound_link):
@@ -277,16 +282,6 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
                 f"Failed to create WorkflowExecutionStarted event links for workflow {workflow_handle}: {e}"
             )
         return workflow_handle
-
-    def _get_request_links(self) -> list[temporalio.api.common.v1.Link]:
-        """Request links to attach to RPCs the operation handler issues.
-
-        These are the inbound Nexus task links. When the operation handler signals,
-        signal-with-starts, or starts a workflow, these links are added to the request's
-        ``links`` field so the callee's history event links back to the caller workflow that
-        scheduled this Nexus operation.
-        """
-        return self._get_links()
 
     def _add_response_link(self, link: temporalio.api.common.v1.Link | None) -> None:
         """Append a response link returned by an RPC the operation handler issued.
@@ -700,7 +695,7 @@ async def _start_nexus_backing_workflow(
             priority=priority,
             versioning_override=versioning_override,
             callbacks=temporal_context._get_callbacks(token),
-            links=temporal_context._get_links(),
+            links=temporal_context._get_request_links(),
             request_id=temporal_context.nexus_context.request_id,
         )
 

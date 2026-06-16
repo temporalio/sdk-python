@@ -1,7 +1,6 @@
 """End-to-end (server-based) tests for Nexus signal-backlink propagation.
 
-These mirror the Java SDK's ``SignalOperationLinkingTest`` and the Go SDK's
-``TestNexusSignalOperationLinks``. They exercise, against a real server, the bidirectional
+These exercise, against a real server, the bidirectional
 link propagation that occurs when a Nexus operation handler signals (or signal-with-starts) a
 workflow:
 
@@ -22,6 +21,7 @@ server that does not emit the backlink, the backward assertions are skipped.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 import pytest
 from nexusrpc import Operation, service
@@ -49,10 +49,15 @@ EventType = temporalio.api.enums.v1.EventType
 # ── Service definition ──────────────────────────────────────────────────────────────────────
 
 
+@dataclass
+class OpInput:
+    mode: str
+    callee_id: str
+
+
 @service
 class SignalingService:
-    # input encodes "<mode>:<callee-workflow-id>".
-    op: Operation[str, str]
+    op: Operation[OpInput, str]
 
 
 # ── Callee workflow ───────────────────────────────────────────────────────────────────────
@@ -87,7 +92,7 @@ class CallerWorkflow:
             endpoint=make_nexus_endpoint_name(task_queue),
         )
         return await client.execute_operation(
-            SignalingService.op, f"{mode}:{callee_id}"
+            SignalingService.op, OpInput(mode=mode, callee_id=callee_id)
         )
 
 
@@ -97,7 +102,7 @@ MODE_SYNC = "sync"
 MODE_ASYNC = "async"
 
 
-class _AsyncSignalingOperation(OperationHandler[str, str]):
+class _AsyncSignalingOperation(OperationHandler[OpInput, str]):
     """Signal-with-starts the callee then returns an async result.
 
     The backlink stashed on ``ctx.outbound_links`` by the signal-with-start RPC is carried on
@@ -105,10 +110,9 @@ class _AsyncSignalingOperation(OperationHandler[str, str]):
     """
 
     async def start(
-        self, ctx: StartOperationContext, input: str
+        self, ctx: StartOperationContext, input: OpInput
     ) -> StartOperationResultAsync:
-        _, callee_id = input.split(":", 1)
-        await _signal_with_start(callee_id, "async-signal")
+        await _signal_with_start(input.callee_id, "async-signal")
         return StartOperationResultAsync(token=f"async-op-{uuid.uuid4()}")
 
     async def cancel(self, ctx, token: str) -> None:  # type: ignore[no-untyped-def]
@@ -124,15 +128,14 @@ class _AsyncSignalingOperation(OperationHandler[str, str]):
 @service_handler(service=SignalingService)
 class SignalingServiceHandler:
     @sync_operation
-    async def op(self, _ctx: StartOperationContext, input: str) -> str:
+    async def op(self, _ctx: StartOperationContext, input: OpInput) -> str:
         # Synchronous path: signal-with-start the callee (first signal) then plain-signal it
         # (second signal). Both backlinks are carried on the sync start-operation response and
         # land on the caller's NexusOperationCompleted event.
-        _, callee_id = input.split(":", 1)
-        await _signal_with_start(callee_id, "first")
+        await _signal_with_start(input.callee_id, "first")
         await (
             nexus.client()
-            .get_workflow_handle(callee_id)
+            .get_workflow_handle(input.callee_id)
             .signal(CalleeWorkflow.ping, "second")
         )
         return "ok:sync"
@@ -141,13 +144,13 @@ class SignalingServiceHandler:
 # A separate service exposing only the async operation, so the caller can address it by name.
 @service
 class AsyncSignalingService:
-    op: Operation[str, str]
+    op: Operation[OpInput, str]
 
 
 @service_handler(service=AsyncSignalingService)
 class AsyncSignalingServiceHandler:
     @operation_handler
-    def op(self) -> OperationHandler[str, str]:
+    def op(self) -> OperationHandler[OpInput, str]:
         return _AsyncSignalingOperation()
 
 
@@ -173,7 +176,7 @@ class AsyncSignalCallerWorkflow:
             endpoint=make_nexus_endpoint_name(task_queue),
         )
         handle = await client.start_operation(
-            AsyncSignalingService.op, f"{MODE_ASYNC}:{callee_id}"
+            AsyncSignalingService.op, OpInput(mode=MODE_ASYNC, callee_id=callee_id)
         )
         # Do not await the result: the async op never completes (no completion is delivered).
         # Returning the token confirms the operation reached the Started state, whose history
