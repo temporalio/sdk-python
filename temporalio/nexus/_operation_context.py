@@ -253,7 +253,7 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
                 event_links.append(link)
         return event_links
 
-    def _add_outbound_links(
+    def _add_backing_workflow_response_link(
         self, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
     ):
         # If links were not sent in StartWorkflowExecutionResponse then construct them.
@@ -699,6 +699,6 @@ async def _start_nexus_backing_workflow(
             request_id=temporal_context.nexus_context.request_id,
         )
 
-    temporal_context._add_outbound_links(wf_handle)
+    temporal_context._add_backing_workflow_response_link(wf_handle)
 
     return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
