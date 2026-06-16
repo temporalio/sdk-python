@@ -231,9 +231,9 @@ impl SlotReserveCtx {
 #[pyclass]
 pub struct SlotMarkUsedCtx {
     #[pyo3(get)]
-    slot_info: PyObject,
+    slot_info: Py<PyAny>,
     #[pyo3(get)]
-    permit: PyObject,
+    permit: Py<PyAny>,
 }
 
 // NOTE: this is dumb because we already have the generated proto code, we just can't use
@@ -268,9 +268,9 @@ pub struct NexusSlotInfo {
 #[pyclass]
 pub struct SlotReleaseCtx {
     #[pyo3(get)]
-    slot_info: Option<PyObject>,
+    slot_info: Option<Py<PyAny>>,
     #[pyo3(get)]
-    permit: PyObject,
+    permit: Py<PyAny>,
 }
 
 fn slot_info_to_py_obj<'py>(py: Python<'py>, info: SlotInfo) -> PyResult<Bound<'py, PyAny>> {
@@ -300,14 +300,14 @@ fn slot_info_to_py_obj<'py>(py: Python<'py>, info: SlotInfo) -> PyResult<Bound<'
     })
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CustomSlotSupplier {
-    inner: Arc<PyObject>,
+    inner: Arc<Py<PyAny>>,
 }
 
 struct CustomSlotSupplierOfType<SK: SlotKind> {
-    inner: Arc<PyObject>,
+    inner: Arc<Py<PyAny>>,
     event_loop_task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
     _phantom: PhantomData<SK>,
 }
@@ -315,7 +315,7 @@ struct CustomSlotSupplierOfType<SK: SlotKind> {
 #[pymethods]
 impl CustomSlotSupplier {
     #[new]
-    fn new(inner: PyObject) -> Self {
+    fn new(inner: Py<PyAny>) -> Self {
         CustomSlotSupplier {
             inner: Arc::new(inner),
         }
@@ -329,23 +329,23 @@ impl CustomSlotSupplier {
 
 #[pyclass]
 struct CreatedTaskForSlotCallback {
-    stored_task: Arc<OnceLock<PyObject>>,
+    stored_task: Arc<OnceLock<Py<PyAny>>>,
 }
 
 #[pymethods]
 impl CreatedTaskForSlotCallback {
-    fn __call__(&self, task: PyObject) -> PyResult<()> {
+    fn __call__(&self, task: Py<PyAny>) -> PyResult<()> {
         self.stored_task.set(task).expect("must only be set once");
         Ok(())
     }
 }
 
 struct TaskCanceller {
-    stored_task: Arc<OnceLock<PyObject>>,
+    stored_task: Arc<OnceLock<Py<PyAny>>>,
 }
 
 impl TaskCanceller {
-    fn new(stored_task: Arc<OnceLock<PyObject>>) -> Self {
+    fn new(stored_task: Arc<OnceLock<Py<PyAny>>>) -> Self {
         TaskCanceller { stored_task }
     }
 }
@@ -353,7 +353,7 @@ impl TaskCanceller {
 impl Drop for TaskCanceller {
     fn drop(&mut self) {
         if let Some(task) = self.stored_task.get() {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 task.call_method0(py, "cancel")
                     .expect("Failed to cancel task");
             });
@@ -369,7 +369,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
         loop {
             let stored_task = Arc::new(OnceLock::new());
             let _task_canceller = TaskCanceller::new(stored_task.clone());
-            let pypermit = match Python::with_gil(|py| {
+            let pypermit = match Python::attach(|py| {
                 let py_obj = self.inner.bind(py);
                 let called = py_obj.call_method1(
                     "reserve_slot",
@@ -404,7 +404,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let py_obj = self.inner.bind(py);
             let pa = py_obj.call_method1(
                 "try_reserve_slot",
@@ -425,10 +425,10 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn mark_slot_used(&self, ctx: &dyn SlotMarkUsedContext<SlotKind = Self::SlotKind>) {
-        if let Err(e) = Python::with_gil(|py| {
+        if let Err(e) = Python::attach(|py| {
             let permit = ctx
                 .permit()
-                .user_data::<PyObject>()
+                .user_data::<Py<PyAny>>()
                 .map(|o| o.clone_ref(py))
                 .unwrap_or_else(|| py.None());
             let py_obj = self.inner.bind(py);
@@ -446,10 +446,10 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn release_slot(&self, ctx: &dyn SlotReleaseContext<SlotKind = Self::SlotKind>) {
-        if let Err(e) = Python::with_gil(|py| {
+        if let Err(e) = Python::attach(|py| {
             let permit = ctx
                 .permit()
-                .user_data::<PyObject>()
+                .user_data::<Py<PyAny>>()
                 .map(|o| o.clone_ref(py))
                 .unwrap_or_else(|| py.None());
             let py_obj = self.inner.bind(py);
