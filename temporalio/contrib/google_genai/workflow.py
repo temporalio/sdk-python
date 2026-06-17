@@ -3,8 +3,6 @@
 This module provides utilities for using the Google Gemini SDK within Temporal
 workflows.  The key entry points are:
 
-- :func:`google_genai_client` — returns an ``AsyncClient`` backed by a
-  ``TemporalApiClient`` that routes all API calls through Temporal activities.
 - :func:`activity_as_tool` — converts a Temporal activity into a Gemini tool
   callable for use with automatic function calling (AFC).
 """
@@ -14,19 +12,10 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable
-from datetime import timedelta
 from typing import Any
-
-from google.genai.client import AsyncClient
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
-from temporalio.contrib.google_genai._temporal_api_client import (
-    TemporalApiClient,
-)
-from temporalio.contrib.google_genai._temporal_async_client import (
-    TemporalAsyncClient,
-)
 from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ActivityConfig
 
@@ -55,8 +44,10 @@ def activity_as_tool(
     Args:
         fn: A Temporal activity function decorated with ``@activity.defn``.
         activity_config: Configuration for the activity execution (timeouts,
-            retry policy, etc.).  Defaults to a 30-second
-            ``start_to_close_timeout``.
+            retry policy, etc.).  Must set ``start_to_close_timeout`` or
+            ``schedule_to_close_timeout`` — Temporal requires one, and there is
+            no default; otherwise the tool call raises when the activity is
+            invoked.
 
     Returns:
         An async callable suitable for use as a Gemini tool.
@@ -77,13 +68,7 @@ def activity_as_tool(
             "invalid_tool",
         )
 
-    config: ActivityConfig = {
-        **(
-            ActivityConfig(start_to_close_timeout=timedelta(seconds=30))
-            if activity_config is None
-            else activity_config
-        )
-    }
+    config: ActivityConfig = {**(activity_config or {})}
     if "summary" not in config:
         config["summary"] = "tool_call"
 
@@ -124,63 +109,3 @@ def activity_as_tool(
     wrapper.__annotations__ = getattr(schema_fn, "__annotations__", {})
 
     return wrapper
-
-
-def google_genai_client(
-    *,
-    vertexai: bool = False,
-    project: str | None = None,
-    location: str | None = None,
-    activity_config: ActivityConfig | None = None,
-) -> AsyncClient:
-    """Create a Gemini ``AsyncClient`` that routes API calls through Temporal activities.
-
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
-
-    Returns an ``AsyncClient`` backed by a :class:`TemporalApiClient`.  The
-    SDK's code (including the AFC loop) runs in the workflow; only the actual
-    HTTP API calls cross into activities.  Credentials are never fetched or
-    stored in the workflow — the activity worker handles authentication
-    independently.
-
-    Call this from within a workflow ``run`` method:
-
-    .. code-block:: python
-
-        @workflow.defn
-        class MyWorkflow:
-            @workflow.run
-            async def run(self, query: str) -> str:
-                client = google_genai_client()
-                response = await client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=query,
-                    config=GenerateContentConfig(
-                        tools=[activity_as_tool(my_tool)],
-                    ),
-                )
-                return response.text
-
-    Args:
-        vertexai: Whether to use Vertex AI API endpoints.  Must match the
-            ``GoogleGenAIPlugin`` configuration on the worker side.  Defaults to
-            ``False`` (Gemini Developer API).
-        project: Google Cloud project ID.  Only needed when ``vertexai=True``
-            and the SDK's request formatting requires it (e.g., cache
-            operations).
-        location: Google Cloud location.  Same conditions as ``project``.
-        activity_config: Override the default activity configuration
-            (timeouts, retry policy, etc.) for Gemini API call activities.
-
-    Returns:
-        A ``google.genai.client.AsyncClient`` instance.
-    """
-    temporal_api_client = TemporalApiClient(
-        vertexai=vertexai,
-        project=project,
-        location=location,
-        activity_config=activity_config,
-    )
-    return TemporalAsyncClient(temporal_api_client, activity_config)

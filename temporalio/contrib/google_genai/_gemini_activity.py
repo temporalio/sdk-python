@@ -14,6 +14,8 @@ from typing import Any, Callable
 import google.auth.credentials
 from google.genai import Client as GeminiClient
 from google.genai import types
+from google.genai._interactions import AsyncStream
+from google.genai._interactions.types import Interaction, InteractionSSEEvent
 from google.genai.types import HttpOptions
 from google.genai.types import HttpResponse as SdkHttpResponse
 
@@ -23,6 +25,9 @@ from temporalio.contrib.google_genai._models import (
     _GeminiApiResponse,
     _GeminiApiStreamedResponse,
     _GeminiDownloadFileRequest,
+    _GeminiInteractionIdRequest,
+    _GeminiInteractionRequest,
+    _GeminiInteractionStreamedResponse,
     _GeminiRegisterFilesRequest,
     _GeminiUploadFileRequest,
     _GeminiUploadToFileSearchStoreRequest,
@@ -36,6 +41,20 @@ def _resolve_http_options(
     if overrides is None:
         return None
     return HttpOptions.model_validate(overrides.model_dump(exclude_none=True))
+
+
+async def _drain_interaction_stream(
+    stream: AsyncStream[InteractionSSEEvent],
+) -> _GeminiInteractionStreamedResponse:
+    """Collect every SSE event from an interaction stream, heartbeating per event."""
+    events: list[dict[str, Any]] = []
+    async with stream:
+        async for event in stream:
+            activity.heartbeat()
+            events.append(
+                event.model_dump(by_alias=True, exclude_none=True, mode="json")
+            )
+    return _GeminiInteractionStreamedResponse(events=events)
 
 
 class GeminiApiCaller:
@@ -164,6 +183,93 @@ class GeminiApiCaller:
                 )
             )
 
+        @activity.defn
+        async def gemini_interactions_create(
+            req: _GeminiInteractionRequest,
+        ) -> dict[str, Any]:
+            """Create an interaction using the real genai.Client on the worker."""
+            interaction = await self._client.aio.interactions.create(**req.params)
+            return interaction.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+        @activity.defn
+        async def gemini_interactions_create_streamed(
+            req: _GeminiInteractionRequest,
+        ) -> _GeminiInteractionStreamedResponse:
+            """Create a streamed interaction, collecting all SSE events."""
+            stream = await self._client.aio.interactions.create(
+                stream=True, **req.params
+            )
+            assert not isinstance(stream, Interaction)
+            return await _drain_interaction_stream(stream)
+
+        @activity.defn
+        async def gemini_interactions_get(
+            req: _GeminiInteractionIdRequest,
+        ) -> dict[str, Any]:
+            """Get an interaction using the real genai.Client on the worker."""
+            interaction = await self._client.aio.interactions.get(req.id, **req.params)
+            return interaction.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+        @activity.defn
+        async def gemini_interactions_get_streamed(
+            req: _GeminiInteractionIdRequest,
+        ) -> _GeminiInteractionStreamedResponse:
+            """Get a streamed interaction, collecting all SSE events."""
+            stream = await self._client.aio.interactions.get(
+                req.id, stream=True, **req.params
+            )
+            assert not isinstance(stream, Interaction)
+            return await _drain_interaction_stream(stream)
+
+        @activity.defn
+        async def gemini_interactions_delete(
+            req: _GeminiInteractionIdRequest,
+        ) -> Any:
+            """Delete an interaction using the real genai.Client on the worker."""
+            return await self._client.aio.interactions.delete(req.id, **req.params)
+
+        @activity.defn
+        async def gemini_interactions_cancel(
+            req: _GeminiInteractionIdRequest,
+        ) -> dict[str, Any]:
+            """Cancel an interaction using the real genai.Client on the worker."""
+            interaction = await self._client.aio.interactions.cancel(
+                req.id, **req.params
+            )
+            return interaction.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+        @activity.defn
+        async def gemini_agents_create(
+            req: _GeminiInteractionRequest,
+        ) -> dict[str, Any]:
+            """Create a managed agent using the real genai.Client on the worker."""
+            agent = await self._client.aio.agents.create(**req.params)
+            return agent.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+        @activity.defn
+        async def gemini_agents_list(
+            req: _GeminiInteractionRequest,
+        ) -> dict[str, Any]:
+            """List managed agents using the real genai.Client on the worker."""
+            response = await self._client.aio.agents.list(**req.params)
+            return response.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+        @activity.defn
+        async def gemini_agents_get(
+            req: _GeminiInteractionIdRequest,
+        ) -> dict[str, Any]:
+            """Get a managed agent using the real genai.Client on the worker."""
+            agent = await self._client.aio.agents.get(req.id, **req.params)
+            return agent.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+        @activity.defn
+        async def gemini_agents_delete(
+            req: _GeminiInteractionIdRequest,
+        ) -> dict[str, Any]:
+            """Delete a managed agent using the real genai.Client on the worker."""
+            response = await self._client.aio.agents.delete(req.id, **req.params)
+            return response.model_dump(by_alias=True, exclude_none=True, mode="json")
+
         return [
             gemini_api_client_async_request,
             gemini_api_client_async_request_streamed,
@@ -171,4 +277,14 @@ class GeminiApiCaller:
             gemini_files_download,
             gemini_files_register,
             gemini_file_search_stores_upload,
+            gemini_interactions_create,
+            gemini_interactions_create_streamed,
+            gemini_interactions_get,
+            gemini_interactions_get_streamed,
+            gemini_interactions_delete,
+            gemini_interactions_cancel,
+            gemini_agents_create,
+            gemini_agents_list,
+            gemini_agents_get,
+            gemini_agents_delete,
         ]

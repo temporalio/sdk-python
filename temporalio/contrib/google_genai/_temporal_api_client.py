@@ -1,6 +1,6 @@
 """Temporal-aware BaseApiClient that routes SDK calls through activities.
 
-This module provides ``TemporalApiClient``, a ``BaseApiClient`` subclass
+This module provides ``_TemporalApiClient``, a ``BaseApiClient`` subclass
 whose HTTP methods dispatch through Temporal activities instead of making
 direct calls.  The real ``genai.Client`` with real credentials only exists
 on the worker side inside the activity.
@@ -59,7 +59,7 @@ def _validate_http_options(http_options: HttpOptions | None) -> None:
         )
 
 
-class TemporalApiClient(BaseApiClient):
+class _TemporalApiClient(BaseApiClient):
     """A ``BaseApiClient`` that routes all API calls through Temporal activities.
 
     This client is used on the workflow side. It does NOT initialize HTTP
@@ -200,7 +200,7 @@ class TemporalApiClient(BaseApiClient):
         """Raise — sync requests not supported in workflows."""
         raise RuntimeError(
             "Synchronous requests are not supported in Temporal workflows. "
-            "Use the AsyncClient returned by google_genai_client() instead."
+            "Use TemporalAsyncClient instead."
         )
 
     def request_streamed(
@@ -213,7 +213,7 @@ class TemporalApiClient(BaseApiClient):
         """Raise — sync streaming not supported in workflows."""
         raise RuntimeError(
             "Synchronous streaming is not supported in Temporal workflows. "
-            "Use the AsyncClient returned by google_genai_client() instead."
+            "Use TemporalAsyncClient instead."
         )
 
     async def async_request_streamed(

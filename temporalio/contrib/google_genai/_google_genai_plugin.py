@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
+from datetime import timedelta
+from typing import TYPE_CHECKING
 
 import google.auth.credentials
 from google.genai import Client as GeminiClient
@@ -13,6 +15,9 @@ from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+if TYPE_CHECKING:
+    from temporalio.contrib.google_genai._mcp import McpSessionFactory
 
 
 def _data_converter(converter: DataConverter | None) -> DataConverter:
@@ -64,6 +69,8 @@ class GoogleGenAIPlugin(SimplePlugin):
         self,
         client: GeminiClient,
         extra_credentials: google.auth.credentials.Credentials | None = None,
+        mcp_servers: dict[str, McpSessionFactory] | None = None,
+        mcp_connection_idle_timeout: timedelta | None = None,
     ) -> None:
         """Initialize the Gemini plugin.
 
@@ -75,8 +82,29 @@ class GoogleGenAIPlugin(SimplePlugin):
                 operations that require explicit auth (e.g.
                 ``files.register_files()``).  If not provided, the
                 client's own credentials are used.
+            mcp_servers: MCP servers to expose to workflows, keyed by name.
+                Each value is a factory returning an async context manager that
+                yields a connected, initialized ``mcp.ClientSession``.  A
+                workflow references a server by name with
+                ``TemporalMcpClientSession(name)`` in a ``generate_content``
+                ``tools`` list; ``list_tools`` / ``call_tool`` then run as the
+                ``{name}-list-tools`` / ``{name}-call-tool`` activities against a
+                worker-side connection.  Requires the ``mcp`` package.
+            mcp_connection_idle_timeout: How long a worker-process MCP
+                connection stays open while idle before being disconnected
+                (the timer resets on each reuse).  Defaults to 5 minutes.
         """
         self._api_caller = GeminiApiCaller(client, credentials=extra_credentials)
+
+        activities = list(self._api_caller.activities())
+        if mcp_servers:
+            # Imported lazily: ``mcp`` is an optional dependency, only needed
+            # when MCP servers are registered.
+            from temporalio.contrib.google_genai._mcp import build_mcp_activities
+
+            activities.extend(
+                build_mcp_activities(mcp_servers, mcp_connection_idle_timeout)
+            )
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
@@ -85,14 +113,14 @@ class GoogleGenAIPlugin(SimplePlugin):
                 return dataclasses.replace(
                     runner,
                     restrictions=runner.restrictions.with_passthrough_modules(
-                        "google.genai"
+                        "google.genai", "mcp"
                     ),
                 )
             return runner
 
         super().__init__(
-            name="GoogleGenAIPlugin",
+            name="google.GenAIPlugin",
             data_converter=_data_converter,
-            activities=self._api_caller.activities(),
+            activities=activities,
             workflow_runner=workflow_runner,
         )

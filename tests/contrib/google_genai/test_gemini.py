@@ -12,9 +12,11 @@ Tests cover:
 - File search store upload via TemporalAsyncFileSearchStores
 - Multi-turn chat via client.chats
 - TemporalAsyncClient wiring (files, file_search_stores)
-- TemporalApiClient edge cases (sync raises)
+- _TemporalApiClient edge cases (sync raises)
 - activity_as_tool validation and metadata preservation
-- google_genai_client configuration
+- TemporalAsyncClient configuration
+- Interactions API (create, batched streaming, get, cancel, delete)
+- Managed agents (create, get, list, delete); webhooks unsupported
 """
 
 import inspect
@@ -23,11 +25,17 @@ import json
 import uuid
 from datetime import timedelta
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from google.genai import Client as GeminiClient
 from google.genai import types
+from google.genai._interactions._models import construct_type
+from google.genai._interactions.types import (
+    Agent,
+    Interaction,
+    InteractionSSEEvent,
+)
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio import activity, workflow
@@ -36,18 +44,20 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib.google_genai import (
     GoogleGenAIPlugin,
     activity_as_tool,
-    google_genai_client,
 )
 from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
     _GeminiApiStreamedResponse,
     _GeminiDownloadFileRequest,
+    _GeminiInteractionIdRequest,
+    _GeminiInteractionRequest,
+    _GeminiInteractionStreamedResponse,
     _GeminiUploadFileRequest,
     _GeminiUploadToFileSearchStoreRequest,
 )
 from temporalio.contrib.google_genai._temporal_api_client import (
-    TemporalApiClient,
+    _TemporalApiClient,
 )
 from temporalio.contrib.google_genai._temporal_async_client import (
     TemporalAsyncClient,
@@ -59,6 +69,7 @@ from temporalio.contrib.google_genai._temporal_files import (
     TemporalAsyncFiles,
 )
 from temporalio.exceptions import ApplicationError
+from temporalio.worker import Replayer
 from temporalio.workflow import ActivityConfig
 from tests.helpers import new_worker
 
@@ -107,6 +118,44 @@ def make_function_call_response(fn_name: str, args: dict) -> str:
             },
         }
     )
+
+
+INTERACTION_ID = "interactions/test-123"
+
+
+def make_interaction_dict(status: str = "completed") -> dict[str, Any]:
+    """Build a minimal Interaction dict as the API would return it."""
+    return {"id": INTERACTION_ID, "object": "interaction", "status": status}
+
+
+def make_interaction_sse_events() -> list[dict[str, Any]]:
+    """Build a small SSE event sequence for a streamed interaction.
+
+    Includes a sparse ``interaction.created`` payload (just ``id`` and
+    ``object``) to exercise the lenient ``construct_type`` rehydration.
+    """
+    return [
+        {
+            "event_type": "interaction.created",
+            "interaction": {"id": INTERACTION_ID, "object": "interaction"},
+        },
+        {
+            "event_type": "step.delta",
+            "index": 0,
+            "delta": {"type": "text", "text": "Hello "},
+        },
+        {
+            "event_type": "step.delta",
+            "index": 0,
+            "delta": {"type": "text", "text": "world"},
+        },
+        {"event_type": "interaction.completed", "interaction": make_interaction_dict()},
+    ]
+
+
+def make_agent_dict(agent_id: str = "test-agent") -> dict[str, Any]:
+    """Build a minimal managed-agent dict as the API would return it."""
+    return {"id": agent_id, "system_instruction": "Be helpful."}
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +220,8 @@ class GeminiApiCallTracker:
         self.file_search_store_upload_requests: list[
             _GeminiUploadToFileSearchStoreRequest
         ] = []
+        self.interaction_requests: list[_GeminiInteractionRequest] = []
+        self.interaction_id_requests: list[_GeminiInteractionIdRequest] = []
         self._call_index = 0
 
     def _next_response(self, req: _GeminiApiRequest) -> str:
@@ -242,6 +293,74 @@ class GeminiApiCallTracker:
             name="operations/test-op",
         )
 
+    @activity.defn
+    async def gemini_interactions_create(
+        self, req: _GeminiInteractionRequest
+    ) -> dict[str, Any]:
+        self.interaction_requests.append(req)
+        return make_interaction_dict()
+
+    @activity.defn
+    async def gemini_interactions_create_streamed(
+        self, req: _GeminiInteractionRequest
+    ) -> _GeminiInteractionStreamedResponse:
+        self.interaction_requests.append(req)
+        return _GeminiInteractionStreamedResponse(events=make_interaction_sse_events())
+
+    @activity.defn
+    async def gemini_interactions_get(
+        self, req: _GeminiInteractionIdRequest
+    ) -> dict[str, Any]:
+        self.interaction_id_requests.append(req)
+        return make_interaction_dict()
+
+    @activity.defn
+    async def gemini_interactions_get_streamed(
+        self, req: _GeminiInteractionIdRequest
+    ) -> _GeminiInteractionStreamedResponse:
+        self.interaction_id_requests.append(req)
+        return _GeminiInteractionStreamedResponse(events=make_interaction_sse_events())
+
+    @activity.defn
+    async def gemini_interactions_delete(self, req: _GeminiInteractionIdRequest) -> Any:
+        self.interaction_id_requests.append(req)
+        return {"deleted": True}
+
+    @activity.defn
+    async def gemini_interactions_cancel(
+        self, req: _GeminiInteractionIdRequest
+    ) -> dict[str, Any]:
+        self.interaction_id_requests.append(req)
+        return make_interaction_dict(status="cancelled")
+
+    @activity.defn
+    async def gemini_agents_create(
+        self, req: _GeminiInteractionRequest
+    ) -> dict[str, Any]:
+        self.interaction_requests.append(req)
+        return make_agent_dict(req.params.get("id", "test-agent"))
+
+    @activity.defn
+    async def gemini_agents_list(
+        self, req: _GeminiInteractionRequest
+    ) -> dict[str, Any]:
+        self.interaction_requests.append(req)
+        return {"agents": [make_agent_dict()], "nextPageToken": "next-tok"}
+
+    @activity.defn
+    async def gemini_agents_get(
+        self, req: _GeminiInteractionIdRequest
+    ) -> dict[str, Any]:
+        self.interaction_id_requests.append(req)
+        return make_agent_dict(req.id)
+
+    @activity.defn
+    async def gemini_agents_delete(
+        self, req: _GeminiInteractionIdRequest
+    ) -> dict[str, Any]:
+        self.interaction_id_requests.append(req)
+        return {"id": req.id, "deleted": True}
+
 
 def apply_plugin(
     client: Client, mock_responses: list[str]
@@ -265,6 +384,16 @@ def apply_plugin(
         tracker.gemini_files_upload,
         tracker.gemini_files_download,
         tracker.gemini_file_search_stores_upload,
+        tracker.gemini_interactions_create,
+        tracker.gemini_interactions_create_streamed,
+        tracker.gemini_interactions_get,
+        tracker.gemini_interactions_get_streamed,
+        tracker.gemini_interactions_delete,
+        tracker.gemini_interactions_cancel,
+        tracker.gemini_agents_create,
+        tracker.gemini_agents_list,
+        tracker.gemini_agents_get,
+        tracker.gemini_agents_delete,
     ]
     try:
         gemini = GeminiClient(api_key="fake-test-key")
@@ -288,7 +417,7 @@ class SimpleGenerateWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -302,7 +431,7 @@ class SingleArgToolWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -326,7 +455,7 @@ class MultiArgToolWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -350,7 +479,7 @@ class ToolFailureWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -375,7 +504,7 @@ class MultipleToolsWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -408,7 +537,7 @@ class WorkflowMethodToolWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -434,7 +563,7 @@ class StreamedGenerateWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> list[str]:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         chunks: list[str] = []
         async for chunk in await client.models.generate_content_stream(
             model="gemini-2.5-flash",
@@ -451,7 +580,7 @@ class HttpOptionsWorkflow:
 
     @workflow.run
     async def run(self, prompt: str, http_options: types.HttpOptionsDict) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         response = await client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
@@ -473,7 +602,7 @@ class FullIntegrationWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> dict[str, Any]:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         results: dict[str, Any] = {}
 
         # 1. generate_content (async_request activity)
@@ -535,6 +664,34 @@ class FullIntegrationWorkflow:
         )
         results["store_deleted"] = True
 
+        # 8. interactions.create (gemini_interactions_create activity)
+        interaction = await client.interactions.create(
+            model="gemini-2.5-flash",
+            input=prompt,
+        )
+        assert isinstance(interaction, Interaction)
+        results["interaction_id"] = interaction.id
+
+        # 9. interactions.create streamed (gemini_interactions_create_streamed)
+        stream = await client.interactions.create(
+            model="gemini-2.5-flash",
+            input=prompt,
+            stream=True,
+        )
+        assert not isinstance(stream, Interaction)
+        event_types: list[str] = []
+        async with stream:
+            async for event in stream:
+                event_types.append(event.event_type)
+        results["interaction_events"] = event_types
+
+        # 10. agents.create (gemini_agents_create activity)
+        agent = await client.agents.create(
+            id="test-agent",
+            system_instruction="Be helpful.",
+        )
+        results["agent_id"] = agent.id
+
         return results
 
 
@@ -544,7 +701,7 @@ class FileUploadStrWorkflow:
 
     @workflow.run
     async def run(self, file_path: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         uploaded = await client.files.upload(
             file=file_path,
             config=types.UploadFileConfig(
@@ -561,7 +718,7 @@ class FileUploadBytesWorkflow:
 
     @workflow.run
     async def run(self, data: bytes) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         uploaded = await client.files.upload(
             file=io.BytesIO(data),
             config=types.UploadFileConfig(
@@ -578,7 +735,7 @@ class FileDownloadWorkflow:
 
     @workflow.run
     async def run(self, file_name: str) -> bytes:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         return await client.files.download(file=file_name)
 
 
@@ -588,7 +745,7 @@ class FileSearchStoreUploadWorkflow:
 
     @workflow.run
     async def run(self, store_name: str, file_path: str) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         op = await client.file_search_stores.upload_to_file_search_store(
             file_search_store_name=store_name,
             file=file_path,
@@ -606,7 +763,7 @@ class RegisterFilesWorkflow:
 
     @workflow.run
     async def run(self, uris: list[str]) -> str:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         # auth arg is ignored by TemporalAsyncFiles — the activity uses
         # credentials from GoogleGenAIPlugin init.  We pass a dummy here;
         # can't import google.auth.credentials in the sandbox so we
@@ -624,13 +781,106 @@ class ChatWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> list[str]:
-        client = google_genai_client()
+        client = TemporalAsyncClient()
         chat = client.chats.create(
             model="gemini-2.5-flash",
         )
         r1 = await chat.send_message(prompt)
         r2 = await chat.send_message("Follow up question")
         return [r1.text or "", r2.text or ""]
+
+
+@workflow.defn
+class InteractionCreateWorkflow:
+    """Workflow that creates an interaction (non-streaming)."""
+
+    @workflow.run
+    async def run(self, prompt: str) -> dict[str, Any]:
+        client = TemporalAsyncClient()
+        interaction = await client.interactions.create(
+            model="gemini-2.5-flash",
+            input=prompt,
+            timeout=120,
+        )
+        assert isinstance(interaction, Interaction)
+        return {"id": interaction.id, "status": str(interaction.status)}
+
+
+@workflow.defn
+class InteractionStreamWorkflow:
+    """Workflow that creates a streamed interaction and collects event types."""
+
+    @workflow.run
+    async def run(self, prompt: str) -> list[str]:
+        client = TemporalAsyncClient()
+        stream = await client.interactions.create(
+            model="gemini-2.5-flash",
+            input=prompt,
+            stream=True,
+        )
+        assert not isinstance(stream, Interaction)
+        event_types: list[str] = []
+        async with stream:
+            async for event in stream:
+                event_types.append(event.event_type)
+        return event_types
+
+
+@workflow.defn
+class InteractionLifecycleWorkflow:
+    """Workflow that gets, cancels, and deletes an interaction."""
+
+    @workflow.run
+    async def run(self, interaction_id: str) -> dict[str, Any]:
+        client = TemporalAsyncClient()
+        got = await client.interactions.get(interaction_id)
+        assert isinstance(got, Interaction)
+        cancelled = await client.interactions.cancel(interaction_id)
+        deleted = await client.interactions.delete(interaction_id)
+        return {
+            "got_id": got.id,
+            "cancel_status": str(cancelled.status),
+            "deleted": deleted,
+        }
+
+
+@workflow.defn
+class AgentsWorkflow:
+    """Workflow that exercises managed-agent CRUD."""
+
+    @workflow.run
+    async def run(self) -> dict[str, Any]:
+        client = TemporalAsyncClient()
+        agent = await client.agents.create(
+            id="test-agent",
+            system_instruction="Be helpful.",
+        )
+        got = await client.agents.get("test-agent")
+        listing = await client.agents.list(page_size=10)
+        deleted = await client.agents.delete("test-agent")
+        return {
+            "created_id": agent.id,
+            "got_id": got.id,
+            "listed_ids": [a.id for a in (listing.agents or [])],
+            "next_page_token": listing.next_page_token,
+            # AgentDeleteResponse defines no fields; the API's JSON comes
+            # back as extras, so return the dict form.
+            "delete_response": deleted.model_dump(mode="json"),
+        }
+
+
+@workflow.defn
+class WebhooksUnsupportedWorkflow:
+    """Workflow that verifies client.webhooks raises a clear error."""
+
+    @workflow.run
+    async def run(self) -> str:
+        client = TemporalAsyncClient()
+        try:
+            _ = client.webhooks
+        except RuntimeError as e:
+            return str(e)
+        return "no error"
 
 
 # ===========================================================================
@@ -1053,6 +1303,26 @@ async def test_chat_multi_turn(client: Client):
     assert result == ["First answer", "Second answer"]
 
 
+class _FakeAsyncStream:
+    """Minimal stand-in for the SDK's AsyncStream in mocked-client tests."""
+
+    def __init__(self, events: list[Any]) -> None:
+        self._events = events
+
+    def __aiter__(self) -> Any:
+        return self._gen()
+
+    async def _gen(self) -> Any:
+        for event in self._events:
+            yield event
+
+    async def __aenter__(self) -> "_FakeAsyncStream":
+        return self
+
+    async def __aexit__(self, *_args: Any) -> None:
+        pass
+
+
 # ===========================================================================
 # Full integration test — real activities, mocked client
 # ===========================================================================
@@ -1119,6 +1389,27 @@ def _apply_plugin_with_mock_client(client: Client, mock_responses: list[str]) ->
         )
     )
 
+    # Interactions and agents go through the vendored nextgen client (not
+    # BaseApiClient); inject a mock instance so the real activities exercise
+    # their code path without network access.
+    interaction = construct_type(type_=Interaction, value=make_interaction_dict())
+    sse_events = [
+        construct_type(type_=InteractionSSEEvent, value=e)
+        for e in make_interaction_sse_events()
+    ]
+
+    async def _interactions_create(*_args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("stream"):
+            return _FakeAsyncStream(sse_events)
+        return interaction
+
+    mock_nextgen = MagicMock()
+    mock_nextgen.interactions.create = _interactions_create
+    mock_nextgen.agents.create = AsyncMock(
+        return_value=construct_type(type_=Agent, value=make_agent_dict())
+    )
+    gemini.aio._nextgen_client_instance = mock_nextgen  # type: ignore[assignment]
+
     plugin = GoogleGenAIPlugin(gemini)
     config = client.config()
     config["plugins"] = [plugin]
@@ -1163,6 +1454,14 @@ async def test_full_integration_with_mock_client(client: Client):
     assert result["fss_upload_op"] == "operations/mock-op"
     assert result["rag"] == "Grounded RAG answer"
     assert result["store_deleted"] is True
+    assert result["interaction_id"] == INTERACTION_ID
+    assert result["interaction_events"] == [
+        "interaction.created",
+        "step.delta",
+        "step.delta",
+        "interaction.completed",
+    ]
+    assert result["agent_id"] == "test-agent"
 
 
 async def test_register_files_without_credentials_fails(client: Client):
@@ -1194,47 +1493,47 @@ async def test_register_files_without_credentials_fails(client: Client):
 
 
 def test_temporal_async_client_has_temporal_files():
-    """google_genai_client() returns a client with TemporalAsyncFiles."""
-    client = google_genai_client()
+    """TemporalAsyncClient() returns a client with TemporalAsyncFiles."""
+    client = TemporalAsyncClient()
     assert isinstance(client, TemporalAsyncClient)
     assert isinstance(client.files, TemporalAsyncFiles)
 
 
 def test_temporal_async_client_has_temporal_file_search_stores():
-    """google_genai_client() returns a client with TemporalAsyncFileSearchStores."""
-    client = google_genai_client()
+    """TemporalAsyncClient() returns a client with TemporalAsyncFileSearchStores."""
+    client = TemporalAsyncClient()
     assert isinstance(client.file_search_stores, TemporalAsyncFileSearchStores)
 
 
 # ===========================================================================
-# Unit tests for TemporalApiClient
+# Unit tests for _TemporalApiClient
 # ===========================================================================
 
 
 def test_sync_request_raises():
     """Synchronous request() raises RuntimeError."""
-    api_client = TemporalApiClient()
+    api_client = _TemporalApiClient()
     with pytest.raises(RuntimeError, match="Synchronous requests are not supported"):
         api_client.request("GET", "/test", {})
 
 
 def test_sync_request_streamed_raises():
     """Synchronous request_streamed() raises RuntimeError."""
-    api_client = TemporalApiClient()
+    api_client = _TemporalApiClient()
     with pytest.raises(RuntimeError, match="Synchronous streaming is not supported"):
         api_client.request_streamed("GET", "/test", {})
 
 
 def test_upload_file_raises():
     """Low-level upload_file() raises NotImplementedError."""
-    api_client = TemporalApiClient()
+    api_client = _TemporalApiClient()
     with pytest.raises(NotImplementedError, match="client.files.upload"):
         api_client.upload_file()
 
 
 def test_download_file_raises():
     """Low-level download_file() raises NotImplementedError."""
-    api_client = TemporalApiClient()
+    api_client = _TemporalApiClient()
     with pytest.raises(NotImplementedError, match="client.files.download"):
         api_client.download_file()
 
@@ -1289,13 +1588,13 @@ def test_activity_as_tool_is_async_callable():
 
 
 # ===========================================================================
-# Unit tests for google_genai_client
+# Unit tests for TemporalAsyncClient
 # ===========================================================================
 
 
-def test_google_genai_client_vertexai_config():
-    """google_genai_client() forwards Vertex AI configuration to the TemporalApiClient."""
-    result = google_genai_client(vertexai=True, project="proj", location="us-central1")
+def test_temporal_async_client_vertexai_config():
+    """TemporalAsyncClient() forwards Vertex AI configuration to the _TemporalApiClient."""
+    result = TemporalAsyncClient(vertexai=True, project="proj", location="us-central1")
     assert result._api_client.vertexai is True
     assert result._api_client.project == "proj"
     assert result._api_client.location == "us-central1"
@@ -1308,7 +1607,7 @@ def test_google_genai_client_vertexai_config():
 
 async def test_file_upload_text_stream_raises():
     """TemporalAsyncFiles.upload rejects text streams with a clear TypeError."""
-    files = TemporalAsyncFiles(TemporalApiClient())
+    files = TemporalAsyncFiles(_TemporalApiClient())
     with pytest.raises(
         TypeError, match="file must be a binary stream when passing an io.IOBase"
     ):
@@ -1317,7 +1616,7 @@ async def test_file_upload_text_stream_raises():
 
 async def test_file_search_store_upload_text_stream_raises():
     """TemporalAsyncFileSearchStores.upload_to_file_search_store rejects text streams."""
-    stores = TemporalAsyncFileSearchStores(TemporalApiClient())
+    stores = TemporalAsyncFileSearchStores(_TemporalApiClient())
     with pytest.raises(
         TypeError, match="file must be a binary stream when passing an io.IOBase"
     ):
@@ -1325,3 +1624,268 @@ async def test_file_search_store_upload_text_stream_raises():
             file_search_store_name="fileSearchStores/x",
             file=io.StringIO("text"),
         )
+
+
+# ===========================================================================
+# Interactions API tests
+# ===========================================================================
+
+
+async def test_interaction_create(client: Client):
+    """Non-streaming interactions.create returns a typed Interaction."""
+    new_client, tracker = apply_plugin(client, [])
+
+    async with new_worker(new_client, InteractionCreateWorkflow) as worker:
+        result = await new_client.execute_workflow(
+            InteractionCreateWorkflow.run,
+            "What's an interaction?",
+            id=f"gemini-interaction-create-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+
+    assert result == {"id": INTERACTION_ID, "status": "completed"}
+    assert len(tracker.interaction_requests) == 1
+    params = tracker.interaction_requests[0].params
+    assert params["model"] == "gemini-2.5-flash"
+    assert params["input"] == "What's an interaction?"
+    # stream selects the activity; timeout maps to start_to_close_timeout.
+    assert "stream" not in params
+    assert "timeout" not in params
+
+
+async def test_interaction_create_stream(client: Client):
+    """Streamed interactions.create yields typed events in order."""
+    new_client, tracker = apply_plugin(client, [])
+
+    async with new_worker(new_client, InteractionStreamWorkflow) as worker:
+        result = await new_client.execute_workflow(
+            InteractionStreamWorkflow.run,
+            "Stream me",
+            id=f"gemini-interaction-stream-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+
+    assert result == [
+        "interaction.created",
+        "step.delta",
+        "step.delta",
+        "interaction.completed",
+    ]
+    assert len(tracker.interaction_requests) == 1
+    assert "stream" not in tracker.interaction_requests[0].params
+
+
+async def test_interaction_lifecycle(client: Client):
+    """interactions.get/cancel/delete forward the interaction id."""
+    new_client, tracker = apply_plugin(client, [])
+
+    async with new_worker(new_client, InteractionLifecycleWorkflow) as worker:
+        result = await new_client.execute_workflow(
+            InteractionLifecycleWorkflow.run,
+            "interactions/abc",
+            id=f"gemini-interaction-lifecycle-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+
+    assert result["got_id"] == INTERACTION_ID
+    assert result["cancel_status"] == "cancelled"
+    assert result["deleted"] == {"deleted": True}
+    assert [r.id for r in tracker.interaction_id_requests] == ["interactions/abc"] * 3
+
+
+async def test_agents_crud(client: Client):
+    """agents.create/get/list/delete round-trip through activities."""
+    new_client, tracker = apply_plugin(client, [])
+
+    async with new_worker(new_client, AgentsWorkflow) as worker:
+        result = await new_client.execute_workflow(
+            AgentsWorkflow.run,
+            id=f"gemini-agents-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+
+    assert result["created_id"] == "test-agent"
+    assert result["got_id"] == "test-agent"
+    assert result["listed_ids"] == ["test-agent"]
+    assert result["next_page_token"] == "next-tok"
+    assert result["delete_response"]["id"] == "test-agent"
+    # create + list went through the no-id request path
+    assert [r.params.get("page_size") for r in tracker.interaction_requests] == [
+        None,
+        10,
+    ]
+
+
+async def test_webhooks_unsupported(client: Client):
+    """client.webhooks raises a clear error inside a workflow."""
+    new_client, _ = apply_plugin(client, [])
+
+    async with new_worker(new_client, WebhooksUnsupportedWorkflow) as worker:
+        result = await new_client.execute_workflow(
+            WebhooksUnsupportedWorkflow.run,
+            id=f"gemini-webhooks-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+
+    assert "client.webhooks is not supported in Temporal workflows" in result
+
+
+# ===========================================================================
+# Unit tests for interactions helpers
+# ===========================================================================
+
+
+def test_pop_timeout_maps_to_activity_config():
+    """A numeric timeout kwarg becomes the activity start_to_close_timeout."""
+    from temporalio.contrib.google_genai._temporal_interactions import _pop_timeout
+
+    config = ActivityConfig()
+    params: dict[str, Any] = {"model": "gemini-2.5-flash", "timeout": 120}
+    _pop_timeout(params, config)
+    assert "timeout" not in params
+    assert config.get("start_to_close_timeout") == timedelta(seconds=120)
+
+
+def test_pop_timeout_rejects_non_numeric():
+    """Non-numeric timeouts (e.g. httpx.Timeout) are rejected."""
+    import httpx
+
+    from temporalio.contrib.google_genai._temporal_interactions import _pop_timeout
+
+    with pytest.raises(ValueError, match="timeout must be numeric seconds"):
+        _pop_timeout({"timeout": httpx.Timeout(5.0)}, ActivityConfig())
+
+
+# ===========================================================================
+# Replay determinism + side-effect (activity scheduling) tests
+# ===========================================================================
+
+
+def _replay_plugin() -> GoogleGenAIPlugin:
+    """Build a real plugin instance for the Replayer.
+
+    Replay never executes activities, so a fake-key client is sufficient.
+    What matters is that the Replayer uses the plugin's data converter,
+    sandbox passthrough, and workflow runner — the same configuration that
+    runs in production — so a history recorded by the plugin replays under
+    it without nondeterminism.
+    """
+    return GoogleGenAIPlugin(GeminiClient(api_key="fake-test-key"))
+
+
+async def test_replay_simple_generate(client: Client):
+    """A recorded simple generate_content history replays deterministically."""
+    new_client, _ = apply_plugin(client, [make_text_response("Hello from Gemini!")])
+
+    async with new_worker(new_client, SimpleGenerateWorkflow) as worker:
+        handle = await new_client.start_workflow(
+            SimpleGenerateWorkflow.run,
+            "Say hello",
+            id=f"gemini-replay-simple-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        await handle.result()
+        history = await handle.fetch_history()
+
+    await Replayer(
+        workflows=[SimpleGenerateWorkflow],
+        plugins=[_replay_plugin()],
+    ).replay_workflow(history)
+
+
+async def test_replay_tool_loop(client: Client):
+    """The in-workflow AFC tool loop replays deterministically.
+
+    The Gemini SDK's automatic-function-calling loop runs inside the
+    workflow, interleaving multiple activity calls with SDK-side request
+    formatting.  That makes it the replay path most likely to surface
+    nondeterminism, so the recorded history is replayed under the real
+    plugin to prove the loop is replay-safe.
+    """
+    tool_tracker = ToolCallTracker()
+    new_client, _ = apply_plugin(
+        client,
+        [
+            make_function_call_response("get_weather", {"city": "Tokyo"}),
+            make_function_call_response(
+                "get_weather_country", {"city": "Paris", "country": "France"}
+            ),
+            make_text_response("Tokyo is sunny; Paris is rainy."),
+        ],
+    )
+
+    async with new_worker(
+        new_client,
+        MultipleToolsWorkflow,
+        activities=[tool_tracker.get_weather, tool_tracker.get_weather_country],
+    ) as worker:
+        handle = await new_client.start_workflow(
+            MultipleToolsWorkflow.run,
+            "Compare Tokyo and Paris weather",
+            id=f"gemini-replay-tools-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=15),
+        )
+        await handle.result()
+        history = await handle.fetch_history()
+
+    await Replayer(
+        workflows=[MultipleToolsWorkflow],
+        plugins=[_replay_plugin()],
+    ).replay_workflow(history)
+
+
+async def test_side_effects_activity_scheduling(client: Client):
+    """Each Gemini API call and tool call schedules exactly one activity.
+
+    Runs with ``max_cached_workflows=0`` so the workflow is evicted and
+    replayed from history between tasks — any nondeterminism in the
+    in-workflow AFC loop would fail the run — then asserts the exact number
+    of ``ActivityTaskScheduled`` events per activity type.  The multi-tool
+    workflow issues three generate_content calls (initial + one per tool
+    result) and one activity per tool invocation.
+    """
+    tool_tracker = ToolCallTracker()
+    new_client, _ = apply_plugin(
+        client,
+        [
+            make_function_call_response("get_weather", {"city": "Tokyo"}),
+            make_function_call_response(
+                "get_weather_country", {"city": "Paris", "country": "France"}
+            ),
+            make_text_response("Tokyo is sunny; Paris is rainy."),
+        ],
+    )
+
+    async with new_worker(
+        new_client,
+        MultipleToolsWorkflow,
+        activities=[tool_tracker.get_weather, tool_tracker.get_weather_country],
+        max_cached_workflows=0,
+    ) as worker:
+        handle = await new_client.start_workflow(
+            MultipleToolsWorkflow.run,
+            "Compare Tokyo and Paris weather",
+            id=f"gemini-side-effects-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=15),
+        )
+        await handle.result()
+
+        scheduled: dict[str, int] = {}
+        async for e in handle.fetch_history_events():
+            if e.HasField("activity_task_scheduled_event_attributes"):
+                name = e.activity_task_scheduled_event_attributes.activity_type.name
+                scheduled[name] = scheduled.get(name, 0) + 1
+
+    assert scheduled == {
+        "gemini_api_client_async_request": 3,
+        "get_weather": 1,
+        "get_weather_country": 1,
+    }

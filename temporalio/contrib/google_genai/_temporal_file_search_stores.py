@@ -20,7 +20,7 @@ from temporalio.contrib.google_genai._models import (
     _GeminiUploadToFileSearchStoreRequest,
 )
 from temporalio.contrib.google_genai._temporal_api_client import (
-    TemporalApiClient,
+    _TemporalApiClient,
     _validate_http_options,
 )
 from temporalio.workflow import ActivityConfig
@@ -33,13 +33,13 @@ class TemporalAsyncFileSearchStores(AsyncFileSearchStores):
     upload negotiation, and chunked transfer — runs inside a Temporal
     activity on the worker.  All other methods (``create``, ``get``,
     ``delete``, ``list``, ``import_file``, ``documents``) are inherited
-    and already work through the ``TemporalApiClient``'s ``async_request``
+    and already work through the ``_TemporalApiClient``'s ``async_request``
     activity.
     """
 
     def __init__(
         self,
-        api_client: TemporalApiClient,
+        api_client: _TemporalApiClient,
         activity_config: ActivityConfig | None = None,
     ) -> None:
         """Initialize with activity config for upload timeouts."""

@@ -16,9 +16,13 @@ __all__ = [
     "_GeminiApiResponse",
     "_GeminiApiStreamedResponse",
     "_GeminiDownloadFileRequest",
+    "_GeminiInteractionIdRequest",
+    "_GeminiInteractionRequest",
+    "_GeminiInteractionStreamedResponse",
     "_GeminiRegisterFilesRequest",
     "_GeminiUploadFileRequest",
     "_GeminiUploadToFileSearchStoreRequest",
+    "_McpCallToolRequest",
     "_SerializableHttpOptions",
 ]
 
@@ -105,3 +109,55 @@ class _GeminiUploadToFileSearchStoreRequest(BaseModel):
     file_bytes: bytes | None = None
     file_path: str | None = None
     config: types.UploadToFileSearchStoreConfig | None = None
+
+
+# ── interactions / agents models ──────────────────────────────────────────
+
+
+class _GeminiInteractionRequest(BaseModel):
+    """Serializable activity input for interactions/agents calls without an id.
+
+    ``params`` is the caller's kwargs forwarded verbatim to the real SDK
+    method on the worker — ``stream`` and ``timeout`` are popped by the
+    workflow-side shim before dispatch (``stream`` selects the activity,
+    ``timeout`` maps to the activity's ``start_to_close_timeout``).
+    """
+
+    params: dict[str, Any] = {}
+
+
+class _GeminiInteractionIdRequest(BaseModel):
+    """Serializable activity input for id-addressed interactions/agents calls."""
+
+    id: str
+    params: dict[str, Any] = {}
+
+
+class _GeminiInteractionStreamedResponse(BaseModel):
+    """Serializable activity output for a batched streamed interaction call.
+
+    ``events`` is the verbatim sequence of ``InteractionSSEEvent`` objects
+    yielded by the SDK's stream, each serialized via
+    ``model_dump(exclude_none=True, mode="json")``.  The workflow-side shim
+    rehydrates each entry with the SDK's own ``construct_type`` so workflow
+    code iterates the same typed events it would get from the SDK directly.
+    """
+
+    events: list[dict[str, Any]] = []
+
+
+# ── MCP models ─────────────────────────────────────────────────────────────
+
+
+class _McpCallToolRequest(BaseModel):
+    """Serializable activity input for an MCP ``call_tool`` invocation.
+
+    Carries the tool name and arguments the Gemini SDK's AFC loop selected;
+    the worker-side activity forwards them to the real ``mcp.ClientSession``.
+    The ``mcp.types.ListToolsResult`` / ``CallToolResult`` returned by the
+    activities are themselves Pydantic models, so they serialize directly via
+    the plugin's ``PydanticPayloadConverter`` and need no wrapper here.
+    """
+
+    name: str
+    arguments: dict[str, Any] = {}
