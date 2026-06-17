@@ -387,6 +387,12 @@ class _BridgeServiceClient(ServiceClient):
         self._bridge_client_connect_lock = asyncio.Lock()
 
     async def _connected_client(self) -> temporalio.bridge.client.Client:
+        # Fast path avoids touching the lock once connected. This keeps the
+        # lock off the per-RPC hot path so it never binds to (or is contended
+        # across) an event loop, letting a connected client be reused from any
+        # loop.
+        if self._bridge_client is not None:
+            return self._bridge_client
         async with self._bridge_client_connect_lock:
             if not self._bridge_client:
                 runtime = self.config.runtime or temporalio.runtime.Runtime.default()
