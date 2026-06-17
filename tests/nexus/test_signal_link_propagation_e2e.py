@@ -118,13 +118,6 @@ class _AsyncSignalingOperation(OperationHandler[OpInput, str]):
     async def cancel(self, ctx, token: str) -> None:  # type: ignore[no-untyped-def]
         raise NotImplementedError
 
-    async def fetch_info(self, ctx, token: str):  # type: ignore[no-untyped-def]
-        raise NotImplementedError
-
-    async def fetch_result(self, ctx, token: str):  # type: ignore[no-untyped-def]
-        raise NotImplementedError
-
-
 @service_handler(service=SignalingService)
 class SignalingServiceHandler:
     @sync_operation
