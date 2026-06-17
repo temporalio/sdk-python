@@ -108,6 +108,42 @@ def verify_dist(args: argparse.Namespace) -> None:
         print(f"  {name}")
 
 
+def changelog_notes(args: argparse.Namespace) -> None:
+    changelog_path = pathlib.Path(args.changelog)
+    lines = changelog_path.read_text(encoding="utf-8").splitlines()
+    heading = re.compile(r"^## \[(?P<version>[^\]]+)\](?:\s+-\s+.*)?\s*$")
+
+    start = None
+    for index, line in enumerate(lines):
+        match = heading.match(line)
+        if match and match.group("version") == args.version:
+            start = index + 1
+            break
+
+    if start is None:
+        raise RuntimeError(
+            f"Could not find changelog section for version {args.version!r}"
+        )
+
+    end = len(lines)
+    for index in range(start, len(lines)):
+        if lines[index].startswith("## "):
+            end = index
+            break
+
+    section_lines = lines[start:end]
+    while section_lines and not section_lines[0].strip():
+        section_lines.pop(0)
+    while section_lines and not section_lines[-1].strip():
+        section_lines.pop()
+
+    if not section_lines:
+        raise RuntimeError(f"Changelog section for {args.version!r} is empty")
+
+    notes = "## Changelog\n\n" + "\n".join(section_lines) + "\n"
+    pathlib.Path(args.output).write_text(notes, encoding="utf-8")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(required=True)
@@ -121,6 +157,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     verify_parser.add_argument("--version", required=True)
     verify_parser.add_argument("--dist-dir", default="dist")
     verify_parser.set_defaults(func=verify_dist)
+
+    changelog_parser = subparsers.add_parser("changelog-notes")
+    changelog_parser.add_argument("--version", required=True)
+    changelog_parser.add_argument("--changelog", default="CHANGELOG.md")
+    changelog_parser.add_argument("--output", required=True)
+    changelog_parser.set_defaults(func=changelog_notes)
 
     args = parser.parse_args(argv)
     args.func(args)
