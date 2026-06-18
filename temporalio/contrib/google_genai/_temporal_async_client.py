@@ -42,6 +42,7 @@ batch jobs from a workflow.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import NoReturn
 
 from google.genai._interactions.resources.agents import AsyncAgentsResource
@@ -122,6 +123,8 @@ class TemporalAsyncClient(AsyncClient):
         project: str | None = None,
         location: str | None = None,
         activity_config: ActivityConfig | None = None,
+        streaming_topic: str | None = None,
+        streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ) -> None:
         """Initialize a Temporal-aware client.
 
@@ -138,12 +141,23 @@ class TemporalAsyncClient(AsyncClient):
                 When not provided, every operation (model calls, files,
                 interactions, managed agents) defaults to a 60-second
                 ``start_to_close_timeout`` and Temporal's default retry policy.
+            streaming_topic: When set, ``generate_content_stream`` publishes each
+                streamed ``GenerateContentResponse`` to this
+                :class:`~temporalio.contrib.workflow_streams.WorkflowStream`
+                topic as it arrives, so external consumers can observe the model
+                output in real time.  The workflow must construct a
+                ``WorkflowStream`` in ``@workflow.init``; otherwise the call
+                raises.  The workflow's own stream iteration is unchanged.
+            streaming_batch_interval: How often the streaming activity flushes
+                published chunks to the workflow stream.  Defaults to 100ms.
         """
         api_client = _TemporalApiClient(
             vertexai=vertexai,
             project=project,
             location=location,
             activity_config=activity_config,
+            streaming_topic=streaming_topic,
+            streaming_batch_interval=streaming_batch_interval,
         )
         super().__init__(api_client)
         self._files = TemporalAsyncFiles(api_client, activity_config)

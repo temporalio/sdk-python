@@ -191,6 +191,56 @@ carries the server name. Tool discovery and calls run as `{name}-list-tools` /
 model. Set `cache_tools=True` to list a server's tools once per workflow instead
 of per turn.
 
+## Streaming
+
+`generate_content_stream` works as usual — the workflow iterates chunks (batched
+from the activity). To let an **external** consumer (a chat UI) observe chunks in
+real time while the workflow runs durably, set `streaming_topic` on the client
+and host a [`WorkflowStream`](../workflow_streams/) in the workflow. Each
+streamed `GenerateContentResponse` is published to that topic as it arrives:
+
+```python
+from temporalio.contrib.workflow_streams import WorkflowStream
+
+
+@workflow.defn
+class StreamingAgent:
+    @workflow.init
+    def __init__(self, prompt: str) -> None:
+        self.stream = WorkflowStream()  # required when streaming_topic is set
+
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        client = TemporalAsyncClient(streaming_topic="gemini")
+        text = []
+        async for chunk in await client.models.generate_content_stream(
+            model="gemini-2.5-flash", contents=prompt,
+        ):
+            text.append(chunk.text or "")
+        return "".join(text)
+```
+
+Consume the stream from outside the workflow:
+
+```python
+from temporalio.contrib.workflow_streams import WorkflowStreamClient
+
+
+async def consume(client, workflow_id):
+    stream = WorkflowStreamClient.create(client, workflow_id)
+    async for item in stream.subscribe(
+        ["gemini"], result_type=types.GenerateContentResponse,
+    ):
+        print(item.data.text, end="", flush=True)
+```
+
+The workflow's own iteration is unchanged (it still receives batched chunks for
+the SDK to parse); the topic is purely for external real-time observation. If
+`streaming_topic` is set but the workflow hosts no `WorkflowStream`, the call
+raises `GoogleGenAIError`. Tune flush cadence with
+`TemporalAsyncClient(streaming_topic=..., streaming_batch_interval=...)`
+(default 100ms).
+
 ## Retries & errors
 
 Temporal owns retries. Configure them with the activity `retry_policy` via

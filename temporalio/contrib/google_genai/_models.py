@@ -48,12 +48,20 @@ class _SerializableHttpOptions(BaseModel):
 
 
 class _GeminiApiRequest(BaseModel):
-    """Serializable activity input for a Gemini SDK API call."""
+    """Serializable activity input for a Gemini SDK API call.
+
+    ``streaming_topic`` / ``streaming_batch_interval_ms`` are only read by the
+    streamed activity: when a topic is set, each streamed chunk is published to
+    that workflow-stream topic as it arrives (in addition to being returned
+    batched), so external consumers can observe the model output in real time.
+    """
 
     http_method: str
     path: str
     request_dict: dict[str, object]
     http_options_overrides: _SerializableHttpOptions | None = None
+    streaming_topic: str | None = None
+    streaming_batch_interval_ms: int = 100
 
 
 class _GeminiApiResponse(BaseModel):

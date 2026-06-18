@@ -30,6 +30,7 @@ from temporalio.contrib.google_genai._models import (
     _GeminiApiStreamedResponse,
     _SerializableHttpOptions,
 )
+from temporalio.contrib.workflow_streams._stream import _PUBLISH_SIGNAL
 from temporalio.workflow import ActivityConfig
 
 # Fields on HttpOptions that cannot be serialized or should not be forwarded.
@@ -78,6 +79,8 @@ class _TemporalApiClient(BaseApiClient):  # pyright: ignore[reportUnusedClass]
         project: str | None = None,
         location: str | None = None,
         activity_config: ActivityConfig | None = None,
+        streaming_topic: str | None = None,
+        streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ) -> None:
         """Initialize without calling super (no HTTP clients needed)."""
         # Do NOT call super().__init__() — it creates HTTP clients, loads
@@ -94,6 +97,8 @@ class _TemporalApiClient(BaseApiClient):  # pyright: ignore[reportUnusedClass]
             if activity_config is None
             else activity_config
         )
+        self._streaming_topic = streaming_topic
+        self._streaming_batch_interval = streaming_batch_interval
 
     def _verify_response(self, response_model: Any) -> None:
         """No-op — matches the base implementation."""
@@ -231,11 +236,19 @@ class _TemporalApiClient(BaseApiClient):  # pyright: ignore[reportUnusedClass]
         request_dict: dict[str, object],
         http_options: HttpOptionsOrDict | None = None,
     ) -> Any:
-        """Dispatch a streamed request, batching chunks in the activity."""
+        """Dispatch a streamed request, batching chunks in the activity.
+
+        When a ``streaming_topic`` is configured, the activity also publishes
+        each chunk to that workflow-stream topic as it arrives; the workflow
+        must host a ``WorkflowStream`` to receive them.
+        """
         config: ActivityConfig = {**self._activity_config}
         if "summary" not in config:
             config["summary"] = f"{http_method.upper()} {path}"
         overrides = self._process_http_options(http_options, config)
+
+        if self._streaming_topic is not None:
+            self._require_workflow_stream()
 
         resp = await temporal_workflow.execute_activity(
             "gemini_api_client_async_request_streamed",
@@ -244,6 +257,10 @@ class _TemporalApiClient(BaseApiClient):  # pyright: ignore[reportUnusedClass]
                 path=path,
                 request_dict=request_dict,
                 http_options_overrides=overrides,
+                streaming_topic=self._streaming_topic,
+                streaming_batch_interval_ms=int(
+                    self._streaming_batch_interval.total_seconds() * 1000
+                ),
             ),
             result_type=_GeminiApiStreamedResponse,
             **config,
@@ -254,6 +271,21 @@ class _TemporalApiClient(BaseApiClient):  # pyright: ignore[reportUnusedClass]
                 yield SdkHttpResponse(headers=chunk.headers, body=chunk.body)
 
         return _yield_chunks()
+
+    def _require_workflow_stream(self) -> None:
+        """Fail fast if streaming is configured but no WorkflowStream is hosted.
+
+        Published chunks are delivered to the workflow's ``WorkflowStream`` via
+        a signal; without a registered handler the signals would be silently
+        dropped, so surface a clear error instead.
+        """
+        if temporal_workflow.get_signal_handler(_PUBLISH_SIGNAL) is None:
+            raise GoogleGenAIError(
+                "streaming_topic is set but this workflow has no WorkflowStream. "
+                "Construct WorkflowStream() in the workflow's @workflow.init "
+                "(from temporalio.contrib.workflow_streams).",
+                non_retryable=True,
+            )
 
     # ── File upload/download ─────────────────────────────────────────────
     # File operations are handled at a higher level by TemporalAsyncFiles

@@ -9,6 +9,8 @@ they never appear in workflow event history.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from contextlib import AsyncExitStack
+from datetime import timedelta
 from typing import Any, Callable
 
 import google.auth.credentials
@@ -33,6 +35,7 @@ from temporalio.contrib.google_genai._models import (
     _GeminiUploadFileRequest,
     _GeminiUploadToFileSearchStoreRequest,
 )
+from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
 
@@ -125,22 +128,51 @@ class GeminiApiCaller:
         async def gemini_api_client_async_request_streamed(
             req: _GeminiApiRequest,
         ) -> _GeminiApiStreamedResponse:
-            """Execute a streamed Gemini SDK API call, collecting all chunks."""
+            """Execute a streamed Gemini SDK API call, collecting all chunks.
+
+            When ``req.streaming_topic`` is set, each chunk is also published to
+            that workflow-stream topic (parsed as ``GenerateContentResponse``)
+            as it arrives, so external consumers see the model output in real
+            time.  Chunks are still returned batched for the SDK to parse
+            in-workflow; publishing is best-effort and never breaks that path.
+            """
+            chunks: list[_GeminiApiResponse] = []
             try:
-                stream = await self._client.aio._api_client.async_request_streamed(
-                    http_method=req.http_method,
-                    path=req.path,
-                    request_dict=req.request_dict,
-                    http_options=_resolve_http_options(req.http_options_overrides),
-                )
-                chunks = []
-                async for chunk in stream:
-                    chunks.append(
-                        _GeminiApiResponse(
-                            headers=chunk.headers or {},
-                            body=chunk.body or "",
+                async with AsyncExitStack() as stack:
+                    topic = None
+                    if req.streaming_topic:
+                        publisher = WorkflowStreamClient.from_within_activity(
+                            batch_interval=timedelta(
+                                milliseconds=req.streaming_batch_interval_ms
+                            ),
                         )
+                        await stack.enter_async_context(publisher)
+                        topic = publisher.topic(
+                            req.streaming_topic, type=types.GenerateContentResponse
+                        )
+
+                    stream = await self._client.aio._api_client.async_request_streamed(
+                        http_method=req.http_method,
+                        path=req.path,
+                        request_dict=req.request_dict,
+                        http_options=_resolve_http_options(req.http_options_overrides),
                     )
+                    async for chunk in stream:
+                        body = chunk.body or ""
+                        chunks.append(
+                            _GeminiApiResponse(headers=chunk.headers or {}, body=body)
+                        )
+                        if topic is not None and body:
+                            try:
+                                topic.publish(
+                                    types.GenerateContentResponse.model_validate_json(
+                                        body
+                                    )
+                                )
+                            except Exception:
+                                # Best-effort: a malformed/transform-needing chunk
+                                # must not break the batched return.
+                                pass
             except genai_errors.APIError as err:
                 raise _classify_api_error(err) from err
             return _GeminiApiStreamedResponse(chunks=chunks)

@@ -40,6 +40,12 @@ types are executed by Google's backend and flow through unchanged as request /
 response data — no extra wiring needed.  Client-side MCP requires the ``mcp``
 package.
 
+Streaming: set ``TemporalAsyncClient(streaming_topic=...)`` and host a
+:class:`temporalio.contrib.workflow_streams.WorkflowStream` in the workflow's
+``@workflow.init``.  Each ``generate_content_stream`` chunk is then published to
+that topic as it arrives, so external consumers can observe model output in real
+time while the workflow runs durably; the workflow's own iteration is unchanged.
+
 Quickstart::
 
     # ---- worker setup (outside the Temporal Python Sandbox) ----
