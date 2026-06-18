@@ -147,12 +147,13 @@ def _build_proto_sample(message_type: type[Message]) -> Message:
 
 def _populate_proto_sample(message: Message, *, path: str = "value") -> None:
     seen_oneofs: set[str] = set()
-    for field in message.DESCRIPTOR.fields:
+    for raw_field in message.DESCRIPTOR.fields:
+        field = cast(FieldDescriptor, raw_field)
         if field.containing_oneof is not None:
             if field.containing_oneof.name in seen_oneofs:
                 continue
             seen_oneofs.add(field.containing_oneof.name)
-        if field.label == FieldDescriptor.LABEL_REPEATED:
+        if _field_is_repeated(field):
             if (
                 field.message_type is not None
                 and field.message_type.GetOptions().map_entry
@@ -186,8 +187,10 @@ def _populate_proto_map_entry(
     *,
     path: str,
 ) -> None:
-    key_field = field.message_type.fields_by_name["key"]
-    value_field = field.message_type.fields_by_name["value"]
+    message_type = field.message_type
+    assert message_type is not None
+    key_field = message_type.fields_by_name["key"]
+    value_field = message_type.fields_by_name["value"]
     key = _proto_scalar_sample(key_field, path=f"{path}.{field.name}.key")
     container = getattr(message, field.name)
     if value_field.cpp_type == FieldDescriptor.CPPTYPE_MESSAGE:
@@ -222,11 +225,23 @@ def _proto_scalar_sample(field: FieldDescriptor, *, path: str) -> Any:
     ):
         return 1.5
     if field.cpp_type == FieldDescriptor.CPPTYPE_ENUM:
-        for enum_value in field.enum_type.values:
+        enum_type = field.enum_type
+        assert enum_type is not None
+        for enum_value in enum_type.values:
             if enum_value.number != 0:
                 return enum_value.number
-        return field.enum_type.values[0].number
+        return enum_type.values[0].number
     raise TypeError(f"Unhandled proto scalar sample at {path}: {field!r}")
+
+
+def _field_is_repeated(field: FieldDescriptor) -> bool:
+    return bool(
+        getattr(
+            field,
+            "is_repeated",
+            getattr(field, "label") == FieldDescriptor.LABEL_REPEATED,
+        )
+    )
 
 
 @pytest.mark.parametrize(

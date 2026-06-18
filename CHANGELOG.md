@@ -31,6 +31,8 @@ to docs, or any other relevant information.
   per-invocation of the worker instead of only at startup. It is advised that
   any shared, heavy-weight operations are performed outside of the callback
   before `run_worker` is invoked.
+- Relaxed the protobuf dependency bounds to allow protobuf 7 where compatible
+  with the selected optional dependencies.
 
 ## [1.29.0] - 2026-06-17
 
