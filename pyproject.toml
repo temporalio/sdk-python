@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.28.0"
+version = "1.29.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -28,7 +28,7 @@ classifiers = [
 grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
-openai-agents = ["openai-agents>=0.17.1", "mcp>=1.9.4, <2"]
+openai-agents = ["openai-agents>=0.17.5", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=2.2.0,<3"]
 langgraph = ["langgraph>=1.1.0"]
 langsmith = ["langsmith>=0.7.34,<0.9"]
@@ -264,4 +264,4 @@ package = false
 exclude-newer = "2 weeks"
 # google-adk 2.2.0 (first release compatible with google-genai 2.x) is newer
 # than the 2-week cutoff; drop this once it ages into the window.
-exclude-newer-package = { google-adk = "2026-06-05T00:00:00Z" }
+exclude-newer-package = { google-adk = "2026-06-05T00:00:00Z", openai-agents = false }

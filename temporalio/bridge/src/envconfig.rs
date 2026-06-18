@@ -14,7 +14,7 @@ use temporalio_common::envconfig::{
 
 pyo3::create_exception!(temporal_sdk_bridge, ConfigError, PyRuntimeError);
 
-fn data_source_to_dict(py: Python, ds: &DataSource) -> PyResult<PyObject> {
+fn data_source_to_dict(py: Python, ds: &DataSource) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     match ds {
         DataSource::Path(p) => dict.set_item("path", p)?,
@@ -23,7 +23,7 @@ fn data_source_to_dict(py: Python, ds: &DataSource) -> PyResult<PyObject> {
     Ok(dict.into())
 }
 
-fn tls_to_dict(py: Python, tls: &CoreClientConfigTLS) -> PyResult<PyObject> {
+fn tls_to_dict(py: Python, tls: &CoreClientConfigTLS) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("disabled", tls.disabled)?;
     if let Some(v) = &tls.client_cert {
@@ -42,7 +42,7 @@ fn tls_to_dict(py: Python, tls: &CoreClientConfigTLS) -> PyResult<PyObject> {
     Ok(dict.into())
 }
 
-fn codec_to_dict(py: Python, codec: &ClientConfigCodec) -> PyResult<PyObject> {
+fn codec_to_dict(py: Python, codec: &ClientConfigCodec) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     if let Some(v) = &codec.endpoint {
         dict.set_item("endpoint", v)?;
@@ -53,7 +53,7 @@ fn codec_to_dict(py: Python, codec: &ClientConfigCodec) -> PyResult<PyObject> {
     Ok(dict.into())
 }
 
-fn profile_to_dict(py: Python, profile: &CoreClientConfigProfile) -> PyResult<PyObject> {
+fn profile_to_dict(py: Python, profile: &CoreClientConfigProfile) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     if let Some(v) = &profile.address {
         dict.set_item("address", v)?;
@@ -76,7 +76,7 @@ fn profile_to_dict(py: Python, profile: &CoreClientConfigProfile) -> PyResult<Py
     Ok(dict.into())
 }
 
-fn core_config_to_dict(py: Python, core_config: &CoreClientConfig) -> PyResult<PyObject> {
+fn core_config_to_dict(py: Python, core_config: &CoreClientConfig) -> PyResult<Py<PyAny>> {
     let profiles_dict = PyDict::new(py);
     for (name, profile) in &core_config.profiles {
         let connect_dict = profile_to_dict(py, profile)?;
@@ -90,7 +90,7 @@ fn load_client_config_inner(
     config_source: Option<DataSource>,
     config_file_strict: bool,
     env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let options = LoadClientConfigOptions {
         config_source,
         config_file_strict,
@@ -109,7 +109,7 @@ fn load_client_connect_config_inner(
     disable_env: bool,
     config_file_strict: bool,
     env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let options = LoadClientConfigProfileOptions {
         config_source,
         config_file_profile: profile,
@@ -132,7 +132,7 @@ pub fn load_client_config(
     data: Option<Vec<u8>>,
     config_file_strict: bool,
     env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let config_source = match (path, data) {
         (Some(p), None) => Some(DataSource::Path(p)),
         (None, Some(d)) => Some(DataSource::Data(d)),
@@ -158,7 +158,7 @@ pub fn load_client_connect_config(
     disable_env: bool,
     config_file_strict: bool,
     env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let config_source = match (path, data) {
         (Some(p), None) => Some(DataSource::Path(p)),
         (None, Some(d)) => Some(DataSource::Data(d)),

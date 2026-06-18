@@ -19,7 +19,7 @@ pub struct MetricMeterRef {
     default_attributes: MetricAttributesRef,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct MetricAttributesRef {
     attrs: metrics::MetricAttributes,
@@ -216,7 +216,7 @@ impl MetricAttributesRef {
         &self,
         py: Python,
         meter: &MetricMeterRef,
-        new_attrs: HashMap<String, PyObject>,
+        new_attrs: HashMap<String, Py<PyAny>>,
     ) -> PyResult<Self> {
         let attrs = meter.meter.extend_attributes(
             self.attrs.clone(),
@@ -234,7 +234,7 @@ impl MetricAttributesRef {
 fn metric_key_value_from_py(
     py: Python,
     k: String,
-    obj: PyObject,
+    obj: Py<PyAny>,
 ) -> PyResult<metrics::MetricKeyValue> {
     let val = if let Ok(v) = obj.extract::<String>(py) {
         metrics::MetricValue::String(v)
