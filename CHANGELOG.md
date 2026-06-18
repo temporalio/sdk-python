@@ -19,6 +19,19 @@ to docs, or any other relevant information.
 
 ## [Unreleased]
 
+### Changed
+
+- AWS Lambda worker `configure` parameter supports sync, async, and async
+  generator style functions. This callback is invoked on the asyncio event
+  loop.
+
+### Breaking Changes
+
+- AWS Lambda worker `configure` parameter has been changed to be invoked
+  per-invocation of the worker instead of only at startup. It is advised that
+  any shared, heavy-weight operations are performed outside of the callback
+  before `run_worker` is invoked.
+
 ## [1.29.0] - 2026-06-17
 
 ### Added
