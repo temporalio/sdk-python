@@ -23,6 +23,21 @@ This ensures:
 upload/download as activities; ``interactions`` and ``agents`` — which bypass
 ``BaseApiClient`` via a vendored HTTP client — are likewise replaced with
 activity-backed shims; ``webhooks`` is not supported in workflows and raises.
+
+Replay determinism
+------------------
+The SDK's request-formatting and automatic-function-calling loop run *in the
+workflow*, so they must be deterministic.  A survey of ``google.genai`` found no
+``time``/``uuid``/``random`` use on the ``generate_content``/AFC path; the SDK's
+own non-deterministic code (HTTP retry backoff, the interactions/agents vendored
+client, local tokenizer temp paths) runs only inside activities on the worker.
+The SDK exposes no time/id provider hooks to override, and none are needed.
+
+The one in-workflow exception is ``batches.create`` on Vertex AI: when
+``display_name``/``dest`` are omitted the SDK auto-generates them from a
+timestamp + UUID (``_common.timestamped_unique_name``), which is not
+replay-safe.  Pass explicit ``display_name`` and ``dest`` when creating Vertex
+batch jobs from a workflow.
 """
 
 from __future__ import annotations

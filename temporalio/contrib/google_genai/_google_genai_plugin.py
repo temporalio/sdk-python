@@ -60,9 +60,9 @@ class GoogleGenAIPlugin(SimplePlugin):
         Use with caution in production environments.
 
     This plugin registers the ``gemini_api_client_async_request`` activity
-    using the provided ``genai.Client`` with real credentials.  Workflows use
-    :func:`google_genai_client` to
-    get an ``AsyncClient`` backed by a ``TemporalApiClient`` that routes all
+    using the provided ``genai.Client`` with real credentials.  Workflows
+    construct a :class:`~temporalio.contrib.google_genai.TemporalAsyncClient`
+    to get an ``AsyncClient`` backed by a ``TemporalApiClient`` that routes all
     API calls through this activity.
 
     No credentials are passed to or from the workflow.  Auth material never
@@ -136,13 +136,21 @@ class GoogleGenAIPlugin(SimplePlugin):
                 return dataclasses.replace(
                     runner,
                     restrictions=runner.restrictions.with_passthrough_modules(
-                        "google.genai", "mcp"
+                        # The SDK's request formatting + AFC loop run in-workflow
+                        # and validate google.genai's Pydantic models; mcp is
+                        # imported to subclass ClientSession.  pydantic itself is
+                        # in the SDK default passthrough, but its compiled core
+                        # and Annotated helper are not, so extend them.
+                        "google.genai",
+                        "mcp",
+                        "pydantic_core",
+                        "annotated_types",
                     ),
                 )
             return runner
 
         super().__init__(
-            name="google.GenAIPlugin",
+            name="google_genai.GoogleGenAIPlugin",
             data_converter=_data_converter,
             activities=activities,
             workflow_runner=workflow_runner,
