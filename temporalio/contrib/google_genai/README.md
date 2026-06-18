@@ -137,15 +137,8 @@ A timeout is required — `activity_config` must set `start_to_close_timeout` or
 
 ## MCP support
 
-Three paths are supported:
-
-- **Client-side MCP** (Gemini Developer API): register the server on the worker
-  and reference it by name in the workflow.
-- **Server-side MCP** (Vertex AI `Tool(mcp_servers=[McpServer(...)])`) and the
-  Interactions API's MCP steps are executed by Google's backend and flow through
-  unchanged — no extra wiring.
-
-Client-side example:
+Client-side MCP (Gemini Developer API) is wired through the plugin: register the
+server on the worker and reference it by name in the workflow.
 
 ```python
 from contextlib import asynccontextmanager
@@ -215,9 +208,9 @@ non-retryable so the workflow fails fast.
 
 ## Vertex AI
 
-Pass `vertexai=True` (and `project` / `location` where the SDK's request
-formatting needs them) to both the worker-side client and the workflow-side
-client:
+Pass `vertexai=True` to both the worker-side `genai.Client` and the
+workflow-side `TemporalAsyncClient`. On the workflow side you must also set
+`project` and `location` **explicitly**:
 
 ```python
 # worker
@@ -226,6 +219,11 @@ genai.Client(vertexai=True, project="my-project", location="us-central1")
 # workflow
 TemporalAsyncClient(vertexai=True, project="my-project", location="us-central1")
 ```
+
+Normally the SDK auto-discovers `project`/`location` from the environment
+(credentials, ADC, metadata server). That discovery
+would be non-deterministic and break replay. Setting them by hand
+keeps it deterministic.
 
 ## Composing with other plugins
 
