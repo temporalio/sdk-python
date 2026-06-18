@@ -21,7 +21,6 @@ from google.genai.types import HttpOptions
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio import activity
-from temporalio.exceptions import ApplicationError
 from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
@@ -34,6 +33,7 @@ from temporalio.contrib.google_genai._models import (
     _GeminiUploadFileRequest,
     _GeminiUploadToFileSearchStoreRequest,
 )
+from temporalio.exceptions import ApplicationError
 
 
 def _resolve_http_options(

@@ -60,7 +60,7 @@ def _validate_http_options(http_options: HttpOptions | None) -> None:
         )
 
 
-class _TemporalApiClient(BaseApiClient):
+class _TemporalApiClient(BaseApiClient):  # pyright: ignore[reportUnusedClass]
     """A ``BaseApiClient`` that routes all API calls through Temporal activities.
 
     This client is used on the workflow side. It does NOT initialize HTTP

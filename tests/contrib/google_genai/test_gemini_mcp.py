@@ -16,10 +16,11 @@ Plus the server-side pass-through paths that need no shim code:
 from __future__ import annotations
 
 import sys
+from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -112,7 +113,7 @@ def _replay_plugin(mcp_servers: dict) -> GoogleGenAIPlugin:
     )
 
 
-async def _activity_names(handle) -> list[str]:
+async def _activity_names(handle: Any) -> list[str]:
     names: list[str] = []
     async for e in handle.fetch_history_events():
         if e.HasField("activity_task_scheduled_event_attributes"):
@@ -121,7 +122,7 @@ async def _activity_names(handle) -> list[str]:
 
 
 @pytest.fixture(autouse=True)
-def _clear_mcp_connections():
+def _clear_mcp_connections():  # pyright: ignore[reportUnusedFunction]
     """Isolate the module-global MCP connection pool between tests."""
     from temporalio.contrib.google_genai import _mcp
 

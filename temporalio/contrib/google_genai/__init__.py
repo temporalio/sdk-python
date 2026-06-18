@@ -89,6 +89,7 @@ if TYPE_CHECKING:
     from temporalio.contrib.google_genai._temporal_mcp import TemporalMcpClientSession
 
 __all__ = [
+    "GoogleGenAIError",
     "GoogleGenAIPlugin",
     "TemporalAsyncClient",
     "TemporalMcpClientSession",
