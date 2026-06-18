@@ -143,7 +143,7 @@ class TemporalAsyncClient(AsyncClient):
                 ``start_to_close_timeout`` and Temporal's default retry policy.
             streaming_topic: When set, ``generate_content_stream`` publishes each
                 streamed ``GenerateContentResponse`` to this
-                :class:`~temporalio.contrib.workflow_streams.WorkflowStream`
+                :class:`temporalio.contrib.workflow_streams.WorkflowStream`
                 topic as it arrives, so external consumers can observe the model
                 output in real time.  The workflow must construct a
                 ``WorkflowStream`` in ``@workflow.init``; otherwise the call

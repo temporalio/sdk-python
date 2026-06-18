@@ -1,11 +1,11 @@
 """Testing utilities for the Google Gemini SDK Temporal integration.
 
 These let you exercise workflows that use
-:class:`~temporalio.contrib.google_genai.TemporalAsyncClient` without making
+:class:`temporalio.contrib.google_genai.TemporalAsyncClient` without making
 real Gemini API calls.  Script the model's responses with :func:`text_response`
 / :func:`function_call_response`, build a plugin with
 :class:`GeminiTestServer`, and register it on your worker like the real
-:class:`~temporalio.contrib.google_genai.GoogleGenAIPlugin`.
+:class:`temporalio.contrib.google_genai.GoogleGenAIPlugin`.
 
 Example::
 
