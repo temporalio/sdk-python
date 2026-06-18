@@ -395,9 +395,8 @@ def _start_response() -> (
     )
 
 
-async def test_start_from_nexus_context_sets_all_on_conflict_options(
-    nexus_ctx: Any,
-) -> None:
+@pytest.mark.usefixtures("nexus_ctx")
+async def test_start_from_nexus_context_sets_all_on_conflict_options() -> None:
     workflow_service = mock.MagicMock()
     workflow_service.start_workflow_execution = mock.AsyncMock(
         return_value=_start_response()
@@ -413,9 +412,10 @@ async def test_start_from_nexus_context_sets_all_on_conflict_options(
     assert sent.on_conflict_options.attach_links
 
 
-async def test_backing_workflow_start_sets_on_conflict_options_without_duplicating_links(
-    nexus_ctx: Any,
-) -> None:
+@pytest.mark.usefixtures("nexus_ctx")
+async def test_backing_workflow_start_sets_on_conflict_options_without_duplicating_links() -> (
+    None
+):
     workflow_service = mock.MagicMock()
     workflow_service.start_workflow_execution = mock.AsyncMock(
         return_value=_start_response()
