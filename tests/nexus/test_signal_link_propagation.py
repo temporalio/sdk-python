@@ -380,6 +380,79 @@ async def test_start_outside_nexus_context_does_not_touch_links() -> None:
     assert len(sent.links) == 0
 
 
+# ── start: on-conflict options ──────────────────────────────────────────────────────────────
+#
+# A start issued from inside a Nexus operation handler enables all on_conflict_options so that,
+# under a WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING policy, a detected conflict attaches the
+# request id, completion callbacks, and links to the existing run.
+
+
+def _start_response() -> (
+    temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse
+):
+    return temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse(
+        run_id="target-run",
+    )
+
+
+async def test_start_from_nexus_context_sets_all_on_conflict_options(
+    nexus_ctx: Any,
+) -> None:
+    workflow_service = mock.MagicMock()
+    workflow_service.start_workflow_execution = mock.AsyncMock(
+        return_value=_start_response()
+    )
+    impl = _make_client_impl(workflow_service)
+
+    await impl.start_workflow(_start_input())
+
+    sent = workflow_service.start_workflow_execution.call_args.args[0]
+    assert sent.HasField("on_conflict_options")
+    assert sent.on_conflict_options.attach_request_id
+    assert sent.on_conflict_options.attach_completion_callbacks
+    assert sent.on_conflict_options.attach_links
+
+
+async def test_backing_workflow_start_sets_on_conflict_options_without_duplicating_links(
+    nexus_ctx: Any,
+) -> None:
+    workflow_service = mock.MagicMock()
+    workflow_service.start_workflow_execution = mock.AsyncMock(
+        return_value=_start_response()
+    )
+    impl = _make_client_impl(workflow_service)
+
+    # The nexus-backing workflow carries its inbound links via input.links (start_workflow
+    # forwards them as links=), so the build path must enable on_conflict_options but must not
+    # also re-add the context's request links.
+    start_input = _start_input()
+    start_input.links = [_inbound_nexus_link()]
+    with temporalio.nexus._operation_context._nexus_backing_workflow_start_context():
+        await impl.start_workflow(start_input)
+
+    sent = workflow_service.start_workflow_execution.call_args.args[0]
+    assert sent.HasField("on_conflict_options")
+    assert sent.on_conflict_options.attach_request_id
+    assert sent.on_conflict_options.attach_completion_callbacks
+    assert sent.on_conflict_options.attach_links
+    # The single inbound link appears exactly once, not duplicated.
+    assert len(sent.links) == 1
+    assert sent.links[0] == _inbound_nexus_link()
+
+
+async def test_start_outside_nexus_context_leaves_on_conflict_options_unset() -> None:
+    workflow_service = mock.MagicMock()
+    workflow_service.start_workflow_execution = mock.AsyncMock(
+        return_value=_start_response()
+    )
+    impl = _make_client_impl(workflow_service)
+
+    await impl.start_workflow(_start_input())
+
+    sent = workflow_service.start_workflow_execution.call_args.args[0]
+    assert not sent.HasField("on_conflict_options")
+
+
 # ── handler-level: backlinks land on the StartOperationResponse ──────────────────────────────
 
 # A response link that a handler stashes on ctx.outbound_links, mimicking what a signal RPC inside

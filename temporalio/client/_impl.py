@@ -256,17 +256,23 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Links are duplicated on request for compatibility with older server versions.
         req.links.extend(links)
 
-        if temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+        nexus_ctx = self._try_nexus_start_operation_context()
+        if nexus_ctx is not None:
+            # This start was issued from inside a Nexus operation handler. If the workflow ID
+            # conflict policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING and a conflict is
+            # detected, attach this request's request ID, completion callbacks, and links to
+            # the existing run. The TemporalNexusClient and WorkflowRunOperationContext are
+            # responsible for setting the callbacks correctly, so it is safe to enable all
+            # on-conflict options whenever we are invoked from an operation handler.
             req.on_conflict_options.attach_request_id = True
             req.on_conflict_options.attach_completion_callbacks = True
             req.on_conflict_options.attach_links = True
-        else:
-            # If this is a plain start_workflow issued from inside a Nexus operation handler
-            # (not the nexus-backing workflow, which already carries inbound links via
-            # input.links), forward the inbound Nexus task links so the started callee's
-            # WorkflowExecutionStarted event links back to the caller.
-            nexus_ctx = self._try_nexus_start_operation_context()
-            if nexus_ctx is not None:
+            # The nexus-backing workflow already carries its inbound links via input.links
+            # (start_workflow forwards them as links=...). A plain start_workflow issued from
+            # inside a Nexus operation handler must forward the inbound Nexus task links
+            # explicitly so the started callee's WorkflowExecutionStarted event links back to
+            # the caller.
+            if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
                 req.links.extend(nexus_ctx._get_request_links())
 
         return req

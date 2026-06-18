@@ -44,6 +44,7 @@ from nexusrpc.handler._decorators import operation_handler
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.history.v1
+import temporalio.common
 from temporalio import nexus, workflow
 from temporalio.client import Client, WorkflowHistory
 from temporalio.service import RPCError, RPCStatusCode
@@ -155,6 +156,31 @@ class AsyncSignalingServiceHandler:
     @operation_handler
     def op(self) -> OperationHandler[OpInput, str]:
         return _AsyncSignalingOperation()
+
+
+# A service whose handler issues a plain start_workflow (no signal, not the nexus-backing
+# workflow) against an already-running callee under a USE_EXISTING conflict policy.
+@service
+class StartConflictService:
+    op: Operation[OpInput, str]
+
+
+@service_handler(service=StartConflictService)
+class StartConflictServiceHandler:
+    @sync_operation
+    async def op(self, _ctx: StartOperationContext, input: OpInput) -> str:
+        # Plain start_workflow from inside a Nexus operation handler, targeting the
+        # already-running callee with WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING. The build path
+        # enables on_conflict_options, so the detected conflict attaches this request's request
+        # id (and links) to the existing run.
+        await nexus.client().start_workflow(
+            CalleeWorkflow.run,
+            1,
+            id=input.callee_id,
+            task_queue=nexus.info().task_queue,
+            id_conflict_policy=temporalio.common.WorkflowIDConflictPolicy.USE_EXISTING,
+        )
+        return "ok:conflict"
 
 
 async def _signal_with_start(callee_id: str, payload: str) -> None:
@@ -468,3 +494,74 @@ async def test_standalone_async_signal_operation_links(
 
     # Forward: the single signal event on the callee references the standalone operation.
     _assert_standalone_forward_link(callee_history, operation_id, expected_count=1)
+
+
+# ── on-conflict options for a plain start from a handler ──────────────────────────────────────
+#
+# When a Nexus operation handler issues a plain start_workflow (no signal, not the nexus-backing
+# workflow) against an already-running workflow under a USE_EXISTING conflict policy, the SDK
+# enables on_conflict_options so the server attaches this request's request id (and links) to the
+# existing run. The attachment surfaces as a WorkflowExecutionOptionsUpdated event on the
+# existing workflow's history. Older servers may not emit it, so the assertion soft-skips.
+
+
+async def test_start_from_handler_attaches_on_conflict_options(
+    client: Client,
+    env: WorkflowEnvironment,
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    callee_id = f"conflict-callee-{uuid.uuid4()}"
+    operation_id = f"conflict-op-{uuid.uuid4()}"
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[StartConflictServiceHandler()],
+        workflows=[CalleeWorkflow],
+    ):
+        # Start the callee first so the handler's start_workflow hits a conflict.
+        callee_handle = await client.start_workflow(
+            CalleeWorkflow.run,
+            1,
+            id=callee_id,
+            task_queue=task_queue,
+        )
+
+        nexus_client = client.create_nexus_client(
+            service=StartConflictService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        handle = await nexus_client.start_operation(
+            StartConflictService.op,
+            OpInput(mode=MODE_SYNC, callee_id=callee_id),
+            id=operation_id,
+            schedule_to_close_timeout=timedelta(seconds=20),
+        )
+        # USE_EXISTING resolves the conflict to the existing run; the operation succeeds.
+        assert await handle.result() == "ok:conflict"
+
+        # Release the callee so it terminates cleanly, then read its history.
+        await callee_handle.signal(CalleeWorkflow.ping, "done")
+        assert await callee_handle.result() == "done"
+        callee_history = await callee_handle.fetch_history()
+
+    updated = _events_of_type(
+        callee_history, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED
+    )
+    if not updated:
+        pytest.skip(
+            "server did not emit a WorkflowExecutionOptionsUpdated event "
+            "(on_conflict_options not honored by this server version)"
+        )
+    # The conflict resolution attached this start request's request id to the existing run,
+    # which only happens because on_conflict_options.attach_request_id was set on the request.
+    assert any(
+        e.workflow_execution_options_updated_event_attributes.attached_request_id
+        for e in updated
+    ), (
+        "expected a WorkflowExecutionOptionsUpdated event carrying an attached request id"
+    )
