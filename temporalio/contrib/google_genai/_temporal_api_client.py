@@ -23,6 +23,7 @@ from google.genai.types import HttpOptions, HttpOptionsOrDict
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio import workflow as temporal_workflow
+from temporalio.contrib.google_genai._errors import GoogleGenAIError
 from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
@@ -137,6 +138,13 @@ class _TemporalApiClient(BaseApiClient):
             opts = HttpOptions.model_validate(http_options)
 
         _validate_http_options(opts)
+
+        if opts.retry_options is not None:
+            raise GoogleGenAIError(
+                "Per-request http_options.retry_options is not supported in "
+                "Temporal workflows. Temporal owns retries; configure them with "
+                "the activity retry_policy via activity_config instead."
+            )
 
         # timeout is owned by Temporal — apply it to the activity config
         # rather than forwarding to the underlying HTTP client.

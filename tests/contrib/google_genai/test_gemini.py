@@ -42,6 +42,7 @@ from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.common import RetryPolicy
 from temporalio.contrib.google_genai import (
+    GoogleGenAIError,
     GoogleGenAIPlugin,
     activity_as_tool,
 )
@@ -1549,7 +1550,7 @@ def test_activity_as_tool_bare_function_raises():
     async def not_an_activity(x: str) -> str:
         return x
 
-    with pytest.raises(ApplicationError, match="@activity.defn"):
+    with pytest.raises(GoogleGenAIError, match="@activity.defn"):
         activity_as_tool(not_an_activity)
 
 
@@ -1759,6 +1760,71 @@ def test_pop_timeout_rejects_non_numeric():
 
     with pytest.raises(ValueError, match="timeout must be numeric seconds"):
         _pop_timeout({"timeout": httpx.Timeout(5.0)}, ActivityConfig())
+
+
+# ===========================================================================
+# Retry handling + error classification (Temporal owns retries)
+# ===========================================================================
+
+
+def test_plugin_rejects_client_retry_options():
+    """A genai.Client with retry_options is rejected at plugin construction."""
+    from google.genai.types import HttpOptions, HttpRetryOptions
+
+    from temporalio.contrib.google_genai._google_genai_plugin import (
+        _reject_sdk_retries,
+    )
+
+    client = GeminiClient(
+        api_key="fake-test-key",
+        http_options=HttpOptions(retry_options=HttpRetryOptions(attempts=3)),
+    )
+    with pytest.raises(ValueError, match="retry_options"):
+        _reject_sdk_retries(client)
+
+
+def test_plugin_allows_no_retry_options():
+    """A default client (no retry_options) passes the retry check."""
+    from temporalio.contrib.google_genai._google_genai_plugin import (
+        _reject_sdk_retries,
+    )
+
+    _reject_sdk_retries(GeminiClient(api_key="fake-test-key"))
+
+
+def test_process_http_options_rejects_retry_options():
+    """Per-request http_options.retry_options raises in the workflow."""
+    from google.genai.types import HttpOptions, HttpRetryOptions
+
+    from temporalio.contrib.google_genai._temporal_api_client import _TemporalApiClient
+
+    with pytest.raises(GoogleGenAIError, match="retry_options"):
+        _TemporalApiClient._process_http_options(
+            HttpOptions(retry_options=HttpRetryOptions(attempts=2)),
+            ActivityConfig(),
+        )
+
+
+def test_classify_api_error_retryable_vs_non_retryable():
+    """Transient HTTP statuses stay retryable; client errors are non-retryable."""
+    from google.genai import errors
+
+    from temporalio.contrib.google_genai._gemini_activity import _classify_api_error
+
+    client_err = errors.ClientError.__new__(errors.ClientError)
+    client_err.code = 400
+    classified = _classify_api_error(client_err)
+    assert classified.non_retryable is True
+    assert classified.type == "ClientError"
+
+    server_err = errors.ServerError.__new__(errors.ServerError)
+    server_err.code = 503
+    assert _classify_api_error(server_err).non_retryable is False
+
+
+def test_google_genai_error_is_application_error():
+    """GoogleGenAIError is an ApplicationError so existing handling still works."""
+    assert issubclass(GoogleGenAIError, ApplicationError)
 
 
 # ===========================================================================

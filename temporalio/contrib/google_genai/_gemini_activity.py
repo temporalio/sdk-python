@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 import google.auth.credentials
 from google.genai import Client as GeminiClient
+from google.genai import errors as genai_errors
 from google.genai import types
 from google.genai._interactions import AsyncStream
 from google.genai._interactions.types import Interaction, InteractionSSEEvent
@@ -20,6 +21,7 @@ from google.genai.types import HttpOptions
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
 from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
@@ -41,6 +43,27 @@ def _resolve_http_options(
     if overrides is None:
         return None
     return HttpOptions.model_validate(overrides.model_dump(exclude_none=True))
+
+
+# HTTP status codes the Gemini SDK itself treats as transient/retryable.
+_RETRYABLE_HTTP_STATUS = frozenset({408, 429, 500, 502, 503, 504})
+
+
+def _classify_api_error(err: genai_errors.APIError) -> ApplicationError:
+    """Map a Gemini ``APIError`` to an ``ApplicationError`` Temporal can act on.
+
+    Transient statuses (timeouts, rate limits, 5xx) stay retryable so the
+    activity's retry policy applies; everything else (e.g. 4xx client errors)
+    is marked non-retryable so the workflow fails fast instead of retrying a
+    request that cannot succeed.
+    """
+    code = getattr(err, "code", None)
+    retryable = code in _RETRYABLE_HTTP_STATUS
+    return ApplicationError(
+        str(err),
+        type=type(err).__name__,
+        non_retryable=not retryable,
+    )
 
 
 async def _drain_interaction_stream(
@@ -82,14 +105,17 @@ class GeminiApiCaller:
             req: _GeminiApiRequest,
         ) -> _GeminiApiResponse:
             """Execute a Gemini SDK API call with real credentials."""
-            response: SdkHttpResponse = (
-                await self._client.aio._api_client.async_request(
-                    http_method=req.http_method,
-                    path=req.path,
-                    request_dict=req.request_dict,
-                    http_options=_resolve_http_options(req.http_options_overrides),
+            try:
+                response: SdkHttpResponse = (
+                    await self._client.aio._api_client.async_request(
+                        http_method=req.http_method,
+                        path=req.path,
+                        request_dict=req.request_dict,
+                        http_options=_resolve_http_options(req.http_options_overrides),
+                    )
                 )
-            )
+            except genai_errors.APIError as err:
+                raise _classify_api_error(err) from err
             return _GeminiApiResponse(
                 headers=response.headers or {},
                 body=response.body or "",
@@ -100,20 +126,23 @@ class GeminiApiCaller:
             req: _GeminiApiRequest,
         ) -> _GeminiApiStreamedResponse:
             """Execute a streamed Gemini SDK API call, collecting all chunks."""
-            stream = await self._client.aio._api_client.async_request_streamed(
-                http_method=req.http_method,
-                path=req.path,
-                request_dict=req.request_dict,
-                http_options=_resolve_http_options(req.http_options_overrides),
-            )
-            chunks = []
-            async for chunk in stream:
-                chunks.append(
-                    _GeminiApiResponse(
-                        headers=chunk.headers or {},
-                        body=chunk.body or "",
-                    )
+            try:
+                stream = await self._client.aio._api_client.async_request_streamed(
+                    http_method=req.http_method,
+                    path=req.path,
+                    request_dict=req.request_dict,
+                    http_options=_resolve_http_options(req.http_options_overrides),
                 )
+                chunks = []
+                async for chunk in stream:
+                    chunks.append(
+                        _GeminiApiResponse(
+                            headers=chunk.headers or {},
+                            body=chunk.body or "",
+                        )
+                    )
+            except genai_errors.APIError as err:
+                raise _classify_api_error(err) from err
             return _GeminiApiStreamedResponse(chunks=chunks)
 
         @activity.defn

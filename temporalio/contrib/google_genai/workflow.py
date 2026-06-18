@@ -16,7 +16,7 @@ from typing import Any
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
-from temporalio.exceptions import ApplicationError
+from temporalio.contrib.google_genai._errors import GoogleGenAIError
 from temporalio.workflow import ActivityConfig
 
 
@@ -53,17 +53,17 @@ def activity_as_tool(
         An async callable suitable for use as a Gemini tool.
 
     Raises:
-        ApplicationError: If ``fn`` is not decorated with ``@activity.defn`` or
+        GoogleGenAIError: If ``fn`` is not decorated with ``@activity.defn`` or
             has no activity name.
     """
     ret = activity._Definition.from_callable(fn)
     if not ret:
-        raise ApplicationError(
+        raise GoogleGenAIError(
             "Bare function without @activity.defn decorator is not supported",
             "invalid_tool",
         )
     if ret.name is None:
-        raise ApplicationError(
+        raise GoogleGenAIError(
             "Activity must have a name to be used as a Gemini tool",
             "invalid_tool",
         )

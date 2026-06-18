@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import google.auth.credentials
 from google.genai import Client as GeminiClient
 
+from temporalio.contrib.google_genai._errors import GoogleGenAIError
 from temporalio.contrib.google_genai._gemini_activity import GeminiApiCaller
 from temporalio.contrib.pydantic import PydanticPayloadConverter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
@@ -18,6 +19,27 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 if TYPE_CHECKING:
     from temporalio.contrib.google_genai._mcp import McpSessionFactory
+
+
+_RETRY_OPTIONS_MESSAGE = (
+    "genai.Client is configured with http_options.retry_options, but Temporal "
+    "owns retries for durable execution. Remove retry_options from the client "
+    "and configure retries with the activity retry_policy instead — e.g. "
+    "TemporalAsyncClient(activity_config=ActivityConfig(retry_policy=...)) or "
+    "activity_as_tool(fn, activity_config=ActivityConfig(retry_policy=...))."
+)
+
+
+def _reject_sdk_retries(client: GeminiClient) -> None:
+    """Raise if the client enables the SDK's own retry loop.
+
+    Temporal must own retries so each attempt is a separate, observable activity
+    attempt; an SDK-internal retry loop would hide retries inside one activity
+    and compound with Temporal's retry policy.
+    """
+    http_options = getattr(client._api_client, "_http_options", None)
+    if http_options is not None and getattr(http_options, "retry_options", None):
+        raise ValueError(_RETRY_OPTIONS_MESSAGE)
 
 
 def _data_converter(converter: DataConverter | None) -> DataConverter:
@@ -94,6 +116,7 @@ class GoogleGenAIPlugin(SimplePlugin):
                 connection stays open while idle before being disconnected
                 (the timer resets on each reuse).  Defaults to 5 minutes.
         """
+        _reject_sdk_retries(client)
         self._api_caller = GeminiApiCaller(client, credentials=extra_credentials)
 
         activities = list(self._api_caller.activities())
@@ -123,4 +146,5 @@ class GoogleGenAIPlugin(SimplePlugin):
             data_converter=_data_converter,
             activities=activities,
             workflow_runner=workflow_runner,
+            workflow_failure_exception_types=[GoogleGenAIError],
         )

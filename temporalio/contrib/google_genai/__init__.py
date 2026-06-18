@@ -76,6 +76,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from temporalio.contrib.google_genai._errors import GoogleGenAIError
 from temporalio.contrib.google_genai._google_genai_plugin import GoogleGenAIPlugin
 from temporalio.contrib.google_genai._temporal_async_client import (
     TemporalAsyncClient,
