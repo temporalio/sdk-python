@@ -16,12 +16,19 @@ The backward direction is produced server-side (temporalio/temporal#9897) and is
 rather than ``EventReference``, so backlink assertions tolerate both oneof variants of
 ``common.v1.Link.WorkflowEvent.reference`` (see ``_backlink_event_type``). When run against a
 server that does not emit the backlink, the backward assertions are skipped.
+
+The forward/backward description above applies to operations scheduled by a caller workflow. The
+file also covers the same handlers invoked as standalone (client-initiated) operations via
+``client.create_nexus_client``; that case has no caller workflow, so the forward link is a
+``NexusOperation`` link to the operation execution itself and only the forward direction is
+asserted (see the standalone tests near the end of the file for details).
 """
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pytest
 from nexusrpc import Operation, service
@@ -39,8 +46,10 @@ import temporalio.api.enums.v1
 import temporalio.api.history.v1
 from temporalio import nexus, workflow
 from temporalio.client import Client, WorkflowHistory
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+from tests.helpers import assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 EventType = temporalio.api.enums.v1.EventType
@@ -117,6 +126,7 @@ class _AsyncSignalingOperation(OperationHandler[OpInput, str]):
 
     async def cancel(self, ctx, token: str) -> None:  # type: ignore[no-untyped-def]
         raise NotImplementedError
+
 
 @service_handler(service=SignalingService)
 class SignalingServiceHandler:
@@ -335,3 +345,126 @@ async def test_async_signal_operation_links(
             "server did not emit a signal backlink "
             "(history.enableCHASMSignalBacklinks not enabled)"
         )
+
+
+# ── Standalone (client-initiated) operations ─────────────────────────────────────────────────
+#
+# The tests above drive the operation from a caller workflow. The tests below invoke the same
+# handlers directly via ``client.create_nexus_client`` (a standalone Nexus operation, with no
+# caller workflow). The forward link still propagates, but as a ``NexusOperation`` link
+# referencing the operation execution itself rather than a ``WorkflowEvent`` link to a caller's
+# ``NexusOperationScheduled`` event. The backward (response) link lands on the standalone
+# operation's own execution, which is a CHASM ``nexusoperation.operation`` archetype and is not
+# retrievable via the workflow history API, so only the forward direction is asserted here.
+
+
+def _assert_standalone_forward_link(
+    callee_history: WorkflowHistory,
+    operation_id: str,
+    expected_count: int,
+) -> None:
+    signaled = _events_of_type(
+        callee_history, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
+    )
+    assert len(signaled) == expected_count, (
+        f"expected {expected_count} WorkflowExecutionSignaled events, got {len(signaled)}"
+    )
+    for event in signaled:
+        assert len(event.links) >= 1, (
+            "expected at least one link on each WorkflowExecutionSignaled event"
+        )
+        link = event.links[0]
+        assert link.HasField("nexus_operation"), (
+            "standalone forward link should be a NexusOperation link"
+        )
+        assert link.nexus_operation.operation_id == operation_id, (
+            "forward link should reference the standalone Nexus operation"
+        )
+
+
+async def test_standalone_sync_signal_operation_links(
+    client: Client,
+    env: WorkflowEnvironment,
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    callee_id = f"standalone-callee-{uuid.uuid4()}"
+    operation_id = f"standalone-op-{uuid.uuid4()}"
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[SignalingServiceHandler()],
+        workflows=[CalleeWorkflow],
+    ):
+        nexus_client = client.create_nexus_client(
+            service=SignalingService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        handle = await nexus_client.start_operation(
+            SignalingService.op,
+            OpInput(mode=MODE_SYNC, callee_id=callee_id),
+            id=operation_id,
+            schedule_to_close_timeout=timedelta(seconds=20),
+        )
+        assert await handle.result() == "ok:sync"
+
+        callee_result = await client.get_workflow_handle(callee_id).result()
+        assert callee_result == "first,second"
+
+        callee_history = await client.get_workflow_handle(callee_id).fetch_history()
+
+    # Forward: both signal events on the callee reference the standalone Nexus operation.
+    _assert_standalone_forward_link(callee_history, operation_id, expected_count=2)
+
+
+async def test_standalone_async_signal_operation_links(
+    client: Client,
+    env: WorkflowEnvironment,
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    callee_id = f"standalone-async-callee-{uuid.uuid4()}"
+    operation_id = f"standalone-async-op-{uuid.uuid4()}"
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[AsyncSignalingServiceHandler()],
+        workflows=[CalleeWorkflow],
+    ):
+        nexus_client = client.create_nexus_client(
+            service=AsyncSignalingService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        # The async operation never completes (no completion is delivered), so we do not await
+        # its result; the handler signals the callee during start.
+        await nexus_client.start_operation(
+            AsyncSignalingService.op,
+            OpInput(mode=MODE_ASYNC, callee_id=callee_id),
+            id=operation_id,
+            schedule_to_close_timeout=timedelta(seconds=20),
+        )
+
+        async def _callee_result() -> str:
+            # The callee is signal-with-started from the handler; tolerate the brief window
+            # before it exists.
+            try:
+                return await client.get_workflow_handle(callee_id).result()
+            except RPCError as err:
+                if err.status == RPCStatusCode.NOT_FOUND:
+                    raise AssertionError("callee not created yet")
+                raise
+
+        assert await assert_eventually(_callee_result) == "async-signal"
+
+        callee_history = await client.get_workflow_handle(callee_id).fetch_history()
+
+    # Forward: the single signal event on the callee references the standalone operation.
+    _assert_standalone_forward_link(callee_history, operation_id, expected_count=1)
