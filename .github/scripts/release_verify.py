@@ -6,6 +6,7 @@ import argparse
 import ast
 import pathlib
 import re
+import subprocess
 from collections.abc import Sequence
 
 try:
@@ -108,6 +109,98 @@ def verify_dist(args: argparse.Namespace) -> None:
         print(f"  {name}")
 
 
+def _git(args: Sequence[str], *, cwd: pathlib.Path | None = None) -> str:
+    return subprocess.check_output(
+        ["git", *args],
+        cwd=cwd,
+        encoding="utf-8",
+        stderr=subprocess.STDOUT,
+    ).strip()
+
+
+def _version_tuple(version: str) -> tuple[int, ...] | None:
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)+)(?:[a-zA-Z0-9_.+-]+)?", version)
+    if not match:
+        return None
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def _previous_release_tag(version: str) -> str:
+    current = _version_tuple(version)
+    if current is None:
+        raise RuntimeError(f"Cannot determine previous release for {version!r}")
+
+    candidates: list[tuple[int, ...]] = []
+    for tag in _git(["tag"]).splitlines():
+        tag_version = _version_tuple(tag)
+        if tag_version is not None and tag_version < current:
+            candidates.append(tag_version)
+    if not candidates:
+        raise RuntimeError(f"Could not find a previous release tag before {version!r}")
+    return ".".join(str(part) for part in max(candidates))
+
+
+def _gitlink(rev: str, path: str) -> str:
+    output = _git(["ls-tree", rev, path])
+    parts = output.split()
+    if len(parts) < 3 or parts[0] != "160000":
+        raise RuntimeError(f"Could not find submodule gitlink {path!r} at {rev!r}")
+    return parts[2]
+
+
+def _clean_commit_subject(subject: str) -> str:
+    subject = subject.encode("ascii", "ignore").decode("ascii")
+    subject = re.sub(r"\s+", " ", subject).strip()
+    subject = re.sub(r"^:[a-z0-9_+-]+:\s*", "", subject)
+    return subject.replace(" : ", ": ")
+
+
+def _link_sdk_core_prs(subject: str) -> str:
+    return re.sub(
+        r"\(#([0-9]+)\)",
+        r"([#\1](https://github.com/temporalio/sdk-rust/pull/\1))",
+        subject,
+    )
+
+
+def _sdk_core_release_notes(version: str, path: str) -> list[str]:
+    previous_tag = _previous_release_tag(version)
+    previous_commit = _gitlink(previous_tag, path)
+    current_commit = _gitlink("HEAD", path)
+    if previous_commit == current_commit:
+        return []
+
+    submodule_path = pathlib.Path(path)
+    if not (submodule_path / ".git").exists():
+        raise RuntimeError(
+            f"Submodule {path!r} is not initialized; checkout with submodules"
+        )
+
+    log_args = [
+        "log",
+        "--format=%H%x00%h%x00%s",
+        "--reverse",
+        f"{previous_commit}..{current_commit}",
+    ]
+    try:
+        log_output = _git(log_args, cwd=submodule_path)
+    except subprocess.CalledProcessError:
+        _git(["fetch", "--quiet", "origin", "main"], cwd=submodule_path)
+        log_output = _git(log_args, cwd=submodule_path)
+    if not log_output:
+        return []
+
+    lines = ["### SDK Core", ""]
+    for line in log_output.splitlines():
+        full_hash, short_hash, subject = line.split("\0", 2)
+        subject = _link_sdk_core_prs(_clean_commit_subject(subject))
+        lines.append(
+            f"- [`{short_hash}`](https://github.com/temporalio/sdk-rust/commit/"
+            f"{full_hash}) {subject}"
+        )
+    return lines
+
+
 def changelog_notes(args: argparse.Namespace) -> None:
     changelog_path = pathlib.Path(args.changelog)
     lines = changelog_path.read_text(encoding="utf-8").splitlines()
@@ -140,7 +233,12 @@ def changelog_notes(args: argparse.Namespace) -> None:
     if not section_lines:
         raise RuntimeError(f"Changelog section for {args.version!r} is empty")
 
-    notes = "## Changelog\n\n" + "\n".join(section_lines) + "\n"
+    note_lines = ["## Notable Changes", "", *section_lines]
+    sdk_core_notes = _sdk_core_release_notes(args.version, args.sdk_core_path)
+    if sdk_core_notes:
+        note_lines.extend(["", *sdk_core_notes])
+
+    notes = "\n".join(note_lines) + "\n"
     pathlib.Path(args.output).write_text(notes, encoding="utf-8")
 
 
@@ -162,6 +260,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     changelog_parser.add_argument("--version", required=True)
     changelog_parser.add_argument("--changelog", default="CHANGELOG.md")
     changelog_parser.add_argument("--output", required=True)
+    changelog_parser.add_argument(
+        "--sdk-core-path", default="temporalio/bridge/sdk-core"
+    )
     changelog_parser.set_defaults(func=changelog_notes)
 
     args = parser.parse_args(argv)
