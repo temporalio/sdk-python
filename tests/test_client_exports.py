@@ -51,6 +51,7 @@ EXPECTED_CLIENT_EXPORTS = [
     "FetchWorkflowHistoryEventsInput",
     "GetWorkerBuildIdCompatibilityInput",
     "GetWorkerTaskReachabilityInput",
+    "GrpcCompression",
     "HeaderCodecBehavior",
     "HeartbeatAsyncActivityInput",
     "HttpConnectProxyConfig",

@@ -389,6 +389,21 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
     ]
     """Delete a custom role"""
+    GetUserNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
+    ]
+    """Get users with access to a namespace"""
+    GetServiceAccountNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
+    ]
+    """Get service accounts with access to a namespace"""
+    GetUserGroupNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
+    ]
+    """Get user groups with access to a namespace"""
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
@@ -925,6 +940,27 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse:
         """Delete a custom role"""
+    @abc.abstractmethod
+    def GetUserNamespaceAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse:
+        """Get users with access to a namespace"""
+    @abc.abstractmethod
+    def GetServiceAccountNamespaceAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse:
+        """Get service accounts with access to a namespace"""
+    @abc.abstractmethod
+    def GetUserGroupNamespaceAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse:
+        """Get user groups with access to a namespace"""
 
 def add_CloudServiceServicer_to_server(
     servicer: CloudServiceServicer, server: grpc.Server

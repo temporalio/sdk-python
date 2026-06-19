@@ -3320,6 +3320,47 @@ global___ChildWorkflowExecutionTerminatedEventAttributes = (
 class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class WorkflowUpdateOptionsUpdate(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        UPDATE_ID_FIELD_NUMBER: builtins.int
+        ATTACHED_REQUEST_ID_FIELD_NUMBER: builtins.int
+        ATTACHED_COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+        update_id: builtins.str
+        """The ID of the workflow update this update options update corresponds to."""
+        attached_request_id: builtins.str
+        """Request ID attached to the running workflow update so that subsequent requests with same
+        request ID will be deduped
+        """
+        @property
+        def attached_completion_callbacks(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            temporalio.api.common.v1.message_pb2.Callback
+        ]:
+            """Completion callbacks attached to the running workflow update."""
+        def __init__(
+            self,
+            *,
+            update_id: builtins.str = ...,
+            attached_request_id: builtins.str = ...,
+            attached_completion_callbacks: collections.abc.Iterable[
+                temporalio.api.common.v1.message_pb2.Callback
+            ]
+            | None = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "attached_completion_callbacks",
+                b"attached_completion_callbacks",
+                "attached_request_id",
+                b"attached_request_id",
+                "update_id",
+                b"update_id",
+            ],
+        ) -> None: ...
+
     VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     UNSET_VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     ATTACHED_REQUEST_ID_FIELD_NUMBER: builtins.int
@@ -3327,6 +3368,7 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     IDENTITY_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
+    WORKFLOW_UPDATE_OPTIONS_FIELD_NUMBER: builtins.int
     @property
     def versioning_override(
         self,
@@ -3359,6 +3401,13 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
         self,
     ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
         """If set, the time-skipping configuration was changed. Contains the full updated configuration."""
+    @property
+    def workflow_update_options(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___WorkflowExecutionOptionsUpdatedEventAttributes.WorkflowUpdateOptionsUpdate
+    ]:
+        """Updates to workflow updates options."""
     def __init__(
         self,
         *,
@@ -3373,6 +3422,10 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
         identity: builtins.str = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
+        workflow_update_options: collections.abc.Iterable[
+            global___WorkflowExecutionOptionsUpdatedEventAttributes.WorkflowUpdateOptionsUpdate
+        ]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -3403,6 +3456,8 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
             b"unset_versioning_override",
             "versioning_override",
             b"versioning_override",
+            "workflow_update_options",
+            b"workflow_update_options",
         ],
     ) -> None: ...
 

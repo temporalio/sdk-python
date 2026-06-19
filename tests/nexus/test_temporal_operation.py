@@ -12,6 +12,7 @@ import temporalio.exceptions
 from temporalio import nexus, workflow
 from temporalio.client import Client, WorkflowExecutionStatus, WorkflowFailureError
 from temporalio.common import NexusOperationExecutionStatus, WorkflowIDConflictPolicy
+from temporalio.nexus._token import OperationToken, OperationTokenType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import EventType, assert_event_subsequence, assert_eventually
@@ -685,3 +686,41 @@ async def test_temporal_operation_overloads(
             if op == "no_param"
             else TemporalOperationOverloadTestValue(value=4)
         )
+
+
+async def test_temporal_operation_includes_token_in_callback(
+    client: Client, env: WorkflowEnvironment
+):
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[EchoWorkflow, EchoWorkflowCaller],
+    ):
+        input_value = f"test-{uuid.uuid4()}"
+        wf_handle = await client.start_workflow(
+            EchoWorkflowCaller.run,
+            Input(value=input_value, task_queue=task_queue),
+            task_queue=task_queue,
+            id=str(uuid.uuid4()),
+        )
+        result = await wf_handle.result()
+        assert result == input_value
+
+        target_handle = client.get_workflow_handle(f"echo-{input_value}")
+
+        desc = await target_handle.describe()
+        token = desc.raw_description.callbacks[0].callback.nexus.header[
+            "nexus-operation-token"
+        ]
+
+        expected_token = OperationToken(
+            type=OperationTokenType.WORKFLOW,
+            namespace=client.namespace,
+            workflow_id=target_handle.id,
+        ).encode()
+
+        assert token == expected_token

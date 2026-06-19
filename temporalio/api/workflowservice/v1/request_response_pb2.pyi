@@ -304,6 +304,7 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
     FAILOVER_VERSION_FIELD_NUMBER: builtins.int
     IS_GLOBAL_NAMESPACE_FIELD_NUMBER: builtins.int
     FAILOVER_HISTORY_FIELD_NUMBER: builtins.int
+    POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
     @property
     def namespace_info(
         self,
@@ -325,6 +326,16 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
         """Contains the historical state of failover_versions for the cluster, truncated to contain only the last N
         states to ensure that the list does not grow unbounded.
         """
+    @property
+    def poller_group_infos(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
+    ]:
+        """The initial info that client should use for poller group assignment. This information is
+        updated through poll response. Client is supposed to use the info received in the latest
+        poll response.
+        """
     def __init__(
         self,
         *,
@@ -337,6 +348,10 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
         is_global_namespace: builtins.bool = ...,
         failover_history: collections.abc.Iterable[
             temporalio.api.replication.v1.message_pb2.FailoverStatus
+        ]
+        | None = ...,
+        poller_group_infos: collections.abc.Iterable[
+            temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
         ]
         | None = ...,
     ) -> None: ...
@@ -364,6 +379,8 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
             b"is_global_namespace",
             "namespace_info",
             b"namespace_info",
+            "poller_group_infos",
+            b"poller_group_infos",
             "replication_config",
             b"replication_config",
         ],
@@ -1110,7 +1127,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
     `poller_group_infos` of the last the PollWorkflowTaskQueueResponse according to the
-    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    instructions. If not set, the poll is routed randomly which can cause it to be blocked
     without receiving a task while the queue actually has tasks in another server location.
     """
     identity: builtins.str
@@ -1904,7 +1921,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
     `poller_group_infos` of the last the PollActivityTaskQueueResponse according to the
-    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    instructions. If not set, the poll is routed randomly which can cause it to be blocked
     without receiving a task while the queue actually has tasks in another server location.
     """
     identity: builtins.str
@@ -6952,6 +6969,7 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
     UPDATE_REF_FIELD_NUMBER: builtins.int
     OUTCOME_FIELD_NUMBER: builtins.int
     STAGE_FIELD_NUMBER: builtins.int
+    LINK_FIELD_NUMBER: builtins.int
     @property
     def update_ref(self) -> temporalio.api.update.v1.message_pb2.UpdateRef:
         """Enough information for subsequent poll calls if needed. Never null."""
@@ -6973,23 +6991,34 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
     request WaitPolicy, and before the context deadline expired; clients may
     may then retry the call as needed.
     """
+    @property
+    def link(self) -> temporalio.api.common.v1.message_pb2.Link:
+        """Link to the update event. May be null if the update has not yet been accepted."""
     def __init__(
         self,
         *,
         update_ref: temporalio.api.update.v1.message_pb2.UpdateRef | None = ...,
         outcome: temporalio.api.update.v1.message_pb2.Outcome | None = ...,
         stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType = ...,
+        link: temporalio.api.common.v1.message_pb2.Link | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "outcome", b"outcome", "update_ref", b"update_ref"
+            "link", b"link", "outcome", b"outcome", "update_ref", b"update_ref"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "outcome", b"outcome", "stage", b"stage", "update_ref", b"update_ref"
+            "link",
+            b"link",
+            "outcome",
+            b"outcome",
+            "stage",
+            b"stage",
+            "update_ref",
+            b"update_ref",
         ],
     ) -> None: ...
 
@@ -7539,7 +7568,7 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
     `poller_group_infos` of the last the PollNexusTaskQueueResponse according to the
-    instructions. If not set, the poll is routed randomly which can cause it being blocked
+    instructions. If not set, the poll is routed randomly which can cause it to be blocked
     without receiving a task while the queue actually has tasks in another server location.
     """
     identity: builtins.str
@@ -11929,6 +11958,8 @@ class DescribeActivityExecutionRequest(google.protobuf.message.Message):
     INCLUDE_INPUT_FIELD_NUMBER: builtins.int
     INCLUDE_OUTCOME_FIELD_NUMBER: builtins.int
     LONG_POLL_TOKEN_FIELD_NUMBER: builtins.int
+    INCLUDE_HEARTBEAT_DETAILS_FIELD_NUMBER: builtins.int
+    INCLUDE_LAST_FAILURE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     activity_id: builtins.str
     run_id: builtins.str
@@ -11945,6 +11976,10 @@ class DescribeActivityExecutionRequest(google.protobuf.message.Message):
     guaranteed that a client making a sequence of long-poll requests will see a complete
     sequence of state changes.
     """
+    include_heartbeat_details: builtins.bool
+    """Include the heartbeat_details field inside info in the response if available."""
+    include_last_failure: builtins.bool
+    """Include the last_failure field inside info in the response if available."""
     def __init__(
         self,
         *,
@@ -11954,14 +11989,20 @@ class DescribeActivityExecutionRequest(google.protobuf.message.Message):
         include_input: builtins.bool = ...,
         include_outcome: builtins.bool = ...,
         long_poll_token: builtins.bytes = ...,
+        include_heartbeat_details: builtins.bool = ...,
+        include_last_failure: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "activity_id",
             b"activity_id",
+            "include_heartbeat_details",
+            b"include_heartbeat_details",
             "include_input",
             b"include_input",
+            "include_last_failure",
+            b"include_last_failure",
             "include_outcome",
             b"include_outcome",
             "long_poll_token",
@@ -11988,7 +12029,9 @@ class DescribeActivityExecutionResponse(google.protobuf.message.Message):
     """The run ID of the activity, useful when run_id was not specified in the request."""
     @property
     def info(self) -> temporalio.api.activity.v1.message_pb2.ActivityExecutionInfo:
-        """Information about the activity execution."""
+        """Information about the activity execution. Fields heartbeat_details and last_failure are omitted unless
+        the request has include_heartbeat_details or include_last_failure set to true, respectively.
+        """
     @property
     def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized activity input, passed as arguments to the activity function.

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+# BEGIN GENERATED NEXUS SYSTEM EXPORTS
+from temporalio.nexus.system.workflow_service import (
+    signal_with_start_workflow,
+)
+
+# END GENERATED NEXUS SYSTEM EXPORTS
 from ..types import (
     AnyType,
     CallableAsyncNoParam,
@@ -59,6 +65,7 @@ from ._context import (
     _current_update_info,
     _Runtime,
     _set_current_update_info,
+    cancellation_reason,
     current_update_info,
     deprecate_patch,
     extern_functions,
@@ -196,6 +203,7 @@ __all__ = [
     "get_last_completion_result",
     "get_last_failure",
     "has_last_completion_result",
+    "cancellation_reason",
     "in_workflow",
     "info",
     "instance",
@@ -312,4 +320,7 @@ __all__ = [
     "ProtocolReturnType",
     "ReturnType",
     "SelfType",
+    # BEGIN GENERATED NEXUS SYSTEM __ALL__
+    "signal_with_start_workflow",
+    # END GENERATED NEXUS SYSTEM __ALL__
 ]

@@ -9,7 +9,7 @@ use temporalio_client::tonic::{
 };
 use temporalio_client::{
     ClientKeepAliveOptions as CoreClientKeepAliveConfig, Connection, ConnectionOptions,
-    DnsLoadBalancingOptions, HttpConnectProxyOptions, RetryOptions,
+    DnsLoadBalancingOptions, GrpcCompression, HttpConnectProxyOptions, RetryOptions,
 };
 use tracing::warn;
 use url::Url;
@@ -37,6 +37,7 @@ pub struct ClientConfig {
     keep_alive_config: Option<ClientKeepAliveConfig>,
     http_connect_proxy_config: Option<ClientHttpConnectProxyConfig>,
     dns_load_balancing_config: Option<ClientDnsLoadBalancingConfig>,
+    grpc_compression: String,
 }
 
 #[derive(FromPyObject)]
@@ -196,7 +197,7 @@ where
     match res {
         Ok(resp) => Ok(resp.get_ref().encode_to_vec()),
         Err(err) => {
-            Python::with_gil(move |py| {
+            Python::attach(move |py| {
                 // Create tuple of "status", "message", and optional "details"
                 let code = err.code() as u32;
                 let message = err.message().to_owned();
@@ -266,6 +267,7 @@ impl ClientConfig {
         .keep_alive(self.keep_alive_config.map(Into::into))
         .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
         .dns_load_balancing(dns_load_balancing)
+        .grpc_compression(grpc_compression_from_str(&self.grpc_compression)?)
         .headers(ascii_headers)
         .binary_headers(binary_headers)
         .maybe_api_key(self.api_key)
@@ -276,6 +278,16 @@ impl ClientConfig {
         })
         .maybe_metrics_meter(metrics_meter);
         Ok(conn_opts.build())
+    }
+}
+
+fn grpc_compression_from_str(value: &str) -> PyResult<GrpcCompression> {
+    match value {
+        "none" => Ok(GrpcCompression::None),
+        "gzip" => Ok(GrpcCompression::Gzip),
+        _ => Err(PyValueError::new_err(format!(
+            "invalid grpc_compression: {value}"
+        ))),
     }
 }
 

@@ -6,7 +6,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from temporalio.api.enums.v1.command_type_pb2 import CommandType
-from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
+from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     ResolveActivity,
     ResolveChildWorkflowExecution,

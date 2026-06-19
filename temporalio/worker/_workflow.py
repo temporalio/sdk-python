@@ -29,8 +29,13 @@ import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
+from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
 
 from . import _command_aware_visitor
+from ._debugger import (
+    _install_workflow_breakpoint_hook,
+    _relax_sandbox_for_debugger,
+)
 from ._interceptor import (
     Interceptor,
     WorkflowInboundInterceptor,
@@ -47,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 # Set to true to log all activations and completions
 LOG_PROTOS = False
+
 
 # Value was chosen abitrarily as a small number that allows some concurrency and prevents
 # large numbers of concurrent external storage operations causing resource contention.
@@ -85,6 +91,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
     ) -> None:
+        # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
+        debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
+
         self._bridge_worker = bridge_worker
         self._namespace = namespace
         self._task_queue = task_queue
@@ -96,7 +105,26 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
         )
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
+
+        # If debug mode is enabled, ensure that the debugpy (https://github.com/microsoft/debugpy)
+        # import is added as a passthrough
+        if debug_mode and isinstance(workflow_runner, SandboxedWorkflowRunner):
+            workflow_runner = dataclasses.replace(
+                workflow_runner,
+                restrictions=workflow_runner.restrictions.with_passthrough_modules(
+                    "_pydevd_bundle"
+                ),
+            )
+
+        # In debug mode, also lift the sandbox restriction on breakpoint()
+        # and install the workflow-aware breakpoint hook so pdb works in
+        # workflow code. Outside of debug mode neither happens.
+        self._debug_mode = debug_mode
+        if self._debug_mode:
+            workflow_runner = _relax_sandbox_for_debugger(workflow_runner)
+            _install_workflow_breakpoint_hook()
         self._workflow_runner = workflow_runner
+
         self._unsandboxed_workflow_runner = unsandboxed_workflow_runner
         self._data_converter = data_converter
         # Build the interceptor classes and collect extern functions
@@ -127,11 +155,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
         self._throw_after_activation: Exception | None = None
 
-        # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
-        # deadlock detection, otherwise set to 2 seconds
-        self._deadlock_timeout_seconds = (
-            None if debug_mode or os.environ.get("TEMPORAL_DEBUG") else 2
-        )
+        # If debug mode is enabled, disable deadlock detection
+        # otherwise set to 2 seconds
+        self._deadlock_timeout_seconds = None if self._debug_mode else 2
 
         # Keep track of workflows that could not be evicted
         self._could_not_evict_count = 0
@@ -241,6 +267,34 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             except PollShutdownError:
                 return
 
+    async def _activate_inline_for_debug(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        workflow: _RunningWorkflow,
+        act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        # Indirect through call_soon + a future so the activation runs outside
+        # the dispatch task's __step() context. Python 3.14 refuses to enter a
+        # task while another on the same thread is mid-step; suspending at the
+        # await below clears that state so workflow.activate can step its own
+        # task without collision.
+        future: asyncio.Future = loop.create_future()
+
+        def run_inline() -> None:
+            # _run_once clears the running-loop registration on exit; restore
+            # the main loop so later code sees the right one.
+            main_loop = asyncio._get_running_loop()
+            try:
+                completion = workflow.activate(act)
+                future.set_result(completion)
+            except BaseException as e:
+                future.set_exception(e)
+            finally:
+                asyncio._set_running_loop(main_loop)
+
+        loop.call_soon(run_inline)
+        return await future
+
     async def _handle_activation(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> None:
@@ -330,35 +384,43 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 )
                 self._running_workflows[act.run_id] = workflow
 
-            # Run activation in separate thread so we can check if it's
-            # deadlocked
-            activate_task = asyncio.get_running_loop().run_in_executor(
-                self._workflow_task_executor,
-                workflow.activate,
-                act,
-            )
+            if self._debug_mode:
+                # Inline on the main thread so pdb / breakpoint() can read
+                # stdin. The loop blocks during the activation — that's the
+                # intended single-stepping semantic.
+                completion = await self._activate_inline_for_debug(
+                    asyncio.get_running_loop(), workflow, act
+                )
+            else:
+                # Run activation in separate thread so we can check if it's
+                # deadlocked
+                activate_task = asyncio.get_running_loop().run_in_executor(
+                    self._workflow_task_executor,
+                    workflow.activate,
+                    act,
+                )
 
-            # Run activation task with deadlock timeout
-            try:
-                completion = await asyncio.wait_for(
-                    activate_task, self._deadlock_timeout_seconds
-                )
-            except asyncio.TimeoutError:
-                # Need to create the deadlock exception up here so it
-                # captures the trace now instead of later after we may have
-                # interrupted it
-                deadlock_exc = _DeadlockError.from_deadlocked_workflow(
-                    workflow.instance, self._deadlock_timeout_seconds
-                )
-                # When we deadlock, we will raise an exception to fail
-                # the task. But before we do that, we want to try to
-                # interrupt the thread and put this activation task on
-                # the workflow so that the successive eviction can wait
-                # on it before trying to evict.
-                workflow.attempt_deadlock_interruption()
-                # Set the task and raise
-                workflow.deadlocked_activation_task = activate_task
-                raise deadlock_exc from None
+                # Run activation task with deadlock timeout
+                try:
+                    completion = await asyncio.wait_for(
+                        activate_task, self._deadlock_timeout_seconds
+                    )
+                except asyncio.TimeoutError:
+                    # Need to create the deadlock exception up here so it
+                    # captures the trace now instead of later after we may have
+                    # interrupted it
+                    deadlock_exc = _DeadlockError.from_deadlocked_workflow(
+                        workflow.instance, self._deadlock_timeout_seconds
+                    )
+                    # When we deadlock, we will raise an exception to fail
+                    # the task. But before we do that, we want to try to
+                    # interrupt the thread and put this activation task on
+                    # the workflow so that the successive eviction can wait
+                    # on it before trying to evict.
+                    workflow.attempt_deadlock_interruption()
+                    # Set the task and raise
+                    workflow.deadlocked_activation_task = activate_task
+                    raise deadlock_exc from None
 
         except Exception as err:
             if isinstance(err, _DeadlockError):
@@ -576,22 +638,27 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             handle_eviction_task: asyncio.Future | None = None
             while True:
                 try:
-                    # We only create the eviction task if we haven't already or
-                    # it is done. This is because if it already is running and
-                    # timed out, it's still running (and holding on to a
-                    # thread). But if did complete running but failed with
-                    # another error, we want to re-create the task.
-                    if not handle_eviction_task or handle_eviction_task.done():
-                        handle_eviction_task = (
-                            asyncio.get_running_loop().run_in_executor(
-                                self._workflow_task_executor,
-                                workflow.activate,
-                                act,
-                            )
+                    if self._debug_mode:
+                        await self._activate_inline_for_debug(
+                            asyncio.get_running_loop(), workflow, act
                         )
-                    await asyncio.wait_for(
-                        handle_eviction_task, self._deadlock_timeout_seconds
-                    )
+                    else:
+                        # We only create the eviction task if we haven't already or
+                        # it is done. This is because if it already is running and
+                        # timed out, it's still running (and holding on to a
+                        # thread). But if did complete running but failed with
+                        # another error, we want to re-create the task.
+                        if not handle_eviction_task or handle_eviction_task.done():
+                            handle_eviction_task = (
+                                asyncio.get_running_loop().run_in_executor(
+                                    self._workflow_task_executor,
+                                    workflow.activate,
+                                    act,
+                                )
+                            )
+                        await asyncio.wait_for(
+                            handle_eviction_task, self._deadlock_timeout_seconds
+                        )
                     # Break if it succeeds
                     break
                 except BaseException as err:

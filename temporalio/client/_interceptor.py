@@ -111,6 +111,7 @@ class CancelWorkflowInput:
     id: str
     run_id: str | None
     first_execution_run_id: str | None
+    reason: str
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -333,8 +334,6 @@ class UpdateWithStartUpdateWorkflowInput:
     wait_for_stage: WorkflowUpdateStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: type | None
-    rpc_metadata: Mapping[str, str | bytes]
-    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -365,18 +364,23 @@ class UpdateWithStartStartWorkflowInput:
     static_details: str | None
     # Type may be absent
     ret_type: type | None
-    rpc_metadata: Mapping[str, str | bytes]
-    rpc_timeout: timedelta | None
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None = None
 
 
 @dataclass
 class StartWorkflowUpdateWithStartInput:
-    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
+    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
+
+    The ``rpc_metadata`` and ``rpc_timeout`` fields are authoritative for the
+    ``execute_multi_operation`` gRPC call.  Interceptors that wish to set RPC
+    metadata should modify :py:attr:`rpc_metadata` on this object.
+    """
 
     start_workflow_input: UpdateWithStartStartWorkflowInput
     update_workflow_input: UpdateWithStartUpdateWorkflowInput
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
     _on_start: Callable[
         [temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse], None
     ]

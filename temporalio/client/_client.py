@@ -32,6 +32,7 @@ import temporalio.workflow
 from temporalio.service import (
     ConnectConfig,
     DnsLoadBalancingConfig,
+    GrpcCompression,
     HttpConnectProxyConfig,
     KeepAliveConfig,
     RetryConfig,
@@ -152,6 +153,7 @@ class Client:
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
         dns_load_balancing_config: DnsLoadBalancingConfig | None = None,
+        grpc_compression: GrpcCompression = GrpcCompression.GZIP,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> Self:
         """Connect to a Temporal server.
@@ -212,6 +214,9 @@ class Client:
                 be set to ``None`` to disable. Silently disabled when
                 ``http_connect_proxy_config`` is set, since the two are mutually
                 exclusive.
+            grpc_compression: Transport-level gRPC compression for the client
+                connection. Default is gzip. Set to
+                :py:attr:`GrpcCompression.NONE` to disable compression.
             header_codec_behavior: Encoding behavior for headers sent by the client.
         """
         connect_config = temporalio.service.ConnectConfig(
@@ -226,6 +231,7 @@ class Client:
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
             dns_load_balancing_config=dns_load_balancing_config,
+            grpc_compression=grpc_compression,
         )
 
         def make_lambda(
@@ -1190,8 +1196,6 @@ class Client:
             args=temporalio.common._arg_or_args(arg, args),
             headers={},
             ret_type=result_type or result_type_from_type_hint,
-            rpc_metadata=rpc_metadata,
-            rpc_timeout=rpc_timeout,
             wait_for_stage=wait_for_stage,
         )
 
@@ -1216,6 +1220,8 @@ class Client:
         input = StartWorkflowUpdateWithStartInput(
             start_workflow_input=start_workflow_operation._start_workflow_input,
             update_workflow_input=update_input,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
             _on_start=on_start,
             _on_start_error=on_start_error,
         )
@@ -3042,6 +3048,7 @@ class ClientConnectConfig(TypedDict, total=False):
     runtime: temporalio.runtime.Runtime | None
     http_connect_proxy_config: HttpConnectProxyConfig | None
     dns_load_balancing_config: DnsLoadBalancingConfig | None
+    grpc_compression: GrpcCompression
     header_codec_behavior: HeaderCodecBehavior
 
 

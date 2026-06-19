@@ -17,8 +17,7 @@ from ._model_activity import ModelActivity
 from ._temporal_mcp_client import (
     _evict_connection,
     build_call_tool_activity,
-    clear_cache,
-    populate_cache,
+    build_list_tools_activity,
 )
 
 
@@ -31,10 +30,11 @@ class StrandsPlugin(SimplePlugin):
     on first use, then cached for the worker's lifetime. Use the same name in
     ``TemporalAgent(model=...)`` inside the workflow.
 
-    When ``mcp_clients`` is supplied, registers a per-server
-    ``{server}-call-tool`` activity for each entry and, at worker startup,
-    connects to each MCP server to cache its tool list. Workflow-side
-    ``TemporalMCPClient(server="...").load_tools()`` reads from the cache.
+    When ``mcp_clients`` is supplied, registers per-server
+    ``{server}-call-tool`` and ``{server}-list-tools`` activities for each
+    entry. Workflow-side ``TemporalMCPClient(server="...")`` discovers tools by
+    running ``{server}-list-tools``; whether it lists once per workflow or once
+    per agent turn is controlled by its ``cache_tools`` option.
 
     ``mcp_connection_idle_timeout`` controls how long a worker-process MCP
     connection is kept open between ``call-tool`` activities before it is
@@ -69,17 +69,19 @@ class StrandsPlugin(SimplePlugin):
                     server, client_factory, mcp_connection_idle_timeout
                 )
             )
+            activities.append(
+                build_list_tools_activity(
+                    server, client_factory, mcp_connection_idle_timeout
+                )
+            )
 
         @asynccontextmanager
         async def run_context() -> AsyncGenerator[None, None]:
-            for server, client_factory in mcp_clients.items():
-                await populate_cache(server, client_factory)
             try:
                 yield
             finally:
                 for server in mcp_clients:
                     await _evict_connection(server)
-                    clear_cache(server)
 
         super().__init__(
             "aws.StrandsPlugin",

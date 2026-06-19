@@ -83,7 +83,15 @@ class Importer:
                     )
                     and not temporalio.workflow.unsafe.is_sandbox_unrestricted()
                 ):
-                    raise RestrictedWorkflowAccessError(f"__builtins__.{name}")
+                    # If a per-builtin child matcher carries a custom
+                    # leaf_message (e.g. directing the user to debug_mode for
+                    # breakpoint()), surface that instead of the generic
+                    # pass-through-modules advice.
+                    child = builtin_matcher.children.get(name)
+                    override_message = child.leaf_message if child else None
+                    raise RestrictedWorkflowAccessError(
+                        f"__builtins__.{name}", override_message=override_message
+                    )
                 return orig(*args, **kwargs)
 
             for k in dir(builtins):
