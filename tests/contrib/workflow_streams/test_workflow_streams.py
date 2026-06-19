@@ -2567,3 +2567,204 @@ async def test_cross_namespace_nexus_stream(
             await broker_handle.signal("close")
             result = await caller_handle.result()
             assert result == "done"
+
+
+# ---------------------------------------------------------------------------
+# Tail-drain on completion: subscribe() falls back from poll updates (which
+# can't reach a completed workflow) to the read query.
+# ---------------------------------------------------------------------------
+
+
+@workflow.defn
+class CompleteAfterPublishWorkflow:
+    """Publishes its whole stream from @workflow.run, then returns immediately.
+
+    There is no ``wait_condition``: the run completes as soon as the items
+    are in the log. A subscriber connecting afterward cannot reach the
+    workflow with poll updates, so ``subscribe()`` must drain the tail via
+    the read query.
+    """
+
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.stream = WorkflowStream()
+
+    @workflow.run
+    async def run(self, count: int) -> None:
+        events = self.stream.topic("events", type=bytes)
+        status = self.stream.topic("status", type=bytes)
+        for i in range(count):
+            events.publish(f"tail-{i}".encode())
+        status.publish(b"done")
+
+
+@workflow.defn
+class CompleteAfterBigPublishWorkflow:
+    """Publishes large items and returns, to exercise read-query pagination."""
+
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.stream = WorkflowStream()
+
+    @workflow.run
+    async def run(self, count: int) -> None:
+        big = self.stream.topic("big", type=bytes)
+        chunk = b"x" * 200_000
+        for _ in range(count):
+            big.publish(chunk)
+
+
+@pytest.mark.asyncio
+async def test_subscribe_drains_tail_after_completion(client: Client) -> None:
+    """Items published just before completion are delivered via the read query."""
+    count = 5
+    async with new_worker(client, CompleteAfterPublishWorkflow) as worker:
+        handle = await client.start_workflow(
+            CompleteAfterPublishWorkflow.run,
+            count,
+            id=f"workflow-stream-drain-tail-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Wait for the workflow to fully complete before subscribing, so
+        # every read goes through the query-drain path, not the update.
+        await handle.result()
+
+        items = await collect_items(client, handle, None, 0, count + 1)
+        assert len(items) == count + 1
+        for i in range(count):
+            assert items[i].topic == "events"
+            assert items[i].data == f"tail-{i}".encode()
+        assert items[count].topic == "status"
+        assert items[count].data == b"done"
+
+
+@pytest.mark.asyncio
+async def test_subscribe_drains_large_tail_after_completion(client: Client) -> None:
+    """The query-drain paginates across the 1MB cap just like the poll path."""
+    count = 8
+    async with new_worker(client, CompleteAfterBigPublishWorkflow) as worker:
+        handle = await client.start_workflow(
+            CompleteAfterBigPublishWorkflow.run,
+            count,
+            id=f"workflow-stream-drain-big-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+
+        chunk = b"x" * 200_000
+        items = await collect_items(client, handle, None, 0, count, timeout=15.0)
+        assert len(items) == count
+        for item in items:
+            assert item.data == chunk
+
+
+@workflow.defn
+class RunThenCompleteWorkflow:
+    """Publishes a first batch while running, then a second batch and completes.
+
+    Exercises a single ``subscribe()`` that spans the live phase (poll
+    updates) and the post-completion tail (read query): the second batch is
+    published in the same task that returns, so a still-reading subscriber
+    must receive it via the tail drain rather than losing it.
+    """
+
+    @workflow.init
+    def __init__(self, batch: int) -> None:
+        self.stream = WorkflowStream()
+        self._closed = False
+
+    @workflow.signal
+    def close(self) -> None:
+        self._closed = True
+
+    @workflow.run
+    async def run(self, batch: int) -> None:
+        events = self.stream.topic("events", type=bytes)
+        for i in range(batch):
+            events.publish(f"live-{i}".encode())
+        await workflow.wait_condition(lambda: self._closed)
+        for i in range(batch):
+            events.publish(f"final-{i}".encode())
+
+
+@pytest.mark.asyncio
+async def test_subscribe_spans_live_and_completed(client: Client) -> None:
+    """One subscription receives items streamed while running and after completion."""
+    batch = 3
+    async with new_worker(client, RunThenCompleteWorkflow) as worker:
+        handle = await client.start_workflow(
+            RunThenCompleteWorkflow.run,
+            batch,
+            id=f"workflow-stream-live-then-complete-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        collected: list[WorkflowStreamItem] = []
+
+        async def consume() -> None:
+            stream = WorkflowStreamClient.create(client, handle.id)
+            async for item in stream.subscribe(
+                ["events"], poll_cooldown=timedelta(0), result_type=bytes
+            ):
+                collected.append(item)
+
+        consumer = asyncio.create_task(consume())
+        try:
+            # First batch streams while the workflow is still running.
+            async def got_live() -> bool:
+                return len(collected) >= batch
+
+            await assert_eq_eventually(True, got_live, timeout=timedelta(seconds=15))
+            assert [i.data for i in collected[:batch]] == [
+                f"live-{i}".encode() for i in range(batch)
+            ]
+
+            # Close the workflow: it publishes the second batch and returns.
+            await handle.signal(RunThenCompleteWorkflow.close)
+            await handle.result()
+
+            # The same subscription drains the post-completion tail, then ends.
+            async with _async_timeout(15.0):
+                await consumer
+        finally:
+            consumer.cancel()
+
+        # Append-only log + monotonic offsets: both batches arrive in order,
+        # regardless of whether each item came via an update or the drain query.
+        assert [i.data for i in collected] == (
+            [f"live-{i}".encode() for i in range(batch)]
+            + [f"final-{i}".encode() for i in range(batch)]
+        )
+
+
+@pytest.mark.asyncio
+async def test_read_query_on_completed_workflow(client: Client) -> None:
+    """The read query serves the log (with topic filtering) after completion."""
+    count = 4
+    async with new_worker(client, CompleteAfterPublishWorkflow) as worker:
+        handle = await client.start_workflow(
+            CompleteAfterPublishWorkflow.run,
+            count,
+            id=f"workflow-stream-read-query-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+
+        # All topics: count "events" items + 1 "status" item.
+        result: PollResult = await handle.query(
+            "__temporal_workflow_stream_read",
+            PollInput(topics=[], from_offset=0),
+            result_type=PollResult,
+        )
+        assert len(result.items) == count + 1
+        assert result.more_ready is False
+        assert result.next_offset == count + 1
+
+        # Topic filter narrows to just the "status" item.
+        filtered: PollResult = await handle.query(
+            "__temporal_workflow_stream_read",
+            PollInput(topics=["status"], from_offset=0),
+            result_type=PollResult,
+        )
+        assert [i.topic for i in filtered.items] == ["status"]
+        assert filtered.more_ready is False

@@ -13,11 +13,16 @@ scales with durable batches rather than tokens.
 
 Under the hood the stream is built directly on Temporal's existing
 message-passing primitives: Signals carry publishes, Updates serve
-long-poll subscriptions, and a Query exposes the current global offset.
-The library packages the boilerplate that turns those primitives into
-a usable stream: batching to amortize per-event overhead, deduplication
-for exactly-once delivery, topic filtering, and continue-as-new helpers
-that hand stream state across Workflow runs.
+long-poll subscriptions while the Workflow is running, and Queries expose
+the current global offset and drain the stream's tail after the Workflow
+completes. (Updates cannot reach a completed Workflow, but Queries can —
+the server replays history to reconstruct the log — so a subscriber that
+is still reading when the Workflow finishes seamlessly receives any
+remaining items rather than losing them.) The library packages the
+boilerplate that turns those primitives into a usable stream: batching to
+amortize per-event overhead, deduplication for exactly-once delivery,
+topic filtering, and continue-as-new helpers that hand stream state across
+Workflow runs.
 
 ## Documentation
 

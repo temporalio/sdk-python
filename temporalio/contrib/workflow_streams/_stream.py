@@ -51,6 +51,7 @@ from ._types import (
 _PUBLISH_SIGNAL = "__temporal_workflow_stream_publish"
 _POLL_UPDATE = "__temporal_workflow_stream_poll"
 _OFFSET_QUERY = "__temporal_workflow_stream_offset"
+_READ_QUERY = "__temporal_workflow_stream_read"
 
 _MAX_POLL_RESPONSE_BYTES = 1_000_000
 
@@ -83,6 +84,9 @@ class WorkflowStream:
     - ``__temporal_workflow_stream_publish`` signal — external publish with dedup
     - ``__temporal_workflow_stream_poll`` update — long-poll subscription
     - ``__temporal_workflow_stream_offset`` query — current log length
+    - ``__temporal_workflow_stream_read`` query — non-blocking read of the
+      current log, used to drain the tail after the workflow completes
+      (updates cannot reach a completed workflow, but queries can)
 
     Note:
         Because the publish handler is registered dynamically from
@@ -157,6 +161,7 @@ class WorkflowStream:
             _POLL_UPDATE, self._on_poll, validator=self._validate_poll
         )
         workflow.set_query_handler(_OFFSET_QUERY, self._on_offset)
+        workflow.set_query_handler(_READ_QUERY, self._on_read)
 
     def _publish_to_topic(self, topic: str, value: Any) -> None:
         """Internal publish path used by :class:`WorkflowTopicHandle`.
@@ -406,9 +411,31 @@ class WorkflowStream:
                 or self._detaching
             ),
         )
-        log_offset = payload.from_offset - self._base_offset
+        return self._collect(payload.from_offset, payload.topics)
+
+    def _on_read(self, payload: PollInput) -> PollResult:
+        """Non-blocking read of the current log, served as a query.
+
+        Used by subscribers to drain the stream's tail after the
+        workflow has completed: updates cannot reach a completed
+        workflow, but queries can (the server replays history to
+        reconstruct ``self._log``). Unlike :meth:`_on_poll`, this runs
+        in a read-only query context and must not block, so it returns
+        whatever is currently available — possibly an empty batch.
+        """
+        return self._collect(payload.from_offset, payload.topics)
+
+    def _collect(self, from_offset: int, topics: list[str]) -> PollResult:
+        """Collect matching items from ``from_offset`` into a PollResult.
+
+        Read-only: shared by the long-poll update (:meth:`_on_poll`,
+        after its wait fires) and the drain query (:meth:`_on_read`).
+        Applies topic filtering and caps the response at ~1MB wire
+        bytes, setting ``more_ready`` when more remain.
+        """
+        log_offset = from_offset - self._base_offset
         if log_offset < 0:
-            if payload.from_offset == 0:
+            if from_offset == 0:
                 # "From the beginning" — start at whatever is available.
                 log_offset = 0
             else:
@@ -417,14 +444,14 @@ class WorkflowStream:
                 # gets the error) without crashing the workflow task —
                 # avoids a poison pill during replay.
                 raise ApplicationError(
-                    f"Requested offset {payload.from_offset} has been truncated. "
+                    f"Requested offset {from_offset} has been truncated. "
                     f"Current base offset is {self._base_offset}.",
                     type="TruncatedOffset",
                     non_retryable=True,
                 )
         all_new = self._log[log_offset:]
-        if payload.topics:
-            topic_set = set(payload.topics)
+        if topics:
+            topic_set = set(topics)
             candidates = [
                 (self._base_offset + log_offset + i, item)
                 for i, item in enumerate(all_new)

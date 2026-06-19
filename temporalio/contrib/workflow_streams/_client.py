@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from datetime import timedelta
 from typing import Any, TypeVar, overload
 
@@ -33,6 +33,7 @@ from temporalio.client import (
     Client,
     WorkflowExecutionStatus,
     WorkflowHandle,
+    WorkflowQueryFailedError,
     WorkflowUpdateFailedError,
     WorkflowUpdateRPCTimeoutOrCancelledError,
 )
@@ -546,10 +547,15 @@ class WorkflowStreamClient:
                     continue
                 if cause_type == "AcceptedUpdateCompletedWorkflow":
                     # Workflow returned (or continued-as-new) before
-                    # this poll's update completed. Either follow the
-                    # chain or exit cleanly.
+                    # this poll's update completed. Follow the chain, or
+                    # drain the tail via query (updates can't reach a
+                    # completed workflow, but queries can) and exit.
                     if await self._follow_continue_as_new():
                         continue
+                    async for item in self._drain_tail(
+                        topic_filter, offset, result_type
+                    ):
+                        yield item
                     return
                 raise
             except WorkflowUpdateRPCTimeoutOrCancelledError:
@@ -566,25 +572,101 @@ class WorkflowStreamClient:
                 if await self._follow_continue_as_new():
                     continue
                 if await self._workflow_in_terminal_state():
+                    async for item in self._drain_tail(
+                        topic_filter, offset, result_type
+                    ):
+                        yield item
                     return
                 raise
-            converter = self._payload_converter()
-            for wire_item in result.items:
-                payload = _decode_payload(wire_item.data)
-                data: Any = (
-                    converter.from_payload(payload)
-                    if result_type is None
-                    else converter.from_payload(payload, result_type)
-                )
-                yield WorkflowStreamItem(
-                    topic=wire_item.topic,
-                    data=data,
-                    offset=wire_item.offset,
-                )
+            for item in self._decode_items(result, result_type):
+                yield item
             offset = result.next_offset
             cooldown_secs = poll_cooldown.total_seconds()
             if not result.more_ready and cooldown_secs > 0:
                 await asyncio.sleep(cooldown_secs)
+
+    def _decode_items(
+        self, result: PollResult, result_type: type | None
+    ) -> Iterator[WorkflowStreamItem[Any]]:
+        """Decode a PollResult's wire items into WorkflowStreamItems.
+
+        Shared by the poll loop and the query-based tail drain so both
+        decode identically via the client's sync payload converter.
+        """
+        converter = self._payload_converter()
+        for wire_item in result.items:
+            payload = _decode_payload(wire_item.data)
+            data: Any = (
+                converter.from_payload(payload)
+                if result_type is None
+                else converter.from_payload(payload, result_type)
+            )
+            yield WorkflowStreamItem(
+                topic=wire_item.topic,
+                data=data,
+                offset=wire_item.offset,
+            )
+
+    async def _drain_tail(
+        self,
+        topics: list[str],
+        offset: int,
+        result_type: type | None,
+    ) -> AsyncIterator[WorkflowStreamItem[Any]]:
+        """Drain the stream's tail from a completed workflow via query.
+
+        Updates cannot reach a completed workflow, but queries can: the
+        server replays history to reconstruct the stream log. This
+        yields any items at or after ``offset`` that the subscriber had
+        not received when the workflow completed, then ends.
+
+        Every failure mode ends the stream cleanly (the iterator simply
+        stops) rather than propagating, preserving ``subscribe()``'s
+        end-of-stream contract. ``reject_condition=None`` is passed
+        explicitly so a client-level default of ``NOT_OPEN`` /
+        ``NOT_COMPLETED_CLEANLY`` cannot reject reads of the now-closed
+        workflow.
+        """
+        retried_from_zero = False
+        while True:
+            try:
+                result: PollResult = await self._handle.query(
+                    "__temporal_workflow_stream_read",
+                    PollInput(topics=topics, from_offset=offset),
+                    result_type=PollResult,
+                    reject_condition=None,
+                )
+            except asyncio.CancelledError:
+                return
+            except WorkflowQueryFailedError:
+                # A query failure carries no structured cause/type, so a
+                # truncated offset can't be detected the way the update
+                # path does. Retry once from offset 0 ("from the
+                # beginning of whatever exists"), which recovers the
+                # legitimate truncation case. A second failure (e.g. the
+                # workflow predates this query handler) ends the stream
+                # cleanly — matching pre-existing behavior.
+                if retried_from_zero:
+                    return
+                retried_from_zero = True
+                offset = 0
+                continue
+            except RPCError as e:
+                # History deleted past retention (or otherwise gone):
+                # the tail is unrecoverable. End the stream cleanly,
+                # matching the NOT_FOUND-as-end-of-stream philosophy.
+                if e.status == RPCStatusCode.NOT_FOUND:
+                    return
+                raise
+            for item in self._decode_items(result, result_type):
+                yield item
+            # The workflow is terminal, so no new items will ever
+            # arrive: a page with more_ready=False is the definitive
+            # end. The offset guard defends against a non-advancing
+            # response.
+            if not result.more_ready or result.next_offset <= offset:
+                return
+            offset = result.next_offset
 
     async def _follow_continue_as_new(self) -> bool:
         """Check if the workflow continued-as-new and re-target the handle.
