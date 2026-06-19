@@ -85,7 +85,7 @@ class WorkflowStream:
     - ``__temporal_workflow_stream_poll`` update — long-poll subscription
     - ``__temporal_workflow_stream_offset`` query — current log length
     - ``__temporal_workflow_stream_read`` query — non-blocking read of the
-      current log, used to drain the tail after the workflow completes
+      current log, used to read the tail after the workflow completes
       (updates cannot reach a completed workflow, but queries can)
 
     Note:
@@ -416,12 +416,14 @@ class WorkflowStream:
     def _on_read(self, payload: PollInput) -> PollResult:
         """Non-blocking read of the current log, served as a query.
 
-        Used by subscribers to drain the stream's tail after the
+        Used by subscribers to read the stream's tail after the
         workflow has completed: updates cannot reach a completed
         workflow, but queries can (the server replays history to
         reconstruct ``self._log``). Unlike :meth:`_on_poll`, this runs
         in a read-only query context and must not block, so it returns
-        whatever is currently available — possibly an empty batch.
+        whatever is currently available — possibly an empty batch. The
+        read is non-destructive: it never mutates the log, so the tail
+        can be read repeatedly.
         """
         return self._collect(payload.from_offset, payload.topics)
 
@@ -429,7 +431,7 @@ class WorkflowStream:
         """Collect matching items from ``from_offset`` into a PollResult.
 
         Read-only: shared by the long-poll update (:meth:`_on_poll`,
-        after its wait fires) and the drain query (:meth:`_on_read`).
+        after its wait fires) and the read query (:meth:`_on_read`).
         Applies topic filtering and caps the response at ~1MB wire
         bytes, setting ``more_ready`` when more remain.
         """

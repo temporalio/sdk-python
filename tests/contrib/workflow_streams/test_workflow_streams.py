@@ -2570,7 +2570,7 @@ async def test_cross_namespace_nexus_stream(
 
 
 # ---------------------------------------------------------------------------
-# Tail-drain on completion: subscribe() falls back from poll updates (which
+# Tail read on completion: subscribe() falls back from poll updates (which
 # can't reach a completed workflow) to the read query.
 # ---------------------------------------------------------------------------
 
@@ -2581,7 +2581,7 @@ class CompleteAfterPublishWorkflow:
 
     There is no ``wait_condition``: the run completes as soon as the items
     are in the log. A subscriber connecting afterward cannot reach the
-    workflow with poll updates, so ``subscribe()`` must drain the tail via
+    workflow with poll updates, so ``subscribe()`` must read the tail via
     the read query.
     """
 
@@ -2615,18 +2615,18 @@ class CompleteAfterBigPublishWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_subscribe_drains_tail_after_completion(client: Client) -> None:
+async def test_subscribe_reads_tail_after_completion(client: Client) -> None:
     """Items published just before completion are delivered via the read query."""
     count = 5
     async with new_worker(client, CompleteAfterPublishWorkflow) as worker:
         handle = await client.start_workflow(
             CompleteAfterPublishWorkflow.run,
             count,
-            id=f"workflow-stream-drain-tail-{uuid.uuid4()}",
+            id=f"workflow-stream-read-tail-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         # Wait for the workflow to fully complete before subscribing, so
-        # every read goes through the query-drain path, not the update.
+        # every read goes through the tail-read query path, not the update.
         await handle.result()
 
         items = await collect_items(client, handle, None, 0, count + 1)
@@ -2639,14 +2639,14 @@ async def test_subscribe_drains_tail_after_completion(client: Client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_subscribe_drains_large_tail_after_completion(client: Client) -> None:
-    """The query-drain paginates across the 1MB cap just like the poll path."""
+async def test_subscribe_reads_large_tail_after_completion(client: Client) -> None:
+    """The tail-read query paginates across the 1MB cap just like the poll path."""
     count = 8
     async with new_worker(client, CompleteAfterBigPublishWorkflow) as worker:
         handle = await client.start_workflow(
             CompleteAfterBigPublishWorkflow.run,
             count,
-            id=f"workflow-stream-drain-big-{uuid.uuid4()}",
+            id=f"workflow-stream-read-big-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         await handle.result()
@@ -2665,7 +2665,7 @@ class RunThenCompleteWorkflow:
     Exercises a single ``subscribe()`` that spans the live phase (poll
     updates) and the post-completion tail (read query): the second batch is
     published in the same task that returns, so a still-reading subscriber
-    must receive it via the tail drain rather than losing it.
+    must receive it via the tail read rather than losing it.
     """
 
     @workflow.init
@@ -2723,14 +2723,14 @@ async def test_subscribe_spans_live_and_completed(client: Client) -> None:
             await handle.signal(RunThenCompleteWorkflow.close)
             await handle.result()
 
-            # The same subscription drains the post-completion tail, then ends.
+            # The same subscription reads the post-completion tail, then ends.
             async with _async_timeout(15.0):
                 await consumer
         finally:
             consumer.cancel()
 
         # Append-only log + monotonic offsets: both batches arrive in order,
-        # regardless of whether each item came via an update or the drain query.
+        # regardless of whether each item came via an update or the read query.
         assert [i.data for i in collected] == (
             [f"live-{i}".encode() for i in range(batch)]
             + [f"final-{i}".encode() for i in range(batch)]

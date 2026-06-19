@@ -548,11 +548,11 @@ class WorkflowStreamClient:
                 if cause_type == "AcceptedUpdateCompletedWorkflow":
                     # Workflow returned (or continued-as-new) before
                     # this poll's update completed. Follow the chain, or
-                    # drain the tail via query (updates can't reach a
+                    # read the tail via query (updates can't reach a
                     # completed workflow, but queries can) and exit.
                     if await self._follow_continue_as_new():
                         continue
-                    async for item in self._drain_tail(
+                    async for item in self._read_tail(
                         topic_filter, offset, result_type
                     ):
                         yield item
@@ -572,7 +572,7 @@ class WorkflowStreamClient:
                 if await self._follow_continue_as_new():
                     continue
                 if await self._workflow_in_terminal_state():
-                    async for item in self._drain_tail(
+                    async for item in self._read_tail(
                         topic_filter, offset, result_type
                     ):
                         yield item
@@ -590,7 +590,7 @@ class WorkflowStreamClient:
     ) -> Iterator[WorkflowStreamItem[Any]]:
         """Decode a PollResult's wire items into WorkflowStreamItems.
 
-        Shared by the poll loop and the query-based tail drain so both
+        Shared by the poll loop and the query-based tail read so both
         decode identically via the client's sync payload converter.
         """
         converter = self._payload_converter()
@@ -607,18 +607,20 @@ class WorkflowStreamClient:
                 offset=wire_item.offset,
             )
 
-    async def _drain_tail(
+    async def _read_tail(
         self,
         topics: list[str],
         offset: int,
         result_type: type | None,
     ) -> AsyncIterator[WorkflowStreamItem[Any]]:
-        """Drain the stream's tail from a completed workflow via query.
+        """Read the stream's tail from a completed workflow via query.
 
         Updates cannot reach a completed workflow, but queries can: the
-        server replays history to reconstruct the stream log. This
-        yields any items at or after ``offset`` that the subscriber had
-        not received when the workflow completed, then ends.
+        server replays history to reconstruct the stream log. This is a
+        non-destructive read — it does not consume or empty the log, so
+        the same tail can be read again. It yields any items at or after
+        ``offset`` that the subscriber had not received when the
+        workflow completed, then ends.
 
         Every failure mode ends the stream cleanly (the iterator simply
         stops) rather than propagating, preserving ``subscribe()``'s
