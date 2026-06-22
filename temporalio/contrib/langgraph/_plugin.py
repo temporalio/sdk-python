@@ -35,6 +35,12 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 _ACTIVITY_OPTION_KEYS: frozenset[str] = frozenset(
     {"execute_in", *inspect.signature(workflow.execute_activity).parameters}
 )
+# Node/task option keys beyond the raw execute_activity parameters:
+# 'summary_fn' is a callable consumed in the workflow (not a Temporal
+# option), so it must be split out of Graph API metadata too.
+_LANGGRAPH_OPTION_KEYS: frozenset[str] = _ACTIVITY_OPTION_KEYS | frozenset(
+    {"summary_fn"}
+)
 
 
 class LangGraphPlugin(SimplePlugin):
@@ -70,6 +76,18 @@ class LangGraphPlugin(SimplePlugin):
         default_activity_options: Activity options applied to every
             activity-bound node and task, overridable per-node (Graph API
             ``metadata``) or per-task (``activity_options[name]``).
+        default_summary_fn: Callable applied to every node and task to
+            compute a summary, overridable per-node (Graph API
+            ``metadata['summary_fn']``) or per-task
+            (``activity_options[name]['summary_fn']``). It receives the
+            node's ``(args, kwargs)`` and returns a summary string (or
+            ``None`` for no summary). For ``execute_in='activity'`` nodes
+            the result sets the activity ``summary`` (shown on each
+            scheduled-activity event); for ``execute_in='workflow'`` nodes
+            it updates the workflow's current details (last-writer-wins).
+            Must be deterministic and must not raise, as it runs in
+            workflow context on every replay. Cannot be combined with a
+            static ``summary`` on the same node.
         streaming_topic: When set, ``langgraph.config.get_stream_writer()``
             inside a node publishes to this topic on the workflow's
             :class:`WorkflowStream`. The workflow must construct
@@ -103,6 +121,8 @@ class LangGraphPlugin(SimplePlugin):
         # TODO: Remove activity_options when we have support for @task(metadata=...)
         activity_options: dict[str, dict[str, Any]] | None = None,
         default_activity_options: dict[str, Any] | None = None,
+        default_summary_fn: Callable[[tuple[Any, ...], dict[str, Any]], str | None]
+        | None = None,
         streaming_topic: str | None = None,
         streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ):
@@ -133,6 +153,7 @@ class LangGraphPlugin(SimplePlugin):
         self.activities: list = []
         self._streaming_topic = streaming_topic
         self._streaming_batch_interval = streaming_batch_interval
+        self._default_summary_fn = default_summary_fn
 
         # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
@@ -168,12 +189,14 @@ class LangGraphPlugin(SimplePlugin):
                     # the node function via config["metadata"].
                     node_meta = node.metadata or {}
                     node_opts = {
-                        k: v for k, v in node_meta.items() if k in _ACTIVITY_OPTION_KEYS
+                        k: v
+                        for k, v in node_meta.items()
+                        if k in _LANGGRAPH_OPTION_KEYS
                     }
                     node.metadata = {
                         k: v
                         for k, v in node_meta.items()
-                        if k not in _ACTIVITY_OPTION_KEYS
+                        if k not in _LANGGRAPH_OPTION_KEYS
                     }
                     if "execute_in" not in node_opts:
                         raise ValueError(
@@ -253,6 +276,16 @@ class LangGraphPlugin(SimplePlugin):
         """Prepare a node or task to execute as an activity or inline in the workflow."""
         opts = kwargs or {}
         execute_in = opts.pop("execute_in")
+        node_summary_fn = opts.pop("summary_fn", None)
+        if node_summary_fn is not None and opts.get("summary") is not None:
+            raise ValueError(
+                f"{activity_name}: set either 'summary' or 'summary_fn', not both."
+            )
+        # Per-node summary_fn wins; a static summary suppresses the plugin
+        # default; otherwise fall back to the plugin-wide default_summary_fn.
+        summary_fn = node_summary_fn or (
+            None if opts.get("summary") is not None else self._default_summary_fn
+        )
 
         if execute_in == "activity":
             wrapped = wrap_activity(
@@ -262,9 +295,13 @@ class LangGraphPlugin(SimplePlugin):
             )
             a = activity.defn(name=activity_name)(wrapped)
             self.activities.append(a)
-            return wrap_execute_activity(a, task_id=task_id(func), **opts)
+            return wrap_execute_activity(
+                a, task_id=task_id(func), summary_fn=summary_fn, **opts
+            )
         elif execute_in == "workflow":
-            return wrap_workflow(func, streaming_topic=self._streaming_topic)
+            return wrap_workflow(
+                func, streaming_topic=self._streaming_topic, summary_fn=summary_fn
+            )
         else:
             raise ValueError(f"Invalid execute_in value: {execute_in}")
 

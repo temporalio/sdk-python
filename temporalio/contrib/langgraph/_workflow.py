@@ -20,6 +20,7 @@ def wrap_workflow(
     func: Callable[..., Any],
     *,
     streaming_topic: str | None = None,
+    summary_fn: Callable[[tuple[Any, ...], dict[str, Any]], str | None] | None = None,
 ) -> Callable[..., Awaitable[Any]]:
     """Wrap a function as a workflow-side LangGraph node.
 
@@ -28,9 +29,18 @@ def wrap_workflow(
     function with the writer installed. Workflow-side nodes publish
     synchronously to the in-workflow ``WorkflowStream`` (no signal
     round-trip); activity-side nodes go through ``WorkflowStreamClient``.
+
+    Workflow-side nodes have no activity to carry a summary, so a
+    truthy ``summary_fn`` result updates the workflow's current details
+    via :func:`temporalio.workflow.set_current_details` (last-writer-wins).
     """
 
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if summary_fn is not None:
+            summary = summary_fn(args, kwargs)
+            if summary:
+                workflow.set_current_details(summary)
+
         async def run(stream_writer: Callable[[Any], None] | None) -> Any:
             token = None
             if stream_writer is not None:
