@@ -10,9 +10,9 @@ license-files = ["LICENSE"]
 keywords = ["temporal", "workflow"]
 dependencies = [
   "nexus-rpc==1.4.0",
-  "protobuf>=3.20,<7.0.0",
+  "protobuf>=3.20,<8.0.0",
   "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
-  "types-protobuf>=3.20,<7.0.0",
+  "types-protobuf>=3.20,<8.0.0",
   "typing-extensions>=4.2.0,<5",
 ]
 classifiers = [
@@ -74,7 +74,7 @@ dev = [
   "openai-agents[litellm]>=0.14.0; python_version < '3.14'",
   "litellm>=1.83.0",
   "openinference-instrumentation-google-adk>=0.1.11",
-  "googleapis-common-protos==1.70.0",
+  "googleapis-common-protos>=1.75.0,<2",
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",

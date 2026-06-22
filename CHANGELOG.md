@@ -25,6 +25,8 @@ to include examples, links to docs, or any other relevant information.
 - AWS Lambda worker `configure` parameter supports sync, async, and async
   generator style functions. This callback is invoked on the asyncio event
   loop.
+- Relaxed the protobuf dependency bounds to allow protobuf 7 where compatible
+  with the selected optional dependencies.
 
 ### Deprecated
 

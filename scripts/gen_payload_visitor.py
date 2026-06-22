@@ -56,6 +56,16 @@ def name_for(desc: Descriptor) -> str:
     return desc.full_name.replace(".", "_")
 
 
+def field_is_repeated(field: FieldDescriptor) -> bool:
+    return bool(
+        getattr(
+            field,
+            "is_repeated",
+            getattr(field, "label") == FieldDescriptor.LABEL_REPEATED,
+        )
+    )
+
+
 def emit_loop(
     field_name: str,
     iter_expr: str,
@@ -290,17 +300,16 @@ class PayloadVisitor:
                 continue
 
             # Repeated fields (including maps which are represented as repeated messages)
-            if field.label == FieldDescriptor.LABEL_REPEATED:
-                if (
-                    field.message_type is not None
-                    and field.message_type.GetOptions().map_entry
-                ):
-                    val_fd = field.message_type.fields_by_name.get("value")
+            if field_is_repeated(field):
+                message_type = field.message_type
+                if message_type is not None and message_type.GetOptions().map_entry:
+                    val_fd = message_type.fields_by_name.get("value")
                     if (
                         val_fd is not None
                         and val_fd.type == FieldDescriptor.TYPE_MESSAGE
                     ):
                         child_desc = val_fd.message_type
+                        assert child_desc is not None
                         child_needed = self.walk(child_desc)
                         if child_needed:
                             has_payload = True
@@ -313,12 +322,13 @@ class PayloadVisitor:
                                 )
                             )
 
-                    key_fd = field.message_type.fields_by_name.get("key")
+                    key_fd = message_type.fields_by_name.get("key")
                     if (
                         key_fd is not None
                         and key_fd.type == FieldDescriptor.TYPE_MESSAGE
                     ):
                         child_desc = key_fd.message_type
+                        assert child_desc is not None
                         child_needed = self.walk(child_desc)
                         if child_needed:
                             has_payload = True
@@ -331,14 +341,16 @@ class PayloadVisitor:
                                 )
                             )
                 else:
+                    assert message_type is not None
                     item = self._collect_repeated(
-                        field.message_type, field, f"o.{field.name}"
+                        message_type, field, f"o.{field.name}"
                     )
                     if item is not None:
                         has_payload = True
                         emit_items.append(item)
             else:
                 child_desc = field.message_type
+                assert child_desc is not None
                 child_has_payload = self.walk(child_desc)
                 has_payload |= child_has_payload
                 if child_has_payload:
@@ -358,6 +370,7 @@ class PayloadVisitor:
             first = True
             for field in fields:
                 child_desc = field.message_type
+                assert child_desc is not None
                 child_has_payload = self.walk(child_desc)
                 has_payload |= child_has_payload
                 if child_has_payload:
