@@ -21,7 +21,7 @@ from nexusrpc.handler import (
     sync_operation,
 )
 
-from temporalio import nexus, workflow
+from temporalio import activity, nexus, workflow
 from temporalio.client import (
     CancelNexusOperationInput,
     Client,
@@ -33,7 +33,9 @@ from temporalio.client import (
     NexusOperationExecutionDescription,
     NexusOperationFailureError,
     NexusOperationHandle,
+    NexusOperationOnCompleteOptions,
     OutboundInterceptor,
+    RPCError,
     StartNexusOperationInput,
     TerminateNexusOperationInput,
     WorkflowUpdateStage,
@@ -949,3 +951,114 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         count_input = interceptor.count_calls[-1]
         assert isinstance(count_input, CountNexusOperationsInput)
         assert count_input.query == query
+
+
+@activity.defn(name="my_activity")
+async def my_activity(input: EchoOutput) -> int:
+    print(f"I'm an activity and I received {input}")
+    return 0
+
+
+@service_handler(name="completions")
+class Completions:
+    @nexus.completion_operation
+    async def on_echo_complete(
+        self,
+        ctx: nexus.TemporalCompletionContext,
+        client: nexus.TemporalCompletionClient,
+        completion: nexus.Completion[EchoOutput],
+    ) -> None:
+        print(f"I'm the completion handler and I received {completion.result}")
+        assert isinstance(completion, nexus.NexusOperationCompletion)
+        assert completion.result
+        # PROTOTYPE: the server does not yet populate operation_id (or other
+        # NexusOperationCompletion fields besides the result), so key the activity ID
+        # on the result value, which the test also knows.
+        await client.start_activity(
+            # need better overloads to pass activity directly but easily accomplished
+            "my_activity",
+            completion.result,
+            id=f"completion-activity-{completion.result.value}",
+            schedule_to_close_timeout=timedelta(seconds=30),
+            task_queue=completion.result.value,
+        )
+
+
+async def test_worker_callback(client: Client, env: WorkflowEnvironment):
+    """Start a workflow_run operation, poll result, verify."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[StandaloneTestServiceHandler(), Completions()],
+        workflows=[EchoHandlerWorkflow],
+        activities=[my_activity],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+        nexus_client = client.create_nexus_client(
+            service=StandaloneTestService, endpoint=endpoint_name
+        )
+        operation_id = str(uuid.uuid4())
+        # activity_id = f"completion-for-{operation_id}"
+        handle = await nexus_client.start_operation(
+            StandaloneTestService.echo_async,
+            EchoInput(value=task_queue),
+            id=operation_id,
+            schedule_to_close_timeout=timedelta(seconds=30),
+            on_complete=NexusOperationOnCompleteOptions(
+                endpoint=endpoint_name,
+                service="completions",
+                operation="on_echo_complete",
+            ),
+        )
+        result = await handle.result()
+        assert isinstance(result, EchoOutput)
+        assert result.value == task_queue
+
+        async def check_activity():
+            activity_handle = client.get_activity_handle(
+                f"completion-activity-{task_queue}"
+            )
+            try:
+                result = await activity_handle.result()
+            except RPCError:
+                raise AssertionError("got rpc error, but want to retry")
+            except Exception as err:
+                print(err.__cause__)
+                raise
+            assert result == 0
+
+        await assert_eventually(check_activity)
+
+        # handle = await nexus_client.start_operation(
+        #     StandaloneTestService.echo_async,
+        #     EchoInput(value="async-hello"),
+        #     id=operation_id,
+        #     schedule_to_close_timeout=timedelta(seconds=30),
+        #     on_complete=NexusOnCompleteOptions(
+        #         activity="myActivity",
+        #         id=activity_id + "2",
+        #         task_queue=task_queue,
+        #     ),
+        # )
+        # result = await handle.result()
+        # assert isinstance(result, EchoOutput)
+        # assert result.value == "async-hello"
+
+        # async def check_activity_2():
+        #     activity_handle = client.get_activity_handle(activity_id + "2")
+        #     try:
+        #         result = await activity_handle.result()
+        #     except RPCError:
+        #         raise AssertionError("got rpc error, but want to retry")
+        #     assert result == 0
+
+        # await assert_eventually(check_activity_2)

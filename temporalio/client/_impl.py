@@ -1487,6 +1487,25 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             for k, v in input.headers.items():
                 req.nexus_header[k] = v
 
+        # PROTOTYPE: Add magic completion URL and target stuff
+        if input.on_complete:
+            req.completion_callbacks.append(
+                temporalio.api.common.v1.Callback(
+                    nexus=temporalio.api.common.v1.Callback.Nexus(
+                        url="temporal://system/dispatch-worker-callback",
+                        header={
+                            "target-namespace": self._client.namespace,
+                            "target-endpoint": input.on_complete.endpoint,
+                            "target-service": input.on_complete.service,
+                            "target-operation": input.on_complete.operation,
+                        },
+                    ),
+                    # PROTOTYPE TODO: form links?
+                    # Maybe server should add these, so it has the run ID as well?
+                    links=[],
+                )
+            )
+
         resp: temporalio.api.workflowservice.v1.StartNexusOperationExecutionResponse
         try:
             resp = await self._client.workflow_service.start_nexus_operation_execution(

@@ -136,6 +136,7 @@ from ._interceptor import (
 )
 from ._nexus import (
     NexusClient,
+    NexusOperationOnCompleteOptions,
     NexusOperationExecution,
     NexusOperationExecutionAsyncIterator,
     NexusOperationExecutionCancellationInfo,
@@ -233,6 +234,7 @@ __all__ = [
     "AsyncActivityHandle",
     "ActivityHandle",
     "NexusClient",
+    "NexusOperationOnCompleteOptions",
     "NexusOperationExecution",
     "NexusOperationExecutionAsyncIterator",
     "NexusOperationExecutionCancellationInfo",

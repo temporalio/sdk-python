@@ -12258,6 +12258,7 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     NEXUS_HEADER_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
+    COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     """The identity of the client who initiated this request."""
@@ -12336,6 +12337,15 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     @property
     def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         """Metadata for use by user interfaces to display the fixed as-of-start summary and details of the operation."""
+    @property
+    def completion_callbacks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Callback
+    ]:
+        """PROTOTYPE
+        Completion callbacks to be invoked once the Nexus operation reaches a terminal state.
+        """
     def __init__(
         self,
         *,
@@ -12356,6 +12366,10 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
         | None = ...,
         nexus_header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        completion_callbacks: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Callback
+        ]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -12378,6 +12392,8 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "completion_callbacks",
+            b"completion_callbacks",
             "endpoint",
             b"endpoint",
             "id_conflict_policy",

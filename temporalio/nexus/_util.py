@@ -5,6 +5,7 @@ import inspect
 import typing
 import warnings
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import (
     Any,
 )
@@ -15,11 +16,14 @@ from nexusrpc import (
     OutputT,
 )
 
+from temporalio.nexus._completion import Completion
 from temporalio.nexus._operation_context import (
+    TemporalCompletionContext,
     TemporalStartOperationContext,
     WorkflowRunOperationContext,
 )
 from temporalio.nexus._temporal_client import (
+    TemporalCompletionClient,
     TemporalNexusClient,
     TemporalOperationResult,
 )
@@ -78,6 +82,58 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
         ),
         expected_return_origin=TemporalOperationResult,
     )
+
+
+def get_completion_method_result_type_annotation(
+    method: Callable[..., Awaitable[None]],
+) -> type[Any] | None:
+    """Return the result type for a completion handler method.
+
+    ``method`` must be a type-annotated completion handler method whose final parameter
+    is annotated as :py:class:`temporalio.nexus.Completion`.
+    """
+    completion_type, return_type = _get_start_method_input_and_output_type_annotations(
+        method,
+        expected_param_types=(
+            TemporalCompletionContext,
+            TemporalCompletionClient,
+        ),
+    )
+    if return_type not in (None, type(None)):
+        warnings.warn(
+            f"Expected return type of {method.__name__} to be None, "
+            f"but is {return_type}"
+        )
+    if completion_type is None:
+        return None
+    origin_type = typing.get_origin(completion_type)
+    if not origin_type:
+        if isinstance(completion_type, type) and issubclass(
+            completion_type, Completion
+        ):
+            # Completion annotation without a type parameter; the result will not be
+            # converted to a specific type.
+            return None
+        warnings.warn(
+            f"Expected final parameter of {method.__name__} to be annotated as "
+            f"{Completion.__name__}, but is {completion_type}"
+        )
+        return None
+    if not issubclass(origin_type, Completion):
+        warnings.warn(
+            f"Expected final parameter of {method.__name__} to be annotated as a "
+            f"subclass of {Completion.__name__}, but is {completion_type}"
+        )
+        return None
+    args = typing.get_args(completion_type)
+    if len(args) != 1:
+        warnings.warn(
+            f"Expected completion annotation {completion_type} of {method.__name__} "
+            f"to have exactly one type parameter, but has {len(args)}: {args}."
+        )
+        return None
+    [result_type] = args
+    return result_type
 
 
 def _get_wrapped_start_method_input_and_output_type_annotations(
@@ -205,6 +261,40 @@ def set_operation_factory(
     ``obj`` should be an operation start method.
     """
     setattr(obj, "__nexus_operation_factory__", operation_factory)
+
+
+_COMPLETION_HANDLER_DEFINITION_ATTR = "__temporal_nexus_completion_definition__"
+
+
+@dataclass(frozen=True)
+class _CompletionHandlerDefinition:
+    """Metadata attached to a method by :py:func:`temporalio.nexus.completion_operation`."""
+
+    name: str
+    """The completion operation name by which the handler is addressed."""
+
+    method_name: str
+    """The name of the decorated method."""
+
+    result_type: type[Any] | None
+    """The operation result type, extracted from the method's completion annotation."""
+
+
+def set_completion_handler_definition(
+    obj: Any, defn: _CompletionHandlerDefinition
+) -> None:
+    """Mark ``obj`` as a completion handler method."""
+    setattr(obj, _COMPLETION_HANDLER_DEFINITION_ATTR, defn)
+
+
+def get_completion_handler_definition(
+    obj: Any,
+) -> _CompletionHandlerDefinition | None:
+    """Return the completion handler definition for ``obj``, if it is one."""
+    defn = getattr(obj, _COMPLETION_HANDLER_DEFINITION_ATTR, None)
+    if not isinstance(defn, _CompletionHandlerDefinition):
+        return None
+    return defn
 
 
 # Copied from https://github.com/modelcontextprotocol/python-sdk

@@ -25,6 +25,7 @@ from ._interceptor import (
     DescribeNexusOperationInput,
     GetNexusOperationResultInput,
     ListNexusOperationsInput,
+    NexusOperationOnCompleteOptions,
     StartNexusOperationInput,
     TerminateNexusOperationInput,
 )
@@ -490,6 +491,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        on_complete: NexusOperationOnCompleteOptions | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -656,6 +658,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        on_complete: NexusOperationOnCompleteOptions | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[Any]:
@@ -974,6 +977,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        on_complete: NexusOperationOnCompleteOptions | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[Any]:
@@ -1003,6 +1007,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
                 search_attributes=search_attributes,
                 summary=summary,
                 headers=dict(headers) if headers else {},
+                on_complete=on_complete,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )

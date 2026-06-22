@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import contextvars
+import inspect
 import threading
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import reduce
@@ -18,6 +19,7 @@ from typing import (
     cast,
 )
 
+import nexusrpc
 import nexusrpc.handler
 from nexusrpc import LazyValue
 from nexusrpc.handler import CancelOperationContext, Handler, StartOperationContext
@@ -38,7 +40,15 @@ from temporalio.exceptions import (
     FailureError,
     WorkflowAlreadyStartedError,
 )
-from temporalio.nexus import Info, logger
+from temporalio.nexus import (
+    Info,
+    NexusOperationCompletion,
+    TemporalCompletionContext,
+    logger,
+)
+from temporalio.nexus._link_conversion import nexus_link_to_temporal_link
+from temporalio.nexus._temporal_client import _TemporalCompletionClient
+from temporalio.nexus._util import get_completion_handler_definition
 from temporalio.service import RPCError, RPCStatusCode
 
 from ._interceptor import (
@@ -59,6 +69,45 @@ class _RunningNexusTask:
     def cancel(self, reason: str):
         self.cancellation.cancel(reason)
         self.task.cancel()
+
+
+@dataclass(frozen=True)
+class _CompletionHandler:
+    """A completion handler method bound to a service handler instance."""
+
+    method: Callable[..., Awaitable[None]]
+    result_type: type[Any] | None
+
+
+def _collect_completion_handlers(
+    service_handlers: Sequence[Any],
+) -> dict[tuple[str, str], _CompletionHandler]:
+    """Collect methods decorated with @temporalio.nexus.completion_operation.
+
+    Returns a mapping from (service name, completion operation name) to the bound
+    handler method.
+    """
+    completion_handlers: dict[tuple[str, str], _CompletionHandler] = {}
+    for service_handler in service_handlers:
+        service_defn = nexusrpc.get_service_definition(type(service_handler))
+        service_name = (
+            service_defn.name if service_defn else type(service_handler).__name__
+        )
+        for _, method in inspect.getmembers(type(service_handler)):
+            defn = get_completion_handler_definition(method)
+            if not defn:
+                continue
+            key = (service_name, defn.name)
+            if key in completion_handlers:
+                raise ValueError(
+                    f"Multiple completion handlers registered for service "
+                    f"{service_name!r} and operation {defn.name!r}"
+                )
+            completion_handlers[key] = _CompletionHandler(
+                method=getattr(service_handler, defn.method_name),
+                result_type=defn.result_type,
+            )
+    return completion_handlers
 
 
 class _NexusWorker:  # type:ignore[reportUnusedClass]
@@ -89,6 +138,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         self._handler = Handler(
             service_handlers, handler_executor, middleware=[middleware]
         )
+        self._completion_handlers = _collect_completion_handlers(service_handlers)
 
         self._data_converter = data_converter
 
@@ -160,6 +210,21 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
                             cancel_op_task, task_cancellation
+                        )
+                    elif task.request.HasField("completion"):
+                        task_cancellation = _NexusTaskCancellation()
+                        completion_task = asyncio.create_task(
+                            self._handle_completion_task(
+                                task_token=task.task_token,
+                                request=task.request.completion,
+                                headers=dict(task.request.header),
+                                task_cancellation=task_cancellation,
+                                request_deadline=request_deadline,
+                                endpoint=nexus_task.endpoint,
+                            )
+                        )
+                        self._running_tasks[task.task_token] = _RunningNexusTask(
+                            completion_task, task_cancellation
                         )
                     else:
                         raise NotImplementedError(
@@ -457,6 +522,215 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 await self._data_converter.encode_failure(new_err, response.failure)
                 return response
 
+    async def _handle_completion_task(
+        self,
+        task_token: bytes,
+        request: temporalio.api.nexus.v1.CompletionRequest,
+        headers: Mapping[str, str],
+        task_cancellation: nexusrpc.handler.OperationTaskCancellation,
+        request_deadline: datetime | None,
+        endpoint: str,
+    ) -> None:
+        """Handle a completion task.
+
+        Attempt to execute the user completion handler method. Handle errors and send
+        the task completion.
+        """
+        try:
+            try:
+                completion_response = await self._handle_completion(
+                    request,
+                    headers,
+                    task_cancellation,
+                    request_deadline,
+                    endpoint,
+                )
+            except asyncio.CancelledError:
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    ack_cancel=task_cancellation.is_cancelled(),
+                )
+            except BaseException as err:
+                logger.warning("Failed to execute Nexus completion handler method")
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                )
+                handler_error = _exception_to_handler_error(err)
+                await self._data_converter.encode_failure(
+                    handler_error, completion.failure
+                )
+
+                if isinstance(err, concurrent.futures.BrokenExecutor):
+                    self._fail_worker_exception_queue.put_nowait(err)
+            else:
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    completed=temporalio.api.nexus.v1.Response(
+                        completion=completion_response
+                    ),
+                )
+
+            await self._complete_task(completion)
+        except Exception:
+            logger.exception("Failed to send Nexus task completion")
+        finally:
+            try:
+                del self._running_tasks[task_token]
+            except KeyError:
+                logger.exception("Failed to remove task for completed Nexus completion")
+
+    async def _handle_completion(
+        self,
+        request: temporalio.api.nexus.v1.CompletionRequest,
+        headers: Mapping[str, str],
+        cancellation: nexusrpc.handler.OperationTaskCancellation,
+        request_deadline: datetime | None,
+        endpoint: str,
+    ) -> temporalio.api.nexus.v1.CompletionResponse:
+        """Invoke the user's completion handler and construct the CompletionResponse.
+
+        Terminal failures (OperationError, non-retryable ApplicationError) are handled
+        by this function, since they result in a CompletionResponse.
+
+        All other exceptions are handled by a caller of this function.
+        """
+        # Create the worker shutdown event if not created
+        if not self._worker_shutdown_event:
+            self._worker_shutdown_event = temporalio.common._CompositeEvent(
+                thread_event=threading.Event(), async_event=asyncio.Event()
+            )
+        ctx = TemporalCompletionContext(
+            service=request.service,
+            operation=request.operation,
+            headers=headers,
+            task_cancellation=cancellation,
+            request_deadline=request_deadline,
+            request_id=request.request_id,
+        )
+        temporalio.nexus._operation_context._TemporalCompletionOperationContext(
+            nexus_context=ctx,
+            client=self._client,
+            info=lambda: Info(
+                endpoint=endpoint,
+                namespace=self._namespace,
+                task_queue=self._task_queue,
+            ),
+            _runtime_metric_meter=self._metric_meter,
+            _worker_shutdown_event=self._worker_shutdown_event,
+        ).set()
+
+        handler = self._completion_handlers.get((request.service, request.operation))
+        if not handler:
+            raise nexusrpc.HandlerError(
+                f"No completion handler registered for service {request.service!r} "
+                f"and operation {request.operation!r}",
+                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+            )
+
+        # This is the seam where future completion variants plug in as new Completion
+        # subclasses.
+        variant = request.WhichOneof("variant")
+        if variant == "nexus_operation":
+            completion = await self._nexus_operation_completion(
+                request.nexus_operation, handler.result_type
+            )
+        else:
+            raise nexusrpc.HandlerError(
+                f"Unsupported Nexus completion variant: {variant}",
+                type=nexusrpc.HandlerErrorType.NOT_IMPLEMENTED,
+            )
+
+        temporal_links: list[temporalio.api.common.v1.Link] = []
+        for link in completion.links:
+            if temporal_link := nexus_link_to_temporal_link(link):
+                temporal_links.append(temporal_link)
+        client = _TemporalCompletionClient(self._client, temporal_links)
+
+        try:
+            await handler.method(ctx, client, completion)
+        except nexusrpc.OperationError as err:
+            # Convert OperationError to a Temporal failure
+            try:
+                match err.state:
+                    case nexusrpc.OperationErrorState.CANCELED:
+                        raise CancelledError(err.message) from err.__cause__
+                    case nexusrpc.OperationErrorState.FAILED:
+                        raise ApplicationError(
+                            message=err.message,
+                            type="OperationError",
+                            non_retryable=True,
+                        ) from err.__cause__
+            except FailureError as new_err:
+                response = temporalio.api.nexus.v1.CompletionResponse()
+                await self._data_converter.encode_failure(new_err, response.failure)
+                return response
+        except ApplicationError as err:
+            if not err.non_retryable:
+                raise
+            response = temporalio.api.nexus.v1.CompletionResponse()
+            await self._data_converter.encode_failure(err, response.failure)
+            return response
+        return temporalio.api.nexus.v1.CompletionResponse()
+
+    async def _nexus_operation_completion(
+        self,
+        source: temporalio.api.nexus.v1.CompletionRequest.NexusOperationCompletion,
+        result_type: type[Any] | None,
+    ) -> NexusOperationCompletion[Any]:
+        """Construct a NexusOperationCompletion from its proto representation."""
+        result: Any = None
+        failure: BaseException | None = None
+        if source.HasField("failure"):
+            failure = await self._data_converter.decode_failure(source.failure)
+        elif source.HasField("result"):
+            result = await _decode_nexus_payload(
+                self._data_converter,
+                source.result,
+                result_type,
+                "Nexus completion result",
+            )
+        return NexusOperationCompletion(
+            result=result,
+            failure=failure,
+            links=[
+                nexusrpc.Link(url=link.url, type=link.type) for link in source.links
+            ],
+            service=source.service,
+            operation=source.operation,
+            operation_id=source.operation_id,
+            operation_token=source.operation_token,
+        )
+
+
+async def _decode_nexus_payload(
+    data_converter: temporalio.converter.DataConverter,
+    payload: temporalio.api.common.v1.Payload,
+    as_type: type[Any] | None,
+    description: str,
+) -> Any:
+    """Decode a payload received over Nexus, converting errors to HandlerErrors."""
+    if data_converter.payload_codec:
+        try:
+            [payload] = await data_converter.payload_codec.decode([payload])
+        except Exception as err:
+            raise nexusrpc.HandlerError(
+                f"Payload codec failed to decode {description}",
+                type=nexusrpc.HandlerErrorType.INTERNAL,
+            ) from err
+
+    try:
+        [value] = data_converter.payload_converter.from_payloads(
+            [payload],
+            type_hints=[as_type] if as_type else None,
+        )
+        return value
+    except Exception as err:
+        raise nexusrpc.HandlerError(
+            f"Payload converter failed to decode {description}",
+            type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+            retryable_override=False,
+        ) from err
+
 
 @dataclass
 class _DummyPayloadSerializer:
@@ -473,28 +747,12 @@ class _DummyPayloadSerializer:
         content: nexusrpc.Content,  # type:ignore[reportUnusedParameter]
         as_type: type[Any] | None = None,
     ) -> Any:
-        payload = self.payload
-        if self.data_converter.payload_codec:
-            try:
-                [payload] = await self.data_converter.payload_codec.decode([payload])
-            except Exception as err:
-                raise nexusrpc.HandlerError(
-                    "Payload codec failed to decode Nexus operation input",
-                    type=nexusrpc.HandlerErrorType.INTERNAL,
-                ) from err
-
-        try:
-            [input] = self.data_converter.payload_converter.from_payloads(
-                [payload],
-                type_hints=[as_type] if as_type else None,
-            )
-            return input
-        except Exception as err:
-            raise nexusrpc.HandlerError(
-                "Payload converter failed to decode Nexus operation input",
-                type=nexusrpc.HandlerErrorType.BAD_REQUEST,
-                retryable_override=False,
-            ) from err
+        return await _decode_nexus_payload(
+            self.data_converter,
+            self.payload,
+            as_type,
+            "Nexus operation input",
+        )
 
 
 def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:

@@ -64,6 +64,10 @@ _temporal_cancel_operation_context: ContextVar[_TemporalCancelOperationContext] 
     ContextVar("temporal-cancel-operation-context")
 )
 
+_temporal_completion_operation_context: ContextVar[
+    _TemporalCompletionOperationContext
+] = ContextVar("temporal-completion-operation-context")
+
 # A Nexus start handler might start zero or more workflows as usual using a Temporal client. In
 # addition, it may start one "nexus-backing" workflow, using
 # WorkflowRunOperationContext.start_workflow. This context is active while the latter is being done.
@@ -149,7 +153,9 @@ def wait_for_worker_shutdown_sync(timeout: timedelta | float | None = None) -> N
 
 
 def _temporal_context() -> (
-    _TemporalStartOperationContext | _TemporalCancelOperationContext
+    _TemporalStartOperationContext
+    | _TemporalCancelOperationContext
+    | _TemporalCompletionOperationContext
 ):
     ctx = _try_temporal_context()
     if ctx is None:
@@ -158,13 +164,23 @@ def _temporal_context() -> (
 
 
 def _try_temporal_context() -> (
-    _TemporalStartOperationContext | _TemporalCancelOperationContext | None
+    _TemporalStartOperationContext
+    | _TemporalCancelOperationContext
+    | _TemporalCompletionOperationContext
+    | None
 ):
-    start_ctx = _temporal_start_operation_context.get(None)
-    cancel_ctx = _temporal_cancel_operation_context.get(None)
-    if start_ctx and cancel_ctx:
-        raise RuntimeError("Cannot be in both start and cancel operation contexts.")
-    return start_ctx or cancel_ctx
+    contexts = [
+        ctx
+        for ctx in (
+            _temporal_start_operation_context.get(None),
+            _temporal_cancel_operation_context.get(None),
+            _temporal_completion_operation_context.get(None),
+        )
+        if ctx is not None
+    ]
+    if len(contexts) > 1:
+        raise RuntimeError("Cannot be in multiple Nexus operation contexts.")
+    return contexts[0] if contexts else None
 
 
 @contextmanager
@@ -546,6 +562,35 @@ class _TemporalCancelOperationContext(_TemporalOperationCtx[CancelOperationConte
 
     def set(self) -> None:
         _temporal_cancel_operation_context.set(self)
+
+
+@dataclass(frozen=True, kw_only=True)
+class TemporalCompletionContext(OperationContext):
+    """Context received by a Nexus completion handler.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    request_id: str
+    """A request ID that can be used as an idempotency key."""
+
+
+@dataclass
+class _TemporalCompletionOperationContext(
+    _TemporalOperationCtx[TemporalCompletionContext]
+):
+    """Context for a Nexus completion being handled by a Temporal Nexus Worker."""
+
+    @classmethod
+    def get(cls) -> _TemporalCompletionOperationContext:
+        ctx = _temporal_completion_operation_context.get(None)
+        if ctx is None:
+            raise RuntimeError("Not in Nexus completion context.")
+        return ctx
+
+    def set(self) -> None:
+        _temporal_completion_operation_context.set(self)
 
 
 class TemporalStartOperationContext(StartOperationContext):

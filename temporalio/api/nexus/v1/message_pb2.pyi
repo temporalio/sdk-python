@@ -315,6 +315,134 @@ class CancelOperationRequest(google.protobuf.message.Message):
 
 global___CancelOperationRequest = CancelOperationRequest
 
+class CompletionRequest(google.protobuf.message.Message):
+    """A request that delivers the result of a completed operation to a worker for processing.
+    Currently only Nexus operation completions are supported; the variant may be extended to
+    support activity and workflow completions.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class NexusOperationCompletion(google.protobuf.message.Message):
+        """The result of a completed Nexus operation, delivered to a worker for processing."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        SERVICE_FIELD_NUMBER: builtins.int
+        OPERATION_FIELD_NUMBER: builtins.int
+        OPERATION_ID_FIELD_NUMBER: builtins.int
+        OPERATION_TOKEN_FIELD_NUMBER: builtins.int
+        RESULT_FIELD_NUMBER: builtins.int
+        FAILURE_FIELD_NUMBER: builtins.int
+        LINKS_FIELD_NUMBER: builtins.int
+        service: builtins.str
+        """The Nexus service that the result came from."""
+        operation: builtins.str
+        """The Nexus operation within the service that the result came from."""
+        operation_id: builtins.str
+        """The ID of the Nexus operation."""
+        operation_token: builtins.str
+        """The token the operation produced if it was an asynchronous Nexus operation."""
+        @property
+        def result(self) -> temporalio.api.common.v1.message_pb2.Payload:
+            """The Payload the operation produced if it completed successfully."""
+        @property
+        def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+            """The Failure the operation produced if it completed unsuccessfully."""
+        @property
+        def links(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+            global___Link
+        ]:
+            """Links that should be used to associate any further invocations with the completed operation."""
+        def __init__(
+            self,
+            *,
+            service: builtins.str = ...,
+            operation: builtins.str = ...,
+            operation_id: builtins.str = ...,
+            operation_token: builtins.str = ...,
+            result: temporalio.api.common.v1.message_pb2.Payload | None = ...,
+            failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+            links: collections.abc.Iterable[global___Link] | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "failure", b"failure", "result", b"result"
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "failure",
+                b"failure",
+                "links",
+                b"links",
+                "operation",
+                b"operation",
+                "operation_id",
+                b"operation_id",
+                "operation_token",
+                b"operation_token",
+                "result",
+                b"result",
+                "service",
+                b"service",
+            ],
+        ) -> None: ...
+
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+    service: builtins.str
+    """Name of service to start the completion operation in."""
+    operation: builtins.str
+    """Type of completion operation to start."""
+    request_id: builtins.str
+    """A request ID that can be used as an idempotentency key."""
+    @property
+    def nexus_operation(
+        self,
+    ) -> global___CompletionRequest.NexusOperationCompletion: ...
+    def __init__(
+        self,
+        *,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+        request_id: builtins.str = ...,
+        nexus_operation: global___CompletionRequest.NexusOperationCompletion
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "nexus_operation", b"nexus_operation", "variant", b"variant"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "nexus_operation",
+            b"nexus_operation",
+            "operation",
+            b"operation",
+            "request_id",
+            b"request_id",
+            "service",
+            b"service",
+            "variant",
+            b"variant",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> typing_extensions.Literal["nexus_operation"] | None: ...
+
+global___CompletionRequest = CompletionRequest
+
 class Request(google.protobuf.message.Message):
     """A Nexus request."""
 
@@ -363,6 +491,7 @@ class Request(google.protobuf.message.Message):
     CAPABILITIES_FIELD_NUMBER: builtins.int
     START_OPERATION_FIELD_NUMBER: builtins.int
     CANCEL_OPERATION_FIELD_NUMBER: builtins.int
+    COMPLETION_FIELD_NUMBER: builtins.int
     ENDPOINT_FIELD_NUMBER: builtins.int
     @property
     def header(
@@ -383,6 +512,8 @@ class Request(google.protobuf.message.Message):
     def start_operation(self) -> global___StartOperationRequest: ...
     @property
     def cancel_operation(self) -> global___CancelOperationRequest: ...
+    @property
+    def completion(self) -> global___CompletionRequest: ...
     endpoint: builtins.str
     """The endpoint this request was addressed to before forwarding to the worker.
     Supported from server version 1.30.0.
@@ -395,6 +526,7 @@ class Request(google.protobuf.message.Message):
         capabilities: global___Request.Capabilities | None = ...,
         start_operation: global___StartOperationRequest | None = ...,
         cancel_operation: global___CancelOperationRequest | None = ...,
+        completion: global___CompletionRequest | None = ...,
         endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
@@ -404,6 +536,8 @@ class Request(google.protobuf.message.Message):
             b"cancel_operation",
             "capabilities",
             b"capabilities",
+            "completion",
+            b"completion",
             "scheduled_time",
             b"scheduled_time",
             "start_operation",
@@ -419,6 +553,8 @@ class Request(google.protobuf.message.Message):
             b"cancel_operation",
             "capabilities",
             b"capabilities",
+            "completion",
+            b"completion",
             "endpoint",
             b"endpoint",
             "header",
@@ -433,7 +569,10 @@ class Request(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["start_operation", "cancel_operation"] | None: ...
+    ) -> (
+        typing_extensions.Literal["start_operation", "cancel_operation", "completion"]
+        | None
+    ): ...
 
 global___Request = Request
 
@@ -589,6 +728,31 @@ class CancelOperationResponse(google.protobuf.message.Message):
 
 global___CancelOperationResponse = CancelOperationResponse
 
+class CompletionResponse(google.protobuf.message.Message):
+    """A response acknowledging that the handler has processed a CompletionRequest."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FAILURE_FIELD_NUMBER: builtins.int
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The failure the handler produced while processing the completion, if any.
+        An unset failure indicates that the completion was acknowledged successfully.
+        """
+    def __init__(
+        self,
+        *,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> None: ...
+
+global___CompletionResponse = CompletionResponse
+
 class Response(google.protobuf.message.Message):
     """A response indicating that the handler has successfully processed a request."""
 
@@ -596,21 +760,27 @@ class Response(google.protobuf.message.Message):
 
     START_OPERATION_FIELD_NUMBER: builtins.int
     CANCEL_OPERATION_FIELD_NUMBER: builtins.int
+    COMPLETION_FIELD_NUMBER: builtins.int
     @property
     def start_operation(self) -> global___StartOperationResponse: ...
     @property
     def cancel_operation(self) -> global___CancelOperationResponse: ...
+    @property
+    def completion(self) -> global___CompletionResponse: ...
     def __init__(
         self,
         *,
         start_operation: global___StartOperationResponse | None = ...,
         cancel_operation: global___CancelOperationResponse | None = ...,
+        completion: global___CompletionResponse | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "cancel_operation",
             b"cancel_operation",
+            "completion",
+            b"completion",
             "start_operation",
             b"start_operation",
             "variant",
@@ -622,6 +792,8 @@ class Response(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancel_operation",
             b"cancel_operation",
+            "completion",
+            b"completion",
             "start_operation",
             b"start_operation",
             "variant",
@@ -630,7 +802,10 @@ class Response(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["start_operation", "cancel_operation"] | None: ...
+    ) -> (
+        typing_extensions.Literal["start_operation", "cancel_operation", "completion"]
+        | None
+    ): ...
 
 global___Response = Response
 

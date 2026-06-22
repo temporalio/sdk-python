@@ -1,6 +1,8 @@
 from .message_pb2 import (
     CancelOperationRequest,
     CancelOperationResponse,
+    CompletionRequest,
+    CompletionResponse,
     Endpoint,
     EndpointSpec,
     EndpointTarget,
@@ -20,6 +22,8 @@ from .message_pb2 import (
 __all__ = [
     "CancelOperationRequest",
     "CancelOperationResponse",
+    "CompletionRequest",
+    "CompletionResponse",
     "Endpoint",
     "EndpointSpec",
     "EndpointTarget",

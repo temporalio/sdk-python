@@ -20,6 +20,7 @@ import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
@@ -4358,6 +4359,7 @@ class HistoryEvent(google.protobuf.message.Message):
     USER_METADATA_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
     PRINCIPAL_FIELD_NUMBER: builtins.int
+    EVENT_GROUP_MARKERS_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_STARTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -4468,6 +4470,13 @@ class HistoryEvent(google.protobuf.message.Message):
     @property
     def principal(self) -> temporalio.api.common.v1.message_pb2.Principal:
         """Server-computed authenticated caller identity associated with this event."""
+    @property
+    def event_group_markers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+    ]:
+        """Event group markers attached to this event."""
     @property
     def workflow_execution_started_event_attributes(
         self,
@@ -4720,6 +4729,10 @@ class HistoryEvent(google.protobuf.message.Message):
         links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
         principal: temporalio.api.common.v1.message_pb2.Principal | None = ...,
+        event_group_markers: collections.abc.Iterable[
+            temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+        ]
+        | None = ...,
         workflow_execution_started_event_attributes: global___WorkflowExecutionStartedEventAttributes
         | None = ...,
         workflow_execution_completed_event_attributes: global___WorkflowExecutionCompletedEventAttributes
@@ -5006,6 +5019,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"child_workflow_execution_terminated_event_attributes",
             "child_workflow_execution_timed_out_event_attributes",
             b"child_workflow_execution_timed_out_event_attributes",
+            "event_group_markers",
+            b"event_group_markers",
             "event_id",
             b"event_id",
             "event_time",

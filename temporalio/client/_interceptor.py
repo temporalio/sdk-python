@@ -561,6 +561,13 @@ class GetWorkerTaskReachabilityInput:
     rpc_timeout: timedelta | None
 
 
+@dataclass(frozen=True)
+class NexusOperationOnCompleteOptions:
+    endpoint: str
+    service: str
+    operation: str
+
+
 @dataclass
 class StartNexusOperationInput:
     """Input for :py:meth:`OutboundInterceptor.start_nexus_operation`.
@@ -583,6 +590,7 @@ class StartNexusOperationInput:
     search_attributes: temporalio.common.TypedSearchAttributes | None
     summary: str | None
     headers: Mapping[str, str]
+    on_complete: NexusOperationOnCompleteOptions | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 

@@ -34,7 +34,7 @@ from temporalio.api.sdk.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n#temporal/api/nexus/v1/message.proto\x12\x15temporal.api.nexus.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a"temporal/api/enums/v1/common.proto\x1a!temporal/api/enums/v1/nexus.proto\x1a%temporal/api/failure/v1/message.proto\x1a\'temporal/api/sdk/v1/user_metadata.proto"\xe0\x01\n\x07\x46\x61ilure\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x13\n\x0bstack_trace\x18\x04 \x01(\t\x12>\n\x08metadata\x18\x02 \x03(\x0b\x32,.temporal.api.nexus.v1.Failure.MetadataEntry\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\x0c\x12-\n\x05\x63\x61use\x18\x05 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\xa2\x01\n\x0cHandlerError\x12\x12\n\nerror_type\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure\x12M\n\x0eretry_behavior\x18\x03 \x01(\x0e\x32\x35.temporal.api.enums.v1.NexusHandlerErrorRetryBehavior"f\n\x1aUnsuccessfulOperationError\x12\x17\n\x0foperation_state\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure"!\n\x04Link\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t"\xd1\x02\n\x15StartOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x10\n\x08\x63\x61llback\x18\x04 \x01(\t\x12\x30\n\x07payload\x18\x05 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12Y\n\x0f\x63\x61llback_header\x18\x06 \x03(\x0b\x32@.temporal.api.nexus.v1.StartOperationRequest.CallbackHeaderEntry\x12*\n\x05links\x18\x07 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x1a\x35\n\x13\x43\x61llbackHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"o\n\x16\x43\x61ncelOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x18\n\x0coperation_id\x18\x03 \x01(\tB\x02\x18\x01\x12\x17\n\x0foperation_token\x18\x04 \x01(\t"\xd0\x03\n\x07Request\x12:\n\x06header\x18\x01 \x03(\x0b\x32*.temporal.api.nexus.v1.Request.HeaderEntry\x12\x32\n\x0escheduled_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x41\n\x0c\x63\x61pabilities\x18\x64 \x01(\x0b\x32+.temporal.api.nexus.v1.Request.Capabilities\x12G\n\x0fstart_operation\x18\x03 \x01(\x0b\x32,.temporal.api.nexus.v1.StartOperationRequestH\x00\x12I\n\x10\x63\x61ncel_operation\x18\x04 \x01(\x0b\x32-.temporal.api.nexus.v1.CancelOperationRequestH\x00\x12\x10\n\x08\x65ndpoint\x18\n \x01(\t\x1a\x32\n\x0c\x43\x61pabilities\x12"\n\x1atemporal_failure_responses\x18\x01 \x01(\x08\x1a-\n\x0bHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\t\n\x07variant"\x92\x04\n\x16StartOperationResponse\x12J\n\x0csync_success\x18\x01 \x01(\x0b\x32\x32.temporal.api.nexus.v1.StartOperationResponse.SyncH\x00\x12L\n\rasync_success\x18\x02 \x01(\x0b\x32\x33.temporal.api.nexus.v1.StartOperationResponse.AsyncH\x00\x12P\n\x0foperation_error\x18\x03 \x01(\x0b\x32\x31.temporal.api.nexus.v1.UnsuccessfulOperationErrorB\x02\x18\x01H\x00\x12\x33\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.FailureH\x00\x1a\x64\n\x04Sync\x12\x30\n\x07payload\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12*\n\x05links\x18\x02 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x1a\x66\n\x05\x41sync\x12\x18\n\x0coperation_id\x18\x01 \x01(\tB\x02\x18\x01\x12*\n\x05links\x18\x02 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x12\x17\n\x0foperation_token\x18\x03 \x01(\tB\t\n\x07variant"\x19\n\x17\x43\x61ncelOperationResponse"\xab\x01\n\x08Response\x12H\n\x0fstart_operation\x18\x01 \x01(\x0b\x32-.temporal.api.nexus.v1.StartOperationResponseH\x00\x12J\n\x10\x63\x61ncel_operation\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.CancelOperationResponseH\x00\x42\t\n\x07variant"\xd8\x01\n\x08\x45ndpoint\x12\x0f\n\x07version\x18\x01 \x01(\x03\x12\n\n\x02id\x18\x02 \x01(\t\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec\x12\x30\n\x0c\x63reated_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nurl_prefix\x18\x06 \x01(\t"\x89\x01\n\x0c\x45ndpointSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x0b\x64\x65scription\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x35\n\x06target\x18\x03 \x01(\x0b\x32%.temporal.api.nexus.v1.EndpointTarget"\xe9\x01\n\x0e\x45ndpointTarget\x12>\n\x06worker\x18\x01 \x01(\x0b\x32,.temporal.api.nexus.v1.EndpointTarget.WorkerH\x00\x12\x42\n\x08\x65xternal\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.EndpointTarget.ExternalH\x00\x1a/\n\x06Worker\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x1a\x17\n\x08\x45xternal\x12\x0b\n\x03url\x18\x01 \x01(\tB\t\n\x07variant"\x9d\x03\n\'NexusOperationExecutionCancellationInfo\x12\x32\n\x0erequested_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x45\n\x05state\x18\x02 \x01(\x0e\x32\x36.temporal.api.enums.v1.NexusOperationCancellationState\x12\x0f\n\x07\x61ttempt\x18\x03 \x01(\x05\x12>\n\x1alast_attempt_complete_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x14last_attempt_failure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12>\n\x1anext_attempt_schedule_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0e\x62locked_reason\x18\x07 \x01(\t\x12\x0e\n\x06reason\x18\x08 \x01(\t"\xff\n\n\x1bNexusOperationExecutionInfo\x12\x14\n\x0coperation_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12\x10\n\x08\x65ndpoint\x18\x03 \x01(\t\x12\x0f\n\x07service\x18\x04 \x01(\t\x12\x11\n\toperation\x18\x05 \x01(\t\x12\x44\n\x06status\x18\x06 \x01(\x0e\x32\x34.temporal.api.enums.v1.NexusOperationExecutionStatus\x12@\n\x05state\x18\x07 \x01(\x0e\x32\x31.temporal.api.enums.v1.PendingNexusOperationState\x12<\n\x19schedule_to_close_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x19schedule_to_start_timeout\x18\t \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\n \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x0f\n\x07\x61ttempt\x18\x0b \x01(\x05\x12\x31\n\rschedule_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x33\n\x0f\x65xpiration_time\x18\r \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x0e \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x1alast_attempt_complete_time\x18\x0f \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x14last_attempt_failure\x18\x10 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12>\n\x1anext_attempt_schedule_time\x18\x11 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x35\n\x12\x65xecution_duration\x18\x12 \x01(\x0b\x32\x19.google.protobuf.Duration\x12Y\n\x11\x63\x61ncellation_info\x18\x13 \x01(\x0b\x32>.temporal.api.nexus.v1.NexusOperationExecutionCancellationInfo\x12\x16\n\x0e\x62locked_reason\x18\x14 \x01(\t\x12\x12\n\nrequest_id\x18\x15 \x01(\t\x12\x17\n\x0foperation_token\x18\x16 \x01(\t\x12\x1e\n\x16state_transition_count\x18\x17 \x01(\x03\x12\x43\n\x11search_attributes\x18\x18 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12Y\n\x0cnexus_header\x18\x19 \x03(\x0b\x32\x43.temporal.api.nexus.v1.NexusOperationExecutionInfo.NexusHeaderEntry\x12\x38\n\ruser_metadata\x18\x1a \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12+\n\x05links\x18\x1b \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12\x10\n\x08identity\x18\x1c \x01(\t\x12\x18\n\x10state_size_bytes\x18\x1d \x01(\x03\x1a\x32\n\x10NexusHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\xdc\x03\n\x1fNexusOperationExecutionListInfo\x12\x14\n\x0coperation_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12\x10\n\x08\x65ndpoint\x18\x03 \x01(\t\x12\x0f\n\x07service\x18\x04 \x01(\t\x12\x11\n\toperation\x18\x05 \x01(\t\x12\x31\n\rschedule_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x44\n\x06status\x18\x08 \x01(\x0e\x32\x34.temporal.api.enums.v1.NexusOperationExecutionStatus\x12\x43\n\x11search_attributes\x18\t \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x1e\n\x16state_transition_count\x18\n \x01(\x03\x12\x35\n\x12\x65xecution_duration\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x18\n\x10state_size_bytes\x18\x0c \x01(\x03\x42\x84\x01\n\x18io.temporal.api.nexus.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/nexus/v1;nexus\xaa\x02\x17Temporalio.Api.Nexus.V1\xea\x02\x1aTemporalio::Api::Nexus::V1b\x06proto3'
+    b'\n#temporal/api/nexus/v1/message.proto\x12\x15temporal.api.nexus.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a"temporal/api/enums/v1/common.proto\x1a!temporal/api/enums/v1/nexus.proto\x1a%temporal/api/failure/v1/message.proto\x1a\'temporal/api/sdk/v1/user_metadata.proto"\xe0\x01\n\x07\x46\x61ilure\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x13\n\x0bstack_trace\x18\x04 \x01(\t\x12>\n\x08metadata\x18\x02 \x03(\x0b\x32,.temporal.api.nexus.v1.Failure.MetadataEntry\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\x0c\x12-\n\x05\x63\x61use\x18\x05 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\xa2\x01\n\x0cHandlerError\x12\x12\n\nerror_type\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure\x12M\n\x0eretry_behavior\x18\x03 \x01(\x0e\x32\x35.temporal.api.enums.v1.NexusHandlerErrorRetryBehavior"f\n\x1aUnsuccessfulOperationError\x12\x17\n\x0foperation_state\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure"!\n\x04Link\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t"\xd1\x02\n\x15StartOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x10\n\x08\x63\x61llback\x18\x04 \x01(\t\x12\x30\n\x07payload\x18\x05 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12Y\n\x0f\x63\x61llback_header\x18\x06 \x03(\x0b\x32@.temporal.api.nexus.v1.StartOperationRequest.CallbackHeaderEntry\x12*\n\x05links\x18\x07 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x1a\x35\n\x13\x43\x61llbackHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"o\n\x16\x43\x61ncelOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x18\n\x0coperation_id\x18\x03 \x01(\tB\x02\x18\x01\x12\x17\n\x0foperation_token\x18\x04 \x01(\t"\xb4\x03\n\x11\x43ompletionRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\\\n\x0fnexus_operation\x18\x04 \x01(\x0b\x32\x41.temporal.api.nexus.v1.CompletionRequest.NexusOperationCompletionH\x00\x1a\xfd\x01\n\x18NexusOperationCompletion\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x14\n\x0coperation_id\x18\x03 \x01(\t\x12\x17\n\x0foperation_token\x18\x04 \x01(\t\x12/\n\x06result\x18\x05 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x31\n\x07\x66\x61ilure\x18\x06 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12*\n\x05links\x18\x07 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.LinkB\t\n\x07variant"\x90\x04\n\x07Request\x12:\n\x06header\x18\x01 \x03(\x0b\x32*.temporal.api.nexus.v1.Request.HeaderEntry\x12\x32\n\x0escheduled_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x41\n\x0c\x63\x61pabilities\x18\x64 \x01(\x0b\x32+.temporal.api.nexus.v1.Request.Capabilities\x12G\n\x0fstart_operation\x18\x03 \x01(\x0b\x32,.temporal.api.nexus.v1.StartOperationRequestH\x00\x12I\n\x10\x63\x61ncel_operation\x18\x04 \x01(\x0b\x32-.temporal.api.nexus.v1.CancelOperationRequestH\x00\x12>\n\ncompletion\x18\x05 \x01(\x0b\x32(.temporal.api.nexus.v1.CompletionRequestH\x00\x12\x10\n\x08\x65ndpoint\x18\n \x01(\t\x1a\x32\n\x0c\x43\x61pabilities\x12"\n\x1atemporal_failure_responses\x18\x01 \x01(\x08\x1a-\n\x0bHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\t\n\x07variant"\x92\x04\n\x16StartOperationResponse\x12J\n\x0csync_success\x18\x01 \x01(\x0b\x32\x32.temporal.api.nexus.v1.StartOperationResponse.SyncH\x00\x12L\n\rasync_success\x18\x02 \x01(\x0b\x32\x33.temporal.api.nexus.v1.StartOperationResponse.AsyncH\x00\x12P\n\x0foperation_error\x18\x03 \x01(\x0b\x32\x31.temporal.api.nexus.v1.UnsuccessfulOperationErrorB\x02\x18\x01H\x00\x12\x33\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.FailureH\x00\x1a\x64\n\x04Sync\x12\x30\n\x07payload\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12*\n\x05links\x18\x02 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x1a\x66\n\x05\x41sync\x12\x18\n\x0coperation_id\x18\x01 \x01(\tB\x02\x18\x01\x12*\n\x05links\x18\x02 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x12\x17\n\x0foperation_token\x18\x03 \x01(\tB\t\n\x07variant"\x19\n\x17\x43\x61ncelOperationResponse"G\n\x12\x43ompletionResponse\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"\xec\x01\n\x08Response\x12H\n\x0fstart_operation\x18\x01 \x01(\x0b\x32-.temporal.api.nexus.v1.StartOperationResponseH\x00\x12J\n\x10\x63\x61ncel_operation\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.CancelOperationResponseH\x00\x12?\n\ncompletion\x18\x03 \x01(\x0b\x32).temporal.api.nexus.v1.CompletionResponseH\x00\x42\t\n\x07variant"\xd8\x01\n\x08\x45ndpoint\x12\x0f\n\x07version\x18\x01 \x01(\x03\x12\n\n\x02id\x18\x02 \x01(\t\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec\x12\x30\n\x0c\x63reated_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nurl_prefix\x18\x06 \x01(\t"\x89\x01\n\x0c\x45ndpointSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x0b\x64\x65scription\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x35\n\x06target\x18\x03 \x01(\x0b\x32%.temporal.api.nexus.v1.EndpointTarget"\xe9\x01\n\x0e\x45ndpointTarget\x12>\n\x06worker\x18\x01 \x01(\x0b\x32,.temporal.api.nexus.v1.EndpointTarget.WorkerH\x00\x12\x42\n\x08\x65xternal\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.EndpointTarget.ExternalH\x00\x1a/\n\x06Worker\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x1a\x17\n\x08\x45xternal\x12\x0b\n\x03url\x18\x01 \x01(\tB\t\n\x07variant"\x9d\x03\n\'NexusOperationExecutionCancellationInfo\x12\x32\n\x0erequested_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x45\n\x05state\x18\x02 \x01(\x0e\x32\x36.temporal.api.enums.v1.NexusOperationCancellationState\x12\x0f\n\x07\x61ttempt\x18\x03 \x01(\x05\x12>\n\x1alast_attempt_complete_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x14last_attempt_failure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12>\n\x1anext_attempt_schedule_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0e\x62locked_reason\x18\x07 \x01(\t\x12\x0e\n\x06reason\x18\x08 \x01(\t"\xff\n\n\x1bNexusOperationExecutionInfo\x12\x14\n\x0coperation_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12\x10\n\x08\x65ndpoint\x18\x03 \x01(\t\x12\x0f\n\x07service\x18\x04 \x01(\t\x12\x11\n\toperation\x18\x05 \x01(\t\x12\x44\n\x06status\x18\x06 \x01(\x0e\x32\x34.temporal.api.enums.v1.NexusOperationExecutionStatus\x12@\n\x05state\x18\x07 \x01(\x0e\x32\x31.temporal.api.enums.v1.PendingNexusOperationState\x12<\n\x19schedule_to_close_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x19schedule_to_start_timeout\x18\t \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\n \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x0f\n\x07\x61ttempt\x18\x0b \x01(\x05\x12\x31\n\rschedule_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x33\n\x0f\x65xpiration_time\x18\r \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x0e \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x1alast_attempt_complete_time\x18\x0f \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x14last_attempt_failure\x18\x10 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12>\n\x1anext_attempt_schedule_time\x18\x11 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x35\n\x12\x65xecution_duration\x18\x12 \x01(\x0b\x32\x19.google.protobuf.Duration\x12Y\n\x11\x63\x61ncellation_info\x18\x13 \x01(\x0b\x32>.temporal.api.nexus.v1.NexusOperationExecutionCancellationInfo\x12\x16\n\x0e\x62locked_reason\x18\x14 \x01(\t\x12\x12\n\nrequest_id\x18\x15 \x01(\t\x12\x17\n\x0foperation_token\x18\x16 \x01(\t\x12\x1e\n\x16state_transition_count\x18\x17 \x01(\x03\x12\x43\n\x11search_attributes\x18\x18 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12Y\n\x0cnexus_header\x18\x19 \x03(\x0b\x32\x43.temporal.api.nexus.v1.NexusOperationExecutionInfo.NexusHeaderEntry\x12\x38\n\ruser_metadata\x18\x1a \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12+\n\x05links\x18\x1b \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12\x10\n\x08identity\x18\x1c \x01(\t\x12\x18\n\x10state_size_bytes\x18\x1d \x01(\x03\x1a\x32\n\x10NexusHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\xdc\x03\n\x1fNexusOperationExecutionListInfo\x12\x14\n\x0coperation_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12\x10\n\x08\x65ndpoint\x18\x03 \x01(\t\x12\x0f\n\x07service\x18\x04 \x01(\t\x12\x11\n\toperation\x18\x05 \x01(\t\x12\x31\n\rschedule_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x44\n\x06status\x18\x08 \x01(\x0e\x32\x34.temporal.api.enums.v1.NexusOperationExecutionStatus\x12\x43\n\x11search_attributes\x18\t \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x1e\n\x16state_transition_count\x18\n \x01(\x03\x12\x35\n\x12\x65xecution_duration\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x18\n\x10state_size_bytes\x18\x0c \x01(\x03\x42\x84\x01\n\x18io.temporal.api.nexus.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/nexus/v1;nexus\xaa\x02\x17Temporalio.Api.Nexus.V1\xea\x02\x1aTemporalio::Api::Nexus::V1b\x06proto3'
 )
 
 
@@ -50,6 +50,10 @@ _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY = (
     _STARTOPERATIONREQUEST.nested_types_by_name["CallbackHeaderEntry"]
 )
 _CANCELOPERATIONREQUEST = DESCRIPTOR.message_types_by_name["CancelOperationRequest"]
+_COMPLETIONREQUEST = DESCRIPTOR.message_types_by_name["CompletionRequest"]
+_COMPLETIONREQUEST_NEXUSOPERATIONCOMPLETION = _COMPLETIONREQUEST.nested_types_by_name[
+    "NexusOperationCompletion"
+]
 _REQUEST = DESCRIPTOR.message_types_by_name["Request"]
 _REQUEST_CAPABILITIES = _REQUEST.nested_types_by_name["Capabilities"]
 _REQUEST_HEADERENTRY = _REQUEST.nested_types_by_name["HeaderEntry"]
@@ -57,6 +61,7 @@ _STARTOPERATIONRESPONSE = DESCRIPTOR.message_types_by_name["StartOperationRespon
 _STARTOPERATIONRESPONSE_SYNC = _STARTOPERATIONRESPONSE.nested_types_by_name["Sync"]
 _STARTOPERATIONRESPONSE_ASYNC = _STARTOPERATIONRESPONSE.nested_types_by_name["Async"]
 _CANCELOPERATIONRESPONSE = DESCRIPTOR.message_types_by_name["CancelOperationResponse"]
+_COMPLETIONRESPONSE = DESCRIPTOR.message_types_by_name["CompletionResponse"]
 _RESPONSE = DESCRIPTOR.message_types_by_name["Response"]
 _ENDPOINT = DESCRIPTOR.message_types_by_name["Endpoint"]
 _ENDPOINTSPEC = DESCRIPTOR.message_types_by_name["EndpointSpec"]
@@ -161,6 +166,27 @@ CancelOperationRequest = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(CancelOperationRequest)
 
+CompletionRequest = _reflection.GeneratedProtocolMessageType(
+    "CompletionRequest",
+    (_message.Message,),
+    {
+        "NexusOperationCompletion": _reflection.GeneratedProtocolMessageType(
+            "NexusOperationCompletion",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _COMPLETIONREQUEST_NEXUSOPERATIONCOMPLETION,
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.CompletionRequest.NexusOperationCompletion)
+            },
+        ),
+        "DESCRIPTOR": _COMPLETIONREQUEST,
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.CompletionRequest)
+    },
+)
+_sym_db.RegisterMessage(CompletionRequest)
+_sym_db.RegisterMessage(CompletionRequest.NexusOperationCompletion)
+
 Request = _reflection.GeneratedProtocolMessageType(
     "Request",
     (_message.Message,),
@@ -233,6 +259,17 @@ CancelOperationResponse = _reflection.GeneratedProtocolMessageType(
     },
 )
 _sym_db.RegisterMessage(CancelOperationResponse)
+
+CompletionResponse = _reflection.GeneratedProtocolMessageType(
+    "CompletionResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _COMPLETIONRESPONSE,
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.CompletionResponse)
+    },
+)
+_sym_db.RegisterMessage(CompletionResponse)
 
 Response = _reflection.GeneratedProtocolMessageType(
     "Response",
@@ -380,38 +417,44 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY._serialized_end = 1185
     _CANCELOPERATIONREQUEST._serialized_start = 1187
     _CANCELOPERATIONREQUEST._serialized_end = 1298
-    _REQUEST._serialized_start = 1301
-    _REQUEST._serialized_end = 1765
-    _REQUEST_CAPABILITIES._serialized_start = 1657
-    _REQUEST_CAPABILITIES._serialized_end = 1707
-    _REQUEST_HEADERENTRY._serialized_start = 1709
-    _REQUEST_HEADERENTRY._serialized_end = 1754
-    _STARTOPERATIONRESPONSE._serialized_start = 1768
-    _STARTOPERATIONRESPONSE._serialized_end = 2298
-    _STARTOPERATIONRESPONSE_SYNC._serialized_start = 2083
-    _STARTOPERATIONRESPONSE_SYNC._serialized_end = 2183
-    _STARTOPERATIONRESPONSE_ASYNC._serialized_start = 2185
-    _STARTOPERATIONRESPONSE_ASYNC._serialized_end = 2287
-    _CANCELOPERATIONRESPONSE._serialized_start = 2300
-    _CANCELOPERATIONRESPONSE._serialized_end = 2325
-    _RESPONSE._serialized_start = 2328
-    _RESPONSE._serialized_end = 2499
-    _ENDPOINT._serialized_start = 2502
-    _ENDPOINT._serialized_end = 2718
-    _ENDPOINTSPEC._serialized_start = 2721
-    _ENDPOINTSPEC._serialized_end = 2858
-    _ENDPOINTTARGET._serialized_start = 2861
-    _ENDPOINTTARGET._serialized_end = 3094
-    _ENDPOINTTARGET_WORKER._serialized_start = 3011
-    _ENDPOINTTARGET_WORKER._serialized_end = 3058
-    _ENDPOINTTARGET_EXTERNAL._serialized_start = 3060
-    _ENDPOINTTARGET_EXTERNAL._serialized_end = 3083
-    _NEXUSOPERATIONEXECUTIONCANCELLATIONINFO._serialized_start = 3097
-    _NEXUSOPERATIONEXECUTIONCANCELLATIONINFO._serialized_end = 3510
-    _NEXUSOPERATIONEXECUTIONINFO._serialized_start = 3513
-    _NEXUSOPERATIONEXECUTIONINFO._serialized_end = 4920
-    _NEXUSOPERATIONEXECUTIONINFO_NEXUSHEADERENTRY._serialized_start = 4870
-    _NEXUSOPERATIONEXECUTIONINFO_NEXUSHEADERENTRY._serialized_end = 4920
-    _NEXUSOPERATIONEXECUTIONLISTINFO._serialized_start = 4923
-    _NEXUSOPERATIONEXECUTIONLISTINFO._serialized_end = 5399
+    _COMPLETIONREQUEST._serialized_start = 1301
+    _COMPLETIONREQUEST._serialized_end = 1737
+    _COMPLETIONREQUEST_NEXUSOPERATIONCOMPLETION._serialized_start = 1473
+    _COMPLETIONREQUEST_NEXUSOPERATIONCOMPLETION._serialized_end = 1726
+    _REQUEST._serialized_start = 1740
+    _REQUEST._serialized_end = 2268
+    _REQUEST_CAPABILITIES._serialized_start = 2160
+    _REQUEST_CAPABILITIES._serialized_end = 2210
+    _REQUEST_HEADERENTRY._serialized_start = 2212
+    _REQUEST_HEADERENTRY._serialized_end = 2257
+    _STARTOPERATIONRESPONSE._serialized_start = 2271
+    _STARTOPERATIONRESPONSE._serialized_end = 2801
+    _STARTOPERATIONRESPONSE_SYNC._serialized_start = 2586
+    _STARTOPERATIONRESPONSE_SYNC._serialized_end = 2686
+    _STARTOPERATIONRESPONSE_ASYNC._serialized_start = 2688
+    _STARTOPERATIONRESPONSE_ASYNC._serialized_end = 2790
+    _CANCELOPERATIONRESPONSE._serialized_start = 2803
+    _CANCELOPERATIONRESPONSE._serialized_end = 2828
+    _COMPLETIONRESPONSE._serialized_start = 2830
+    _COMPLETIONRESPONSE._serialized_end = 2901
+    _RESPONSE._serialized_start = 2904
+    _RESPONSE._serialized_end = 3140
+    _ENDPOINT._serialized_start = 3143
+    _ENDPOINT._serialized_end = 3359
+    _ENDPOINTSPEC._serialized_start = 3362
+    _ENDPOINTSPEC._serialized_end = 3499
+    _ENDPOINTTARGET._serialized_start = 3502
+    _ENDPOINTTARGET._serialized_end = 3735
+    _ENDPOINTTARGET_WORKER._serialized_start = 3652
+    _ENDPOINTTARGET_WORKER._serialized_end = 3699
+    _ENDPOINTTARGET_EXTERNAL._serialized_start = 3701
+    _ENDPOINTTARGET_EXTERNAL._serialized_end = 3724
+    _NEXUSOPERATIONEXECUTIONCANCELLATIONINFO._serialized_start = 3738
+    _NEXUSOPERATIONEXECUTIONCANCELLATIONINFO._serialized_end = 4151
+    _NEXUSOPERATIONEXECUTIONINFO._serialized_start = 4154
+    _NEXUSOPERATIONEXECUTIONINFO._serialized_end = 5561
+    _NEXUSOPERATIONEXECUTIONINFO_NEXUSHEADERENTRY._serialized_start = 5511
+    _NEXUSOPERATIONEXECUTIONINFO_NEXUSHEADERENTRY._serialized_end = 5561
+    _NEXUSOPERATIONEXECUTIONLISTINFO._serialized_start = 5564
+    _NEXUSOPERATIONEXECUTIONLISTINFO._serialized_end = 6040
 # @@protoc_insertion_point(module_scope)

@@ -3,8 +3,11 @@
 See https://github.com/temporalio/sdk-python/tree/main#nexus
 """
 
+from ._completion import Completion, NexusOperationCompletion
 from ._decorators import (
+    CompletionHandlerFunc,
     TemporalOperationStartHandlerFunc,
+    completion_operation,
     temporal_operation,
     workflow_run_operation,
 )
@@ -13,6 +16,7 @@ from ._operation_context import (
     LoggerAdapter,
     NexusCallback,
     TemporalCancelOperationContext,
+    TemporalCompletionContext,
     TemporalStartOperationContext,
     WorkflowRunOperationContext,
     client,
@@ -28,12 +32,22 @@ from ._operation_handlers import (
     CancelWorkflowRunOptions,
     TemporalOperationHandler,
 )
-from ._temporal_client import TemporalNexusClient, TemporalOperationResult
+from ._temporal_client import (
+    TemporalCompletionClient,
+    TemporalNexusClient,
+    TemporalOperationResult,
+)
 from ._token import WorkflowHandle
 
 __all__ = (
     "workflow_run_operation",
     "CancelWorkflowRunOptions",
+    "Completion",
+    "CompletionHandlerFunc",
+    "NexusOperationCompletion",
+    "TemporalCompletionClient",
+    "TemporalCompletionContext",
+    "completion_operation",
     "Info",
     "LoggerAdapter",
     "NexusCallback",
