@@ -8,6 +8,7 @@ import logging
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
+from datetime import timedelta
 
 from typing_extensions import TypedDict
 
@@ -48,6 +49,7 @@ class Replayer:
         identity: str | None = None,
         workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         debug_mode: bool = False,
+        deadlock_detection_timeout: timedelta = timedelta(seconds=2),
         runtime: temporalio.runtime.Runtime | None = None,
         disable_safe_workflow_eviction: bool = False,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
@@ -78,6 +80,7 @@ class Replayer:
             identity=identity,
             workflow_failure_exception_types=workflow_failure_exception_types,
             debug_mode=debug_mode,
+            deadlock_detection_timeout=deadlock_detection_timeout,
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
@@ -256,6 +259,9 @@ class Replayer:
                     "workflow_failure_exception_types", []
                 ),
                 debug_mode=self._config.get("debug_mode", False),
+                deadlock_detection_timeout=self._config.get(
+                    "deadlock_detection_timeout", timedelta(seconds=2)
+                ),
                 metric_meter=runtime.metric_meter,
                 on_eviction_hook=on_eviction_hook,
                 disable_eager_activity_execution=False,
@@ -410,6 +416,7 @@ class ReplayerConfig(TypedDict, total=False):
     identity: str | None
     workflow_failure_exception_types: Sequence[type[BaseException]]
     debug_mode: bool
+    deadlock_detection_timeout: timedelta
     runtime: temporalio.runtime.Runtime | None
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior

@@ -79,6 +79,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         interceptors: Sequence[Interceptor],
         workflow_failure_exception_types: Sequence[type[BaseException]],
         debug_mode: bool,
+        deadlock_detection_timeout: timedelta,
         disable_eager_activity_execution: bool,
         metric_meter: temporalio.common.MetricMeter,
         on_eviction_hook: Callable[
@@ -155,9 +156,11 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
         self._throw_after_activation: Exception | None = None
 
-        # If debug mode is enabled, disable deadlock detection
-        # otherwise set to 2 seconds
-        self._deadlock_timeout_seconds = None if self._debug_mode else 2
+        # If debug mode is enabled, disable deadlock detection entirely;
+        # otherwise use the configured timeout (defaults to 2 seconds).
+        self._deadlock_timeout_seconds = (
+            None if self._debug_mode else deadlock_detection_timeout.total_seconds()
+        )
 
         # Keep track of workflows that could not be evicted
         self._could_not_evict_count = 0

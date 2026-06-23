@@ -1707,3 +1707,35 @@ async def test_worker_debug_mode(client: Client):
             "_pydevd_bundle"
             in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
         )
+
+
+async def test_worker_deadlock_detection_timeout(client: Client):
+    # Default is 2 seconds.
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds == 2
+
+    # A custom timeout is honored.
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        deadlock_detection_timeout=timedelta(seconds=10),
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds == 10
+
+    # debug_mode disables detection regardless of the configured timeout.
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        deadlock_detection_timeout=timedelta(seconds=10),
+        debug_mode=True,
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds is None

@@ -130,6 +130,7 @@ class Worker:
         workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         shared_state_manager: SharedStateManager | None = None,
         debug_mode: bool = False,
+        deadlock_detection_timeout: timedelta = timedelta(seconds=2),
         disable_eager_activity_execution: bool = False,
         on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
         use_worker_versioning: bool = False,
@@ -282,6 +283,11 @@ class Worker:
                 sandboxing in order to make using a debugger easier. If false
                 but the environment variable ``TEMPORAL_DEBUG`` is truthy, this
                 will be set to true.
+            deadlock_detection_timeout: Maximum amount of time a workflow task
+                is allowed to run without yielding control back to the event
+                loop before it is considered a deadlock and the task fails with
+                ``[TMPRL1101]``. Defaults to 2 seconds. Ignored when
+                ``debug_mode`` is enabled (detection is fully disabled then).
             disable_eager_activity_execution: If true, will disable eager
                 activity execution. Eager activity execution is an optimization
                 on some servers that sends activities back to the same worker as
@@ -363,6 +369,7 @@ class Worker:
             workflow_failure_exception_types=workflow_failure_exception_types,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
+            deadlock_detection_timeout=deadlock_detection_timeout,
             disable_eager_activity_execution=disable_eager_activity_execution,
             on_fatal_error=on_fatal_error,
             use_worker_versioning=use_worker_versioning,
@@ -529,6 +536,7 @@ class Worker:
                     "workflow_failure_exception_types"
                 ],  # type: ignore[reportTypedDictNotRequiredAccess]
                 debug_mode=config["debug_mode"],  # type: ignore[reportTypedDictNotRequiredAccess]
+                deadlock_detection_timeout=config["deadlock_detection_timeout"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 disable_eager_activity_execution=config[
                     "disable_eager_activity_execution"
                 ],  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -977,6 +985,7 @@ class WorkerConfig(TypedDict, total=False):
     workflow_failure_exception_types: Sequence[type[BaseException]]
     shared_state_manager: SharedStateManager | None
     debug_mode: bool
+    deadlock_detection_timeout: timedelta
     disable_eager_activity_execution: bool
     on_fatal_error: Callable[[BaseException], Awaitable[None]] | None
     use_worker_versioning: bool

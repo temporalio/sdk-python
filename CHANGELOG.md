@@ -20,6 +20,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- `Worker` and `Replayer` now accept a `deadlock_detection_timeout`
+  (`timedelta`, default 2 seconds) to configure how long a workflow task may run
+  without yielding before it is failed as a deadlock (`[TMPRL1101]`). This brings
+  the Python SDK in line with the other Temporal SDKs, which already expose this
+  option. `debug_mode` still disables detection entirely.
+
 ### Changed
 
 - AWS Lambda worker `configure` parameter supports sync, async, and async
