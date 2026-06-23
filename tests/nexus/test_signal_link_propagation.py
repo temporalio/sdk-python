@@ -8,6 +8,7 @@ and is therefore not covered here.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from typing import Any
 from unittest import mock
 
@@ -31,6 +32,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.nexus._link_conversion
 import temporalio.nexus._operation_context
+from temporalio.nexus._operation_context import _TemporalStartOperationContext
 from temporalio.client._impl import _ClientImpl
 from temporalio.client._interceptor import (
     SignalWorkflowInput,
@@ -68,7 +70,7 @@ def _inbound_nexus_link() -> temporalio.api.common.v1.Link:
 
 
 @pytest.fixture
-def nexus_ctx() -> Any:
+def nexus_ctx() -> Generator[_TemporalStartOperationContext]:
     """Install a Nexus start-operation context with a single inbound link.
 
     The inbound link is provided in nexusrpc.Link form, exactly as the worker populates it from
@@ -169,7 +171,7 @@ def _outbound_link_urls(ctx: Any) -> list[str]:
 
 
 async def test_signal_forwards_inbound_links_and_captures_response_backlink(
-    nexus_ctx: Any,
+    nexus_ctx: _TemporalStartOperationContext,
 ) -> None:
     response_link = _workflow_event_link(
         WORKFLOW_ID,
@@ -197,7 +199,7 @@ async def test_signal_forwards_inbound_links_and_captures_response_backlink(
 
 
 async def test_signal_against_older_server_captures_no_backlink(
-    nexus_ctx: Any,
+    nexus_ctx: _TemporalStartOperationContext,
 ) -> None:
     workflow_service = mock.MagicMock()
     workflow_service.signal_workflow_execution = mock.AsyncMock(
@@ -215,7 +217,9 @@ async def test_signal_against_older_server_captures_no_backlink(
     assert nexus_ctx.nexus_context.outbound_links == []
 
 
-async def test_multiple_signals_accumulate_all_backlinks(nexus_ctx: Any) -> None:
+async def test_multiple_signals_accumulate_all_backlinks(
+    nexus_ctx: _TemporalStartOperationContext,
+) -> None:
     first = _workflow_event_link(
         "callee-a",
         "run-a",
@@ -265,7 +269,7 @@ async def test_signal_outside_nexus_context_does_not_touch_links() -> None:
 
 
 async def test_signal_with_start_forwards_inbound_links_and_captures_backlink(
-    nexus_ctx: Any,
+    nexus_ctx: _TemporalStartOperationContext,
 ) -> None:
     response_link = _workflow_event_link(
         WORKFLOW_ID,
@@ -294,7 +298,7 @@ async def test_signal_with_start_forwards_inbound_links_and_captures_backlink(
 
 
 async def test_signal_with_start_against_older_server_captures_no_backlink(
-    nexus_ctx: Any,
+    nexus_ctx: _TemporalStartOperationContext,
 ) -> None:
     workflow_service = mock.MagicMock()
     workflow_service.signal_with_start_workflow_execution = mock.AsyncMock(
@@ -314,8 +318,8 @@ async def test_signal_with_start_against_older_server_captures_no_backlink(
 # ── start ─────────────────────────────────────────────────────────────────────────────────
 
 
-async def test_start_forwards_inbound_links_and_captures_no_backlink(
-    nexus_ctx: Any,
+async def test_start_forwards_inbound_links_and_captures_backlink(
+    nexus_ctx: _TemporalStartOperationContext,
 ) -> None:
     server_link = _workflow_event_link(
         WORKFLOW_ID,
@@ -338,12 +342,13 @@ async def test_start_forwards_inbound_links_and_captures_no_backlink(
     assert len(sent.links) == 1
     assert sent.links[0] == _inbound_nexus_link()
 
-    # Backward: a plain start does not capture a backlink, even when the server returns one.
-    assert nexus_ctx.nexus_context.outbound_links == []
+    # Backward: a plain start captures a backlink
+    assert len(nexus_ctx.nexus_context.outbound_links) == 1
+    assert "wf-target" in _outbound_link_urls(nexus_ctx)[0]
 
 
 async def test_start_against_older_server_captures_no_backlink(
-    nexus_ctx: Any,
+    nexus_ctx: _TemporalStartOperationContext,
 ) -> None:
     workflow_service = mock.MagicMock()
     workflow_service.start_workflow_execution = mock.AsyncMock(
@@ -360,8 +365,9 @@ async def test_start_against_older_server_captures_no_backlink(
     assert len(sent.links) == 1
     assert sent.links[0] == _inbound_nexus_link()
 
-    # Backward: a plain start never fabricates a backlink.
-    assert nexus_ctx.nexus_context.outbound_links == []
+    # Backward: a plain start fabricates a backlink when the server doesn't return one.
+    assert len(nexus_ctx.nexus_context.outbound_links) == 1
+    assert "wf-target" in _outbound_link_urls(nexus_ctx)[0]
 
 
 async def test_start_outside_nexus_context_does_not_touch_links() -> None:
