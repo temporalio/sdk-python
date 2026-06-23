@@ -276,6 +276,8 @@ class LangGraphPlugin(SimplePlugin):
         """Prepare a node or task to execute as an activity or inline in the workflow."""
         opts = kwargs or {}
         execute_in = opts.pop("execute_in")
+        # Remove control keys before opts is splatted into execute_activity
+        # below; summary_fn is consumed here, not a Temporal activity option.
         node_summary_fn = opts.pop("summary_fn", None)
         if node_summary_fn is not None and opts.get("summary") is not None:
             raise ValueError(
