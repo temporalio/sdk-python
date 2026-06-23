@@ -2066,6 +2066,57 @@ async def test_follow_continue_as_new_describes_polled_run(client: Client) -> No
         await new_handle.signal(ContinueAsNewHelperWorkflow.close)
 
 
+@pytest.mark.asyncio
+async def test_subscribe_captures_polled_run_id(client: Client) -> None:
+    """The ``subscribe`` loop must record the run each poll was admitted to.
+
+    ``_follow_continue_as_new`` relies on ``_polled_run_id`` to describe the
+    *polled* run rather than the latest one (see
+    ``test_follow_continue_as_new_describes_polled_run``). This verifies the
+    real subscribe flow populates that field, rather than setting it by hand.
+    """
+    async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
+        handle = await client.start_workflow(
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-polled-run-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(
+            "__temporal_workflow_stream_publish",
+            PublishInput(
+                items=[PublishEntry(topic="events", data=_wire_bytes(b"item-0"))],
+                publisher_id="pub",
+                sequence=1,
+            ),
+        )
+
+        stream = WorkflowStreamClient.create(client, handle.id)
+        received: list[WorkflowStreamItem] = []
+
+        async def consume() -> None:
+            async for item in stream.subscribe(
+                from_offset=0, poll_cooldown=timedelta(0), result_type=bytes
+            ):
+                received.append(item)
+
+        async def received_count() -> int:
+            return len(received)
+
+        task = asyncio.create_task(consume())
+        try:
+            await assert_eq_eventually(1, received_count)
+            # The poll was admitted to the run we started; subscribe must have
+            # captured exactly that run id, not left it unset.
+            assert stream._polled_run_id == handle.result_run_id
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            await handle.signal(BasicWorkflowStreamWorkflow.close)
+
+
 @workflow.defn
 class DrainingGateWorkflow:
     """CAN workflow that detaches pollers and then *holds* in the draining state

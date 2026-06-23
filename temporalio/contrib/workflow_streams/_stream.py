@@ -37,6 +37,8 @@ from temporalio.exceptions import ApplicationError
 
 from ._topic_handle import WorkflowTopicHandle
 from ._types import (
+    STREAM_DRAINING_ERROR_TYPE,
+    TRUNCATED_OFFSET_ERROR_TYPE,
     PollInput,
     PollResult,
     PublisherState,
@@ -357,7 +359,6 @@ class WorkflowStream:
                 f"Cannot truncate to offset {up_to_offset}: "
                 f"valid range is [{self._base_offset}, {self._base_offset + len(self._log)})",
                 type="TruncateOutOfRange",
-                non_retryable=True,
             )
         self._log = self._log[log_index:]
         self._base_offset = up_to_offset
@@ -419,8 +420,7 @@ class WorkflowStream:
                 raise ApplicationError(
                     f"Requested offset {payload.from_offset} has been truncated. "
                     f"Current base offset is {self._base_offset}.",
-                    type="TruncatedOffset",
-                    non_retryable=True,
+                    type=TRUNCATED_OFFSET_ERROR_TYPE,
                 )
         all_new = self._log[log_offset:]
         if payload.topics:
@@ -469,8 +469,7 @@ class WorkflowStream:
         if self._detaching:
             raise ApplicationError(
                 "Workflow pollers are detached for continue-as-new",
-                type="StreamDraining",
-                non_retryable=True,
+                type=STREAM_DRAINING_ERROR_TYPE,
             )
 
     def _on_offset(self) -> int:

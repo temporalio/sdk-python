@@ -31,6 +31,7 @@ from temporalio import activity
 from temporalio.api.common.v1 import Payload
 from temporalio.client import (
     Client,
+    WorkflowExecutionDescription,
     WorkflowExecutionStatus,
     WorkflowHandle,
     WorkflowUpdateFailedError,
@@ -42,6 +43,8 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from ._topic_handle import TopicHandle
 from ._types import (
+    STREAM_DRAINING_ERROR_TYPE,
+    TRUNCATED_OFFSET_ERROR_TYPE,
     PollInput,
     PollResult,
     PublishEntry,
@@ -509,9 +512,11 @@ class WorkflowStreamClient:
                 ``Payload`` — useful for heterogeneous topics where
                 the caller dispatches on ``Payload.metadata`` or wants
                 to forward the bytes without decoding.
-            poll_cooldown: Minimum interval between polls to avoid
-                overwhelming the workflow when items arrive faster
-                than the poll round-trip. Defaults to 100ms.
+            poll_cooldown: Minimum interval between polls when caught
+                up (backlogs always drain at full speed). Defaults to
+                100ms. Avoid ``timedelta(0)``: an idle subscriber
+                busy-loops, and each poll grows workflow history toward
+                its limit. Use 0 only in tests.
 
         Yields:
             :class:`WorkflowStreamItem` for each matching item.
@@ -549,14 +554,14 @@ class WorkflowStreamClient:
                 return
             except WorkflowUpdateFailedError as e:
                 cause_type = getattr(e.cause, "type", None)
-                if cause_type == "TruncatedOffset":
+                if cause_type == TRUNCATED_OFFSET_ERROR_TYPE:
                     # Subscriber fell behind truncation. Retry from
                     # offset 0 which the stream treats as "from the
                     # beginning of whatever exists" (i.e., from
                     # base_offset).
                     offset = 0
                     continue
-                if cause_type == "StreamDraining":
+                if cause_type == STREAM_DRAINING_ERROR_TYPE:
                     # Workflow is detaching for continue-as-new. Back off and
                     # retry; the poll lands on the successor run once the
                     # rollover completes.
@@ -606,7 +611,7 @@ class WorkflowStreamClient:
             if not result.more_ready and cooldown_secs > 0:
                 await asyncio.sleep(cooldown_secs)
 
-    async def _describe_polled_run(self):
+    async def _describe_polled_run(self) -> WorkflowExecutionDescription:
         """Describe the specific run the most recent poll was admitted to.
 
         Describing that run (rather than the latest) is what lets a
