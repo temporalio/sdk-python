@@ -10,6 +10,7 @@ import temporalio.runtime
 import temporalio.service
 from temporalio.service import (
     DnsLoadBalancingConfig,
+    GrpcCompression,
     HttpConnectProxyConfig,
     KeepAliveConfig,
     RetryConfig,
@@ -51,6 +52,7 @@ class CloudOperationsClient:
         runtime: temporalio.runtime.Runtime | None = None,
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
         dns_load_balancing_config: DnsLoadBalancingConfig | None = None,
+        grpc_compression: GrpcCompression = GrpcCompression.GZIP,
     ) -> CloudOperationsClient:
         """Connect to a Temporal Cloud Operations API.
 
@@ -91,6 +93,9 @@ class CloudOperationsClient:
                 client connection. Default is disabled. Silently disabled when
                 ``http_connect_proxy_config`` is set, since the two are mutually
                 exclusive.
+            grpc_compression: Transport-level gRPC compression for the client
+                connection. Default is gzip. Set to
+                :py:attr:`GrpcCompression.NONE` to disable compression.
         """
         # Add version if given
         if version:
@@ -108,6 +113,7 @@ class CloudOperationsClient:
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
             dns_load_balancing_config=dns_load_balancing_config,
+            grpc_compression=grpc_compression,
         )
         return CloudOperationsClient(
             await temporalio.service.ServiceClient.connect(connect_config)

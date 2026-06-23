@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.27.2"
+version = "1.29.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -10,9 +10,9 @@ license-files = ["LICENSE"]
 keywords = ["temporal", "workflow"]
 dependencies = [
   "nexus-rpc==1.4.0",
-  "protobuf>=3.20,<7.0.0",
+  "protobuf>=3.20,<8.0.0",
   "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
-  "types-protobuf>=3.20,<7.0.0",
+  "types-protobuf>=3.20,<8.0.0",
   "typing-extensions>=4.2.0,<5",
 ]
 classifiers = [
@@ -28,7 +28,7 @@ classifiers = [
 grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
-openai-agents = ["openai-agents>=0.17.1", "mcp>=1.9.4, <2"]
+openai-agents = ["openai-agents>=0.17.5", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=1.27.0,<2"]
 langgraph = ["langgraph>=1.1.0"]
 langsmith = ["langsmith>=0.7.34,<0.9"]
@@ -74,7 +74,7 @@ dev = [
   "openai-agents[litellm]>=0.14.0; python_version < '3.14'",
   "litellm>=1.83.0",
   "openinference-instrumentation-google-adk>=0.1.11",
-  "googleapis-common-protos==1.70.0",
+  "googleapis-common-protos>=1.75.0,<2",
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
@@ -99,14 +99,17 @@ format = [
   { cmd = "cargo fmt", cwd = "temporalio/bridge" },
 ]
 gen-docs = "uv run scripts/gen_docs.py"
+gen-nexus-system-api = "uv run scripts/gen_nexus_system_api.py"
 gen-protos = [
   { cmd = "uv run scripts/gen_protos.py" },
+  { ref = "gen-nexus-system-api" },
   { cmd = "uv run scripts/gen_payload_visitor.py" },
   { cmd = "uv run scripts/gen_bridge_client.py" },
   { ref = "format" },
 ]
 gen-protos-docker = [
   { cmd = "uv run scripts/gen_protos_docker.py" },
+  { ref = "gen-nexus-system-api" },
   { cmd = "uv run scripts/gen_payload_visitor.py" },
   { cmd = "uv run scripts/gen_bridge_client.py" },
   { ref = "format" },
@@ -170,7 +173,7 @@ exclude = [
 [tool.pydocstyle]
 convention = "google"
 # https://github.com/PyCQA/pydocstyle/issues/363#issuecomment-625563088
-match_dir = "^(?!(docs|scripts|tests|api|proto|\\.)).*"
+match_dir = "^(?!(docs|scripts|tests|api|proto|system|\\.)).*"
 add_ignore = [
   # We like to wrap at a certain number of chars, even long summary sentences.
   # https://github.com/PyCQA/pydocstyle/issues/184
@@ -257,3 +260,4 @@ exclude = ["temporalio/bridge/target/**/*"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
+exclude-newer-package = { openai-agents = false }

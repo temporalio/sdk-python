@@ -5,7 +5,7 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, MutableSequence, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import (
     TypeAlias,
@@ -22,7 +22,7 @@ import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.converter._extstore
 from temporalio.api.common.v1.message_pb2 import Payload
-from temporalio.bridge._visitor import VisitorFunctions
+from temporalio.bridge._visitor_functions import PayloadSequence, VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
@@ -281,15 +281,20 @@ class Worker:
 
 
 class _Visitor(VisitorFunctions):
-    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]]):
+    def __init__(
+        self,
+        f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
+        visit_system_nexus_envelope: Callable[[Payload], Awaitable[None]] | None = None,
+    ):
         self._f = f
+        self._visit_system_nexus_envelope = visit_system_nexus_envelope
 
     async def visit_payload(self, payload: Payload) -> None:
         new_payload = (await self._f([payload]))[0]
         if new_payload is not payload:
             payload.CopyFrom(new_payload)
 
-    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+    async def visit_payloads(self, payloads: PayloadSequence) -> None:
         if len(payloads) == 0:
             return
         new_payloads = await self._f(payloads)
@@ -297,6 +302,10 @@ class _Visitor(VisitorFunctions):
             return
         del payloads[:]
         payloads.extend(new_payloads)
+
+    async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+        if self._visit_system_nexus_envelope is not None:
+            await self._visit_system_nexus_envelope(payload)
 
 
 async def decode_activation(
@@ -339,10 +348,20 @@ async def encode_completion(
     Returns:
         Metrics from any external storage store operations that occurred.
     """
+
+    async def _validate_system_nexus_envelope(payload: Payload) -> None:
+        data_converter._validate_payload_limits([payload])
+
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True,
         skip_headers=not encode_headers,
-    ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
+    ).visit(
+        _Visitor(
+            data_converter._encode_payload_sequence,
+            visit_system_nexus_envelope=_validate_system_nexus_envelope,
+        ),
+        completion,
+    )
 
     async def _store_and_validate(
         payloads: Sequence[Payload],
@@ -357,6 +376,12 @@ async def encode_completion(
             skip_search_attributes=True,
             skip_headers=not encode_headers,
             concurrency_limit=storage_concurrency_limit,
-        ).visit(_Visitor(_store_and_validate), completion)
+        ).visit(
+            _Visitor(
+                _store_and_validate,
+                visit_system_nexus_envelope=_validate_system_nexus_envelope,
+            ),
+            completion,
+        )
 
     return metrics

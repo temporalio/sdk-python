@@ -207,6 +207,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     CANCELED_REASON_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
     TOTAL_HEARTBEAT_COUNT_FIELD_NUMBER: builtins.int
+    SDK_NAME_FIELD_NUMBER: builtins.int
+    SDK_VERSION_FIELD_NUMBER: builtins.int
+    START_DELAY_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """Unique identifier of this activity within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -251,7 +254,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """The retry policy for the activity. Will never exceed `schedule_to_close_timeout`."""
     @property
     def heartbeat_details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
-        """Details provided in the last recorded activity heartbeat."""
+        """Details provided in the last recorded activity heartbeat.
+        DescribeActivityExecution does not set this field unless include_heartbeat_details was true in the request.
+        """
     @property
     def last_heartbeat_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time the last heartbeat was recorded."""
@@ -274,7 +279,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """Time when the activity transitioned to a closed state."""
     @property
     def last_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """Failure details from the last failed attempt."""
+        """Failure details from the last failed attempt.
+        DescribeActivityExecution does not set this field unless include_last_failure was true in the request.
+        """
     last_worker_identity: builtins.str
     @property
     def current_retry_interval(self) -> google.protobuf.duration_pb2.Duration:
@@ -327,6 +334,17 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """Links to related entities, such as the entity that started this activity."""
     total_heartbeat_count: builtins.int
     """Total number of heartbeats recorded across all attempts of this activity, including retries."""
+    sdk_name: builtins.str
+    """The name of the SDK of the worker that most recently picked up an attempt of this activity.
+    Overwritten on each new attempt. Empty if unknown.
+    """
+    sdk_version: builtins.str
+    """The version of the SDK of the worker that most recently picked up an attempt of this activity.
+    Overwritten on each new attempt. Empty if unknown.
+    """
+    @property
+    def start_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """Time to wait before dispatching the first activity task. This delay is not applied to retry attempts."""
     def __init__(
         self,
         *,
@@ -370,6 +388,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
         total_heartbeat_count: builtins.int = ...,
+        sdk_name: builtins.str = ...,
+        sdk_version: builtins.str = ...,
+        start_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -414,6 +435,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"schedule_to_start_timeout",
             "search_attributes",
             b"search_attributes",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "user_metadata",
@@ -475,8 +498,14 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "sdk_name",
+            b"sdk_name",
+            "sdk_version",
+            b"sdk_version",
             "search_attributes",
             b"search_attributes",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "state_size_bytes",

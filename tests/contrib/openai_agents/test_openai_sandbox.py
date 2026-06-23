@@ -9,6 +9,11 @@ from typing import Any, Literal
 import pytest
 from agents import Agent, FunctionTool, RunConfig, Runner, Tool
 from agents.sandbox import Capability, Manifest, SandboxAgent, SandboxRunConfig
+from agents.sandbox.errors import (
+    ExecTransportError,
+    SandboxError,
+    WorkspaceArchiveReadError,
+)
 from agents.sandbox.session.base_sandbox_session import BaseSandboxSession
 from agents.sandbox.session.sandbox_client import (
     BaseSandboxClient,
@@ -55,6 +60,7 @@ from temporalio.contrib.openai_agents.testing import (
     TestModelProvider,
 )
 from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
+from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ActivityConfig
 from tests.helpers import new_worker
 
@@ -567,6 +573,149 @@ async def test_multiple_providers_register_distinct_activities():
         n.startswith("local-sandbox_client_") or n.startswith("local-sandbox_session_")
         for n in names2
     )
+
+
+# ── SandboxError retryable mapping tests ──
+
+
+class _ExecRaisingSession(_MockSandboxSession):
+    """Mock session whose exec() raises a chosen SandboxError."""
+
+    def __init__(self, error: SandboxError) -> None:
+        super().__init__()
+        self._error = error
+
+    async def _exec_internal(
+        self,
+        *command: str | Path,  # type: ignore[reportUnusedParameter]
+        timeout: float | None = None,  # type: ignore[reportUnusedParameter]
+    ) -> ExecResult:
+        raise self._error
+
+
+async def _exec_with_error(error: SandboxError) -> None:
+    provider = SandboxClientProvider(
+        "mock", _MockSandboxClient(_ExecRaisingSession(error))
+    )
+    acts = _activity_map(provider)
+    state = (
+        await acts["mock-sandbox_client_create"](
+            CreateSessionArgs(
+                snapshot_spec=None, manifest=Manifest(), client_options=None
+            )
+        )
+    ).state
+    await acts["mock-sandbox_session_exec"](
+        ExecArgs(state=state, command=["boom"], shell=True)
+    )
+
+
+async def test_exec_terminal_error_becomes_non_retryable_application_error():
+    """retryable is False should map to a non-retryable ApplicationError."""
+    with pytest.raises(ApplicationError) as exc_info:
+        await _exec_with_error(ExecTransportError(command=["boom"], retryable=False))
+    assert exc_info.value.non_retryable is True
+    assert exc_info.value.type == "exec_transport_error"
+
+
+async def test_exec_transient_error_propagates_unchanged():
+    """retryable is True should let the original SandboxError propagate."""
+    with pytest.raises(ExecTransportError):
+        await _exec_with_error(ExecTransportError(command=["boom"], retryable=True))
+
+
+async def test_exec_unclassified_error_propagates_unchanged():
+    """retryable is None should let the original SandboxError propagate (not converted)."""
+    with pytest.raises(ExecTransportError):
+        await _exec_with_error(ExecTransportError(command=["boom"], retryable=None))
+
+
+class _ShutdownRaisingSession(_MockSandboxSession):
+    """Mock session whose shutdown() raises a chosen SandboxError."""
+
+    def __init__(self, error: SandboxError) -> None:
+        super().__init__()
+        self._error = error
+
+    async def shutdown(self) -> None:
+        raise self._error
+
+
+async def _create_shutdown_raising(
+    error: SandboxError,
+) -> tuple[dict[str, Any], SandboxClientProvider, StopArgs, str]:
+    provider = SandboxClientProvider(
+        "mock", _MockSandboxClient(_ShutdownRaisingSession(error))
+    )
+    acts = _activity_map(provider)
+    state = (
+        await acts["mock-sandbox_client_create"](
+            CreateSessionArgs(
+                snapshot_spec=None, manifest=Manifest(), client_options=None
+            )
+        )
+    ).state
+    key = str(state.session_id)
+    assert key in provider._sessions
+    return acts, provider, StopArgs(state=state), key
+
+
+async def test_shutdown_terminal_error_evicts_session_and_raises():
+    """A terminal shutdown error maps to a non-retryable ApplicationError and
+    evicts the dead session from the cache."""
+    acts, provider, args, key = await _create_shutdown_raising(
+        ExecTransportError(command=["shutdown"], retryable=False)
+    )
+
+    with pytest.raises(ApplicationError) as exc_info:
+        await acts["mock-sandbox_session_shutdown"](args)
+    assert exc_info.value.non_retryable is True
+    assert key not in provider._sessions
+
+
+async def test_shutdown_retryable_error_keeps_session_cached():
+    """A retryable shutdown error propagates unchanged and leaves the session
+    cached so the activity's retry can still shut it down."""
+    acts, provider, args, key = await _create_shutdown_raising(
+        ExecTransportError(command=["shutdown"], retryable=True)
+    )
+
+    with pytest.raises(ExecTransportError):
+        await acts["mock-sandbox_session_shutdown"](args)
+    assert key in provider._sessions
+
+
+class _RunningRaisingSession(_MockSandboxSession):
+    """Mock session whose running() raises a chosen SandboxError."""
+
+    def __init__(self, error: SandboxError) -> None:
+        super().__init__()
+        self._error = error
+
+    async def running(self) -> bool:
+        raise self._error
+
+
+async def test_running_terminal_error_becomes_non_retryable_application_error():
+    """A terminal SandboxError from a non-exec activity also maps to a
+    non-retryable ApplicationError, with type set to its error_code."""
+    error = WorkspaceArchiveReadError(path=Path("/workspace"), retryable=False)
+    provider = SandboxClientProvider(
+        "mock", _MockSandboxClient(_RunningRaisingSession(error))
+    )
+    acts = _activity_map(provider)
+    state = (
+        await acts["mock-sandbox_client_create"](
+            CreateSessionArgs(
+                snapshot_spec=None, manifest=Manifest(), client_options=None
+            )
+        )
+    ).state
+
+    with pytest.raises(ApplicationError) as exc_info:
+        await acts["mock-sandbox_session_running"](RunningArgs(state=state))
+    assert exc_info.value.non_retryable is True
+    assert exc_info.value.type == "workspace_archive_read_error"
 
 
 # ── End-to-end test: Runner + SandboxAgent through Temporal activities ──

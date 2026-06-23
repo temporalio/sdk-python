@@ -57,6 +57,7 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.service import __version__
@@ -2085,8 +2086,19 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     ):
                         t.uncancel()  # type: ignore[union-attr]
 
+        payload_converter = (
+            temporalio.nexus.system.get_payload_converter()
+            if temporalio.nexus.system.is_system_operation(
+                input.service, input.operation_name
+            )
+            else self._context_free_payload_converter
+        )
         handle = _NexusOperationHandle(
-            self, self._next_seq("nexus_operation"), input, operation_handle_fn()
+            self,
+            self._next_seq("nexus_operation"),
+            input,
+            operation_handle_fn(),
+            payload_converter,
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
@@ -3453,6 +3465,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         seq: int,
         input: StartNexusOperationInput[Any, OutputT],
         fn: Coroutine[Any, Any, OutputT],
+        payload_converter: temporalio.converter.PayloadConverter,
     ):
         self._instance = instance
         self._seq = seq
@@ -3460,7 +3473,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._task = asyncio.Task(fn)
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
-        self._payload_converter = self._instance._context_free_payload_converter
+        self._payload_converter = payload_converter
         self._failure_converter = self._instance._context_free_failure_converter
 
     @property

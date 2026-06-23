@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
+import itertools
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -126,8 +129,6 @@ class TestLambdaWorkerConfig:
         assert second_called
 
     def test_is_dataclass(self) -> None:
-        import dataclasses
-
         assert dataclasses.is_dataclass(LambdaWorkerConfig)
 
     def test_default_field_independence(self) -> None:
@@ -278,14 +279,17 @@ class TestRunWorkerInternal:
         def bad_configure(_config: LambdaWorkerConfig) -> None:
             raise RuntimeError("bad config")
 
+        # configure runs per invocation, so the error surfaces when the handler is invoked.
+        handler = _run_worker_internal(TEST_VERSION, bad_configure, deps)
         with pytest.raises(RuntimeError, match="bad config"):
-            _run_worker_internal(TEST_VERSION, bad_configure, deps)
+            handler({}, _make_lambda_context())
 
     def test_missing_task_queue(self) -> None:
         deps = _make_test_deps()
         deps.getenv = lambda _: None  # type: ignore[assignment]
+        handler = _run_worker_internal(TEST_VERSION, lambda config: None, deps)
         with pytest.raises(ValueError, match="task queue not configured"):
-            _run_worker_internal(TEST_VERSION, lambda config: None, deps)
+            handler({}, _make_lambda_context())
 
     def test_missing_version(self) -> None:
         deps = _make_test_deps()
@@ -494,7 +498,8 @@ class TestRunWorkerInternal:
         def configure(config: LambdaWorkerConfig) -> None:
             task_queues.append(config.worker_config.get("task_queue"))
 
-        _run_worker_internal(TEST_VERSION, configure, deps)
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
         assert task_queues[0] == "test-queue"
 
     def test_config_pre_populated_with_defaults(self) -> None:
@@ -505,7 +510,8 @@ class TestRunWorkerInternal:
         def configure(config: LambdaWorkerConfig) -> None:
             captured.append(config)
 
-        _run_worker_internal(TEST_VERSION, configure, deps)
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
         wc = captured[0].worker_config
         assert wc.get("max_concurrent_activities") == DEFAULT_MAX_CONCURRENT_ACTIVITIES
         assert wc.get("disable_eager_activity_execution") is True
@@ -522,3 +528,141 @@ class TestRunWorkerInternal:
         ctx.aws_request_id = "req-123"
         ctx.invoked_function_arn = "arn:aws:lambda:us-east-1:123:function:f"
         handler({}, ctx)
+
+
+class TestAsyncConfigure:
+    """configure may be sync, an async coroutine, or an async generator; all run once per
+    invocation inside that invocation's event loop."""
+
+    def test_async_configure_called_per_invocation(self) -> None:
+        deps = _make_test_deps()
+        calls = 0
+
+        async def configure(config: LambdaWorkerConfig) -> None:
+            nonlocal calls
+            calls += 1
+            config.worker_config["task_queue"] = "async-queue"
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
+        assert calls == 2
+
+    def test_async_configure_can_set_data_converter(self) -> None:
+        connect_capture: list[dict[str, Any]] = []
+        deps = _make_test_deps(connect_kwargs_capture=connect_capture)
+        sentinel = object()
+
+        async def configure(config: LambdaWorkerConfig) -> None:
+            config.client_connect_config["data_converter"] = sentinel  # type: ignore[typeddict-item]
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
+        assert connect_capture[0]["data_converter"] is sentinel
+
+    def test_async_generator_setup_runs_before_connect_teardown_after(self) -> None:
+        order: list[str] = []
+        deps = _make_test_deps()
+
+        original_connect = deps.connect
+
+        async def tracking_connect(**kwargs: Any) -> Any:
+            order.append("connect")
+            return await original_connect(**kwargs)
+
+        deps.connect = tracking_connect
+
+        async def configure(config: LambdaWorkerConfig):
+            order.append("setup")
+            config.worker_config["task_queue"] = "gen-queue"
+            yield
+            order.append("teardown")
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
+        assert order == ["setup", "connect", "teardown"]
+
+    def test_async_generator_teardown_runs_on_error(self) -> None:
+        """Teardown after the yield runs even when the worker run raises."""
+        torn_down = False
+        deps = _make_test_deps()
+
+        async def failing_run() -> None:
+            raise RuntimeError("worker boom")
+
+        def fake_create_worker(_client: Any, **_kwargs: Any) -> Any:
+            w = MagicMock()
+            w.run = failing_run
+            return w
+
+        deps.create_worker = fake_create_worker
+
+        async def configure(config: LambdaWorkerConfig):
+            nonlocal torn_down
+            config.worker_config["task_queue"] = "gen-queue"
+            try:
+                yield
+            finally:
+                torn_down = True
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        with pytest.raises(RuntimeError, match="worker boom"):
+            handler({}, _make_lambda_context())
+        assert torn_down
+
+    def test_async_generator_resource_per_invocation(self) -> None:
+        """Each invocation builds and tears down its own resource instance. Tagging each
+        resource with a construction sequence number proves the instances are distinct
+        (open-1/close-1, then open-2/close-2) rather than one resource reopened."""
+        events: list[str] = []
+        counter = itertools.count(1)
+        deps = _make_test_deps()
+
+        class FakeResource:
+            def __init__(self) -> None:
+                self.n = next(counter)
+
+            async def __aenter__(self) -> FakeResource:
+                events.append(f"open-{self.n}")
+                return self
+
+            async def __aexit__(self, *exc: Any) -> None:
+                events.append(f"close-{self.n}")
+
+        async def configure(config: LambdaWorkerConfig):
+            config.worker_config["task_queue"] = "gen-queue"
+            async with FakeResource():
+                yield
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
+        assert events == ["open-1", "close-1", "open-2", "close-2"]
+
+    def test_async_configure_validates_task_queue_per_invocation(self) -> None:
+        deps = _make_test_deps()
+        deps.getenv = lambda _: None  # type: ignore[assignment]
+
+        async def configure(_config: LambdaWorkerConfig) -> None:
+            pass
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        with pytest.raises(ValueError, match="task queue not configured"):
+            handler({}, _make_lambda_context())
+
+    def test_asynccontextmanager_decorated_configure_supported(self) -> None:
+        """A @asynccontextmanager-decorated configure is entered and exited per invocation,
+        the same as a bare async generator."""
+        events: list[str] = []
+        deps = _make_test_deps()
+
+        @asynccontextmanager
+        async def configure(config: LambdaWorkerConfig):
+            events.append("setup")
+            config.worker_config["task_queue"] = "gen-queue"
+            yield
+            events.append("teardown")
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
+        assert events == ["setup", "teardown"]

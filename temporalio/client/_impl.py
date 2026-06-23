@@ -698,9 +698,14 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             long_poll_token=resp.long_poll_token or None,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
-                WorkflowSerializationContext(
+                ActivitySerializationContext(
                     namespace=self._client.namespace,
-                    workflow_id=input.activity_id,  # Using activity_id as workflow_id for activities not started by a workflow
+                    activity_id=resp.info.activity_id,
+                    activity_task_queue=resp.info.task_queue,
+                    activity_type=resp.info.activity_type.name,
+                    workflow_id=None,
+                    workflow_type=None,
+                    is_local=False,
                 )
             ),
         )
@@ -847,7 +852,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
         try:
             return await self._start_workflow_update_with_start(
-                input.start_workflow_input, input.update_workflow_input, on_start
+                input.start_workflow_input,
+                input.update_workflow_input,
+                input.rpc_metadata,
+                input.rpc_timeout,
+                on_start,
             )
         except asyncio.CancelledError as _err:
             err = _err
@@ -909,6 +918,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self,
         start_input: UpdateWithStartStartWorkflowInput,
         update_input: UpdateWithStartUpdateWorkflowInput,
+        rpc_metadata: Mapping[str, str | bytes],
+        rpc_timeout: timedelta | None,
         on_start: Callable[
             [temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse], None
         ],
@@ -936,7 +947,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Repeatedly try to invoke ExecuteMultiOperation until the update is durable
         while True:
             multiop_response = (
-                await self._client.workflow_service.execute_multi_operation(multiop_req)
+                await self._client.workflow_service.execute_multi_operation(
+                    multiop_req,
+                    retry=True,
+                    metadata=rpc_metadata,
+                    timeout=rpc_timeout,
+                )
             )
             start_response = multiop_response.responses[0].start_workflow
             update_response = multiop_response.responses[1].update_workflow

@@ -45,10 +45,11 @@ class OTelOpenAIAgentsContextPropagationInterceptor(
         otel_span = opentelemetry.trace.get_current_span()
 
         if otel_span and otel_span.get_span_context().is_valid:
-            otel_span_id = otel_span.get_span_context().span_id
+            span_context = otel_span.get_span_context()
             return {
                 **super().header_contents(),
-                "otelSpanId": otel_span_id,
+                "otelSpanId": span_context.span_id,
+                "otelTraceId": span_context.trace_id,
             }
         else:
             return super().header_contents()
@@ -63,6 +64,12 @@ class OTelOpenAIAgentsContextPropagationInterceptor(
         if span_info is None:
             return
         otel_span_id = span_info.get("otelSpanId")
+        otel_trace_id = span_info.get("otelTraceId")
+
+        # Seed the trace id before the trace is reconstructed so the workflow's root
+        # OTEL span shares the caller's trace id rather than generating a new one.
+        if otel_trace_id and self._otel_id_generator:
+            self._otel_id_generator.seed_trace_id(otel_trace_id)
 
         # If only a trace was propagated from the caller, we need to seed for trace context
         if otel_span_id and self._otel_id_generator and span_info.get("spanId") is None:

@@ -101,6 +101,8 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
@@ -111,6 +113,12 @@ jobs:
           python .github/scripts/release_verify.py validate-version \
             --sha "$(git rev-parse HEAD)" \
             --github-output "$GITHUB_OUTPUT"
+      - name: Validate changelog release notes
+        run: |
+          set -euo pipefail
+          python .github/scripts/release_verify.py changelog-notes \
+            --version "${{ steps.validate_versions.outputs.version }}" \
+            --output /tmp/release-notes.md
       - name: Download and flatten artifacts
         env:
           GH_TOKEN: ${{ github.token }}
@@ -249,6 +257,19 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.verify_artifacts.outputs.release_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Build changelog release notes
+        env:
+          VERSION: ${{ needs.verify_artifacts.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/release_verify.py changelog-notes \
+            --version "$VERSION" \
+            --output release-notes.md
       - name: Create draft release with generated notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -261,4 +282,5 @@ jobs:
             --target "$RELEASE_SHA" \
             --title "$VERSION" \
             --draft \
+            --notes-file release-notes.md \
             --generate-notes

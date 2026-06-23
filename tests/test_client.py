@@ -1,12 +1,14 @@
+import asyncio
 import dataclasses
 import json
 import multiprocessing
 import multiprocessing.context
 import os
+import threading
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any, Literal, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -570,6 +572,73 @@ async def test_lazy_client(client: Client, env: WorkflowEnvironment):
     assert not lazy_client.service_client.worker_service_client._bridge_client
     await lazy_client.workflow_service.get_system_info(GetSystemInfoRequest())
     assert lazy_client.service_client.worker_service_client._bridge_client
+
+
+async def test_client_connected_skips_connect_lock(client: Client):
+    # Once connected, RPCs must not touch the lazy-connect lock. Acquiring it
+    # per-RPC put an event-loop-bound primitive on the hot path, pinning a
+    # connected client to the loop it connected on.
+    other = await Client.connect(
+        client.service_client.config.target_host, namespace=client.namespace
+    )
+    svc = other.service_client.worker_service_client
+    assert svc._bridge_client
+
+    class CountingLock(asyncio.Lock):
+        def __init__(self) -> None:
+            super().__init__()
+            self.acquire_count = 0
+
+        async def acquire(self) -> Literal[True]:
+            self.acquire_count += 1
+            return await super().acquire()
+
+    counting = CountingLock()
+    svc._bridge_client_connect_lock = counting
+    await other.workflow_service.get_system_info(GetSystemInfoRequest())
+    assert counting.acquire_count == 0
+
+
+def test_client_reuse_across_event_loops(client: Client):
+    # A connected client must not be pinned to the loop (or thread) it
+    # connected on. This mirrors the long-lived-loop reuse pattern used by
+    # gevent/gunicorn and synchronous services.
+    target_host = client.service_client.config.target_host
+    namespace = client.namespace
+
+    connect_loop = asyncio.new_event_loop()
+    try:
+        reused_client = connect_loop.run_until_complete(
+            Client.connect(target_host, namespace=namespace)
+        )
+    finally:
+        connect_loop.close()
+
+    errors: list[BaseException] = []
+
+    async def hammer() -> None:
+        await asyncio.gather(
+            *(
+                reused_client.workflow_service.get_system_info(GetSystemInfoRequest())
+                for _ in range(10)
+            )
+        )
+
+    def reuse_on_new_loop() -> None:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(hammer())
+        except BaseException as err:
+            errors.append(err)
+        finally:
+            asyncio.set_event_loop(None)
+            loop.close()
+
+    thread = threading.Thread(target=reuse_on_new_loop)
+    thread.start()
+    thread.join()
+    assert not errors, f"cross-loop reuse failed: {errors[0]!r}"
 
 
 @workflow.defn
