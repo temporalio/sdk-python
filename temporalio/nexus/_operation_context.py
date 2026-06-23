@@ -43,8 +43,6 @@ from temporalio.types import (
     SelfType,
 )
 
-import temporalio.api.enums.v1
-
 from ._link_conversion import (
     nexus_link_to_temporal_link,
     temporal_link_to_nexus_link,

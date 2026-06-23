@@ -32,12 +32,12 @@ import temporalio.common
 import temporalio.converter
 import temporalio.nexus._link_conversion
 import temporalio.nexus._operation_context
-from temporalio.nexus._operation_context import _TemporalStartOperationContext
 from temporalio.client._impl import _ClientImpl
 from temporalio.client._interceptor import (
     SignalWorkflowInput,
     StartWorkflowInput,
 )
+from temporalio.nexus._operation_context import _TemporalStartOperationContext
 from temporalio.worker._nexus import _NexusTaskCancellation, _NexusWorker
 
 NAMESPACE = "test-namespace"
