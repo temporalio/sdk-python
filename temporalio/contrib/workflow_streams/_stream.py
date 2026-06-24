@@ -37,6 +37,8 @@ from temporalio.exceptions import ApplicationError
 
 from ._topic_handle import WorkflowTopicHandle
 from ._types import (
+    STREAM_DRAINING_ERROR_TYPE,
+    TRUNCATED_OFFSET_ERROR_TYPE,
     PollInput,
     PollResult,
     PublisherState,
@@ -357,7 +359,6 @@ class WorkflowStream:
                 f"Cannot truncate to offset {up_to_offset}: "
                 f"valid range is [{self._base_offset}, {self._base_offset + len(self._log)})",
                 type="TruncateOutOfRange",
-                non_retryable=True,
             )
         self._log = self._log[log_index:]
         self._base_offset = up_to_offset
@@ -419,8 +420,7 @@ class WorkflowStream:
                 raise ApplicationError(
                     f"Requested offset {payload.from_offset} has been truncated. "
                     f"Current base offset is {self._base_offset}.",
-                    type="TruncatedOffset",
-                    non_retryable=True,
+                    type=TRUNCATED_OFFSET_ERROR_TYPE,
                 )
         all_new = self._log[log_offset:]
         if payload.topics:
@@ -460,9 +460,17 @@ class WorkflowStream:
         )
 
     def _validate_poll(self, _payload: PollInput) -> None:
-        """Reject new polls when pollers are detached for continue-as-new."""
+        """Reject new polls when pollers are detached for continue-as-new.
+
+        Uses the well-known ``StreamDraining`` type so a subscriber recognizes
+        the rollover-in-progress and retries until its poll lands on the
+        successor run, rather than surfacing the rejection as an error.
+        """
         if self._detaching:
-            raise RuntimeError("Workflow pollers are detached for continue-as-new")
+            raise ApplicationError(
+                "Workflow pollers are detached for continue-as-new",
+                type=STREAM_DRAINING_ERROR_TYPE,
+            )
 
     def _on_offset(self) -> int:
         """Return the current global offset (base_offset + log length)."""

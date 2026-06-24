@@ -26,6 +26,13 @@ from temporalio.api.common.v1 import Payload
 
 T = TypeVar("T")
 
+# Well-known ``ApplicationError.type`` values the stream workflow uses to reject
+# polls, and which ``WorkflowStreamClient.subscribe`` recognizes to drive retry
+# behavior. Defined here so the raise sites (``_stream.py``) and the handling
+# sites (``_client.py``) cannot diverge.
+STREAM_DRAINING_ERROR_TYPE = "StreamDraining"
+TRUNCATED_OFFSET_ERROR_TYPE = "TruncatedOffset"
+
 
 # basedpyright flags _-prefixed module-level functions as unused even when
 # sibling modules import them (_stream.py, _client.py). Vanilla pyright does
