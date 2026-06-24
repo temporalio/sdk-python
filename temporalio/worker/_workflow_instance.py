@@ -2090,9 +2090,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         payload_converter = (
             temporalio.nexus.system.get_payload_converter()
-            if temporalio.nexus.system.is_system_operation(
-                input.service, input.operation_name
-            )
+            if temporalio.nexus.system.is_system_endpoint(input.endpoint)
             else self._context_free_payload_converter
         )
         handle = _NexusOperationHandle(

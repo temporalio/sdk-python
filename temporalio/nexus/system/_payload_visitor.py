@@ -58,13 +58,11 @@ class PayloadVisitor:
     async def _visit_nexus_operation_input_payload(
         self,
         fs: VisitorFunctions,
-        service: str,
-        operation: str,
+        endpoint: str,
         payload: Payload,
     ) -> None:
         new_payload = await temporalio.nexus.system.maybe_visit_payload(
-            service,
-            operation,
+            endpoint,
             payload,
             fs,
             self.skip_search_attributes,
