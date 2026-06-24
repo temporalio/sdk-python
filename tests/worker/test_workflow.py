@@ -1893,6 +1893,7 @@ class ContinueAsNewWorkflow:
             # Add memo and retry policy to check
             memo={"past_run_id_count": len(past_run_ids)},
             retry_policy=RetryPolicy(maximum_attempts=1000 + len(past_run_ids)),
+            backoff_start_interval=timedelta(milliseconds=1),
         )
 
 
@@ -1914,6 +1915,19 @@ async def test_workflow_continue_as_new(client: Client, env: WorkflowEnvironment
         result = await handle.result()
         assert len(result) == 5
         assert result[0] == handle.first_execution_run_id
+        first_run_handle = client.get_workflow_handle(
+            handle.id, run_id=handle.first_execution_run_id
+        )
+        history = await first_run_handle.fetch_history()
+        continued = [
+            event.workflow_execution_continued_as_new_event_attributes
+            for event in history.events
+            if event.HasField("workflow_execution_continued_as_new_event_attributes")
+        ]
+        assert continued
+        assert continued[0].backoff_start_interval.ToTimedelta() == timedelta(
+            milliseconds=1
+        )
 
 
 sa_prefix = "python_test_"
