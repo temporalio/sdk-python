@@ -200,12 +200,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
-        # If this signal-with-start is issued from inside a Nexus operation handler (but not as the
-        # nexus-backing workflow, whose links are handled separately by
-        # WorkflowRunOperationContext.start_workflow), capture the signal response link the server
-        # returned so the caller workflow's Nexus history event links to the signaled event. A
-        # plain start does not capture a response link: it only forwards the inbound request links
-        # onto the start request.
         nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
         if nexus_ctx is not None:
             nexus_ctx._add_start_workflow_response_link(handle)
