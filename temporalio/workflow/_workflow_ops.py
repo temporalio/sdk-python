@@ -683,6 +683,7 @@ def continue_as_new(
     task_queue: str | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,
+    backoff_start_interval: timedelta | None = None,
     retry_policy: temporalio.common.RetryPolicy | None = None,
     memo: Mapping[str, Any] | None = None,
     search_attributes: None
@@ -702,6 +703,7 @@ def continue_as_new(
     task_queue: str | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,
+    backoff_start_interval: timedelta | None = None,
     retry_policy: temporalio.common.RetryPolicy | None = None,
     memo: Mapping[str, Any] | None = None,
     search_attributes: None
@@ -722,6 +724,7 @@ def continue_as_new(
     task_queue: str | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,
+    backoff_start_interval: timedelta | None = None,
     retry_policy: temporalio.common.RetryPolicy | None = None,
     memo: Mapping[str, Any] | None = None,
     search_attributes: None
@@ -742,6 +745,7 @@ def continue_as_new(
     task_queue: str | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,
+    backoff_start_interval: timedelta | None = None,
     retry_policy: temporalio.common.RetryPolicy | None = None,
     memo: Mapping[str, Any] | None = None,
     search_attributes: None
@@ -762,6 +766,7 @@ def continue_as_new(
     task_queue: str | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,
+    backoff_start_interval: timedelta | None = None,
     retry_policy: temporalio.common.RetryPolicy | None = None,
     memo: Mapping[str, Any] | None = None,
     search_attributes: None
@@ -781,6 +786,7 @@ def continue_as_new(
     task_queue: str | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,
+    backoff_start_interval: timedelta | None = None,
     retry_policy: temporalio.common.RetryPolicy | None = None,
     memo: Mapping[str, Any] | None = None,
     search_attributes: None
@@ -804,6 +810,8 @@ def continue_as_new(
             workflow's run timeout.
         task_timeout: Timeout of a single workflow task. Defaults to the current
             workflow's task timeout.
+        backoff_start_interval: Delay before the first workflow task of the
+            continued run is scheduled.
         memo: Memo for the workflow. Defaults to the current workflow's memo.
         search_attributes: Search attributes for the workflow. Defaults to the
             current workflow's search attributes. The dictionary form of this is
@@ -826,6 +834,7 @@ def continue_as_new(
         task_queue=task_queue,
         run_timeout=run_timeout,
         task_timeout=task_timeout,
+        backoff_start_interval=backoff_start_interval,
         retry_policy=retry_policy,
         memo=memo,
         search_attributes=search_attributes,

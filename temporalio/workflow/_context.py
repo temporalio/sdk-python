@@ -286,6 +286,7 @@ class _Runtime(ABC):
         task_queue: str | None,
         run_timeout: timedelta | None,
         task_timeout: timedelta | None,
+        backoff_start_interval: timedelta | None,
         retry_policy: temporalio.common.RetryPolicy | None,
         memo: Mapping[str, Any] | None,
         search_attributes: None

@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Exposed `backoff_start_interval` for continue-as-new, to allow the new workflow to start after a delay.
+
 ### Changed
 
 - AWS Lambda worker `configure` parameter supports sync, async, and async
