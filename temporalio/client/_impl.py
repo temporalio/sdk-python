@@ -217,28 +217,18 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if input.request_id:
             req.request_id = input.request_id
 
-        # Server currently only supports workflow_event and batch_job
-        # link types. This filter should be removed or adapted as
-        # server-side support comes online.
-        # See https://github.com/temporalio/temporal/issues/10345
-        links = [
-            link
-            for link in input.links
-            if link.HasField("workflow_event") or link.HasField("batch_job")
-        ]
-
         req.completion_callbacks.extend(
             temporalio.api.common.v1.Callback(
                 nexus=temporalio.api.common.v1.Callback.Nexus(
                     url=callback.url,
                     header=callback.headers,
                 ),
-                links=links,
+                links=input.links,
             )
             for callback in input.callbacks
         )
         # Links are duplicated on request for compatibility with older server versions.
-        req.links.extend(links)
+        req.links.extend(input.links)
 
         nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
         if nexus_ctx is not None:
