@@ -34,6 +34,7 @@ to include examples, links to docs, or any other relevant information.
   loop.
 - Relaxed the protobuf dependency bounds to allow protobuf 7 where compatible
   with the selected optional dependencies.
+- Standalone Nexus operation links are now forwarded on start workflow and signal requests.
 
 ### Deprecated
 
