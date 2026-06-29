@@ -21,6 +21,7 @@ from nexusrpc.handler import (
     sync_operation,
 )
 
+import temporalio.api.enums.v1
 from temporalio import nexus, workflow
 from temporalio.client import (
     CancelNexusOperationInput,
@@ -36,6 +37,7 @@ from temporalio.client import (
     OutboundInterceptor,
     StartNexusOperationInput,
     TerminateNexusOperationInput,
+    WorkflowHistory,
     WorkflowUpdateStage,
 )
 from temporalio.common import (
@@ -56,7 +58,13 @@ from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eventually
-from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.helpers.nexus import (
+    assert_links_match,
+    expected_nexus_operation_link,
+    expected_workflow_event_link,
+    links_from_workflow_execution_started_event,
+    make_nexus_endpoint_name,
+)
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -257,6 +265,61 @@ async def test_start_async_operation_and_poll_result(
         result = await handle.result()
         assert isinstance(result, EchoOutput)
         assert result.value == "async-hello"
+
+
+async def test_started_workflow_has_link_to_standalone_nexus_operation(
+    client: Client, env: WorkflowEnvironment
+):
+    """Start a workflow_run operation and verify its workflow links back to the Nexus op."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    service_handler = StandaloneTestServiceHandler()
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        workflows=[EchoHandlerWorkflow, BlockingHandlerWorkflow],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+        nexus_client = client.create_nexus_client(
+            service=StandaloneTestService, endpoint=endpoint_name
+        )
+        op_id = str(uuid.uuid4())
+        input_value = f"link-test-{uuid.uuid4()}"
+        workflow_id = f"blocking_async-{input_value}"
+
+        handle = await nexus_client.start_operation(
+            StandaloneTestService.blocking_async,
+            EchoInput(value=input_value),
+            id=op_id,
+            id_reuse_policy=NexusOperationIDReusePolicy.REJECT_DUPLICATE,
+            id_conflict_policy=NexusOperationIDConflictPolicy.FAIL,
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
+
+        await service_handler.started_blocking.wait()
+        workflow_history = await _assert_workflow_started_with_nexus_operation_link(
+            client, workflow_id, handle
+        )
+        await _assert_nexus_operation_has_link_to_started_workflow(
+            client, workflow_history, handle
+        )
+
+        workflow_handle = client.get_workflow_handle(workflow_id)
+        await workflow_handle.start_update(
+            BlockingHandlerWorkflow.unblock,
+            wait_for_stage=WorkflowUpdateStage.COMPLETED,
+        )
+        result = await handle.result()
+        assert isinstance(result, EchoOutput)
+        assert result.value == input_value
 
 
 async def test_execute_operation(client: Client, env: WorkflowEnvironment):
@@ -949,3 +1012,52 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         count_input = interceptor.count_calls[-1]
         assert isinstance(count_input, CountNexusOperationsInput)
         assert count_input.query == query
+
+
+async def _assert_workflow_started_with_nexus_operation_link(
+    client: Client,
+    workflow_id: str,
+    operation_handle: NexusOperationHandle[Any],
+) -> WorkflowHistory:
+    history = await client.get_workflow_handle(workflow_id).fetch_history()
+    started_event = next(
+        (
+            e
+            for e in history.events
+            if (
+                e.event_type
+                == temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+            )
+        ),
+        None,
+    )
+    assert started_event is not None
+
+    assert operation_handle.run_id is not None
+    assert_links_match(
+        links_from_workflow_execution_started_event(started_event),
+        expected_nexus_operation_link(
+            namespace=client.namespace,
+            operation_id=operation_handle.operation_id,
+            run_id=operation_handle.run_id,
+        ),
+    )
+    return history
+
+
+async def _assert_nexus_operation_has_link_to_started_workflow(
+    client: Client,
+    workflow_history: WorkflowHistory,
+    operation_handle: NexusOperationHandle[Any],
+) -> None:
+    desc = await operation_handle.describe()
+    assert_links_match(
+        desc.raw_description.links,
+        expected_workflow_event_link(
+            namespace=client.namespace,
+            workflow_id=workflow_history.workflow_id,
+            run_id=workflow_history.run_id,
+            event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+            event_id=workflow_history.events[0].event_id,
+        ),
+    )

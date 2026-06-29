@@ -1148,6 +1148,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         task_queue: str | None,
         run_timeout: timedelta | None,
         task_timeout: timedelta | None,
+        backoff_start_interval: timedelta | None,
         retry_policy: temporalio.common.RetryPolicy | None,
         memo: Mapping[str, Any] | None,
         search_attributes: None
@@ -1178,6 +1179,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 task_queue=task_queue,
                 run_timeout=run_timeout,
                 task_timeout=task_timeout,
+                backoff_start_interval=backoff_start_interval,
                 retry_policy=retry_policy,
                 memo=memo,
                 search_attributes=search_attributes,
@@ -2088,9 +2090,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         payload_converter = (
             temporalio.nexus.system.get_payload_converter()
-            if temporalio.nexus.system.is_system_operation(
-                input.service, input.operation_name
-            )
+            if temporalio.nexus.system.is_system_endpoint(input.endpoint)
             else self._context_free_payload_converter
         )
         handle = _NexusOperationHandle(
@@ -3587,6 +3587,8 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             v.workflow_run_timeout.FromTimedelta(self._input.run_timeout)
         if self._input.task_timeout:
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
+        if self._input.backoff_start_interval:
+            v.backoff_start_interval.FromTimedelta(self._input.backoff_start_interval)
         if self._input.headers:
             temporalio.common._apply_headers(self._input.headers, v.headers)
         if self._input.retry_policy:

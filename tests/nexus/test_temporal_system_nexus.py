@@ -15,6 +15,10 @@ import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice
 import temporalio.converter
 import temporalio.nexus.system as nexus_system
 from temporalio import workflow
+from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import (
+    WorkflowActivationCompletion,
+)
 from temporalio.client import Client
 from temporalio.converter import ExternalStorage, PayloadCodec
 from temporalio.testing import WorkflowEnvironment
@@ -137,6 +141,89 @@ def _assert_start_nexus_operation_interceptor_trace() -> None:
     assert request.workflow_id == "system-nexus-workflow-id"
     assert request.signal_name == "test-signal"
     assert request.workflow_type.name == "test-workflow"
+
+
+class _MarkingPayloadVisitor:
+    def __init__(self) -> None:
+        self.visited_payload_count = 0
+        self.system_envelope_count = 0
+
+    async def visit_payload(self, payload: temporalio.api.common.v1.Payload) -> None:
+        self.visited_payload_count += 1
+        payload.metadata["visited"] = b"true"
+
+    async def visit_payloads(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> None:
+        for payload in payloads:
+            await self.visit_payload(payload)
+
+    async def visit_system_nexus_envelope(
+        self, payload: temporalio.api.common.v1.Payload
+    ) -> None:
+        _ = payload
+        self.system_envelope_count += 1
+
+
+def _new_schedule_nexus_completion(
+    endpoint: str, payload: temporalio.api.common.v1.Payload
+) -> WorkflowActivationCompletion:
+    completion = WorkflowActivationCompletion()
+    command = completion.successful.commands.add()
+    schedule = command.schedule_nexus_operation
+    schedule.seq = 1
+    schedule.endpoint = endpoint
+    schedule.service = "not-a-registered-system-service"
+    schedule.operation = "NotARegisteredSystemOperation"
+    schedule.input.CopyFrom(payload)
+    return completion
+
+
+def _new_system_nexus_request_payload() -> temporalio.api.common.v1.Payload:
+    nested_payload = temporalio.converter.PayloadConverter.default.to_payload(
+        "workflow-input"
+    )
+    assert nested_payload is not None
+    request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest()
+    request.input.payloads.add().CopyFrom(nested_payload)
+    payload = nexus_system.get_payload_converter().to_payload(request)
+    assert payload is not None
+    return payload
+
+
+async def test_schedule_system_nexus_endpoint_ignores_operation_registry() -> None:
+    completion = _new_schedule_nexus_completion(
+        nexus_system.TEMPORAL_SYSTEM_ENDPOINT,
+        _new_system_nexus_request_payload(),
+    )
+    visitor = _MarkingPayloadVisitor()
+
+    await PayloadVisitor().visit(visitor, completion)
+
+    schedule = completion.successful.commands[0].schedule_nexus_operation
+    decoded = nexus_system.get_payload_converter().from_payload(schedule.input)
+    assert isinstance(
+        decoded, workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
+    )
+    assert decoded.input.payloads[0].metadata["visited"] == b"true"
+    assert "visited" not in schedule.input.metadata
+    assert visitor.visited_payload_count == 1
+    assert visitor.system_envelope_count == 1
+
+
+async def test_schedule_non_system_nexus_visits_input_as_regular_payload() -> None:
+    completion = _new_schedule_nexus_completion(
+        "not-the-system-endpoint",
+        _new_system_nexus_request_payload(),
+    )
+    visitor = _MarkingPayloadVisitor()
+
+    await PayloadVisitor().visit(visitor, completion)
+
+    schedule = completion.successful.commands[0].schedule_nexus_operation
+    assert schedule.input.metadata["visited"] == b"true"
+    assert visitor.visited_payload_count == 1
+    assert visitor.system_envelope_count == 0
 
 
 def _build_proto_sample(message_type: type[Message]) -> Message:

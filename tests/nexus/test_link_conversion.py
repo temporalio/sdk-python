@@ -277,7 +277,7 @@ def test_link_conversion_workflow_to_link_and_back(
             ),
             nexusrpc.Link(
                 type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns/nexus-operations/op-id?runID=run-id",
+                url="temporal:///namespaces/ns/nexus-operations/op-id/run-id/details",
             ),
         ),
         (
@@ -289,7 +289,7 @@ def test_link_conversion_workflow_to_link_and_back(
             ),
             nexusrpc.Link(
                 type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns/nexus-operations/op-id",
+                url="temporal:///namespaces/ns/nexus-operations/op-id//details",
             ),
         ),
         (
@@ -301,7 +301,7 @@ def test_link_conversion_workflow_to_link_and_back(
             ),
             nexusrpc.Link(
                 type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-                url="temporal:///namespaces/ns/nexus-operations/op%2Fid",
+                url="temporal:///namespaces/ns/nexus-operations/op%2Fid//details",
             ),
         ),
     ],
@@ -332,10 +332,12 @@ def test_link_conversion_nexus_operation_to_link_and_back(
     )
 
 
-def test_nexus_operation_link_with_duplicate_run_id_is_ignored():
+def test_nexus_operation_link_with_unparseable_url_is_ignored():
+    # The canonical path is /nexus-operations/{op_id}/{run_id}/details; a URL missing the
+    # run-id/details suffix (e.g. the legacy ?runID= form) does not parse.
     link = nexusrpc.Link(
         type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
-        url="temporal:///namespaces/ns/nexus-operations/op-id?runID=one&runID=two",
+        url="temporal:///namespaces/ns/nexus-operations/op-id?runID=run-id",
     )
     assert temporalio.nexus._link_conversion.nexus_link_to_temporal_link(link) is None
 

@@ -942,6 +942,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     VERSIONING_INTENT_FIELD_NUMBER: builtins.int
     INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
+    BACKOFF_START_INTERVAL_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     task_queue: builtins.str
@@ -1000,6 +1001,9 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
     For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
     of the previous run.
     """
+    @property
+    def backoff_start_interval(self) -> google.protobuf.duration_pb2.Duration:
+        """Delay before the first workflow task of the continued run is scheduled."""
     def __init__(
         self,
         *,
@@ -1024,10 +1028,13 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
         initial_versioning_behavior: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType = ...,
+        backoff_start_interval: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "backoff_start_interval",
+            b"backoff_start_interval",
             "retry_policy",
             b"retry_policy",
             "search_attributes",
@@ -1043,6 +1050,8 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "arguments",
             b"arguments",
+            "backoff_start_interval",
+            b"backoff_start_interval",
             "headers",
             b"headers",
             "initial_versioning_behavior",

@@ -23,6 +23,7 @@ from typing import (
     overload,
 )
 
+import nexusrpc
 from nexusrpc.handler import (
     CancelOperationContext,
     OperationContext,
@@ -44,6 +45,7 @@ from temporalio.types import (
 
 from ._link_conversion import (
     nexus_link_to_temporal_link,
+    temporal_link_to_nexus_link,
     workflow_event_to_nexus_link,
     workflow_execution_started_event_link_from_workflow_handle,
 )
@@ -167,6 +169,11 @@ def _try_temporal_context() -> (
     return start_ctx or cancel_ctx
 
 
+def _try_start_operation_context() -> _TemporalStartOperationContext | None:  # pyright: ignore[reportUnusedFunction]
+    """The Nexus start-operation context if a handler is currently running, else None."""
+    return _temporal_start_operation_context.get(None)
+
+
 @contextmanager
 def _nexus_backing_workflow_start_context() -> Generator[None]:
     token = _temporal_nexus_backing_workflow_start_context.set(True)
@@ -239,44 +246,73 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
             else []
         )
 
-    def _get_links(
-        self,
-    ) -> list[temporalio.api.common.v1.Link]:
+    def _get_request_links(self) -> list[temporalio.api.common.v1.Link]:
+        """Request links to attach to RPCs the operation handler issues.
+
+        These are the inbound Nexus task links. When the operation handler signals,
+        signal-with-starts, or starts a workflow, these links are added to the request's
+        ``links`` field so the callee's history event links back to whatever scheduled this
+        Nexus operation.
+        """
         event_links: list[temporalio.api.common.v1.Link] = []
         for inbound_link in self.nexus_context.inbound_links:
             if link := nexus_link_to_temporal_link(inbound_link):
                 event_links.append(link)
         return event_links
 
-    def _add_outbound_links(
+    def _add_start_workflow_response_link(
         self, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
     ):
-        # If links were not sent in StartWorkflowExecutionResponse then construct them.
-        wf_event_links: list[temporalio.api.common.v1.Link.WorkflowEvent] = []
-        try:
-            if isinstance(
-                workflow_handle._start_workflow_response,
-                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-            ):
-                if workflow_handle._start_workflow_response.HasField("link"):
-                    if link := workflow_handle._start_workflow_response.link:
-                        if link.HasField("workflow_event"):
-                            wf_event_links.append(link.workflow_event)
-            if not wf_event_links:
-                wf_event_links = [
-                    workflow_execution_started_event_link_from_workflow_handle(
+        response = workflow_handle._start_workflow_response
+
+        nexus_link: nexusrpc.Link | None = None
+        if isinstance(
+            response, temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse
+        ):
+            if response.HasField("link"):
+                nexus_link = temporal_link_to_nexus_link(response.link)
+            else:
+                # If a link was not sent in response then construct it.
+                link = temporalio.api.common.v1.Link(
+                    workflow_event=workflow_execution_started_event_link_from_workflow_handle(
                         workflow_handle,
                         self.nexus_context.request_id,
                     )
-                ]
-            self.nexus_context.outbound_links.extend(
-                workflow_event_to_nexus_link(link) for link in wf_event_links
-            )
+                )
+                nexus_link = temporal_link_to_nexus_link(link)
+
+        elif isinstance(
+            response,
+            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
+        ):
+            # Server >= 1.31 with EnableCHASMSignalBacklinks returns signal_link pointing at
+            # the WorkflowExecutionSignaled event; older servers leave it unset.
+            if response.HasField("signal_link"):
+                nexus_link = temporal_link_to_nexus_link(response.signal_link)
+
+        try:
+            if nexus_link is not None:
+                self.nexus_context.outbound_links.append(nexus_link)
         except Exception as e:
             logger.warning(
-                f"Failed to create WorkflowExecutionStarted event links for workflow {workflow_handle}: {e}"
+                f"Failed to create event links for workflow {workflow_handle}: {e}"
             )
-        return workflow_handle
+
+    def _add_response_link(self, link: temporalio.api.common.v1.Link | None) -> None:
+        """Append a response link returned by an RPC the operation handler issued.
+
+        ``link`` is the ``common.v1.Link`` returned on a signal, signal-with-start, or start
+        response (or ``None`` against a server that did not return one). When present and of the
+        ``workflow_event`` variant, it is converted to a Nexus link and added to the operation's
+        outbound links so the caller workflow's Nexus history event links to the callee event.
+
+        This is only safe to call from the single thread/task that runs the operation handler.
+        """
+        if link is None or not link.HasField("workflow_event"):
+            return
+        self.nexus_context.outbound_links.append(
+            workflow_event_to_nexus_link(link.workflow_event)
+        )
 
 
 class WorkflowRunOperationContext(StartOperationContext):
@@ -674,10 +710,8 @@ async def _start_nexus_backing_workflow(
             priority=priority,
             versioning_override=versioning_override,
             callbacks=temporal_context._get_callbacks(token),
-            links=temporal_context._get_links(),
+            links=temporal_context._get_request_links(),
             request_id=temporal_context.nexus_context.request_id,
         )
-
-    temporal_context._add_outbound_links(wf_handle)
 
     return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
