@@ -9194,7 +9194,7 @@ async def test_workflow_cancel_no_shielded_future_log(
     client: Client, caplog: pytest.LogCaptureFixture
 ):
     activity_inst = _SlowActivity()
-    
+
     with caplog.at_level(logging.ERROR):
         async with new_worker(
             client,
