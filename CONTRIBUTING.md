@@ -72,6 +72,18 @@ Avoid changes that make review harder without improving the contribution:
 * Large feature pull requests that were not discussed first.
 * License, copyright, or other legal changes without maintainer discussion.
 
+## AI-Generated Contributions
+
+Using AI tools while contributing is acceptable. You are responsible for the
+correctness, quality, and maintainability of everything you submit.
+
+Thoroughly self-review AI-generated code and documentation before opening a pull
+request. Make sure it is correct, tested where appropriate, and consistent with the
+style and patterns of the codebase.
+
+Keep AI-assisted changes concise and scoped. Avoid verbose generated prose,
+unnecessary comments, or broad rewrites that make the change harder to review.
+
 ## Contributor License Agreement
 
 All contributors must complete the Temporal Contributor License Agreement (CLA)
