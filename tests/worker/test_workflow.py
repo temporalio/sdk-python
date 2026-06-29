@@ -9194,25 +9194,26 @@ async def test_workflow_cancel_no_shielded_future_log(
     client: Client, caplog: pytest.LogCaptureFixture
 ):
     activity_inst = _SlowActivity()
-    async with new_worker(
-        client,
-        _CancelInFlightActivityWorkflow,
-        activities=[activity_inst.slow_activity],
-    ) as worker:
-        handle = await client.start_workflow(
-            _CancelInFlightActivityWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(minutes=5),
-        )
+    
+    with caplog.at_level(logging.ERROR):
+        async with new_worker(
+            client,
+            _CancelInFlightActivityWorkflow,
+            activities=[activity_inst.slow_activity],
+        ) as worker:
+            handle = await client.start_workflow(
+                _CancelInFlightActivityWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(minutes=5),
+            )
 
-        # Wait for activities to start
-        await asyncio.wait_for(activity_inst.started.wait(), timeout=10)
+            # Wait for activities to start
+            await asyncio.wait_for(activity_inst.started.wait(), timeout=10)
 
-        # Ignore worker startup logs
-        caplog.clear()
+            # Ignore worker startup logs
+            caplog.clear()
 
-        with caplog.at_level(logging.ERROR):
             await handle.cancel()
 
             try:
@@ -9220,9 +9221,6 @@ async def test_workflow_cancel_no_shielded_future_log(
             except WorkflowFailureError as err:
                 assert isinstance(err.cause, CancelledError)
 
-            await asyncio.sleep(0.5)
-
-            assert not any(
-                "exception in shielded future" in record.message
-                for record in caplog.records
-            )
+    assert not any(
+        "exception in shielded future" in record.message for record in caplog.records
+    )
