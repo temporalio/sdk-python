@@ -20,6 +20,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Nexus operation link propagation for signals. When a Nexus operation handler signals a workflow
+  (including signal-with-start), the inbound Nexus request links are now forwarded onto the signaled
+  workflow so its history events link back to the caller, and the link the server returns for the
+  signaled event is attached to the caller workflow's Nexus operation history event. This makes the
+  caller and callee mutually navigable in the UI for signal-based Nexus operations.
+- Exposed `backoff_start_interval` for continue-as-new, to allow the new workflow to start after a delay.
+
 ### Changed
 
 - AWS Lambda worker `configure` parameter supports sync, async, and async
@@ -27,6 +34,7 @@ to include examples, links to docs, or any other relevant information.
   loop.
 - Relaxed the protobuf dependency bounds to allow protobuf 7 where compatible
   with the selected optional dependencies.
+- Standalone Nexus operation links are now forwarded on start workflow and signal requests.
 
 ### Deprecated
 

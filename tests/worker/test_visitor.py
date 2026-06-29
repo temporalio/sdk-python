@@ -371,6 +371,7 @@ async def test_system_nexus_envelope_visit_is_bounded():
                 WorkflowCommand(
                     schedule_nexus_operation=ScheduleNexusOperation(
                         seq=1,
+                        endpoint=nexus_system.TEMPORAL_SYSTEM_ENDPOINT,
                         service="temporal.api.workflowservice.v1.WorkflowService",
                         operation="SignalWithStartWorkflowExecution",
                         input=payload,

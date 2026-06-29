@@ -518,12 +518,13 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         # Log workflow task duration with external storage metrics
         self._log_workflow_task_duration(
-            act, task_start_time, download_metrics, upload_metrics
+            act, workflow, task_start_time, download_metrics, upload_metrics
         )
 
     def _log_workflow_task_duration(
         self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+        workflow: _RunningWorkflow | None,
         task_start_time: float,
         download_metrics: temporalio.converter._extstore.StorageOperationMetrics,
         upload_metrics: temporalio.converter._extstore.StorageOperationMetrics,
@@ -537,8 +538,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             return f"{secs * 1000:.3f}ms"
 
         completed_event_id = act.history_length + 1
-        _running = self._running_workflows.get(act.run_id)
-        _info = _running.get_info() if _running is not None else None
+        _info = workflow.get_info() if workflow is not None else None
         attempt = _info.attempt if _info is not None else "unknown"
         log_id = f"{act.run_id}:{completed_event_id}:{attempt}"
         msg_details, extra = temporalio.workflow._build_log_context(
