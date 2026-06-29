@@ -27,9 +27,7 @@ from nexusrpc.handler import (
 from nexusrpc.handler._decorators import operation_handler
 
 import temporalio.api
-import temporalio.api.common.v1
 import temporalio.api.enums.v1
-import temporalio.api.history.v1
 import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
@@ -69,7 +67,10 @@ from temporalio.worker import (
 )
 from tests.helpers import find_free_port, new_worker
 from tests.helpers.metrics import PromMetricMatcher
-from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.helpers.nexus import (
+    links_from_workflow_execution_started_event,
+    make_nexus_endpoint_name,
+)
 
 # TODO(nexus-preview): test worker shutdown, wait_all_completed, drain etc
 
@@ -1285,7 +1286,7 @@ async def test_untyped_caller(
         task_queue=task_queue,
         workflow_failure_exception_types=[Exception],
     ):
-        if type(response_type) == SyncResponse:
+        if type(response_type) is SyncResponse:
             response_type = SyncResponse(
                 op_definition_type=op_definition_type,
                 use_async_def=True,
@@ -1696,7 +1697,7 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
             == temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
         )
     )
-    links = _get_links_from_workflow_execution_started_event(wf_started_event)
+    links = links_from_workflow_execution_started_event(wf_started_event)
     if not len(links) == 1:
         pytest.fail(
             f"Expected 1 link on WorkflowExecutionStarted event, got {len(links)}"
@@ -1710,16 +1711,6 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
         link.workflow_event.event_ref.event_type
         == temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
     )
-
-
-def _get_links_from_workflow_execution_started_event(
-    event: temporalio.api.history.v1.HistoryEvent,
-) -> list[temporalio.api.common.v1.Link]:
-    [callback] = event.workflow_execution_started_event_attributes.completion_callbacks
-    if links := callback.links:
-        return list(links)
-    else:
-        return list(event.links)
 
 
 # When request_cancel is True, the NexusOperationHandle in the workflow evolves
