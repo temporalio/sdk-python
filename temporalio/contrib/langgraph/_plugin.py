@@ -43,6 +43,13 @@ _LANGGRAPH_OPTION_KEYS: frozenset[str] = _ACTIVITY_OPTION_KEYS | frozenset(
 )
 
 
+def _constant_summary_fn(
+    value: str,
+) -> Callable[[tuple[Any, ...], dict[str, Any]], str]:
+    """Adapt a static summary string to the summary_fn interface."""
+    return lambda args, kwargs: value
+
+
 class LangGraphPlugin(SimplePlugin):
     """LangGraph plugin for Temporal SDK.
 
@@ -76,18 +83,6 @@ class LangGraphPlugin(SimplePlugin):
         default_activity_options: Activity options applied to every
             activity-bound node and task, overridable per-node (Graph API
             ``metadata``) or per-task (``activity_options[name]``).
-        default_summary_fn: Callable applied to every node and task to
-            compute a summary, overridable per-node (Graph API
-            ``metadata['summary_fn']``) or per-task
-            (``activity_options[name]['summary_fn']``). It receives the
-            node's ``(args, kwargs)`` and returns a summary string (or
-            ``None`` for no summary). For ``execute_in='activity'`` nodes
-            the result sets the activity ``summary`` (shown on each
-            scheduled-activity event); for ``execute_in='workflow'`` nodes
-            it updates the workflow's current details (last-writer-wins).
-            Must be deterministic and must not raise, as it runs in
-            workflow context on every replay. Cannot be combined with a
-            static ``summary`` on the same node.
         streaming_topic: When set, ``langgraph.config.get_stream_writer()``
             inside a node publishes to this topic on the workflow's
             :class:`WorkflowStream`. The workflow must construct
@@ -121,8 +116,6 @@ class LangGraphPlugin(SimplePlugin):
         # TODO: Remove activity_options when we have support for @task(metadata=...)
         activity_options: dict[str, dict[str, Any]] | None = None,
         default_activity_options: dict[str, Any] | None = None,
-        default_summary_fn: Callable[[tuple[Any, ...], dict[str, Any]], str | None]
-        | None = None,
         streaming_topic: str | None = None,
         streaming_batch_interval: timedelta = timedelta(milliseconds=100),
     ):
@@ -153,7 +146,6 @@ class LangGraphPlugin(SimplePlugin):
         self.activities: list = []
         self._streaming_topic = streaming_topic
         self._streaming_batch_interval = streaming_batch_interval
-        self._default_summary_fn = default_summary_fn
 
         # Graph API: Wrap graph nodes as Temporal Activities.
         if graphs:
@@ -276,18 +268,18 @@ class LangGraphPlugin(SimplePlugin):
         """Prepare a node or task to execute as an activity or inline in the workflow."""
         opts = kwargs or {}
         execute_in = opts.pop("execute_in")
-        # Remove control keys before opts is splatted into execute_activity
-        # below; summary_fn is consumed here, not a Temporal activity option.
-        node_summary_fn = opts.pop("summary_fn", None)
-        if node_summary_fn is not None and opts.get("summary") is not None:
+        # Normalize the node's summary to a single summary_fn. Both keys are
+        # popped so neither reaches workflow.execute_activity (which takes no
+        # summary_fn, and would get a duplicate summary kwarg); a static
+        # summary becomes a summary_fn that ignores its input.
+        summary_fn = opts.pop("summary_fn", None)
+        static_summary = opts.pop("summary", None)
+        if summary_fn is not None and static_summary is not None:
             raise ValueError(
                 f"{activity_name}: set either 'summary' or 'summary_fn', not both."
             )
-        # Per-node summary_fn wins; a static summary suppresses the plugin
-        # default; otherwise fall back to the plugin-wide default_summary_fn.
-        summary_fn = node_summary_fn or (
-            None if opts.get("summary") is not None else self._default_summary_fn
-        )
+        if static_summary is not None:
+            summary_fn = _constant_summary_fn(static_summary)
 
         if execute_in == "activity":
             wrapped = wrap_activity(

@@ -31,15 +31,16 @@ def wrap_workflow(
     round-trip); activity-side nodes go through ``WorkflowStreamClient``.
 
     Workflow-side nodes have no activity to carry a summary, so a
-    truthy ``summary_fn`` result updates the workflow's current details
-    via :func:`temporalio.workflow.set_current_details` (last-writer-wins).
+    ``summary_fn`` result updates the workflow's current details via
+    :func:`temporalio.workflow.set_current_details` (last-writer-wins);
+    an empty result clears it.
     """
 
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
         if summary_fn is not None:
-            summary = summary_fn(args, kwargs)
-            if summary:
-                workflow.set_current_details(summary)
+            # Always write (clearing when empty) so this node never shows a
+            # stale summary left by an earlier workflow-bound node.
+            workflow.set_current_details(summary_fn(args, kwargs) or "")
 
         async def run(stream_writer: Callable[[Any], None] | None) -> Any:
             token = None

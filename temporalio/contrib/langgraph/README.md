@@ -174,15 +174,14 @@ plugin = LangGraphPlugin(
     tasks=[plan],
     activity_options={"plan": {"execute_in": "activity", "summary_fn": summarize}},
 )
-
-# Plugin-wide default, overridable per-node/per-task
-plugin = LangGraphPlugin(graphs={"g": g}, default_summary_fn=summarize)
 ```
 
-- For `execute_in="activity"` nodes the result sets the activity `summary` (one per scheduled-activity event, visible in history).
-- For `execute_in="workflow"` nodes there is no activity, so the result updates the workflow's current details via [`workflow.set_current_details()`](https://python.temporal.io/temporalio.workflow.html#set_current_details). This is a single workflow-level slot (last-writer-wins): it reflects the most recent workflow-bound node and is queryable via `__temporal_workflow_metadata`.
+`summary_fn` is set per node/task (like the static `summary`), so different nodes — which receive different inputs — can compute their summaries independently.
 
-`summary_fn` runs in workflow context on every replay, so it **must be deterministic and must not raise** (an exception fails the workflow task). Setting both a static `summary` and a `summary_fn` on the same node raises `ValueError`; a static `summary` on a node takes precedence over `default_summary_fn`.
+- For `execute_in="activity"` nodes the result sets the activity `summary` (one per scheduled-activity event, visible in history).
+- For `execute_in="workflow"` nodes there is no activity, so the result updates the workflow's current details via [`workflow.set_current_details()`](https://python.temporal.io/temporalio.workflow.html#set_current_details). This is a single workflow-level slot (last-writer-wins) reflecting the most recent workflow-bound node that defines a `summary_fn`; a `None`/`""` result clears it. It is queryable via `__temporal_workflow_metadata`.
+
+`summary_fn` runs in workflow context on every replay, so it **must be deterministic and must not raise** (an exception fails the workflow task). Setting both a static `summary` and a `summary_fn` on the same node raises `ValueError`.
 
 ## Streaming
 

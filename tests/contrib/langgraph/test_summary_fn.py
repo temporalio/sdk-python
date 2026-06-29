@@ -1,4 +1,4 @@
-"""Tests for dynamic node/task summaries (summary_fn / default_summary_fn)."""
+"""Tests for node/task summaries (static summary and summary_fn)."""
 
 from __future__ import annotations
 
@@ -116,32 +116,13 @@ async def test_summary_fn_variants(
     assert summaries == [expected]
 
 
-async def test_default_summary_fn(client: Client) -> None:
-    plugin = _plugin(
-        _activity_graph(None),
-        default_summary_fn=lambda args, kwargs: "defaulted",
-    )
-    summaries = await _run_and_collect_summaries(client, plugin, "x")
-    assert summaries == [b'"defaulted"']
-
-
-async def test_per_node_summary_fn_overrides_default(client: Client) -> None:
-    plugin = _plugin(
-        _activity_graph(lambda args, kwargs: "per-node"),
-        default_summary_fn=lambda args, kwargs: "defaulted",
-    )
-    summaries = await _run_and_collect_summaries(client, plugin, "x")
-    assert summaries == [b'"per-node"']
-
-
-async def test_static_summary_suppresses_default(client: Client) -> None:
+async def test_static_summary(client: Client) -> None:
     g: StateGraph[State, None, State, State] = StateGraph(State)
     g.add_node(
         "node", passthrough, metadata={"execute_in": "activity", "summary": "static"}
     )
     g.add_edge(START, "node")
-    plugin = _plugin(g, default_summary_fn=lambda args, kwargs: "defaulted")
-    summaries = await _run_and_collect_summaries(client, plugin, "x")
+    summaries = await _run_and_collect_summaries(client, _plugin(g), "x")
     assert summaries == [b'"static"']
 
 
@@ -199,10 +180,12 @@ class WorkflowNodeSummaryWorkflow:
     def __init__(self) -> None:
         self.app = graph("wf-node-graph").compile()
         self._done = False
+        self._invoked = False
 
     @workflow.run
     async def run(self, input: str) -> Any:
         result = await self.app.ainvoke({"value": input})
+        self._invoked = True
         await workflow.wait_condition(lambda: self._done)
         return result
 
@@ -213,6 +196,10 @@ class WorkflowNodeSummaryWorkflow:
     @workflow.query
     def ran(self) -> bool:
         return workflow.get_current_details() != ""
+
+    @workflow.query
+    def invoked(self) -> bool:
+        return self._invoked
 
 
 async def test_workflow_node_sets_current_details(
@@ -253,6 +240,49 @@ async def test_workflow_node_sets_current_details(
         assert md.current_details == "wf:ready"
         await handle.signal(WorkflowNodeSummaryWorkflow.finish)
         assert await handle.result() == {"value": "ready"}
+
+
+async def test_workflow_node_clears_current_details_on_empty(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("metadata query unreliable on the time-skipping test server")
+    g: StateGraph[State, None, State, State] = StateGraph(State)
+    g.add_node(
+        "a",
+        passthrough,
+        metadata={"execute_in": "workflow", "summary_fn": lambda args, kwargs: "first"},
+    )
+    g.add_node(
+        "b",
+        passthrough,
+        metadata={"execute_in": "workflow", "summary_fn": lambda args, kwargs: None},
+    )
+    g.add_edge(START, "a")
+    g.add_edge("a", "b")
+    task_queue = f"wf-node-clear-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[WorkflowNodeSummaryWorkflow],
+        plugins=[LangGraphPlugin(graphs={"wf-node-graph": g})],
+    ):
+        handle = await client.start_workflow(
+            WorkflowNodeSummaryWorkflow.run,
+            "ready",
+            id=f"wf-node-clear-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        await assert_eq_eventually(
+            True, lambda: handle.query(WorkflowNodeSummaryWorkflow.invoked)
+        )
+        md: temporalio.api.sdk.v1.WorkflowMetadata = await handle.query(
+            "__temporal_workflow_metadata",
+            result_type=temporalio.api.sdk.v1.WorkflowMetadata,
+        )
+        assert md.current_details == ""
+        await handle.signal(WorkflowNodeSummaryWorkflow.finish)
+        await handle.result()
 
 
 async def test_replay_with_summary_fn(client: Client) -> None:
