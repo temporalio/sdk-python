@@ -26,6 +26,9 @@ to include examples, links to docs, or any other relevant information.
   signaled event is attached to the caller workflow's Nexus operation history event. This makes the
   caller and callee mutually navigable in the UI for signal-based Nexus operations.
 - Exposed `backoff_start_interval` for continue-as-new, to allow the new workflow to start after a delay.
+- Added an optional `signal_shutdown` argument to `Worker.run`. When set (e.g.
+  `signal_shutdown=[signal.SIGTERM, signal.SIGINT]`), the listed OS signals initiate a graceful
+  worker shutdown. Handlers are installed for the duration of the call and removed on exit.
 
 ### Changed
 
