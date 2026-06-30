@@ -14,8 +14,8 @@ The backward direction is produced server-side (temporalio/temporal#9897) and is
 ``history.enableCHASMSignalBacklinks=true`` (added to the local dev-server args in
 ``tests/conftest.py``). The server populates the backlink's reference via ``RequestIdReference``
 rather than ``EventReference``, so backlink assertions tolerate both oneof variants of
-``common.v1.Link.WorkflowEvent.reference`` (see ``_backlink_event_type``). When run against a
-server that does not emit the backlink, the backward assertions are skipped.
+``common.v1.Link.WorkflowEvent.reference`` (see ``workflow_event_link_event_type``). When run
+against a server that does not emit the backlink, the backward assertions are skipped.
 
 The forward/backward description above applies to operations scheduled by a caller workflow. The
 file also covers the same handlers invoked as standalone (client-initiated) operations via
@@ -41,7 +41,6 @@ from nexusrpc.handler import (
 )
 from nexusrpc.handler._decorators import operation_handler
 
-import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.history.v1
 import temporalio.common
@@ -51,7 +50,11 @@ from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eventually
-from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.helpers.nexus import (
+    events_of_type,
+    make_nexus_endpoint_name,
+    workflow_event_link_event_type,
+)
 
 EventType = temporalio.api.enums.v1.EventType
 
@@ -216,29 +219,12 @@ class AsyncSignalCallerWorkflow:
 # ── Assertion helpers ───────────────────────────────────────────────────────────────────────
 
 
-def _events_of_type(
-    history: WorkflowHistory,
-    event_type: temporalio.api.enums.v1.EventType.ValueType,
-) -> list[temporalio.api.history.v1.HistoryEvent]:
-    return [e for e in history.events if e.event_type == event_type]
-
-
-def _backlink_event_type(
-    we: temporalio.api.common.v1.Link.WorkflowEvent,
-) -> temporalio.api.enums.v1.EventType.ValueType:
-    # Server PR #9897 keys backlinks via RequestIdReference rather than EventReference; accept
-    # either oneof variant (matches Java SignalOperationLinkingTest.assertBacklink).
-    if we.HasField("request_id_ref"):
-        return we.request_id_ref.event_type
-    return we.event_ref.event_type
-
-
 def _assert_forward_link(
     callee_history: WorkflowHistory,
     caller_id: str,
     expected_count: int,
 ) -> None:
-    signaled = _events_of_type(
+    signaled = events_of_type(
         callee_history, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
     )
     assert len(signaled) == expected_count, (
@@ -267,7 +253,10 @@ def _assert_backlink(
         return False
     we = event.links[0].workflow_event
     assert we.workflow_id == callee_id, "backlink should reference the callee workflow"
-    assert _backlink_event_type(we) == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
+    assert (
+        workflow_event_link_event_type(we)
+        == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
+    )
     return True
 
 
@@ -310,7 +299,7 @@ async def test_sync_signal_operation_links(
     _assert_forward_link(callee_history, caller_id, expected_count=2)
 
     # Backward: the single NexusOperationCompleted carries backlinks to the callee.
-    completed = _events_of_type(
+    completed = events_of_type(
         caller_history, EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED
     )
     assert len(completed) == 1, (
@@ -360,7 +349,7 @@ async def test_async_signal_operation_links(
     _assert_forward_link(callee_history, caller_id, expected_count=1)
 
     # Backward: the backlink lands on NexusOperationStarted for the async response path.
-    started = _events_of_type(
+    started = events_of_type(
         caller_history, EventType.EVENT_TYPE_NEXUS_OPERATION_STARTED
     )
     assert len(started) == 1, (
@@ -389,7 +378,7 @@ def _assert_standalone_forward_link(
     operation_id: str,
     expected_count: int,
 ) -> None:
-    signaled = _events_of_type(
+    signaled = events_of_type(
         callee_history, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
     )
     assert len(signaled) == expected_count, (
@@ -549,7 +538,7 @@ async def test_start_from_handler_attaches_on_conflict_options(
         assert await callee_handle.result() == "done"
         callee_history = await callee_handle.fetch_history()
 
-    updated = _events_of_type(
+    updated = events_of_type(
         callee_history, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_OPTIONS_UPDATED
     )
     if not updated:
