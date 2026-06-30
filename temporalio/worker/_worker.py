@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextlib
 import hashlib
 import logging
+import signal
 import sys
 import warnings
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
@@ -739,7 +741,11 @@ class Worker:
         """
         return self._shutdown_complete_event.is_set()
 
-    async def run(self) -> None:
+    async def run(
+        self,
+        *,
+        signal_shutdown: Sequence[signal.Signals] = (),
+    ) -> None:
         """Run the worker and wait on it to be shut down.
 
         This will not return until shutdown is complete. This means that
@@ -755,6 +761,15 @@ class Worker:
         async function assuming that it is currently running. A cancel could
         also cancel the shutdown process. Therefore users are encouraged to use
         explicit shutdown instead.
+
+        Args:
+            signal_shutdown: OS signals that, when received, initiate a
+                graceful worker shutdown. For example,
+                ``signal_shutdown=[signal.SIGTERM, signal.SIGINT]``. Handlers
+                are installed on entry and removed on exit. On platforms where
+                :py:meth:`asyncio.AbstractEventLoop.add_signal_handler` is not
+                supported (e.g. Windows), :py:func:`signal.signal` is used as a
+                fallback.
         """
 
         def make_lambda(plugin: Plugin, next: Callable[[Worker], Awaitable[None]]):
@@ -764,7 +779,48 @@ class Worker:
         for plugin in reversed(self._plugins):
             next_function = make_lambda(plugin, next_function)
 
-        await next_function(self)
+        with self._install_signal_handlers(signal_shutdown):
+            await next_function(self)
+
+    @contextlib.contextmanager
+    def _install_signal_handlers(
+        self, sigs: Sequence[signal.Signals]
+    ) -> Iterator[None]:
+        if not sigs:
+            yield
+            return
+
+        def request_shutdown() -> None:
+            self._shutdown_event.set()
+
+        loop = asyncio.get_running_loop()
+        added_via_loop: list[signal.Signals] = []
+        previous_handlers: dict[signal.Signals, Any] = {}
+        try:
+            for sig in sigs:
+                try:
+                    loop.add_signal_handler(sig, request_shutdown)
+                    added_via_loop.append(sig)
+                except NotImplementedError:
+                    # Fallback (e.g. Windows): the handler runs outside the loop,
+                    # so schedule the set threadsafe to wake a blocked loop.
+                    previous_handlers[sig] = signal.signal(
+                        sig, lambda *_: loop.call_soon_threadsafe(request_shutdown)
+                    )
+            yield
+        finally:
+            for sig in added_via_loop:
+                try:
+                    loop.remove_signal_handler(sig)
+                except (NotImplementedError, ValueError):
+                    pass
+            for sig, prev in previous_handlers.items():
+                # prev is None when the prior handler was not set from Python,
+                # which signal.signal rejects with TypeError.
+                try:
+                    signal.signal(sig, prev)
+                except (ValueError, OSError, TypeError):
+                    pass
 
     async def _run(self):
         # Eagerly validate which will do a namespace check in Core
