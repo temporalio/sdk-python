@@ -1891,7 +1891,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 "Activity must have start_to_close_timeout or schedule_to_close_timeout"
             )
 
-        handle: _ActivityHandle
+        # Pre-bind handle to None so the closure cell is not empty when
+        # Python 3.14's asyncio.Task inspects it eagerly during task naming.
+        # The coroutine only executes after the real _ActivityHandle is assigned
+        # below, so handle is always the correct object by the time it is used.
+        handle = cast(_ActivityHandle, None)
 
         # Function that runs in the handle
         async def run_activity() -> Any:
@@ -1988,7 +1992,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _outbound_start_child_workflow(
         self, input: StartChildWorkflowInput
     ) -> _ChildWorkflowHandle:
-        handle: _ChildWorkflowHandle
+        # Pre-bind handle to None so the closure cell is not empty when
+        # Python 3.14's asyncio.Task inspects it eagerly during task naming.
+        handle = cast(_ChildWorkflowHandle, None)
 
         # Common code for handling cancel for start and run
         def apply_child_cancel_error(err: asyncio.CancelledError) -> None:
@@ -2071,7 +2077,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # resolved with an operation token). See comments in tests/worker/test_nexus.py for worked
         # examples of the evolution of the resulting handle state machine in the sync and async
         # Nexus response cases.
-        handle: _NexusOperationHandle[OutputT]
+        # Pre-bind handle to None so the closure cell is not empty when
+        # Python 3.14's asyncio.Task inspects it eagerly during task naming.
+        handle = cast(_NexusOperationHandle[OutputT], None)
 
         async def operation_handle_fn() -> OutputT:
             while True:
