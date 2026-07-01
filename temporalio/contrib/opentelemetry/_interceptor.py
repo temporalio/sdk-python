@@ -58,6 +58,26 @@ _CarrierDict: TypeAlias = dict[str, opentelemetry.propagators.textmap.CarrierVal
 _ContextT = TypeVar("_ContextT", bound=nexusrpc.handler.OperationContext)
 
 
+def _restore_context(previous: Context | None, attached: Context | None) -> None:
+    """Restore ``previous`` as the current OTel context after attaching one.
+
+    Restores by re-attaching ``previous`` rather than detaching the attach
+    token. ``opentelemetry.context.detach`` resets a ``contextvars`` Token, which
+    fails (and logs "Failed to detach context") when the restore runs in a
+    different ``contextvars.Context`` than the attach did -- e.g. when the
+    workflow event loop resumes inside ``contextvars.copy_context().run(...)``.
+    A copy preserves the OTel context value (so the guard below still matches)
+    but invalidates the Token. ``attach`` goes through ``ContextVar.set``, which
+    is valid in any ``contextvars.Context``, so restoration never fails.
+
+    The guard restores only when our attached context is still current, so we
+    don't clobber a context something else has since attached. A ``None``
+    ``previous`` means nothing was attached, so there is nothing to restore.
+    """
+    if previous is not None and attached is opentelemetry.context.get_current():
+        opentelemetry.context.attach(previous)
+
+
 class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interceptor):
     """Interceptor that supports client and worker OpenTelemetry span creation
     and propagation.
@@ -182,7 +202,9 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Context | None = None,
     ) -> Iterator[None]:
-        token = opentelemetry.context.attach(context) if context else None
+        previous = opentelemetry.context.get_current() if context else None
+        if context:
+            opentelemetry.context.attach(context)
         try:
             with self.tracer.start_as_current_span(
                 name,
@@ -219,8 +241,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                         )
                     raise
         finally:
-            if token and context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
+            _restore_context(previous, context)
 
     def _completed_workflow_span(
         self, params: _CompletedWorkflowSpanParams
@@ -551,7 +572,8 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         # We need to put this interceptor on the context too
         context = self._set_on_context(context)
         # Run under context with new span
-        token = opentelemetry.context.attach(context)
+        previous = opentelemetry.context.get_current()
+        opentelemetry.context.attach(context)
         try:
             # This won't be created if there was no context header
             self._completed_span(
@@ -563,12 +585,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             )
             return await super().handle_query(input)
         finally:
-            # In some exceptional cases this finally is executed with a
-            # different contextvars.Context than the one the token was created
-            # on. As such we do a best effort detach to avoid using a mismatched
-            # token.
-            if context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
+            _restore_context(previous, context)
 
     def handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
@@ -639,7 +656,8 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         success = False
         exception: Exception | None = None
         # Run under this context
-        token = opentelemetry.context.attach(context)
+        previous = opentelemetry.context.get_current()
+        opentelemetry.context.attach(context)
 
         try:
             yield None
@@ -650,7 +668,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             exception = err
             raise
         finally:
-            # Create a completed span before detaching context
+            # Create a completed span before restoring context
             if exception or (success and success_is_complete):
                 self._completed_span(
                     f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
@@ -658,12 +676,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
                     kind=opentelemetry.trace.SpanKind.INTERNAL,
                 )
 
-            # In some exceptional cases this finally is executed with a
-            # different contextvars.Context than the one the token was created
-            # on. As such we do a best effort detach to avoid using a mismatched
-            # token.
-            if context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
+            _restore_context(previous, context)
 
     def _context_to_headers(
         self, headers: Mapping[str, temporalio.api.common.v1.Payload]
