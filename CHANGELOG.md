@@ -20,6 +20,20 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.30.0] - 2026-07-01
+
+### Added
+
 - Nexus operation link propagation for signals. When a Nexus operation handler signals a workflow
   (including signal-with-start), the inbound Nexus request links are now forwarded onto the signaled
   workflow so its history events link back to the caller, and the link the server returns for the
@@ -36,18 +50,12 @@ to include examples, links to docs, or any other relevant information.
   with the selected optional dependencies.
 - Standalone Nexus operation links are now forwarded on start workflow and signal requests.
 
-### Deprecated
-
 ### Breaking Changes
 
 - AWS Lambda worker `configure` parameter has been changed to be invoked
   per-invocation of the worker instead of only at startup. It is advised that
   any shared, heavy-weight operations are performed outside of the callback
   before `run_worker` is invoked.
-
-### Fixed
-
-### Security
 
 ## [1.29.0] - 2026-06-17
 
