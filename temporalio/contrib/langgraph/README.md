@@ -143,6 +143,46 @@ await g.ainvoke({...}, context=Context(user_id="alice"))
 
 Your `context` object must be serializable by the configured Temporal payload converter, since it crosses the Activity boundary.
 
+## Summaries
+
+Summaries are short, human-readable labels that show up in the Temporal UI and CLI, making it easier to see what each step of a run is doing.
+
+### Static summary
+
+`summary` is an ordinary Activity option, so a fixed per-node label works today — pass it like any other option:
+
+```python
+g.add_node("plan", plan, metadata={"execute_in": "activity", "summary": "Planning step"})
+```
+
+It is attached to the node's scheduled-activity event (`execute_in="activity"` only).
+
+### Dynamic summary (`summary_fn`)
+
+To derive the label from the node's input at runtime, supply a `summary_fn`. It receives the node's `(args, kwargs)` and returns a summary string, or `None`/`""` for no summary. For a `StateGraph` node `args[0]` is the state; for a Functional `@task` it is the task's arguments.
+
+```python
+def summarize(args, kwargs) -> str | None:
+    state = args[0]
+    return f"stage={state['stage']} doc={state['doc_id']}"
+
+# Graph API: per-node
+g.add_node("plan", plan, metadata={"execute_in": "activity", "summary_fn": summarize})
+
+# Functional API: per-task
+plugin = LangGraphPlugin(
+    tasks=[plan],
+    activity_options={"plan": {"execute_in": "activity", "summary_fn": summarize}},
+)
+```
+
+`summary_fn` is set per node/task (like the static `summary`), so different nodes — which receive different inputs — can compute their summaries independently. You can also put a `summary` or `summary_fn` in `default_activity_options` as a fallback for every node; a node/task that sets either form overrides the inherited default (you just can't set both forms at the same level).
+
+- For `execute_in="activity"` nodes the result sets the activity `summary` (one per scheduled-activity event, visible in history).
+- For `execute_in="workflow"` nodes there is no activity, so the result updates the workflow's current details via [`workflow.set_current_details()`](https://python.temporal.io/temporalio.workflow.html#set_current_details). This is a single workflow-level slot (last-writer-wins) reflecting the most recent workflow-bound node that defines a `summary_fn`; a `None`/`""` result clears it. It is queryable via `__temporal_workflow_metadata`.
+
+`summary_fn` runs in workflow context on every replay, so it **must be deterministic and must not raise** (an exception fails the workflow task). Setting both a static `summary` and a `summary_fn` on the same node raises `ValueError`.
+
 ## Streaming
 
 When `streaming_topic` is set on `LangGraphPlugin`, calls to `langgraph.config.get_stream_writer()` inside a node publish to the named topic on the workflow's [`WorkflowStream`](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/workflow_streams). Activity-side nodes publish via `WorkflowStreamClient` (a signal carrying batched items, controlled by `streaming_batch_interval`); workflow-side nodes publish synchronously to the in-workflow stream (no signal). External subscribers consume the stream with `WorkflowStreamClient.create(...).topic(...).subscribe(...)`.
