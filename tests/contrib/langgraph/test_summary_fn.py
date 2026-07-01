@@ -126,6 +126,61 @@ async def test_static_summary(client: Client) -> None:
     assert summaries == [b'"static"']
 
 
+async def test_node_static_summary_overrides_default_summary_fn(
+    client: Client,
+) -> None:
+    g: StateGraph[State, None, State, State] = StateGraph(State)
+    g.add_node(
+        "node",
+        passthrough,
+        metadata={"execute_in": "activity", "summary": "node-static"},
+    )
+    g.add_edge(START, "node")
+    plugin = LangGraphPlugin(
+        graphs={"summary-graph": g},
+        default_activity_options={
+            "start_to_close_timeout": timedelta(seconds=10),
+            "summary_fn": lambda args, kwargs: "global",
+        },
+    )
+    summaries = await _run_and_collect_summaries(client, plugin, "x")
+    assert summaries == [b'"node-static"']
+
+
+async def test_node_summary_fn_overrides_default_summary(client: Client) -> None:
+    plugin = LangGraphPlugin(
+        graphs={"summary-graph": _activity_graph(lambda args, kwargs: "node-fn")},
+        default_activity_options={
+            "start_to_close_timeout": timedelta(seconds=10),
+            "summary": "global-static",
+        },
+    )
+    summaries = await _run_and_collect_summaries(client, plugin, "x")
+    assert summaries == [b'"node-fn"']
+
+
+async def test_default_summary_fn_applies_without_override(client: Client) -> None:
+    plugin = LangGraphPlugin(
+        graphs={"summary-graph": _activity_graph(None)},
+        default_activity_options={
+            "start_to_close_timeout": timedelta(seconds=10),
+            "summary_fn": lambda args, kwargs: "global",
+        },
+    )
+    summaries = await _run_and_collect_summaries(client, plugin, "x")
+    assert summaries == [b'"global"']
+
+
+def test_both_in_default_activity_options_raises() -> None:
+    with pytest.raises(ValueError, match="default_activity_options"):
+        LangGraphPlugin(
+            default_activity_options={
+                "summary": "s",
+                "summary_fn": lambda args, kwargs: "f",
+            }
+        )
+
+
 def test_summary_and_summary_fn_raises() -> None:
     g: StateGraph[State, None, State, State] = StateGraph(State)
     g.add_node(

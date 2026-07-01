@@ -176,7 +176,7 @@ plugin = LangGraphPlugin(
 )
 ```
 
-`summary_fn` is set per node/task (like the static `summary`), so different nodes — which receive different inputs — can compute their summaries independently.
+`summary_fn` is set per node/task (like the static `summary`), so different nodes — which receive different inputs — can compute their summaries independently. You can also put a `summary` or `summary_fn` in `default_activity_options` as a fallback for every node; a node/task that sets either form overrides the inherited default (you just can't set both forms at the same level).
 
 - For `execute_in="activity"` nodes the result sets the activity `summary` (one per scheduled-activity event, visible in history).
 - For `execute_in="workflow"` nodes there is no activity, so the result updates the workflow's current details via [`workflow.set_current_details()`](https://python.temporal.io/temporalio.workflow.html#set_current_details). This is a single workflow-level slot (last-writer-wins) reflecting the most recent workflow-bound node that defines a `summary_fn`; a `None`/`""` result clears it. It is queryable via `__temporal_workflow_metadata`.

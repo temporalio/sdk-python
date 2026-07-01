@@ -50,6 +50,23 @@ def _constant_summary_fn(
     return lambda args, kwargs: value
 
 
+def _merge_activity_opts(
+    defaults: dict[str, Any] | None, specific: dict[str, Any]
+) -> dict[str, Any]:
+    """Layer per-node/task options over the plugin defaults.
+
+    ``summary`` and ``summary_fn`` are two forms of one setting, so a node or
+    task that supplies either form overrides an inherited default of *either*
+    form, rather than coexisting with it and tripping the exclusivity check.
+    """
+    merged = dict(defaults or {})
+    if "summary" in specific or "summary_fn" in specific:
+        merged.pop("summary", None)
+        merged.pop("summary_fn", None)
+    merged.update(specific)
+    return merged
+
+
 class LangGraphPlugin(SimplePlugin):
     """LangGraph plugin for Temporal SDK.
 
@@ -82,7 +99,9 @@ class LangGraphPlugin(SimplePlugin):
             Functional API has no per-task ``metadata`` channel.
         default_activity_options: Activity options applied to every
             activity-bound node and task, overridable per-node (Graph API
-            ``metadata``) or per-task (``activity_options[name]``).
+            ``metadata``) or per-task (``activity_options[name]``). A
+            node/task that sets ``summary`` or ``summary_fn`` overrides an
+            inherited default of either form.
         streaming_topic: When set, ``langgraph.config.get_stream_writer()``
             inside a node publishes to this topic on the workflow's
             :class:`WorkflowStream`. The workflow must construct
@@ -143,6 +162,16 @@ class LangGraphPlugin(SimplePlugin):
                 "activity_options[task_name] (Functional API)."
             )
 
+        if (
+            default_activity_options
+            and "summary" in default_activity_options
+            and "summary_fn" in default_activity_options
+        ):
+            raise ValueError(
+                "Set either 'summary' or 'summary_fn' in default_activity_options, "
+                "not both."
+            )
+
         self.activities: list = []
         self._streaming_topic = streaming_topic
         self._streaming_batch_interval = streaming_batch_interval
@@ -196,7 +225,7 @@ class LangGraphPlugin(SimplePlugin):
                             f"'execute_in' in metadata. Set it to 'activity' or "
                             f"'workflow'."
                         )
-                    opts = {**(default_activity_options or {}), **node_opts}
+                    opts = _merge_activity_opts(default_activity_options, node_opts)
                     # Route all LangGraph node calls through afunc so the async
                     # activity wrapper is always used. wrap_activity handles
                     # sync vs. async user functions inside the activity itself.
@@ -223,10 +252,7 @@ class LangGraphPlugin(SimplePlugin):
                         f"activity_options[{name!r}]. Set it to 'activity' or "
                         f"'workflow'."
                     )
-                opts = {
-                    **(default_activity_options or {}),
-                    **task_opts,
-                }
+                opts = _merge_activity_opts(default_activity_options, task_opts)
 
                 task.func = self.execute(task_id(task.func), task.func, opts)
                 task.func.__name__ = name
