@@ -30,7 +30,7 @@ document as a quick reference when submitting pull requests.
 * Avoid unqualified imports from `temporalio` packages except `temporalio.types`.
   Relative imports are acceptable for private packages.
 * Do not commit `uv.lock` or `pyproject.toml` changes created only for temporary
-  protobuf downgrade workflows.
+  protobuf downgrade workflows. Prefer to use poe gen-protos-docker when possible.
 
 ## Repo Specific Utilities
 
