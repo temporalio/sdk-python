@@ -15,15 +15,17 @@ from typing import (
     overload,
 )
 
-from nexusrpc import HandlerError, HandlerErrorType
+from nexusrpc import HandlerError, HandlerErrorType, OperationError, OperationErrorState
 from nexusrpc.handler import StartOperationResultAsync, StartOperationResultSync
 from typing_extensions import Self
 
 import temporalio.common
 from temporalio.nexus._operation_context import (
+    _start_nexus_backed_workflow_update,
     _start_nexus_backing_workflow,
     _TemporalStartOperationContext,
 )
+from temporalio.nexus._token import UpdateHandle
 from temporalio.types import (
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
@@ -35,6 +37,7 @@ from temporalio.types import (
 
 if TYPE_CHECKING:
     import temporalio.client
+    import temporalio.workflow
 
 
 _ResultT = TypeVar("_ResultT")
@@ -279,6 +282,85 @@ class TemporalNexusClient(ABC):
         """
         ...
 
+    # Overload for no-param update
+    @overload
+    async def start_workflow_update(
+        self,
+        workflow_id: str,
+        update: temporalio.workflow.UpdateMethodMultiParam[[Any], ReturnType],
+        *,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # Overload for single-param update
+    @overload
+    async def start_workflow_update(
+        self,
+        workflow_id: str,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            [Any, ParamType], ReturnType
+        ],
+        arg: ParamType,
+        *,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # Overload for multi-param update
+    @overload
+    async def start_workflow_update(
+        self,
+        workflow_id: str,
+        update: temporalio.workflow.UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+        *,
+        args: MultiParamSpec.args,  # type: ignore
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # Overload for string-name update
+    @overload
+    async def start_workflow_update(
+        self,
+        workflow_id: str,
+        update: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str | None = None,
+        result_type: type[ReturnType] | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> TemporalOperationResult[ReturnType]: ...
+
+    # draft-review: check why run_id and first_execution_run_id are not used
+    # for update workflow in python sdk
+    @abstractmethod
+    async def start_workflow_update(
+        self,
+        workflow_id: str,
+        update: str | Callable,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        # run_id: str | None = None,
+        # first_execution_run_id: str | None = None,
+    ) -> TemporalOperationResult[Any]:
+        """Start a workflow update as the backing asynchronous Nexus operation.
+
+        .. warning::
+            This API is experimental and unstable.
+        """
+        ...
+
 
 class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnusedClass]
     """Nexus-aware wrapper around a Temporal Client.
@@ -377,3 +459,52 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
             )
 
         return TemporalOperationResult.async_token(wf_handle.to_token())
+
+    async def start_workflow_update(
+        self,
+        workflow_id: str,
+        update: str | Callable,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        # run_id: str | None = None,
+        # first_execution_run_id: str | None = None,
+    ) -> TemporalOperationResult[Any]:
+        """Start a workflow update as the backing asynchronous Nexus operation."""
+        if not self._temporal_context.nexus_context.callback_url:
+            raise HandlerError(
+                "callback URL is required for a workflow update Nexus operation",
+                type=HandlerErrorType.BAD_REQUEST,
+            )
+        with self._reserve_async_start():
+            update_handle = await _start_nexus_backed_workflow_update(
+                temporal_context=self._temporal_context,
+                workflow_id=workflow_id,
+                update=update,
+                arg=arg,
+                args=args,
+                id=id,
+                result_type=result_type,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                # run_id=run_id,
+                # first_execution_run_id=first_execution_run_id,
+            )
+            # If the update has already completed, return the result synchronously
+            # This is in-line with the Go implementation as well
+            if update_handle._known_outcome is not None:
+                try:
+                    result = await update_handle.result()
+                except temporalio.client.WorkflowUpdateFailedError as err:
+                    raise OperationError(
+                        str(err), state=OperationErrorState.FAILED
+                    ) from err
+                return TemporalOperationResult.sync(result)
+        nexus_handle: UpdateHandle[Any] = (
+            UpdateHandle._unsafe_from_client_workflow_update_handle(update_handle)
+        )
+        return TemporalOperationResult.async_token(nexus_handle.to_token())

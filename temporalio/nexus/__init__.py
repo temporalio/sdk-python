@@ -25,15 +25,17 @@ from ._operation_context import (
     wait_for_worker_shutdown_sync,
 )
 from ._operation_handlers import (
+    CancelUpdateWorkflowOptions,
     CancelWorkflowRunOptions,
     TemporalOperationHandler,
 )
 from ._temporal_client import TemporalNexusClient, TemporalOperationResult
-from ._token import WorkflowHandle
+from ._token import UpdateHandle, WorkflowHandle
 
 __all__ = (
     "workflow_run_operation",
     "CancelWorkflowRunOptions",
+    "CancelUpdateWorkflowOptions",
     "Info",
     "LoggerAdapter",
     "NexusCallback",
@@ -49,6 +51,7 @@ __all__ = (
     "wait_for_worker_shutdown",
     "wait_for_worker_shutdown_sync",
     "WorkflowHandle",
+    "UpdateHandle",
     "TemporalNexusClient",
     "TemporalOperationStartHandlerFunc",
     "TemporalOperationHandler",
