@@ -13,8 +13,9 @@ feature request, or design topic, add any relevant details there instead of open
 duplicate. Use an upvote on the issue to show that it affects you too.
 
 Use GitHub issues for actionable bugs and feature work. For usage questions, help
-debugging an application, or general discussion, use the
-[Temporal community Slack](https://temporal.io/slack) or the support channel
+debugging an application, or general discussion, join the relevant
+language-specific channel in the
+[Temporal community Slack](https://temporal.io/slack) or use the support channel
 available to you.
 
 ## Bug Reports
@@ -42,9 +43,9 @@ Open or join a GitHub issue before starting substantial feature work, behavior
 changes, or API design changes. This gives maintainers and other SDK users a chance
 to discuss the approach before you invest in a larger implementation.
 
-Temporal community Slack is also a good place for early discussion, but important
-decisions should still be captured in a GitHub issue so they are visible and
-searchable.
+The relevant language-specific channel in Temporal community Slack is also a good
+place for early discussion, but important decisions should still be captured in a
+GitHub issue so they are visible and searchable.
 
 Small bug fixes, documentation fixes, and narrowly scoped maintenance changes can go
 straight to a pull request.
@@ -98,7 +99,8 @@ to security@temporal.io instead.
 
 Maintainers review pull requests for correctness, compatibility, test coverage,
 documentation, and long-term maintainability. Review may require changes before a
-pull request can be merged.
+pull request can be merged, and it may take maintainers some time to review a
+contribution.
 
 CI is the final validation gate. If CI fails, update the pull request or ask for help
 if the failure appears unrelated to your change. Some CI gates may wait for a
