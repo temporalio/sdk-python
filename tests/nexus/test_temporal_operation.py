@@ -23,6 +23,8 @@ from tests.helpers.nexus import make_nexus_endpoint_name
 class Input:
     value: str
     task_queue: str
+    update_value: str = ""
+    update_id: str = ""
 
 
 def test_temporal_operation_result_validates_single_result_kind() -> None:
@@ -63,6 +65,7 @@ class TestService:
     retry_after_failed_start: Operation[Input, str]
     sync_result: Operation[Input, str]
     custom_cancel: Operation[str, None]
+    update_op: Operation[Input, str]
 
 
 @service_handler(service=TestService)
@@ -216,6 +219,19 @@ class TestServiceHandler:
 
         return CustomCancelNexusOpHandler()
 
+    @nexus.temporal_operation
+    async def update_op(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: Input,
+    ) -> nexus.TemporalOperationResult[str]:
+        # input.value carries the target workflow_id, input.update_value has actual update
+        update_id = input.update_id or str(uuid.uuid4())
+        return await client.start_workflow_update(
+            input.value, UpdatableWorkflow.do_update, input.update_value, id=update_id
+        )
+
 
 @workflow.defn
 class EchoWorkflowCaller:
@@ -225,6 +241,19 @@ class EchoWorkflowCaller:
             service=TestService, endpoint=make_nexus_endpoint_name(input.task_queue)
         )
         return await client.execute_operation(TestService.echo, input)
+
+
+@workflow.defn
+class UpdateWorkflowCaller:
+    """Simple caller workflow that triggers a workflow update via nexus op"""
+
+    @workflow.run
+    async def run(self, input: Input) -> str:
+        client = workflow.create_nexus_client(
+            service=TestService,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        return await client.execute_operation(TestService.update_op, input)
 
 
 async def test_temporal_operation_start_workflow(
@@ -256,6 +285,87 @@ async def test_temporal_operation_start_workflow(
                 EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
             ],
         )
+
+
+async def test_temporal_operation_update_workflow(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[UpdatableWorkflow, UpdateWorkflowCaller],
+    ):
+        update_workflow_id = f"updatable-workflow-{uuid.uuid4()}"
+        await client.start_workflow(
+            UpdatableWorkflow.run, id=update_workflow_id, task_queue=task_queue
+        )
+        wf_handle = await client.start_workflow(
+            UpdateWorkflowCaller.run,
+            Input(
+                value=update_workflow_id, task_queue=task_queue, update_value="Created"
+            ),
+            task_queue=task_queue,
+            id=f"update-workflow-caller-created",
+        )
+        result = await wf_handle.result()
+        assert result == "Updated workflow status from Pending to Created"
+
+        # await assert_event_subsequence(
+        #     wf_handle,
+        #     [
+        #         EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+        #         EventType.EVENT_TYPE_NEXUS_OPERATION_STARTED,
+        #         EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
+        #     ],
+        # )
+
+        stable_update_id = str(uuid.uuid4())
+        wf_handle = await client.start_workflow(
+            UpdateWorkflowCaller.run,
+            Input(
+                value=update_workflow_id,
+                task_queue=task_queue,
+                update_value="Processed",
+                update_id=stable_update_id,
+            ),
+            task_queue=task_queue,
+            id=f"update-workflow-caller-processed",
+        )
+        result = await wf_handle.result()
+        assert result == "Updated workflow status from Created to Processed"
+
+        # same update_id -> wont be processed again, receives a sync result
+        wf_handle = await client.start_workflow(
+            UpdateWorkflowCaller.run,
+            Input(
+                value=update_workflow_id,
+                task_queue=task_queue,
+                update_value="Processed",
+                update_id=stable_update_id,
+            ),
+            task_queue=task_queue,
+            id=f"update-workflow-caller-processed",
+        )
+        # wf_handle.
+        result = await wf_handle.result()
+        assert result == "Updated workflow status from Created to Processed"
+
+        wf_handle = await client.start_workflow(
+            UpdateWorkflowCaller.run,
+            Input(
+                value=update_workflow_id,
+                task_queue=task_queue,
+                update_value="Completed",
+            ),
+            task_queue=task_queue,
+            id=f"update-workflow-caller-completed",
+        )
+        result = await wf_handle.result()
+        assert result == "Updated workflow status from Processed to Completed"
 
 
 @workflow.defn
@@ -724,3 +834,23 @@ async def test_temporal_operation_includes_token_in_callback(
         ).encode()
 
         assert token == expected_token
+
+
+@workflow.defn
+class UpdatableWorkflow:
+    """Workflow that accepts updates and exits when it receives a specific status"""
+
+    def __init__(self) -> None:
+        self.order_status = "Pending"
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self.order_status == "Completed")
+        # some more order processing etc
+
+    @workflow.update
+    async def do_update(self, value: str) -> str:
+        status = self.order_status
+        self.order_status = value
+        update_result = f"Updated workflow status from {status} to {value}"
+        return update_result

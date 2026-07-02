@@ -322,6 +322,10 @@ class StartWorkflowUpdateInput:
     ret_type: type | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    # The following options are for Nexus Operation-backed updates. Experimental and unstable
+    callbacks: Sequence[Callback] | None = None
+    links: Sequence[temporalio.api.common.v1.Link] | None = None
+    request_id: str | None = None
 
 
 @dataclass
