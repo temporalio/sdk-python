@@ -513,15 +513,14 @@ class LoggerAdapter(logging.LoggerAdapter):
             if context:
                 if self.activity_info_on_message:
                     msg = f"{msg} ({context.logger_details})"
-                if self.activity_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
-                    extra["temporal_activity"] = context.logger_details
-                    kwargs["extra"] = extra
-                if self.full_activity_info_on_extra:
-                    # Extra can be absent or None, this handles both
-                    extra = kwargs.get("extra", None) or {}
-                    extra["activity_info"] = context.info()
+                if self.activity_info_on_extra or self.full_activity_info_on_extra:
+                    # Copy any caller-provided extra rather than mutating it in
+                    # place (see https://github.com/temporalio/sdk-python/issues/503).
+                    extra = dict(kwargs.get("extra") or {})
+                    if self.activity_info_on_extra:
+                        extra["temporal_activity"] = context.logger_details
+                    if self.full_activity_info_on_extra:
+                        extra["activity_info"] = context.info()
                     kwargs["extra"] = extra
         return (msg, kwargs)
 
