@@ -59,6 +59,7 @@ from ..types import (
     ReturnType,
     SelfType,
 )
+from ._callback import Callback
 from ._exceptions import (
     WorkflowContinuedAsNewError,
     WorkflowFailureError,
@@ -896,6 +897,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[Any]: ...
 
+    # draft-review: check why this doesnt currently support run_id and first_execution_run_id
+    # If it can be supported, wire it up for nexus operation-backed updates as well
     async def start_update(
         self,
         update: str | Callable,
@@ -955,6 +958,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: type | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
+        # run_id: str | None = None,
+        # first_execution_run_id: str | None = None,
+        # The following options are for Nexus Operation-backed updates. Experimental and unstable
+        callbacks: Sequence[Callback] | None = None,
+        links: Sequence[temporalio.api.common.v1.Link] | None = None,
+        request_id: str | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
@@ -976,6 +985,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 wait_for_stage=wait_for_stage,
+                # run_id=run_id,
+                # first_execution_run_id=first_execution_run_id,
+                callbacks=callbacks,
+                links=links,
+                request_id=request_id,
             )
         )
 
