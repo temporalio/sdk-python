@@ -71,7 +71,7 @@ For release artifacts, use `uv build`. Documentation can be generated with
 
 ## Expectations for Pull Requests
 
-* Format and lint code before submitting when practical.
+* Format and lint code before submitting.
 * Include tests for behavior changes.
 * Update public API documentation or doc comments for public behavior changes.
 * Add a high-level changelog entry for user-facing changes according to the
