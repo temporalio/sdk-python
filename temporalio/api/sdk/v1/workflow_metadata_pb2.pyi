@@ -6,18 +6,20 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class WorkflowMetadata(google.protobuf.message.Message):
     """The name of the query to retrieve this information is `__temporal_workflow_metadata`."""
 
@@ -25,31 +27,33 @@ class WorkflowMetadata(google.protobuf.message.Message):
 
     DEFINITION_FIELD_NUMBER: builtins.int
     CURRENT_DETAILS_FIELD_NUMBER: builtins.int
-    @property
-    def definition(self) -> global___WorkflowDefinition:
-        """Metadata provided at declaration or creation time."""
     current_details: builtins.str
     """Current long-form details of the workflow's state. This is used by user interfaces to show
     long-form text. This text may be formatted by the user interface.
     """
+    @property
+    def definition(self) -> Global___WorkflowDefinition:
+        """Metadata provided at declaration or creation time."""
+
     def __init__(
         self,
         *,
-        definition: global___WorkflowDefinition | None = ...,
+        definition: Global___WorkflowDefinition | None = ...,
         current_details: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["definition", b"definition"]
+        self, field_name: typing.Literal["definition", b"definition"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_details", b"current_details", "definition", b"definition"
         ],
     ) -> None: ...
 
-global___WorkflowMetadata = WorkflowMetadata
+Global___WorkflowMetadata: typing_extensions.TypeAlias = WorkflowMetadata
 
+@typing.final
 class WorkflowDefinition(google.protobuf.message.Message):
     """(-- api-linter: core::0203::optional=disabled --)"""
 
@@ -67,43 +71,46 @@ class WorkflowDefinition(google.protobuf.message.Message):
     def query_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___WorkflowInteractionDefinition
+        Global___WorkflowInteractionDefinition
     ]:
         """Query definitions, sorted by name."""
+
     @property
     def signal_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___WorkflowInteractionDefinition
+        Global___WorkflowInteractionDefinition
     ]:
         """Signal definitions, sorted by name."""
+
     @property
     def update_definitions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___WorkflowInteractionDefinition
+        Global___WorkflowInteractionDefinition
     ]:
         """Update definitions, sorted by name."""
+
     def __init__(
         self,
         *,
         type: builtins.str = ...,
         query_definitions: collections.abc.Iterable[
-            global___WorkflowInteractionDefinition
+            Global___WorkflowInteractionDefinition
         ]
         | None = ...,
         signal_definitions: collections.abc.Iterable[
-            global___WorkflowInteractionDefinition
+            Global___WorkflowInteractionDefinition
         ]
         | None = ...,
         update_definitions: collections.abc.Iterable[
-            global___WorkflowInteractionDefinition
+            Global___WorkflowInteractionDefinition
         ]
         | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "query_definitions",
             b"query_definitions",
             "signal_definitions",
@@ -115,8 +122,9 @@ class WorkflowDefinition(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___WorkflowDefinition = WorkflowDefinition
+Global___WorkflowDefinition: typing_extensions.TypeAlias = WorkflowDefinition
 
+@typing.final
 class WorkflowInteractionDefinition(google.protobuf.message.Message):
     """(-- api-linter: core::0123::resource-annotation=disabled
         aip.dev/not-precedent: The `name` field is optional. --)
@@ -144,10 +152,9 @@ class WorkflowInteractionDefinition(google.protobuf.message.Message):
         description: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "description", b"description", "name", b"name"
-        ],
+        self, field_name: typing.Literal["description", b"description", "name", b"name"]
     ) -> None: ...
 
-global___WorkflowInteractionDefinition = WorkflowInteractionDefinition
+Global___WorkflowInteractionDefinition: typing_extensions.TypeAlias = (
+    WorkflowInteractionDefinition
+)

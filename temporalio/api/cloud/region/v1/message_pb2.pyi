@@ -18,6 +18,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class Region(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -30,7 +31,7 @@ class Region(google.protobuf.message.Message):
             Region._CloudProvider.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         CLOUD_PROVIDER_UNSPECIFIED: Region._CloudProvider.ValueType  # 0
         CLOUD_PROVIDER_AWS: Region._CloudProvider.ValueType  # 1
@@ -56,7 +57,7 @@ class Region(google.protobuf.message.Message):
     Deprecated: Not supported after v0.3.0 api version. Use cloud_provider instead. 
     temporal:versioning:max_version=v0.3.0
     """
-    cloud_provider: global___Region.CloudProvider.ValueType
+    cloud_provider: Global___Region.CloudProvider.ValueType
     """The cloud provider that's hosting the region.
     temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=cloud_provider_deprecated
@@ -70,13 +71,13 @@ class Region(google.protobuf.message.Message):
         *,
         id: builtins.str = ...,
         cloud_provider_deprecated: builtins.str = ...,
-        cloud_provider: global___Region.CloudProvider.ValueType = ...,
+        cloud_provider: Global___Region.CloudProvider.ValueType = ...,
         cloud_provider_region: builtins.str = ...,
         location: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cloud_provider",
             b"cloud_provider",
             "cloud_provider_deprecated",
@@ -90,4 +91,4 @@ class Region(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___Region = Region
+Global___Region: typing_extensions.TypeAlias = Region

@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -14,13 +15,14 @@ import google.protobuf.timestamp_pb2
 
 import temporalio.api.enums.v1.namespace_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ClusterReplicationConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -32,11 +34,14 @@ class ClusterReplicationConfig(google.protobuf.message.Message):
         cluster_name: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["cluster_name", b"cluster_name"]
+        self, field_name: typing.Literal["cluster_name", b"cluster_name"]
     ) -> None: ...
 
-global___ClusterReplicationConfig = ClusterReplicationConfig
+Global___ClusterReplicationConfig: typing_extensions.TypeAlias = (
+    ClusterReplicationConfig
+)
 
+@typing.final
 class NamespaceReplicationConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -44,24 +49,24 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
     CLUSTERS_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     active_cluster_name: builtins.str
+    state: temporalio.api.enums.v1.namespace_pb2.ReplicationState.ValueType
     @property
     def clusters(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___ClusterReplicationConfig
+        Global___ClusterReplicationConfig
     ]: ...
-    state: temporalio.api.enums.v1.namespace_pb2.ReplicationState.ValueType
     def __init__(
         self,
         *,
         active_cluster_name: builtins.str = ...,
-        clusters: collections.abc.Iterable[global___ClusterReplicationConfig]
+        clusters: collections.abc.Iterable[Global___ClusterReplicationConfig]
         | None = ...,
         state: temporalio.api.enums.v1.namespace_pb2.ReplicationState.ValueType = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "active_cluster_name",
             b"active_cluster_name",
             "clusters",
@@ -71,8 +76,11 @@ class NamespaceReplicationConfig(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___NamespaceReplicationConfig = NamespaceReplicationConfig
+Global___NamespaceReplicationConfig: typing_extensions.TypeAlias = (
+    NamespaceReplicationConfig
+)
 
+@typing.final
 class FailoverStatus(google.protobuf.message.Message):
     """Represents a historical replication status of a Namespace"""
 
@@ -80,10 +88,11 @@ class FailoverStatus(google.protobuf.message.Message):
 
     FAILOVER_TIME_FIELD_NUMBER: builtins.int
     FAILOVER_VERSION_FIELD_NUMBER: builtins.int
+    failover_version: builtins.int
     @property
     def failover_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Timestamp when the Cluster switched to the following failover_version"""
-    failover_version: builtins.int
+
     def __init__(
         self,
         *,
@@ -91,13 +100,13 @@ class FailoverStatus(google.protobuf.message.Message):
         failover_version: builtins.int = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failover_time", b"failover_time"]
+        self, field_name: typing.Literal["failover_time", b"failover_time"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failover_time", b"failover_time", "failover_version", b"failover_version"
         ],
     ) -> None: ...
 
-global___FailoverStatus = FailoverStatus
+Global___FailoverStatus: typing_extensions.TypeAlias = FailoverStatus

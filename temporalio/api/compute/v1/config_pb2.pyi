@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.field_mask_pb2
@@ -16,13 +17,14 @@ import temporalio.api.compute.v1.provider_pb2
 import temporalio.api.compute.v1.scaler_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ComputeConfigScalingGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -39,16 +41,19 @@ class ComputeConfigScalingGroup(google.protobuf.message.Message):
         If not provided, this scaling group serves all not otherwise defined
         task types.
         """
+
     @property
     def provider(self) -> temporalio.api.compute.v1.provider_pb2.ComputeProvider:
         """Stores instructions for a worker control plane controller how to respond
         to worker lifeycle events.
         """
+
     @property
     def scaler(self) -> temporalio.api.compute.v1.scaler_pb2.ComputeScaler:
         """Informs a worker lifecycle controller *when* and *how often* to perform
         certain worker lifecycle actions like starting a serverless worker.
         """
+
     def __init__(
         self,
         *,
@@ -60,14 +65,11 @@ class ComputeConfigScalingGroup(google.protobuf.message.Message):
         scaler: temporalio.api.compute.v1.scaler_pb2.ComputeScaler | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "provider", b"provider", "scaler", b"scaler"
-        ],
+        self, field_name: typing.Literal["provider", b"provider", "scaler", b"scaler"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "provider",
             b"provider",
             "scaler",
@@ -77,8 +79,11 @@ class ComputeConfigScalingGroup(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___ComputeConfigScalingGroup = ComputeConfigScalingGroup
+Global___ComputeConfigScalingGroup: typing_extensions.TypeAlias = (
+    ComputeConfigScalingGroup
+)
 
+@typing.final
 class ComputeConfig(google.protobuf.message.Message):
     """ComputeConfig stores configuration that helps a worker control plane
     controller understand *when* and *how* to respond to worker lifecycle
@@ -87,6 +92,7 @@ class ComputeConfig(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class ScalingGroupsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -94,19 +100,18 @@ class ComputeConfig(google.protobuf.message.Message):
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
         @property
-        def value(self) -> global___ComputeConfigScalingGroup: ...
+        def value(self) -> Global___ComputeConfigScalingGroup: ...
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: global___ComputeConfigScalingGroup | None = ...,
+            value: Global___ComputeConfigScalingGroup | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     SCALING_GROUPS_FIELD_NUMBER: builtins.int
@@ -114,7 +119,7 @@ class ComputeConfig(google.protobuf.message.Message):
     def scaling_groups(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, global___ComputeConfigScalingGroup
+        builtins.str, Global___ComputeConfigScalingGroup
     ]:
         """Each scaling group describes a compute config for a specific subset of the worker
         deployment version: covering a specific set of task types and/or regions.
@@ -124,27 +129,29 @@ class ComputeConfig(google.protobuf.message.Message):
         The key of the map is the ID of the scaling group used to reference it in subsequent
         update calls.
         """
+
     def __init__(
         self,
         *,
         scaling_groups: collections.abc.Mapping[
-            builtins.str, global___ComputeConfigScalingGroup
+            builtins.str, Global___ComputeConfigScalingGroup
         ]
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["scaling_groups", b"scaling_groups"]
+        self, field_name: typing.Literal["scaling_groups", b"scaling_groups"]
     ) -> None: ...
 
-global___ComputeConfig = ComputeConfig
+Global___ComputeConfig: typing_extensions.TypeAlias = ComputeConfig
 
+@typing.final
 class ComputeConfigScalingGroupUpdate(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SCALING_GROUP_FIELD_NUMBER: builtins.int
     UPDATE_MASK_FIELD_NUMBER: builtins.int
     @property
-    def scaling_group(self) -> global___ComputeConfigScalingGroup: ...
+    def scaling_group(self) -> Global___ComputeConfigScalingGroup: ...
     @property
     def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
         """Controls which fields from `scaling_group` will be applied. Semantics:
@@ -155,32 +162,37 @@ class ComputeConfigScalingGroupUpdate(google.protobuf.message.Message):
         - Accepted paths: "task_queue_types", "provider", "provider.type", "provider.details",
           "provider.nexus_endpoint", "scaler", "scaler.type", "scaler.details"
         """
+
     def __init__(
         self,
         *,
-        scaling_group: global___ComputeConfigScalingGroup | None = ...,
+        scaling_group: Global___ComputeConfigScalingGroup | None = ...,
         update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "scaling_group", b"scaling_group", "update_mask", b"update_mask"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "scaling_group", b"scaling_group", "update_mask", b"update_mask"
         ],
     ) -> None: ...
 
-global___ComputeConfigScalingGroupUpdate = ComputeConfigScalingGroupUpdate
+Global___ComputeConfigScalingGroupUpdate: typing_extensions.TypeAlias = (
+    ComputeConfigScalingGroupUpdate
+)
 
+@typing.final
 class ComputeConfigSummary(google.protobuf.message.Message):
     """A subset of information in ComputeConfig optimized for list views."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class ScalingGroupsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -188,19 +200,18 @@ class ComputeConfigSummary(google.protobuf.message.Message):
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
         @property
-        def value(self) -> global___ComputeConfigScalingGroupSummary: ...
+        def value(self) -> Global___ComputeConfigScalingGroupSummary: ...
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: global___ComputeConfigScalingGroupSummary | None = ...,
+            value: Global___ComputeConfigScalingGroupSummary | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     SCALING_GROUPS_FIELD_NUMBER: builtins.int
@@ -208,34 +219,35 @@ class ComputeConfigSummary(google.protobuf.message.Message):
     def scaling_groups(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, global___ComputeConfigScalingGroupSummary
+        builtins.str, Global___ComputeConfigScalingGroupSummary
     ]: ...
     def __init__(
         self,
         *,
         scaling_groups: collections.abc.Mapping[
-            builtins.str, global___ComputeConfigScalingGroupSummary
+            builtins.str, Global___ComputeConfigScalingGroupSummary
         ]
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["scaling_groups", b"scaling_groups"]
+        self, field_name: typing.Literal["scaling_groups", b"scaling_groups"]
     ) -> None: ...
 
-global___ComputeConfigSummary = ComputeConfigSummary
+Global___ComputeConfigSummary: typing_extensions.TypeAlias = ComputeConfigSummary
 
+@typing.final
 class ComputeConfigScalingGroupSummary(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TASK_QUEUE_TYPES_FIELD_NUMBER: builtins.int
     PROVIDER_TYPE_FIELD_NUMBER: builtins.int
+    provider_type: builtins.str
     @property
     def task_queue_types(
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
         temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
     ]: ...
-    provider_type: builtins.str
     def __init__(
         self,
         *,
@@ -247,9 +259,11 @@ class ComputeConfigScalingGroupSummary(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "provider_type", b"provider_type", "task_queue_types", b"task_queue_types"
         ],
     ) -> None: ...
 
-global___ComputeConfigScalingGroupSummary = ComputeConfigScalingGroupSummary
+Global___ComputeConfigScalingGroupSummary: typing_extensions.TypeAlias = (
+    ComputeConfigScalingGroupSummary
+)

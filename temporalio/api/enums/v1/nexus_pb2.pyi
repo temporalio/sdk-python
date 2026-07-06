@@ -26,7 +26,7 @@ class _NexusHandlerErrorRetryBehaviorEnumTypeWrapper(
         _NexusHandlerErrorRetryBehavior.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED: (
         _NexusHandlerErrorRetryBehavior.ValueType
@@ -60,7 +60,9 @@ NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE: (
     NexusHandlerErrorRetryBehavior.ValueType
 )  # 2
 """A handler error is explicitly marked as non-retryable."""
-global___NexusHandlerErrorRetryBehavior = NexusHandlerErrorRetryBehavior
+Global___NexusHandlerErrorRetryBehavior: typing_extensions.TypeAlias = (
+    NexusHandlerErrorRetryBehavior
+)
 
 class _NexusOperationExecutionStatus:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -71,7 +73,7 @@ class _NexusOperationExecutionStatusEnumTypeWrapper(
         _NexusOperationExecutionStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_EXECUTION_STATUS_UNSPECIFIED: (
         _NexusOperationExecutionStatus.ValueType
@@ -139,7 +141,9 @@ NEXUS_OPERATION_EXECUTION_STATUS_TERMINATED: (
 """The operation was terminated. Termination happens immediately without notifying the handler."""
 NEXUS_OPERATION_EXECUTION_STATUS_TIMED_OUT: NexusOperationExecutionStatus.ValueType  # 6
 """The operation has timed out by reaching one of the specified timeouts."""
-global___NexusOperationExecutionStatus = NexusOperationExecutionStatus
+Global___NexusOperationExecutionStatus: typing_extensions.TypeAlias = (
+    NexusOperationExecutionStatus
+)
 
 class _NexusOperationWaitStage:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -150,7 +154,7 @@ class _NexusOperationWaitStageEnumTypeWrapper(
         _NexusOperationWaitStage.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_WAIT_STAGE_UNSPECIFIED: _NexusOperationWaitStage.ValueType  # 0
     NEXUS_OPERATION_WAIT_STAGE_STARTED: _NexusOperationWaitStage.ValueType  # 1
@@ -168,7 +172,7 @@ NEXUS_OPERATION_WAIT_STAGE_STARTED: NexusOperationWaitStage.ValueType  # 1
 """Wait for the operation to be started."""
 NEXUS_OPERATION_WAIT_STAGE_CLOSED: NexusOperationWaitStage.ValueType  # 2
 """Wait for the operation to be in a terminal state, either successful or unsuccessful."""
-global___NexusOperationWaitStage = NexusOperationWaitStage
+Global___NexusOperationWaitStage: typing_extensions.TypeAlias = NexusOperationWaitStage
 
 class _NexusOperationIdReusePolicy:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -179,7 +183,7 @@ class _NexusOperationIdReusePolicyEnumTypeWrapper(
         _NexusOperationIdReusePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_ID_REUSE_POLICY_UNSPECIFIED: (
         _NexusOperationIdReusePolicy.ValueType
@@ -227,7 +231,9 @@ NEXUS_OPERATION_ID_REUSE_POLICY_REJECT_DUPLICATE: (
 """Do not permit re-use of the ID for this operation. Future start requests could potentially change the policy,
 allowing re-use of the ID.
 """
-global___NexusOperationIdReusePolicy = NexusOperationIdReusePolicy
+Global___NexusOperationIdReusePolicy: typing_extensions.TypeAlias = (
+    NexusOperationIdReusePolicy
+)
 
 class _NexusOperationIdConflictPolicy:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -238,7 +244,7 @@ class _NexusOperationIdConflictPolicyEnumTypeWrapper(
         _NexusOperationIdConflictPolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_ID_CONFLICT_POLICY_UNSPECIFIED: (
         _NexusOperationIdConflictPolicy.ValueType
@@ -271,4 +277,6 @@ NEXUS_OPERATION_ID_CONFLICT_POLICY_USE_EXISTING: (
     NexusOperationIdConflictPolicy.ValueType
 )  # 2
 """Don't start a new operation; instead return a handle for the running operation."""
-global___NexusOperationIdConflictPolicy = NexusOperationIdConflictPolicy
+Global___NexusOperationIdConflictPolicy: typing_extensions.TypeAlias = (
+    NexusOperationIdConflictPolicy
+)

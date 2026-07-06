@@ -26,7 +26,7 @@ class _UpdateWorkflowExecutionLifecycleStageEnumTypeWrapper(
         _UpdateWorkflowExecutionLifecycleStage.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED: (
         _UpdateWorkflowExecutionLifecycleStage.ValueType
@@ -90,7 +90,9 @@ UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_COMPLETED: (
 """The API call will not return until the Update has executed to completion
 on a worker and has either been rejected or returned a value or an error.
 """
-global___UpdateWorkflowExecutionLifecycleStage = UpdateWorkflowExecutionLifecycleStage
+Global___UpdateWorkflowExecutionLifecycleStage: typing_extensions.TypeAlias = (
+    UpdateWorkflowExecutionLifecycleStage
+)
 
 class _UpdateAdmittedEventOrigin:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -101,7 +103,7 @@ class _UpdateAdmittedEventOriginEnumTypeWrapper(
         _UpdateAdmittedEventOrigin.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     UPDATE_ADMITTED_EVENT_ORIGIN_UNSPECIFIED: _UpdateAdmittedEventOrigin.ValueType  # 0
     UPDATE_ADMITTED_EVENT_ORIGIN_REAPPLY: _UpdateAdmittedEventOrigin.ValueType  # 1
@@ -123,4 +125,6 @@ UPDATE_ADMITTED_EVENT_ORIGIN_REAPPLY: UpdateAdmittedEventOrigin.ValueType  # 1
 or replication. I.e. an accepted Update on one branch of Workflow history
 was converted into an admitted Update on a different branch.
 """
-global___UpdateAdmittedEventOrigin = UpdateAdmittedEventOrigin
+Global___UpdateAdmittedEventOrigin: typing_extensions.TypeAlias = (
+    UpdateAdmittedEventOrigin
+)

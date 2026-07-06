@@ -5,20 +5,23 @@ isort:skip_file
 
 import builtins
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class WorkerConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class SimplePollerBehavior(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -30,9 +33,10 @@ class WorkerConfig(google.protobuf.message.Message):
             max_pollers: builtins.int = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing_extensions.Literal["max_pollers", b"max_pollers"]
+            self, field_name: typing.Literal["max_pollers", b"max_pollers"]
         ) -> None: ...
 
+    @typing.final
     class AutoscalingPollerBehavior(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -58,7 +62,7 @@ class WorkerConfig(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "initial_pollers",
                 b"initial_pollers",
                 "max_pollers",
@@ -73,22 +77,22 @@ class WorkerConfig(google.protobuf.message.Message):
     AUTOSCALING_POLLER_BEHAVIOR_FIELD_NUMBER: builtins.int
     workflow_cache_size: builtins.int
     @property
-    def simple_poller_behavior(self) -> global___WorkerConfig.SimplePollerBehavior: ...
+    def simple_poller_behavior(self) -> Global___WorkerConfig.SimplePollerBehavior: ...
     @property
     def autoscaling_poller_behavior(
         self,
-    ) -> global___WorkerConfig.AutoscalingPollerBehavior: ...
+    ) -> Global___WorkerConfig.AutoscalingPollerBehavior: ...
     def __init__(
         self,
         *,
         workflow_cache_size: builtins.int = ...,
-        simple_poller_behavior: global___WorkerConfig.SimplePollerBehavior | None = ...,
-        autoscaling_poller_behavior: global___WorkerConfig.AutoscalingPollerBehavior
+        simple_poller_behavior: Global___WorkerConfig.SimplePollerBehavior | None = ...,
+        autoscaling_poller_behavior: Global___WorkerConfig.AutoscalingPollerBehavior
         | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "autoscaling_poller_behavior",
             b"autoscaling_poller_behavior",
             "poller_behavior",
@@ -99,7 +103,7 @@ class WorkerConfig(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "autoscaling_poller_behavior",
             b"autoscaling_poller_behavior",
             "poller_behavior",
@@ -111,13 +115,9 @@ class WorkerConfig(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self,
-        oneof_group: typing_extensions.Literal["poller_behavior", b"poller_behavior"],
+        self, oneof_group: typing.Literal["poller_behavior", b"poller_behavior"]
     ) -> (
-        typing_extensions.Literal[
-            "simple_poller_behavior", "autoscaling_poller_behavior"
-        ]
-        | None
+        typing.Literal["simple_poller_behavior", "autoscaling_poller_behavior"] | None
     ): ...
 
-global___WorkerConfig = WorkerConfig
+Global___WorkerConfig: typing_extensions.TypeAlias = WorkerConfig

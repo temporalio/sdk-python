@@ -26,7 +26,7 @@ class _ResourceStateEnumTypeWrapper(
         _ResourceState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESOURCE_STATE_UNSPECIFIED: _ResourceState.ValueType  # 0
     RESOURCE_STATE_ACTIVATING: _ResourceState.ValueType  # 1
@@ -73,4 +73,4 @@ RESOURCE_STATE_SUSPENDED: ResourceState.ValueType  # 9
 """The resource is suspended and not available for use. Reach out to support for remediation."""
 RESOURCE_STATE_EXPIRED: ResourceState.ValueType  # 10
 """The resource has expired and is no longer available for use."""
-global___ResourceState = ResourceState
+Global___ResourceState: typing_extensions.TypeAlias = ResourceState

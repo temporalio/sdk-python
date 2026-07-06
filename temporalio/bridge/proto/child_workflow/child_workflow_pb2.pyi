@@ -30,7 +30,7 @@ class _ParentClosePolicyEnumTypeWrapper(
         _ParentClosePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PARENT_CLOSE_POLICY_UNSPECIFIED: _ParentClosePolicy.ValueType  # 0
     """Let's the server set the default."""
@@ -56,7 +56,7 @@ PARENT_CLOSE_POLICY_ABANDON: ParentClosePolicy.ValueType  # 2
 """Abandon means not doing anything on the child workflow."""
 PARENT_CLOSE_POLICY_REQUEST_CANCEL: ParentClosePolicy.ValueType  # 3
 """Cancel means requesting cancellation on the child workflow."""
-global___ParentClosePolicy = ParentClosePolicy
+Global___ParentClosePolicy: typing_extensions.TypeAlias = ParentClosePolicy
 
 class _StartChildWorkflowExecutionFailedCause:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -67,7 +67,7 @@ class _StartChildWorkflowExecutionFailedCauseEnumTypeWrapper(
         _StartChildWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
         _StartChildWorkflowExecutionFailedCause.ValueType
@@ -88,7 +88,9 @@ START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: (
     StartChildWorkflowExecutionFailedCause.ValueType
 )  # 1
-global___StartChildWorkflowExecutionFailedCause = StartChildWorkflowExecutionFailedCause
+Global___StartChildWorkflowExecutionFailedCause: typing_extensions.TypeAlias = (
+    StartChildWorkflowExecutionFailedCause
+)
 
 class _ChildWorkflowCancellationType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -99,7 +101,7 @@ class _ChildWorkflowCancellationTypeEnumTypeWrapper(
         _ChildWorkflowCancellationType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ABANDON: _ChildWorkflowCancellationType.ValueType  # 0
     """Do not request cancellation of the child workflow if already scheduled"""
@@ -124,8 +126,11 @@ WAIT_CANCELLATION_COMPLETED: ChildWorkflowCancellationType.ValueType  # 2
 """Wait for child cancellation completion."""
 WAIT_CANCELLATION_REQUESTED: ChildWorkflowCancellationType.ValueType  # 3
 """Request cancellation of the child and wait for confirmation that the request was received."""
-global___ChildWorkflowCancellationType = ChildWorkflowCancellationType
+Global___ChildWorkflowCancellationType: typing_extensions.TypeAlias = (
+    ChildWorkflowCancellationType
+)
 
+@typing.final
 class ChildWorkflowResult(google.protobuf.message.Message):
     """Used by core to resolve child workflow executions."""
 
@@ -135,21 +140,21 @@ class ChildWorkflowResult(google.protobuf.message.Message):
     FAILED_FIELD_NUMBER: builtins.int
     CANCELLED_FIELD_NUMBER: builtins.int
     @property
-    def completed(self) -> global___Success: ...
+    def completed(self) -> Global___Success: ...
     @property
-    def failed(self) -> global___Failure: ...
+    def failed(self) -> Global___Failure: ...
     @property
-    def cancelled(self) -> global___Cancellation: ...
+    def cancelled(self) -> Global___Cancellation: ...
     def __init__(
         self,
         *,
-        completed: global___Success | None = ...,
-        failed: global___Failure | None = ...,
-        cancelled: global___Cancellation | None = ...,
+        completed: Global___Success | None = ...,
+        failed: Global___Failure | None = ...,
+        cancelled: Global___Cancellation | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancelled",
             b"cancelled",
             "completed",
@@ -162,7 +167,7 @@ class ChildWorkflowResult(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancelled",
             b"cancelled",
             "completed",
@@ -174,11 +179,12 @@ class ChildWorkflowResult(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> typing_extensions.Literal["completed", "failed", "cancelled"] | None: ...
+        self, oneof_group: typing.Literal["status", b"status"]
+    ) -> typing.Literal["completed", "failed", "cancelled"] | None: ...
 
-global___ChildWorkflowResult = ChildWorkflowResult
+Global___ChildWorkflowResult: typing_extensions.TypeAlias = ChildWorkflowResult
 
+@typing.final
 class Success(google.protobuf.message.Message):
     """Used in ChildWorkflowResult to report successful completion."""
 
@@ -193,14 +199,13 @@ class Success(google.protobuf.message.Message):
         result: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["result", b"result"]
+        self, field_name: typing.Literal["result", b"result"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["result", b"result"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["result", b"result"]) -> None: ...
 
-global___Success = Success
+Global___Success: typing_extensions.TypeAlias = Success
 
+@typing.final
 class Failure(google.protobuf.message.Message):
     """Used in ChildWorkflowResult to report non successful outcomes such as
     application failures, timeouts, terminations, and cancellations.
@@ -217,14 +222,13 @@ class Failure(google.protobuf.message.Message):
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self, field_name: typing.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["failure", b"failure"]) -> None: ...
 
-global___Failure = Failure
+Global___Failure: typing_extensions.TypeAlias = Failure
 
+@typing.final
 class Cancellation(google.protobuf.message.Message):
     """Used in ChildWorkflowResult to report cancellation.
     Failure should be ChildWorkflowFailure with a CanceledFailure cause.
@@ -241,10 +245,8 @@ class Cancellation(google.protobuf.message.Message):
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self, field_name: typing.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["failure", b"failure"]) -> None: ...
 
-global___Cancellation = Cancellation
+Global___Cancellation: typing_extensions.TypeAlias = Cancellation

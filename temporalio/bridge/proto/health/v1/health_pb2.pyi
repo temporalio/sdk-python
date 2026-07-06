@@ -18,6 +18,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class HealthCheckRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -28,12 +29,11 @@ class HealthCheckRequest(google.protobuf.message.Message):
         *,
         service: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["service", b"service"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["service", b"service"]) -> None: ...
 
-global___HealthCheckRequest = HealthCheckRequest
+Global___HealthCheckRequest: typing_extensions.TypeAlias = HealthCheckRequest
 
+@typing.final
 class HealthCheckResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -46,7 +46,7 @@ class HealthCheckResponse(google.protobuf.message.Message):
             HealthCheckResponse._ServingStatus.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         UNKNOWN: HealthCheckResponse._ServingStatus.ValueType  # 0
         SERVING: HealthCheckResponse._ServingStatus.ValueType  # 1
@@ -62,14 +62,12 @@ class HealthCheckResponse(google.protobuf.message.Message):
     """Used only by the Watch method."""
 
     STATUS_FIELD_NUMBER: builtins.int
-    status: global___HealthCheckResponse.ServingStatus.ValueType
+    status: Global___HealthCheckResponse.ServingStatus.ValueType
     def __init__(
         self,
         *,
-        status: global___HealthCheckResponse.ServingStatus.ValueType = ...,
+        status: Global___HealthCheckResponse.ServingStatus.ValueType = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["status", b"status"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["status", b"status"]) -> None: ...
 
-global___HealthCheckResponse = HealthCheckResponse
+Global___HealthCheckResponse: typing_extensions.TypeAlias = HealthCheckResponse

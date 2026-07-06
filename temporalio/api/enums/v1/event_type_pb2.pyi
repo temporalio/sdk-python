@@ -24,7 +24,7 @@ class _EventType:
 class _EventTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_EventType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     EVENT_TYPE_UNSPECIFIED: _EventType.ValueType  # 0
     """Place holder and should never appear in a Workflow execution history"""
@@ -408,4 +408,4 @@ EVENT_TYPE_WORKFLOW_EXECUTION_UNPAUSED: EventType.ValueType  # 59
 """An event that indicates that the previously paused workflow execution has been unpaused."""
 EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED: EventType.ValueType  # 60
 """An event that indicates time skipping advanced time or was disabled automatically after a bound was reached."""
-global___EventType = EventType
+Global___EventType: typing_extensions.TypeAlias = EventType

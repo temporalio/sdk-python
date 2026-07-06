@@ -26,7 +26,7 @@ class _QueryResultTypeEnumTypeWrapper(
         _QueryResultType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     QUERY_RESULT_TYPE_UNSPECIFIED: _QueryResultType.ValueType  # 0
     QUERY_RESULT_TYPE_ANSWERED: _QueryResultType.ValueType  # 1
@@ -37,7 +37,7 @@ class QueryResultType(_QueryResultType, metaclass=_QueryResultTypeEnumTypeWrappe
 QUERY_RESULT_TYPE_UNSPECIFIED: QueryResultType.ValueType  # 0
 QUERY_RESULT_TYPE_ANSWERED: QueryResultType.ValueType  # 1
 QUERY_RESULT_TYPE_FAILED: QueryResultType.ValueType  # 2
-global___QueryResultType = QueryResultType
+Global___QueryResultType: typing_extensions.TypeAlias = QueryResultType
 
 class _QueryRejectCondition:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -48,7 +48,7 @@ class _QueryRejectConditionEnumTypeWrapper(
         _QueryRejectCondition.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     QUERY_REJECT_CONDITION_UNSPECIFIED: _QueryRejectCondition.ValueType  # 0
     QUERY_REJECT_CONDITION_NONE: _QueryRejectCondition.ValueType  # 1
@@ -69,4 +69,4 @@ QUERY_REJECT_CONDITION_NOT_OPEN: QueryRejectCondition.ValueType  # 2
 """NotOpen indicates that query should be rejected if workflow is not open."""
 QUERY_REJECT_CONDITION_NOT_COMPLETED_CLEANLY: QueryRejectCondition.ValueType  # 3
 """NotCompletedCleanly indicates that query should be rejected if workflow did not complete cleanly."""
-global___QueryRejectCondition = QueryRejectCondition
+Global___QueryRejectCondition: typing_extensions.TypeAlias = QueryRejectCondition

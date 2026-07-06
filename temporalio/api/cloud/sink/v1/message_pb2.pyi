@@ -5,17 +5,19 @@ isort:skip_file
 
 import builtins
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class S3Spec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -45,7 +47,7 @@ class S3Spec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "aws_account_id",
             b"aws_account_id",
             "bucket_name",
@@ -59,8 +61,9 @@ class S3Spec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___S3Spec = S3Spec
+Global___S3Spec: typing_extensions.TypeAlias = S3Spec
 
+@typing.final
 class GCSSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -86,7 +89,7 @@ class GCSSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "bucket_name",
             b"bucket_name",
             "gcp_project_id",
@@ -98,8 +101,9 @@ class GCSSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___GCSSpec = GCSSpec
+Global___GCSSpec: typing_extensions.TypeAlias = GCSSpec
 
+@typing.final
 class KinesisSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -121,7 +125,7 @@ class KinesisSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "destination_uri",
             b"destination_uri",
             "region",
@@ -131,8 +135,9 @@ class KinesisSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___KinesisSpec = KinesisSpec
+Global___KinesisSpec: typing_extensions.TypeAlias = KinesisSpec
 
+@typing.final
 class PubSubSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -154,7 +159,7 @@ class PubSubSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "gcp_project_id",
             b"gcp_project_id",
             "service_account_id",
@@ -164,4 +169,4 @@ class PubSubSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___PubSubSpec = PubSubSpec
+Global___PubSubSpec: typing_extensions.TypeAlias = PubSubSpec

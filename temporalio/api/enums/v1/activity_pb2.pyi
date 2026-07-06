@@ -26,7 +26,7 @@ class _ActivityExecutionStatusEnumTypeWrapper(
         _ActivityExecutionStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ACTIVITY_EXECUTION_STATUS_UNSPECIFIED: _ActivityExecutionStatus.ValueType  # 0
     ACTIVITY_EXECUTION_STATUS_RUNNING: _ActivityExecutionStatus.ValueType  # 1
@@ -107,7 +107,7 @@ ACTIVITY_EXECUTION_STATUS_TIMED_OUT: ActivityExecutionStatus.ValueType  # 6
   reached when retry is blocked (RetryPolicy.maximum_attempts exhausted,
   SCHEDULE_TO_CLOSE would be exceeded, or cancellation has been requested).
 """
-global___ActivityExecutionStatus = ActivityExecutionStatus
+Global___ActivityExecutionStatus: typing_extensions.TypeAlias = ActivityExecutionStatus
 
 class _ActivityIdReusePolicy:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -118,7 +118,7 @@ class _ActivityIdReusePolicyEnumTypeWrapper(
         _ActivityIdReusePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ACTIVITY_ID_REUSE_POLICY_UNSPECIFIED: _ActivityIdReusePolicy.ValueType  # 0
     ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE: _ActivityIdReusePolicy.ValueType  # 1
@@ -156,7 +156,7 @@ ACTIVITY_ID_REUSE_POLICY_REJECT_DUPLICATE: ActivityIdReusePolicy.ValueType  # 3
 """Do not permit re-use of the ID for this activity. Future start requests could potentially change the policy,
 allowing re-use of the ID.
 """
-global___ActivityIdReusePolicy = ActivityIdReusePolicy
+Global___ActivityIdReusePolicy: typing_extensions.TypeAlias = ActivityIdReusePolicy
 
 class _ActivityIdConflictPolicy:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -167,7 +167,7 @@ class _ActivityIdConflictPolicyEnumTypeWrapper(
         _ActivityIdConflictPolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ACTIVITY_ID_CONFLICT_POLICY_UNSPECIFIED: _ActivityIdConflictPolicy.ValueType  # 0
     ACTIVITY_ID_CONFLICT_POLICY_FAIL: _ActivityIdConflictPolicy.ValueType  # 1
@@ -189,4 +189,6 @@ ACTIVITY_ID_CONFLICT_POLICY_FAIL: ActivityIdConflictPolicy.ValueType  # 1
 """Don't start a new activity; instead return `ActivityExecutionAlreadyStarted` error."""
 ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING: ActivityIdConflictPolicy.ValueType  # 2
 """Don't start a new activity; instead return a handle for the running activity."""
-global___ActivityIdConflictPolicy = ActivityIdConflictPolicy
+Global___ActivityIdConflictPolicy: typing_extensions.TypeAlias = (
+    ActivityIdConflictPolicy
+)

@@ -26,7 +26,7 @@ class _ResetReapplyExcludeTypeEnumTypeWrapper(
         _ResetReapplyExcludeType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_REAPPLY_EXCLUDE_TYPE_UNSPECIFIED: _ResetReapplyExcludeType.ValueType  # 0
     RESET_REAPPLY_EXCLUDE_TYPE_SIGNAL: _ResetReapplyExcludeType.ValueType  # 1
@@ -52,7 +52,7 @@ RESET_REAPPLY_EXCLUDE_TYPE_NEXUS: ResetReapplyExcludeType.ValueType  # 3
 """Exclude nexus events when reapplying events beyond the reset point."""
 RESET_REAPPLY_EXCLUDE_TYPE_CANCEL_REQUEST: ResetReapplyExcludeType.ValueType  # 4
 """Deprecated, unimplemented option."""
-global___ResetReapplyExcludeType = ResetReapplyExcludeType
+Global___ResetReapplyExcludeType: typing_extensions.TypeAlias = ResetReapplyExcludeType
 
 class _ResetReapplyType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -63,7 +63,7 @@ class _ResetReapplyTypeEnumTypeWrapper(
         _ResetReapplyType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_REAPPLY_TYPE_UNSPECIFIED: _ResetReapplyType.ValueType  # 0
     RESET_REAPPLY_TYPE_SIGNAL: _ResetReapplyType.ValueType  # 1
@@ -86,7 +86,7 @@ RESET_REAPPLY_TYPE_NONE: ResetReapplyType.ValueType  # 2
 """No events are reapplied when workflow is reset."""
 RESET_REAPPLY_TYPE_ALL_ELIGIBLE: ResetReapplyType.ValueType  # 3
 """All eligible events are reapplied when workflow is reset."""
-global___ResetReapplyType = ResetReapplyType
+Global___ResetReapplyType: typing_extensions.TypeAlias = ResetReapplyType
 
 class _ResetType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -95,7 +95,7 @@ class _ResetType:
 class _ResetTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ResetType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_TYPE_UNSPECIFIED: _ResetType.ValueType  # 0
     RESET_TYPE_FIRST_WORKFLOW_TASK: _ResetType.ValueType  # 1
@@ -111,4 +111,4 @@ RESET_TYPE_FIRST_WORKFLOW_TASK: ResetType.ValueType  # 1
 """Resets to event of the first workflow task completed, or if it does not exist, the event after task scheduled."""
 RESET_TYPE_LAST_WORKFLOW_TASK: ResetType.ValueType  # 2
 """Resets to event of the last workflow task completed, or if it does not exist, the event after task scheduled."""
-global___ResetType = ResetType
+Global___ResetType: typing_extensions.TypeAlias = ResetType

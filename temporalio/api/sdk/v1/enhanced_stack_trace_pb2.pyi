@@ -6,23 +6,26 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class EnhancedStackTrace(google.protobuf.message.Message):
     """Internal structure used to create worker stack traces with references to code."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class SourcesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -30,61 +33,62 @@ class EnhancedStackTrace(google.protobuf.message.Message):
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
         @property
-        def value(self) -> global___StackTraceFileSlice: ...
+        def value(self) -> Global___StackTraceFileSlice: ...
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: global___StackTraceFileSlice | None = ...,
+            value: Global___StackTraceFileSlice | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     SDK_FIELD_NUMBER: builtins.int
     SOURCES_FIELD_NUMBER: builtins.int
     STACKS_FIELD_NUMBER: builtins.int
     @property
-    def sdk(self) -> global___StackTraceSDKInfo:
+    def sdk(self) -> Global___StackTraceSDKInfo:
         """Information pertaining to the SDK that the trace has been captured from."""
+
     @property
     def sources(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, global___StackTraceFileSlice
+        builtins.str, Global___StackTraceFileSlice
     ]:
         """Mapping of file path to file contents."""
+
     @property
     def stacks(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___StackTrace
+        Global___StackTrace
     ]:
         """Collection of stacks captured."""
+
     def __init__(
         self,
         *,
-        sdk: global___StackTraceSDKInfo | None = ...,
-        sources: collections.abc.Mapping[builtins.str, global___StackTraceFileSlice]
+        sdk: Global___StackTraceSDKInfo | None = ...,
+        sources: collections.abc.Mapping[builtins.str, Global___StackTraceFileSlice]
         | None = ...,
-        stacks: collections.abc.Iterable[global___StackTrace] | None = ...,
+        stacks: collections.abc.Iterable[Global___StackTrace] | None = ...,
     ) -> None: ...
-    def HasField(
-        self, field_name: typing_extensions.Literal["sdk", b"sdk"]
-    ) -> builtins.bool: ...
+    def HasField(self, field_name: typing.Literal["sdk", b"sdk"]) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "sdk", b"sdk", "sources", b"sources", "stacks", b"stacks"
         ],
     ) -> None: ...
 
-global___EnhancedStackTrace = EnhancedStackTrace
+Global___EnhancedStackTrace: typing_extensions.TypeAlias = EnhancedStackTrace
 
+@typing.final
 class StackTraceSDKInfo(google.protobuf.message.Message):
     """Information pertaining to the SDK that the trace has been captured from.
     (-- api-linter: core::0123::resource-annotation=disabled
@@ -106,12 +110,12 @@ class StackTraceSDKInfo(google.protobuf.message.Message):
         version: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["name", b"name", "version", b"version"],
+        self, field_name: typing.Literal["name", b"name", "version", b"version"]
     ) -> None: ...
 
-global___StackTraceSDKInfo = StackTraceSDKInfo
+Global___StackTraceSDKInfo: typing_extensions.TypeAlias = StackTraceSDKInfo
 
+@typing.final
 class StackTraceFileSlice(google.protobuf.message.Message):
     """ "Slice" of a file starting at line_offset -- a line offset and code fragment corresponding to the worker's stack."""
 
@@ -135,13 +139,14 @@ class StackTraceFileSlice(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "content", b"content", "line_offset", b"line_offset"
         ],
     ) -> None: ...
 
-global___StackTraceFileSlice = StackTraceFileSlice
+Global___StackTraceFileSlice: typing_extensions.TypeAlias = StackTraceFileSlice
 
+@typing.final
 class StackTraceFileLocation(google.protobuf.message.Message):
     """More specific location details of a file: its path, precise line and column numbers if applicable, and function name if available.
     In essence, a pointer to a location in a file
@@ -183,7 +188,7 @@ class StackTraceFileLocation(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "column",
             b"column",
             "file_path",
@@ -197,8 +202,9 @@ class StackTraceFileLocation(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___StackTraceFileLocation = StackTraceFileLocation
+Global___StackTraceFileLocation: typing_extensions.TypeAlias = StackTraceFileLocation
 
+@typing.final
 class StackTrace(google.protobuf.message.Message):
     """Collection of FileLocation messages from a single stack."""
 
@@ -209,17 +215,18 @@ class StackTrace(google.protobuf.message.Message):
     def locations(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___StackTraceFileLocation
+        Global___StackTraceFileLocation
     ]:
         """Collection of `FileLocation`s, each for a stack frame that comprise a stack trace."""
+
     def __init__(
         self,
         *,
-        locations: collections.abc.Iterable[global___StackTraceFileLocation]
+        locations: collections.abc.Iterable[Global___StackTraceFileLocation]
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["locations", b"locations"]
+        self, field_name: typing.Literal["locations", b"locations"]
     ) -> None: ...
 
-global___StackTrace = StackTrace
+Global___StackTrace: typing_extensions.TypeAlias = StackTrace

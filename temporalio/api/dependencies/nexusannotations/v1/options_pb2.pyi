@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.descriptor_pb2
@@ -13,13 +14,14 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.extension_dict
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class OperationOptions(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -32,6 +34,7 @@ class OperationOptions(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Tags to attach to the operation. Used by code generators to include and exclude operations."""
+
     def __init__(
         self,
         *,
@@ -39,11 +42,12 @@ class OperationOptions(google.protobuf.message.Message):
         tags: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["name", b"name", "tags", b"tags"]
+        self, field_name: typing.Literal["name", b"name", "tags", b"tags"]
     ) -> None: ...
 
-global___OperationOptions = OperationOptions
+Global___OperationOptions: typing_extensions.TypeAlias = OperationOptions
 
+@typing.final
 class ServiceOptions(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -56,6 +60,7 @@ class ServiceOptions(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Tags to attach to the service. Used by code generators to include and exclude services."""
+
     def __init__(
         self,
         *,
@@ -63,16 +68,16 @@ class ServiceOptions(google.protobuf.message.Message):
         tags: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["name", b"name", "tags", b"tags"]
+        self, field_name: typing.Literal["name", b"name", "tags", b"tags"]
     ) -> None: ...
 
-global___ServiceOptions = ServiceOptions
+Global___ServiceOptions: typing_extensions.TypeAlias = ServiceOptions
 
 SERVICE_FIELD_NUMBER: builtins.int
 OPERATION_FIELD_NUMBER: builtins.int
 service: google.protobuf.internal.extension_dict._ExtensionFieldDescriptor[
-    google.protobuf.descriptor_pb2.ServiceOptions, global___ServiceOptions
+    google.protobuf.descriptor_pb2.ServiceOptions, Global___ServiceOptions
 ]
 operation: google.protobuf.internal.extension_dict._ExtensionFieldDescriptor[
-    google.protobuf.descriptor_pb2.MethodOptions, global___OperationOptions
+    google.protobuf.descriptor_pb2.MethodOptions, Global___OperationOptions
 ]

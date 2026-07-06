@@ -5,18 +5,20 @@ isort:skip_file
 
 import builtins
 import sys
+import typing
 
 import google.protobuf.any_pb2
 import google.protobuf.descriptor
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class Message(google.protobuf.message.Message):
     """(-- api-linter: core::0146::any=disabled
     aip.dev/not-precedent: We want runtime extensibility for the body field --)
@@ -42,6 +44,7 @@ class Message(google.protobuf.message.Message):
         """The opaque data carried by this message. The protocol type can be
         extracted from the package name of the message carried inside the Any.
         """
+
     def __init__(
         self,
         *,
@@ -53,7 +56,7 @@ class Message(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "body",
             b"body",
             "command_index",
@@ -66,7 +69,7 @@ class Message(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "body",
             b"body",
             "command_index",
@@ -82,7 +85,7 @@ class Message(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["sequencing_id", b"sequencing_id"]
-    ) -> typing_extensions.Literal["event_id", "command_index"] | None: ...
+        self, oneof_group: typing.Literal["sequencing_id", b"sequencing_id"]
+    ) -> typing.Literal["event_id", "command_index"] | None: ...
 
-global___Message = Message
+Global___Message: typing_extensions.TypeAlias = Message

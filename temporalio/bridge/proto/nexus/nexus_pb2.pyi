@@ -33,7 +33,7 @@ class _NexusTaskCancelReasonEnumTypeWrapper(
         _NexusTaskCancelReason.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TIMED_OUT: _NexusTaskCancelReason.ValueType  # 0
     """The nexus task is known to have timed out"""
@@ -48,7 +48,7 @@ TIMED_OUT: NexusTaskCancelReason.ValueType  # 0
 """The nexus task is known to have timed out"""
 WORKER_SHUTDOWN: NexusTaskCancelReason.ValueType  # 1
 """The worker is shutting down"""
-global___NexusTaskCancelReason = NexusTaskCancelReason
+Global___NexusTaskCancelReason: typing_extensions.TypeAlias = NexusTaskCancelReason
 
 class _NexusOperationCancellationType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -59,7 +59,7 @@ class _NexusOperationCancellationTypeEnumTypeWrapper(
         _NexusOperationCancellationType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WAIT_CANCELLATION_COMPLETED: _NexusOperationCancellationType.ValueType  # 0
     """Wait for operation cancellation completion. Default."""
@@ -90,8 +90,11 @@ If you want to ensure that cancellation is delivered to the operation, use WAIT_
 """
 WAIT_CANCELLATION_REQUESTED: NexusOperationCancellationType.ValueType  # 3
 """Request cancellation of the operation and wait for confirmation that the request was received."""
-global___NexusOperationCancellationType = NexusOperationCancellationType
+Global___NexusOperationCancellationType: typing_extensions.TypeAlias = (
+    NexusOperationCancellationType
+)
 
+@typing.final
 class NexusOperationResult(google.protobuf.message.Message):
     """Used by core to resolve nexus operations."""
 
@@ -119,7 +122,7 @@ class NexusOperationResult(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancelled",
             b"cancelled",
             "completed",
@@ -134,7 +137,7 @@ class NexusOperationResult(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancelled",
             b"cancelled",
             "completed",
@@ -148,14 +151,12 @@ class NexusOperationResult(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> (
-        typing_extensions.Literal["completed", "failed", "cancelled", "timed_out"]
-        | None
-    ): ...
+        self, oneof_group: typing.Literal["status", b"status"]
+    ) -> typing.Literal["completed", "failed", "cancelled", "timed_out"] | None: ...
 
-global___NexusOperationResult = NexusOperationResult
+Global___NexusOperationResult: typing_extensions.TypeAlias = NexusOperationResult
 
+@typing.final
 class NexusTaskCompletion(google.protobuf.message.Message):
     """A response to a Nexus task"""
 
@@ -168,14 +169,6 @@ class NexusTaskCompletion(google.protobuf.message.Message):
     FAILURE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The unique identifier for this task provided in the poll response"""
-    @property
-    def completed(self) -> temporalio.api.nexus.v1.message_pb2.Response:
-        """The handler completed (successfully or not). Note that the response kind must match the
-        request kind (start or cancel).
-        """
-    @property
-    def error(self) -> temporalio.api.nexus.v1.message_pb2.HandlerError:
-        """The handler could not complete the request for some reason. Deprecated, use failure."""
     ack_cancel: builtins.bool
     """The lang SDK acknowledges that it is responding to a `CancelNexusTask` and thus the
     response is irrelevant. This is not the only way to respond to a cancel, the other
@@ -183,8 +176,19 @@ class NexusTaskCompletion(google.protobuf.message.Message):
     by cancellation.
     """
     @property
+    def completed(self) -> temporalio.api.nexus.v1.message_pb2.Response:
+        """The handler completed (successfully or not). Note that the response kind must match the
+        request kind (start or cancel).
+        """
+
+    @property
+    def error(self) -> temporalio.api.nexus.v1.message_pb2.HandlerError:
+        """The handler could not complete the request for some reason. Deprecated, use failure."""
+
+    @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """The handler could not complete the request for some reason."""
+
     def __init__(
         self,
         *,
@@ -196,7 +200,7 @@ class NexusTaskCompletion(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "ack_cancel",
             b"ack_cancel",
             "completed",
@@ -211,7 +215,7 @@ class NexusTaskCompletion(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "ack_cancel",
             b"ack_cancel",
             "completed",
@@ -227,13 +231,12 @@ class NexusTaskCompletion(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> (
-        typing_extensions.Literal["completed", "error", "ack_cancel", "failure"] | None
-    ): ...
+        self, oneof_group: typing.Literal["status", b"status"]
+    ) -> typing.Literal["completed", "error", "ack_cancel", "failure"] | None: ...
 
-global___NexusTaskCompletion = NexusTaskCompletion
+Global___NexusTaskCompletion: typing_extensions.TypeAlias = NexusTaskCompletion
 
+@typing.final
 class NexusTask(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -241,13 +244,18 @@ class NexusTask(google.protobuf.message.Message):
     CANCEL_TASK_FIELD_NUMBER: builtins.int
     REQUEST_DEADLINE_FIELD_NUMBER: builtins.int
     ENDPOINT_FIELD_NUMBER: builtins.int
+    endpoint: builtins.str
+    """The endpoint this request was addressed to. Extracted from the request for convenient access.
+    Only set when variant is `task`.
+    """
     @property
     def task(
         self,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse:
         """A nexus task from server"""
+
     @property
-    def cancel_task(self) -> global___CancelNexusTask:
+    def cancel_task(self) -> Global___CancelNexusTask:
         """A request by Core to notify an in-progress operation handler that it should cancel. This
         is distinct from a `CancelOperationRequest` from the server, which results from the user
         requesting the cancellation of an operation. Handling this variant should result in
@@ -260,28 +268,26 @@ class NexusTask(google.protobuf.message.Message):
         EX: Core knows the nexus operation has timed out, and it does not make sense for the
         user's operation handler to continue doing work.
         """
+
     @property
     def request_deadline(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The deadline for this request, parsed from the "Request-Timeout" header.
         Only set when variant is `task` and the header was present with a valid value.
         Represented as an absolute timestamp.
         """
-    endpoint: builtins.str
-    """The endpoint this request was addressed to. Extracted from the request for convenient access.
-    Only set when variant is `task`.
-    """
+
     def __init__(
         self,
         *,
         task: temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse
         | None = ...,
-        cancel_task: global___CancelNexusTask | None = ...,
+        cancel_task: Global___CancelNexusTask | None = ...,
         request_deadline: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_task",
             b"cancel_task",
             "request_deadline",
@@ -294,7 +300,7 @@ class NexusTask(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_task",
             b"cancel_task",
             "endpoint",
@@ -308,11 +314,12 @@ class NexusTask(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["task", "cancel_task"] | None: ...
+        self, oneof_group: typing.Literal["variant", b"variant"]
+    ) -> typing.Literal["task", "cancel_task"] | None: ...
 
-global___NexusTask = NexusTask
+Global___NexusTask: typing_extensions.TypeAlias = NexusTask
 
+@typing.final
 class CancelNexusTask(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -320,19 +327,17 @@ class CancelNexusTask(google.protobuf.message.Message):
     REASON_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token from the PollNexusTaskQueueResponse"""
-    reason: global___NexusTaskCancelReason.ValueType
+    reason: Global___NexusTaskCancelReason.ValueType
     """Why Core is asking for this operation to be cancelled"""
     def __init__(
         self,
         *,
         task_token: builtins.bytes = ...,
-        reason: global___NexusTaskCancelReason.ValueType = ...,
+        reason: Global___NexusTaskCancelReason.ValueType = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "reason", b"reason", "task_token", b"task_token"
-        ],
+        field_name: typing.Literal["reason", b"reason", "task_token", b"task_token"],
     ) -> None: ...
 
-global___CancelNexusTask = CancelNexusTask
+Global___CancelNexusTask: typing_extensions.TypeAlias = CancelNexusTask

@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -13,13 +14,14 @@ import google.protobuf.message
 
 import temporalio.api.worker.v1.message_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ExecuteCommandsRequest(google.protobuf.message.Message):
     """(--
     Internal Nexus service for server-to-worker communication.
@@ -46,11 +48,12 @@ class ExecuteCommandsRequest(google.protobuf.message.Message):
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["commands", b"commands"]
+        self, field_name: typing.Literal["commands", b"commands"]
     ) -> None: ...
 
-global___ExecuteCommandsRequest = ExecuteCommandsRequest
+Global___ExecuteCommandsRequest: typing_extensions.TypeAlias = ExecuteCommandsRequest
 
+@typing.final
 class ExecuteCommandsResponse(google.protobuf.message.Message):
     """Response payload for the "ExecuteCommands" Nexus operation.
     The results list must be 1:1 with the commands list in the request (same size and order).
@@ -73,8 +76,6 @@ class ExecuteCommandsResponse(google.protobuf.message.Message):
         ]
         | None = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["results", b"results"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["results", b"results"]) -> None: ...
 
-global___ExecuteCommandsResponse = ExecuteCommandsResponse
+Global___ExecuteCommandsResponse: typing_extensions.TypeAlias = ExecuteCommandsResponse

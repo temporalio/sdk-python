@@ -6,19 +6,21 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.any_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class GrpcStatus(google.protobuf.message.Message):
     """From https://github.com/grpc/grpc/blob/master/src/proto/grpc/status/status.proto
     since we don't import grpc but still need the status info
@@ -46,9 +48,9 @@ class GrpcStatus(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "code", b"code", "details", b"details", "message", b"message"
         ],
     ) -> None: ...
 
-global___GrpcStatus = GrpcStatus
+Global___GrpcStatus: typing_extensions.TypeAlias = GrpcStatus

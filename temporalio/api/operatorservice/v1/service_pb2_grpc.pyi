@@ -4,12 +4,240 @@ isort:skip_file
 """
 
 import abc
+import collections.abc
+import sys
+import typing
 
 import grpc
+import grpc.aio
 
 import temporalio.api.operatorservice.v1.request_response_pb2
 
-class OperatorServiceStub:
+if sys.version_info >= (3, 13):
+    import typing as typing_extensions
+else:
+    import typing_extensions
+
+_T = typing.TypeVar("_T")
+
+class _MaybeAsyncIterator(
+    collections.abc.AsyncIterator[_T],
+    collections.abc.Iterator[_T],
+    metaclass=abc.ABCMeta,
+): ...
+class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore[misc, type-arg]
+    ...
+
+GRPC_GENERATED_VERSION: str
+GRPC_VERSION: str
+_OperatorServiceAddSearchAttributesType = typing_extensions.TypeVar(
+    "_OperatorServiceAddSearchAttributesType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
+    ],
+)
+
+_OperatorServiceRemoveSearchAttributesType = typing_extensions.TypeVar(
+    "_OperatorServiceRemoveSearchAttributesType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
+    ],
+)
+
+_OperatorServiceListSearchAttributesType = typing_extensions.TypeVar(
+    "_OperatorServiceListSearchAttributesType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
+    ],
+)
+
+_OperatorServiceDeleteNamespaceType = typing_extensions.TypeVar(
+    "_OperatorServiceDeleteNamespaceType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
+    ],
+)
+
+_OperatorServiceAddOrUpdateRemoteClusterType = typing_extensions.TypeVar(
+    "_OperatorServiceAddOrUpdateRemoteClusterType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+    ],
+)
+
+_OperatorServiceRemoveRemoteClusterType = typing_extensions.TypeVar(
+    "_OperatorServiceRemoveRemoteClusterType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+    ],
+)
+
+_OperatorServiceListClustersType = typing_extensions.TypeVar(
+    "_OperatorServiceListClustersType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+    ],
+)
+
+_OperatorServiceGetNexusEndpointType = typing_extensions.TypeVar(
+    "_OperatorServiceGetNexusEndpointType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+    ],
+)
+
+_OperatorServiceCreateNexusEndpointType = typing_extensions.TypeVar(
+    "_OperatorServiceCreateNexusEndpointType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+    ],
+)
+
+_OperatorServiceUpdateNexusEndpointType = typing_extensions.TypeVar(
+    "_OperatorServiceUpdateNexusEndpointType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+    ],
+)
+
+_OperatorServiceDeleteNexusEndpointType = typing_extensions.TypeVar(
+    "_OperatorServiceDeleteNexusEndpointType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+    ],
+)
+
+_OperatorServiceListNexusEndpointsType = typing_extensions.TypeVar(
+    "_OperatorServiceListNexusEndpointsType",
+    grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+    ],
+    default=grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+    ],
+)
+
+class OperatorServiceStub(
+    typing.Generic[
+        _OperatorServiceAddSearchAttributesType,
+        _OperatorServiceRemoveSearchAttributesType,
+        _OperatorServiceListSearchAttributesType,
+        _OperatorServiceDeleteNamespaceType,
+        _OperatorServiceAddOrUpdateRemoteClusterType,
+        _OperatorServiceRemoveRemoteClusterType,
+        _OperatorServiceListClustersType,
+        _OperatorServiceGetNexusEndpointType,
+        _OperatorServiceCreateNexusEndpointType,
+        _OperatorServiceUpdateNexusEndpointType,
+        _OperatorServiceDeleteNexusEndpointType,
+        _OperatorServiceListNexusEndpointsType,
+    ]
+):
     """OperatorService API defines how Temporal SDKs and other clients interact with the Temporal server
     to perform administrative functions like registering a search attribute or a namespace.
     APIs in this file could be not compatible with Temporal Cloud, hence it's usage in SDKs should be limited by
@@ -17,86 +245,220 @@ class OperatorServiceStub:
     (-- Search Attribute --)
     """
 
-    def __init__(self, channel: grpc.Channel) -> None: ...
-    AddSearchAttributes: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
-    ]
+    @typing.overload
+    def __init__(
+        self: OperatorServiceStub[
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+            ],
+            grpc.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+            ],
+        ],
+        channel: grpc.Channel,
+    ) -> None: ...
+    @typing.overload
+    def __init__(
+        self: OperatorServiceStub[
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+            ],
+            grpc.aio.UnaryUnaryMultiCallable[
+                temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+                temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+            ],
+        ],
+        channel: grpc.aio.Channel,
+    ) -> None: ...
+
+    AddSearchAttributes: _OperatorServiceAddSearchAttributesType
     """AddSearchAttributes add custom search attributes.
 
     Returns ALREADY_EXISTS status code if a Search Attribute with any of the specified names already exists
     Returns INTERNAL status code with temporalio.api.errordetails.v1.SystemWorkflowFailure in Error Details if registration process fails,
     """
-    RemoveSearchAttributes: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
-    ]
+
+    RemoveSearchAttributes: _OperatorServiceRemoveSearchAttributesType
     """RemoveSearchAttributes removes custom search attributes.
 
     Returns NOT_FOUND status code if a Search Attribute with any of the specified names is not registered
     """
-    ListSearchAttributes: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
-    ]
+
+    ListSearchAttributes: _OperatorServiceListSearchAttributesType
     """ListSearchAttributes returns comprehensive information about search attributes."""
-    DeleteNamespace: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
-    ]
+
+    DeleteNamespace: _OperatorServiceDeleteNamespaceType
     """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
-    AddOrUpdateRemoteCluster: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
-    ]
+
+    AddOrUpdateRemoteCluster: _OperatorServiceAddOrUpdateRemoteClusterType
     """AddOrUpdateRemoteCluster adds or updates remote cluster."""
-    RemoveRemoteCluster: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
-    ]
+
+    RemoveRemoteCluster: _OperatorServiceRemoveRemoteClusterType
     """RemoveRemoteCluster removes remote cluster."""
-    ListClusters: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
-    ]
+
+    ListClusters: _OperatorServiceListClustersType
     """ListClusters returns information about Temporal clusters."""
-    GetNexusEndpoint: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
-    ]
+
+    GetNexusEndpoint: _OperatorServiceGetNexusEndpointType
     """Get a registered Nexus endpoint by ID. The returned version can be used for optimistic updates."""
-    CreateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-    ]
+
+    CreateNexusEndpoint: _OperatorServiceCreateNexusEndpointType
     """Create a Nexus endpoint. This will fail if an endpoint with the same name is already registered with a status of
     ALREADY_EXISTS.
     Returns the created endpoint with its initial version. You may use this version for subsequent updates.
     """
-    UpdateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-    ]
+
+    UpdateNexusEndpoint: _OperatorServiceUpdateNexusEndpointType
     """Optimistically update a Nexus endpoint based on provided version as obtained via the `GetNexusEndpoint` or
     `ListNexusEndpointResponse` APIs. This will fail with a status of FAILED_PRECONDITION if the version does not
     match.
     Returns the updated endpoint with its updated version. You may use this version for subsequent updates. You don't
     need to increment the version yourself. The server will increment the version for you after each update.
     """
-    DeleteNexusEndpoint: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-    ]
+
+    DeleteNexusEndpoint: _OperatorServiceDeleteNexusEndpointType
     """Delete an incoming Nexus service by ID."""
-    ListNexusEndpoints: grpc.UnaryUnaryMultiCallable[
-        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
-        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
-    ]
+
+    ListNexusEndpoints: _OperatorServiceListNexusEndpointsType
     """List all Nexus endpoints for the cluster, sorted by ID in ascending order. Set page_token in the request to the
     next_page_token field of the previous response to get the next page of results. An empty next_page_token
     indicates that there are no more results. During pagination, a newly added service with an ID lexicographically
     earlier than the previous page's last endpoint's ID may be missed.
     """
+
+OperatorServiceAsyncStub: typing_extensions.TypeAlias = OperatorServiceStub[
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+    ],
+    grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+    ],
+]
 
 class OperatorServiceServicer(metaclass=abc.ABCMeta):
     """OperatorService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -110,102 +472,171 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
     def AddSearchAttributes(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.AddSearchAttributesResponse
+        ],
+    ]:
         """AddSearchAttributes add custom search attributes.
 
         Returns ALREADY_EXISTS status code if a Search Attribute with any of the specified names already exists
         Returns INTERNAL status code with temporalio.api.errordetails.v1.SystemWorkflowFailure in Error Details if registration process fails,
         """
+
     @abc.abstractmethod
     def RemoveSearchAttributes(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.RemoveSearchAttributesResponse
+        ],
+    ]:
         """RemoveSearchAttributes removes custom search attributes.
 
         Returns NOT_FOUND status code if a Search Attribute with any of the specified names is not registered
         """
+
     @abc.abstractmethod
     def ListSearchAttributes(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.ListSearchAttributesResponse
+        ],
+    ]:
         """ListSearchAttributes returns comprehensive information about search attributes."""
+
     @abc.abstractmethod
     def DeleteNamespace(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse
+        ],
+    ]:
         """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
+
     @abc.abstractmethod
     def AddOrUpdateRemoteCluster(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse
+        ],
+    ]:
         """AddOrUpdateRemoteCluster adds or updates remote cluster."""
+
     @abc.abstractmethod
     def RemoveRemoteCluster(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.RemoveRemoteClusterResponse
+        ],
+    ]:
         """RemoveRemoteCluster removes remote cluster."""
+
     @abc.abstractmethod
     def ListClusters(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.ListClustersRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.ListClustersResponse
+        ],
+    ]:
         """ListClusters returns information about Temporal clusters."""
+
     @abc.abstractmethod
     def GetNexusEndpoint(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointRequest,
-        context: grpc.ServicerContext,
-    ) -> (
-        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse
-    ):
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.GetNexusEndpointResponse
+        ],
+    ]:
         """Get a registered Nexus endpoint by ID. The returned version can be used for optimistic updates."""
+
     @abc.abstractmethod
     def CreateNexusEndpoint(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.CreateNexusEndpointResponse
+        ],
+    ]:
         """Create a Nexus endpoint. This will fail if an endpoint with the same name is already registered with a status of
         ALREADY_EXISTS.
         Returns the created endpoint with its initial version. You may use this version for subsequent updates.
         """
+
     @abc.abstractmethod
     def UpdateNexusEndpoint(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.UpdateNexusEndpointResponse
+        ],
+    ]:
         """Optimistically update a Nexus endpoint based on provided version as obtained via the `GetNexusEndpoint` or
         `ListNexusEndpointResponse` APIs. This will fail with a status of FAILED_PRECONDITION if the version does not
         match.
         Returns the updated endpoint with its updated version. You may use this version for subsequent updates. You don't
         need to increment the version yourself. The server will increment the version for you after each update.
         """
+
     @abc.abstractmethod
     def DeleteNexusEndpoint(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.DeleteNexusEndpointResponse
+        ],
+    ]:
         """Delete an incoming Nexus service by ID."""
+
     @abc.abstractmethod
     def ListNexusEndpoints(
         self,
         request: temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.ListNexusEndpointsResponse
+        ],
+    ]:
         """List all Nexus endpoints for the cluster, sorted by ID in ascending order. Set page_token in the request to the
         next_page_token field of the previous response to get the next page of results. An empty next_page_token
         indicates that there are no more results. During pagination, a newly added service with an ID lexicographically
@@ -213,5 +644,6 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         """
 
 def add_OperatorServiceServicer_to_server(
-    servicer: OperatorServiceServicer, server: grpc.Server
+    servicer: OperatorServiceServicer,
+    server: typing.Union[grpc.Server, grpc.aio.Server],
 ) -> None: ...

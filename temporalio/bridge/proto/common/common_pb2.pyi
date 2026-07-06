@@ -27,7 +27,7 @@ class _VersioningIntentEnumTypeWrapper(
         _VersioningIntent.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     UNSPECIFIED: _VersioningIntent.ValueType  # 0
     """Indicates that core should choose the most sensible default behavior for the type of
@@ -63,8 +63,9 @@ DEFAULT: VersioningIntent.ValueType  # 2
 """Indicates that the command should run on the target task queue's current overall-default
 build ID.
 """
-global___VersioningIntent = VersioningIntent
+Global___VersioningIntent: typing_extensions.TypeAlias = VersioningIntent
 
+@typing.final
 class NamespacedWorkflowExecution(google.protobuf.message.Message):
     """Identifying information about a particular workflow execution, including namespace"""
 
@@ -88,7 +89,7 @@ class NamespacedWorkflowExecution(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "namespace",
             b"namespace",
             "run_id",
@@ -98,8 +99,11 @@ class NamespacedWorkflowExecution(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___NamespacedWorkflowExecution = NamespacedWorkflowExecution
+Global___NamespacedWorkflowExecution: typing_extensions.TypeAlias = (
+    NamespacedWorkflowExecution
+)
 
+@typing.final
 class WorkerDeploymentVersion(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -115,9 +119,9 @@ class WorkerDeploymentVersion(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id", b"build_id", "deployment_name", b"deployment_name"
         ],
     ) -> None: ...
 
-global___WorkerDeploymentVersion = WorkerDeploymentVersion
+Global___WorkerDeploymentVersion: typing_extensions.TypeAlias = WorkerDeploymentVersion

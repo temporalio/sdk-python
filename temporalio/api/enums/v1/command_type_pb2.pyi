@@ -24,7 +24,7 @@ class _CommandType:
 class _CommandTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_CommandType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     COMMAND_TYPE_UNSPECIFIED: _CommandType.ValueType  # 0
     COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK: _CommandType.ValueType  # 1
@@ -66,4 +66,4 @@ COMMAND_TYPE_PROTOCOL_MESSAGE: CommandType.ValueType  # 14
 COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES: CommandType.ValueType  # 16
 COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION: CommandType.ValueType  # 17
 COMMAND_TYPE_REQUEST_CANCEL_NEXUS_OPERATION: CommandType.ValueType  # 18
-global___CommandType = CommandType
+Global___CommandType: typing_extensions.TypeAlias = CommandType

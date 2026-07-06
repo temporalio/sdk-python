@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -14,13 +15,14 @@ import google.protobuf.message
 import temporalio.api.common.v1.message_pb2
 import temporalio.bridge.proto.activity_result.activity_result_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ActivityHeartbeat(google.protobuf.message.Message):
     """A request as given to `record_activity_heartbeat`"""
 
@@ -44,13 +46,12 @@ class ActivityHeartbeat(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "details", b"details", "task_token", b"task_token"
-        ],
+        field_name: typing.Literal["details", b"details", "task_token", b"task_token"],
     ) -> None: ...
 
-global___ActivityHeartbeat = ActivityHeartbeat
+Global___ActivityHeartbeat: typing_extensions.TypeAlias = ActivityHeartbeat
 
+@typing.final
 class ActivityTaskCompletion(google.protobuf.message.Message):
     """A request as given to `complete_activity_task`"""
 
@@ -71,17 +72,16 @@ class ActivityTaskCompletion(google.protobuf.message.Message):
         | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["result", b"result"]
+        self, field_name: typing.Literal["result", b"result"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "result", b"result", "task_token", b"task_token"
-        ],
+        field_name: typing.Literal["result", b"result", "task_token", b"task_token"],
     ) -> None: ...
 
-global___ActivityTaskCompletion = ActivityTaskCompletion
+Global___ActivityTaskCompletion: typing_extensions.TypeAlias = ActivityTaskCompletion
 
+@typing.final
 class WorkflowSlotInfo(google.protobuf.message.Message):
     """Info about workflow task slot usage"""
 
@@ -99,13 +99,14 @@ class WorkflowSlotInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "is_sticky", b"is_sticky", "workflow_type", b"workflow_type"
         ],
     ) -> None: ...
 
-global___WorkflowSlotInfo = WorkflowSlotInfo
+Global___WorkflowSlotInfo: typing_extensions.TypeAlias = WorkflowSlotInfo
 
+@typing.final
 class ActivitySlotInfo(google.protobuf.message.Message):
     """Info about activity task slot usage"""
 
@@ -119,11 +120,12 @@ class ActivitySlotInfo(google.protobuf.message.Message):
         activity_type: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["activity_type", b"activity_type"]
+        self, field_name: typing.Literal["activity_type", b"activity_type"]
     ) -> None: ...
 
-global___ActivitySlotInfo = ActivitySlotInfo
+Global___ActivitySlotInfo: typing_extensions.TypeAlias = ActivitySlotInfo
 
+@typing.final
 class LocalActivitySlotInfo(google.protobuf.message.Message):
     """Info about local activity slot usage"""
 
@@ -137,11 +139,12 @@ class LocalActivitySlotInfo(google.protobuf.message.Message):
         activity_type: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["activity_type", b"activity_type"]
+        self, field_name: typing.Literal["activity_type", b"activity_type"]
     ) -> None: ...
 
-global___LocalActivitySlotInfo = LocalActivitySlotInfo
+Global___LocalActivitySlotInfo: typing_extensions.TypeAlias = LocalActivitySlotInfo
 
+@typing.final
 class NexusSlotInfo(google.protobuf.message.Message):
     """Info about nexus task slot usage"""
 
@@ -159,18 +162,18 @@ class NexusSlotInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "operation", b"operation", "service", b"service"
-        ],
+        field_name: typing.Literal["operation", b"operation", "service", b"service"],
     ) -> None: ...
 
-global___NexusSlotInfo = NexusSlotInfo
+Global___NexusSlotInfo: typing_extensions.TypeAlias = NexusSlotInfo
 
+@typing.final
 class NamespaceInfo(google.protobuf.message.Message):
     """Info about a namespace"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class Limits(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -191,7 +194,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "blob_size_limit_error",
                 b"blob_size_limit_error",
                 "memo_size_limit_error",
@@ -201,18 +204,17 @@ class NamespaceInfo(google.protobuf.message.Message):
 
     LIMITS_FIELD_NUMBER: builtins.int
     @property
-    def limits(self) -> global___NamespaceInfo.Limits:
+    def limits(self) -> Global___NamespaceInfo.Limits:
         """Namespace configured limits"""
+
     def __init__(
         self,
         *,
-        limits: global___NamespaceInfo.Limits | None = ...,
+        limits: Global___NamespaceInfo.Limits | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["limits", b"limits"]
+        self, field_name: typing.Literal["limits", b"limits"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["limits", b"limits"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["limits", b"limits"]) -> None: ...
 
-global___NamespaceInfo = NamespaceInfo
+Global___NamespaceInfo: typing_extensions.TypeAlias = NamespaceInfo

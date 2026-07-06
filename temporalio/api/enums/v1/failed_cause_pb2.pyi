@@ -26,7 +26,7 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
         _WorkflowTaskFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_TASK_FAILED_CAUSE_UNSPECIFIED: _WorkflowTaskFailedCause.ValueType  # 0
     WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_COMMAND: (
@@ -320,7 +320,7 @@ WORKFLOW_TASK_FAILED_CAUSE_GRPC_MESSAGE_TOO_LARGE: (
 """A workflow task failed because a grpc message was too large."""
 WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: WorkflowTaskFailedCause.ValueType  # 37
 """A workflow task failed because payloads were too large."""
-global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
+Global___WorkflowTaskFailedCause: typing_extensions.TypeAlias = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -331,7 +331,7 @@ class _StartChildWorkflowExecutionFailedCauseEnumTypeWrapper(
         _StartChildWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
         _StartChildWorkflowExecutionFailedCause.ValueType
@@ -357,7 +357,9 @@ START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: (
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: (
     StartChildWorkflowExecutionFailedCause.ValueType
 )  # 2
-global___StartChildWorkflowExecutionFailedCause = StartChildWorkflowExecutionFailedCause
+Global___StartChildWorkflowExecutionFailedCause: typing_extensions.TypeAlias = (
+    StartChildWorkflowExecutionFailedCause
+)
 
 class _CancelExternalWorkflowExecutionFailedCause:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -368,7 +370,7 @@ class _CancelExternalWorkflowExecutionFailedCauseEnumTypeWrapper(
         _CancelExternalWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
         _CancelExternalWorkflowExecutionFailedCause.ValueType
@@ -392,7 +394,7 @@ CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_EXTERNAL_WORKFLOW_EXECUTION_NOT_
 CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: (
     CancelExternalWorkflowExecutionFailedCause.ValueType
 )  # 2
-global___CancelExternalWorkflowExecutionFailedCause = (
+Global___CancelExternalWorkflowExecutionFailedCause: typing_extensions.TypeAlias = (
     CancelExternalWorkflowExecutionFailedCause
 )
 
@@ -405,7 +407,7 @@ class _SignalExternalWorkflowExecutionFailedCauseEnumTypeWrapper(
         _SignalExternalWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
         _SignalExternalWorkflowExecutionFailedCause.ValueType
@@ -437,7 +439,7 @@ SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_SIGNAL_COUNT_LIMIT_EXCEEDED: (
     SignalExternalWorkflowExecutionFailedCause.ValueType
 )  # 3
 """Signal count limit is per workflow and controlled by server dynamic config "history.maximumSignalsPerExecution" """
-global___SignalExternalWorkflowExecutionFailedCause = (
+Global___SignalExternalWorkflowExecutionFailedCause: typing_extensions.TypeAlias = (
     SignalExternalWorkflowExecutionFailedCause
 )
 
@@ -450,7 +452,7 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
         _ResourceExhaustedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESOURCE_EXHAUSTED_CAUSE_UNSPECIFIED: _ResourceExhaustedCause.ValueType  # 0
     RESOURCE_EXHAUSTED_CAUSE_RPS_LIMIT: _ResourceExhaustedCause.ValueType  # 1
@@ -509,7 +511,7 @@ RESOURCE_EXHAUSTED_CAUSE_WORKER_DEPLOYMENT_LIMITS: (
     ResourceExhaustedCause.ValueType
 )  # 10
 """Limits related to Worker Deployments are reached."""
-global___ResourceExhaustedCause = ResourceExhaustedCause
+Global___ResourceExhaustedCause: typing_extensions.TypeAlias = ResourceExhaustedCause
 
 class _ResourceExhaustedScope:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -520,7 +522,7 @@ class _ResourceExhaustedScopeEnumTypeWrapper(
         _ResourceExhaustedScope.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESOURCE_EXHAUSTED_SCOPE_UNSPECIFIED: _ResourceExhaustedScope.ValueType  # 0
     RESOURCE_EXHAUSTED_SCOPE_NAMESPACE: _ResourceExhaustedScope.ValueType  # 1
@@ -537,4 +539,4 @@ RESOURCE_EXHAUSTED_SCOPE_NAMESPACE: ResourceExhaustedScope.ValueType  # 1
 """Exhausted resource is a system-level resource."""
 RESOURCE_EXHAUSTED_SCOPE_SYSTEM: ResourceExhaustedScope.ValueType  # 2
 """Exhausted resource is a namespace-level resource."""
-global___ResourceExhaustedScope = ResourceExhaustedScope
+Global___ResourceExhaustedScope: typing_extensions.TypeAlias = ResourceExhaustedScope

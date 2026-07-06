@@ -26,7 +26,7 @@ class _WorkflowIdReusePolicyEnumTypeWrapper(
         _WorkflowIdReusePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_ID_REUSE_POLICY_UNSPECIFIED: _WorkflowIdReusePolicy.ValueType  # 0
     WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE: _WorkflowIdReusePolicy.ValueType  # 1
@@ -80,7 +80,7 @@ Deprecated. Instead, set `WorkflowIdReusePolicy` to `ALLOW_DUPLICATE` and
 `WorkflowIdConflictPolicy` to `TERMINATE_EXISTING`. Note that `WorkflowIdConflictPolicy`
 requires Temporal Server v1.24.0 or later.
 """
-global___WorkflowIdReusePolicy = WorkflowIdReusePolicy
+Global___WorkflowIdReusePolicy: typing_extensions.TypeAlias = WorkflowIdReusePolicy
 
 class _WorkflowIdConflictPolicy:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -91,7 +91,7 @@ class _WorkflowIdConflictPolicyEnumTypeWrapper(
         _WorkflowIdConflictPolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_ID_CONFLICT_POLICY_UNSPECIFIED: _WorkflowIdConflictPolicy.ValueType  # 0
     WORKFLOW_ID_CONFLICT_POLICY_FAIL: _WorkflowIdConflictPolicy.ValueType  # 1
@@ -119,7 +119,9 @@ WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING: WorkflowIdConflictPolicy.ValueType  # 
 """Don't start a new workflow; instead return a workflow handle for the running workflow."""
 WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING: WorkflowIdConflictPolicy.ValueType  # 3
 """Terminate the running workflow before starting a new one."""
-global___WorkflowIdConflictPolicy = WorkflowIdConflictPolicy
+Global___WorkflowIdConflictPolicy: typing_extensions.TypeAlias = (
+    WorkflowIdConflictPolicy
+)
 
 class _ParentClosePolicy:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -130,7 +132,7 @@ class _ParentClosePolicyEnumTypeWrapper(
         _ParentClosePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PARENT_CLOSE_POLICY_UNSPECIFIED: _ParentClosePolicy.ValueType  # 0
     PARENT_CLOSE_POLICY_TERMINATE: _ParentClosePolicy.ValueType  # 1
@@ -152,7 +154,7 @@ PARENT_CLOSE_POLICY_ABANDON: ParentClosePolicy.ValueType  # 2
 """The child workflow will do nothing"""
 PARENT_CLOSE_POLICY_REQUEST_CANCEL: ParentClosePolicy.ValueType  # 3
 """Cancellation will be requested of the child workflow"""
-global___ParentClosePolicy = ParentClosePolicy
+Global___ParentClosePolicy: typing_extensions.TypeAlias = ParentClosePolicy
 
 class _ContinueAsNewInitiator:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -163,7 +165,7 @@ class _ContinueAsNewInitiatorEnumTypeWrapper(
         _ContinueAsNewInitiator.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CONTINUE_AS_NEW_INITIATOR_UNSPECIFIED: _ContinueAsNewInitiator.ValueType  # 0
     CONTINUE_AS_NEW_INITIATOR_WORKFLOW: _ContinueAsNewInitiator.ValueType  # 1
@@ -184,7 +186,7 @@ CONTINUE_AS_NEW_INITIATOR_RETRY: ContinueAsNewInitiator.ValueType  # 2
 """The workflow continued as new because it is retrying"""
 CONTINUE_AS_NEW_INITIATOR_CRON_SCHEDULE: ContinueAsNewInitiator.ValueType  # 3
 """The workflow continued as new because cron has triggered a new execution"""
-global___ContinueAsNewInitiator = ContinueAsNewInitiator
+Global___ContinueAsNewInitiator: typing_extensions.TypeAlias = ContinueAsNewInitiator
 
 class _WorkflowExecutionStatus:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -195,7 +197,7 @@ class _WorkflowExecutionStatusEnumTypeWrapper(
         _WorkflowExecutionStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_EXECUTION_STATUS_UNSPECIFIED: _WorkflowExecutionStatus.ValueType  # 0
     WORKFLOW_EXECUTION_STATUS_RUNNING: _WorkflowExecutionStatus.ValueType  # 1
@@ -225,7 +227,7 @@ WORKFLOW_EXECUTION_STATUS_TERMINATED: WorkflowExecutionStatus.ValueType  # 5
 WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW: WorkflowExecutionStatus.ValueType  # 6
 WORKFLOW_EXECUTION_STATUS_TIMED_OUT: WorkflowExecutionStatus.ValueType  # 7
 WORKFLOW_EXECUTION_STATUS_PAUSED: WorkflowExecutionStatus.ValueType  # 8
-global___WorkflowExecutionStatus = WorkflowExecutionStatus
+Global___WorkflowExecutionStatus: typing_extensions.TypeAlias = WorkflowExecutionStatus
 
 class _PendingActivityState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -236,7 +238,7 @@ class _PendingActivityStateEnumTypeWrapper(
         _PendingActivityState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PENDING_ACTIVITY_STATE_UNSPECIFIED: _PendingActivityState.ValueType  # 0
     PENDING_ACTIVITY_STATE_SCHEDULED: _PendingActivityState.ValueType  # 1
@@ -259,7 +261,7 @@ PENDING_ACTIVITY_STATE_PAUSED: PendingActivityState.ValueType  # 4
 """PAUSED means activity is paused on the server, and is not running in the worker"""
 PENDING_ACTIVITY_STATE_PAUSE_REQUESTED: PendingActivityState.ValueType  # 5
 """PAUSE_REQUESTED means activity is currently running on the worker, but paused on the server"""
-global___PendingActivityState = PendingActivityState
+Global___PendingActivityState: typing_extensions.TypeAlias = PendingActivityState
 
 class _PendingWorkflowTaskState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -270,7 +272,7 @@ class _PendingWorkflowTaskStateEnumTypeWrapper(
         _PendingWorkflowTaskState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PENDING_WORKFLOW_TASK_STATE_UNSPECIFIED: _PendingWorkflowTaskState.ValueType  # 0
     PENDING_WORKFLOW_TASK_STATE_SCHEDULED: _PendingWorkflowTaskState.ValueType  # 1
@@ -283,7 +285,9 @@ class PendingWorkflowTaskState(
 PENDING_WORKFLOW_TASK_STATE_UNSPECIFIED: PendingWorkflowTaskState.ValueType  # 0
 PENDING_WORKFLOW_TASK_STATE_SCHEDULED: PendingWorkflowTaskState.ValueType  # 1
 PENDING_WORKFLOW_TASK_STATE_STARTED: PendingWorkflowTaskState.ValueType  # 2
-global___PendingWorkflowTaskState = PendingWorkflowTaskState
+Global___PendingWorkflowTaskState: typing_extensions.TypeAlias = (
+    PendingWorkflowTaskState
+)
 
 class _HistoryEventFilterType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -294,7 +298,7 @@ class _HistoryEventFilterTypeEnumTypeWrapper(
         _HistoryEventFilterType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     HISTORY_EVENT_FILTER_TYPE_UNSPECIFIED: _HistoryEventFilterType.ValueType  # 0
     HISTORY_EVENT_FILTER_TYPE_ALL_EVENT: _HistoryEventFilterType.ValueType  # 1
@@ -307,7 +311,7 @@ class HistoryEventFilterType(
 HISTORY_EVENT_FILTER_TYPE_UNSPECIFIED: HistoryEventFilterType.ValueType  # 0
 HISTORY_EVENT_FILTER_TYPE_ALL_EVENT: HistoryEventFilterType.ValueType  # 1
 HISTORY_EVENT_FILTER_TYPE_CLOSE_EVENT: HistoryEventFilterType.ValueType  # 2
-global___HistoryEventFilterType = HistoryEventFilterType
+Global___HistoryEventFilterType: typing_extensions.TypeAlias = HistoryEventFilterType
 
 class _RetryState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -316,7 +320,7 @@ class _RetryState:
 class _RetryStateEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RetryState.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RETRY_STATE_UNSPECIFIED: _RetryState.ValueType  # 0
     RETRY_STATE_IN_PROGRESS: _RetryState.ValueType  # 1
@@ -337,7 +341,7 @@ RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED: RetryState.ValueType  # 4
 RETRY_STATE_RETRY_POLICY_NOT_SET: RetryState.ValueType  # 5
 RETRY_STATE_INTERNAL_SERVER_ERROR: RetryState.ValueType  # 6
 RETRY_STATE_CANCEL_REQUESTED: RetryState.ValueType  # 7
-global___RetryState = RetryState
+Global___RetryState: typing_extensions.TypeAlias = RetryState
 
 class _TimeoutType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -346,7 +350,7 @@ class _TimeoutType:
 class _TimeoutTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_TimeoutType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TIMEOUT_TYPE_UNSPECIFIED: _TimeoutType.ValueType  # 0
     TIMEOUT_TYPE_START_TO_CLOSE: _TimeoutType.ValueType  # 1
@@ -361,7 +365,7 @@ TIMEOUT_TYPE_START_TO_CLOSE: TimeoutType.ValueType  # 1
 TIMEOUT_TYPE_SCHEDULE_TO_START: TimeoutType.ValueType  # 2
 TIMEOUT_TYPE_SCHEDULE_TO_CLOSE: TimeoutType.ValueType  # 3
 TIMEOUT_TYPE_HEARTBEAT: TimeoutType.ValueType  # 4
-global___TimeoutType = TimeoutType
+Global___TimeoutType: typing_extensions.TypeAlias = TimeoutType
 
 class _VersioningBehavior:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -372,7 +376,7 @@ class _VersioningBehaviorEnumTypeWrapper(
         _VersioningBehavior.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     VERSIONING_BEHAVIOR_UNSPECIFIED: _VersioningBehavior.ValueType  # 0
     """Workflow execution does not have a Versioning Behavior and is called Unversioned. This is the
@@ -476,7 +480,7 @@ Task Queue.
 Workflows stuck on a backlogged activity will still auto-upgrade if their Target Version
 changes, without having to wait for the backlogged activity to complete on the old Version.
 """
-global___VersioningBehavior = VersioningBehavior
+Global___VersioningBehavior: typing_extensions.TypeAlias = VersioningBehavior
 
 class _ContinueAsNewVersioningBehavior:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -487,7 +491,7 @@ class _ContinueAsNewVersioningBehaviorEnumTypeWrapper(
         _ContinueAsNewVersioningBehavior.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED: (
         _ContinueAsNewVersioningBehavior.ValueType
@@ -562,7 +566,9 @@ Note that if the workflow being continued has a Pinned override, that override w
 new workflow run regardless of the ContinueAsNewVersioningBehavior specified in the continue-as-new
 command. Versioning Override always takes precedence until it's removed manually via UpdateWorkflowExecutionOptions.
 """
-global___ContinueAsNewVersioningBehavior = ContinueAsNewVersioningBehavior
+Global___ContinueAsNewVersioningBehavior: typing_extensions.TypeAlias = (
+    ContinueAsNewVersioningBehavior
+)
 
 class _SuggestContinueAsNewReason:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -573,7 +579,7 @@ class _SuggestContinueAsNewReasonEnumTypeWrapper(
         _SuggestContinueAsNewReason.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED: (
         _SuggestContinueAsNewReason.ValueType
@@ -609,4 +615,6 @@ SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES: (
     SuggestContinueAsNewReason.ValueType
 )  # 3
 """Workflow's count of completed plus in-flight updates is too large."""
-global___SuggestContinueAsNewReason = SuggestContinueAsNewReason
+Global___SuggestContinueAsNewReason: typing_extensions.TypeAlias = (
+    SuggestContinueAsNewReason
+)

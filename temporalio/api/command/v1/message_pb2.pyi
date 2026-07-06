@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -16,16 +17,18 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.command_type_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -43,6 +46,14 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     USE_WORKFLOW_BUILD_ID_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
+    request_eager_execution: builtins.bool
+    """Request to start the activity directly bypassing matching service and worker polling
+    The slot for executing the activity should be reserved when setting this field to true.
+    """
+    use_workflow_build_id: builtins.bool
+    """If this is set, the activity would be assigned to the Build ID of the workflow. Otherwise,
+    Assignment rules of the activity's Task Queue will be used to determine the Build ID.
+    """
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
     @property
@@ -61,6 +72,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
+
     @property
     def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Limits the time an activity task can stay in a task queue before a worker picks it up. The
@@ -74,6 +86,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
+
     @property
     def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Maximum time an activity is allowed to execute after being picked up by a worker. This
@@ -82,28 +95,24 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
+
     @property
     def heartbeat_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Maximum permitted time between successful worker heartbeats."""
+
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """Activities are provided by a default retry policy which is controlled through the service's
         dynamic configuration. Retries will be attempted until `schedule_to_close_timeout` has
         elapsed. To disable retries set retry_policy.maximum_attempts to 1.
         """
-    request_eager_execution: builtins.bool
-    """Request to start the activity directly bypassing matching service and worker polling
-    The slot for executing the activity should be reserved when setting this field to true.
-    """
-    use_workflow_build_id: builtins.bool
-    """If this is set, the activity would be assigned to the Build ID of the workflow. Otherwise,
-    Assignment rules of the activity's Task Queue will be used to determine the Build ID.
-    """
+
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata. If this message is not present, or any fields are not
         present, they inherit the values from the workflow.
         """
+
     def __init__(
         self,
         *,
@@ -123,7 +132,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_type",
             b"activity_type",
             "header",
@@ -148,7 +157,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_id",
             b"activity_id",
             "activity_type",
@@ -178,8 +187,11 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___ScheduleActivityTaskCommandAttributes = ScheduleActivityTaskCommandAttributes
+Global___ScheduleActivityTaskCommandAttributes: typing_extensions.TypeAlias = (
+    ScheduleActivityTaskCommandAttributes
+)
 
+@typing.final
 class RequestCancelActivityTaskCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -192,16 +204,14 @@ class RequestCancelActivityTaskCommandAttributes(google.protobuf.message.Message
         scheduled_event_id: builtins.int = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "scheduled_event_id", b"scheduled_event_id"
-        ],
+        self, field_name: typing.Literal["scheduled_event_id", b"scheduled_event_id"]
     ) -> None: ...
 
-global___RequestCancelActivityTaskCommandAttributes = (
+Global___RequestCancelActivityTaskCommandAttributes: typing_extensions.TypeAlias = (
     RequestCancelActivityTaskCommandAttributes
 )
 
+@typing.final
 class StartTimerCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -218,6 +228,7 @@ class StartTimerCommandAttributes(google.protobuf.message.Message):
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
+
     def __init__(
         self,
         *,
@@ -226,19 +237,20 @@ class StartTimerCommandAttributes(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
-            "start_to_fire_timeout", b"start_to_fire_timeout"
-        ],
+        field_name: typing.Literal["start_to_fire_timeout", b"start_to_fire_timeout"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "start_to_fire_timeout", b"start_to_fire_timeout", "timer_id", b"timer_id"
         ],
     ) -> None: ...
 
-global___StartTimerCommandAttributes = StartTimerCommandAttributes
+Global___StartTimerCommandAttributes: typing_extensions.TypeAlias = (
+    StartTimerCommandAttributes
+)
 
+@typing.final
 class CompleteWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -251,16 +263,15 @@ class CompleteWorkflowExecutionCommandAttributes(google.protobuf.message.Message
         result: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["result", b"result"]
+        self, field_name: typing.Literal["result", b"result"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["result", b"result"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["result", b"result"]) -> None: ...
 
-global___CompleteWorkflowExecutionCommandAttributes = (
+Global___CompleteWorkflowExecutionCommandAttributes: typing_extensions.TypeAlias = (
     CompleteWorkflowExecutionCommandAttributes
 )
 
+@typing.final
 class FailWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -273,14 +284,15 @@ class FailWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self, field_name: typing.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["failure", b"failure"]) -> None: ...
 
-global___FailWorkflowExecutionCommandAttributes = FailWorkflowExecutionCommandAttributes
+Global___FailWorkflowExecutionCommandAttributes: typing_extensions.TypeAlias = (
+    FailWorkflowExecutionCommandAttributes
+)
 
+@typing.final
 class CancelTimerCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -293,11 +305,14 @@ class CancelTimerCommandAttributes(google.protobuf.message.Message):
         timer_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["timer_id", b"timer_id"]
+        self, field_name: typing.Literal["timer_id", b"timer_id"]
     ) -> None: ...
 
-global___CancelTimerCommandAttributes = CancelTimerCommandAttributes
+Global___CancelTimerCommandAttributes: typing_extensions.TypeAlias = (
+    CancelTimerCommandAttributes
+)
 
+@typing.final
 class CancelWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -310,16 +325,15 @@ class CancelWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
         details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
+        self, field_name: typing.Literal["details", b"details"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["details", b"details"]) -> None: ...
 
-global___CancelWorkflowExecutionCommandAttributes = (
+Global___CancelWorkflowExecutionCommandAttributes: typing_extensions.TypeAlias = (
     CancelWorkflowExecutionCommandAttributes
 )
 
+@typing.final
 class RequestCancelExternalWorkflowExecutionCommandAttributes(
     google.protobuf.message.Message
 ):
@@ -356,7 +370,7 @@ class RequestCancelExternalWorkflowExecutionCommandAttributes(
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "child_workflow_only",
             b"child_workflow_only",
             "control",
@@ -372,10 +386,9 @@ class RequestCancelExternalWorkflowExecutionCommandAttributes(
         ],
     ) -> None: ...
 
-global___RequestCancelExternalWorkflowExecutionCommandAttributes = (
-    RequestCancelExternalWorkflowExecutionCommandAttributes
-)
+Global___RequestCancelExternalWorkflowExecutionCommandAttributes: typing_extensions.TypeAlias = RequestCancelExternalWorkflowExecutionCommandAttributes
 
+@typing.final
 class SignalExternalWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -388,13 +401,8 @@ class SignalExternalWorkflowExecutionCommandAttributes(google.protobuf.message.M
     HEADER_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Deprecated. Cross-namespace operations are disabled by default as of server 1.30.1."""
-    @property
-    def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     signal_name: builtins.str
     """The workflow author-defined name of the signal to send to the workflow."""
-    @property
-    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
-        """Serialized value(s) to provide with the signal."""
     control: builtins.str
     """Deprecated"""
     child_workflow_only: builtins.bool
@@ -403,10 +411,17 @@ class SignalExternalWorkflowExecutionCommandAttributes(google.protobuf.message.M
     a child of the requesting workflow.
     """
     @property
+    def execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
+    @property
+    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
+        """Serialized value(s) to provide with the signal."""
+
+    @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
         """Headers that are passed by the workflow that is sending a signal to the external
         workflow that is receiving this signal.
         """
+
     def __init__(
         self,
         *,
@@ -420,13 +435,13 @@ class SignalExternalWorkflowExecutionCommandAttributes(google.protobuf.message.M
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "execution", b"execution", "header", b"header", "input", b"input"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "child_workflow_only",
             b"child_workflow_only",
             "control",
@@ -444,10 +459,9 @@ class SignalExternalWorkflowExecutionCommandAttributes(google.protobuf.message.M
         ],
     ) -> None: ...
 
-global___SignalExternalWorkflowExecutionCommandAttributes = (
-    SignalExternalWorkflowExecutionCommandAttributes
-)
+Global___SignalExternalWorkflowExecutionCommandAttributes: typing_extensions.TypeAlias = SignalExternalWorkflowExecutionCommandAttributes
 
+@typing.final
 class UpsertWorkflowSearchAttributesCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -463,22 +477,15 @@ class UpsertWorkflowSearchAttributesCommandAttributes(google.protobuf.message.Me
         | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "search_attributes", b"search_attributes"
-        ],
+        self, field_name: typing.Literal["search_attributes", b"search_attributes"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "search_attributes", b"search_attributes"
-        ],
+        self, field_name: typing.Literal["search_attributes", b"search_attributes"]
     ) -> None: ...
 
-global___UpsertWorkflowSearchAttributesCommandAttributes = (
-    UpsertWorkflowSearchAttributesCommandAttributes
-)
+Global___UpsertWorkflowSearchAttributesCommandAttributes: typing_extensions.TypeAlias = UpsertWorkflowSearchAttributesCommandAttributes
 
+@typing.final
 class ModifyWorkflowPropertiesCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -489,25 +496,28 @@ class ModifyWorkflowPropertiesCommandAttributes(google.protobuf.message.Message)
         the existing memo. If the user wants to delete values, a default/empty Payload should be
         used as the value for the key being deleted.
         """
+
     def __init__(
         self,
         *,
         upserted_memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["upserted_memo", b"upserted_memo"]
+        self, field_name: typing.Literal["upserted_memo", b"upserted_memo"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["upserted_memo", b"upserted_memo"]
+        self, field_name: typing.Literal["upserted_memo", b"upserted_memo"]
     ) -> None: ...
 
-global___ModifyWorkflowPropertiesCommandAttributes = (
+Global___ModifyWorkflowPropertiesCommandAttributes: typing_extensions.TypeAlias = (
     ModifyWorkflowPropertiesCommandAttributes
 )
 
+@typing.final
 class RecordMarkerCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class DetailsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -523,11 +533,10 @@ class RecordMarkerCommandAttributes(google.protobuf.message.Message):
             value: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     MARKER_NAME_FIELD_NUMBER: builtins.int
@@ -557,14 +566,11 @@ class RecordMarkerCommandAttributes(google.protobuf.message.Message):
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "failure", b"failure", "header", b"header"
-        ],
+        self, field_name: typing.Literal["failure", b"failure", "header", b"header"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "details",
             b"details",
             "failure",
@@ -576,8 +582,11 @@ class RecordMarkerCommandAttributes(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___RecordMarkerCommandAttributes = RecordMarkerCommandAttributes
+Global___RecordMarkerCommandAttributes: typing_extensions.TypeAlias = (
+    RecordMarkerCommandAttributes
+)
 
+@typing.final
 class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -597,41 +606,10 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     INHERIT_BUILD_ID_FIELD_NUMBER: builtins.int
     INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
-    @property
-    def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
-    @property
-    def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
-    @property
-    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
-    @property
-    def workflow_run_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Timeout of a single workflow run."""
-    @property
-    def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Timeout of a single workflow task."""
-    @property
-    def backoff_start_interval(self) -> google.protobuf.duration_pb2.Duration:
-        """How long the workflow start will be delayed - not really a "backoff" in the traditional sense."""
-    @property
-    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
     initiator: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
     """Should be removed"""
-    @property
-    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """Should be removed"""
-    @property
-    def last_completion_result(self) -> temporalio.api.common.v1.message_pb2.Payloads:
-        """Should be removed"""
     cron_schedule: builtins.str
     """Should be removed. Not necessarily unused but unclear and not exposed by SDKs."""
-    @property
-    def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
-    @property
-    def memo(self) -> temporalio.api.common.v1.message_pb2.Memo: ...
-    @property
-    def search_attributes(
-        self,
-    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
     inherit_build_id: builtins.bool
     """If this is set, the new execution inherits the Build ID of the current execution. Otherwise,
     the assignment rules will be used to independently assign a Build ID to the new execution.
@@ -644,6 +622,42 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
     of the previous run.
     """
+    @property
+    def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
+    @property
+    def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
+    @property
+    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    @property
+    def workflow_run_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Timeout of a single workflow run."""
+
+    @property
+    def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Timeout of a single workflow task."""
+
+    @property
+    def backoff_start_interval(self) -> google.protobuf.duration_pb2.Duration:
+        """How long the workflow start will be delayed - not really a "backoff" in the traditional sense."""
+
+    @property
+    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """Should be removed"""
+
+    @property
+    def last_completion_result(self) -> temporalio.api.common.v1.message_pb2.Payloads:
+        """Should be removed"""
+
+    @property
+    def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    @property
+    def memo(self) -> temporalio.api.common.v1.message_pb2.Memo: ...
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
     def __init__(
         self,
         *,
@@ -668,7 +682,7 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backoff_start_interval",
             b"backoff_start_interval",
             "failure",
@@ -697,7 +711,7 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backoff_start_interval",
             b"backoff_start_interval",
             "cron_schedule",
@@ -733,10 +747,9 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
         ],
     ) -> None: ...
 
-global___ContinueAsNewWorkflowExecutionCommandAttributes = (
-    ContinueAsNewWorkflowExecutionCommandAttributes
-)
+Global___ContinueAsNewWorkflowExecutionCommandAttributes: typing_extensions.TypeAlias = ContinueAsNewWorkflowExecutionCommandAttributes
 
+@typing.final
 class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -761,21 +774,6 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     namespace: builtins.str
     """Deprecated. Cross-namespace operations are disabled by default as of server 1.30.1."""
     workflow_id: builtins.str
-    @property
-    def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
-    @property
-    def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
-    @property
-    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
-    @property
-    def workflow_execution_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Total workflow execution timeout including retries and continue as new."""
-    @property
-    def workflow_run_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Timeout of a single workflow run."""
-    @property
-    def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Timeout of a single workflow task."""
     parent_close_policy: (
         temporalio.api.enums.v1.workflow_pb2.ParentClosePolicy.ValueType
     )
@@ -785,10 +783,33 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
         temporalio.api.enums.v1.workflow_pb2.WorkflowIdReusePolicy.ValueType
     )
     """Default: WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE."""
-    @property
-    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
     cron_schedule: builtins.str
     """Establish a cron schedule for the child workflow."""
+    inherit_build_id: builtins.bool
+    """If this is set, the child workflow inherits the Build ID of the parent. Otherwise, the assignment
+    rules of the child's Task Queue will be used to independently assign a Build ID to it.
+    Deprecated. Only considered for versioning v0.2.
+    """
+    @property
+    def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
+    @property
+    def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
+    @property
+    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
+    @property
+    def workflow_execution_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Total workflow execution timeout including retries and continue as new."""
+
+    @property
+    def workflow_run_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Timeout of a single workflow run."""
+
+    @property
+    def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Timeout of a single workflow task."""
+
+    @property
+    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
     @property
@@ -797,16 +818,12 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     def search_attributes(
         self,
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
-    inherit_build_id: builtins.bool
-    """If this is set, the child workflow inherits the Build ID of the parent. Otherwise, the assignment
-    rules of the child's Task Queue will be used to independently assign a Build ID to it.
-    Deprecated. Only considered for versioning v0.2.
-    """
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata. If this message is not present, or any fields are not
         present, they inherit the values from the workflow.
         """
+
     def __init__(
         self,
         *,
@@ -832,7 +849,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "header",
             b"header",
             "input",
@@ -859,7 +876,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "control",
             b"control",
             "cron_schedule",
@@ -899,10 +916,11 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
         ],
     ) -> None: ...
 
-global___StartChildWorkflowExecutionCommandAttributes = (
+Global___StartChildWorkflowExecutionCommandAttributes: typing_extensions.TypeAlias = (
     StartChildWorkflowExecutionCommandAttributes
 )
 
+@typing.final
 class ProtocolMessageCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -915,14 +933,18 @@ class ProtocolMessageCommandAttributes(google.protobuf.message.Message):
         message_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["message_id", b"message_id"]
+        self, field_name: typing.Literal["message_id", b"message_id"]
     ) -> None: ...
 
-global___ProtocolMessageCommandAttributes = ProtocolMessageCommandAttributes
+Global___ProtocolMessageCommandAttributes: typing_extensions.TypeAlias = (
+    ProtocolMessageCommandAttributes
+)
 
+@typing.final
 class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class NexusHeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -937,8 +959,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     ENDPOINT_FIELD_NUMBER: builtins.int
@@ -961,6 +982,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
         internally when sending the StartOperation request. On the handler side, if it is also backed by Temporal, the
         content is transformed back to the original Payload sent in this command.
         """
+
     @property
     def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Schedule-to-close timeout for this operation.
@@ -969,6 +991,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
+
     @property
     def nexus_header(
         self,
@@ -980,6 +1003,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
         Note these headers are not the same as Temporal headers on internal activities and child workflows, these are
         transmitted to Nexus operations that may be external and are not traditional payloads.
         """
+
     @property
     def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Schedule-to-start timeout for this operation.
@@ -991,6 +1015,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         Requires server version 1.31.0 or later.
         """
+
     @property
     def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Start-to-close timeout for this operation.
@@ -1003,6 +1028,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
             aip.dev/not-precedent: "to" is used to indicate interval. --)
         Requires server version 1.31.0 or later.
         """
+
     def __init__(
         self,
         *,
@@ -1017,7 +1043,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "input",
             b"input",
             "schedule_to_close_timeout",
@@ -1030,7 +1056,7 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "endpoint",
             b"endpoint",
             "input",
@@ -1050,10 +1076,11 @@ class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___ScheduleNexusOperationCommandAttributes = (
+Global___ScheduleNexusOperationCommandAttributes: typing_extensions.TypeAlias = (
     ScheduleNexusOperationCommandAttributes
 )
 
+@typing.final
 class RequestCancelNexusOperationCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1068,21 +1095,20 @@ class RequestCancelNexusOperationCommandAttributes(google.protobuf.message.Messa
         scheduled_event_id: builtins.int = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "scheduled_event_id", b"scheduled_event_id"
-        ],
+        self, field_name: typing.Literal["scheduled_event_id", b"scheduled_event_id"]
     ) -> None: ...
 
-global___RequestCancelNexusOperationCommandAttributes = (
+Global___RequestCancelNexusOperationCommandAttributes: typing_extensions.TypeAlias = (
     RequestCancelNexusOperationCommandAttributes
 )
 
+@typing.final
 class Command(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     COMMAND_TYPE_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
+    EVENT_GROUP_MARKERS_FIELD_NUMBER: builtins.int
     SCHEDULE_ACTIVITY_TASK_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_TIMER_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     COMPLETE_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -1116,119 +1142,133 @@ class Command(google.protobuf.message.Message):
          * start_timer_command_attributes - populates temporalio.api.history.v1.HistoryEvent for timer
            started where the summary is used to identify the timer.
         """
+
+    @property
+    def event_group_markers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+    ]:
+        """Event Group Markers attached to the command by the workflow author."""
+
     @property
     def schedule_activity_task_command_attributes(
         self,
-    ) -> global___ScheduleActivityTaskCommandAttributes: ...
+    ) -> Global___ScheduleActivityTaskCommandAttributes: ...
     @property
     def start_timer_command_attributes(
         self,
-    ) -> global___StartTimerCommandAttributes: ...
+    ) -> Global___StartTimerCommandAttributes: ...
     @property
     def complete_workflow_execution_command_attributes(
         self,
-    ) -> global___CompleteWorkflowExecutionCommandAttributes: ...
+    ) -> Global___CompleteWorkflowExecutionCommandAttributes: ...
     @property
     def fail_workflow_execution_command_attributes(
         self,
-    ) -> global___FailWorkflowExecutionCommandAttributes: ...
+    ) -> Global___FailWorkflowExecutionCommandAttributes: ...
     @property
     def request_cancel_activity_task_command_attributes(
         self,
-    ) -> global___RequestCancelActivityTaskCommandAttributes: ...
+    ) -> Global___RequestCancelActivityTaskCommandAttributes: ...
     @property
     def cancel_timer_command_attributes(
         self,
-    ) -> global___CancelTimerCommandAttributes: ...
+    ) -> Global___CancelTimerCommandAttributes: ...
     @property
     def cancel_workflow_execution_command_attributes(
         self,
-    ) -> global___CancelWorkflowExecutionCommandAttributes: ...
+    ) -> Global___CancelWorkflowExecutionCommandAttributes: ...
     @property
     def request_cancel_external_workflow_execution_command_attributes(
         self,
-    ) -> global___RequestCancelExternalWorkflowExecutionCommandAttributes: ...
+    ) -> Global___RequestCancelExternalWorkflowExecutionCommandAttributes: ...
     @property
     def record_marker_command_attributes(
         self,
-    ) -> global___RecordMarkerCommandAttributes: ...
+    ) -> Global___RecordMarkerCommandAttributes: ...
     @property
     def continue_as_new_workflow_execution_command_attributes(
         self,
-    ) -> global___ContinueAsNewWorkflowExecutionCommandAttributes: ...
+    ) -> Global___ContinueAsNewWorkflowExecutionCommandAttributes: ...
     @property
     def start_child_workflow_execution_command_attributes(
         self,
-    ) -> global___StartChildWorkflowExecutionCommandAttributes: ...
+    ) -> Global___StartChildWorkflowExecutionCommandAttributes: ...
     @property
     def signal_external_workflow_execution_command_attributes(
         self,
-    ) -> global___SignalExternalWorkflowExecutionCommandAttributes: ...
+    ) -> Global___SignalExternalWorkflowExecutionCommandAttributes: ...
     @property
     def upsert_workflow_search_attributes_command_attributes(
         self,
-    ) -> global___UpsertWorkflowSearchAttributesCommandAttributes: ...
+    ) -> Global___UpsertWorkflowSearchAttributesCommandAttributes: ...
     @property
     def protocol_message_command_attributes(
         self,
-    ) -> global___ProtocolMessageCommandAttributes: ...
+    ) -> Global___ProtocolMessageCommandAttributes: ...
     @property
     def modify_workflow_properties_command_attributes(
         self,
-    ) -> global___ModifyWorkflowPropertiesCommandAttributes:
+    ) -> Global___ModifyWorkflowPropertiesCommandAttributes:
         """16 is available for use - it was used as part of a prototype that never made it into a release"""
+
     @property
     def schedule_nexus_operation_command_attributes(
         self,
-    ) -> global___ScheduleNexusOperationCommandAttributes: ...
+    ) -> Global___ScheduleNexusOperationCommandAttributes: ...
     @property
     def request_cancel_nexus_operation_command_attributes(
         self,
-    ) -> global___RequestCancelNexusOperationCommandAttributes: ...
+    ) -> Global___RequestCancelNexusOperationCommandAttributes: ...
     def __init__(
         self,
         *,
         command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType = ...,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
         | None = ...,
-        schedule_activity_task_command_attributes: global___ScheduleActivityTaskCommandAttributes
+        event_group_markers: collections.abc.Iterable[
+            temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+        ]
         | None = ...,
-        start_timer_command_attributes: global___StartTimerCommandAttributes
+        schedule_activity_task_command_attributes: Global___ScheduleActivityTaskCommandAttributes
         | None = ...,
-        complete_workflow_execution_command_attributes: global___CompleteWorkflowExecutionCommandAttributes
+        start_timer_command_attributes: Global___StartTimerCommandAttributes
         | None = ...,
-        fail_workflow_execution_command_attributes: global___FailWorkflowExecutionCommandAttributes
+        complete_workflow_execution_command_attributes: Global___CompleteWorkflowExecutionCommandAttributes
         | None = ...,
-        request_cancel_activity_task_command_attributes: global___RequestCancelActivityTaskCommandAttributes
+        fail_workflow_execution_command_attributes: Global___FailWorkflowExecutionCommandAttributes
         | None = ...,
-        cancel_timer_command_attributes: global___CancelTimerCommandAttributes
+        request_cancel_activity_task_command_attributes: Global___RequestCancelActivityTaskCommandAttributes
         | None = ...,
-        cancel_workflow_execution_command_attributes: global___CancelWorkflowExecutionCommandAttributes
+        cancel_timer_command_attributes: Global___CancelTimerCommandAttributes
         | None = ...,
-        request_cancel_external_workflow_execution_command_attributes: global___RequestCancelExternalWorkflowExecutionCommandAttributes
+        cancel_workflow_execution_command_attributes: Global___CancelWorkflowExecutionCommandAttributes
         | None = ...,
-        record_marker_command_attributes: global___RecordMarkerCommandAttributes
+        request_cancel_external_workflow_execution_command_attributes: Global___RequestCancelExternalWorkflowExecutionCommandAttributes
         | None = ...,
-        continue_as_new_workflow_execution_command_attributes: global___ContinueAsNewWorkflowExecutionCommandAttributes
+        record_marker_command_attributes: Global___RecordMarkerCommandAttributes
         | None = ...,
-        start_child_workflow_execution_command_attributes: global___StartChildWorkflowExecutionCommandAttributes
+        continue_as_new_workflow_execution_command_attributes: Global___ContinueAsNewWorkflowExecutionCommandAttributes
         | None = ...,
-        signal_external_workflow_execution_command_attributes: global___SignalExternalWorkflowExecutionCommandAttributes
+        start_child_workflow_execution_command_attributes: Global___StartChildWorkflowExecutionCommandAttributes
         | None = ...,
-        upsert_workflow_search_attributes_command_attributes: global___UpsertWorkflowSearchAttributesCommandAttributes
+        signal_external_workflow_execution_command_attributes: Global___SignalExternalWorkflowExecutionCommandAttributes
         | None = ...,
-        protocol_message_command_attributes: global___ProtocolMessageCommandAttributes
+        upsert_workflow_search_attributes_command_attributes: Global___UpsertWorkflowSearchAttributesCommandAttributes
         | None = ...,
-        modify_workflow_properties_command_attributes: global___ModifyWorkflowPropertiesCommandAttributes
+        protocol_message_command_attributes: Global___ProtocolMessageCommandAttributes
         | None = ...,
-        schedule_nexus_operation_command_attributes: global___ScheduleNexusOperationCommandAttributes
+        modify_workflow_properties_command_attributes: Global___ModifyWorkflowPropertiesCommandAttributes
         | None = ...,
-        request_cancel_nexus_operation_command_attributes: global___RequestCancelNexusOperationCommandAttributes
+        schedule_nexus_operation_command_attributes: Global___ScheduleNexusOperationCommandAttributes
+        | None = ...,
+        request_cancel_nexus_operation_command_attributes: Global___RequestCancelNexusOperationCommandAttributes
         | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attributes",
             b"attributes",
             "cancel_timer_command_attributes",
@@ -1271,7 +1311,7 @@ class Command(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attributes",
             b"attributes",
             "cancel_timer_command_attributes",
@@ -1284,6 +1324,8 @@ class Command(google.protobuf.message.Message):
             b"complete_workflow_execution_command_attributes",
             "continue_as_new_workflow_execution_command_attributes",
             b"continue_as_new_workflow_execution_command_attributes",
+            "event_group_markers",
+            b"event_group_markers",
             "fail_workflow_execution_command_attributes",
             b"fail_workflow_execution_command_attributes",
             "modify_workflow_properties_command_attributes",
@@ -1315,9 +1357,9 @@ class Command(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["attributes", b"attributes"]
+        self, oneof_group: typing.Literal["attributes", b"attributes"]
     ) -> (
-        typing_extensions.Literal[
+        typing.Literal[
             "schedule_activity_task_command_attributes",
             "start_timer_command_attributes",
             "complete_workflow_execution_command_attributes",
@@ -1339,4 +1381,4 @@ class Command(google.protobuf.message.Message):
         | None
     ): ...
 
-global___Command = Command
+Global___Command: typing_extensions.TypeAlias = Command

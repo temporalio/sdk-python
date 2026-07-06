@@ -21,6 +21,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class AsyncOperation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -33,7 +34,7 @@ class AsyncOperation(google.protobuf.message.Message):
             AsyncOperation._State.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         STATE_UNSPECIFIED: AsyncOperation._State.ValueType  # 0
         STATE_PENDING: AsyncOperation._State.ValueType  # 1
@@ -81,36 +82,40 @@ class AsyncOperation(google.protobuf.message.Message):
     Deprecated: Not supported after v0.3.0 api version. Use state instead.
     temporal:versioning:max_version=v0.3.0
     """
-    state: global___AsyncOperation.State.ValueType
+    state: Global___AsyncOperation.State.ValueType
     """The current state of this operation.
     temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
+    operation_type: builtins.str
+    """The type of operation being performed."""
+    failure_reason: builtins.str
+    """If the operation failed, the reason for the failure."""
     @property
     def check_duration(self) -> google.protobuf.duration_pb2.Duration:
         """The recommended duration to check back for an update in the operation's state."""
-    operation_type: builtins.str
-    """The type of operation being performed."""
+
     @property
     def operation_input(self) -> google.protobuf.any_pb2.Any:
         """The input to the operation being performed.
 
         (-- api-linter: core::0146::any=disabled --)
         """
-    failure_reason: builtins.str
-    """If the operation failed, the reason for the failure."""
+
     @property
     def started_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the operation initiated."""
+
     @property
     def finished_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the operation completed."""
+
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         state_deprecated: builtins.str = ...,
-        state: global___AsyncOperation.State.ValueType = ...,
+        state: Global___AsyncOperation.State.ValueType = ...,
         check_duration: google.protobuf.duration_pb2.Duration | None = ...,
         operation_type: builtins.str = ...,
         operation_input: google.protobuf.any_pb2.Any | None = ...,
@@ -120,7 +125,7 @@ class AsyncOperation(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "check_duration",
             b"check_duration",
             "finished_time",
@@ -133,7 +138,7 @@ class AsyncOperation(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "check_duration",
             b"check_duration",
             "failure_reason",
@@ -155,4 +160,4 @@ class AsyncOperation(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___AsyncOperation = AsyncOperation
+Global___AsyncOperation: typing_extensions.TypeAlias = AsyncOperation

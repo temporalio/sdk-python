@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -19,13 +20,14 @@ import temporalio.api.enums.v1.nexus_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class Failure(google.protobuf.message.Message):
     """A general purpose failure message.
     See: https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
@@ -33,6 +35,7 @@ class Failure(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -47,8 +50,7 @@ class Failure(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     MESSAGE_FIELD_NUMBER: builtins.int
@@ -58,14 +60,14 @@ class Failure(google.protobuf.message.Message):
     CAUSE_FIELD_NUMBER: builtins.int
     message: builtins.str
     stack_trace: builtins.str
+    details: builtins.bytes
+    """UTF-8 encoded JSON serializable details."""
     @property
     def metadata(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
-    details: builtins.bytes
-    """UTF-8 encoded JSON serializable details."""
     @property
-    def cause(self) -> global___Failure: ...
+    def cause(self) -> Global___Failure: ...
     def __init__(
         self,
         *,
@@ -73,14 +75,14 @@ class Failure(google.protobuf.message.Message):
         stack_trace: builtins.str = ...,
         metadata: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         details: builtins.bytes = ...,
-        cause: global___Failure | None = ...,
+        cause: Global___Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["cause", b"cause"]
+        self, field_name: typing.Literal["cause", b"cause"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cause",
             b"cause",
             "details",
@@ -94,8 +96,9 @@ class Failure(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___Failure = Failure
+Global___Failure: typing_extensions.TypeAlias = Failure
 
+@typing.final
 class HandlerError(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -104,25 +107,25 @@ class HandlerError(google.protobuf.message.Message):
     RETRY_BEHAVIOR_FIELD_NUMBER: builtins.int
     error_type: builtins.str
     """See https://github.com/nexus-rpc/api/blob/main/SPEC.md#predefined-handler-errors."""
-    @property
-    def failure(self) -> global___Failure: ...
     retry_behavior: (
         temporalio.api.enums.v1.nexus_pb2.NexusHandlerErrorRetryBehavior.ValueType
     )
     """Retry behavior, defaults to the retry behavior of the error type as defined in the spec."""
+    @property
+    def failure(self) -> Global___Failure: ...
     def __init__(
         self,
         *,
         error_type: builtins.str = ...,
-        failure: global___Failure | None = ...,
+        failure: Global___Failure | None = ...,
         retry_behavior: temporalio.api.enums.v1.nexus_pb2.NexusHandlerErrorRetryBehavior.ValueType = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self, field_name: typing.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "error_type",
             b"error_type",
             "failure",
@@ -132,8 +135,9 @@ class HandlerError(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___HandlerError = HandlerError
+Global___HandlerError: typing_extensions.TypeAlias = HandlerError
 
+@typing.final
 class UnsuccessfulOperationError(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -142,25 +146,28 @@ class UnsuccessfulOperationError(google.protobuf.message.Message):
     operation_state: builtins.str
     """See https://github.com/nexus-rpc/api/blob/main/SPEC.md#operationinfo."""
     @property
-    def failure(self) -> global___Failure: ...
+    def failure(self) -> Global___Failure: ...
     def __init__(
         self,
         *,
         operation_state: builtins.str = ...,
-        failure: global___Failure | None = ...,
+        failure: Global___Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self, field_name: typing.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failure", b"failure", "operation_state", b"operation_state"
         ],
     ) -> None: ...
 
-global___UnsuccessfulOperationError = UnsuccessfulOperationError
+Global___UnsuccessfulOperationError: typing_extensions.TypeAlias = (
+    UnsuccessfulOperationError
+)
 
+@typing.final
 class Link(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -176,16 +183,18 @@ class Link(google.protobuf.message.Message):
         type: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["type", b"type", "url", b"url"]
+        self, field_name: typing.Literal["type", b"type", "url", b"url"]
     ) -> None: ...
 
-global___Link = Link
+Global___Link: typing_extensions.TypeAlias = Link
 
+@typing.final
 class StartOperationRequest(google.protobuf.message.Message):
     """A request to start an operation."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class CallbackHeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -200,8 +209,7 @@ class StartOperationRequest(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     SERVICE_FIELD_NUMBER: builtins.int
@@ -222,18 +230,21 @@ class StartOperationRequest(google.protobuf.message.Message):
     @property
     def payload(self) -> temporalio.api.common.v1.message_pb2.Payload:
         """Full request body from the incoming HTTP request."""
+
     @property
     def callback_header(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """Header that is expected to be attached to the callback request when the operation completes."""
+
     @property
     def links(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___Link
+        Global___Link
     ]:
         """Links contain caller information and can be attached to the operations started by the handler."""
+
     def __init__(
         self,
         *,
@@ -244,14 +255,14 @@ class StartOperationRequest(google.protobuf.message.Message):
         payload: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         callback_header: collections.abc.Mapping[builtins.str, builtins.str]
         | None = ...,
-        links: collections.abc.Iterable[global___Link] | None = ...,
+        links: collections.abc.Iterable[Global___Link] | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["payload", b"payload"]
+        self, field_name: typing.Literal["payload", b"payload"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "callback",
             b"callback",
             "callback_header",
@@ -269,8 +280,9 @@ class StartOperationRequest(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___StartOperationRequest = StartOperationRequest
+Global___StartOperationRequest: typing_extensions.TypeAlias = StartOperationRequest
 
+@typing.final
 class CancelOperationRequest(google.protobuf.message.Message):
     """A request to cancel an operation."""
 
@@ -301,7 +313,7 @@ class CancelOperationRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "operation",
             b"operation",
             "operation_id",
@@ -313,13 +325,15 @@ class CancelOperationRequest(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___CancelOperationRequest = CancelOperationRequest
+Global___CancelOperationRequest: typing_extensions.TypeAlias = CancelOperationRequest
 
+@typing.final
 class Request(google.protobuf.message.Message):
     """A Nexus request."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class Capabilities(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -335,11 +349,12 @@ class Request(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "temporal_failure_responses", b"temporal_failure_responses"
             ],
         ) -> None: ...
 
+    @typing.final
     class HeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -354,8 +369,7 @@ class Request(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     HEADER_FIELD_NUMBER: builtins.int
@@ -364,6 +378,10 @@ class Request(google.protobuf.message.Message):
     START_OPERATION_FIELD_NUMBER: builtins.int
     CANCEL_OPERATION_FIELD_NUMBER: builtins.int
     ENDPOINT_FIELD_NUMBER: builtins.int
+    endpoint: builtins.str
+    """The endpoint this request was addressed to before forwarding to the worker.
+    Supported from server version 1.30.0.
+    """
     @property
     def header(
         self,
@@ -371,35 +389,33 @@ class Request(google.protobuf.message.Message):
         """Headers extracted from the original request in the Temporal frontend.
         When using Nexus over HTTP, this includes the request's HTTP headers ignoring multiple values.
         """
+
     @property
     def scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The timestamp when the request was scheduled in the frontend.
         (-- api-linter: core::0142::time-field-names=disabled
             aip.dev/not-precedent: Not following linter rules. --)
         """
+
     @property
-    def capabilities(self) -> global___Request.Capabilities: ...
+    def capabilities(self) -> Global___Request.Capabilities: ...
     @property
-    def start_operation(self) -> global___StartOperationRequest: ...
+    def start_operation(self) -> Global___StartOperationRequest: ...
     @property
-    def cancel_operation(self) -> global___CancelOperationRequest: ...
-    endpoint: builtins.str
-    """The endpoint this request was addressed to before forwarding to the worker.
-    Supported from server version 1.30.0.
-    """
+    def cancel_operation(self) -> Global___CancelOperationRequest: ...
     def __init__(
         self,
         *,
         header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        capabilities: global___Request.Capabilities | None = ...,
-        start_operation: global___StartOperationRequest | None = ...,
-        cancel_operation: global___CancelOperationRequest | None = ...,
+        capabilities: Global___Request.Capabilities | None = ...,
+        start_operation: Global___StartOperationRequest | None = ...,
+        cancel_operation: Global___CancelOperationRequest | None = ...,
         endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_operation",
             b"cancel_operation",
             "capabilities",
@@ -414,7 +430,7 @@ class Request(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_operation",
             b"cancel_operation",
             "capabilities",
@@ -432,16 +448,18 @@ class Request(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["start_operation", "cancel_operation"] | None: ...
+        self, oneof_group: typing.Literal["variant", b"variant"]
+    ) -> typing.Literal["start_operation", "cancel_operation"] | None: ...
 
-global___Request = Request
+Global___Request: typing_extensions.TypeAlias = Request
 
+@typing.final
 class StartOperationResponse(google.protobuf.message.Message):
     """Response variant for StartOperationRequest."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class Sync(google.protobuf.message.Message):
         """An operation completed successfully."""
 
@@ -455,24 +473,22 @@ class StartOperationResponse(google.protobuf.message.Message):
         def links(
             self,
         ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-            global___Link
+            Global___Link
         ]: ...
         def __init__(
             self,
             *,
             payload: temporalio.api.common.v1.message_pb2.Payload | None = ...,
-            links: collections.abc.Iterable[global___Link] | None = ...,
+            links: collections.abc.Iterable[Global___Link] | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["payload", b"payload"]
+            self, field_name: typing.Literal["payload", b"payload"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal[
-                "links", b"links", "payload", b"payload"
-            ],
+            self, field_name: typing.Literal["links", b"links", "payload", b"payload"]
         ) -> None: ...
 
+    @typing.final
     class Async(google.protobuf.message.Message):
         """The operation will complete asynchronously.
         The returned ID can be used to reference this operation.
@@ -485,23 +501,23 @@ class StartOperationResponse(google.protobuf.message.Message):
         OPERATION_TOKEN_FIELD_NUMBER: builtins.int
         operation_id: builtins.str
         """Deprecated. Renamed to operation_token."""
+        operation_token: builtins.str
         @property
         def links(
             self,
         ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-            global___Link
+            Global___Link
         ]: ...
-        operation_token: builtins.str
         def __init__(
             self,
             *,
             operation_id: builtins.str = ...,
-            links: collections.abc.Iterable[global___Link] | None = ...,
+            links: collections.abc.Iterable[Global___Link] | None = ...,
             operation_token: builtins.str = ...,
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "links",
                 b"links",
                 "operation_id",
@@ -516,30 +532,32 @@ class StartOperationResponse(google.protobuf.message.Message):
     OPERATION_ERROR_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
     @property
-    def sync_success(self) -> global___StartOperationResponse.Sync: ...
+    def sync_success(self) -> Global___StartOperationResponse.Sync: ...
     @property
-    def async_success(self) -> global___StartOperationResponse.Async: ...
+    def async_success(self) -> Global___StartOperationResponse.Async: ...
     @property
-    def operation_error(self) -> global___UnsuccessfulOperationError:
+    def operation_error(self) -> Global___UnsuccessfulOperationError:
         """The operation completed unsuccessfully (failed or canceled).
         Deprecated. Use the failure variant instead.
         """
+
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """The operation completed unsuccessfully (failed or canceled).
         Failure object must contain an ApplicationFailureInfo or CanceledFailureInfo object.
         """
+
     def __init__(
         self,
         *,
-        sync_success: global___StartOperationResponse.Sync | None = ...,
-        async_success: global___StartOperationResponse.Async | None = ...,
-        operation_error: global___UnsuccessfulOperationError | None = ...,
+        sync_success: Global___StartOperationResponse.Sync | None = ...,
+        async_success: Global___StartOperationResponse.Async | None = ...,
+        operation_error: Global___UnsuccessfulOperationError | None = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "async_success",
             b"async_success",
             "failure",
@@ -554,7 +572,7 @@ class StartOperationResponse(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "async_success",
             b"async_success",
             "failure",
@@ -568,16 +586,15 @@ class StartOperationResponse(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+        self, oneof_group: typing.Literal["variant", b"variant"]
     ) -> (
-        typing_extensions.Literal[
-            "sync_success", "async_success", "operation_error", "failure"
-        ]
+        typing.Literal["sync_success", "async_success", "operation_error", "failure"]
         | None
     ): ...
 
-global___StartOperationResponse = StartOperationResponse
+Global___StartOperationResponse: typing_extensions.TypeAlias = StartOperationResponse
 
+@typing.final
 class CancelOperationResponse(google.protobuf.message.Message):
     """Response variant for CancelOperationRequest."""
 
@@ -587,8 +604,9 @@ class CancelOperationResponse(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-global___CancelOperationResponse = CancelOperationResponse
+Global___CancelOperationResponse: typing_extensions.TypeAlias = CancelOperationResponse
 
+@typing.final
 class Response(google.protobuf.message.Message):
     """A response indicating that the handler has successfully processed a request."""
 
@@ -597,18 +615,18 @@ class Response(google.protobuf.message.Message):
     START_OPERATION_FIELD_NUMBER: builtins.int
     CANCEL_OPERATION_FIELD_NUMBER: builtins.int
     @property
-    def start_operation(self) -> global___StartOperationResponse: ...
+    def start_operation(self) -> Global___StartOperationResponse: ...
     @property
-    def cancel_operation(self) -> global___CancelOperationResponse: ...
+    def cancel_operation(self) -> Global___CancelOperationResponse: ...
     def __init__(
         self,
         *,
-        start_operation: global___StartOperationResponse | None = ...,
-        cancel_operation: global___CancelOperationResponse | None = ...,
+        start_operation: Global___StartOperationResponse | None = ...,
+        cancel_operation: Global___CancelOperationResponse | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_operation",
             b"cancel_operation",
             "start_operation",
@@ -619,7 +637,7 @@ class Response(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_operation",
             b"cancel_operation",
             "start_operation",
@@ -629,11 +647,12 @@ class Response(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["start_operation", "cancel_operation"] | None: ...
+        self, oneof_group: typing.Literal["variant", b"variant"]
+    ) -> typing.Literal["start_operation", "cancel_operation"] | None: ...
 
-global___Response = Response
+Global___Response: typing_extensions.TypeAlias = Response
 
+@typing.final
 class Endpoint(google.protobuf.message.Message):
     """A cluster-global binding from an endpoint ID to a target for dispatching incoming Nexus requests."""
 
@@ -649,15 +668,22 @@ class Endpoint(google.protobuf.message.Message):
     """Data version for this endpoint, incremented for every update issued via the UpdateNexusEndpoint API."""
     id: builtins.str
     """Unique server-generated endpoint ID."""
+    url_prefix: builtins.str
+    """Server exposed URL prefix for invocation of operations on this endpoint.
+    This doesn't include the protocol, hostname or port as the server does not know how it should be accessed
+    publicly. The URL is stable in the face of endpoint renames.
+    """
     @property
-    def spec(self) -> global___EndpointSpec:
+    def spec(self) -> Global___EndpointSpec:
         """Spec for the endpoint."""
+
     @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the endpoint was created.
         (-- api-linter: core::0142::time-field-names=disabled
             aip.dev/not-precedent: Not following linter rules. --)
         """
+
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the endpoint was last modified.
@@ -665,24 +691,20 @@ class Endpoint(google.protobuf.message.Message):
         (-- api-linter: core::0142::time-field-names=disabled
             aip.dev/not-precedent: Not following linter rules. --)
         """
-    url_prefix: builtins.str
-    """Server exposed URL prefix for invocation of operations on this endpoint.
-    This doesn't include the protocol, hostname or port as the server does not know how it should be accessed
-    publicly. The URL is stable in the face of endpoint renames.
-    """
+
     def __init__(
         self,
         *,
         version: builtins.int = ...,
         id: builtins.str = ...,
-        spec: global___EndpointSpec | None = ...,
+        spec: Global___EndpointSpec | None = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         url_prefix: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "created_time",
             b"created_time",
             "last_modified_time",
@@ -693,7 +715,7 @@ class Endpoint(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "created_time",
             b"created_time",
             "id",
@@ -709,8 +731,9 @@ class Endpoint(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___Endpoint = Endpoint
+Global___Endpoint: typing_extensions.TypeAlias = Endpoint
 
+@typing.final
 class EndpointSpec(google.protobuf.message.Message):
     """Contains mutable fields for an Endpoint."""
 
@@ -729,36 +752,38 @@ class EndpointSpec(google.protobuf.message.Message):
         If the Payload is encrypted, the UI and CLI may decrypt with the configured codec server endpoint.
         By default, the server enforces a limit of 20,000 bytes for this entire payload.
         """
+
     @property
-    def target(self) -> global___EndpointTarget:
+    def target(self) -> Global___EndpointTarget:
         """Target to route requests to."""
+
     def __init__(
         self,
         *,
         name: builtins.str = ...,
         description: temporalio.api.common.v1.message_pb2.Payload | None = ...,
-        target: global___EndpointTarget | None = ...,
+        target: Global___EndpointTarget | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
-            "description", b"description", "target", b"target"
-        ],
+        field_name: typing.Literal["description", b"description", "target", b"target"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "description", b"description", "name", b"name", "target", b"target"
         ],
     ) -> None: ...
 
-global___EndpointSpec = EndpointSpec
+Global___EndpointSpec: typing_extensions.TypeAlias = EndpointSpec
 
+@typing.final
 class EndpointTarget(google.protobuf.message.Message):
     """Target to route requests to."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class Worker(google.protobuf.message.Message):
         """Target a worker polling on a Nexus task queue in a specific namespace."""
 
@@ -778,11 +803,12 @@ class EndpointTarget(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "namespace", b"namespace", "task_queue", b"task_queue"
             ],
         ) -> None: ...
 
+    @typing.final
     class External(google.protobuf.message.Message):
         """Target an external server by URL.
         At a later point, this will support providing credentials, in the meantime, an http.RoundTripper can be injected
@@ -799,40 +825,39 @@ class EndpointTarget(google.protobuf.message.Message):
             *,
             url: builtins.str = ...,
         ) -> None: ...
-        def ClearField(
-            self, field_name: typing_extensions.Literal["url", b"url"]
-        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["url", b"url"]) -> None: ...
 
     WORKER_FIELD_NUMBER: builtins.int
     EXTERNAL_FIELD_NUMBER: builtins.int
     @property
-    def worker(self) -> global___EndpointTarget.Worker: ...
+    def worker(self) -> Global___EndpointTarget.Worker: ...
     @property
-    def external(self) -> global___EndpointTarget.External: ...
+    def external(self) -> Global___EndpointTarget.External: ...
     def __init__(
         self,
         *,
-        worker: global___EndpointTarget.Worker | None = ...,
-        external: global___EndpointTarget.External | None = ...,
+        worker: Global___EndpointTarget.Worker | None = ...,
+        external: Global___EndpointTarget.External | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "external", b"external", "variant", b"variant", "worker", b"worker"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "external", b"external", "variant", b"variant", "worker", b"worker"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["worker", "external"] | None: ...
+        self, oneof_group: typing.Literal["variant", b"variant"]
+    ) -> typing.Literal["worker", "external"] | None: ...
 
-global___EndpointTarget = EndpointTarget
+Global___EndpointTarget: typing_extensions.TypeAlias = EndpointTarget
 
+@typing.final
 class NexusOperationExecutionCancellationInfo(google.protobuf.message.Message):
     """NexusOperationExecutionCancellationInfo contains the state of a Nexus operation cancellation."""
 
@@ -846,27 +871,31 @@ class NexusOperationExecutionCancellationInfo(google.protobuf.message.Message):
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
     BLOCKED_REASON_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
-    @property
-    def requested_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when cancellation was requested."""
     state: temporalio.api.enums.v1.common_pb2.NexusOperationCancellationState.ValueType
     attempt: builtins.int
     """The number of attempts made to deliver the cancel operation request.
     This number represents a minimum bound since the attempt is incremented after the request completes.
     """
-    @property
-    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when the last attempt completed."""
-    @property
-    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """The last attempt's failure, if any."""
-    @property
-    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when the next attempt is scheduled."""
     blocked_reason: builtins.str
     """If the state is BLOCKED, blocked reason provides additional information."""
     reason: builtins.str
     """A reason that may be specified in the CancelNexusOperationRequest."""
+    @property
+    def requested_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when cancellation was requested."""
+
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+
     def __init__(
         self,
         *,
@@ -884,7 +913,7 @@ class NexusOperationExecutionCancellationInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "last_attempt_complete_time",
             b"last_attempt_complete_time",
             "last_attempt_failure",
@@ -897,7 +926,7 @@ class NexusOperationExecutionCancellationInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attempt",
             b"attempt",
             "blocked_reason",
@@ -917,15 +946,17 @@ class NexusOperationExecutionCancellationInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___NexusOperationExecutionCancellationInfo = (
+Global___NexusOperationExecutionCancellationInfo: typing_extensions.TypeAlias = (
     NexusOperationExecutionCancellationInfo
 )
 
+@typing.final
 class NexusOperationExecutionInfo(google.protobuf.message.Message):
     """Full current state of a standalone Nexus operation, as of the time of the request."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class NexusHeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -940,8 +971,7 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     OPERATION_ID_FIELD_NUMBER: builtins.int
@@ -988,55 +1018,12 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
     """
     state: temporalio.api.enums.v1.common_pb2.PendingNexusOperationState.ValueType
     """More detailed breakdown of NEXUS_OPERATION_EXECUTION_STATUS_RUNNING."""
-    @property
-    def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Schedule-to-close timeout for this operation.
-        (-- api-linter: core::0140::prepositions=disabled
-            aip.dev/not-precedent: "to" is used to indicate interval. --)
-        """
-    @property
-    def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Schedule-to-start timeout for this operation.
-        (-- api-linter: core::0140::prepositions=disabled
-            aip.dev/not-precedent: "to" is used to indicate interval. --)
-        """
-    @property
-    def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
-        """Start-to-close timeout for this operation.
-        (-- api-linter: core::0140::prepositions=disabled
-            aip.dev/not-precedent: "to" is used to indicate interval. --)
-        """
     attempt: builtins.int
     """The number of attempts made to deliver the start operation request.
     This number is approximate, it is incremented when a task is added to the history queue.
     In practice, there could be more attempts if a task is executed but fails to commit, or less attempts if a task
     was never executed.
     """
-    @property
-    def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Time the operation was originally scheduled via a StartNexusOperation request."""
-    @property
-    def expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Scheduled time + schedule to close timeout."""
-    @property
-    def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Time when the operation transitioned to a closed state."""
-    @property
-    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when the last attempt completed."""
-    @property
-    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """The last attempt's failure, if any."""
-    @property
-    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when the next attempt is scheduled."""
-    @property
-    def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
-        """Elapsed time from schedule_time to now for running operations or to close_time for closed
-        operations, including all attempts and backoff between attempts.
-        """
-    @property
-    def cancellation_info(self) -> global___NexusOperationExecutionCancellationInfo: ...
     blocked_reason: builtins.str
     """If the state is BLOCKED, blocked reason provides additional information."""
     request_id: builtins.str
@@ -1048,6 +1035,63 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
     """Operation token. Only set for asynchronous operations after a successful StartOperation call."""
     state_transition_count: builtins.int
     """Incremented each time the operation's state is mutated in persistence."""
+    identity: builtins.str
+    """The identity of the client who started this operation."""
+    state_size_bytes: builtins.int
+    """Updated once on scheduled and once on terminal status."""
+    @property
+    def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-close timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+
+    @property
+    def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-start timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+
+    @property
+    def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Start-to-close timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+
+    @property
+    def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time the operation was originally scheduled via a StartNexusOperation request."""
+
+    @property
+    def expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Scheduled time + schedule to close timeout."""
+
+    @property
+    def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time when the operation transitioned to a closed state."""
+
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+
+    @property
+    def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Elapsed time from schedule_time to now for running operations or to close_time for closed
+        operations, including all attempts and backoff between attempts.
+        """
+
+    @property
+    def cancellation_info(self) -> Global___NexusOperationExecutionCancellationInfo: ...
     @property
     def search_attributes(
         self,
@@ -1057,9 +1101,11 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """Header for context propagation and tracing purposes."""
+
     @property
     def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         """Metadata for use by user interfaces to display the fixed as-of-start summary and details of the operation."""
+
     @property
     def links(
         self,
@@ -1067,10 +1113,7 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
         temporalio.api.common.v1.message_pb2.Link
     ]:
         """Links attached by the handler of this operation on start or completion."""
-    identity: builtins.str
-    """The identity of the client who started this operation."""
-    state_size_bytes: builtins.int
-    """Updated once on scheduled and once on terminal status."""
+
     def __init__(
         self,
         *,
@@ -1095,7 +1138,7 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
         next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
         | None = ...,
         execution_duration: google.protobuf.duration_pb2.Duration | None = ...,
-        cancellation_info: global___NexusOperationExecutionCancellationInfo
+        cancellation_info: Global___NexusOperationExecutionCancellationInfo
         | None = ...,
         blocked_reason: builtins.str = ...,
         request_id: builtins.str = ...,
@@ -1113,7 +1156,7 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancellation_info",
             b"cancellation_info",
             "close_time",
@@ -1144,7 +1187,7 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attempt",
             b"attempt",
             "blocked_reason",
@@ -1206,8 +1249,11 @@ class NexusOperationExecutionInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___NexusOperationExecutionInfo = NexusOperationExecutionInfo
+Global___NexusOperationExecutionInfo: typing_extensions.TypeAlias = (
+    NexusOperationExecutionInfo
+)
 
+@typing.final
 class NexusOperationExecutionListInfo(google.protobuf.message.Message):
     """Limited Nexus operation information returned in the list response.
     When adding fields here, ensure that it is also present in NexusOperationExecutionInfo (note that it may already be present in
@@ -1238,28 +1284,32 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
     """Service name."""
     operation: builtins.str
     """Operation name."""
+    status: temporalio.api.enums.v1.nexus_pb2.NexusOperationExecutionStatus.ValueType
+    """The status is updated once, when the operation is originally scheduled, and again when the operation reaches a terminal status."""
+    state_transition_count: builtins.int
+    """Updated on terminal status."""
+    state_size_bytes: builtins.int
+    """Updated once on scheduled and once on terminal status."""
     @property
     def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time the operation was originally scheduled via a StartNexusOperation request."""
+
     @property
     def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """If the operation is in a terminal status, this field represents the time the operation transitioned to that status."""
-    status: temporalio.api.enums.v1.nexus_pb2.NexusOperationExecutionStatus.ValueType
-    """The status is updated once, when the operation is originally scheduled, and again when the operation reaches a terminal status."""
+
     @property
     def search_attributes(
         self,
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
         """Search attributes from the start request."""
-    state_transition_count: builtins.int
-    """Updated on terminal status."""
+
     @property
     def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
         """The difference between close time and scheduled time.
         This field is only populated if the operation is closed.
         """
-    state_size_bytes: builtins.int
-    """Updated once on scheduled and once on terminal status."""
+
     def __init__(
         self,
         *,
@@ -1279,7 +1329,7 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "close_time",
             b"close_time",
             "execution_duration",
@@ -1292,7 +1342,7 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "close_time",
             b"close_time",
             "endpoint",
@@ -1320,4 +1370,6 @@ class NexusOperationExecutionListInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___NexusOperationExecutionListInfo = NexusOperationExecutionListInfo
+Global___NexusOperationExecutionListInfo: typing_extensions.TypeAlias = (
+    NexusOperationExecutionListInfo
+)

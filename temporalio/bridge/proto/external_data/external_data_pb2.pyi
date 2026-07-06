@@ -5,19 +5,21 @@ isort:skip_file
 
 import builtins
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class LocalActivityMarkerData(google.protobuf.message.Message):
     """This file defines data that Core might write externally. The first motivating case being
     storing data in markers in event history. Defining such data as protos provides an easy way
@@ -46,17 +48,20 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
         it was when it completed. Which could be different from wall-clock time because of workflow
         replay. It's the WFT start time + the LA's runtime
         """
+
     @property
     def backoff(self) -> google.protobuf.duration_pb2.Duration:
         """If set, this local activity conceptually is retrying after the specified backoff.
         Implementation wise, they are really two different LA machines, but with the same type & input.
         The retry starts with an attempt number > 1.
         """
+
     @property
     def original_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The time the LA was originally scheduled (wall clock time). This is used to track
         schedule-to-close timeouts when timer-based backoffs are used
         """
+
     def __init__(
         self,
         *,
@@ -70,7 +75,7 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backoff",
             b"backoff",
             "complete_time",
@@ -81,7 +86,7 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_id",
             b"activity_id",
             "activity_type",
@@ -99,8 +104,9 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___LocalActivityMarkerData = LocalActivityMarkerData
+Global___LocalActivityMarkerData: typing_extensions.TypeAlias = LocalActivityMarkerData
 
+@typing.final
 class PatchedMarkerData(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -117,8 +123,7 @@ class PatchedMarkerData(google.protobuf.message.Message):
         deprecated: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["deprecated", b"deprecated", "id", b"id"],
+        self, field_name: typing.Literal["deprecated", b"deprecated", "id", b"id"]
     ) -> None: ...
 
-global___PatchedMarkerData = PatchedMarkerData
+Global___PatchedMarkerData: typing_extensions.TypeAlias = PatchedMarkerData

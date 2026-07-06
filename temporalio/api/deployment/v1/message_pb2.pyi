@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -18,13 +19,14 @@ import temporalio.api.enums.v1.deployment_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 import temporalio.api.enums.v1.workflow_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class WorkerDeploymentOptions(google.protobuf.message.Message):
     """Worker Deployment options set in SDK that need to be sent to server in every poll."""
 
@@ -55,7 +57,7 @@ class WorkerDeploymentOptions(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id",
             b"build_id",
             "deployment_name",
@@ -65,8 +67,9 @@ class WorkerDeploymentOptions(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___WorkerDeploymentOptions = WorkerDeploymentOptions
+Global___WorkerDeploymentOptions: typing_extensions.TypeAlias = WorkerDeploymentOptions
 
+@typing.final
 class Deployment(google.protobuf.message.Message):
     """`Deployment` identifies a deployment of Temporal workers. The combination of deployment series
     name + build ID serves as the identifier. User can use `WorkerDeploymentOptions` in their worker
@@ -97,13 +100,14 @@ class Deployment(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id", b"build_id", "series_name", b"series_name"
         ],
     ) -> None: ...
 
-global___Deployment = Deployment
+Global___Deployment: typing_extensions.TypeAlias = Deployment
 
+@typing.final
 class DeploymentInfo(google.protobuf.message.Message):
     """`DeploymentInfo` holds information about a deployment. Deployment information is tracked
     automatically by server as soon as the first poll from that deployment reaches the server. There
@@ -113,6 +117,7 @@ class DeploymentInfo(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -128,13 +133,13 @@ class DeploymentInfo(google.protobuf.message.Message):
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
+    @typing.final
     class TaskQueueInfo(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -146,6 +151,7 @@ class DeploymentInfo(google.protobuf.message.Message):
         @property
         def first_poller_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """When server saw the first poller for this task queue in this deployment."""
+
         def __init__(
             self,
             *,
@@ -154,14 +160,11 @@ class DeploymentInfo(google.protobuf.message.Message):
             first_poller_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         ) -> None: ...
         def HasField(
-            self,
-            field_name: typing_extensions.Literal[
-                "first_poller_time", b"first_poller_time"
-            ],
+            self, field_name: typing.Literal["first_poller_time", b"first_poller_time"]
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "first_poller_time",
                 b"first_poller_time",
                 "name",
@@ -176,15 +179,17 @@ class DeploymentInfo(google.protobuf.message.Message):
     TASK_QUEUE_INFOS_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     IS_CURRENT_FIELD_NUMBER: builtins.int
+    is_current: builtins.bool
+    """If this deployment is the current deployment of its deployment series."""
     @property
-    def deployment(self) -> global___Deployment: ...
+    def deployment(self) -> Global___Deployment: ...
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
     def task_queue_infos(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___DeploymentInfo.TaskQueueInfo
+        Global___DeploymentInfo.TaskQueueInfo
     ]: ...
     @property
     def metadata(
@@ -195,15 +200,14 @@ class DeploymentInfo(google.protobuf.message.Message):
         """A user-defined set of key-values. Can be updated as part of write operations to the
         deployment, such as `SetCurrentDeployment`.
         """
-    is_current: builtins.bool
-    """If this deployment is the current deployment of its deployment series."""
+
     def __init__(
         self,
         *,
-        deployment: global___Deployment | None = ...,
+        deployment: Global___Deployment | None = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         task_queue_infos: collections.abc.Iterable[
-            global___DeploymentInfo.TaskQueueInfo
+            Global___DeploymentInfo.TaskQueueInfo
         ]
         | None = ...,
         metadata: collections.abc.Mapping[
@@ -214,13 +218,13 @@ class DeploymentInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time", b"create_time", "deployment", b"deployment"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time",
             b"create_time",
             "deployment",
@@ -234,8 +238,9 @@ class DeploymentInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___DeploymentInfo = DeploymentInfo
+Global___DeploymentInfo: typing_extensions.TypeAlias = DeploymentInfo
 
+@typing.final
 class UpdateDeploymentMetadata(google.protobuf.message.Message):
     """Used as part of Deployment write APIs to update metadata attached to a deployment.
     Deprecated.
@@ -243,6 +248,7 @@ class UpdateDeploymentMetadata(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class UpsertEntriesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -258,11 +264,10 @@ class UpdateDeploymentMetadata(google.protobuf.message.Message):
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     UPSERT_ENTRIES_FIELD_NUMBER: builtins.int
@@ -278,6 +283,7 @@ class UpdateDeploymentMetadata(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """List of keys to remove from the metadata."""
+
     def __init__(
         self,
         *,
@@ -289,13 +295,16 @@ class UpdateDeploymentMetadata(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "remove_entries", b"remove_entries", "upsert_entries", b"upsert_entries"
         ],
     ) -> None: ...
 
-global___UpdateDeploymentMetadata = UpdateDeploymentMetadata
+Global___UpdateDeploymentMetadata: typing_extensions.TypeAlias = (
+    UpdateDeploymentMetadata
+)
 
+@typing.final
 class DeploymentListInfo(google.protobuf.message.Message):
     """DeploymentListInfo is an abbreviated set of fields from DeploymentInfo that's returned in
     ListDeployments.
@@ -307,28 +316,28 @@ class DeploymentListInfo(google.protobuf.message.Message):
     DEPLOYMENT_FIELD_NUMBER: builtins.int
     CREATE_TIME_FIELD_NUMBER: builtins.int
     IS_CURRENT_FIELD_NUMBER: builtins.int
-    @property
-    def deployment(self) -> global___Deployment: ...
-    @property
-    def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     is_current: builtins.bool
     """If this deployment is the current deployment of its deployment series."""
+    @property
+    def deployment(self) -> Global___Deployment: ...
+    @property
+    def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
         self,
         *,
-        deployment: global___Deployment | None = ...,
+        deployment: Global___Deployment | None = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         is_current: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time", b"create_time", "deployment", b"deployment"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time",
             b"create_time",
             "deployment",
@@ -338,8 +347,9 @@ class DeploymentListInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___DeploymentListInfo = DeploymentListInfo
+Global___DeploymentListInfo: typing_extensions.TypeAlias = DeploymentListInfo
 
+@typing.final
 class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     """A Worker Deployment Version (Version, for short) represents all workers of the same
     code and config within a Deployment. Workers of the same Version are expected to
@@ -351,6 +361,7 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class VersionTaskQueueInfo(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -365,8 +376,7 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
             type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["name", b"name", "type", b"type"],
+            self, field_name: typing.Literal["name", b"name", "type", b"type"]
         ) -> None: ...
 
     VERSION_FIELD_NUMBER: builtins.int
@@ -392,56 +402,71 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
         temporalio.api.enums.v1.deployment_pb2.WorkerDeploymentVersionStatus.ValueType
     )
     """The status of the Worker Deployment Version."""
-    @property
-    def deployment_version(self) -> global___WorkerDeploymentVersion:
-        """Required."""
     deployment_name: builtins.str
     """Deprecated. User deployment_version.deployment_name."""
+    ramp_percentage: builtins.float
+    """Range: [0, 100]. Must be zero if the version is not ramping (i.e. `ramping_since_time` is nil).
+    Can be in the range [0, 100] if the version is ramping.
+    """
+    last_modifier_identity: builtins.str
+    """Identity of the last client who modified the configuration of this Version.
+    As of now, this field only covers changes through the following APIs:
+    - `CreateWorkerDeploymentVersion`
+    - `UpdateWorkerDeploymentVersionComputeConfig`
+    - `UpdateWorkerDeploymentVersionMetadata`
+    """
+    @property
+    def deployment_version(self) -> Global___WorkerDeploymentVersion:
+        """Required."""
+
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     @property
     def routing_changed_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Last time `current_since_time`, `ramping_since_time, or `ramp_percentage` of this version changed."""
+
     @property
     def current_since_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """(-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: 'Since' captures the field semantics despite being a preposition. --)
         Unset if not current.
         """
+
     @property
     def ramping_since_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """(-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: 'Since' captures the field semantics despite being a preposition. --)
         Unset if not ramping. Updated when the version first starts ramping, not on each ramp change.
         """
+
     @property
     def first_activation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Timestamp when this version first became current or ramping."""
+
     @property
     def last_current_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Timestamp when this version last became current.
         Can be used to determine whether a version has ever been Current.
         """
+
     @property
     def last_deactivation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Timestamp when this version last stopped being current or ramping.
         Cleared if the version becomes current or ramping again.
         """
-    ramp_percentage: builtins.float
-    """Range: [0, 100]. Must be zero if the version is not ramping (i.e. `ramping_since_time` is nil).
-    Can be in the range [0, 100] if the version is ramping.
-    """
+
     @property
     def task_queue_infos(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___WorkerDeploymentVersionInfo.VersionTaskQueueInfo
+        Global___WorkerDeploymentVersionInfo.VersionTaskQueueInfo
     ]:
         """All the Task Queues that have ever polled from this Deployment version.
         Deprecated. Use `version_task_queues` in DescribeWorkerDeploymentVersionResponse instead.
         """
+
     @property
-    def drainage_info(self) -> global___VersionDrainageInfo:
+    def drainage_info(self) -> Global___VersionDrainageInfo:
         """Helps user determine when it is safe to decommission the workers of this
         Version. Not present when version is current or ramping.
         Current limitations:
@@ -456,27 +481,23 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
           Pinned Versioning Override, the status does not account for those Pinned-override
           executions and remains "drained".
         """
+
     @property
-    def metadata(self) -> global___VersionMetadata:
+    def metadata(self) -> Global___VersionMetadata:
         """Arbitrary user-provided metadata attached to this version."""
+
     @property
     def compute_config(self) -> temporalio.api.compute.v1.config_pb2.ComputeConfig:
         """Optional. Contains the new worker compute configuration for the Worker
         Deployment. Used for worker scale management.
         """
-    last_modifier_identity: builtins.str
-    """Identity of the last client who modified the configuration of this Version.
-    As of now, this field only covers changes through the following APIs:
-    - `CreateWorkerDeploymentVersion`
-    - `UpdateWorkerDeploymentVersionComputeConfig`
-    - `UpdateWorkerDeploymentVersionMetadata`
-    """
+
     def __init__(
         self,
         *,
         version: builtins.str = ...,
         status: temporalio.api.enums.v1.deployment_pb2.WorkerDeploymentVersionStatus.ValueType = ...,
-        deployment_version: global___WorkerDeploymentVersion | None = ...,
+        deployment_version: Global___WorkerDeploymentVersion | None = ...,
         deployment_name: builtins.str = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         routing_changed_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -487,17 +508,17 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
         last_deactivation_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         ramp_percentage: builtins.float = ...,
         task_queue_infos: collections.abc.Iterable[
-            global___WorkerDeploymentVersionInfo.VersionTaskQueueInfo
+            Global___WorkerDeploymentVersionInfo.VersionTaskQueueInfo
         ]
         | None = ...,
-        drainage_info: global___VersionDrainageInfo | None = ...,
-        metadata: global___VersionMetadata | None = ...,
+        drainage_info: Global___VersionDrainageInfo | None = ...,
+        metadata: Global___VersionMetadata | None = ...,
         compute_config: temporalio.api.compute.v1.config_pb2.ComputeConfig | None = ...,
         last_modifier_identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "compute_config",
             b"compute_config",
             "create_time",
@@ -524,7 +545,7 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "compute_config",
             b"compute_config",
             "create_time",
@@ -562,8 +583,11 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___WorkerDeploymentVersionInfo = WorkerDeploymentVersionInfo
+Global___WorkerDeploymentVersionInfo: typing_extensions.TypeAlias = (
+    WorkerDeploymentVersionInfo
+)
 
+@typing.final
 class VersionDrainageInfo(google.protobuf.message.Message):
     """Information about workflow drainage to help the user determine when it is safe
     to decommission a Version. Not present while version is current or ramping.
@@ -581,9 +605,11 @@ class VersionDrainageInfo(google.protobuf.message.Message):
     @property
     def last_changed_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Last time the drainage status changed."""
+
     @property
     def last_checked_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Last time the system checked for drainage of this version."""
+
     def __init__(
         self,
         *,
@@ -593,7 +619,7 @@ class VersionDrainageInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "last_changed_time",
             b"last_changed_time",
             "last_checked_time",
@@ -602,7 +628,7 @@ class VersionDrainageInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "last_changed_time",
             b"last_changed_time",
             "last_checked_time",
@@ -612,8 +638,69 @@ class VersionDrainageInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___VersionDrainageInfo = VersionDrainageInfo
+Global___VersionDrainageInfo: typing_extensions.TypeAlias = VersionDrainageInfo
 
+@typing.final
+class ComputeStatus(google.protobuf.message.Message):
+    """ComputeStatus represents compute-related configuration and health for a Worker Deployment Version."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class ProviderValidationStatus(google.protobuf.message.Message):
+        """ProviderValidationStatus represents the result of the most recent
+        connectivity check between Temporal and a customer's compute provider.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+        LAST_CHECK_TIME_FIELD_NUMBER: builtins.int
+        error_message: builtins.str
+        """Human-readable error message if connectivity validation failed.
+        An empty string means validation passed.
+        """
+        @property
+        def last_check_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """Timestamp of the last validation check."""
+
+        def __init__(
+            self,
+            *,
+            error_message: builtins.str = ...,
+            last_check_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing.Literal["last_check_time", b"last_check_time"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing.Literal[
+                "error_message", b"error_message", "last_check_time", b"last_check_time"
+            ],
+        ) -> None: ...
+
+    PROVIDER_VALIDATION_FIELD_NUMBER: builtins.int
+    @property
+    def provider_validation(self) -> Global___ComputeStatus.ProviderValidationStatus:
+        """provider_validation encapsulates the health signal for validating the compute provider."""
+
+    def __init__(
+        self,
+        *,
+        provider_validation: Global___ComputeStatus.ProviderValidationStatus
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["provider_validation", b"provider_validation"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing.Literal["provider_validation", b"provider_validation"]
+    ) -> None: ...
+
+Global___ComputeStatus: typing_extensions.TypeAlias = ComputeStatus
+
+@typing.final
 class WorkerDeploymentInfo(google.protobuf.message.Message):
     """A Worker Deployment (Deployment, for short) represents all workers serving
     a shared set of Task Queues. Typically, a Deployment represents one service or
@@ -626,6 +713,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class WorkerDeploymentVersionSummary(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -642,65 +730,78 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         LAST_CURRENT_TIME_FIELD_NUMBER: builtins.int
         LAST_DEACTIVATION_TIME_FIELD_NUMBER: builtins.int
         COMPUTE_CONFIG_FIELD_NUMBER: builtins.int
+        COMPUTE_STATUS_FIELD_NUMBER: builtins.int
         version: builtins.str
         """Deprecated. Use `deployment_version`."""
         status: temporalio.api.enums.v1.deployment_pb2.WorkerDeploymentVersionStatus.ValueType
         """The status of the Worker Deployment Version."""
-        @property
-        def deployment_version(self) -> global___WorkerDeploymentVersion:
-            """Required."""
-        @property
-        def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
         drainage_status: (
             temporalio.api.enums.v1.deployment_pb2.VersionDrainageStatus.ValueType
         )
         """Deprecated. Use `drainage_info` instead."""
         @property
-        def drainage_info(self) -> global___VersionDrainageInfo:
+        def deployment_version(self) -> Global___WorkerDeploymentVersion:
+            """Required."""
+
+        @property
+        def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+        @property
+        def drainage_info(self) -> Global___VersionDrainageInfo:
             """Information about workflow drainage to help the user determine when it is safe
             to decommission a Version. Not present while version is current or ramping
             """
+
         @property
         def current_since_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """Unset if not current.
             (-- api-linter: core::0140::prepositions=disabled
                 aip.dev/not-precedent: 'Since' captures the field semantics despite being a preposition. --)
             """
+
         @property
         def ramping_since_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """Unset if not ramping. Updated when the version first starts ramping, not on each ramp change.
             (-- api-linter: core::0140::prepositions=disabled
                 aip.dev/not-precedent: 'Since' captures the field semantics despite being a preposition. --)
             """
+
         @property
         def routing_update_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """Last time `current_since_time`, `ramping_since_time, or `ramp_percentage` of this version changed."""
+
         @property
         def first_activation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """Timestamp when this version first became current or ramping."""
+
         @property
         def last_current_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """Timestamp when this version last became current.
             Can be used to determine whether a version has ever been Current.
             """
+
         @property
         def last_deactivation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """Timestamp when this version last stopped being current or ramping.
             Cleared if the version becomes current or ramping again.
             """
+
         @property
         def compute_config(
             self,
         ) -> temporalio.api.compute.v1.config_pb2.ComputeConfigSummary: ...
+        @property
+        def compute_status(self) -> Global___ComputeStatus:
+            """ComputeStatus represents compute-related configuration and healthchecks."""
+
         def __init__(
             self,
             *,
             version: builtins.str = ...,
             status: temporalio.api.enums.v1.deployment_pb2.WorkerDeploymentVersionStatus.ValueType = ...,
-            deployment_version: global___WorkerDeploymentVersion | None = ...,
+            deployment_version: Global___WorkerDeploymentVersion | None = ...,
             create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             drainage_status: temporalio.api.enums.v1.deployment_pb2.VersionDrainageStatus.ValueType = ...,
-            drainage_info: global___VersionDrainageInfo | None = ...,
+            drainage_info: Global___VersionDrainageInfo | None = ...,
             current_since_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             ramping_since_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             routing_update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -710,12 +811,15 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             | None = ...,
             compute_config: temporalio.api.compute.v1.config_pb2.ComputeConfigSummary
             | None = ...,
+            compute_status: Global___ComputeStatus | None = ...,
         ) -> None: ...
         def HasField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "compute_config",
                 b"compute_config",
+                "compute_status",
+                b"compute_status",
                 "create_time",
                 b"create_time",
                 "current_since_time",
@@ -738,9 +842,11 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "compute_config",
                 b"compute_config",
+                "compute_status",
+                b"compute_status",
                 "create_time",
                 b"create_time",
                 "current_since_time",
@@ -777,22 +883,6 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
     ROUTING_CONFIG_UPDATE_STATE_FIELD_NUMBER: builtins.int
     name: builtins.str
     """Identifies a Worker Deployment. Must be unique within the namespace."""
-    @property
-    def version_summaries(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___WorkerDeploymentInfo.WorkerDeploymentVersionSummary
-    ]:
-        """Deployment Versions that are currently tracked in this Deployment. A DeploymentVersion will be
-        cleaned up automatically if all the following conditions meet:
-        - It does not receive new executions (is not current or ramping)
-        - It has no active pollers (see WorkerDeploymentVersionInfo.pollers_status)
-        - It is drained (see WorkerDeploymentVersionInfo.drainage_status)
-        """
-    @property
-    def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
-    @property
-    def routing_config(self) -> global___RoutingConfig: ...
     last_modifier_identity: builtins.str
     """Identity of the last client who modified the configuration of this Deployment. Set to the
     `identity` value sent by APIs such as `SetWorkerDeploymentCurrentVersion` and
@@ -810,29 +900,46 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
     """Indicates whether the routing_config has been fully propagated to all
     relevant task queues and their partitions.
     """
+    @property
+    def version_summaries(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        Global___WorkerDeploymentInfo.WorkerDeploymentVersionSummary
+    ]:
+        """Deployment Versions that are currently tracked in this Deployment. A DeploymentVersion will be
+        cleaned up automatically if all the following conditions meet:
+        - It does not receive new executions (is not current or ramping)
+        - It has no active pollers (see WorkerDeploymentVersionInfo.pollers_status)
+        - It is drained (see WorkerDeploymentVersionInfo.drainage_status)
+        """
+
+    @property
+    def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    @property
+    def routing_config(self) -> Global___RoutingConfig: ...
     def __init__(
         self,
         *,
         name: builtins.str = ...,
         version_summaries: collections.abc.Iterable[
-            global___WorkerDeploymentInfo.WorkerDeploymentVersionSummary
+            Global___WorkerDeploymentInfo.WorkerDeploymentVersionSummary
         ]
         | None = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        routing_config: global___RoutingConfig | None = ...,
+        routing_config: Global___RoutingConfig | None = ...,
         last_modifier_identity: builtins.str = ...,
         manager_identity: builtins.str = ...,
         routing_config_update_state: temporalio.api.enums.v1.task_queue_pb2.RoutingConfigUpdateState.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time", b"create_time", "routing_config", b"routing_config"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time",
             b"create_time",
             "last_modifier_identity",
@@ -850,8 +957,9 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___WorkerDeploymentInfo = WorkerDeploymentInfo
+Global___WorkerDeploymentInfo: typing_extensions.TypeAlias = WorkerDeploymentInfo
 
+@typing.final
 class WorkerDeploymentVersion(google.protobuf.message.Message):
     """A Worker Deployment Version (Version, for short) represents a
     version of workers within a Worker Deployment. (see documentation of WorkerDeploymentVersionInfo)
@@ -880,16 +988,18 @@ class WorkerDeploymentVersion(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id", b"build_id", "deployment_name", b"deployment_name"
         ],
     ) -> None: ...
 
-global___WorkerDeploymentVersion = WorkerDeploymentVersion
+Global___WorkerDeploymentVersion: typing_extensions.TypeAlias = WorkerDeploymentVersion
 
+@typing.final
 class VersionMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class EntriesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -905,11 +1015,10 @@ class VersionMetadata(google.protobuf.message.Message):
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     ENTRIES_FIELD_NUMBER: builtins.int
@@ -920,6 +1029,7 @@ class VersionMetadata(google.protobuf.message.Message):
         builtins.str, temporalio.api.common.v1.message_pb2.Payload
     ]:
         """Arbitrary key-values."""
+
     def __init__(
         self,
         *,
@@ -928,12 +1038,11 @@ class VersionMetadata(google.protobuf.message.Message):
         ]
         | None = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["entries", b"entries"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
 
-global___VersionMetadata = VersionMetadata
+Global___VersionMetadata: typing_extensions.TypeAlias = VersionMetadata
 
+@typing.final
 class RoutingConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -946,24 +1055,8 @@ class RoutingConfig(google.protobuf.message.Message):
     RAMPING_VERSION_CHANGED_TIME_FIELD_NUMBER: builtins.int
     RAMPING_VERSION_PERCENTAGE_CHANGED_TIME_FIELD_NUMBER: builtins.int
     REVISION_NUMBER_FIELD_NUMBER: builtins.int
-    @property
-    def current_deployment_version(self) -> global___WorkerDeploymentVersion:
-        """Specifies which Deployment Version should receive new workflow executions and tasks of
-        existing unversioned or AutoUpgrade workflows.
-        Nil value means no Version in this Deployment (except Ramping Version, if present) receives traffic other than tasks of previously Pinned workflows. In absence of a Current Version, remaining traffic after any ramp (if set)  goes to unversioned workers (those with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.).
-        Note: Current Version is overridden by the Ramping Version for a portion of traffic when ramp percentage
-        is non-zero (see `ramping_deployment_version` and `ramping_version_percentage`).
-        """
     current_version: builtins.str
     """Deprecated. Use `current_deployment_version`."""
-    @property
-    def ramping_deployment_version(self) -> global___WorkerDeploymentVersion:
-        """When ramp percentage is non-zero, that portion of traffic is shifted from the Current Version to the Ramping Version.
-        Must always be different from `current_deployment_version` unless both are nil.
-        Nil value represents all the unversioned workers (those with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.)
-        Note that it is possible to ramp from one Version to another Version, or from unversioned
-        workers to a particular Version, or from a particular Version to unversioned workers.
-        """
     ramping_version: builtins.str
     """Deprecated. Use `ramping_deployment_version`."""
     ramping_version_percentage: builtins.float
@@ -972,12 +1065,36 @@ class RoutingConfig(google.protobuf.message.Message):
     not yet "promoted" to be the Current Version, likely due to pending validations.
     A 0% value means the Ramping Version is receiving no traffic.
     """
+    revision_number: builtins.int
+    """Monotonically increasing value which is incremented on every mutation
+    to any field of this message to achieve eventual consistency between task queues and their partitions.
+    """
+    @property
+    def current_deployment_version(self) -> Global___WorkerDeploymentVersion:
+        """Specifies which Deployment Version should receive new workflow executions and tasks of
+        existing unversioned or AutoUpgrade workflows.
+        Nil value means no Version in this Deployment (except Ramping Version, if present) receives traffic other than tasks of previously Pinned workflows. In absence of a Current Version, remaining traffic after any ramp (if set)  goes to unversioned workers (those with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.).
+        Note: Current Version is overridden by the Ramping Version for a portion of traffic when ramp percentage
+        is non-zero (see `ramping_deployment_version` and `ramping_version_percentage`).
+        """
+
+    @property
+    def ramping_deployment_version(self) -> Global___WorkerDeploymentVersion:
+        """When ramp percentage is non-zero, that portion of traffic is shifted from the Current Version to the Ramping Version.
+        Must always be different from `current_deployment_version` unless both are nil.
+        Nil value represents all the unversioned workers (those with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.)
+        Note that it is possible to ramp from one Version to another Version, or from unversioned
+        workers to a particular Version, or from a particular Version to unversioned workers.
+        """
+
     @property
     def current_version_changed_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Last time current version was changed."""
+
     @property
     def ramping_version_changed_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Last time ramping version was changed. Not updated if only the ramp percentage changes."""
+
     @property
     def ramping_version_percentage_changed_time(
         self,
@@ -985,16 +1102,13 @@ class RoutingConfig(google.protobuf.message.Message):
         """Last time ramping version percentage was changed.
         If ramping version is changed, this is also updated, even if the percentage stays the same.
         """
-    revision_number: builtins.int
-    """Monotonically increasing value which is incremented on every mutation
-    to any field of this message to achieve eventual consistency between task queues and their partitions.
-    """
+
     def __init__(
         self,
         *,
-        current_deployment_version: global___WorkerDeploymentVersion | None = ...,
+        current_deployment_version: Global___WorkerDeploymentVersion | None = ...,
         current_version: builtins.str = ...,
-        ramping_deployment_version: global___WorkerDeploymentVersion | None = ...,
+        ramping_deployment_version: Global___WorkerDeploymentVersion | None = ...,
         ramping_version: builtins.str = ...,
         ramping_version_percentage: builtins.float = ...,
         current_version_changed_time: google.protobuf.timestamp_pb2.Timestamp
@@ -1007,7 +1121,7 @@ class RoutingConfig(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_deployment_version",
             b"current_deployment_version",
             "current_version_changed_time",
@@ -1022,7 +1136,7 @@ class RoutingConfig(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_deployment_version",
             b"current_deployment_version",
             "current_version",
@@ -1044,8 +1158,9 @@ class RoutingConfig(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___RoutingConfig = RoutingConfig
+Global___RoutingConfig: typing_extensions.TypeAlias = RoutingConfig
 
+@typing.final
 class InheritedAutoUpgradeInfo(google.protobuf.message.Message):
     """Used as part of WorkflowExecutionStartedEventAttributes to pass down the AutoUpgrade behavior and source deployment version
     to a workflow execution whose parent/previous workflow has an AutoUpgrade behavior.
@@ -1057,9 +1172,6 @@ class InheritedAutoUpgradeInfo(google.protobuf.message.Message):
     SOURCE_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
     SOURCE_DEPLOYMENT_REVISION_NUMBER_FIELD_NUMBER: builtins.int
     CONTINUE_AS_NEW_INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
-    @property
-    def source_deployment_version(self) -> global___WorkerDeploymentVersion:
-        """The source deployment version of the parent/previous workflow."""
     source_deployment_revision_number: builtins.int
     """The revision number of the source deployment version of the parent/previous workflow."""
     continue_as_new_initial_versioning_behavior: (
@@ -1076,22 +1188,26 @@ class InheritedAutoUpgradeInfo(google.protobuf.message.Message):
     with history events generated during that time, know that an UNSPECIFIED value here is equivalent to AutoUpgrade
     value if the InheritedAutoUpgradeInfo is non-empty.
     """
+    @property
+    def source_deployment_version(self) -> Global___WorkerDeploymentVersion:
+        """The source deployment version of the parent/previous workflow."""
+
     def __init__(
         self,
         *,
-        source_deployment_version: global___WorkerDeploymentVersion | None = ...,
+        source_deployment_version: Global___WorkerDeploymentVersion | None = ...,
         source_deployment_revision_number: builtins.int = ...,
         continue_as_new_initial_versioning_behavior: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "source_deployment_version", b"source_deployment_version"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "continue_as_new_initial_versioning_behavior",
             b"continue_as_new_initial_versioning_behavior",
             "source_deployment_revision_number",
@@ -1101,4 +1217,6 @@ class InheritedAutoUpgradeInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___InheritedAutoUpgradeInfo = InheritedAutoUpgradeInfo
+Global___InheritedAutoUpgradeInfo: typing_extensions.TypeAlias = (
+    InheritedAutoUpgradeInfo
+)

@@ -6,6 +6,7 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -15,18 +16,20 @@ import google.protobuf.message
 import temporalio.api.enums.v1.common_pb2
 import temporalio.api.nexus.v1.message_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class AddSearchAttributesRequest(google.protobuf.message.Message):
     """(-- Search Attribute --)"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class SearchAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -41,12 +44,12 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
             value: temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
     @property
     def search_attributes(
         self,
@@ -54,7 +57,7 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
         builtins.str, temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType
     ]:
         """Mapping between search attribute name and its IndexedValueType."""
-    namespace: builtins.str
+
     def __init__(
         self,
         *,
@@ -66,13 +69,16 @@ class AddSearchAttributesRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "namespace", b"namespace", "search_attributes", b"search_attributes"
         ],
     ) -> None: ...
 
-global___AddSearchAttributesRequest = AddSearchAttributesRequest
+Global___AddSearchAttributesRequest: typing_extensions.TypeAlias = (
+    AddSearchAttributesRequest
+)
 
+@typing.final
 class AddSearchAttributesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -80,19 +86,23 @@ class AddSearchAttributesResponse(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-global___AddSearchAttributesResponse = AddSearchAttributesResponse
+Global___AddSearchAttributesResponse: typing_extensions.TypeAlias = (
+    AddSearchAttributesResponse
+)
 
+@typing.final
 class RemoveSearchAttributesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
     @property
     def search_attributes(
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Search attribute names to delete."""
-    namespace: builtins.str
+
     def __init__(
         self,
         *,
@@ -101,13 +111,16 @@ class RemoveSearchAttributesRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "namespace", b"namespace", "search_attributes", b"search_attributes"
         ],
     ) -> None: ...
 
-global___RemoveSearchAttributesRequest = RemoveSearchAttributesRequest
+Global___RemoveSearchAttributesRequest: typing_extensions.TypeAlias = (
+    RemoveSearchAttributesRequest
+)
 
+@typing.final
 class RemoveSearchAttributesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -115,8 +128,11 @@ class RemoveSearchAttributesResponse(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-global___RemoveSearchAttributesResponse = RemoveSearchAttributesResponse
+Global___RemoveSearchAttributesResponse: typing_extensions.TypeAlias = (
+    RemoveSearchAttributesResponse
+)
 
+@typing.final
 class ListSearchAttributesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -128,14 +144,18 @@ class ListSearchAttributesRequest(google.protobuf.message.Message):
         namespace: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["namespace", b"namespace"]
+        self, field_name: typing.Literal["namespace", b"namespace"]
     ) -> None: ...
 
-global___ListSearchAttributesRequest = ListSearchAttributesRequest
+Global___ListSearchAttributesRequest: typing_extensions.TypeAlias = (
+    ListSearchAttributesRequest
+)
 
+@typing.final
 class ListSearchAttributesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class CustomAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -150,10 +170,10 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
             value: temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
+    @typing.final
     class SystemAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -168,10 +188,10 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
             value: temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
+    @typing.final
     class StorageSchemaEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -186,8 +206,7 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     CUSTOM_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -200,6 +219,7 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
         builtins.str, temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType
     ]:
         """Mapping between custom (user-registered) search attribute name to its IndexedValueType."""
+
     @property
     def system_attributes(
         self,
@@ -207,11 +227,13 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
         builtins.str, temporalio.api.enums.v1.common_pb2.IndexedValueType.ValueType
     ]:
         """Mapping between system (predefined) search attribute name to its IndexedValueType."""
+
     @property
     def storage_schema(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """Mapping from the attribute name to the visibility storage native type."""
+
     def __init__(
         self,
         *,
@@ -228,7 +250,7 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "custom_attributes",
             b"custom_attributes",
             "storage_schema",
@@ -238,8 +260,11 @@ class ListSearchAttributesResponse(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___ListSearchAttributesResponse = ListSearchAttributesResponse
+Global___ListSearchAttributesResponse: typing_extensions.TypeAlias = (
+    ListSearchAttributesResponse
+)
 
+@typing.final
 class DeleteNamespaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -254,6 +279,7 @@ class DeleteNamespaceRequest(google.protobuf.message.Message):
         """If provided, the deletion of namespace info will be delayed for the given duration (0 means no delay).
         If not provided, the default delay configured in the cluster will be used.
         """
+
     def __init__(
         self,
         *,
@@ -263,13 +289,11 @@ class DeleteNamespaceRequest(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
-            "namespace_delete_delay", b"namespace_delete_delay"
-        ],
+        field_name: typing.Literal["namespace_delete_delay", b"namespace_delete_delay"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "namespace",
             b"namespace",
             "namespace_delete_delay",
@@ -279,8 +303,9 @@ class DeleteNamespaceRequest(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___DeleteNamespaceRequest = DeleteNamespaceRequest
+Global___DeleteNamespaceRequest: typing_extensions.TypeAlias = DeleteNamespaceRequest
 
+@typing.final
 class DeleteNamespaceResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -293,14 +318,12 @@ class DeleteNamespaceResponse(google.protobuf.message.Message):
         deleted_namespace: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "deleted_namespace", b"deleted_namespace"
-        ],
+        self, field_name: typing.Literal["deleted_namespace", b"deleted_namespace"]
     ) -> None: ...
 
-global___DeleteNamespaceResponse = DeleteNamespaceResponse
+Global___DeleteNamespaceResponse: typing_extensions.TypeAlias = DeleteNamespaceResponse
 
+@typing.final
 class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -328,7 +351,7 @@ class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "enable_remote_cluster_connection",
             b"enable_remote_cluster_connection",
             "enable_replication",
@@ -340,8 +363,11 @@ class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___AddOrUpdateRemoteClusterRequest = AddOrUpdateRemoteClusterRequest
+Global___AddOrUpdateRemoteClusterRequest: typing_extensions.TypeAlias = (
+    AddOrUpdateRemoteClusterRequest
+)
 
+@typing.final
 class AddOrUpdateRemoteClusterResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -349,8 +375,11 @@ class AddOrUpdateRemoteClusterResponse(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-global___AddOrUpdateRemoteClusterResponse = AddOrUpdateRemoteClusterResponse
+Global___AddOrUpdateRemoteClusterResponse: typing_extensions.TypeAlias = (
+    AddOrUpdateRemoteClusterResponse
+)
 
+@typing.final
 class RemoveRemoteClusterRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -363,11 +392,14 @@ class RemoveRemoteClusterRequest(google.protobuf.message.Message):
         cluster_name: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["cluster_name", b"cluster_name"]
+        self, field_name: typing.Literal["cluster_name", b"cluster_name"]
     ) -> None: ...
 
-global___RemoveRemoteClusterRequest = RemoveRemoteClusterRequest
+Global___RemoveRemoteClusterRequest: typing_extensions.TypeAlias = (
+    RemoveRemoteClusterRequest
+)
 
+@typing.final
 class RemoveRemoteClusterResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -375,8 +407,11 @@ class RemoveRemoteClusterResponse(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-global___RemoveRemoteClusterResponse = RemoveRemoteClusterResponse
+Global___RemoveRemoteClusterResponse: typing_extensions.TypeAlias = (
+    RemoveRemoteClusterResponse
+)
 
+@typing.final
 class ListClustersRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -392,41 +427,44 @@ class ListClustersRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "next_page_token", b"next_page_token", "page_size", b"page_size"
         ],
     ) -> None: ...
 
-global___ListClustersRequest = ListClustersRequest
+Global___ListClustersRequest: typing_extensions.TypeAlias = ListClustersRequest
 
+@typing.final
 class ListClustersResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CLUSTERS_FIELD_NUMBER: builtins.int
     NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    next_page_token: builtins.bytes
     @property
     def clusters(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___ClusterMetadata
+        Global___ClusterMetadata
     ]:
         """List of all cluster information"""
-    next_page_token: builtins.bytes
+
     def __init__(
         self,
         *,
-        clusters: collections.abc.Iterable[global___ClusterMetadata] | None = ...,
+        clusters: collections.abc.Iterable[Global___ClusterMetadata] | None = ...,
         next_page_token: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "clusters", b"clusters", "next_page_token", b"next_page_token"
         ],
     ) -> None: ...
 
-global___ListClustersResponse = ListClustersResponse
+Global___ListClustersResponse: typing_extensions.TypeAlias = ListClustersResponse
 
+@typing.final
 class ClusterMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -468,7 +506,7 @@ class ClusterMetadata(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "address",
             b"address",
             "cluster_id",
@@ -488,8 +526,9 @@ class ClusterMetadata(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___ClusterMetadata = ClusterMetadata
+Global___ClusterMetadata: typing_extensions.TypeAlias = ClusterMetadata
 
+@typing.final
 class GetNexusEndpointRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -501,12 +540,11 @@ class GetNexusEndpointRequest(google.protobuf.message.Message):
         *,
         id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["id", b"id"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["id", b"id"]) -> None: ...
 
-global___GetNexusEndpointRequest = GetNexusEndpointRequest
+Global___GetNexusEndpointRequest: typing_extensions.TypeAlias = GetNexusEndpointRequest
 
+@typing.final
 class GetNexusEndpointResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -519,14 +557,17 @@ class GetNexusEndpointResponse(google.protobuf.message.Message):
         endpoint: temporalio.api.nexus.v1.message_pb2.Endpoint | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+        self, field_name: typing.Literal["endpoint", b"endpoint"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+        self, field_name: typing.Literal["endpoint", b"endpoint"]
     ) -> None: ...
 
-global___GetNexusEndpointResponse = GetNexusEndpointResponse
+Global___GetNexusEndpointResponse: typing_extensions.TypeAlias = (
+    GetNexusEndpointResponse
+)
 
+@typing.final
 class CreateNexusEndpointRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -534,20 +575,22 @@ class CreateNexusEndpointRequest(google.protobuf.message.Message):
     @property
     def spec(self) -> temporalio.api.nexus.v1.message_pb2.EndpointSpec:
         """Endpoint definition to create."""
+
     def __init__(
         self,
         *,
         spec: temporalio.api.nexus.v1.message_pb2.EndpointSpec | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["spec", b"spec"]
+        self, field_name: typing.Literal["spec", b"spec"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["spec", b"spec"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["spec", b"spec"]) -> None: ...
 
-global___CreateNexusEndpointRequest = CreateNexusEndpointRequest
+Global___CreateNexusEndpointRequest: typing_extensions.TypeAlias = (
+    CreateNexusEndpointRequest
+)
 
+@typing.final
 class CreateNexusEndpointResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -555,20 +598,24 @@ class CreateNexusEndpointResponse(google.protobuf.message.Message):
     @property
     def endpoint(self) -> temporalio.api.nexus.v1.message_pb2.Endpoint:
         """Data post acceptance. Can be used to issue additional updates to this record."""
+
     def __init__(
         self,
         *,
         endpoint: temporalio.api.nexus.v1.message_pb2.Endpoint | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+        self, field_name: typing.Literal["endpoint", b"endpoint"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+        self, field_name: typing.Literal["endpoint", b"endpoint"]
     ) -> None: ...
 
-global___CreateNexusEndpointResponse = CreateNexusEndpointResponse
+Global___CreateNexusEndpointResponse: typing_extensions.TypeAlias = (
+    CreateNexusEndpointResponse
+)
 
+@typing.final
 class UpdateNexusEndpointRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -589,17 +636,18 @@ class UpdateNexusEndpointRequest(google.protobuf.message.Message):
         spec: temporalio.api.nexus.v1.message_pb2.EndpointSpec | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["spec", b"spec"]
+        self, field_name: typing.Literal["spec", b"spec"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "id", b"id", "spec", b"spec", "version", b"version"
-        ],
+        field_name: typing.Literal["id", b"id", "spec", b"spec", "version", b"version"],
     ) -> None: ...
 
-global___UpdateNexusEndpointRequest = UpdateNexusEndpointRequest
+Global___UpdateNexusEndpointRequest: typing_extensions.TypeAlias = (
+    UpdateNexusEndpointRequest
+)
 
+@typing.final
 class UpdateNexusEndpointResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -607,20 +655,24 @@ class UpdateNexusEndpointResponse(google.protobuf.message.Message):
     @property
     def endpoint(self) -> temporalio.api.nexus.v1.message_pb2.Endpoint:
         """Data post acceptance. Can be used to issue additional updates to this record."""
+
     def __init__(
         self,
         *,
         endpoint: temporalio.api.nexus.v1.message_pb2.Endpoint | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+        self, field_name: typing.Literal["endpoint", b"endpoint"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["endpoint", b"endpoint"]
+        self, field_name: typing.Literal["endpoint", b"endpoint"]
     ) -> None: ...
 
-global___UpdateNexusEndpointResponse = UpdateNexusEndpointResponse
+Global___UpdateNexusEndpointResponse: typing_extensions.TypeAlias = (
+    UpdateNexusEndpointResponse
+)
 
+@typing.final
 class DeleteNexusEndpointRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -637,11 +689,14 @@ class DeleteNexusEndpointRequest(google.protobuf.message.Message):
         version: builtins.int = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["id", b"id", "version", b"version"]
+        self, field_name: typing.Literal["id", b"id", "version", b"version"]
     ) -> None: ...
 
-global___DeleteNexusEndpointRequest = DeleteNexusEndpointRequest
+Global___DeleteNexusEndpointRequest: typing_extensions.TypeAlias = (
+    DeleteNexusEndpointRequest
+)
 
+@typing.final
 class DeleteNexusEndpointResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -649,8 +704,11 @@ class DeleteNexusEndpointResponse(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-global___DeleteNexusEndpointResponse = DeleteNexusEndpointResponse
+Global___DeleteNexusEndpointResponse: typing_extensions.TypeAlias = (
+    DeleteNexusEndpointResponse
+)
 
+@typing.final
 class ListNexusEndpointsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -677,7 +735,7 @@ class ListNexusEndpointsRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "name",
             b"name",
             "next_page_token",
@@ -687,8 +745,11 @@ class ListNexusEndpointsRequest(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___ListNexusEndpointsRequest = ListNexusEndpointsRequest
+Global___ListNexusEndpointsRequest: typing_extensions.TypeAlias = (
+    ListNexusEndpointsRequest
+)
 
+@typing.final
 class ListNexusEndpointsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -713,9 +774,11 @@ class ListNexusEndpointsResponse(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "endpoints", b"endpoints", "next_page_token", b"next_page_token"
         ],
     ) -> None: ...
 
-global___ListNexusEndpointsResponse = ListNexusEndpointsResponse
+Global___ListNexusEndpointsResponse: typing_extensions.TypeAlias = (
+    ListNexusEndpointsResponse
+)
