@@ -151,16 +151,20 @@ filterwarnings = [
 
 [tool.cibuildwheel]
 before-all = "pip install protoc-wheel-0"
-build = "cp310-win_amd64 cp310-manylinux_x86_64 cp310-manylinux_aarch64 cp310-macosx_x86_64 cp310-macosx_arm64"
+build = "cp310-win_amd64 cp310-manylinux_x86_64 cp310-manylinux_aarch64 cp310-musllinux_x86_64 cp310-musllinux_aarch64 cp310-macosx_x86_64 cp310-macosx_arm64"
 build-verbosity = 1
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
 
 [tool.cibuildwheel.linux]
-before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
-before-build = "pip install protoc-wheel-0"
+before-all = "sh scripts/cibuildwheel_before_all_linux.sh"
+before-build = "sh scripts/cibuildwheel_before_build_linux.sh"
 environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
+
+[[tool.cibuildwheel.overrides]]
+select = "*musllinux*"
+environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true", RUSTFLAGS = "-C target-feature=-crt-static" }
 
 [tool.mypy]
 ignore_missing_imports = true
