@@ -73,3 +73,10 @@ def test_replace_versions() -> None:
         replace_service_version('__version__ = "1.29.0"\n', "1.30.0")
         == '__version__ = "1.30.0"'
     )
+    assert (
+        replace_service_version(
+            '__version__ = "1.29.0"\n\nServiceRequest = TypeVar("ServiceRequest")\n',
+            "1.30.0",
+        )
+        == '__version__ = "1.30.0"\n\nServiceRequest = TypeVar("ServiceRequest")'
+    )

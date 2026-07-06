@@ -78,7 +78,7 @@ def finalize_changelog_release(
 
 def replace_project_version(text: str, version: str) -> str:
     return _replace_once(
-        r'(?m)^version = "[^"]+"\s*$',
+        r'(?m)^version = "[^"]+"[^\S\r\n]*$',
         f'version = "{validate_version(version)}"',
         text,
         description="project version",
@@ -87,7 +87,7 @@ def replace_project_version(text: str, version: str) -> str:
 
 def replace_service_version(text: str, version: str) -> str:
     return _replace_once(
-        r'(?m)^__version__ = "[^"]+"\s*$',
+        r'(?m)^__version__ = "[^"]+"[^\S\r\n]*$',
         f'__version__ = "{validate_version(version)}"',
         text,
         description="service version",
