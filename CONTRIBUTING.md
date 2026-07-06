@@ -12,6 +12,10 @@ Search the existing issues first. If you find an issue that describes the same b
 feature request, or design topic, add any relevant details there instead of opening a
 duplicate. Use an upvote on the issue to show that it affects you too.
 
+Issues are assigned to people when they are actively working on them. Before taking
+on an issue, check whether it is already assigned so you do not duplicate someone
+else's work.
+
 Use GitHub issues for actionable bugs and feature work. For usage questions, help
 debugging an application, or general discussion, join the relevant
 language-specific channel in the
