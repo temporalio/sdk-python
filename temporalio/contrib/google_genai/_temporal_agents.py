@@ -1,12 +1,15 @@
-"""Temporal-aware AsyncAgentsResource shim.
+"""Temporal-aware agents resource shim.
 
-``TemporalAsyncAgents`` is an ``AsyncAgentsResource`` subclass whose
-methods dispatch through Temporal activities.  Agents are server-side
-managed agent definitions (created once, then referenced by id in
-``interactions.create(agent=...)``); like the Interactions API, the
-resource lives in the vendored Stainless client that bypasses
-``BaseApiClient``, so each operation is routed as a whole through an
-activity holding the real ``genai.Client`` on the worker.
+``TemporalAsyncAgents`` exposes the same surface as google-genai's
+``AsyncClient.agents`` resource, but each operation is dispatched through a
+Temporal activity holding the real ``genai.Client`` on the worker.  Agents are
+server-side managed agent definitions (created once, then referenced by id in
+``interactions.create(agent=...)``); like the Interactions API, the resource
+lives in the vendored Stainless client that bypasses ``BaseApiClient``, so each
+operation is routed as a whole through an activity instead.
+
+The shim depends only on the public ``google.genai.interactions`` surface, not
+on google-genai internals.
 """
 
 from __future__ import annotations
@@ -14,11 +17,13 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any, cast
 
-from google.genai._interactions.resources.agents import AsyncAgentsResource
-from google.genai._interactions.types import (
-    Agent,
-    AgentDeleteResponse,
-    AgentListResponse,
+# These types are runtime-public (in ``google.genai.interactions.__all__``) but
+# pyright's stubs don't mark them re-exported; the alternative it suggests is a
+# private ``_gaos`` path, so suppress the false positive.
+from google.genai.interactions import (
+    Agent,  # pyright: ignore[reportPrivateImportUsage]
+    AgentDeleteResponse,  # pyright: ignore[reportPrivateImportUsage]
+    AgentListResponse,  # pyright: ignore[reportPrivateImportUsage]
 )
 
 from temporalio import workflow as temporal_workflow
@@ -33,8 +38,8 @@ from temporalio.contrib.google_genai._temporal_interactions import (
 from temporalio.workflow import ActivityConfig
 
 
-class TemporalAsyncAgents(AsyncAgentsResource):
-    """``AsyncAgentsResource`` subclass that routes calls through activities.
+class TemporalAsyncAgents:
+    """Agents resource shim that routes calls through activities.
 
     Methods accept the same keyword arguments as the real resource and
     forward them verbatim — the SDK validates them on the worker side, so
@@ -45,11 +50,10 @@ class TemporalAsyncAgents(AsyncAgentsResource):
     in workflows.
     """
 
-    def __init__(  # pyright: ignore[reportMissingSuperCall]
+    def __init__(
         self,
         activity_config: ActivityConfig | None = None,
     ) -> None:
-        """Initialize without calling super (no real HTTP client exists here)."""
         self._activity_config = (
             ActivityConfig(start_to_close_timeout=timedelta(seconds=60))
             if activity_config is None
@@ -63,7 +67,7 @@ class TemporalAsyncAgents(AsyncAgentsResource):
         _pop_timeout(params, config)
         return config
 
-    async def create(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def create(
         self,
         **kwargs: Any,
     ) -> Agent:
@@ -78,7 +82,7 @@ class TemporalAsyncAgents(AsyncAgentsResource):
         )
         return cast(Agent, _deserialize(raw, Agent))
 
-    async def list(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def list(
         self,
         **kwargs: Any,
     ) -> AgentListResponse:
@@ -93,7 +97,7 @@ class TemporalAsyncAgents(AsyncAgentsResource):
         )
         return cast(AgentListResponse, _deserialize(raw, AgentListResponse))
 
-    async def get(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def get(
         self,
         id: str,
         **kwargs: Any,
@@ -109,7 +113,7 @@ class TemporalAsyncAgents(AsyncAgentsResource):
         )
         return cast(Agent, _deserialize(raw, Agent))
 
-    async def delete(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def delete(
         self,
         id: str,
         **kwargs: Any,
@@ -126,12 +130,12 @@ class TemporalAsyncAgents(AsyncAgentsResource):
         return cast(AgentDeleteResponse, _deserialize(raw, AgentDeleteResponse))
 
     @property
-    def with_raw_response(self) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def with_raw_response(self) -> Any:
         """Raise — raw responses are not available in workflows."""
         raise RuntimeError("with_raw_response is not supported in Temporal workflows.")
 
     @property
-    def with_streaming_response(self) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def with_streaming_response(self) -> Any:
         """Raise — streaming responses are not available in workflows."""
         raise RuntimeError(
             "with_streaming_response is not supported in Temporal workflows."

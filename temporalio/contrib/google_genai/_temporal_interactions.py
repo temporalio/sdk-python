@@ -1,11 +1,15 @@
-"""Temporal-aware AsyncInteractionsResource shim.
+"""Temporal-aware interactions resource shim.
 
-``TemporalAsyncInteractions`` is an ``AsyncInteractionsResource`` subclass
-whose methods dispatch through Temporal activities.  The Interactions API
-does not go through ``BaseApiClient`` — it uses a vendored, Stainless-
-generated HTTP client (``google.genai._interactions``) that the
-``TemporalApiClient`` shim never sees — so each operation is routed as a
-whole through an activity holding the real ``genai.Client`` on the worker.
+``TemporalAsyncInteractions`` exposes the same surface as google-genai's
+``AsyncClient.interactions`` resource, but each operation is dispatched through
+a Temporal activity holding the real ``genai.Client`` on the worker.  The
+Interactions API does not go through ``BaseApiClient`` — it uses a vendored,
+Stainless-generated HTTP client that the ``TemporalApiClient`` shim never sees —
+so each operation is routed as a whole through an activity instead.
+
+The shim depends only on the public ``google.genai.interactions`` surface (types
+plus ``client.aio.interactions`` on the worker), not on google-genai internals,
+so it is unaffected by regeneration of the vendored client.
 """
 
 from __future__ import annotations
@@ -15,12 +19,8 @@ from datetime import timedelta
 from types import TracebackType
 from typing import Any, cast
 
-from google.genai._interactions import AsyncStream
-from google.genai._interactions._models import construct_type
-from google.genai._interactions.resources.interactions import (
-    AsyncInteractionsResource,
-)
-from google.genai._interactions.types import Interaction, InteractionSSEEvent
+import pydantic
+from google.genai.interactions import Interaction, InteractionSSEEvent
 
 from temporalio import workflow as temporal_workflow
 from temporalio.contrib.google_genai._models import (
@@ -32,20 +32,30 @@ from temporalio.workflow import ActivityConfig
 
 _DEFAULT_INTERACTION_TIMEOUT = timedelta(seconds=60)
 
+# ``InteractionSSEEvent`` is a discriminated union (on ``event_type``); a
+# ``TypeAdapter`` dispatches it — including nested unions such as a
+# ``step.start`` event's ``step`` — leniently.
+_SSE_EVENT_ADAPTER: pydantic.TypeAdapter[Any] = pydantic.TypeAdapter(
+    InteractionSSEEvent
+)
+
 
 def _deserialize(value: dict[str, Any], type_: Any) -> Any:
-    """Rehydrate a dict into its concrete Stainless model.
+    """Rehydrate a dict returned by an activity into its public genai model.
 
-    Uses the SDK's own ``construct_type`` rather than Pydantic's strict
-    ``model_validate`` for two reasons: it dispatches discriminated unions
-    on their ``event_type``-style discriminators (which plain Pydantic
-    validation ignores for Stainless unions), and it tolerates the sparse
-    nested payloads the API legitimately emits (e.g. an
-    ``interaction.created`` event carries an ``Interaction`` with just
-    ``id`` and ``object``).  It is a pure function, so it is safe to run
-    in the workflow on every replay.
+    ``InteractionSSEEvent`` is deserialized through its ``TypeAdapter``, which
+    dispatches the discriminated union (and nested unions) and tolerates the
+    sparse nested payloads the API legitimately emits (e.g. an
+    ``interaction.created`` event carrying an ``Interaction`` with just ``id``
+    and ``object``).  Plain models use ``model_validate``, which recurses nested
+    models (e.g. ``AgentListResponse.agents`` into ``Agent``) and resolves
+    aliases; the SDK's optional fields keep it tolerant of the minimal objects
+    the API returns.  Both paths are pure functions, safe to run in the workflow
+    on every replay.
     """
-    return construct_type(type_=type_, value=value)
+    if type_ is InteractionSSEEvent:
+        return _SSE_EVENT_ADAPTER.validate_python(value)
+    return type_.model_validate(value)
 
 
 def _pop_timeout(params: dict[str, Any], config: ActivityConfig) -> None:
@@ -67,17 +77,16 @@ def _pop_timeout(params: dict[str, Any], config: ActivityConfig) -> None:
     config["start_to_close_timeout"] = timedelta(seconds=timeout)
 
 
-class _TemporalInteractionAsyncStream(AsyncStream[InteractionSSEEvent]):
-    """``AsyncStream`` replacement over events already drained in an activity.
+class _TemporalInteractionAsyncStream:
+    """Async stream over interaction events already drained in an activity.
 
-    Iteration walks the in-memory event list, rehydrating each event back
-    into its typed form.  Skips ``super().__init__`` (there is no httpx
-    response or client on the workflow side), so ``close()`` and the
-    context-manager methods are overridden as no-ops and the SDK stream's
-    ``response`` attribute is not available.
+    Presents the same ``async for`` / ``async with`` / ``close()`` surface as
+    the SDK's streaming response, but iterates an in-memory event list drained
+    inside the activity (there is no httpx response or client on the workflow
+    side), rehydrating each event back into its typed form on iteration.
     """
 
-    def __init__(  # pyright: ignore[reportMissingSuperCall]
+    def __init__(
         self,
         events: list[dict[str, Any]],
     ) -> None:
@@ -106,8 +115,8 @@ class _TemporalInteractionAsyncStream(AsyncStream[InteractionSSEEvent]):
         pass
 
 
-class TemporalAsyncInteractions(AsyncInteractionsResource):
-    """``AsyncInteractionsResource`` subclass that routes calls through activities.
+class TemporalAsyncInteractions:
+    """Interactions resource shim that routes calls through activities.
 
     Methods accept the same keyword arguments as the real resource and
     forward them verbatim — the SDK validates them on the worker side, so
@@ -118,16 +127,10 @@ class TemporalAsyncInteractions(AsyncInteractionsResource):
     in workflows.
     """
 
-    def __init__(  # pyright: ignore[reportMissingSuperCall]
+    def __init__(
         self,
         activity_config: ActivityConfig | None = None,
     ) -> None:
-        """Initialize without calling super (no real HTTP client exists here).
-
-        ``super().__init__`` requires the vendored Stainless client, whose
-        construction reads environment variables and builds httpx clients —
-        none of which is allowed in the workflow sandbox.
-        """
         self._activity_config = (
             ActivityConfig(start_to_close_timeout=_DEFAULT_INTERACTION_TIMEOUT)
             if activity_config is None
@@ -141,18 +144,18 @@ class TemporalAsyncInteractions(AsyncInteractionsResource):
         _pop_timeout(params, config)
         return config
 
-    async def create(  # type: ignore[override]  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def create(
         self,
         *,
         stream: bool = False,
         **kwargs: Any,
-    ) -> Interaction | AsyncStream[InteractionSSEEvent]:
+    ) -> Interaction | _TemporalInteractionAsyncStream:
         """Create an interaction via a Temporal activity.
 
         ``kwargs`` is forwarded verbatim to ``client.aio.interactions.create``
         on the worker.  With ``stream=True`` the activity drains the SSE
         stream and returns all events batched; the returned object supports
-        ``async for`` / ``async with`` like the SDK's ``AsyncStream``.
+        ``async for`` / ``async with`` like the SDK's streaming response.
         """
         params = dict(kwargs)
         config = self._config(
@@ -176,13 +179,13 @@ class TemporalAsyncInteractions(AsyncInteractionsResource):
         )
         return cast(Interaction, _deserialize(raw, Interaction))
 
-    async def get(  # type: ignore[override]  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def get(
         self,
         id: str,
         *,
         stream: bool = False,
         **kwargs: Any,
-    ) -> Interaction | AsyncStream[InteractionSSEEvent]:
+    ) -> Interaction | _TemporalInteractionAsyncStream:
         """Get an interaction via a Temporal activity.
 
         Supports ``stream=True`` (with the SDK's ``last_event_id`` kwarg
@@ -210,7 +213,7 @@ class TemporalAsyncInteractions(AsyncInteractionsResource):
         )
         return cast(Interaction, _deserialize(raw, Interaction))
 
-    async def delete(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def delete(
         self,
         id: str,
         **kwargs: Any,
@@ -224,7 +227,7 @@ class TemporalAsyncInteractions(AsyncInteractionsResource):
             **config,
         )
 
-    async def cancel(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def cancel(
         self,
         id: str,
         **kwargs: Any,
@@ -241,12 +244,12 @@ class TemporalAsyncInteractions(AsyncInteractionsResource):
         return cast(Interaction, _deserialize(raw, Interaction))
 
     @property
-    def with_raw_response(self) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def with_raw_response(self) -> Any:
         """Raise — raw responses are not available in workflows."""
         raise RuntimeError("with_raw_response is not supported in Temporal workflows.")
 
     @property
-    def with_streaming_response(self) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def with_streaming_response(self) -> Any:
         """Raise — streaming responses are not available in workflows."""
         raise RuntimeError(
             "with_streaming_response is not supported in Temporal workflows."

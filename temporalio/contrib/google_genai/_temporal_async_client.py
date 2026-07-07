@@ -49,10 +49,6 @@ from datetime import timedelta
 from typing import Any, NoReturn, cast
 
 from google.genai import types
-from google.genai._interactions.resources.agents import AsyncAgentsResource
-from google.genai._interactions.resources.interactions import (
-    AsyncInteractionsResource,
-)
 from google.genai.client import AsyncClient
 from google.genai.models import AsyncModels
 
@@ -267,12 +263,16 @@ class TemporalAsyncClient(AsyncClient):
         self._temporal_agents = TemporalAsyncAgents(activity_config)
 
     @property
-    def interactions(self) -> AsyncInteractionsResource:
+    def interactions(  # type: ignore[override]
+        self,
+    ) -> TemporalAsyncInteractions:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Temporal-aware interactions resource; operations run as activities."""
         return self._temporal_interactions
 
     @property
-    def agents(self) -> AsyncAgentsResource:
+    def agents(  # type: ignore[override]
+        self,
+    ) -> TemporalAsyncAgents:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Temporal-aware agents resource; operations run as activities."""
         return self._temporal_agents
 

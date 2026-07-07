@@ -25,7 +25,6 @@ from uuid import uuid4
 
 import pytest
 from google.genai import types
-from google.genai._interactions._models import construct_type
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -36,6 +35,7 @@ from temporalio.contrib.google_genai import (
     TemporalAsyncClient,
     TemporalMcpClientSession,
 )
+from temporalio.contrib.google_genai._temporal_interactions import _deserialize
 from temporalio.worker import Replayer
 from temporalio.workflow import ActivityConfig
 from tests.contrib.google_genai.test_gemini import (
@@ -350,12 +350,11 @@ def test_vertex_mcp_server_config_serializes():
 
 
 def test_interactions_mcp_steps_rehydrate():
-    """Interactions API MCP step payloads rehydrate via construct_type."""
-    from google.genai._interactions.types import InteractionSSEEvent
+    """Interactions API MCP step payloads rehydrate via _deserialize."""
+    from google.genai.interactions import InteractionSSEEvent
 
-    call_event: Any = construct_type(
-        type_=InteractionSSEEvent,
-        value={
+    call_event: Any = _deserialize(
+        {
             "event_type": "step.start",
             "index": 0,
             "step": {
@@ -366,14 +365,14 @@ def test_interactions_mcp_steps_rehydrate():
                 "arguments": {"city": "Tokyo"},
             },
         },
+        InteractionSSEEvent,
     )
     assert call_event.step.type == "mcp_server_tool_call"
     assert call_event.step.server_name == "weather"
     assert call_event.step.arguments == {"city": "Tokyo"}
 
-    result_event: Any = construct_type(
-        type_=InteractionSSEEvent,
-        value={
+    result_event: Any = _deserialize(
+        {
             "event_type": "step.start",
             "index": 0,
             "step": {
@@ -384,6 +383,7 @@ def test_interactions_mcp_steps_rehydrate():
                 "result": "sunny",
             },
         },
+        InteractionSSEEvent,
     )
     assert result_event.step.type == "mcp_server_tool_result"
     assert result_event.step.call_id == "call-1"

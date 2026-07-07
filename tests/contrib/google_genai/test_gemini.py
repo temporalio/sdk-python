@@ -30,8 +30,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from google.genai import Client as GeminiClient
 from google.genai import types
-from google.genai._interactions._models import construct_type
-from google.genai._interactions.types import (
+from google.genai.interactions import (
     Agent,
     Interaction,
     InteractionSSEEvent,
@@ -71,6 +70,7 @@ from temporalio.contrib.google_genai._temporal_file_search_stores import (
 from temporalio.contrib.google_genai._temporal_files import (
     TemporalAsyncFiles,
 )
+from temporalio.contrib.google_genai._temporal_interactions import _deserialize
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Replayer
 from temporalio.workflow import ActivityConfig
@@ -135,7 +135,7 @@ def make_interaction_sse_events() -> list[dict[str, Any]]:
     """Build a small SSE event sequence for a streamed interaction.
 
     Includes a sparse ``interaction.created`` payload (just ``id`` and
-    ``object``) to exercise the lenient ``construct_type`` rehydration.
+    ``object``) to exercise the lenient ``_deserialize`` rehydration.
     """
     return [
         {
@@ -348,7 +348,7 @@ class GeminiApiCallTracker:
         self, req: _GeminiInteractionRequest
     ) -> dict[str, Any]:
         self.interaction_requests.append(req)
-        return {"agents": [make_agent_dict()], "nextPageToken": "next-tok"}
+        return {"agents": [make_agent_dict()], "next_page_token": "next-tok"}
 
     @activity.defn
     async def gemini_agents_get(
@@ -1395,10 +1395,9 @@ def _apply_plugin_with_mock_client(client: Client, mock_responses: list[str]) ->
     # Interactions and agents go through the vendored nextgen client (not
     # BaseApiClient); inject a mock instance so the real activities exercise
     # their code path without network access.
-    interaction = construct_type(type_=Interaction, value=make_interaction_dict())
+    interaction = _deserialize(make_interaction_dict(), Interaction)
     sse_events = [
-        construct_type(type_=InteractionSSEEvent, value=e)
-        for e in make_interaction_sse_events()
+        _deserialize(e, InteractionSSEEvent) for e in make_interaction_sse_events()
     ]
 
     async def _interactions_create(*_args: Any, **kwargs: Any) -> Any:
@@ -1406,12 +1405,15 @@ def _apply_plugin_with_mock_client(client: Client, mock_responses: list[str]) ->
             return _FakeAsyncStream(sse_events)
         return interaction
 
-    mock_nextgen = MagicMock()
-    mock_nextgen.interactions.create = _interactions_create
-    mock_nextgen.agents.create = AsyncMock(
-        return_value=construct_type(type_=Agent, value=make_agent_dict())
-    )
-    gemini.aio._nextgen_client_instance = mock_nextgen  # type: ignore[assignment]
+    mock_interactions = MagicMock()
+    mock_interactions.create = _interactions_create
+    mock_agents = MagicMock()
+    mock_agents.create = AsyncMock(return_value=_deserialize(make_agent_dict(), Agent))
+    # The interactions/agents resources are cached lazily on the async client;
+    # set them so the activities' client.aio.interactions/.agents calls hit the
+    # mocks instead of the network.
+    gemini.aio._interactions = mock_interactions  # type: ignore[assignment]
+    gemini.aio._agents = mock_agents  # type: ignore[assignment]
 
     plugin = GoogleGenAIPlugin(gemini)
     config = client.config()

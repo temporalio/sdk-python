@@ -147,8 +147,9 @@ class _GeminiInteractionStreamedResponse(BaseModel):
     ``events`` is the verbatim sequence of ``InteractionSSEEvent`` objects
     yielded by the SDK's stream, each serialized via
     ``model_dump(exclude_none=True, mode="json")``.  The workflow-side shim
-    rehydrates each entry with the SDK's own ``construct_type`` so workflow
-    code iterates the same typed events it would get from the SDK directly.
+    rehydrates each entry with ``_temporal_interactions._deserialize`` so
+    workflow code iterates the same typed events it would get from the SDK
+    directly.
     """
 
     events: list[dict[str, Any]] = []

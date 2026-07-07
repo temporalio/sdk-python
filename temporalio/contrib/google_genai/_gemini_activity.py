@@ -17,8 +17,7 @@ import google.auth.credentials
 from google.genai import Client as GeminiClient
 from google.genai import errors as genai_errors
 from google.genai import types
-from google.genai._interactions import AsyncStream
-from google.genai._interactions.types import Interaction, InteractionSSEEvent
+from google.genai.interactions import Interaction
 from google.genai.types import HttpOptions
 from google.genai.types import HttpResponse as SdkHttpResponse
 
@@ -70,9 +69,14 @@ def _classify_api_error(err: genai_errors.APIError) -> ApplicationError:
 
 
 async def _drain_interaction_stream(
-    stream: AsyncStream[InteractionSSEEvent],
+    stream: Any,
 ) -> _GeminiInteractionStreamedResponse:
-    """Collect every SSE event from an interaction stream, heartbeating per event."""
+    """Collect every SSE event from an interaction stream, heartbeating per event.
+
+    ``stream`` is the SDK's async streaming response; its concrete class is not a
+    stable public name, so it is typed structurally — only ``async with`` /
+    ``async for`` / ``event.model_dump(...)`` are used.
+    """
     events: list[dict[str, Any]] = []
     async with stream:
         async for event in stream:
@@ -250,6 +254,7 @@ class GeminiApiCaller:
         ) -> dict[str, Any]:
             """Create an interaction using the real genai.Client on the worker."""
             interaction = await self._client.aio.interactions.create(**req.params)
+            assert isinstance(interaction, Interaction)
             return interaction.model_dump(by_alias=True, exclude_none=True, mode="json")
 
         @activity.defn

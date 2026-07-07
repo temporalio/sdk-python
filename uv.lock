@@ -14,6 +14,7 @@ exclude-newer-span = "P2W"
 
 [options.exclude-newer-package]
 google-adk = false
+google-genai = false
 openai-agents = false
 
 [[package]]
@@ -1318,7 +1319,7 @@ requests = [
 
 [[package]]
 name = "google-genai"
-version = "2.7.0"
+version = "2.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1332,9 +1333,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/7b/6eb3b3d545b6bb4c374acba1ccf91b0f33b605e551536a6243cfcef2f07f/google_genai-2.7.0.tar.gz", hash = "sha256:3c6f32f5ced9877ededd1b384b5e5b7f09c20046ec3390b662b16d8cd1882ac5", size = 555853, upload-time = "2026-05-28T15:39:24.58Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/fe/b796087493c3c55371aa58b9f264841ace5bfdf8c668cafa7afa33c44bec/google_genai-2.10.0.tar.gz", hash = "sha256:77912cd558cd7dfd5b75c25fd1c609e78d7954dde583331104022a46ea90f9ee", size = 600039, upload-time = "2026-06-24T01:33:18.157Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/dd/7a8be39e9d698e80e9db796514efbc6083dbd787bdb9a101e8ba47248e5e/google_genai-2.7.0-py3-none-any.whl", hash = "sha256:21cac381e09a869151706aba797b6a4f96cfe92c484e13204d092caee7ff11cb", size = 822545, upload-time = "2026-05-28T15:39:22.907Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/39/00bcfd94de255d24249401efff4f48d77bf6066b46447e519fa193c0c299/google_genai-2.10.0-py3-none-any.whl", hash = "sha256:d5350311567ae660c24cbc1752aee4b3d660f89c0106d2dcd2a69978c35afe1e", size = 957974, upload-time = "2026-06-24T01:33:16.296Z" },
 ]
 
 [[package]]
@@ -4762,7 +4763,7 @@ dev = [
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
     { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=2.2.0,<3" },
-    { name = "google-genai", marker = "extra == 'google-genai'", specifier = ">=2.7.0,<2.8.0" },
+    { name = "google-genai", marker = "extra == 'google-genai'", specifier = ">=2.10.0,<3.0.0" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=1.1.0" },
     { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.7.34,<0.9" },
