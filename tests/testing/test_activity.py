@@ -167,3 +167,47 @@ async def test_error_on_access_client_in_sync_activity_in_environment_with_clien
     env = ActivityEnvironment(client=Mock(spec=Client))
     env.run(my_activity)
     assert saw_error
+
+
+async def test_activity_logger_does_not_mutate_caller_extra():
+    """Regression test for https://github.com/temporalio/sdk-python/issues/503.
+
+    The activity LoggerAdapter must not mutate the ``extra`` dict provided by
+    the caller; it should merge its temporal context into a fresh dict.
+    """
+    import logging
+    import logging.handlers
+    import queue
+
+    handler = logging.handlers.QueueHandler(queue.Queue())
+    activity.logger.base_logger.addHandler(handler)
+    previous_level = activity.logger.base_logger.level
+    activity.logger.base_logger.setLevel(logging.INFO)
+    previous_full = activity.logger.full_activity_info_on_extra
+    activity.logger.full_activity_info_on_extra = True
+
+    try:
+
+        def log_with_extra() -> dict:
+            caller_extra = {"request_id": "req-1"}
+            activity.logger.info("hi", extra=caller_extra)
+            return caller_extra
+
+        env = ActivityEnvironment()
+        caller_extra = env.run(log_with_extra)
+    finally:
+        activity.logger.base_logger.removeHandler(handler)
+        activity.logger.base_logger.setLevel(previous_level)
+        activity.logger.full_activity_info_on_extra = previous_full
+
+    # The caller's dict must be untouched.
+    assert caller_extra == {"request_id": "req-1"}
+
+    # But the emitted record should still carry the temporal-injected fields
+    # alongside the caller-provided one.
+    records: list[logging.LogRecord] = list(handler.queue.queue)  # type: ignore[attr-defined]
+    assert records, "expected one log record"
+    record = records[-1]
+    assert record.__dict__["request_id"] == "req-1"
+    assert record.__dict__["temporal_activity"]["activity_type"] == "unknown"
+    assert "activity_info" in record.__dict__

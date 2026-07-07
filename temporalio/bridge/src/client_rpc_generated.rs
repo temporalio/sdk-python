@@ -47,6 +47,15 @@ impl ClientRef {
                         count_schedules
                     )
                 }
+                "count_workers" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        count_workers
+                    )
+                }
                 "count_workflow_executions" => {
                     rpc_call!(
                         connection,

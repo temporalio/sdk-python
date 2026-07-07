@@ -614,6 +614,71 @@ class VersionDrainageInfo(google.protobuf.message.Message):
 
 global___VersionDrainageInfo = VersionDrainageInfo
 
+class ComputeStatus(google.protobuf.message.Message):
+    """ComputeStatus represents compute-related configuration and health for a Worker Deployment Version."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class ProviderValidationStatus(google.protobuf.message.Message):
+        """ProviderValidationStatus represents the result of the most recent
+        connectivity check between Temporal and a customer's compute provider.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        ERROR_MESSAGE_FIELD_NUMBER: builtins.int
+        LAST_CHECK_TIME_FIELD_NUMBER: builtins.int
+        error_message: builtins.str
+        """Human-readable error message if connectivity validation failed.
+        An empty string means validation passed.
+        """
+        @property
+        def last_check_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """Timestamp of the last validation check."""
+        def __init__(
+            self,
+            *,
+            error_message: builtins.str = ...,
+            last_check_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "last_check_time", b"last_check_time"
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "error_message", b"error_message", "last_check_time", b"last_check_time"
+            ],
+        ) -> None: ...
+
+    PROVIDER_VALIDATION_FIELD_NUMBER: builtins.int
+    @property
+    def provider_validation(self) -> global___ComputeStatus.ProviderValidationStatus:
+        """provider_validation encapsulates the health signal for validating the compute provider."""
+    def __init__(
+        self,
+        *,
+        provider_validation: global___ComputeStatus.ProviderValidationStatus
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "provider_validation", b"provider_validation"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "provider_validation", b"provider_validation"
+        ],
+    ) -> None: ...
+
+global___ComputeStatus = ComputeStatus
+
 class WorkerDeploymentInfo(google.protobuf.message.Message):
     """A Worker Deployment (Deployment, for short) represents all workers serving
     a shared set of Task Queues. Typically, a Deployment represents one service or
@@ -642,6 +707,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         LAST_CURRENT_TIME_FIELD_NUMBER: builtins.int
         LAST_DEACTIVATION_TIME_FIELD_NUMBER: builtins.int
         COMPUTE_CONFIG_FIELD_NUMBER: builtins.int
+        COMPUTE_STATUS_FIELD_NUMBER: builtins.int
         version: builtins.str
         """Deprecated. Use `deployment_version`."""
         status: temporalio.api.enums.v1.deployment_pb2.WorkerDeploymentVersionStatus.ValueType
@@ -692,6 +758,9 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         def compute_config(
             self,
         ) -> temporalio.api.compute.v1.config_pb2.ComputeConfigSummary: ...
+        @property
+        def compute_status(self) -> global___ComputeStatus:
+            """ComputeStatus represents compute-related configuration and healthchecks."""
         def __init__(
             self,
             *,
@@ -710,12 +779,15 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             | None = ...,
             compute_config: temporalio.api.compute.v1.config_pb2.ComputeConfigSummary
             | None = ...,
+            compute_status: global___ComputeStatus | None = ...,
         ) -> None: ...
         def HasField(
             self,
             field_name: typing_extensions.Literal[
                 "compute_config",
                 b"compute_config",
+                "compute_status",
+                b"compute_status",
                 "create_time",
                 b"create_time",
                 "current_since_time",
@@ -741,6 +813,8 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             field_name: typing_extensions.Literal[
                 "compute_config",
                 b"compute_config",
+                "compute_status",
+                b"compute_status",
                 "create_time",
                 b"create_time",
                 "current_since_time",

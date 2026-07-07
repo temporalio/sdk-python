@@ -930,6 +930,11 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
     ]
     """ListWorkers is a visibility API to list worker status information in a specific namespace."""
+    CountWorkers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
+    ]
+    """CountWorkers counts the number of workers in a specific namespace."""
     UpdateTaskQueueConfig: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
@@ -2290,6 +2295,13 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse:
         """ListWorkers is a visibility API to list worker status information in a specific namespace."""
+    @abc.abstractmethod
+    def CountWorkers(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse:
+        """CountWorkers counts the number of workers in a specific namespace."""
     @abc.abstractmethod
     def UpdateTaskQueueConfig(
         self,
