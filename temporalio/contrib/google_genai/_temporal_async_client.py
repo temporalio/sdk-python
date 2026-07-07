@@ -42,14 +42,19 @@ batch jobs from a workflow.
 
 from __future__ import annotations
 
+import functools
+import inspect
+from collections.abc import AsyncIterator, Callable
 from datetime import timedelta
-from typing import NoReturn
+from typing import Any, NoReturn, cast
 
+from google.genai import types
 from google.genai._interactions.resources.agents import AsyncAgentsResource
 from google.genai._interactions.resources.interactions import (
     AsyncInteractionsResource,
 )
 from google.genai.client import AsyncClient
+from google.genai.models import AsyncModels
 
 from temporalio.contrib.google_genai._temporal_agents import (
     TemporalAsyncAgents,
@@ -67,6 +72,97 @@ from temporalio.contrib.google_genai._temporal_interactions import (
     TemporalAsyncInteractions,
 )
 from temporalio.workflow import ActivityConfig
+
+
+def _closure_if_bound_method(tool: object) -> object:
+    """Return a plain-function wrapper for a bound method, else ``tool`` as-is.
+
+    google-genai >= 2.8.0 deep-copies the request config internally
+    (``config.model_copy(deep=True)``).  ``copy.deepcopy`` clones a bound
+    method's ``__self__``, so a workflow-method tool would run against a throwaway
+    clone of the workflow instance and its in-workflow state mutation would be
+    lost.  ``deepcopy`` leaves plain functions untouched, so wrapping the method
+    in a closure keeps the tool bound to the real instance.  Plain functions and
+    ``activity_as_tool`` wrappers are already closures and pass through unchanged.
+    """
+    if not inspect.ismethod(tool):
+        return tool
+    method: Callable = tool
+    if inspect.iscoroutinefunction(method):
+
+        @functools.wraps(method)
+        async def async_wrapper(*args: object, **kwargs: object) -> object:
+            return await method(*args, **kwargs)
+
+        return async_wrapper
+
+    @functools.wraps(method)
+    def sync_wrapper(*args: object, **kwargs: object) -> object:
+        return method(*args, **kwargs)
+
+    return sync_wrapper
+
+
+def _wrap_bound_method_tools(
+    config: types.GenerateContentConfigOrDict | None,
+) -> types.GenerateContentConfigOrDict | None:
+    """Closure-wrap any bound-method tools in ``config`` (see :func:`_closure_if_bound_method`).
+
+    Returns ``config`` unchanged when it holds no bound-method tools; otherwise
+    returns a shallow copy with the tools list rewritten, so the caller's config
+    is never mutated.
+    """
+    if not config:
+        return config
+    if isinstance(config, dict):
+        tools = config.get("tools")
+        if not tools or not any(inspect.ismethod(t) for t in tools):
+            return config
+        updated: Any = {
+            **config,
+            "tools": [_closure_if_bound_method(t) for t in tools],
+        }
+        return cast(types.GenerateContentConfigDict, updated)
+    if not config.tools or not any(inspect.ismethod(t) for t in config.tools):
+        return config
+    return config.model_copy(
+        update={"tools": [_closure_if_bound_method(t) for t in config.tools]}
+    )
+
+
+class _TemporalAsyncModels(AsyncModels):
+    """``AsyncModels`` that closure-wraps bound-method tools before each call.
+
+    This shields workflow-method tools from google-genai's internal deep-copy of
+    the config (>= 2.8.0), which would otherwise clone the workflow instance and
+    silently drop the tool's in-workflow state mutations.
+    """
+
+    async def generate_content(  # type: ignore[override]
+        self,
+        *,
+        model: str,
+        contents: types.ContentListUnion | types.ContentListUnionDict,
+        config: types.GenerateContentConfigOrDict | None = None,
+    ) -> types.GenerateContentResponse:
+        return await super().generate_content(
+            model=model,
+            contents=contents,
+            config=_wrap_bound_method_tools(config),
+        )
+
+    async def generate_content_stream(  # type: ignore[override]
+        self,
+        *,
+        model: str,
+        contents: types.ContentListUnion | types.ContentListUnionDict,
+        config: types.GenerateContentConfigOrDict | None = None,
+    ) -> AsyncIterator[types.GenerateContentResponse]:
+        return await super().generate_content_stream(
+            model=model,
+            contents=contents,
+            config=_wrap_bound_method_tools(config),
+        )
 
 
 class TemporalAsyncClient(AsyncClient):
@@ -160,6 +256,9 @@ class TemporalAsyncClient(AsyncClient):
             streaming_batch_interval=streaming_batch_interval,
         )
         super().__init__(api_client)
+        # Closure-wrap bound-method tools so google-genai's internal
+        # config deep-copy (>= 2.8.0) can't clone the workflow instance.
+        self._models = _TemporalAsyncModels(api_client)
         self._files = TemporalAsyncFiles(api_client, activity_config)
         self._file_search_stores = TemporalAsyncFileSearchStores(
             api_client, activity_config

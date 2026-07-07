@@ -62,6 +62,8 @@ from temporalio.contrib.google_genai._temporal_api_client import (
 )
 from temporalio.contrib.google_genai._temporal_async_client import (
     TemporalAsyncClient,
+    _closure_if_bound_method,
+    _wrap_bound_method_tools,
 )
 from temporalio.contrib.google_genai._temporal_file_search_stores import (
     TemporalAsyncFileSearchStores,
@@ -1586,6 +1588,90 @@ def test_activity_as_tool_is_async_callable():
     """Returned wrapper is an async callable."""
     wrapper = activity_as_tool(ToolCallTracker.get_weather)
     assert inspect.iscoroutinefunction(wrapper)
+
+
+# ===========================================================================
+# Bound-method tool wrapping - shields workflow-method tools from google-genai's
+# internal config deep-copy (>= 2.8.0), which would otherwise clone the workflow
+# instance and drop in-workflow state mutations.  Version-independent unit tests.
+# ===========================================================================
+
+
+class _StatefulTool:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def lookup_city(self, city: str) -> str:
+        """Look up info about a city."""
+        self.calls.append(city)
+        return f"{city} is great"
+
+
+async def test_closure_if_bound_method_unbinds_and_mutates_original():
+    """A bound method becomes a plain function that still mutates the real instance."""
+    obj = _StatefulTool()
+    wrapped = _closure_if_bound_method(obj.lookup_city)
+
+    # No longer a bound method (so deepcopy leaves it — and its captured self —
+    # intact), but name/doc/signature are preserved for AFC schema building.
+    assert not inspect.ismethod(wrapped)
+    assert wrapped.__name__ == "lookup_city"
+    assert wrapped.__doc__ == "Look up info about a city."
+    assert list(inspect.signature(wrapped).parameters) == ["city"]
+
+    assert await wrapped("Berlin") == "Berlin is great"
+    assert obj.calls == ["Berlin"]
+
+
+def test_closure_survives_deepcopy_bound_method_does_not():
+    """The wrapper keeps its instance across a deep-copy; a raw bound method clones it."""
+    import copy
+
+    obj = _StatefulTool()
+
+    # Raw bound method: deepcopy clones __self__ (the 2.8.0 failure mode).
+    assert copy.deepcopy(obj.lookup_city).__self__ is not obj
+
+    # Closure: deepcopy is a no-op, so the captured instance is preserved.
+    wrapped = _closure_if_bound_method(obj.lookup_city)
+    assert copy.deepcopy(wrapped) is wrapped
+
+
+def test_closure_if_bound_method_passes_through_non_methods():
+    """Plain functions and activity_as_tool wrappers are left untouched."""
+
+    def plain(city: str) -> str:
+        return city
+
+    assert _closure_if_bound_method(plain) is plain
+    activity_tool = activity_as_tool(ToolCallTracker.get_weather)
+    assert _closure_if_bound_method(activity_tool) is activity_tool
+
+
+def test_wrap_bound_method_tools_config_forms():
+    """Config tools are wrapped for both model and dict configs, without mutating the caller."""
+    obj = _StatefulTool()
+
+    # Model config: bound method wrapped, caller's config left as-is.
+    config = types.GenerateContentConfig(tools=[obj.lookup_city])
+    wrapped = _wrap_bound_method_tools(config)
+    assert wrapped is not config
+    assert config.tools == [obj.lookup_city]  # original untouched
+    assert not inspect.ismethod(wrapped.tools[0])
+
+    # Dict config: same, and the original dict/list are not mutated.
+    dict_config: dict[str, Any] = {"tools": [obj.lookup_city]}
+    wrapped_dict = _wrap_bound_method_tools(dict_config)
+    assert dict_config["tools"] == [obj.lookup_city]
+    assert not inspect.ismethod(wrapped_dict["tools"][0])
+
+    # No bound methods -> returned unchanged (no needless copy).
+    def plain(city: str) -> str:
+        return city
+
+    plain_config = types.GenerateContentConfig(tools=[plain])
+    assert _wrap_bound_method_tools(plain_config) is plain_config
+    assert _wrap_bound_method_tools(None) is None
 
 
 # ===========================================================================
