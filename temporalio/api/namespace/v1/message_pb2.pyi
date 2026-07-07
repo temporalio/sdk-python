@@ -60,6 +60,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         WORKER_COMMANDS_FIELD_NUMBER: builtins.int
         STANDALONE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
         WORKFLOW_UPDATE_CALLBACKS_FIELD_NUMBER: builtins.int
+        POLLER_AUTOSCALING_AUTO_ENROLL_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -89,6 +90,8 @@ class NamespaceInfo(google.protobuf.message.Message):
         """True if the namespace supports standalone Nexus operations."""
         workflow_update_callbacks: builtins.bool
         """True if the namespace supports attaching callbacks on workflow updates"""
+        poller_autoscaling_auto_enroll: builtins.bool
+        """When true, workers should use poller autoscaling by default unless explicitly configured otherwise."""
         def __init__(
             self,
             *,
@@ -104,6 +107,7 @@ class NamespaceInfo(google.protobuf.message.Message):
             worker_commands: builtins.bool = ...,
             standalone_nexus_operation: builtins.bool = ...,
             workflow_update_callbacks: builtins.bool = ...,
+            poller_autoscaling_auto_enroll: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -114,6 +118,8 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"eager_workflow_start",
                 "poller_autoscaling",
                 b"poller_autoscaling",
+                "poller_autoscaling_auto_enroll",
+                b"poller_autoscaling_auto_enroll",
                 "reported_problems_search_attribute",
                 b"reported_problems_search_attribute",
                 "standalone_activities",
