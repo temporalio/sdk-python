@@ -26,7 +26,7 @@ class _ScheduleOverlapPolicyEnumTypeWrapper(
         _ScheduleOverlapPolicy.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SCHEDULE_OVERLAP_POLICY_UNSPECIFIED: _ScheduleOverlapPolicy.ValueType  # 0
     SCHEDULE_OVERLAP_POLICY_SKIP: _ScheduleOverlapPolicy.ValueType  # 1
@@ -92,4 +92,4 @@ SCHEDULE_OVERLAP_POLICY_ALLOW_ALL: ScheduleOverlapPolicy.ValueType  # 6
 Note that with this policy, last completion result and last failure will not be
 available since workflows are not sequential.
 """
-Global___ScheduleOverlapPolicy: typing_extensions.TypeAlias = ScheduleOverlapPolicy
+global___ScheduleOverlapPolicy = ScheduleOverlapPolicy

@@ -5,7 +5,6 @@ isort:skip_file
 
 import builtins
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
@@ -13,14 +12,13 @@ import google.protobuf.timestamp_pb2
 
 import temporalio.api.cloud.resource.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class ConnectivityRule(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -32,6 +30,9 @@ class ConnectivityRule(google.protobuf.message.Message):
     CREATED_TIME_FIELD_NUMBER: builtins.int
     id: builtins.str
     """The id of the private connectivity rule."""
+    @property
+    def spec(self) -> global___ConnectivityRuleSpec:
+        """The connectivity rule specification."""
     resource_version: builtins.str
     """The current version of the connectivity rule specification.
     The next update operation will have to include this version.
@@ -40,18 +41,13 @@ class ConnectivityRule(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the connectivity rule, if any."""
     @property
-    def spec(self) -> Global___ConnectivityRuleSpec:
-        """The connectivity rule specification."""
-
-    @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the connectivity rule was created."""
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
-        spec: Global___ConnectivityRuleSpec | None = ...,
+        spec: global___ConnectivityRuleSpec | None = ...,
         resource_version: builtins.str = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
@@ -59,11 +55,13 @@ class ConnectivityRule(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal["created_time", b"created_time", "spec", b"spec"],
+        field_name: typing_extensions.Literal[
+            "created_time", b"created_time", "spec", b"spec"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "created_time",
@@ -79,9 +77,8 @@ class ConnectivityRule(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ConnectivityRule: typing_extensions.TypeAlias = ConnectivityRule
+global___ConnectivityRule = ConnectivityRule
 
-@typing.final
 class ConnectivityRuleSpec(google.protobuf.message.Message):
     """The connectivity rule specification passed in on create/update operations."""
 
@@ -90,22 +87,20 @@ class ConnectivityRuleSpec(google.protobuf.message.Message):
     PUBLIC_RULE_FIELD_NUMBER: builtins.int
     PRIVATE_RULE_FIELD_NUMBER: builtins.int
     @property
-    def public_rule(self) -> Global___PublicConnectivityRule:
+    def public_rule(self) -> global___PublicConnectivityRule:
         """This allows access via public internet."""
-
     @property
-    def private_rule(self) -> Global___PrivateConnectivityRule:
+    def private_rule(self) -> global___PrivateConnectivityRule:
         """This allows access via specific private vpc."""
-
     def __init__(
         self,
         *,
-        public_rule: Global___PublicConnectivityRule | None = ...,
-        private_rule: Global___PrivateConnectivityRule | None = ...,
+        public_rule: global___PublicConnectivityRule | None = ...,
+        private_rule: global___PrivateConnectivityRule | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "connection_type",
             b"connection_type",
             "private_rule",
@@ -116,7 +111,7 @@ class ConnectivityRuleSpec(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "connection_type",
             b"connection_type",
             "private_rule",
@@ -126,12 +121,12 @@ class ConnectivityRuleSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["connection_type", b"connection_type"]
-    ) -> typing.Literal["public_rule", "private_rule"] | None: ...
+        self,
+        oneof_group: typing_extensions.Literal["connection_type", b"connection_type"],
+    ) -> typing_extensions.Literal["public_rule", "private_rule"] | None: ...
 
-Global___ConnectivityRuleSpec: typing_extensions.TypeAlias = ConnectivityRuleSpec
+global___ConnectivityRuleSpec = ConnectivityRuleSpec
 
-@typing.final
 class PublicConnectivityRule(google.protobuf.message.Message):
     """A public connectivity rule allows access to the namespace via the public internet."""
 
@@ -148,12 +143,14 @@ class PublicConnectivityRule(google.protobuf.message.Message):
         enable_stable_ips: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["enable_stable_ips", b"enable_stable_ips"]
+        self,
+        field_name: typing_extensions.Literal[
+            "enable_stable_ips", b"enable_stable_ips"
+        ],
     ) -> None: ...
 
-Global___PublicConnectivityRule: typing_extensions.TypeAlias = PublicConnectivityRule
+global___PublicConnectivityRule = PublicConnectivityRule
 
-@typing.final
 class PrivateConnectivityRule(google.protobuf.message.Message):
     """A private connectivity rule allows connections from a specific private vpc only."""
 
@@ -181,7 +178,7 @@ class PrivateConnectivityRule(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "connection_id",
             b"connection_id",
             "gcp_project_id",
@@ -191,4 +188,4 @@ class PrivateConnectivityRule(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___PrivateConnectivityRule: typing_extensions.TypeAlias = PrivateConnectivityRule
+global___PrivateConnectivityRule = PrivateConnectivityRule

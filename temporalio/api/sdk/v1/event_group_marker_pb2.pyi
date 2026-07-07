@@ -5,25 +5,22 @@ isort:skip_file
 
 import builtins
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
 import temporalio.api.common.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class EventGroupMarker(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class Label(google.protobuf.message.Message):
         """A user-defined short-form string value to be used as the group's label."""
 
@@ -48,7 +45,6 @@ class EventGroupMarker(google.protobuf.message.Message):
             in a given workflow execution that carry the same label, provided that
             they have the distinct ID.
             """
-
         def __init__(
             self,
             *,
@@ -56,13 +52,12 @@ class EventGroupMarker(google.protobuf.message.Message):
             label: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing.Literal["label", b"label"]
+            self, field_name: typing_extensions.Literal["label", b"label"]
         ) -> builtins.bool: ...
         def ClearField(
-            self, field_name: typing.Literal["id", b"id", "label", b"label"]
+            self, field_name: typing_extensions.Literal["id", b"id", "label", b"label"]
         ) -> None: ...
 
-    @typing.final
     class InboundEvent(google.protobuf.message.Message):
         """The event ID of an event in the present workflow that triggered implicit
         creation of this group Marker.
@@ -82,10 +77,12 @@ class EventGroupMarker(google.protobuf.message.Message):
             inbound_event_id: builtins.int = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["inbound_event_id", b"inbound_event_id"]
+            self,
+            field_name: typing_extensions.Literal[
+                "inbound_event_id", b"inbound_event_id"
+            ],
         ) -> None: ...
 
-    @typing.final
     class InboundUpdate(google.protobuf.message.Message):
         """The identifier of an inbound Update (request.meta.update_id)
         whose handler triggered implicit creation of this group Marker.
@@ -105,28 +102,31 @@ class EventGroupMarker(google.protobuf.message.Message):
             inbound_update_id: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["inbound_update_id", b"inbound_update_id"]
+            self,
+            field_name: typing_extensions.Literal[
+                "inbound_update_id", b"inbound_update_id"
+            ],
         ) -> None: ...
 
     LABEL_FIELD_NUMBER: builtins.int
     INBOUND_EVENT_FIELD_NUMBER: builtins.int
     INBOUND_UPDATE_FIELD_NUMBER: builtins.int
     @property
-    def label(self) -> Global___EventGroupMarker.Label: ...
+    def label(self) -> global___EventGroupMarker.Label: ...
     @property
-    def inbound_event(self) -> Global___EventGroupMarker.InboundEvent: ...
+    def inbound_event(self) -> global___EventGroupMarker.InboundEvent: ...
     @property
-    def inbound_update(self) -> Global___EventGroupMarker.InboundUpdate: ...
+    def inbound_update(self) -> global___EventGroupMarker.InboundUpdate: ...
     def __init__(
         self,
         *,
-        label: Global___EventGroupMarker.Label | None = ...,
-        inbound_event: Global___EventGroupMarker.InboundEvent | None = ...,
-        inbound_update: Global___EventGroupMarker.InboundUpdate | None = ...,
+        label: global___EventGroupMarker.Label | None = ...,
+        inbound_event: global___EventGroupMarker.InboundEvent | None = ...,
+        inbound_update: global___EventGroupMarker.InboundUpdate | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "inbound_event",
             b"inbound_event",
             "inbound_update",
@@ -139,7 +139,7 @@ class EventGroupMarker(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "inbound_event",
             b"inbound_event",
             "inbound_update",
@@ -151,7 +151,9 @@ class EventGroupMarker(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["variant", b"variant"]
-    ) -> typing.Literal["label", "inbound_event", "inbound_update"] | None: ...
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> (
+        typing_extensions.Literal["label", "inbound_event", "inbound_update"] | None
+    ): ...
 
-Global___EventGroupMarker: typing_extensions.TypeAlias = EventGroupMarker
+global___EventGroupMarker = EventGroupMarker

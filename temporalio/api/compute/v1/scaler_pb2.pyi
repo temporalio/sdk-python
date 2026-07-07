@@ -5,21 +5,19 @@ isort:skip_file
 
 import builtins
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
 import temporalio.api.common.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class ComputeScaler(google.protobuf.message.Message):
     """ComputeScaler instructs the Temporal Service when to scale up or down the number of
     Workers that comprise a WorkerDeployment.
@@ -42,7 +40,6 @@ class ComputeScaler(google.protobuf.message.Message):
         For remote-implemented scalers, you might use your own data
         converters according to what the remote endpoints understand.
         """
-
     def __init__(
         self,
         *,
@@ -50,10 +47,11 @@ class ComputeScaler(google.protobuf.message.Message):
         details: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["details", b"details"]
+        self, field_name: typing_extensions.Literal["details", b"details"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["details", b"details", "type", b"type"]
+        self,
+        field_name: typing_extensions.Literal["details", b"details", "type", b"type"],
     ) -> None: ...
 
-Global___ComputeScaler: typing_extensions.TypeAlias = ComputeScaler
+global___ComputeScaler = ComputeScaler

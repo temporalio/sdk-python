@@ -5,21 +5,19 @@ isort:skip_file
 
 import builtins
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
 import temporalio.api.common.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class UserMetadata(google.protobuf.message.Message):
     """Information a user can set, often for use by user interfaces."""
 
@@ -34,14 +32,12 @@ class UserMetadata(google.protobuf.message.Message):
         apply to this text when used in "title" situations. The payload data section is limited to 400
         bytes by default.
         """
-
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payload:
         """Long-form text that provides details. This payload should be a "json/plain"-encoded payload
         that is a single JSON string for use in user interfaces. User interface formatting may apply to
         this text in common use. The payload data section is limited to 20000 bytes by default.
         """
-
     def __init__(
         self,
         *,
@@ -49,10 +45,16 @@ class UserMetadata(google.protobuf.message.Message):
         details: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["details", b"details", "summary", b"summary"]
+        self,
+        field_name: typing_extensions.Literal[
+            "details", b"details", "summary", b"summary"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["details", b"details", "summary", b"summary"]
+        self,
+        field_name: typing_extensions.Literal[
+            "details", b"details", "summary", b"summary"
+        ],
     ) -> None: ...
 
-Global___UserMetadata: typing_extensions.TypeAlias = UserMetadata
+global___UserMetadata = UserMetadata

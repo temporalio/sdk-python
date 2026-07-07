@@ -26,7 +26,7 @@ class _BatchOperationTypeEnumTypeWrapper(
         _BatchOperationType.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     BATCH_OPERATION_TYPE_UNSPECIFIED: _BatchOperationType.ValueType  # 0
     BATCH_OPERATION_TYPE_TERMINATE: _BatchOperationType.ValueType  # 1
@@ -53,7 +53,7 @@ BATCH_OPERATION_TYPE_UPDATE_EXECUTION_OPTIONS: BatchOperationType.ValueType  # 6
 BATCH_OPERATION_TYPE_UNPAUSE_ACTIVITY: BatchOperationType.ValueType  # 7
 BATCH_OPERATION_TYPE_UPDATE_ACTIVITY_OPTIONS: BatchOperationType.ValueType  # 8
 BATCH_OPERATION_TYPE_RESET_ACTIVITY: BatchOperationType.ValueType  # 9
-Global___BatchOperationType: typing_extensions.TypeAlias = BatchOperationType
+global___BatchOperationType = BatchOperationType
 
 class _BatchOperationState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -64,7 +64,7 @@ class _BatchOperationStateEnumTypeWrapper(
         _BatchOperationState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     BATCH_OPERATION_STATE_UNSPECIFIED: _BatchOperationState.ValueType  # 0
     BATCH_OPERATION_STATE_RUNNING: _BatchOperationState.ValueType  # 1
@@ -79,4 +79,4 @@ BATCH_OPERATION_STATE_UNSPECIFIED: BatchOperationState.ValueType  # 0
 BATCH_OPERATION_STATE_RUNNING: BatchOperationState.ValueType  # 1
 BATCH_OPERATION_STATE_COMPLETED: BatchOperationState.ValueType  # 2
 BATCH_OPERATION_STATE_FAILED: BatchOperationState.ValueType  # 3
-Global___BatchOperationState: typing_extensions.TypeAlias = BatchOperationState
+global___BatchOperationState = BatchOperationState

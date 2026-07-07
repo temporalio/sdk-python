@@ -26,7 +26,7 @@ class _NamespaceStateEnumTypeWrapper(
         _NamespaceState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NAMESPACE_STATE_UNSPECIFIED: _NamespaceState.ValueType  # 0
     NAMESPACE_STATE_REGISTERED: _NamespaceState.ValueType  # 1
@@ -39,7 +39,7 @@ NAMESPACE_STATE_UNSPECIFIED: NamespaceState.ValueType  # 0
 NAMESPACE_STATE_REGISTERED: NamespaceState.ValueType  # 1
 NAMESPACE_STATE_DEPRECATED: NamespaceState.ValueType  # 2
 NAMESPACE_STATE_DELETED: NamespaceState.ValueType  # 3
-Global___NamespaceState: typing_extensions.TypeAlias = NamespaceState
+global___NamespaceState = NamespaceState
 
 class _ArchivalState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -50,7 +50,7 @@ class _ArchivalStateEnumTypeWrapper(
         _ArchivalState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ARCHIVAL_STATE_UNSPECIFIED: _ArchivalState.ValueType  # 0
     ARCHIVAL_STATE_DISABLED: _ArchivalState.ValueType  # 1
@@ -61,7 +61,7 @@ class ArchivalState(_ArchivalState, metaclass=_ArchivalStateEnumTypeWrapper): ..
 ARCHIVAL_STATE_UNSPECIFIED: ArchivalState.ValueType  # 0
 ARCHIVAL_STATE_DISABLED: ArchivalState.ValueType  # 1
 ARCHIVAL_STATE_ENABLED: ArchivalState.ValueType  # 2
-Global___ArchivalState: typing_extensions.TypeAlias = ArchivalState
+global___ArchivalState = ArchivalState
 
 class _ReplicationState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -72,7 +72,7 @@ class _ReplicationStateEnumTypeWrapper(
         _ReplicationState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     REPLICATION_STATE_UNSPECIFIED: _ReplicationState.ValueType  # 0
     REPLICATION_STATE_NORMAL: _ReplicationState.ValueType  # 1
@@ -85,4 +85,4 @@ class ReplicationState(
 REPLICATION_STATE_UNSPECIFIED: ReplicationState.ValueType  # 0
 REPLICATION_STATE_NORMAL: ReplicationState.ValueType  # 1
 REPLICATION_STATE_HANDOVER: ReplicationState.ValueType  # 2
-Global___ReplicationState: typing_extensions.TypeAlias = ReplicationState
+global___ReplicationState = ReplicationState

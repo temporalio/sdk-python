@@ -25,7 +25,6 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class CertificateFilterSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -59,7 +58,7 @@ class CertificateFilterSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "common_name",
             b"common_name",
             "organization",
@@ -71,9 +70,8 @@ class CertificateFilterSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___CertificateFilterSpec: typing_extensions.TypeAlias = CertificateFilterSpec
+global___CertificateFilterSpec = CertificateFilterSpec
 
-@typing.final
 class MtlsAuthSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -94,34 +92,33 @@ class MtlsAuthSpec(google.protobuf.message.Message):
     This must only be one value, but the CA can have a chain.
     temporal:versioning:min_version=v0.2.0
     """
-    enabled: builtins.bool
-    """Flag to enable mTLS auth (default: disabled).
-    Note: disabling mTLS auth will cause existing mTLS connections to fail.
-    temporal:versioning:min_version=v0.2.0
-    """
     @property
     def certificate_filters(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___CertificateFilterSpec
+        global___CertificateFilterSpec
     ]:
         """Certificate filters which, if specified, only allow connections from client certificates whose distinguished name properties match at least one of the filters.
         This allows limiting access to specific end-entity certificates.
         Optional, default is empty.
         """
-
+    enabled: builtins.bool
+    """Flag to enable mTLS auth (default: disabled).
+    Note: disabling mTLS auth will cause existing mTLS connections to fail.
+    temporal:versioning:min_version=v0.2.0
+    """
     def __init__(
         self,
         *,
         accepted_client_ca_deprecated: builtins.str = ...,
         accepted_client_ca: builtins.bytes = ...,
-        certificate_filters: collections.abc.Iterable[Global___CertificateFilterSpec]
+        certificate_filters: collections.abc.Iterable[global___CertificateFilterSpec]
         | None = ...,
         enabled: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "accepted_client_ca",
             b"accepted_client_ca",
             "accepted_client_ca_deprecated",
@@ -133,9 +130,8 @@ class MtlsAuthSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___MtlsAuthSpec: typing_extensions.TypeAlias = MtlsAuthSpec
+global___MtlsAuthSpec = MtlsAuthSpec
 
-@typing.final
 class ApiKeyAuthSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -149,11 +145,12 @@ class ApiKeyAuthSpec(google.protobuf.message.Message):
         *,
         enabled: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["enabled", b"enabled"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["enabled", b"enabled"]
+    ) -> None: ...
 
-Global___ApiKeyAuthSpec: typing_extensions.TypeAlias = ApiKeyAuthSpec
+global___ApiKeyAuthSpec = ApiKeyAuthSpec
 
-@typing.final
 class LifecycleSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -167,22 +164,19 @@ class LifecycleSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "enable_delete_protection", b"enable_delete_protection"
         ],
     ) -> None: ...
 
-Global___LifecycleSpec: typing_extensions.TypeAlias = LifecycleSpec
+global___LifecycleSpec = LifecycleSpec
 
-@typing.final
 class CodecServerSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class CustomErrorMessage(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing.final
         class ErrorMessage(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -199,25 +193,27 @@ class CodecServerSpec(google.protobuf.message.Message):
                 link: builtins.str = ...,
             ) -> None: ...
             def ClearField(
-                self, field_name: typing.Literal["link", b"link", "message", b"message"]
+                self,
+                field_name: typing_extensions.Literal[
+                    "link", b"link", "message", b"message"
+                ],
             ) -> None: ...
 
         DEFAULT_FIELD_NUMBER: builtins.int
         @property
-        def default(self) -> Global___CodecServerSpec.CustomErrorMessage.ErrorMessage:
+        def default(self) -> global___CodecServerSpec.CustomErrorMessage.ErrorMessage:
             """The error message to display by default for any remote codec server errors."""
-
         def __init__(
             self,
             *,
-            default: Global___CodecServerSpec.CustomErrorMessage.ErrorMessage
+            default: global___CodecServerSpec.CustomErrorMessage.ErrorMessage
             | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing.Literal["default", b"default"]
+            self, field_name: typing_extensions.Literal["default", b"default"]
         ) -> builtins.bool: ...
         def ClearField(
-            self, field_name: typing.Literal["default", b"default"]
+            self, field_name: typing_extensions.Literal["default", b"default"]
         ) -> None: ...
 
     ENDPOINT_FIELD_NUMBER: builtins.int
@@ -231,26 +227,27 @@ class CodecServerSpec(google.protobuf.message.Message):
     include_cross_origin_credentials: builtins.bool
     """Whether to include cross-origin credentials."""
     @property
-    def custom_error_message(self) -> Global___CodecServerSpec.CustomErrorMessage:
+    def custom_error_message(self) -> global___CodecServerSpec.CustomErrorMessage:
         """A custom error message to display for remote codec server errors.
         temporal:versioning:min_version=v0.5.1
         """
-
     def __init__(
         self,
         *,
         endpoint: builtins.str = ...,
         pass_access_token: builtins.bool = ...,
         include_cross_origin_credentials: builtins.bool = ...,
-        custom_error_message: Global___CodecServerSpec.CustomErrorMessage | None = ...,
+        custom_error_message: global___CodecServerSpec.CustomErrorMessage | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal["custom_error_message", b"custom_error_message"],
+        field_name: typing_extensions.Literal[
+            "custom_error_message", b"custom_error_message"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "custom_error_message",
             b"custom_error_message",
             "endpoint",
@@ -262,9 +259,8 @@ class CodecServerSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___CodecServerSpec: typing_extensions.TypeAlias = CodecServerSpec
+global___CodecServerSpec = CodecServerSpec
 
-@typing.final
 class HighAvailabilitySpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -284,7 +280,7 @@ class HighAvailabilitySpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "disable_managed_failover",
             b"disable_managed_failover",
             "disable_passive_poller_forwarding",
@@ -292,9 +288,8 @@ class HighAvailabilitySpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___HighAvailabilitySpec: typing_extensions.TypeAlias = HighAvailabilitySpec
+global___HighAvailabilitySpec = HighAvailabilitySpec
 
-@typing.final
 class ReplicaSpec(google.protobuf.message.Message):
     """temporal:versioning:min_version=v0.13.0"""
 
@@ -313,11 +308,12 @@ class ReplicaSpec(google.protobuf.message.Message):
         *,
         region: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["region", b"region"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["region", b"region"]
+    ) -> None: ...
 
-Global___ReplicaSpec: typing_extensions.TypeAlias = ReplicaSpec
+global___ReplicaSpec = ReplicaSpec
 
-@typing.final
 class Replica(google.protobuf.message.Message):
     """temporal:versioning:min_version=v0.13.0"""
 
@@ -332,7 +328,7 @@ class Replica(google.protobuf.message.Message):
             Replica._ReplicaState.ValueType
         ],
         builtins.type,
-    ):
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         REPLICA_STATE_UNSPECIFIED: Replica._ReplicaState.ValueType  # 0
         REPLICA_STATE_ADDING: Replica._ReplicaState.ValueType  # 1
@@ -363,7 +359,7 @@ class Replica(google.protobuf.message.Message):
     """The id of the replica. This is generated by Temporal after a replica is created."""
     is_primary: builtins.bool
     """Whether this replica is currently the primary one."""
-    state: Global___Replica.ReplicaState.ValueType
+    state: global___Replica.ReplicaState.ValueType
     """The current state of this replica."""
     region: builtins.str
     """The cloud provider and region of this replica."""
@@ -372,12 +368,12 @@ class Replica(google.protobuf.message.Message):
         *,
         id: builtins.str = ...,
         is_primary: builtins.bool = ...,
-        state: Global___Replica.ReplicaState.ValueType = ...,
+        state: global___Replica.ReplicaState.ValueType = ...,
         region: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "id",
             b"id",
             "is_primary",
@@ -389,15 +385,13 @@ class Replica(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___Replica: typing_extensions.TypeAlias = Replica
+global___Replica = Replica
 
-@typing.final
 class CapacitySpec(google.protobuf.message.Message):
     """temporal:versioning:min_version=v0.10.0"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class OnDemand(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -405,7 +399,6 @@ class CapacitySpec(google.protobuf.message.Message):
             self,
         ) -> None: ...
 
-    @typing.final
     class Provisioned(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -419,47 +412,45 @@ class CapacitySpec(google.protobuf.message.Message):
             *,
             value: builtins.float = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing.Literal["value", b"value"]) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> None: ...
 
     ON_DEMAND_FIELD_NUMBER: builtins.int
     PROVISIONED_FIELD_NUMBER: builtins.int
     @property
-    def on_demand(self) -> Global___CapacitySpec.OnDemand:
+    def on_demand(self) -> global___CapacitySpec.OnDemand:
         """The on-demand capacity mode configuration."""
-
     @property
-    def provisioned(self) -> Global___CapacitySpec.Provisioned:
+    def provisioned(self) -> global___CapacitySpec.Provisioned:
         """The provisioned capacity mode configuration."""
-
     def __init__(
         self,
         *,
-        on_demand: Global___CapacitySpec.OnDemand | None = ...,
-        provisioned: Global___CapacitySpec.Provisioned | None = ...,
+        on_demand: global___CapacitySpec.OnDemand | None = ...,
+        provisioned: global___CapacitySpec.Provisioned | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "on_demand", b"on_demand", "provisioned", b"provisioned", "spec", b"spec"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "on_demand", b"on_demand", "provisioned", b"provisioned", "spec", b"spec"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["spec", b"spec"]
-    ) -> typing.Literal["on_demand", "provisioned"] | None: ...
+        self, oneof_group: typing_extensions.Literal["spec", b"spec"]
+    ) -> typing_extensions.Literal["on_demand", "provisioned"] | None: ...
 
-Global___CapacitySpec: typing_extensions.TypeAlias = CapacitySpec
+global___CapacitySpec = CapacitySpec
 
-@typing.final
 class Capacity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class OnDemand(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -467,7 +458,6 @@ class Capacity(google.protobuf.message.Message):
             self,
         ) -> None: ...
 
-    @typing.final
     class Provisioned(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -482,10 +472,10 @@ class Capacity(google.protobuf.message.Message):
             current_value: builtins.float = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["current_value", b"current_value"]
+            self,
+            field_name: typing_extensions.Literal["current_value", b"current_value"],
         ) -> None: ...
 
-    @typing.final
     class Request(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -498,7 +488,7 @@ class Capacity(google.protobuf.message.Message):
                 Capacity.Request._State.ValueType
             ],
             builtins.type,
-        ):
+        ):  # noqa: F821
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
             STATE_CAPACITY_REQUEST_UNSPECIFIED: Capacity.Request._State.ValueType  # 0
             STATE_CAPACITY_REQUEST_COMPLETED: Capacity.Request._State.ValueType  # 1
@@ -516,40 +506,37 @@ class Capacity(google.protobuf.message.Message):
         END_TIME_FIELD_NUMBER: builtins.int
         ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
         SPEC_FIELD_NUMBER: builtins.int
-        state: Global___Capacity.Request.State.ValueType
+        state: global___Capacity.Request.State.ValueType
         """The current state of the capacity request (e.g. in-progress, completed, failed)."""
-        async_operation_id: builtins.str
-        """The id of the async operation that is creating/updating/deleting the capacity, if any."""
         @property
         def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """The date and time when the capacity request was created."""
-
         @property
         def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """The date and time when the capacity request was completed or failed."""
-
+        async_operation_id: builtins.str
+        """The id of the async operation that is creating/updating/deleting the capacity, if any."""
         @property
-        def spec(self) -> Global___CapacitySpec:
+        def spec(self) -> global___CapacitySpec:
             """The requested capacity specification."""
-
         def __init__(
             self,
             *,
-            state: Global___Capacity.Request.State.ValueType = ...,
+            state: global___Capacity.Request.State.ValueType = ...,
             start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             end_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             async_operation_id: builtins.str = ...,
-            spec: Global___CapacitySpec | None = ...,
+            spec: global___CapacitySpec | None = ...,
         ) -> None: ...
         def HasField(
             self,
-            field_name: typing.Literal[
+            field_name: typing_extensions.Literal[
                 "end_time", b"end_time", "spec", b"spec", "start_time", b"start_time"
             ],
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing.Literal[
+            field_name: typing_extensions.Literal[
                 "async_operation_id",
                 b"async_operation_id",
                 "end_time",
@@ -567,27 +554,24 @@ class Capacity(google.protobuf.message.Message):
     PROVISIONED_FIELD_NUMBER: builtins.int
     LATEST_REQUEST_FIELD_NUMBER: builtins.int
     @property
-    def on_demand(self) -> Global___Capacity.OnDemand:
+    def on_demand(self) -> global___Capacity.OnDemand:
         """The status of on-demand capacity mode."""
-
     @property
-    def provisioned(self) -> Global___Capacity.Provisioned:
+    def provisioned(self) -> global___Capacity.Provisioned:
         """The status of provisioned capacity mode."""
-
     @property
-    def latest_request(self) -> Global___Capacity.Request:
+    def latest_request(self) -> global___Capacity.Request:
         """The latest requested capacity for the namespace, if any."""
-
     def __init__(
         self,
         *,
-        on_demand: Global___Capacity.OnDemand | None = ...,
-        provisioned: Global___Capacity.Provisioned | None = ...,
-        latest_request: Global___Capacity.Request | None = ...,
+        on_demand: global___Capacity.OnDemand | None = ...,
+        provisioned: global___Capacity.Provisioned | None = ...,
+        latest_request: global___Capacity.Request | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_mode",
             b"current_mode",
             "latest_request",
@@ -600,7 +584,7 @@ class Capacity(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_mode",
             b"current_mode",
             "latest_request",
@@ -612,12 +596,11 @@ class Capacity(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["current_mode", b"current_mode"]
-    ) -> typing.Literal["on_demand", "provisioned"] | None: ...
+        self, oneof_group: typing_extensions.Literal["current_mode", b"current_mode"]
+    ) -> typing_extensions.Literal["on_demand", "provisioned"] | None: ...
 
-Global___Capacity: typing_extensions.TypeAlias = Capacity
+global___Capacity = Capacity
 
-@typing.final
 class FairnessSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -631,14 +614,13 @@ class FairnessSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "task_queue_fairness_enabled", b"task_queue_fairness_enabled"
         ],
     ) -> None: ...
 
-Global___FairnessSpec: typing_extensions.TypeAlias = FairnessSpec
+global___FairnessSpec = FairnessSpec
 
-@typing.final
 class NamespaceSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -651,7 +633,7 @@ class NamespaceSpec(google.protobuf.message.Message):
             NamespaceSpec._SearchAttributeType.ValueType
         ],
         builtins.type,
-    ):
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         SEARCH_ATTRIBUTE_TYPE_UNSPECIFIED: (
             NamespaceSpec._SearchAttributeType.ValueType
@@ -680,7 +662,6 @@ class NamespaceSpec(google.protobuf.message.Message):
     SEARCH_ATTRIBUTE_TYPE_DATETIME: NamespaceSpec.SearchAttributeType.ValueType  # 6
     SEARCH_ATTRIBUTE_TYPE_KEYWORD_LIST: NamespaceSpec.SearchAttributeType.ValueType  # 7
 
-    @typing.final
     class CustomSearchAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -695,25 +676,26 @@ class NamespaceSpec(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
-    @typing.final
     class SearchAttributesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         KEY_FIELD_NUMBER: builtins.int
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
-        value: Global___NamespaceSpec.SearchAttributeType.ValueType
+        value: global___NamespaceSpec.SearchAttributeType.ValueType
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: Global___NamespaceSpec.SearchAttributeType.ValueType = ...,
+            value: global___NamespaceSpec.SearchAttributeType.ValueType = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
     NAME_FIELD_NUMBER: builtins.int
@@ -735,11 +717,6 @@ class NamespaceSpec(google.protobuf.message.Message):
     This will create a namespace that's available at '<name>.<account>.tmprl.cloud:7233'.
     The name is immutable. Once set, it cannot be changed.
     """
-    retention_days: builtins.int
-    """The number of days the workflows data will be retained for.
-    Changes to the retention period may impact your storage costs.
-    Any changes to the retention period will be applied to all new running workflows.
-    """
     @property
     def regions(
         self,
@@ -755,20 +732,22 @@ class NamespaceSpec(google.protobuf.message.Message):
         Deprecated: Use replicas field instead.
         temporal:versioning:max_version=v0.15.0
         """
-
+    retention_days: builtins.int
+    """The number of days the workflows data will be retained for.
+    Changes to the retention period may impact your storage costs.
+    Any changes to the retention period will be applied to all new running workflows.
+    """
     @property
-    def mtls_auth(self) -> Global___MtlsAuthSpec:
+    def mtls_auth(self) -> global___MtlsAuthSpec:
         """The mTLS auth configuration for the namespace.
         If unspecified, mTLS will be disabled.
         """
-
     @property
-    def api_key_auth(self) -> Global___ApiKeyAuthSpec:
+    def api_key_auth(self) -> global___ApiKeyAuthSpec:
         """The API key auth configuration for the namespace.
         If unspecified, API keys will be disabled.
         temporal:versioning:min_version=v0.2.0
         """
-
     @property
     def custom_search_attributes(
         self,
@@ -781,12 +760,11 @@ class NamespaceSpec(google.protobuf.message.Message):
         Deprecated: Not supported after v0.3.0 api version. Use search_attributes instead.
         temporal:versioning:max_version=v0.3.0
         """
-
     @property
     def search_attributes(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[
-        builtins.str, Global___NamespaceSpec.SearchAttributeType.ValueType
+        builtins.str, global___NamespaceSpec.SearchAttributeType.ValueType
     ]:
         """The custom search attributes to use for the namespace.
         The name of the attribute is the key and the type is the value.
@@ -795,25 +773,21 @@ class NamespaceSpec(google.protobuf.message.Message):
         temporal:versioning:min_version=v0.3.0
         temporal:enums:replaces=custom_search_attributes
         """
-
     @property
-    def codec_server(self) -> Global___CodecServerSpec:
+    def codec_server(self) -> global___CodecServerSpec:
         """Codec server spec used by UI to decode payloads for all users interacting with this namespace.
         Optional, default is unset.
         """
-
     @property
-    def lifecycle(self) -> Global___LifecycleSpec:
+    def lifecycle(self) -> global___LifecycleSpec:
         """The lifecycle configuration for the namespace.
         temporal:versioning:min_version=v0.4.0
         """
-
     @property
-    def high_availability(self) -> Global___HighAvailabilitySpec:
+    def high_availability(self) -> global___HighAvailabilitySpec:
         """The high availability configuration for the namespace.
         temporal:versioning:min_version=v0.4.0
         """
-
     @property
     def connectivity_rule_ids(
         self,
@@ -822,9 +796,8 @@ class NamespaceSpec(google.protobuf.message.Message):
         This will apply the connectivity rules specified to the namespace.
         temporal:versioning:min_version=v0.6.0
         """
-
     @property
-    def capacity_spec(self) -> Global___CapacitySpec:
+    def capacity_spec(self) -> global___CapacitySpec:
         """The capacity configuration for the namespace.
         There are two capacity modes: on-demand and provisioned.
         On-demand capacity mode allows the namespace to scale automatically based on usage.
@@ -832,12 +805,11 @@ class NamespaceSpec(google.protobuf.message.Message):
         Can be changed only when the last capacity request is not in progress.
         temporal:versioning:min_version=v0.10.0
         """
-
     @property
     def replicas(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___ReplicaSpec
+        global___ReplicaSpec
     ]:
         """The replication configuration for the namespace.
         At least one replica must be specified.
@@ -847,39 +819,37 @@ class NamespaceSpec(google.protobuf.message.Message):
         If the preferred primary replica ID is not set, the first replica in this replicas list will be the preferred primary.
         temporal:versioning:min_version=v0.13.0
         """
-
     @property
-    def fairness(self) -> Global___FairnessSpec:
+    def fairness(self) -> global___FairnessSpec:
         """The fairness configuration for the namespace.
         If unspecified, fairness features will be disabled.
         temporal:versioning:min_version=v0.14.0
         """
-
     def __init__(
         self,
         *,
         name: builtins.str = ...,
         regions: collections.abc.Iterable[builtins.str] | None = ...,
         retention_days: builtins.int = ...,
-        mtls_auth: Global___MtlsAuthSpec | None = ...,
-        api_key_auth: Global___ApiKeyAuthSpec | None = ...,
+        mtls_auth: global___MtlsAuthSpec | None = ...,
+        api_key_auth: global___ApiKeyAuthSpec | None = ...,
         custom_search_attributes: collections.abc.Mapping[builtins.str, builtins.str]
         | None = ...,
         search_attributes: collections.abc.Mapping[
-            builtins.str, Global___NamespaceSpec.SearchAttributeType.ValueType
+            builtins.str, global___NamespaceSpec.SearchAttributeType.ValueType
         ]
         | None = ...,
-        codec_server: Global___CodecServerSpec | None = ...,
-        lifecycle: Global___LifecycleSpec | None = ...,
-        high_availability: Global___HighAvailabilitySpec | None = ...,
+        codec_server: global___CodecServerSpec | None = ...,
+        lifecycle: global___LifecycleSpec | None = ...,
+        high_availability: global___HighAvailabilitySpec | None = ...,
         connectivity_rule_ids: collections.abc.Iterable[builtins.str] | None = ...,
-        capacity_spec: Global___CapacitySpec | None = ...,
-        replicas: collections.abc.Iterable[Global___ReplicaSpec] | None = ...,
-        fairness: Global___FairnessSpec | None = ...,
+        capacity_spec: global___CapacitySpec | None = ...,
+        replicas: collections.abc.Iterable[global___ReplicaSpec] | None = ...,
+        fairness: global___FairnessSpec | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "api_key_auth",
             b"api_key_auth",
             "capacity_spec",
@@ -898,7 +868,7 @@ class NamespaceSpec(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "api_key_auth",
             b"api_key_auth",
             "capacity_spec",
@@ -930,9 +900,8 @@ class NamespaceSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___NamespaceSpec: typing_extensions.TypeAlias = NamespaceSpec
+global___NamespaceSpec = NamespaceSpec
 
-@typing.final
 class Endpoints(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -954,7 +923,7 @@ class Endpoints(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "grpc_address",
             b"grpc_address",
             "mtls_grpc_address",
@@ -964,9 +933,8 @@ class Endpoints(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___Endpoints: typing_extensions.TypeAlias = Endpoints
+global___Endpoints = Endpoints
 
-@typing.final
 class Limits(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -982,14 +950,13 @@ class Limits(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "actions_per_second_limit", b"actions_per_second_limit"
         ],
     ) -> None: ...
 
-Global___Limits: typing_extensions.TypeAlias = Limits
+global___Limits = Limits
 
-@typing.final
 class AWSPrivateLinkInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1000,13 +967,11 @@ class AWSPrivateLinkInfo(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """The list of principal arns that are allowed to access the namespace on the private link."""
-
     @property
     def vpc_endpoint_service_names(
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """The list of vpc endpoint service names that are associated with the namespace."""
-
     def __init__(
         self,
         *,
@@ -1015,7 +980,7 @@ class AWSPrivateLinkInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "allowed_principal_arns",
             b"allowed_principal_arns",
             "vpc_endpoint_service_names",
@@ -1023,9 +988,8 @@ class AWSPrivateLinkInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___AWSPrivateLinkInfo: typing_extensions.TypeAlias = AWSPrivateLinkInfo
+global___AWSPrivateLinkInfo = AWSPrivateLinkInfo
 
-@typing.final
 class PrivateConnectivity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1034,34 +998,32 @@ class PrivateConnectivity(google.protobuf.message.Message):
     region: builtins.str
     """The id of the region where the private connectivity applies."""
     @property
-    def aws_private_link(self) -> Global___AWSPrivateLinkInfo:
+    def aws_private_link(self) -> global___AWSPrivateLinkInfo:
         """The AWS PrivateLink info.
         This will only be set for an aws region.
         """
-
     def __init__(
         self,
         *,
         region: builtins.str = ...,
-        aws_private_link: Global___AWSPrivateLinkInfo | None = ...,
+        aws_private_link: global___AWSPrivateLinkInfo | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["aws_private_link", b"aws_private_link"]
+        self,
+        field_name: typing_extensions.Literal["aws_private_link", b"aws_private_link"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "aws_private_link", b"aws_private_link", "region", b"region"
         ],
     ) -> None: ...
 
-Global___PrivateConnectivity: typing_extensions.TypeAlias = PrivateConnectivity
+global___PrivateConnectivity = PrivateConnectivity
 
-@typing.final
 class Namespace(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class RegionStatusEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1069,21 +1031,21 @@ class Namespace(google.protobuf.message.Message):
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
         @property
-        def value(self) -> Global___NamespaceRegionStatus: ...
+        def value(self) -> global___NamespaceRegionStatus: ...
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: Global___NamespaceRegionStatus | None = ...,
+            value: global___NamespaceRegionStatus | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing.Literal["value", b"value"]
+            self, field_name: typing_extensions.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
-    @typing.final
     class TagsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1098,7 +1060,8 @@ class Namespace(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
     NAMESPACE_FIELD_NUMBER: builtins.int
@@ -1124,6 +1087,9 @@ class Namespace(google.protobuf.message.Message):
     """The current version of the namespace specification.
     The next update operation will have to include this version.
     """
+    @property
+    def spec(self) -> global___NamespaceSpec:
+        """The namespace specification."""
     state_deprecated: builtins.str
     """The current state of the namespace.
     Deprecated: Not supported after v0.3.0 api version. Use state instead.
@@ -1137,50 +1103,40 @@ class Namespace(google.protobuf.message.Message):
     """
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the namespace, if any."""
+    @property
+    def endpoints(self) -> global___Endpoints:
+        """The endpoints for the namespace."""
     active_region: builtins.str
     """The currently active region for the namespace."""
     @property
-    def spec(self) -> Global___NamespaceSpec:
-        """The namespace specification."""
-
-    @property
-    def endpoints(self) -> Global___Endpoints:
-        """The endpoints for the namespace."""
-
-    @property
-    def limits(self) -> Global___Limits:
+    def limits(self) -> global___Limits:
         """The limits set on the namespace currently."""
-
     @property
     def private_connectivities(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___PrivateConnectivity
+        global___PrivateConnectivity
     ]:
         """The private connectivities for the namespace, if any."""
-
     @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the namespace was created."""
-
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the namespace was last modified.
         Will not be set if the namespace has never been modified.
         """
-
     @property
     def region_status(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, Global___NamespaceRegionStatus
+        builtins.str, global___NamespaceRegionStatus
     ]:
         """The status of each region where the namespace is available.
         The id of the region is the key and the status is the value of the map.
         deprecated: Use replicas field instead.
         temporal:versioning:max_version=v0.15.0
         """
-
     @property
     def connectivity_rules(
         self,
@@ -1188,45 +1144,41 @@ class Namespace(google.protobuf.message.Message):
         temporalio.api.cloud.connectivityrule.v1.message_pb2.ConnectivityRule
     ]:
         """The connectivity rules that are set on this namespace."""
-
     @property
     def tags(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """The tags for the namespace."""
-
     @property
-    def capacity(self) -> Global___Capacity:
+    def capacity(self) -> global___Capacity:
         """The status of namespace's capacity, if any."""
-
     @property
     def replicas(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___Replica
+        global___Replica
     ]:
         """The status of each replica where the namespace is available.
         temporal:versioning:min_version=v0.13.0
         """
-
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         resource_version: builtins.str = ...,
-        spec: Global___NamespaceSpec | None = ...,
+        spec: global___NamespaceSpec | None = ...,
         state_deprecated: builtins.str = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
-        endpoints: Global___Endpoints | None = ...,
+        endpoints: global___Endpoints | None = ...,
         active_region: builtins.str = ...,
-        limits: Global___Limits | None = ...,
-        private_connectivities: collections.abc.Iterable[Global___PrivateConnectivity]
+        limits: global___Limits | None = ...,
+        private_connectivities: collections.abc.Iterable[global___PrivateConnectivity]
         | None = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         region_status: collections.abc.Mapping[
-            builtins.str, Global___NamespaceRegionStatus
+            builtins.str, global___NamespaceRegionStatus
         ]
         | None = ...,
         connectivity_rules: collections.abc.Iterable[
@@ -1234,12 +1186,12 @@ class Namespace(google.protobuf.message.Message):
         ]
         | None = ...,
         tags: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
-        capacity: Global___Capacity | None = ...,
-        replicas: collections.abc.Iterable[Global___Replica] | None = ...,
+        capacity: global___Capacity | None = ...,
+        replicas: collections.abc.Iterable[global___Replica] | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "capacity",
             b"capacity",
             "created_time",
@@ -1256,7 +1208,7 @@ class Namespace(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "active_region",
             b"active_region",
             "async_operation_id",
@@ -1294,9 +1246,8 @@ class Namespace(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___Namespace: typing_extensions.TypeAlias = Namespace
+global___Namespace = Namespace
 
-@typing.final
 class NamespaceRegionStatus(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1309,7 +1260,7 @@ class NamespaceRegionStatus(google.protobuf.message.Message):
             NamespaceRegionStatus._State.ValueType
         ],
         builtins.type,
-    ):
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         STATE_UNSPECIFIED: NamespaceRegionStatus._State.ValueType  # 0
         STATE_ADDING: NamespaceRegionStatus._State.ValueType  # 1
@@ -1346,7 +1297,7 @@ class NamespaceRegionStatus(google.protobuf.message.Message):
     Deprecated: Not supported after v0.3.0 api version. Use state instead.
     temporal:versioning:max_version=v0.3.0
     """
-    state: Global___NamespaceRegionStatus.State.ValueType
+    state: global___NamespaceRegionStatus.State.ValueType
     """The current state of the namespace region.
     temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
@@ -1357,12 +1308,12 @@ class NamespaceRegionStatus(google.protobuf.message.Message):
         self,
         *,
         state_deprecated: builtins.str = ...,
-        state: Global___NamespaceRegionStatus.State.ValueType = ...,
+        state: global___NamespaceRegionStatus.State.ValueType = ...,
         async_operation_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "state",
@@ -1372,9 +1323,8 @@ class NamespaceRegionStatus(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___NamespaceRegionStatus: typing_extensions.TypeAlias = NamespaceRegionStatus
+global___NamespaceRegionStatus = NamespaceRegionStatus
 
-@typing.final
 class ExportSinkSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1389,13 +1339,11 @@ class ExportSinkSpec(google.protobuf.message.Message):
     @property
     def s3(self) -> temporalio.api.cloud.sink.v1.message_pb2.S3Spec:
         """The S3 configuration details when destination_type is S3."""
-
     @property
     def gcs(self) -> temporalio.api.cloud.sink.v1.message_pb2.GCSSpec:
         """This is a feature under development. We will allow GCS sink support for GCP Namespaces.
         The GCS configuration details when destination_type is GCS.
         """
-
     def __init__(
         self,
         *,
@@ -1405,18 +1353,17 @@ class ExportSinkSpec(google.protobuf.message.Message):
         gcs: temporalio.api.cloud.sink.v1.message_pb2.GCSSpec | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["gcs", b"gcs", "s3", b"s3"]
+        self, field_name: typing_extensions.Literal["gcs", b"gcs", "s3", b"s3"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "enabled", b"enabled", "gcs", b"gcs", "name", b"name", "s3", b"s3"
         ],
     ) -> None: ...
 
-Global___ExportSinkSpec: typing_extensions.TypeAlias = ExportSinkSpec
+global___ExportSinkSpec = ExportSinkSpec
 
-@typing.final
 class ExportSink(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1429,7 +1376,7 @@ class ExportSink(google.protobuf.message.Message):
             ExportSink._Health.ValueType
         ],
         builtins.type,
-    ):
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         HEALTH_UNSPECIFIED: ExportSink._Health.ValueType  # 0
         HEALTH_OK: ExportSink._Health.ValueType  # 1
@@ -1456,37 +1403,34 @@ class ExportSink(google.protobuf.message.Message):
     """The version of the export sink resource."""
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the export sink."""
-    health: Global___ExportSink.Health.ValueType
+    @property
+    def spec(self) -> global___ExportSinkSpec:
+        """The specification details of the export sink."""
+    health: global___ExportSink.Health.ValueType
     """The health status of the export sink."""
     error_message: builtins.str
     """An error message describing any issues with the export sink, if applicable."""
     @property
-    def spec(self) -> Global___ExportSinkSpec:
-        """The specification details of the export sink."""
-
-    @property
     def latest_data_export_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The timestamp of the latest successful data export."""
-
     @property
     def last_health_check_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The timestamp of the last health check performed on the export sink."""
-
     def __init__(
         self,
         *,
         name: builtins.str = ...,
         resource_version: builtins.str = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
-        spec: Global___ExportSinkSpec | None = ...,
-        health: Global___ExportSink.Health.ValueType = ...,
+        spec: global___ExportSinkSpec | None = ...,
+        health: global___ExportSink.Health.ValueType = ...,
         error_message: builtins.str = ...,
         latest_data_export_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_health_check_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "last_health_check_time",
             b"last_health_check_time",
             "latest_data_export_time",
@@ -1497,7 +1441,7 @@ class ExportSink(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "error_message",
             b"error_message",
             "health",
@@ -1517,29 +1461,21 @@ class ExportSink(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ExportSink: typing_extensions.TypeAlias = ExportSink
+global___ExportSink = ExportSink
 
-@typing.final
 class NamespaceCapacityInfo(google.protobuf.message.Message):
     """NamespaceCapacityInfo contains detailed capacity information for a namespace."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class CapacityModeOptions(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing.final
         class Provisioned(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
             VALID_TRU_VALUES_FIELD_NUMBER: builtins.int
             MAX_AVAILABLE_TRU_VALUE_FIELD_NUMBER: builtins.int
-            max_available_tru_value: builtins.float
-            """The maximum TRU value that can currently be set for this namespace.
-            This may be lower than the highest value in valid_tru_values due to
-            inventory constraints.
-            """
             @property
             def valid_tru_values(
                 self,
@@ -1549,7 +1485,11 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
                 """The valid TRU (Temporal Resource Unit) values that can be set.
                 These are the discrete capacity tiers available for selection.
                 """
-
+            max_available_tru_value: builtins.float
+            """The maximum TRU value that can currently be set for this namespace.
+            This may be lower than the highest value in valid_tru_values due to
+            inventory constraints.
+            """
             def __init__(
                 self,
                 *,
@@ -1558,7 +1498,7 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
             ) -> None: ...
             def ClearField(
                 self,
-                field_name: typing.Literal[
+                field_name: typing_extensions.Literal[
                     "max_available_tru_value",
                     b"max_available_tru_value",
                     "valid_tru_values",
@@ -1566,7 +1506,6 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
                 ],
             ) -> None: ...
 
-        @typing.final
         class OnDemand(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1581,7 +1520,7 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
                 aps_limit: builtins.float = ...,
             ) -> None: ...
             def ClearField(
-                self, field_name: typing.Literal["aps_limit", b"aps_limit"]
+                self, field_name: typing_extensions.Literal["aps_limit", b"aps_limit"]
             ) -> None: ...
 
         PROVISIONED_FIELD_NUMBER: builtins.int
@@ -1589,41 +1528,37 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
         @property
         def provisioned(
             self,
-        ) -> Global___NamespaceCapacityInfo.CapacityModeOptions.Provisioned:
+        ) -> global___NamespaceCapacityInfo.CapacityModeOptions.Provisioned:
             """Provisioned capacity options and entitlements."""
-
         @property
         def on_demand(
             self,
-        ) -> Global___NamespaceCapacityInfo.CapacityModeOptions.OnDemand:
+        ) -> global___NamespaceCapacityInfo.CapacityModeOptions.OnDemand:
             """On-Demand capacity information."""
-
         def __init__(
             self,
             *,
-            provisioned: Global___NamespaceCapacityInfo.CapacityModeOptions.Provisioned
+            provisioned: global___NamespaceCapacityInfo.CapacityModeOptions.Provisioned
             | None = ...,
-            on_demand: Global___NamespaceCapacityInfo.CapacityModeOptions.OnDemand
+            on_demand: global___NamespaceCapacityInfo.CapacityModeOptions.OnDemand
             | None = ...,
         ) -> None: ...
         def HasField(
             self,
-            field_name: typing.Literal[
+            field_name: typing_extensions.Literal[
                 "on_demand", b"on_demand", "provisioned", b"provisioned"
             ],
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing.Literal[
+            field_name: typing_extensions.Literal[
                 "on_demand", b"on_demand", "provisioned", b"provisioned"
             ],
         ) -> None: ...
 
-    @typing.final
     class Stats(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-        @typing.final
         class Summary(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1642,25 +1577,26 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
             ) -> None: ...
             def ClearField(
                 self,
-                field_name: typing.Literal[
+                field_name: typing_extensions.Literal[
                     "mean", b"mean", "p90", b"p90", "p99", b"p99"
                 ],
             ) -> None: ...
 
         APS_FIELD_NUMBER: builtins.int
         @property
-        def aps(self) -> Global___NamespaceCapacityInfo.Stats.Summary:
+        def aps(self) -> global___NamespaceCapacityInfo.Stats.Summary:
             """Actions-per-second measurements summarized over the last 7 days."""
-
         def __init__(
             self,
             *,
-            aps: Global___NamespaceCapacityInfo.Stats.Summary | None = ...,
+            aps: global___NamespaceCapacityInfo.Stats.Summary | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing.Literal["aps", b"aps"]
+            self, field_name: typing_extensions.Literal["aps", b"aps"]
         ) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["aps", b"aps"]) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["aps", b"aps"]
+        ) -> None: ...
 
     NAMESPACE_FIELD_NUMBER: builtins.int
     HAS_LEGACY_LIMITS_FIELD_NUMBER: builtins.int
@@ -1674,35 +1610,32 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
     When true, adjusting the namespace's capacity will reset this limit.
     """
     @property
-    def current_capacity(self) -> Global___Capacity:
+    def current_capacity(self) -> global___Capacity:
         """The current capacity of the namespace.
         Includes the current mode (on-demand or provisioned) and latest request status.
         """
-
     @property
-    def mode_options(self) -> Global___NamespaceCapacityInfo.CapacityModeOptions:
+    def mode_options(self) -> global___NamespaceCapacityInfo.CapacityModeOptions:
         """Available capacity mode options for this namespace.
         Contains configuration limits for both provisioned and on-demand modes.
         """
-
     @property
-    def stats(self) -> Global___NamespaceCapacityInfo.Stats:
+    def stats(self) -> global___NamespaceCapacityInfo.Stats:
         """Usage statistics for the namespace over the last 7 days.
         Used to calculate On-Demand capacity limits, also useful for capacity planning.
         """
-
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         has_legacy_limits: builtins.bool = ...,
-        current_capacity: Global___Capacity | None = ...,
-        mode_options: Global___NamespaceCapacityInfo.CapacityModeOptions | None = ...,
-        stats: Global___NamespaceCapacityInfo.Stats | None = ...,
+        current_capacity: global___Capacity | None = ...,
+        mode_options: global___NamespaceCapacityInfo.CapacityModeOptions | None = ...,
+        stats: global___NamespaceCapacityInfo.Stats | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_capacity",
             b"current_capacity",
             "mode_options",
@@ -1713,7 +1646,7 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_capacity",
             b"current_capacity",
             "has_legacy_limits",
@@ -1727,4 +1660,4 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___NamespaceCapacityInfo: typing_extensions.TypeAlias = NamespaceCapacityInfo
+global___NamespaceCapacityInfo = NamespaceCapacityInfo

@@ -8,7 +8,6 @@ and extend standard Error Details defined in https://github.com/googleapis/googl
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.any_pb2
 import google.protobuf.descriptor
@@ -20,14 +19,13 @@ import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.namespace_pb2
 import temporalio.api.failure.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class NotFoundFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -43,14 +41,13 @@ class NotFoundFailure(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "active_cluster", b"active_cluster", "current_cluster", b"current_cluster"
         ],
     ) -> None: ...
 
-Global___NotFoundFailure: typing_extensions.TypeAlias = NotFoundFailure
+global___NotFoundFailure = NotFoundFailure
 
-@typing.final
 class WorkflowExecutionAlreadyStartedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -66,16 +63,13 @@ class WorkflowExecutionAlreadyStartedFailure(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "run_id", b"run_id", "start_request_id", b"start_request_id"
         ],
     ) -> None: ...
 
-Global___WorkflowExecutionAlreadyStartedFailure: typing_extensions.TypeAlias = (
-    WorkflowExecutionAlreadyStartedFailure
-)
+global___WorkflowExecutionAlreadyStartedFailure = WorkflowExecutionAlreadyStartedFailure
 
-@typing.final
 class NamespaceNotActiveFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -94,7 +88,7 @@ class NamespaceNotActiveFailure(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "active_cluster",
             b"active_cluster",
             "current_cluster",
@@ -104,11 +98,8 @@ class NamespaceNotActiveFailure(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___NamespaceNotActiveFailure: typing_extensions.TypeAlias = (
-    NamespaceNotActiveFailure
-)
+global___NamespaceNotActiveFailure = NamespaceNotActiveFailure
 
-@typing.final
 class NamespaceUnavailableFailure(google.protobuf.message.Message):
     """NamespaceUnavailableFailure is returned by the service when a request addresses a namespace that is unavailable. For
     example, when a namespace is in the process of failing over between clusters.
@@ -125,14 +116,11 @@ class NamespaceUnavailableFailure(google.protobuf.message.Message):
         namespace: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["namespace", b"namespace"]
+        self, field_name: typing_extensions.Literal["namespace", b"namespace"]
     ) -> None: ...
 
-Global___NamespaceUnavailableFailure: typing_extensions.TypeAlias = (
-    NamespaceUnavailableFailure
-)
+global___NamespaceUnavailableFailure = NamespaceUnavailableFailure
 
-@typing.final
 class NamespaceInvalidStateFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -151,7 +139,6 @@ class NamespaceInvalidStateFailure(google.protobuf.message.Message):
         """Allowed namespace states for requested operation.
         For example NAMESPACE_STATE_DELETED is forbidden for most operations but allowed for DescribeNamespace.
         """
-
     def __init__(
         self,
         *,
@@ -164,7 +151,7 @@ class NamespaceInvalidStateFailure(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "allowed_states",
             b"allowed_states",
             "namespace",
@@ -174,11 +161,8 @@ class NamespaceInvalidStateFailure(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___NamespaceInvalidStateFailure: typing_extensions.TypeAlias = (
-    NamespaceInvalidStateFailure
-)
+global___NamespaceInvalidStateFailure = NamespaceInvalidStateFailure
 
-@typing.final
 class NamespaceNotFoundFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -190,14 +174,11 @@ class NamespaceNotFoundFailure(google.protobuf.message.Message):
         namespace: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["namespace", b"namespace"]
+        self, field_name: typing_extensions.Literal["namespace", b"namespace"]
     ) -> None: ...
 
-Global___NamespaceNotFoundFailure: typing_extensions.TypeAlias = (
-    NamespaceNotFoundFailure
-)
+global___NamespaceNotFoundFailure = NamespaceNotFoundFailure
 
-@typing.final
 class NamespaceAlreadyExistsFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -205,11 +186,8 @@ class NamespaceAlreadyExistsFailure(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-Global___NamespaceAlreadyExistsFailure: typing_extensions.TypeAlias = (
-    NamespaceAlreadyExistsFailure
-)
+global___NamespaceAlreadyExistsFailure = NamespaceAlreadyExistsFailure
 
-@typing.final
 class ClientVersionNotSupportedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -228,7 +206,7 @@ class ClientVersionNotSupportedFailure(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "client_name",
             b"client_name",
             "client_version",
@@ -238,11 +216,8 @@ class ClientVersionNotSupportedFailure(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ClientVersionNotSupportedFailure: typing_extensions.TypeAlias = (
-    ClientVersionNotSupportedFailure
-)
+global___ClientVersionNotSupportedFailure = ClientVersionNotSupportedFailure
 
-@typing.final
 class ServerVersionNotSupportedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -258,7 +233,7 @@ class ServerVersionNotSupportedFailure(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "client_supported_server_versions",
             b"client_supported_server_versions",
             "server_version",
@@ -266,11 +241,8 @@ class ServerVersionNotSupportedFailure(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ServerVersionNotSupportedFailure: typing_extensions.TypeAlias = (
-    ServerVersionNotSupportedFailure
-)
+global___ServerVersionNotSupportedFailure = ServerVersionNotSupportedFailure
 
-@typing.final
 class CancellationAlreadyRequestedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -278,11 +250,8 @@ class CancellationAlreadyRequestedFailure(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-Global___CancellationAlreadyRequestedFailure: typing_extensions.TypeAlias = (
-    CancellationAlreadyRequestedFailure
-)
+global___CancellationAlreadyRequestedFailure = CancellationAlreadyRequestedFailure
 
-@typing.final
 class QueryFailedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -293,20 +262,20 @@ class QueryFailedFailure(google.protobuf.message.Message):
         SDK. This field can be encoded by the SDK's failure converter to support E2E encryption of messages and stack
         traces.
         """
-
     def __init__(
         self,
         *,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["failure", b"failure"]
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["failure", b"failure"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> None: ...
 
-Global___QueryFailedFailure: typing_extensions.TypeAlias = QueryFailedFailure
+global___QueryFailedFailure = QueryFailedFailure
 
-@typing.final
 class PermissionDeniedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -317,11 +286,12 @@ class PermissionDeniedFailure(google.protobuf.message.Message):
         *,
         reason: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["reason", b"reason"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["reason", b"reason"]
+    ) -> None: ...
 
-Global___PermissionDeniedFailure: typing_extensions.TypeAlias = PermissionDeniedFailure
+global___PermissionDeniedFailure = PermissionDeniedFailure
 
-@typing.final
 class ResourceExhaustedFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -336,21 +306,17 @@ class ResourceExhaustedFailure(google.protobuf.message.Message):
         scope: temporalio.api.enums.v1.failed_cause_pb2.ResourceExhaustedScope.ValueType = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["cause", b"cause", "scope", b"scope"]
+        self,
+        field_name: typing_extensions.Literal["cause", b"cause", "scope", b"scope"],
     ) -> None: ...
 
-Global___ResourceExhaustedFailure: typing_extensions.TypeAlias = (
-    ResourceExhaustedFailure
-)
+global___ResourceExhaustedFailure = ResourceExhaustedFailure
 
-@typing.final
 class SystemWorkflowFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_ERROR_FIELD_NUMBER: builtins.int
-    workflow_error: builtins.str
-    """Serialized error returned by the system workflow performing the underlying operation."""
     @property
     def workflow_execution(
         self,
@@ -358,7 +324,8 @@ class SystemWorkflowFailure(google.protobuf.message.Message):
         """WorkflowId and RunId of the Temporal system workflow performing the underlying operation.
         Looking up the info of the system workflow run may help identify the issue causing the failure.
         """
-
+    workflow_error: builtins.str
+    """Serialized error returned by the system workflow performing the underlying operation."""
     def __init__(
         self,
         *,
@@ -367,11 +334,14 @@ class SystemWorkflowFailure(google.protobuf.message.Message):
         workflow_error: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["workflow_execution", b"workflow_execution"]
+        self,
+        field_name: typing_extensions.Literal[
+            "workflow_execution", b"workflow_execution"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "workflow_error",
             b"workflow_error",
             "workflow_execution",
@@ -379,9 +349,8 @@ class SystemWorkflowFailure(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___SystemWorkflowFailure: typing_extensions.TypeAlias = SystemWorkflowFailure
+global___SystemWorkflowFailure = SystemWorkflowFailure
 
-@typing.final
 class WorkflowNotReadyFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -389,9 +358,8 @@ class WorkflowNotReadyFailure(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-Global___WorkflowNotReadyFailure: typing_extensions.TypeAlias = WorkflowNotReadyFailure
+global___WorkflowNotReadyFailure = WorkflowNotReadyFailure
 
-@typing.final
 class NewerBuildExistsFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -404,16 +372,15 @@ class NewerBuildExistsFailure(google.protobuf.message.Message):
         default_build_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["default_build_id", b"default_build_id"]
+        self,
+        field_name: typing_extensions.Literal["default_build_id", b"default_build_id"],
     ) -> None: ...
 
-Global___NewerBuildExistsFailure: typing_extensions.TypeAlias = NewerBuildExistsFailure
+global___NewerBuildExistsFailure = NewerBuildExistsFailure
 
-@typing.final
 class MultiOperationExecutionFailure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class OperationStatus(google.protobuf.message.Message):
         """NOTE: `OperationStatus` is modelled after
         [`google.rpc.Status`](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto).
@@ -444,7 +411,7 @@ class MultiOperationExecutionFailure(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing.Literal[
+            field_name: typing_extensions.Literal[
                 "code", b"code", "details", b"details", "message", b"message"
             ],
         ) -> None: ...
@@ -454,30 +421,26 @@ class MultiOperationExecutionFailure(google.protobuf.message.Message):
     def statuses(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___MultiOperationExecutionFailure.OperationStatus
+        global___MultiOperationExecutionFailure.OperationStatus
     ]:
         """One status for each requested operation from the failed MultiOperation. The failed
         operation(s) have the same error details as if it was executed separately. All other operations have the
         status code `Aborted` and `MultiOperationExecutionAborted` is added to the details field.
         """
-
     def __init__(
         self,
         *,
         statuses: collections.abc.Iterable[
-            Global___MultiOperationExecutionFailure.OperationStatus
+            global___MultiOperationExecutionFailure.OperationStatus
         ]
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["statuses", b"statuses"]
+        self, field_name: typing_extensions.Literal["statuses", b"statuses"]
     ) -> None: ...
 
-Global___MultiOperationExecutionFailure: typing_extensions.TypeAlias = (
-    MultiOperationExecutionFailure
-)
+global___MultiOperationExecutionFailure = MultiOperationExecutionFailure
 
-@typing.final
 class ActivityExecutionAlreadyStartedFailure(google.protobuf.message.Message):
     """An error indicating that an activity execution failed to start. Returned when there is an existing activity with the
     given activity ID, and the given ID reuse and conflict policies do not permit starting a new one or attaching to an
@@ -498,16 +461,13 @@ class ActivityExecutionAlreadyStartedFailure(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "run_id", b"run_id", "start_request_id", b"start_request_id"
         ],
     ) -> None: ...
 
-Global___ActivityExecutionAlreadyStartedFailure: typing_extensions.TypeAlias = (
-    ActivityExecutionAlreadyStartedFailure
-)
+global___ActivityExecutionAlreadyStartedFailure = ActivityExecutionAlreadyStartedFailure
 
-@typing.final
 class NexusOperationExecutionAlreadyStartedFailure(google.protobuf.message.Message):
     """An error indicating that a Nexus operation failed to start. Returned when there is an existing operation with the
     given operation ID, and the given ID reuse and conflict policies do not permit starting a new one or attaching to an
@@ -528,11 +488,11 @@ class NexusOperationExecutionAlreadyStartedFailure(google.protobuf.message.Messa
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "run_id", b"run_id", "start_request_id", b"start_request_id"
         ],
     ) -> None: ...
 
-Global___NexusOperationExecutionAlreadyStartedFailure: typing_extensions.TypeAlias = (
+global___NexusOperationExecutionAlreadyStartedFailure = (
     NexusOperationExecutionAlreadyStartedFailure
 )

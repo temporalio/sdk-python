@@ -26,7 +26,7 @@ class _TaskQueueKindEnumTypeWrapper(
         _TaskQueueKind.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TASK_QUEUE_KIND_UNSPECIFIED: _TaskQueueKind.ValueType  # 0
     """Tasks from any non workflow task may be unspecified.
@@ -91,7 +91,7 @@ cancellations). These queues are ephemeral and per-worker-process — they exist
 the lifetime of the worker process. Used with TASK_QUEUE_TYPE_NEXUS and polled via
 PollNexusTaskQueue.
 """
-Global___TaskQueueKind: typing_extensions.TypeAlias = TaskQueueKind
+global___TaskQueueKind = TaskQueueKind
 
 class _TaskQueueType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -102,7 +102,7 @@ class _TaskQueueTypeEnumTypeWrapper(
         _TaskQueueType.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TASK_QUEUE_TYPE_UNSPECIFIED: _TaskQueueType.ValueType  # 0
     TASK_QUEUE_TYPE_WORKFLOW: _TaskQueueType.ValueType  # 1
@@ -121,7 +121,7 @@ TASK_QUEUE_TYPE_ACTIVITY: TaskQueueType.ValueType  # 2
 """Activity type of task queue."""
 TASK_QUEUE_TYPE_NEXUS: TaskQueueType.ValueType  # 3
 """Task queue type for dispatching Nexus requests."""
-Global___TaskQueueType: typing_extensions.TypeAlias = TaskQueueType
+global___TaskQueueType = TaskQueueType
 
 class _TaskReachability:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -132,7 +132,7 @@ class _TaskReachabilityEnumTypeWrapper(
         _TaskReachability.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TASK_REACHABILITY_UNSPECIFIED: _TaskReachability.ValueType  # 0
     TASK_REACHABILITY_NEW_WORKFLOWS: _TaskReachability.ValueType  # 1
@@ -173,7 +173,7 @@ TASK_REACHABILITY_CLOSED_WORKFLOWS: TaskReachability.ValueType  # 4
 """There's a possiblity for a worker to receive existing workflow tasks from closed workflows. Workers may be
 retired dependending on application requirements. For example, if there's no need to query closed workflows.
 """
-Global___TaskReachability: typing_extensions.TypeAlias = TaskReachability
+global___TaskReachability = TaskReachability
 
 class _BuildIdTaskReachability:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -184,7 +184,7 @@ class _BuildIdTaskReachabilityEnumTypeWrapper(
         _BuildIdTaskReachability.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     BUILD_ID_TASK_REACHABILITY_UNSPECIFIED: _BuildIdTaskReachability.ValueType  # 0
     """Task reachability is not reported"""
@@ -235,7 +235,7 @@ BUILD_ID_TASK_REACHABILITY_UNREACHABLE: BuildIdTaskReachability.ValueType  # 3
 """Build ID is not used for new executions, nor it has been used by any existing execution
 within the retention period.
 """
-Global___BuildIdTaskReachability: typing_extensions.TypeAlias = BuildIdTaskReachability
+global___BuildIdTaskReachability = BuildIdTaskReachability
 
 class _DescribeTaskQueueMode:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -246,7 +246,7 @@ class _DescribeTaskQueueModeEnumTypeWrapper(
         _DescribeTaskQueueMode.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     DESCRIBE_TASK_QUEUE_MODE_UNSPECIFIED: _DescribeTaskQueueMode.ValueType  # 0
     """Unspecified means legacy behavior."""
@@ -261,7 +261,7 @@ DESCRIBE_TASK_QUEUE_MODE_UNSPECIFIED: DescribeTaskQueueMode.ValueType  # 0
 """Unspecified means legacy behavior."""
 DESCRIBE_TASK_QUEUE_MODE_ENHANCED: DescribeTaskQueueMode.ValueType  # 1
 """Enhanced mode reports aggregated results for all partitions, supports Build IDs, and reports richer info."""
-Global___DescribeTaskQueueMode: typing_extensions.TypeAlias = DescribeTaskQueueMode
+global___DescribeTaskQueueMode = DescribeTaskQueueMode
 
 class _RateLimitSource:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -272,7 +272,7 @@ class _RateLimitSourceEnumTypeWrapper(
         _RateLimitSource.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RATE_LIMIT_SOURCE_UNSPECIFIED: _RateLimitSource.ValueType  # 0
     RATE_LIMIT_SOURCE_API: _RateLimitSource.ValueType  # 1
@@ -292,7 +292,7 @@ RATE_LIMIT_SOURCE_WORKER: RateLimitSource.ValueType  # 2
 """The value was set by a worker."""
 RATE_LIMIT_SOURCE_SYSTEM: RateLimitSource.ValueType  # 3
 """The value was set as the system default."""
-Global___RateLimitSource: typing_extensions.TypeAlias = RateLimitSource
+global___RateLimitSource = RateLimitSource
 
 class _RoutingConfigUpdateState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -303,7 +303,7 @@ class _RoutingConfigUpdateStateEnumTypeWrapper(
         _RoutingConfigUpdateState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED: _RoutingConfigUpdateState.ValueType  # 0
     ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS: _RoutingConfigUpdateState.ValueType  # 1
@@ -323,6 +323,4 @@ ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS: RoutingConfigUpdateState.ValueType  # 1
 """Update to the RoutingConfig is currently in progress."""
 ROUTING_CONFIG_UPDATE_STATE_COMPLETED: RoutingConfigUpdateState.ValueType  # 2
 """Update to the RoutingConfig has completed successfully."""
-Global___RoutingConfigUpdateState: typing_extensions.TypeAlias = (
-    RoutingConfigUpdateState
-)
+global___RoutingConfigUpdateState = RoutingConfigUpdateState

@@ -6,20 +6,18 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class ExternalStorageReference(google.protobuf.message.Message):
     """ExternalStorageReference identifies a payload stored in an external storage system.
     It is used as a claim-check token, allowing the actual payload data to be retrieved
@@ -28,7 +26,6 @@ class ExternalStorageReference(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class ClaimDataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -43,7 +40,8 @@ class ExternalStorageReference(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
     DRIVER_NAME_FIELD_NUMBER: builtins.int
@@ -55,7 +53,6 @@ class ExternalStorageReference(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """Driver-specific key-value pairs that identify and provide access to the stored payload."""
-
     def __init__(
         self,
         *,
@@ -64,11 +61,9 @@ class ExternalStorageReference(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "claim_data", b"claim_data", "driver_name", b"driver_name"
         ],
     ) -> None: ...
 
-Global___ExternalStorageReference: typing_extensions.TypeAlias = (
-    ExternalStorageReference
-)
+global___ExternalStorageReference = ExternalStorageReference

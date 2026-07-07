@@ -5,21 +5,19 @@ isort:skip_file
 
 import builtins
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
 import temporalio.api.common.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class ComputeProvider(google.protobuf.message.Message):
     """ComputeProvider stores information used by a worker control plane controller
     to respond to worker lifecycle events. For example, when a Task is received
@@ -38,10 +36,6 @@ class ComputeProvider(google.protobuf.message.Message):
     can be used by implementations to understand how to interpret the
     contents of the provider_details field.
     """
-    nexus_endpoint: builtins.str
-    """Optional. If the compute provider is a Nexus service, this should point
-    there.
-    """
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payload:
         """Contains provider-specific instructions and configuration.
@@ -50,7 +44,10 @@ class ComputeProvider(google.protobuf.message.Message):
         For remote-implemented providers, you might use your own content
         converters according to what the remote endpoints understand.
         """
-
+    nexus_endpoint: builtins.str
+    """Optional. If the compute provider is a Nexus service, this should point
+    there.
+    """
     def __init__(
         self,
         *,
@@ -59,13 +56,13 @@ class ComputeProvider(google.protobuf.message.Message):
         nexus_endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["details", b"details"]
+        self, field_name: typing_extensions.Literal["details", b"details"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "details", b"details", "nexus_endpoint", b"nexus_endpoint", "type", b"type"
         ],
     ) -> None: ...
 
-Global___ComputeProvider: typing_extensions.TypeAlias = ComputeProvider
+global___ComputeProvider = ComputeProvider

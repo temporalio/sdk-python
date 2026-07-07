@@ -6,7 +6,6 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -16,14 +15,13 @@ import google.protobuf.timestamp_pb2
 import temporalio.api.cloud.resource.v1.message_pb2
 import temporalio.api.common.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class EndpointSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -37,50 +35,47 @@ class EndpointSpec(google.protobuf.message.Message):
     The name must match `^[a-zA-Z][a-zA-Z0-9\\-]*[a-zA-Z0-9]$`.
     This field is mutable.
     """
-    description_deprecated: builtins.str
-    """Deprecated: Not supported after v0.4.0 api version. Use description instead.
-    temporal:versioning:max_version=v0.4.0
-    """
     @property
-    def target_spec(self) -> Global___EndpointTargetSpec:
+    def target_spec(self) -> global___EndpointTargetSpec:
         """Indicates where the endpoint should forward received nexus requests to."""
-
     @property
     def policy_specs(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___EndpointPolicySpec
+        global___EndpointPolicySpec
     ]:
         """The set of policies (e.g. authorization) for the endpoint. Each request's caller
         must match with at least one of the specs to be accepted by the endpoint.
         This field is mutable.
         """
-
+    description_deprecated: builtins.str
+    """Deprecated: Not supported after v0.4.0 api version. Use description instead.
+    temporal:versioning:max_version=v0.4.0
+    """
     @property
     def description(self) -> temporalio.api.common.v1.message_pb2.Payload:
         """The markdown description of the endpoint - optional.
         temporal:versioning:min_version=v0.4.0
         """
-
     def __init__(
         self,
         *,
         name: builtins.str = ...,
-        target_spec: Global___EndpointTargetSpec | None = ...,
-        policy_specs: collections.abc.Iterable[Global___EndpointPolicySpec]
+        target_spec: global___EndpointTargetSpec | None = ...,
+        policy_specs: collections.abc.Iterable[global___EndpointPolicySpec]
         | None = ...,
         description_deprecated: builtins.str = ...,
         description: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "description", b"description", "target_spec", b"target_spec"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "description",
             b"description",
             "description_deprecated",
@@ -94,41 +89,38 @@ class EndpointSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___EndpointSpec: typing_extensions.TypeAlias = EndpointSpec
+global___EndpointSpec = EndpointSpec
 
-@typing.final
 class EndpointTargetSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     WORKER_TARGET_SPEC_FIELD_NUMBER: builtins.int
     @property
-    def worker_target_spec(self) -> Global___WorkerTargetSpec:
+    def worker_target_spec(self) -> global___WorkerTargetSpec:
         """A target spec for routing nexus requests to a specific cloud namespace worker."""
-
     def __init__(
         self,
         *,
-        worker_target_spec: Global___WorkerTargetSpec | None = ...,
+        worker_target_spec: global___WorkerTargetSpec | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "variant", b"variant", "worker_target_spec", b"worker_target_spec"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "variant", b"variant", "worker_target_spec", b"worker_target_spec"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["variant", b"variant"]
-    ) -> typing.Literal["worker_target_spec"] | None: ...
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> typing_extensions.Literal["worker_target_spec"] | None: ...
 
-Global___EndpointTargetSpec: typing_extensions.TypeAlias = EndpointTargetSpec
+global___EndpointTargetSpec = EndpointTargetSpec
 
-@typing.final
 class WorkerTargetSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -146,14 +138,13 @@ class WorkerTargetSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "namespace_id", b"namespace_id", "task_queue", b"task_queue"
         ],
     ) -> None: ...
 
-Global___WorkerTargetSpec: typing_extensions.TypeAlias = WorkerTargetSpec
+global___WorkerTargetSpec = WorkerTargetSpec
 
-@typing.final
 class EndpointPolicySpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -161,18 +152,17 @@ class EndpointPolicySpec(google.protobuf.message.Message):
     @property
     def allowed_cloud_namespace_policy_spec(
         self,
-    ) -> Global___AllowedCloudNamespacePolicySpec:
+    ) -> global___AllowedCloudNamespacePolicySpec:
         """A policy spec that allows one caller namespace to access the endpoint."""
-
     def __init__(
         self,
         *,
-        allowed_cloud_namespace_policy_spec: Global___AllowedCloudNamespacePolicySpec
+        allowed_cloud_namespace_policy_spec: global___AllowedCloudNamespacePolicySpec
         | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "allowed_cloud_namespace_policy_spec",
             b"allowed_cloud_namespace_policy_spec",
             "variant",
@@ -181,7 +171,7 @@ class EndpointPolicySpec(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "allowed_cloud_namespace_policy_spec",
             b"allowed_cloud_namespace_policy_spec",
             "variant",
@@ -189,12 +179,11 @@ class EndpointPolicySpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["variant", b"variant"]
-    ) -> typing.Literal["allowed_cloud_namespace_policy_spec"] | None: ...
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> typing_extensions.Literal["allowed_cloud_namespace_policy_spec"] | None: ...
 
-Global___EndpointPolicySpec: typing_extensions.TypeAlias = EndpointPolicySpec
+global___EndpointPolicySpec = EndpointPolicySpec
 
-@typing.final
 class AllowedCloudNamespacePolicySpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -207,14 +196,11 @@ class AllowedCloudNamespacePolicySpec(google.protobuf.message.Message):
         namespace_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["namespace_id", b"namespace_id"]
+        self, field_name: typing_extensions.Literal["namespace_id", b"namespace_id"]
     ) -> None: ...
 
-Global___AllowedCloudNamespacePolicySpec: typing_extensions.TypeAlias = (
-    AllowedCloudNamespacePolicySpec
-)
+global___AllowedCloudNamespacePolicySpec = AllowedCloudNamespacePolicySpec
 
-@typing.final
 class Endpoint(google.protobuf.message.Message):
     """An endpoint that receives and then routes Nexus requests"""
 
@@ -233,6 +219,9 @@ class Endpoint(google.protobuf.message.Message):
     """The current version of the endpoint specification.
     The next update operation must include this version.
     """
+    @property
+    def spec(self) -> global___EndpointSpec:
+        """The endpoint specification."""
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the endpoint.
     For any failed state, reach out to Temporal Cloud support for remediation.
@@ -240,23 +229,17 @@ class Endpoint(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of any ongoing async operation that is creating, updating, or deleting the endpoint, if any."""
     @property
-    def spec(self) -> Global___EndpointSpec:
-        """The endpoint specification."""
-
-    @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the endpoint was created."""
-
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the endpoint was last modified."""
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
-        spec: Global___EndpointSpec | None = ...,
+        spec: global___EndpointSpec | None = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -264,7 +247,7 @@ class Endpoint(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time",
             b"created_time",
             "last_modified_time",
@@ -275,7 +258,7 @@ class Endpoint(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "created_time",
@@ -293,4 +276,4 @@ class Endpoint(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___Endpoint: typing_extensions.TypeAlias = Endpoint
+global___Endpoint = Endpoint

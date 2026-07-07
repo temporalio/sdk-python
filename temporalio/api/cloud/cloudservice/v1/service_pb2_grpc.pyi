@@ -4,2498 +4,406 @@ isort:skip_file
 """
 
 import abc
-import collections.abc
-import sys
-import typing
 
 import grpc
-import grpc.aio
 
 import temporalio.api.cloud.cloudservice.v1.request_response_pb2
 
-if sys.version_info >= (3, 13):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
-_T = typing.TypeVar("_T")
-
-class _MaybeAsyncIterator(
-    collections.abc.AsyncIterator[_T],
-    collections.abc.Iterator[_T],
-    metaclass=abc.ABCMeta,
-): ...
-class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore[misc, type-arg]
-    ...
-
-GRPC_GENERATED_VERSION: str
-GRPC_VERSION: str
-_CloudServiceGetCurrentIdentityType = typing_extensions.TypeVar(
-    "_CloudServiceGetCurrentIdentityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
-    ],
-)
-
-_CloudServiceGetUsersType = typing_extensions.TypeVar(
-    "_CloudServiceGetUsersType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
-    ],
-)
-
-_CloudServiceGetUserType = typing_extensions.TypeVar(
-    "_CloudServiceGetUserType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
-    ],
-)
-
-_CloudServiceCreateUserType = typing_extensions.TypeVar(
-    "_CloudServiceCreateUserType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
-    ],
-)
-
-_CloudServiceUpdateUserType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateUserType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
-    ],
-)
-
-_CloudServiceDeleteUserType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteUserType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
-    ],
-)
-
-_CloudServiceSetUserNamespaceAccessType = typing_extensions.TypeVar(
-    "_CloudServiceSetUserNamespaceAccessType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
-    ],
-)
-
-_CloudServiceGetAsyncOperationType = typing_extensions.TypeVar(
-    "_CloudServiceGetAsyncOperationType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
-    ],
-)
-
-_CloudServiceCreateNamespaceType = typing_extensions.TypeVar(
-    "_CloudServiceCreateNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
-    ],
-)
-
-_CloudServiceGetNamespacesType = typing_extensions.TypeVar(
-    "_CloudServiceGetNamespacesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
-    ],
-)
-
-_CloudServiceGetNamespaceType = typing_extensions.TypeVar(
-    "_CloudServiceGetNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
-    ],
-)
-
-_CloudServiceUpdateNamespaceType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-)
-
-_CloudServiceRenameCustomSearchAttributeType = typing_extensions.TypeVar(
-    "_CloudServiceRenameCustomSearchAttributeType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
-    ],
-)
-
-_CloudServiceDeleteNamespaceType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
-    ],
-)
-
-_CloudServiceFailoverNamespaceRegionType = typing_extensions.TypeVar(
-    "_CloudServiceFailoverNamespaceRegionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
-    ],
-)
-
-_CloudServiceAddNamespaceRegionType = typing_extensions.TypeVar(
-    "_CloudServiceAddNamespaceRegionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
-    ],
-)
-
-_CloudServiceDeleteNamespaceRegionType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteNamespaceRegionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
-    ],
-)
-
-_CloudServiceGetRegionsType = typing_extensions.TypeVar(
-    "_CloudServiceGetRegionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
-    ],
-)
-
-_CloudServiceGetRegionType = typing_extensions.TypeVar(
-    "_CloudServiceGetRegionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
-    ],
-)
-
-_CloudServiceGetApiKeysType = typing_extensions.TypeVar(
-    "_CloudServiceGetApiKeysType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
-    ],
-)
-
-_CloudServiceGetApiKeyType = typing_extensions.TypeVar(
-    "_CloudServiceGetApiKeyType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
-    ],
-)
-
-_CloudServiceCreateApiKeyType = typing_extensions.TypeVar(
-    "_CloudServiceCreateApiKeyType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
-    ],
-)
-
-_CloudServiceUpdateApiKeyType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateApiKeyType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
-    ],
-)
-
-_CloudServiceDeleteApiKeyType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteApiKeyType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
-    ],
-)
-
-_CloudServiceGetNexusEndpointsType = typing_extensions.TypeVar(
-    "_CloudServiceGetNexusEndpointsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
-    ],
-)
-
-_CloudServiceGetNexusEndpointType = typing_extensions.TypeVar(
-    "_CloudServiceGetNexusEndpointType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
-    ],
-)
-
-_CloudServiceCreateNexusEndpointType = typing_extensions.TypeVar(
-    "_CloudServiceCreateNexusEndpointType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-    ],
-)
-
-_CloudServiceUpdateNexusEndpointType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateNexusEndpointType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-    ],
-)
-
-_CloudServiceDeleteNexusEndpointType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteNexusEndpointType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-    ],
-)
-
-_CloudServiceGetUserGroupsType = typing_extensions.TypeVar(
-    "_CloudServiceGetUserGroupsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
-    ],
-)
-
-_CloudServiceGetUserGroupType = typing_extensions.TypeVar(
-    "_CloudServiceGetUserGroupType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
-    ],
-)
-
-_CloudServiceCreateUserGroupType = typing_extensions.TypeVar(
-    "_CloudServiceCreateUserGroupType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
-    ],
-)
-
-_CloudServiceUpdateUserGroupType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateUserGroupType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
-    ],
-)
-
-_CloudServiceDeleteUserGroupType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteUserGroupType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
-    ],
-)
-
-_CloudServiceSetUserGroupNamespaceAccessType = typing_extensions.TypeVar(
-    "_CloudServiceSetUserGroupNamespaceAccessType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
-    ],
-)
-
-_CloudServiceAddUserGroupMemberType = typing_extensions.TypeVar(
-    "_CloudServiceAddUserGroupMemberType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
-    ],
-)
-
-_CloudServiceRemoveUserGroupMemberType = typing_extensions.TypeVar(
-    "_CloudServiceRemoveUserGroupMemberType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
-    ],
-)
-
-_CloudServiceGetUserGroupMembersType = typing_extensions.TypeVar(
-    "_CloudServiceGetUserGroupMembersType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
-    ],
-)
-
-_CloudServiceCreateServiceAccountType = typing_extensions.TypeVar(
-    "_CloudServiceCreateServiceAccountType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
-    ],
-)
-
-_CloudServiceGetServiceAccountType = typing_extensions.TypeVar(
-    "_CloudServiceGetServiceAccountType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
-    ],
-)
-
-_CloudServiceGetServiceAccountsType = typing_extensions.TypeVar(
-    "_CloudServiceGetServiceAccountsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
-    ],
-)
-
-_CloudServiceUpdateServiceAccountType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateServiceAccountType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
-    ],
-)
-
-_CloudServiceSetServiceAccountNamespaceAccessType = typing_extensions.TypeVar(
-    "_CloudServiceSetServiceAccountNamespaceAccessType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
-    ],
-)
-
-_CloudServiceDeleteServiceAccountType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteServiceAccountType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
-    ],
-)
-
-_CloudServiceGetUsageType = typing_extensions.TypeVar(
-    "_CloudServiceGetUsageType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
-    ],
-)
-
-_CloudServiceGetAccountType = typing_extensions.TypeVar(
-    "_CloudServiceGetAccountType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
-    ],
-)
-
-_CloudServiceUpdateAccountType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateAccountType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
-    ],
-)
-
-_CloudServiceCreateNamespaceExportSinkType = typing_extensions.TypeVar(
-    "_CloudServiceCreateNamespaceExportSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
-    ],
-)
-
-_CloudServiceGetNamespaceExportSinkType = typing_extensions.TypeVar(
-    "_CloudServiceGetNamespaceExportSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
-    ],
-)
-
-_CloudServiceGetNamespaceExportSinksType = typing_extensions.TypeVar(
-    "_CloudServiceGetNamespaceExportSinksType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
-    ],
-)
-
-_CloudServiceUpdateNamespaceExportSinkType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateNamespaceExportSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
-    ],
-)
-
-_CloudServiceDeleteNamespaceExportSinkType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteNamespaceExportSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
-    ],
-)
-
-_CloudServiceValidateNamespaceExportSinkType = typing_extensions.TypeVar(
-    "_CloudServiceValidateNamespaceExportSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
-    ],
-)
-
-_CloudServiceUpdateNamespaceTagsType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateNamespaceTagsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
-    ],
-)
-
-_CloudServiceCreateConnectivityRuleType = typing_extensions.TypeVar(
-    "_CloudServiceCreateConnectivityRuleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
-    ],
-)
-
-_CloudServiceGetConnectivityRuleType = typing_extensions.TypeVar(
-    "_CloudServiceGetConnectivityRuleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
-    ],
-)
-
-_CloudServiceGetConnectivityRulesType = typing_extensions.TypeVar(
-    "_CloudServiceGetConnectivityRulesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
-    ],
-)
-
-_CloudServiceDeleteConnectivityRuleType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteConnectivityRuleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
-    ],
-)
-
-_CloudServiceGetAuditLogsType = typing_extensions.TypeVar(
-    "_CloudServiceGetAuditLogsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
-    ],
-)
-
-_CloudServiceValidateAccountAuditLogSinkType = typing_extensions.TypeVar(
-    "_CloudServiceValidateAccountAuditLogSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
-    ],
-)
-
-_CloudServiceCreateAccountAuditLogSinkType = typing_extensions.TypeVar(
-    "_CloudServiceCreateAccountAuditLogSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
-    ],
-)
-
-_CloudServiceGetAccountAuditLogSinkType = typing_extensions.TypeVar(
-    "_CloudServiceGetAccountAuditLogSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
-    ],
-)
-
-_CloudServiceGetAccountAuditLogSinksType = typing_extensions.TypeVar(
-    "_CloudServiceGetAccountAuditLogSinksType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
-    ],
-)
-
-_CloudServiceUpdateAccountAuditLogSinkType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateAccountAuditLogSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
-    ],
-)
-
-_CloudServiceDeleteAccountAuditLogSinkType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteAccountAuditLogSinkType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
-    ],
-)
-
-_CloudServiceGetNamespaceCapacityInfoType = typing_extensions.TypeVar(
-    "_CloudServiceGetNamespaceCapacityInfoType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
-    ],
-)
-
-_CloudServiceCreateBillingReportType = typing_extensions.TypeVar(
-    "_CloudServiceCreateBillingReportType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
-    ],
-)
-
-_CloudServiceGetBillingReportType = typing_extensions.TypeVar(
-    "_CloudServiceGetBillingReportType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
-    ],
-)
-
-_CloudServiceGetCustomRolesType = typing_extensions.TypeVar(
-    "_CloudServiceGetCustomRolesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
-    ],
-)
-
-_CloudServiceGetCustomRoleType = typing_extensions.TypeVar(
-    "_CloudServiceGetCustomRoleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
-    ],
-)
-
-_CloudServiceCreateCustomRoleType = typing_extensions.TypeVar(
-    "_CloudServiceCreateCustomRoleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
-    ],
-)
-
-_CloudServiceUpdateCustomRoleType = typing_extensions.TypeVar(
-    "_CloudServiceUpdateCustomRoleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
-    ],
-)
-
-_CloudServiceDeleteCustomRoleType = typing_extensions.TypeVar(
-    "_CloudServiceDeleteCustomRoleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
-    ],
-)
-
-_CloudServiceGetUserNamespaceAssignmentsType = typing_extensions.TypeVar(
-    "_CloudServiceGetUserNamespaceAssignmentsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
-    ],
-)
-
-_CloudServiceGetServiceAccountNamespaceAssignmentsType = typing_extensions.TypeVar(
-    "_CloudServiceGetServiceAccountNamespaceAssignmentsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
-    ],
-)
-
-_CloudServiceGetUserGroupNamespaceAssignmentsType = typing_extensions.TypeVar(
-    "_CloudServiceGetUserGroupNamespaceAssignmentsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
-    ],
-)
-
-class CloudServiceStub(
-    typing.Generic[
-        _CloudServiceGetCurrentIdentityType,
-        _CloudServiceGetUsersType,
-        _CloudServiceGetUserType,
-        _CloudServiceCreateUserType,
-        _CloudServiceUpdateUserType,
-        _CloudServiceDeleteUserType,
-        _CloudServiceSetUserNamespaceAccessType,
-        _CloudServiceGetAsyncOperationType,
-        _CloudServiceCreateNamespaceType,
-        _CloudServiceGetNamespacesType,
-        _CloudServiceGetNamespaceType,
-        _CloudServiceUpdateNamespaceType,
-        _CloudServiceRenameCustomSearchAttributeType,
-        _CloudServiceDeleteNamespaceType,
-        _CloudServiceFailoverNamespaceRegionType,
-        _CloudServiceAddNamespaceRegionType,
-        _CloudServiceDeleteNamespaceRegionType,
-        _CloudServiceGetRegionsType,
-        _CloudServiceGetRegionType,
-        _CloudServiceGetApiKeysType,
-        _CloudServiceGetApiKeyType,
-        _CloudServiceCreateApiKeyType,
-        _CloudServiceUpdateApiKeyType,
-        _CloudServiceDeleteApiKeyType,
-        _CloudServiceGetNexusEndpointsType,
-        _CloudServiceGetNexusEndpointType,
-        _CloudServiceCreateNexusEndpointType,
-        _CloudServiceUpdateNexusEndpointType,
-        _CloudServiceDeleteNexusEndpointType,
-        _CloudServiceGetUserGroupsType,
-        _CloudServiceGetUserGroupType,
-        _CloudServiceCreateUserGroupType,
-        _CloudServiceUpdateUserGroupType,
-        _CloudServiceDeleteUserGroupType,
-        _CloudServiceSetUserGroupNamespaceAccessType,
-        _CloudServiceAddUserGroupMemberType,
-        _CloudServiceRemoveUserGroupMemberType,
-        _CloudServiceGetUserGroupMembersType,
-        _CloudServiceCreateServiceAccountType,
-        _CloudServiceGetServiceAccountType,
-        _CloudServiceGetServiceAccountsType,
-        _CloudServiceUpdateServiceAccountType,
-        _CloudServiceSetServiceAccountNamespaceAccessType,
-        _CloudServiceDeleteServiceAccountType,
-        _CloudServiceGetUsageType,
-        _CloudServiceGetAccountType,
-        _CloudServiceUpdateAccountType,
-        _CloudServiceCreateNamespaceExportSinkType,
-        _CloudServiceGetNamespaceExportSinkType,
-        _CloudServiceGetNamespaceExportSinksType,
-        _CloudServiceUpdateNamespaceExportSinkType,
-        _CloudServiceDeleteNamespaceExportSinkType,
-        _CloudServiceValidateNamespaceExportSinkType,
-        _CloudServiceUpdateNamespaceTagsType,
-        _CloudServiceCreateConnectivityRuleType,
-        _CloudServiceGetConnectivityRuleType,
-        _CloudServiceGetConnectivityRulesType,
-        _CloudServiceDeleteConnectivityRuleType,
-        _CloudServiceGetAuditLogsType,
-        _CloudServiceValidateAccountAuditLogSinkType,
-        _CloudServiceCreateAccountAuditLogSinkType,
-        _CloudServiceGetAccountAuditLogSinkType,
-        _CloudServiceGetAccountAuditLogSinksType,
-        _CloudServiceUpdateAccountAuditLogSinkType,
-        _CloudServiceDeleteAccountAuditLogSinkType,
-        _CloudServiceGetNamespaceCapacityInfoType,
-        _CloudServiceCreateBillingReportType,
-        _CloudServiceGetBillingReportType,
-        _CloudServiceGetCustomRolesType,
-        _CloudServiceGetCustomRoleType,
-        _CloudServiceCreateCustomRoleType,
-        _CloudServiceUpdateCustomRoleType,
-        _CloudServiceDeleteCustomRoleType,
-        _CloudServiceGetUserNamespaceAssignmentsType,
-        _CloudServiceGetServiceAccountNamespaceAssignmentsType,
-        _CloudServiceGetUserGroupNamespaceAssignmentsType,
-    ]
-):
+class CloudServiceStub:
     """WARNING: This service is currently experimental and may change in
     incompatible ways.
     """
 
-    @typing.overload
-    def __init__(
-        self: CloudServiceStub[
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
-            ],
-        ],
-        channel: grpc.Channel,
-    ) -> None: ...
-    @typing.overload
-    def __init__(
-        self: CloudServiceStub[
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
-                temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
-            ],
-        ],
-        channel: grpc.aio.Channel,
-    ) -> None: ...
-
-    GetCurrentIdentity: _CloudServiceGetCurrentIdentityType
+    def __init__(self, channel: grpc.Channel) -> None: ...
+    GetCurrentIdentity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
+    ]
     """Get information about the current authenticated user or service account principal"""
-
-    GetUsers: _CloudServiceGetUsersType
+    GetUsers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
+    ]
     """Gets all known users"""
-
-    GetUser: _CloudServiceGetUserType
+    GetUser: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
+    ]
     """Get a user"""
-
-    CreateUser: _CloudServiceCreateUserType
+    CreateUser: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
+    ]
     """Create a user"""
-
-    UpdateUser: _CloudServiceUpdateUserType
+    UpdateUser: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
+    ]
     """Update a user"""
-
-    DeleteUser: _CloudServiceDeleteUserType
+    DeleteUser: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
+    ]
     """Delete a user"""
-
-    SetUserNamespaceAccess: _CloudServiceSetUserNamespaceAccessType
+    SetUserNamespaceAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
+    ]
     """Set a user's access to a namespace"""
-
-    GetAsyncOperation: _CloudServiceGetAsyncOperationType
+    GetAsyncOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
+    ]
     """Get the latest information on an async operation"""
-
-    CreateNamespace: _CloudServiceCreateNamespaceType
+    CreateNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
+    ]
     """Create a new namespace"""
-
-    GetNamespaces: _CloudServiceGetNamespacesType
+    GetNamespaces: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
+    ]
     """Get all namespaces"""
-
-    GetNamespace: _CloudServiceGetNamespaceType
+    GetNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
+    ]
     """Get a namespace"""
-
-    UpdateNamespace: _CloudServiceUpdateNamespaceType
+    UpdateNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
+    ]
     """Update a namespace"""
-
-    RenameCustomSearchAttribute: _CloudServiceRenameCustomSearchAttributeType
+    RenameCustomSearchAttribute: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
+    ]
     """Rename an existing customer search attribute"""
-
-    DeleteNamespace: _CloudServiceDeleteNamespaceType
+    DeleteNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
+    ]
     """Delete a namespace"""
-
-    FailoverNamespaceRegion: _CloudServiceFailoverNamespaceRegionType
+    FailoverNamespaceRegion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
+    ]
     """Failover a multi-region namespace"""
-
-    AddNamespaceRegion: _CloudServiceAddNamespaceRegionType
+    AddNamespaceRegion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
+    ]
     """Add a new region to a namespace
     Deprecated: Use the UpdateNamespace() to add new replica in the namespace spec instead.
     """
-
-    DeleteNamespaceRegion: _CloudServiceDeleteNamespaceRegionType
+    DeleteNamespaceRegion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
+    ]
     """Delete a region from a namespace
     Deprecated: Use the UpdateNamespace() to delete a replica in the namespace spec instead.
     """
-
-    GetRegions: _CloudServiceGetRegionsType
+    GetRegions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
+    ]
     """Get all regions"""
-
-    GetRegion: _CloudServiceGetRegionType
+    GetRegion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
+    ]
     """Get a region"""
-
-    GetApiKeys: _CloudServiceGetApiKeysType
+    GetApiKeys: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
+    ]
     """Get all known API keys"""
-
-    GetApiKey: _CloudServiceGetApiKeyType
+    GetApiKey: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
+    ]
     """Get an API key"""
-
-    CreateApiKey: _CloudServiceCreateApiKeyType
+    CreateApiKey: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
+    ]
     """Create an API key"""
-
-    UpdateApiKey: _CloudServiceUpdateApiKeyType
+    UpdateApiKey: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
+    ]
     """Update an API key"""
-
-    DeleteApiKey: _CloudServiceDeleteApiKeyType
+    DeleteApiKey: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
+    ]
     """Delete an API key"""
-
-    GetNexusEndpoints: _CloudServiceGetNexusEndpointsType
+    GetNexusEndpoints: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
+    ]
     """Gets nexus endpoints"""
-
-    GetNexusEndpoint: _CloudServiceGetNexusEndpointType
+    GetNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
+    ]
     """Get a nexus endpoint"""
-
-    CreateNexusEndpoint: _CloudServiceCreateNexusEndpointType
+    CreateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
+    ]
     """Create a nexus endpoint"""
-
-    UpdateNexusEndpoint: _CloudServiceUpdateNexusEndpointType
+    UpdateNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
+    ]
     """Update a nexus endpoint"""
-
-    DeleteNexusEndpoint: _CloudServiceDeleteNexusEndpointType
+    DeleteNexusEndpoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
+    ]
     """Delete a nexus endpoint"""
-
-    GetUserGroups: _CloudServiceGetUserGroupsType
+    GetUserGroups: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
+    ]
     """Get all user groups"""
-
-    GetUserGroup: _CloudServiceGetUserGroupType
+    GetUserGroup: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
+    ]
     """Get a user group"""
-
-    CreateUserGroup: _CloudServiceCreateUserGroupType
+    CreateUserGroup: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
+    ]
     """Create new a user group"""
-
-    UpdateUserGroup: _CloudServiceUpdateUserGroupType
+    UpdateUserGroup: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
+    ]
     """Update a user group"""
-
-    DeleteUserGroup: _CloudServiceDeleteUserGroupType
+    DeleteUserGroup: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
+    ]
     """Delete a user group"""
-
-    SetUserGroupNamespaceAccess: _CloudServiceSetUserGroupNamespaceAccessType
+    SetUserGroupNamespaceAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
+    ]
     """Set a user group's access to a namespace"""
-
-    AddUserGroupMember: _CloudServiceAddUserGroupMemberType
+    AddUserGroupMember: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
+    ]
     """Add a member to the group, can only be used with Cloud group types."""
-
-    RemoveUserGroupMember: _CloudServiceRemoveUserGroupMemberType
+    RemoveUserGroupMember: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
+    ]
     """Remove a member from the group, can only be used with Cloud group types."""
-
-    GetUserGroupMembers: _CloudServiceGetUserGroupMembersType
-
-    CreateServiceAccount: _CloudServiceCreateServiceAccountType
+    GetUserGroupMembers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
+    ]
+    CreateServiceAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
+    ]
     """Create a service account."""
-
-    GetServiceAccount: _CloudServiceGetServiceAccountType
+    GetServiceAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
+    ]
     """Get a service account."""
-
-    GetServiceAccounts: _CloudServiceGetServiceAccountsType
+    GetServiceAccounts: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
+    ]
     """Get service accounts."""
-
-    UpdateServiceAccount: _CloudServiceUpdateServiceAccountType
+    UpdateServiceAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
+    ]
     """Update a service account."""
-
-    SetServiceAccountNamespaceAccess: _CloudServiceSetServiceAccountNamespaceAccessType
+    SetServiceAccountNamespaceAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
+    ]
     """Set a service account's access to a namespace."""
-
-    DeleteServiceAccount: _CloudServiceDeleteServiceAccountType
+    DeleteServiceAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
+    ]
     """Delete a service account."""
-
-    GetUsage: _CloudServiceGetUsageType
+    GetUsage: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
+    ]
     """WARNING: Pre-Release Feature
     Get usage data across namespaces
     """
-
-    GetAccount: _CloudServiceGetAccountType
+    GetAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
+    ]
     """Get account information."""
-
-    UpdateAccount: _CloudServiceUpdateAccountType
+    UpdateAccount: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
+    ]
     """Update account information."""
-
-    CreateNamespaceExportSink: _CloudServiceCreateNamespaceExportSinkType
+    CreateNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
+    ]
     """Create an export sink"""
-
-    GetNamespaceExportSink: _CloudServiceGetNamespaceExportSinkType
+    GetNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
+    ]
     """Get an export sink"""
-
-    GetNamespaceExportSinks: _CloudServiceGetNamespaceExportSinksType
+    GetNamespaceExportSinks: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
+    ]
     """Get export sinks"""
-
-    UpdateNamespaceExportSink: _CloudServiceUpdateNamespaceExportSinkType
+    UpdateNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
+    ]
     """Update an export sink"""
-
-    DeleteNamespaceExportSink: _CloudServiceDeleteNamespaceExportSinkType
+    DeleteNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
+    ]
     """Delete an export sink"""
-
-    ValidateNamespaceExportSink: _CloudServiceValidateNamespaceExportSinkType
+    ValidateNamespaceExportSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
+    ]
     """Validates an export sink configuration by delivering an empty test file to the specified sink.
     This operation verifies that the sink is correctly configured, accessible, and ready for data export.
     """
-
-    UpdateNamespaceTags: _CloudServiceUpdateNamespaceTagsType
+    UpdateNamespaceTags: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
+    ]
     """Update the tags for a namespace"""
-
-    CreateConnectivityRule: _CloudServiceCreateConnectivityRuleType
+    CreateConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
+    ]
     """Creates a connectivity rule"""
-
-    GetConnectivityRule: _CloudServiceGetConnectivityRuleType
+    GetConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
+    ]
     """Gets a connectivity rule by id"""
-
-    GetConnectivityRules: _CloudServiceGetConnectivityRulesType
+    GetConnectivityRules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
+    ]
     """Lists connectivity rules by account"""
-
-    DeleteConnectivityRule: _CloudServiceDeleteConnectivityRuleType
+    DeleteConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
+    ]
     """Deletes a connectivity rule by id"""
-
-    GetAuditLogs: _CloudServiceGetAuditLogsType
+    GetAuditLogs: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
+    ]
     """Get audit logs"""
-
-    ValidateAccountAuditLogSink: _CloudServiceValidateAccountAuditLogSinkType
+    ValidateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
+    ]
     """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
     The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
     """
-
-    CreateAccountAuditLogSink: _CloudServiceCreateAccountAuditLogSinkType
-    """Create an audit log sink"""
-
-    GetAccountAuditLogSink: _CloudServiceGetAccountAuditLogSinkType
-    """Get an audit log sink"""
-
-    GetAccountAuditLogSinks: _CloudServiceGetAccountAuditLogSinksType
-    """Get audit log sinks"""
-
-    UpdateAccountAuditLogSink: _CloudServiceUpdateAccountAuditLogSinkType
-    """Update an audit log sink"""
-
-    DeleteAccountAuditLogSink: _CloudServiceDeleteAccountAuditLogSinkType
-    """Delete an audit log sink"""
-
-    GetNamespaceCapacityInfo: _CloudServiceGetNamespaceCapacityInfoType
-    """Get namespace capacity information"""
-
-    CreateBillingReport: _CloudServiceCreateBillingReportType
-    """Create a billing report"""
-
-    GetBillingReport: _CloudServiceGetBillingReportType
-    """Get a billing report"""
-
-    GetCustomRoles: _CloudServiceGetCustomRolesType
-    """Get custom roles"""
-
-    GetCustomRole: _CloudServiceGetCustomRoleType
-    """Get a custom role"""
-
-    CreateCustomRole: _CloudServiceCreateCustomRoleType
-    """Create a custom role"""
-
-    UpdateCustomRole: _CloudServiceUpdateCustomRoleType
-    """Update a custom role"""
-
-    DeleteCustomRole: _CloudServiceDeleteCustomRoleType
-    """Delete a custom role"""
-
-    GetUserNamespaceAssignments: _CloudServiceGetUserNamespaceAssignmentsType
-    """Get users with access to a namespace"""
-
-    GetServiceAccountNamespaceAssignments: (
-        _CloudServiceGetServiceAccountNamespaceAssignmentsType
-    )
-    """Get service accounts with access to a namespace"""
-
-    GetUserGroupNamespaceAssignments: _CloudServiceGetUserGroupNamespaceAssignmentsType
-    """Get user groups with access to a namespace"""
-
-CloudServiceAsyncStub: typing_extensions.TypeAlias = CloudServiceStub[
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    CreateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Create an audit log sink"""
+    GetAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get an audit log sink"""
+    GetAccountAuditLogSinks: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get audit log sinks"""
+    UpdateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Update an audit log sink"""
+    DeleteAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Delete an audit log sink"""
+    GetNamespaceCapacityInfo: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get namespace capacity information"""
+    CreateBillingReport: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Create a billing report"""
+    GetBillingReport: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get a billing report"""
+    GetCustomRoles: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get custom roles"""
+    GetCustomRole: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get a custom role"""
+    CreateCustomRole: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Create a custom role"""
+    UpdateCustomRole: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Update a custom role"""
+    DeleteCustomRole: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Delete a custom role"""
+    GetUserNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get users with access to a namespace"""
+    GetServiceAccountNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
+    ]
+    """Get service accounts with access to a namespace"""
+    GetUserGroupNamespaceAssignments: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
-    ],
-]
+    ]
+    """Get user groups with access to a namespace"""
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
@@ -2506,998 +414,554 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
     def GetCurrentIdentity(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCurrentIdentityResponse:
         """Get information about the current authenticated user or service account principal"""
-
     @abc.abstractmethod
     def GetUsers(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsersResponse:
         """Gets all known users"""
-
     @abc.abstractmethod
     def GetUser(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserResponse:
         """Get a user"""
-
     @abc.abstractmethod
     def CreateUser(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserResponse:
         """Create a user"""
-
     @abc.abstractmethod
     def UpdateUser(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserResponse:
         """Update a user"""
-
     @abc.abstractmethod
     def DeleteUser(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserResponse:
         """Delete a user"""
-
     @abc.abstractmethod
     def SetUserNamespaceAccess(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserNamespaceAccessResponse:
         """Set a user's access to a namespace"""
-
     @abc.abstractmethod
     def GetAsyncOperation(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAsyncOperationResponse:
         """Get the latest information on an async operation"""
-
     @abc.abstractmethod
     def CreateNamespace(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceResponse:
         """Create a new namespace"""
-
     @abc.abstractmethod
     def GetNamespaces(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespacesResponse
+    ):
         """Get all namespaces"""
-
     @abc.abstractmethod
     def GetNamespace(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceResponse:
         """Get a namespace"""
-
     @abc.abstractmethod
     def UpdateNamespace(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceResponse:
         """Update a namespace"""
-
     @abc.abstractmethod
     def RenameCustomSearchAttribute(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.RenameCustomSearchAttributeResponse:
         """Rename an existing customer search attribute"""
-
     @abc.abstractmethod
     def DeleteNamespace(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceResponse:
         """Delete a namespace"""
-
     @abc.abstractmethod
     def FailoverNamespaceRegion(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.FailoverNamespaceRegionResponse:
         """Failover a multi-region namespace"""
-
     @abc.abstractmethod
     def AddNamespaceRegion(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse:
         """Add a new region to a namespace
         Deprecated: Use the UpdateNamespace() to add new replica in the namespace spec instead.
         """
-
     @abc.abstractmethod
     def DeleteNamespaceRegion(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse:
         """Delete a region from a namespace
         Deprecated: Use the UpdateNamespace() to delete a replica in the namespace spec instead.
         """
-
     @abc.abstractmethod
     def GetRegions(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse:
         """Get all regions"""
-
     @abc.abstractmethod
     def GetRegion(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionResponse:
         """Get a region"""
-
     @abc.abstractmethod
     def GetApiKeys(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeysResponse:
         """Get all known API keys"""
-
     @abc.abstractmethod
     def GetApiKey(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetApiKeyResponse:
         """Get an API key"""
-
     @abc.abstractmethod
     def CreateApiKey(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateApiKeyResponse:
         """Create an API key"""
-
     @abc.abstractmethod
     def UpdateApiKey(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateApiKeyResponse:
         """Update an API key"""
-
     @abc.abstractmethod
     def DeleteApiKey(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteApiKeyResponse:
         """Delete an API key"""
-
     @abc.abstractmethod
     def GetNexusEndpoints(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointsResponse:
         """Gets nexus endpoints"""
-
     @abc.abstractmethod
     def GetNexusEndpoint(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNexusEndpointResponse:
         """Get a nexus endpoint"""
-
     @abc.abstractmethod
     def CreateNexusEndpoint(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNexusEndpointResponse:
         """Create a nexus endpoint"""
-
     @abc.abstractmethod
     def UpdateNexusEndpoint(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNexusEndpointResponse:
         """Update a nexus endpoint"""
-
     @abc.abstractmethod
     def DeleteNexusEndpoint(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNexusEndpointResponse:
         """Delete a nexus endpoint"""
-
     @abc.abstractmethod
     def GetUserGroups(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse
+    ):
         """Get all user groups"""
-
     @abc.abstractmethod
     def GetUserGroup(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupResponse:
         """Get a user group"""
-
     @abc.abstractmethod
     def CreateUserGroup(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateUserGroupResponse:
         """Create new a user group"""
-
     @abc.abstractmethod
     def UpdateUserGroup(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateUserGroupResponse:
         """Update a user group"""
-
     @abc.abstractmethod
     def DeleteUserGroup(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteUserGroupResponse:
         """Delete a user group"""
-
     @abc.abstractmethod
     def SetUserGroupNamespaceAccess(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse:
         """Set a user group's access to a namespace"""
-
     @abc.abstractmethod
     def AddUserGroupMember(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse:
         """Add a member to the group, can only be used with Cloud group types."""
-
     @abc.abstractmethod
     def RemoveUserGroupMember(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse:
         """Remove a member from the group, can only be used with Cloud group types."""
-
     @abc.abstractmethod
     def GetUserGroupMembers(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse
-        ],
-    ]: ...
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse: ...
     @abc.abstractmethod
     def CreateServiceAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse:
         """Create a service account."""
-
     @abc.abstractmethod
     def GetServiceAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountResponse:
         """Get a service account."""
-
     @abc.abstractmethod
     def GetServiceAccounts(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountsResponse:
         """Get service accounts."""
-
     @abc.abstractmethod
     def UpdateServiceAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse:
         """Update a service account."""
-
     @abc.abstractmethod
     def SetServiceAccountNamespaceAccess(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse:
         """Set a service account's access to a namespace."""
-
     @abc.abstractmethod
     def DeleteServiceAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse:
         """Delete a service account."""
-
     @abc.abstractmethod
     def GetUsage(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUsageResponse:
         """WARNING: Pre-Release Feature
         Get usage data across namespaces
         """
-
     @abc.abstractmethod
     def GetAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountResponse:
         """Get account information."""
-
     @abc.abstractmethod
     def UpdateAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountResponse
+    ):
         """Update account information."""
-
     @abc.abstractmethod
     def CreateNamespaceExportSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateNamespaceExportSinkResponse:
         """Create an export sink"""
-
     @abc.abstractmethod
     def GetNamespaceExportSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinkResponse:
         """Get an export sink"""
-
     @abc.abstractmethod
     def GetNamespaceExportSinks(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceExportSinksResponse:
         """Get export sinks"""
-
     @abc.abstractmethod
     def UpdateNamespaceExportSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceExportSinkResponse:
         """Update an export sink"""
-
     @abc.abstractmethod
     def DeleteNamespaceExportSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceExportSinkResponse:
         """Delete an export sink"""
-
     @abc.abstractmethod
     def ValidateNamespaceExportSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse:
         """Validates an export sink configuration by delivering an empty test file to the specified sink.
         This operation verifies that the sink is correctly configured, accessible, and ready for data export.
         """
-
     @abc.abstractmethod
     def UpdateNamespaceTags(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse:
         """Update the tags for a namespace"""
-
     @abc.abstractmethod
     def CreateConnectivityRule(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse:
         """Creates a connectivity rule"""
-
     @abc.abstractmethod
     def GetConnectivityRule(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse:
         """Gets a connectivity rule by id"""
-
     @abc.abstractmethod
     def GetConnectivityRules(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse:
         """Lists connectivity rules by account"""
-
     @abc.abstractmethod
     def DeleteConnectivityRule(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse:
         """Deletes a connectivity rule by id"""
-
     @abc.abstractmethod
     def GetAuditLogs(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAuditLogsResponse:
         """Get audit logs"""
-
     @abc.abstractmethod
     def ValidateAccountAuditLogSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse:
         """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
         The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
         """
-
     @abc.abstractmethod
     def CreateAccountAuditLogSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateAccountAuditLogSinkResponse:
         """Create an audit log sink"""
-
     @abc.abstractmethod
     def GetAccountAuditLogSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinkResponse:
         """Get an audit log sink"""
-
     @abc.abstractmethod
     def GetAccountAuditLogSinks(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetAccountAuditLogSinksResponse:
         """Get audit log sinks"""
-
     @abc.abstractmethod
     def UpdateAccountAuditLogSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateAccountAuditLogSinkResponse:
         """Update an audit log sink"""
-
     @abc.abstractmethod
     def DeleteAccountAuditLogSink(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteAccountAuditLogSinkResponse:
         """Delete an audit log sink"""
-
     @abc.abstractmethod
     def GetNamespaceCapacityInfo(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetNamespaceCapacityInfoResponse:
         """Get namespace capacity information"""
-
     @abc.abstractmethod
     def CreateBillingReport(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateBillingReportResponse:
         """Create a billing report"""
-
     @abc.abstractmethod
     def GetBillingReport(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetBillingReportResponse:
         """Get a billing report"""
-
     @abc.abstractmethod
     def GetCustomRoles(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRolesResponse
+    ):
         """Get custom roles"""
-
     @abc.abstractmethod
     def GetCustomRole(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCustomRoleResponse
+    ):
         """Get a custom role"""
-
     @abc.abstractmethod
     def CreateCustomRole(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCustomRoleResponse:
         """Create a custom role"""
-
     @abc.abstractmethod
     def UpdateCustomRole(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCustomRoleResponse:
         """Update a custom role"""
-
     @abc.abstractmethod
     def DeleteCustomRole(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCustomRoleResponse:
         """Delete a custom role"""
-
     @abc.abstractmethod
     def GetUserNamespaceAssignments(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserNamespaceAssignmentsResponse:
         """Get users with access to a namespace"""
-
     @abc.abstractmethod
     def GetServiceAccountNamespaceAssignments(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountNamespaceAssignmentsResponse:
         """Get service accounts with access to a namespace"""
-
     @abc.abstractmethod
     def GetUserGroupNamespaceAssignments(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse:
         """Get user groups with access to a namespace"""
 
 def add_CloudServiceServicer_to_server(
-    servicer: CloudServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]
+    servicer: CloudServiceServicer, server: grpc.Server
 ) -> None: ...

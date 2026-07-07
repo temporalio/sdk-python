@@ -5,21 +5,19 @@ isort:skip_file
 
 import builtins
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 import google.protobuf.struct_pb2
 import google.protobuf.timestamp_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class LogRecord(google.protobuf.message.Message):
     """LogRecord represents an audit log entry from Temporal, structured for easy parsing and analysis."""
 
@@ -34,6 +32,9 @@ class LogRecord(google.protobuf.message.Message):
     RAW_DETAILS_FIELD_NUMBER: builtins.int
     X_FORWARDED_FOR_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    @property
+    def emit_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time when the log was emitted."""
     operation: builtins.str
     """The operation performed."""
     status: builtins.str
@@ -42,22 +43,16 @@ class LogRecord(google.protobuf.message.Message):
     """The internal version of the log message.  Can be used in deduplication if needed."""
     log_id: builtins.str
     """Unique ID for the log record."""
+    @property
+    def principal(self) -> global___Principal:
+        """The principal that performed the operation."""
+    @property
+    def raw_details(self) -> google.protobuf.struct_pb2.Struct:
+        """The raw details of the operation."""
     x_forwarded_for: builtins.str
     """The originating IP address of the request."""
     async_operation_id: builtins.str
     """The ID of the async operation."""
-    @property
-    def emit_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Time when the log was emitted."""
-
-    @property
-    def principal(self) -> Global___Principal:
-        """The principal that performed the operation."""
-
-    @property
-    def raw_details(self) -> google.protobuf.struct_pb2.Struct:
-        """The raw details of the operation."""
-
     def __init__(
         self,
         *,
@@ -66,14 +61,14 @@ class LogRecord(google.protobuf.message.Message):
         status: builtins.str = ...,
         version: builtins.int = ...,
         log_id: builtins.str = ...,
-        principal: Global___Principal | None = ...,
+        principal: global___Principal | None = ...,
         raw_details: google.protobuf.struct_pb2.Struct | None = ...,
         x_forwarded_for: builtins.str = ...,
         async_operation_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "emit_time",
             b"emit_time",
             "principal",
@@ -84,7 +79,7 @@ class LogRecord(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "emit_time",
@@ -106,9 +101,8 @@ class LogRecord(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___LogRecord: typing_extensions.TypeAlias = LogRecord
+global___LogRecord = LogRecord
 
-@typing.final
 class Principal(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -136,9 +130,9 @@ class Principal(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "api_key_id", b"api_key_id", "id", b"id", "name", b"name", "type", b"type"
         ],
     ) -> None: ...
 
-Global___Principal: typing_extensions.TypeAlias = Principal
+global___Principal = Principal

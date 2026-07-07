@@ -6,7 +6,6 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -17,14 +16,13 @@ import google.protobuf.timestamp_pb2
 import temporalio.api.deployment.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class WorkerPollerInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -33,10 +31,10 @@ class WorkerPollerInfo(google.protobuf.message.Message):
     IS_AUTOSCALING_FIELD_NUMBER: builtins.int
     current_pollers: builtins.int
     """Number of polling RPCs that are currently in flight."""
-    is_autoscaling: builtins.bool
-    """Set true if the number of concurrent pollers is auto-scaled"""
     @property
     def last_successful_poll_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    is_autoscaling: builtins.bool
+    """Set true if the number of concurrent pollers is auto-scaled"""
     def __init__(
         self,
         *,
@@ -46,13 +44,13 @@ class WorkerPollerInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "last_successful_poll_time", b"last_successful_poll_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_pollers",
             b"current_pollers",
             "is_autoscaling",
@@ -62,9 +60,8 @@ class WorkerPollerInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___WorkerPollerInfo: typing_extensions.TypeAlias = WorkerPollerInfo
+global___WorkerPollerInfo = WorkerPollerInfo
 
-@typing.final
 class WorkerSlotsInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -111,7 +108,7 @@ class WorkerSlotsInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_available_slots",
             b"current_available_slots",
             "current_used_slots",
@@ -129,9 +126,8 @@ class WorkerSlotsInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___WorkerSlotsInfo: typing_extensions.TypeAlias = WorkerSlotsInfo
+global___WorkerSlotsInfo = WorkerSlotsInfo
 
-@typing.final
 class WorkerHostInfo(google.protobuf.message.Message):
     """Holds everything needed to identify the worker host/process context"""
 
@@ -172,7 +168,7 @@ class WorkerHostInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_host_cpu_usage",
             b"current_host_cpu_usage",
             "current_host_mem_usage",
@@ -186,9 +182,8 @@ class WorkerHostInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___WorkerHostInfo: typing_extensions.TypeAlias = WorkerHostInfo
+global___WorkerHostInfo = WorkerHostInfo
 
-@typing.final
 class WorkerHeartbeat(google.protobuf.message.Message):
     """Worker info message, contains information about the worker and its current state.
     All information is provided by the worker itself.
@@ -230,12 +225,48 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     """Worker identity, set by the client, may not be unique.
     Usually host_name+(user group name)+process_id, but can be overwritten by the user.
     """
+    @property
+    def host_info(self) -> global___WorkerHostInfo:
+        """Worker host information."""
     task_queue: builtins.str
     """Task queue this worker is polling for tasks."""
+    @property
+    def deployment_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
     sdk_name: builtins.str
     sdk_version: builtins.str
     status: temporalio.api.enums.v1.common_pb2.WorkerStatus.ValueType
     """Worker status. Defined by SDK."""
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Worker start time.
+        It can be used to determine worker uptime. (current time - start time)
+        """
+    @property
+    def heartbeat_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Timestamp of this heartbeat, coming from the worker. Worker should set it to "now".
+        Note that this timestamp comes directly from the worker and is subject to workers' clock skew.
+        """
+    @property
+    def elapsed_since_last_heartbeat(self) -> google.protobuf.duration_pb2.Duration:
+        """Elapsed time since the last heartbeat from the worker."""
+    @property
+    def workflow_task_slots_info(self) -> global___WorkerSlotsInfo: ...
+    @property
+    def activity_task_slots_info(self) -> global___WorkerSlotsInfo: ...
+    @property
+    def nexus_task_slots_info(self) -> global___WorkerSlotsInfo: ...
+    @property
+    def local_activity_slots_info(self) -> global___WorkerSlotsInfo: ...
+    @property
+    def workflow_poller_info(self) -> global___WorkerPollerInfo: ...
+    @property
+    def workflow_sticky_poller_info(self) -> global___WorkerPollerInfo: ...
+    @property
+    def activity_poller_info(self) -> global___WorkerPollerInfo: ...
+    @property
+    def nexus_poller_info(self) -> global___WorkerPollerInfo: ...
     total_sticky_cache_hit: builtins.int
     """A Workflow Task found a cached Workflow Execution to run against."""
     total_sticky_cache_miss: builtins.int
@@ -243,67 +274,25 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     current_sticky_cache_size: builtins.int
     """Current cache size, expressed in number of Workflow Executions."""
     @property
-    def host_info(self) -> Global___WorkerHostInfo:
-        """Worker host information."""
-
-    @property
-    def deployment_version(
-        self,
-    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
-    @property
-    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Worker start time.
-        It can be used to determine worker uptime. (current time - start time)
-        """
-
-    @property
-    def heartbeat_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Timestamp of this heartbeat, coming from the worker. Worker should set it to "now".
-        Note that this timestamp comes directly from the worker and is subject to workers' clock skew.
-        """
-
-    @property
-    def elapsed_since_last_heartbeat(self) -> google.protobuf.duration_pb2.Duration:
-        """Elapsed time since the last heartbeat from the worker."""
-
-    @property
-    def workflow_task_slots_info(self) -> Global___WorkerSlotsInfo: ...
-    @property
-    def activity_task_slots_info(self) -> Global___WorkerSlotsInfo: ...
-    @property
-    def nexus_task_slots_info(self) -> Global___WorkerSlotsInfo: ...
-    @property
-    def local_activity_slots_info(self) -> Global___WorkerSlotsInfo: ...
-    @property
-    def workflow_poller_info(self) -> Global___WorkerPollerInfo: ...
-    @property
-    def workflow_sticky_poller_info(self) -> Global___WorkerPollerInfo: ...
-    @property
-    def activity_poller_info(self) -> Global___WorkerPollerInfo: ...
-    @property
-    def nexus_poller_info(self) -> Global___WorkerPollerInfo: ...
-    @property
     def plugins(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___PluginInfo
+        global___PluginInfo
     ]:
         """Plugins currently in use by this SDK."""
-
     @property
     def drivers(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___StorageDriverInfo
+        global___StorageDriverInfo
     ]:
         """Storage drivers in use by this SDK."""
-
     def __init__(
         self,
         *,
         worker_instance_key: builtins.str = ...,
         worker_identity: builtins.str = ...,
-        host_info: Global___WorkerHostInfo | None = ...,
+        host_info: global___WorkerHostInfo | None = ...,
         task_queue: builtins.str = ...,
         deployment_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
         | None = ...,
@@ -314,23 +303,23 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         heartbeat_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         elapsed_since_last_heartbeat: google.protobuf.duration_pb2.Duration
         | None = ...,
-        workflow_task_slots_info: Global___WorkerSlotsInfo | None = ...,
-        activity_task_slots_info: Global___WorkerSlotsInfo | None = ...,
-        nexus_task_slots_info: Global___WorkerSlotsInfo | None = ...,
-        local_activity_slots_info: Global___WorkerSlotsInfo | None = ...,
-        workflow_poller_info: Global___WorkerPollerInfo | None = ...,
-        workflow_sticky_poller_info: Global___WorkerPollerInfo | None = ...,
-        activity_poller_info: Global___WorkerPollerInfo | None = ...,
-        nexus_poller_info: Global___WorkerPollerInfo | None = ...,
+        workflow_task_slots_info: global___WorkerSlotsInfo | None = ...,
+        activity_task_slots_info: global___WorkerSlotsInfo | None = ...,
+        nexus_task_slots_info: global___WorkerSlotsInfo | None = ...,
+        local_activity_slots_info: global___WorkerSlotsInfo | None = ...,
+        workflow_poller_info: global___WorkerPollerInfo | None = ...,
+        workflow_sticky_poller_info: global___WorkerPollerInfo | None = ...,
+        activity_poller_info: global___WorkerPollerInfo | None = ...,
+        nexus_poller_info: global___WorkerPollerInfo | None = ...,
         total_sticky_cache_hit: builtins.int = ...,
         total_sticky_cache_miss: builtins.int = ...,
         current_sticky_cache_size: builtins.int = ...,
-        plugins: collections.abc.Iterable[Global___PluginInfo] | None = ...,
-        drivers: collections.abc.Iterable[Global___StorageDriverInfo] | None = ...,
+        plugins: collections.abc.Iterable[global___PluginInfo] | None = ...,
+        drivers: collections.abc.Iterable[global___StorageDriverInfo] | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity_poller_info",
             b"activity_poller_info",
             "activity_task_slots_info",
@@ -361,7 +350,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity_poller_info",
             b"activity_poller_info",
             "activity_task_slots_info",
@@ -413,9 +402,8 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___WorkerHeartbeat: typing_extensions.TypeAlias = WorkerHeartbeat
+global___WorkerHeartbeat = WorkerHeartbeat
 
-@typing.final
 class WorkerInfo(google.protobuf.message.Message):
     """Detailed worker information."""
 
@@ -423,22 +411,23 @@ class WorkerInfo(google.protobuf.message.Message):
 
     WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     @property
-    def worker_heartbeat(self) -> Global___WorkerHeartbeat: ...
+    def worker_heartbeat(self) -> global___WorkerHeartbeat: ...
     def __init__(
         self,
         *,
-        worker_heartbeat: Global___WorkerHeartbeat | None = ...,
+        worker_heartbeat: global___WorkerHeartbeat | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["worker_heartbeat", b"worker_heartbeat"]
+        self,
+        field_name: typing_extensions.Literal["worker_heartbeat", b"worker_heartbeat"],
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["worker_heartbeat", b"worker_heartbeat"]
+        self,
+        field_name: typing_extensions.Literal["worker_heartbeat", b"worker_heartbeat"],
     ) -> None: ...
 
-Global___WorkerInfo: typing_extensions.TypeAlias = WorkerInfo
+global___WorkerInfo = WorkerInfo
 
-@typing.final
 class WorkerListInfo(google.protobuf.message.Message):
     """Limited worker information returned in the list response.
     When adding fields here, ensure that it is also added to WorkerInfo (as it carries the full worker information).
@@ -469,10 +458,19 @@ class WorkerListInfo(google.protobuf.message.Message):
     """
     task_queue: builtins.str
     """Task queue this worker is polling for tasks."""
+    @property
+    def deployment_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
     sdk_name: builtins.str
     sdk_version: builtins.str
     status: temporalio.api.enums.v1.common_pb2.WorkerStatus.ValueType
     """Worker status. Defined by SDK."""
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Worker start time.
+        It can be used to determine worker uptime. (current time - start time)
+        """
     host_name: builtins.str
     """Worker host identifier."""
     worker_grouping_key: builtins.str
@@ -485,31 +483,19 @@ class WorkerListInfo(google.protobuf.message.Message):
     within one host (so using e.g. a unix pid would be appropriate).
     """
     @property
-    def deployment_version(
-        self,
-    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
-    @property
-    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Worker start time.
-        It can be used to determine worker uptime. (current time - start time)
-        """
-
-    @property
     def plugins(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___PluginInfo
+        global___PluginInfo
     ]:
         """Plugins currently in use by this SDK."""
-
     @property
     def drivers(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___StorageDriverInfo
+        global___StorageDriverInfo
     ]:
         """Storage drivers in use by this SDK."""
-
     def __init__(
         self,
         *,
@@ -525,18 +511,18 @@ class WorkerListInfo(google.protobuf.message.Message):
         host_name: builtins.str = ...,
         worker_grouping_key: builtins.str = ...,
         process_id: builtins.str = ...,
-        plugins: collections.abc.Iterable[Global___PluginInfo] | None = ...,
-        drivers: collections.abc.Iterable[Global___StorageDriverInfo] | None = ...,
+        plugins: collections.abc.Iterable[global___PluginInfo] | None = ...,
+        drivers: collections.abc.Iterable[global___StorageDriverInfo] | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "deployment_version", b"deployment_version", "start_time", b"start_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "deployment_version",
             b"deployment_version",
             "drivers",
@@ -566,9 +552,8 @@ class WorkerListInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___WorkerListInfo: typing_extensions.TypeAlias = WorkerListInfo
+global___WorkerListInfo = WorkerListInfo
 
-@typing.final
 class PluginInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -585,12 +570,12 @@ class PluginInfo(google.protobuf.message.Message):
         version: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["name", b"name", "version", b"version"]
+        self,
+        field_name: typing_extensions.Literal["name", b"name", "version", b"version"],
     ) -> None: ...
 
-Global___PluginInfo: typing_extensions.TypeAlias = PluginInfo
+global___PluginInfo = PluginInfo
 
-@typing.final
 class StorageDriverInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -602,11 +587,12 @@ class StorageDriverInfo(google.protobuf.message.Message):
         *,
         type: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["type", b"type"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["type", b"type"]
+    ) -> None: ...
 
-Global___StorageDriverInfo: typing_extensions.TypeAlias = StorageDriverInfo
+global___StorageDriverInfo = StorageDriverInfo
 
-@typing.final
 class WorkerCommand(google.protobuf.message.Message):
     """A command sent from the server to a worker."""
 
@@ -614,31 +600,30 @@ class WorkerCommand(google.protobuf.message.Message):
 
     CANCEL_ACTIVITY_FIELD_NUMBER: builtins.int
     @property
-    def cancel_activity(self) -> Global___CancelActivityCommand: ...
+    def cancel_activity(self) -> global___CancelActivityCommand: ...
     def __init__(
         self,
         *,
-        cancel_activity: Global___CancelActivityCommand | None = ...,
+        cancel_activity: global___CancelActivityCommand | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["type", b"type"]
-    ) -> typing.Literal["cancel_activity"] | None: ...
+        self, oneof_group: typing_extensions.Literal["type", b"type"]
+    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
 
-Global___WorkerCommand: typing_extensions.TypeAlias = WorkerCommand
+global___WorkerCommand = WorkerCommand
 
-@typing.final
 class CancelActivityCommand(google.protobuf.message.Message):
     """Cancel an activity if it is still running. Otherwise, do nothing."""
 
@@ -652,12 +637,11 @@ class CancelActivityCommand(google.protobuf.message.Message):
         task_token: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["task_token", b"task_token"]
+        self, field_name: typing_extensions.Literal["task_token", b"task_token"]
     ) -> None: ...
 
-Global___CancelActivityCommand: typing_extensions.TypeAlias = CancelActivityCommand
+global___CancelActivityCommand = CancelActivityCommand
 
-@typing.final
 class WorkerCommandResult(google.protobuf.message.Message):
     """The result of executing a WorkerCommand."""
 
@@ -665,31 +649,30 @@ class WorkerCommandResult(google.protobuf.message.Message):
 
     CANCEL_ACTIVITY_FIELD_NUMBER: builtins.int
     @property
-    def cancel_activity(self) -> Global___CancelActivityResult: ...
+    def cancel_activity(self) -> global___CancelActivityResult: ...
     def __init__(
         self,
         *,
-        cancel_activity: Global___CancelActivityResult | None = ...,
+        cancel_activity: global___CancelActivityResult | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["type", b"type"]
-    ) -> typing.Literal["cancel_activity"] | None: ...
+        self, oneof_group: typing_extensions.Literal["type", b"type"]
+    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
 
-Global___WorkerCommandResult: typing_extensions.TypeAlias = WorkerCommandResult
+global___WorkerCommandResult = WorkerCommandResult
 
-@typing.final
 class CancelActivityResult(google.protobuf.message.Message):
     """Result of a CancelActivityCommand.
     Treat both successful cancellation and no-op (activity is no longer running) as success.
@@ -701,4 +684,4 @@ class CancelActivityResult(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-Global___CancelActivityResult: typing_extensions.TypeAlias = CancelActivityResult
+global___CancelActivityResult = CancelActivityResult

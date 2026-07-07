@@ -6,7 +6,6 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -19,14 +18,13 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.deployment.v1.message_pb2
 import temporalio.api.enums.v1.task_queue_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class TaskQueue(google.protobuf.message.Message):
     """See https://docs.temporal.io/docs/concepts/task-queues/"""
 
@@ -51,14 +49,13 @@ class TaskQueue(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "kind", b"kind", "name", b"name", "normal_name", b"normal_name"
         ],
     ) -> None: ...
 
-Global___TaskQueue: typing_extensions.TypeAlias = TaskQueue
+global___TaskQueue = TaskQueue
 
-@typing.final
 class TaskQueueMetadata(google.protobuf.message.Message):
     """Only applies to activity task queues"""
 
@@ -68,7 +65,6 @@ class TaskQueueMetadata(google.protobuf.message.Message):
     @property
     def max_tasks_per_second(self) -> google.protobuf.wrappers_pb2.DoubleValue:
         """Allows throttling dispatch of tasks from this queue"""
-
     def __init__(
         self,
         *,
@@ -76,16 +72,19 @@ class TaskQueueMetadata(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal["max_tasks_per_second", b"max_tasks_per_second"],
+        field_name: typing_extensions.Literal[
+            "max_tasks_per_second", b"max_tasks_per_second"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal["max_tasks_per_second", b"max_tasks_per_second"],
+        field_name: typing_extensions.Literal[
+            "max_tasks_per_second", b"max_tasks_per_second"
+        ],
     ) -> None: ...
 
-Global___TaskQueueMetadata: typing_extensions.TypeAlias = TaskQueueMetadata
+global___TaskQueueMetadata = TaskQueueMetadata
 
-@typing.final
 class TaskQueueVersioningInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -95,16 +94,6 @@ class TaskQueueVersioningInfo(google.protobuf.message.Message):
     RAMPING_VERSION_FIELD_NUMBER: builtins.int
     RAMPING_VERSION_PERCENTAGE_FIELD_NUMBER: builtins.int
     UPDATE_TIME_FIELD_NUMBER: builtins.int
-    current_version: builtins.str
-    """Deprecated. Use `current_deployment_version`."""
-    ramping_version: builtins.str
-    """Deprecated. Use `ramping_deployment_version`."""
-    ramping_version_percentage: builtins.float
-    """Percentage of tasks that are routed to the Ramping Version instead of the Current Version.
-    Valid range: [0, 100]. A 100% value means the Ramping Version is receiving full traffic but
-    not yet "promoted" to be the Current Version, likely due to pending validations.
-    A 0% value means the Ramping Version is receiving no traffic.
-    """
     @property
     def current_deployment_version(
         self,
@@ -115,7 +104,8 @@ class TaskQueueVersioningInfo(google.protobuf.message.Message):
         Note: Current Version is overridden by the Ramping Version for a portion of traffic when ramp percentage
         is non-zero (see `ramping_deployment_version` and `ramping_version_percentage`).
         """
-
+    current_version: builtins.str
+    """Deprecated. Use `current_deployment_version`."""
     @property
     def ramping_deployment_version(
         self,
@@ -126,11 +116,17 @@ class TaskQueueVersioningInfo(google.protobuf.message.Message):
         Note that it is possible to ramp from one Version to another Version, or from unversioned
         workers to a particular Version, or from a particular Version to unversioned workers.
         """
-
+    ramping_version: builtins.str
+    """Deprecated. Use `ramping_deployment_version`."""
+    ramping_version_percentage: builtins.float
+    """Percentage of tasks that are routed to the Ramping Version instead of the Current Version.
+    Valid range: [0, 100]. A 100% value means the Ramping Version is receiving full traffic but
+    not yet "promoted" to be the Current Version, likely due to pending validations.
+    A 0% value means the Ramping Version is receiving no traffic.
+    """
     @property
     def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Last time versioning information of this Task Queue changed."""
-
     def __init__(
         self,
         *,
@@ -145,7 +141,7 @@ class TaskQueueVersioningInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_deployment_version",
             b"current_deployment_version",
             "ramping_deployment_version",
@@ -156,7 +152,7 @@ class TaskQueueVersioningInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "current_deployment_version",
             b"current_deployment_version",
             "current_version",
@@ -172,9 +168,8 @@ class TaskQueueVersioningInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___TaskQueueVersioningInfo: typing_extensions.TypeAlias = TaskQueueVersioningInfo
+global___TaskQueueVersioningInfo = TaskQueueVersioningInfo
 
-@typing.final
 class TaskQueueVersionSelection(google.protobuf.message.Message):
     """Used for specifying versions the caller is interested in."""
 
@@ -183,18 +178,17 @@ class TaskQueueVersionSelection(google.protobuf.message.Message):
     BUILD_IDS_FIELD_NUMBER: builtins.int
     UNVERSIONED_FIELD_NUMBER: builtins.int
     ALL_ACTIVE_FIELD_NUMBER: builtins.int
+    @property
+    def build_ids(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Include specific Build IDs."""
     unversioned: builtins.bool
     """Include the unversioned queue."""
     all_active: builtins.bool
     """Include all active versions. A version is considered active if, in the last few minutes,
     it has had new tasks or polls, or it has been the subject of certain task queue API calls.
     """
-    @property
-    def build_ids(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """Include specific Build IDs."""
-
     def __init__(
         self,
         *,
@@ -204,7 +198,7 @@ class TaskQueueVersionSelection(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "all_active",
             b"all_active",
             "build_ids",
@@ -214,15 +208,11 @@ class TaskQueueVersionSelection(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___TaskQueueVersionSelection: typing_extensions.TypeAlias = (
-    TaskQueueVersionSelection
-)
+global___TaskQueueVersionSelection = TaskQueueVersionSelection
 
-@typing.final
 class TaskQueueVersionInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class TypesInfoEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -230,22 +220,30 @@ class TaskQueueVersionInfo(google.protobuf.message.Message):
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.int
         @property
-        def value(self) -> Global___TaskQueueTypeInfo: ...
+        def value(self) -> global___TaskQueueTypeInfo: ...
         def __init__(
             self,
             *,
             key: builtins.int = ...,
-            value: Global___TaskQueueTypeInfo | None = ...,
+            value: global___TaskQueueTypeInfo | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing.Literal["value", b"value"]
+            self, field_name: typing_extensions.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
     TYPES_INFO_FIELD_NUMBER: builtins.int
     TASK_REACHABILITY_FIELD_NUMBER: builtins.int
+    @property
+    def types_info(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.int, global___TaskQueueTypeInfo
+    ]:
+        """Task Queue info per Task Type. Key is the numerical value of the temporalio.api.enums.v1.TaskQueueType enum."""
     task_reachability: (
         temporalio.api.enums.v1.task_queue_pb2.BuildIdTaskReachability.ValueType
     )
@@ -259,31 +257,22 @@ class TaskQueueVersionInfo(google.protobuf.message.Message):
     who inherit the parent/previous workflow's Build ID but not its Task Queue. In those cases, make
     sure to query reachability for the parent/previous workflow's Task Queue as well.
     """
-    @property
-    def types_info(
-        self,
-    ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.int, Global___TaskQueueTypeInfo
-    ]:
-        """Task Queue info per Task Type. Key is the numerical value of the temporalio.api.enums.v1.TaskQueueType enum."""
-
     def __init__(
         self,
         *,
-        types_info: collections.abc.Mapping[builtins.int, Global___TaskQueueTypeInfo]
+        types_info: collections.abc.Mapping[builtins.int, global___TaskQueueTypeInfo]
         | None = ...,
         task_reachability: temporalio.api.enums.v1.task_queue_pb2.BuildIdTaskReachability.ValueType = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "task_reachability", b"task_reachability", "types_info", b"types_info"
         ],
     ) -> None: ...
 
-Global___TaskQueueVersionInfo: typing_extensions.TypeAlias = TaskQueueVersionInfo
+global___TaskQueueVersionInfo = TaskQueueVersionInfo
 
-@typing.final
 class TaskQueueTypeInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -293,28 +282,27 @@ class TaskQueueTypeInfo(google.protobuf.message.Message):
     def pollers(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___PollerInfo
+        global___PollerInfo
     ]:
         """Unversioned workers (with `useVersioning=false`) are reported in unversioned result even if they set a Build ID."""
-
     @property
-    def stats(self) -> Global___TaskQueueStats: ...
+    def stats(self) -> global___TaskQueueStats: ...
     def __init__(
         self,
         *,
-        pollers: collections.abc.Iterable[Global___PollerInfo] | None = ...,
-        stats: Global___TaskQueueStats | None = ...,
+        pollers: collections.abc.Iterable[global___PollerInfo] | None = ...,
+        stats: global___TaskQueueStats | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["stats", b"stats"]
+        self, field_name: typing_extensions.Literal["stats", b"stats"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["pollers", b"pollers", "stats", b"stats"]
+        self,
+        field_name: typing_extensions.Literal["pollers", b"pollers", "stats", b"stats"],
     ) -> None: ...
 
-Global___TaskQueueTypeInfo: typing_extensions.TypeAlias = TaskQueueTypeInfo
+global___TaskQueueTypeInfo = TaskQueueTypeInfo
 
-@typing.final
 class TaskQueueStats(google.protobuf.message.Message):
     """TaskQueueStats contains statistics about task queue backlog and activity.
 
@@ -336,6 +324,15 @@ class TaskQueueStats(google.protobuf.message.Message):
     those tasks only remain valid for a few seconds, the inaccuracy becomes less significant as the backlog size
     grows.
     """
+    @property
+    def approximate_backlog_age(self) -> google.protobuf.duration_pb2.Duration:
+        """Approximate age of the oldest task in the backlog based on the creation time of the task at the head of
+        the queue. Can be relied upon for scaling decisions.
+
+        Special note for workflow task queue type: this metric does not count sticky queue tasks. However, because
+        those tasks only remain valid for a few seconds, they should not affect the result when backlog is older than
+        few seconds.
+        """
     tasks_add_rate: builtins.float
     """The approximate tasks per second added to the task queue, averaging the last 30 seconds. These includes tasks
     whether or not they were added to/dispatched from the backlog or they were dispatched immediately without going
@@ -368,16 +365,6 @@ class TaskQueueStats(google.protobuf.message.Message):
       workflow goes to a normal queue, and the rest workflow tasks go to the Sticky queue associated with a specific
       worker instance.
     """
-    @property
-    def approximate_backlog_age(self) -> google.protobuf.duration_pb2.Duration:
-        """Approximate age of the oldest task in the backlog based on the creation time of the task at the head of
-        the queue. Can be relied upon for scaling decisions.
-
-        Special note for workflow task queue type: this metric does not count sticky queue tasks. However, because
-        those tasks only remain valid for a few seconds, they should not affect the result when backlog is older than
-        few seconds.
-        """
-
     def __init__(
         self,
         *,
@@ -388,13 +375,13 @@ class TaskQueueStats(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "approximate_backlog_age", b"approximate_backlog_age"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "approximate_backlog_age",
             b"approximate_backlog_age",
             "approximate_backlog_count",
@@ -406,9 +393,8 @@ class TaskQueueStats(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___TaskQueueStats: typing_extensions.TypeAlias = TaskQueueStats
+global___TaskQueueStats = TaskQueueStats
 
-@typing.final
 class TaskQueueStatus(google.protobuf.message.Message):
     """Deprecated. Use `InternalTaskQueueStatus`. This is kept until `DescribeTaskQueue` supports legacy behavior."""
 
@@ -424,7 +410,7 @@ class TaskQueueStatus(google.protobuf.message.Message):
     ack_level: builtins.int
     rate_per_second: builtins.float
     @property
-    def task_id_block(self) -> Global___TaskIdBlock: ...
+    def task_id_block(self) -> global___TaskIdBlock: ...
     def __init__(
         self,
         *,
@@ -432,14 +418,14 @@ class TaskQueueStatus(google.protobuf.message.Message):
         read_level: builtins.int = ...,
         ack_level: builtins.int = ...,
         rate_per_second: builtins.float = ...,
-        task_id_block: Global___TaskIdBlock | None = ...,
+        task_id_block: global___TaskIdBlock | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["task_id_block", b"task_id_block"]
+        self, field_name: typing_extensions.Literal["task_id_block", b"task_id_block"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "ack_level",
             b"ack_level",
             "backlog_count_hint",
@@ -453,9 +439,8 @@ class TaskQueueStatus(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___TaskQueueStatus: typing_extensions.TypeAlias = TaskQueueStatus
+global___TaskQueueStatus = TaskQueueStatus
 
-@typing.final
 class TaskIdBlock(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -470,12 +455,14 @@ class TaskIdBlock(google.protobuf.message.Message):
         end_id: builtins.int = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["end_id", b"end_id", "start_id", b"start_id"]
+        self,
+        field_name: typing_extensions.Literal[
+            "end_id", b"end_id", "start_id", b"start_id"
+        ],
     ) -> None: ...
 
-Global___TaskIdBlock: typing_extensions.TypeAlias = TaskIdBlock
+global___TaskIdBlock = TaskIdBlock
 
-@typing.final
 class TaskQueuePartitionMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -491,16 +478,13 @@ class TaskQueuePartitionMetadata(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "key", b"key", "owner_host_name", b"owner_host_name"
         ],
     ) -> None: ...
 
-Global___TaskQueuePartitionMetadata: typing_extensions.TypeAlias = (
-    TaskQueuePartitionMetadata
-)
+global___TaskQueuePartitionMetadata = TaskQueuePartitionMetadata
 
-@typing.final
 class PollerInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -509,10 +493,10 @@ class PollerInfo(google.protobuf.message.Message):
     RATE_PER_SECOND_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
-    identity: builtins.str
-    rate_per_second: builtins.float
     @property
     def last_access_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    identity: builtins.str
+    rate_per_second: builtins.float
     @property
     def worker_version_capabilities(
         self,
@@ -521,13 +505,11 @@ class PollerInfo(google.protobuf.message.Message):
         appear here.
         Deprecated. Replaced by deployment_options.
         """
-
     @property
     def deployment_options(
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that SDK sent to server."""
-
     def __init__(
         self,
         *,
@@ -541,7 +523,7 @@ class PollerInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "deployment_options",
             b"deployment_options",
             "last_access_time",
@@ -552,7 +534,7 @@ class PollerInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "deployment_options",
             b"deployment_options",
             "identity",
@@ -566,31 +548,29 @@ class PollerInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___PollerInfo: typing_extensions.TypeAlias = PollerInfo
+global___PollerInfo = PollerInfo
 
-@typing.final
 class StickyExecutionAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     WORKER_TASK_QUEUE_FIELD_NUMBER: builtins.int
     SCHEDULE_TO_START_TIMEOUT_FIELD_NUMBER: builtins.int
     @property
-    def worker_task_queue(self) -> Global___TaskQueue: ...
+    def worker_task_queue(self) -> global___TaskQueue: ...
     @property
     def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """(-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: "to" is used to indicate interval. --)
         """
-
     def __init__(
         self,
         *,
-        worker_task_queue: Global___TaskQueue | None = ...,
+        worker_task_queue: global___TaskQueue | None = ...,
         schedule_to_start_timeout: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
             "worker_task_queue",
@@ -599,7 +579,7 @@ class StickyExecutionAttributes(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
             "worker_task_queue",
@@ -607,11 +587,8 @@ class StickyExecutionAttributes(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___StickyExecutionAttributes: typing_extensions.TypeAlias = (
-    StickyExecutionAttributes
-)
+global___StickyExecutionAttributes = StickyExecutionAttributes
 
-@typing.final
 class CompatibleVersionSet(google.protobuf.message.Message):
     """Used by the worker versioning APIs, represents an unordered set of one or more versions which are
     considered to be compatible with each other. Currently the versions are always worker build IDs.
@@ -625,19 +602,17 @@ class CompatibleVersionSet(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """All the compatible versions, unordered, except for the last element, which is considered the set "default"."""
-
     def __init__(
         self,
         *,
         build_ids: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["build_ids", b"build_ids"]
+        self, field_name: typing_extensions.Literal["build_ids", b"build_ids"]
     ) -> None: ...
 
-Global___CompatibleVersionSet: typing_extensions.TypeAlias = CompatibleVersionSet
+global___CompatibleVersionSet = CompatibleVersionSet
 
-@typing.final
 class TaskQueueReachability(google.protobuf.message.Message):
     """Reachability of tasks for a worker on a single task queue."""
 
@@ -656,7 +631,6 @@ class TaskQueueReachability(google.protobuf.message.Message):
         See the TaskReachability docstring for information about each enum variant.
         If reachability is empty, this worker is considered unreachable in this task queue.
         """
-
     def __init__(
         self,
         *,
@@ -668,14 +642,13 @@ class TaskQueueReachability(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "reachability", b"reachability", "task_queue", b"task_queue"
         ],
     ) -> None: ...
 
-Global___TaskQueueReachability: typing_extensions.TypeAlias = TaskQueueReachability
+global___TaskQueueReachability = TaskQueueReachability
 
-@typing.final
 class BuildIdReachability(google.protobuf.message.Message):
     """Reachability of tasks for a worker by build id, in one or more task queues."""
 
@@ -689,22 +662,21 @@ class BuildIdReachability(google.protobuf.message.Message):
     def task_queue_reachability(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___TaskQueueReachability
+        global___TaskQueueReachability
     ]:
         """Reachability per task queue."""
-
     def __init__(
         self,
         *,
         build_id: builtins.str = ...,
         task_queue_reachability: collections.abc.Iterable[
-            Global___TaskQueueReachability
+            global___TaskQueueReachability
         ]
         | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "build_id",
             b"build_id",
             "task_queue_reachability",
@@ -712,9 +684,8 @@ class BuildIdReachability(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___BuildIdReachability: typing_extensions.TypeAlias = BuildIdReachability
+global___BuildIdReachability = BuildIdReachability
 
-@typing.final
 class RampByPercentage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -727,12 +698,12 @@ class RampByPercentage(google.protobuf.message.Message):
         ramp_percentage: builtins.float = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["ramp_percentage", b"ramp_percentage"]
+        self,
+        field_name: typing_extensions.Literal["ramp_percentage", b"ramp_percentage"],
     ) -> None: ...
 
-Global___RampByPercentage: typing_extensions.TypeAlias = RampByPercentage
+global___RampByPercentage = RampByPercentage
 
-@typing.final
 class BuildIdAssignmentRule(google.protobuf.message.Message):
     """Assignment rules are applied to *new* Workflow and Activity executions at
     schedule time to assign them to a Build ID.
@@ -779,27 +750,26 @@ class BuildIdAssignmentRule(google.protobuf.message.Message):
     PERCENTAGE_RAMP_FIELD_NUMBER: builtins.int
     target_build_id: builtins.str
     @property
-    def percentage_ramp(self) -> Global___RampByPercentage:
+    def percentage_ramp(self) -> global___RampByPercentage:
         """This ramp is useful for gradual Blue/Green deployments (and similar)
         where you want to send a certain portion of the traffic to the target
         Build ID.
         """
-
     def __init__(
         self,
         *,
         target_build_id: builtins.str = ...,
-        percentage_ramp: Global___RampByPercentage | None = ...,
+        percentage_ramp: global___RampByPercentage | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "percentage_ramp", b"percentage_ramp", "ramp", b"ramp"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "percentage_ramp",
             b"percentage_ramp",
             "ramp",
@@ -809,12 +779,11 @@ class BuildIdAssignmentRule(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["ramp", b"ramp"]
-    ) -> typing.Literal["percentage_ramp"] | None: ...
+        self, oneof_group: typing_extensions.Literal["ramp", b"ramp"]
+    ) -> typing_extensions.Literal["percentage_ramp"] | None: ...
 
-Global___BuildIdAssignmentRule: typing_extensions.TypeAlias = BuildIdAssignmentRule
+global___BuildIdAssignmentRule = BuildIdAssignmentRule
 
-@typing.final
 class CompatibleBuildIdRedirectRule(google.protobuf.message.Message):
     """These rules apply to tasks assigned to a particular Build ID
     (`source_build_id`) to redirect them to another *compatible* Build ID
@@ -857,70 +826,75 @@ class CompatibleBuildIdRedirectRule(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "source_build_id", b"source_build_id", "target_build_id", b"target_build_id"
         ],
     ) -> None: ...
 
-Global___CompatibleBuildIdRedirectRule: typing_extensions.TypeAlias = (
-    CompatibleBuildIdRedirectRule
-)
+global___CompatibleBuildIdRedirectRule = CompatibleBuildIdRedirectRule
 
-@typing.final
 class TimestampedBuildIdAssignmentRule(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RULE_FIELD_NUMBER: builtins.int
     CREATE_TIME_FIELD_NUMBER: builtins.int
     @property
-    def rule(self) -> Global___BuildIdAssignmentRule: ...
+    def rule(self) -> global___BuildIdAssignmentRule: ...
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
         self,
         *,
-        rule: Global___BuildIdAssignmentRule | None = ...,
+        rule: global___BuildIdAssignmentRule | None = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["create_time", b"create_time", "rule", b"rule"]
+        self,
+        field_name: typing_extensions.Literal[
+            "create_time", b"create_time", "rule", b"rule"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["create_time", b"create_time", "rule", b"rule"]
+        self,
+        field_name: typing_extensions.Literal[
+            "create_time", b"create_time", "rule", b"rule"
+        ],
     ) -> None: ...
 
-Global___TimestampedBuildIdAssignmentRule: typing_extensions.TypeAlias = (
-    TimestampedBuildIdAssignmentRule
-)
+global___TimestampedBuildIdAssignmentRule = TimestampedBuildIdAssignmentRule
 
-@typing.final
 class TimestampedCompatibleBuildIdRedirectRule(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RULE_FIELD_NUMBER: builtins.int
     CREATE_TIME_FIELD_NUMBER: builtins.int
     @property
-    def rule(self) -> Global___CompatibleBuildIdRedirectRule: ...
+    def rule(self) -> global___CompatibleBuildIdRedirectRule: ...
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
         self,
         *,
-        rule: Global___CompatibleBuildIdRedirectRule | None = ...,
+        rule: global___CompatibleBuildIdRedirectRule | None = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["create_time", b"create_time", "rule", b"rule"]
+        self,
+        field_name: typing_extensions.Literal[
+            "create_time", b"create_time", "rule", b"rule"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["create_time", b"create_time", "rule", b"rule"]
+        self,
+        field_name: typing_extensions.Literal[
+            "create_time", b"create_time", "rule", b"rule"
+        ],
     ) -> None: ...
 
-Global___TimestampedCompatibleBuildIdRedirectRule: typing_extensions.TypeAlias = (
+global___TimestampedCompatibleBuildIdRedirectRule = (
     TimestampedCompatibleBuildIdRedirectRule
 )
 
-@typing.final
 class PollerGroupInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -935,12 +909,11 @@ class PollerGroupInfo(google.protobuf.message.Message):
         weight: builtins.float = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["id", b"id", "weight", b"weight"]
+        self, field_name: typing_extensions.Literal["id", b"id", "weight", b"weight"]
     ) -> None: ...
 
-Global___PollerGroupInfo: typing_extensions.TypeAlias = PollerGroupInfo
+global___PollerGroupInfo = PollerGroupInfo
 
-@typing.final
 class PollerScalingDecision(google.protobuf.message.Message):
     """Attached to task responses to give hints to the SDK about how it may adjust its number of
     pollers.
@@ -964,14 +937,13 @@ class PollerScalingDecision(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "poll_request_delta_suggestion", b"poll_request_delta_suggestion"
         ],
     ) -> None: ...
 
-Global___PollerScalingDecision: typing_extensions.TypeAlias = PollerScalingDecision
+global___PollerScalingDecision = PollerScalingDecision
 
-@typing.final
 class RateLimit(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -984,12 +956,14 @@ class RateLimit(google.protobuf.message.Message):
         requests_per_second: builtins.float = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["requests_per_second", b"requests_per_second"]
+        self,
+        field_name: typing_extensions.Literal[
+            "requests_per_second", b"requests_per_second"
+        ],
     ) -> None: ...
 
-Global___RateLimit: typing_extensions.TypeAlias = RateLimit
+global___RateLimit = RateLimit
 
-@typing.final
 class ConfigMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1005,7 +979,6 @@ class ConfigMetadata(google.protobuf.message.Message):
     @property
     def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time of the last update."""
-
     def __init__(
         self,
         *,
@@ -1014,11 +987,11 @@ class ConfigMetadata(google.protobuf.message.Message):
         update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["update_time", b"update_time"]
+        self, field_name: typing_extensions.Literal["update_time", b"update_time"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "reason",
             b"reason",
             "update_identity",
@@ -1028,44 +1001,41 @@ class ConfigMetadata(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ConfigMetadata: typing_extensions.TypeAlias = ConfigMetadata
+global___ConfigMetadata = ConfigMetadata
 
-@typing.final
 class RateLimitConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RATE_LIMIT_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     @property
-    def rate_limit(self) -> Global___RateLimit: ...
+    def rate_limit(self) -> global___RateLimit: ...
     @property
-    def metadata(self) -> Global___ConfigMetadata: ...
+    def metadata(self) -> global___ConfigMetadata: ...
     def __init__(
         self,
         *,
-        rate_limit: Global___RateLimit | None = ...,
-        metadata: Global___ConfigMetadata | None = ...,
+        rate_limit: global___RateLimit | None = ...,
+        metadata: global___ConfigMetadata | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "metadata", b"metadata", "rate_limit", b"rate_limit"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "metadata", b"metadata", "rate_limit", b"rate_limit"
         ],
     ) -> None: ...
 
-Global___RateLimitConfig: typing_extensions.TypeAlias = RateLimitConfig
+global___RateLimitConfig = RateLimitConfig
 
-@typing.final
 class TaskQueueConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class FairnessWeightOverridesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1080,37 +1050,35 @@ class TaskQueueConfig(google.protobuf.message.Message):
             value: builtins.float = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
     QUEUE_RATE_LIMIT_FIELD_NUMBER: builtins.int
     FAIRNESS_KEYS_RATE_LIMIT_DEFAULT_FIELD_NUMBER: builtins.int
     FAIRNESS_WEIGHT_OVERRIDES_FIELD_NUMBER: builtins.int
     @property
-    def queue_rate_limit(self) -> Global___RateLimitConfig:
+    def queue_rate_limit(self) -> global___RateLimitConfig:
         """Unless modified, this is the system-defined rate limit."""
-
     @property
-    def fairness_keys_rate_limit_default(self) -> Global___RateLimitConfig:
+    def fairness_keys_rate_limit_default(self) -> global___RateLimitConfig:
         """If set, each individual fairness key will be limited to this rate, scaled by the weight of the fairness key."""
-
     @property
     def fairness_weight_overrides(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.float]:
         """If set, overrides the fairness weights for the corresponding fairness keys."""
-
     def __init__(
         self,
         *,
-        queue_rate_limit: Global___RateLimitConfig | None = ...,
-        fairness_keys_rate_limit_default: Global___RateLimitConfig | None = ...,
+        queue_rate_limit: global___RateLimitConfig | None = ...,
+        fairness_keys_rate_limit_default: global___RateLimitConfig | None = ...,
         fairness_weight_overrides: collections.abc.Mapping[builtins.str, builtins.float]
         | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "fairness_keys_rate_limit_default",
             b"fairness_keys_rate_limit_default",
             "queue_rate_limit",
@@ -1119,7 +1087,7 @@ class TaskQueueConfig(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "fairness_keys_rate_limit_default",
             b"fairness_keys_rate_limit_default",
             "fairness_weight_overrides",
@@ -1129,4 +1097,4 @@ class TaskQueueConfig(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___TaskQueueConfig: typing_extensions.TypeAlias = TaskQueueConfig
+global___TaskQueueConfig = TaskQueueConfig

@@ -6,7 +6,6 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -14,14 +13,13 @@ import google.protobuf.message
 
 import temporalio.api.history.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class WorkflowExecution(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -34,13 +32,14 @@ class WorkflowExecution(google.protobuf.message.Message):
         history: temporalio.api.history.v1.message_pb2.History | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["history", b"history"]
+        self, field_name: typing_extensions.Literal["history", b"history"]
     ) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["history", b"history"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["history", b"history"]
+    ) -> None: ...
 
-Global___WorkflowExecution: typing_extensions.TypeAlias = WorkflowExecution
+global___WorkflowExecution = WorkflowExecution
 
-@typing.final
 class WorkflowExecutions(google.protobuf.message.Message):
     """WorkflowExecutions is used by the Cloud Export feature to deserialize
     the exported file. It encapsulates a collection of workflow execution information.
@@ -53,13 +52,15 @@ class WorkflowExecutions(google.protobuf.message.Message):
     def items(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___WorkflowExecution
+        global___WorkflowExecution
     ]: ...
     def __init__(
         self,
         *,
-        items: collections.abc.Iterable[Global___WorkflowExecution] | None = ...,
+        items: collections.abc.Iterable[global___WorkflowExecution] | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["items", b"items"]
+    ) -> None: ...
 
-Global___WorkflowExecutions: typing_extensions.TypeAlias = WorkflowExecutions
+global___WorkflowExecutions = WorkflowExecutions

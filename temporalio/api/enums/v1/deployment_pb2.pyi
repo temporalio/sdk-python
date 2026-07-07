@@ -26,7 +26,7 @@ class _DeploymentReachabilityEnumTypeWrapper(
         _DeploymentReachability.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     DEPLOYMENT_REACHABILITY_UNSPECIFIED: _DeploymentReachability.ValueType  # 0
     """Reachability level is not specified."""
@@ -68,7 +68,7 @@ DEPLOYMENT_REACHABILITY_UNREACHABLE: DeploymentReachability.ValueType  # 3
 """The deployment is not reachable by any workflow because all the workflows who needed this
 deployment went out of retention period. The deployment can be decommissioned safely.
 """
-Global___DeploymentReachability: typing_extensions.TypeAlias = DeploymentReachability
+global___DeploymentReachability = DeploymentReachability
 
 class _VersionDrainageStatus:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -79,7 +79,7 @@ class _VersionDrainageStatusEnumTypeWrapper(
         _VersionDrainageStatus.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     VERSION_DRAINAGE_STATUS_UNSPECIFIED: _VersionDrainageStatus.ValueType  # 0
     """Drainage Status is not specified."""
@@ -115,7 +115,7 @@ Queries sent to closed workflows. The version can be decommissioned safely if us
 not query closed workflows. If the user does query closed workflows for some time x after
 workflows are closed, they should decommission the version after it has been drained for that duration.
 """
-Global___VersionDrainageStatus: typing_extensions.TypeAlias = VersionDrainageStatus
+global___VersionDrainageStatus = VersionDrainageStatus
 
 class _WorkerVersioningMode:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -126,7 +126,7 @@ class _WorkerVersioningModeEnumTypeWrapper(
         _WorkerVersioningMode.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKER_VERSIONING_MODE_UNSPECIFIED: _WorkerVersioningMode.ValueType  # 0
     WORKER_VERSIONING_MODE_UNVERSIONED: _WorkerVersioningMode.ValueType  # 1
@@ -183,7 +183,7 @@ between the Pinned and AutoUpgrade behaviors. Depending on the chosen behavior, 
 or may not need to use Patching to keep the new code compatible with prior versions. (see
 VersioningBehavior enum.)
 """
-Global___WorkerVersioningMode: typing_extensions.TypeAlias = WorkerVersioningMode
+global___WorkerVersioningMode = WorkerVersioningMode
 
 class _WorkerDeploymentVersionStatus:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -194,7 +194,7 @@ class _WorkerDeploymentVersionStatusEnumTypeWrapper(
         _WorkerDeploymentVersionStatus.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKER_DEPLOYMENT_VERSION_STATUS_UNSPECIFIED: (
         _WorkerDeploymentVersionStatus.ValueType
@@ -278,6 +278,4 @@ WORKER_DEPLOYMENT_VERSION_STATUS_CREATED: WorkerDeploymentVersionStatus.ValueTyp
 """The Worker Deployment Version is created by user (via `CreateWorkerDeploymentVersion` API)
 but server has not seen any poller for it yet.
 """
-Global___WorkerDeploymentVersionStatus: typing_extensions.TypeAlias = (
-    WorkerDeploymentVersionStatus
-)
+global___WorkerDeploymentVersionStatus = WorkerDeploymentVersionStatus

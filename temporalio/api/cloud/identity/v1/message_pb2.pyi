@@ -30,7 +30,7 @@ class _OwnerType:
 class _OwnerTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_OwnerType.ValueType],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     OWNER_TYPE_UNSPECIFIED: _OwnerType.ValueType  # 0
     OWNER_TYPE_USER: _OwnerType.ValueType  # 1
@@ -45,9 +45,8 @@ OWNER_TYPE_USER: OwnerType.ValueType  # 1
 """The owner is a user."""
 OWNER_TYPE_SERVICE_ACCOUNT: OwnerType.ValueType  # 2
 """The owner is a service account."""
-Global___OwnerType: typing_extensions.TypeAlias = OwnerType
+global___OwnerType = OwnerType
 
-@typing.final
 class AccountAccess(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -60,7 +59,7 @@ class AccountAccess(google.protobuf.message.Message):
             AccountAccess._Role.ValueType
         ],
         builtins.type,
-    ):
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         ROLE_UNSPECIFIED: AccountAccess._Role.ValueType  # 0
         ROLE_OWNER: AccountAccess._Role.ValueType  # 1
@@ -105,7 +104,7 @@ class AccountAccess(google.protobuf.message.Message):
     Deprecated: Not supported after v0.3.0 api version. Use role instead.
     temporal:versioning:max_version=v0.3.0
     """
-    role: Global___AccountAccess.Role.ValueType
+    role: global___AccountAccess.Role.ValueType
     """The role on the account.
     temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=role_deprecated
@@ -117,17 +116,16 @@ class AccountAccess(google.protobuf.message.Message):
         """List of custom role IDs assigned to the user or service account.
         temporal:versioning:min_version=v0.13.0
         """
-
     def __init__(
         self,
         *,
         role_deprecated: builtins.str = ...,
-        role: Global___AccountAccess.Role.ValueType = ...,
+        role: global___AccountAccess.Role.ValueType = ...,
         custom_roles: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "custom_roles",
             b"custom_roles",
             "role",
@@ -137,9 +135,8 @@ class AccountAccess(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___AccountAccess: typing_extensions.TypeAlias = AccountAccess
+global___AccountAccess = AccountAccess
 
-@typing.final
 class NamespaceAccess(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -152,7 +149,7 @@ class NamespaceAccess(google.protobuf.message.Message):
             NamespaceAccess._Permission.ValueType
         ],
         builtins.type,
-    ):
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         PERMISSION_UNSPECIFIED: NamespaceAccess._Permission.ValueType  # 0
         PERMISSION_ADMIN: NamespaceAccess._Permission.ValueType  # 1
@@ -181,7 +178,7 @@ class NamespaceAccess(google.protobuf.message.Message):
     Deprecated: Not supported after v0.3.0 api version. Use permission instead.
     temporal:versioning:max_version=v0.3.0
     """
-    permission: Global___NamespaceAccess.Permission.ValueType
+    permission: global___NamespaceAccess.Permission.ValueType
     """The permission to the namespace.
     temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=permission_deprecated
@@ -190,11 +187,11 @@ class NamespaceAccess(google.protobuf.message.Message):
         self,
         *,
         permission_deprecated: builtins.str = ...,
-        permission: Global___NamespaceAccess.Permission.ValueType = ...,
+        permission: global___NamespaceAccess.Permission.ValueType = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "permission",
             b"permission",
             "permission_deprecated",
@@ -202,13 +199,11 @@ class NamespaceAccess(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___NamespaceAccess: typing_extensions.TypeAlias = NamespaceAccess
+global___NamespaceAccess = NamespaceAccess
 
-@typing.final
 class Access(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class NamespaceAccessesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -216,37 +211,36 @@ class Access(google.protobuf.message.Message):
         VALUE_FIELD_NUMBER: builtins.int
         key: builtins.str
         @property
-        def value(self) -> Global___NamespaceAccess: ...
+        def value(self) -> global___NamespaceAccess: ...
         def __init__(
             self,
             *,
             key: builtins.str = ...,
-            value: Global___NamespaceAccess | None = ...,
+            value: global___NamespaceAccess | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing.Literal["value", b"value"]
+            self, field_name: typing_extensions.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
     ACCOUNT_ACCESS_FIELD_NUMBER: builtins.int
     NAMESPACE_ACCESSES_FIELD_NUMBER: builtins.int
     CUSTOM_ROLES_DEPRECATED_FIELD_NUMBER: builtins.int
     @property
-    def account_access(self) -> Global___AccountAccess:
+    def account_access(self) -> global___AccountAccess:
         """The account access"""
-
     @property
     def namespace_accesses(
         self,
     ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, Global___NamespaceAccess
+        builtins.str, global___NamespaceAccess
     ]:
         """The map of namespace accesses
         The key is the namespace name and the value is the access to the namespace
         """
-
     @property
     def custom_roles_deprecated(
         self,
@@ -255,23 +249,22 @@ class Access(google.protobuf.message.Message):
         Deprecated: Not supported after v0.12.0 api version. Use account_access.custom_roles instead.
         temporal:versioning:max_version=v0.12.0
         """
-
     def __init__(
         self,
         *,
-        account_access: Global___AccountAccess | None = ...,
+        account_access: global___AccountAccess | None = ...,
         namespace_accesses: collections.abc.Mapping[
-            builtins.str, Global___NamespaceAccess
+            builtins.str, global___NamespaceAccess
         ]
         | None = ...,
         custom_roles_deprecated: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["account_access", b"account_access"]
+        self, field_name: typing_extensions.Literal["account_access", b"account_access"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "account_access",
             b"account_access",
             "custom_roles_deprecated",
@@ -281,9 +274,8 @@ class Access(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___Access: typing_extensions.TypeAlias = Access
+global___Access = Access
 
-@typing.final
 class NamespaceScopedAccess(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -292,25 +284,26 @@ class NamespaceScopedAccess(google.protobuf.message.Message):
     namespace: builtins.str
     """The namespace the service account is assigned to - immutable."""
     @property
-    def access(self) -> Global___NamespaceAccess:
+    def access(self) -> global___NamespaceAccess:
         """The namespace access assigned to the service account - mutable."""
-
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
-        access: Global___NamespaceAccess | None = ...,
+        access: global___NamespaceAccess | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["access", b"access"]
+        self, field_name: typing_extensions.Literal["access", b"access"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["access", b"access", "namespace", b"namespace"]
+        self,
+        field_name: typing_extensions.Literal[
+            "access", b"access", "namespace", b"namespace"
+        ],
     ) -> None: ...
 
-Global___NamespaceScopedAccess: typing_extensions.TypeAlias = NamespaceScopedAccess
+global___NamespaceScopedAccess = NamespaceScopedAccess
 
-@typing.final
 class UserSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -319,25 +312,24 @@ class UserSpec(google.protobuf.message.Message):
     email: builtins.str
     """The email address associated to the user"""
     @property
-    def access(self) -> Global___Access:
+    def access(self) -> global___Access:
         """The access to assigned to the user"""
-
     def __init__(
         self,
         *,
         email: builtins.str = ...,
-        access: Global___Access | None = ...,
+        access: global___Access | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["access", b"access"]
+        self, field_name: typing_extensions.Literal["access", b"access"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["access", b"access", "email", b"email"]
+        self,
+        field_name: typing_extensions.Literal["access", b"access", "email", b"email"],
     ) -> None: ...
 
-Global___UserSpec: typing_extensions.TypeAlias = UserSpec
+global___UserSpec = UserSpec
 
-@typing.final
 class Invitation(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -346,11 +338,9 @@ class Invitation(google.protobuf.message.Message):
     @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the user was created"""
-
     @property
     def expired_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the invitation expires or has expired"""
-
     def __init__(
         self,
         *,
@@ -359,20 +349,19 @@ class Invitation(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time", b"created_time", "expired_time", b"expired_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time", b"created_time", "expired_time", b"expired_time"
         ],
     ) -> None: ...
 
-Global___Invitation: typing_extensions.TypeAlias = Invitation
+global___Invitation = Invitation
 
-@typing.final
 class User(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -391,6 +380,9 @@ class User(google.protobuf.message.Message):
     """The current version of the user specification
     The next update operation will have to include this version
     """
+    @property
+    def spec(self) -> global___UserSpec:
+        """The user specification"""
     state_deprecated: builtins.str
     """The current state of the user
     Deprecated: Not supported after v0.3.0 api version. Use state instead.
@@ -405,39 +397,32 @@ class User(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the user, if any"""
     @property
-    def spec(self) -> Global___UserSpec:
-        """The user specification"""
-
-    @property
-    def invitation(self) -> Global___Invitation:
+    def invitation(self) -> global___Invitation:
         """The details of the open invitation sent to the user, if any"""
-
     @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the user was created"""
-
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the user was last modified
         Will not be set if the user has never been modified
         """
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
-        spec: Global___UserSpec | None = ...,
+        spec: global___UserSpec | None = ...,
         state_deprecated: builtins.str = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
-        invitation: Global___Invitation | None = ...,
+        invitation: global___Invitation | None = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time",
             b"created_time",
             "invitation",
@@ -450,7 +435,7 @@ class User(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "created_time",
@@ -472,9 +457,8 @@ class User(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___User: typing_extensions.TypeAlias = User
+global___User = User
 
-@typing.final
 class GoogleGroupSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -489,12 +473,11 @@ class GoogleGroupSpec(google.protobuf.message.Message):
         email_address: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["email_address", b"email_address"]
+        self, field_name: typing_extensions.Literal["email_address", b"email_address"]
     ) -> None: ...
 
-Global___GoogleGroupSpec: typing_extensions.TypeAlias = GoogleGroupSpec
+global___GoogleGroupSpec = GoogleGroupSpec
 
-@typing.final
 class SCIMGroupSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -506,11 +489,12 @@ class SCIMGroupSpec(google.protobuf.message.Message):
         *,
         idp_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["idp_id", b"idp_id"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["idp_id", b"idp_id"]
+    ) -> None: ...
 
-Global___SCIMGroupSpec: typing_extensions.TypeAlias = SCIMGroupSpec
+global___SCIMGroupSpec = SCIMGroupSpec
 
-@typing.final
 class CloudGroupSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -518,9 +502,8 @@ class CloudGroupSpec(google.protobuf.message.Message):
         self,
     ) -> None: ...
 
-Global___CloudGroupSpec: typing_extensions.TypeAlias = CloudGroupSpec
+global___CloudGroupSpec = CloudGroupSpec
 
-@typing.final
 class UserGroupSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -532,37 +515,33 @@ class UserGroupSpec(google.protobuf.message.Message):
     display_name: builtins.str
     """The display name of the group."""
     @property
-    def access(self) -> Global___Access:
+    def access(self) -> global___Access:
         """The access assigned to the group."""
-
     @property
-    def google_group(self) -> Global___GoogleGroupSpec:
+    def google_group(self) -> global___GoogleGroupSpec:
         """The specification of the google group that this group is associated with."""
-
     @property
-    def scim_group(self) -> Global___SCIMGroupSpec:
+    def scim_group(self) -> global___SCIMGroupSpec:
         """The specification of the SCIM group that this group is associated with.
         SCIM groups cannot be created or deleted directly, but their access can be managed.
         """
-
     @property
-    def cloud_group(self) -> Global___CloudGroupSpec:
+    def cloud_group(self) -> global___CloudGroupSpec:
         """The specification for a Cloud group. Cloud groups can manage members using
         the add and remove member APIs.
         """
-
     def __init__(
         self,
         *,
         display_name: builtins.str = ...,
-        access: Global___Access | None = ...,
-        google_group: Global___GoogleGroupSpec | None = ...,
-        scim_group: Global___SCIMGroupSpec | None = ...,
-        cloud_group: Global___CloudGroupSpec | None = ...,
+        access: global___Access | None = ...,
+        google_group: global___GoogleGroupSpec | None = ...,
+        scim_group: global___SCIMGroupSpec | None = ...,
+        cloud_group: global___CloudGroupSpec | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "access",
             b"access",
             "cloud_group",
@@ -577,7 +556,7 @@ class UserGroupSpec(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "access",
             b"access",
             "cloud_group",
@@ -593,12 +572,13 @@ class UserGroupSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["group_type", b"group_type"]
-    ) -> typing.Literal["google_group", "scim_group", "cloud_group"] | None: ...
+        self, oneof_group: typing_extensions.Literal["group_type", b"group_type"]
+    ) -> (
+        typing_extensions.Literal["google_group", "scim_group", "cloud_group"] | None
+    ): ...
 
-Global___UserGroupSpec: typing_extensions.TypeAlias = UserGroupSpec
+global___UserGroupSpec = UserGroupSpec
 
-@typing.final
 class UserGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -616,6 +596,9 @@ class UserGroup(google.protobuf.message.Message):
     """The current version of the group specification
     The next update operation will have to include this version
     """
+    @property
+    def spec(self) -> global___UserGroupSpec:
+        """The group specification"""
     state_deprecated: builtins.str
     """The current state of the group.
     Deprecated: Not supported after v0.3.0 api version. Use state instead.
@@ -630,25 +613,19 @@ class UserGroup(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the group, if any"""
     @property
-    def spec(self) -> Global___UserGroupSpec:
-        """The group specification"""
-
-    @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the group was created"""
-
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the group was last modified
         Will not be set if the group has never been modified
         """
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
-        spec: Global___UserGroupSpec | None = ...,
+        spec: global___UserGroupSpec | None = ...,
         state_deprecated: builtins.str = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
@@ -657,7 +634,7 @@ class UserGroup(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time",
             b"created_time",
             "last_modified_time",
@@ -668,7 +645,7 @@ class UserGroup(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "created_time",
@@ -688,9 +665,8 @@ class UserGroup(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___UserGroup: typing_extensions.TypeAlias = UserGroup
+global___UserGroup = UserGroup
 
-@typing.final
 class UserGroupMemberId(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -703,54 +679,52 @@ class UserGroupMemberId(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "member_type", b"member_type", "user_id", b"user_id"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "member_type", b"member_type", "user_id", b"user_id"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["member_type", b"member_type"]
-    ) -> typing.Literal["user_id"] | None: ...
+        self, oneof_group: typing_extensions.Literal["member_type", b"member_type"]
+    ) -> typing_extensions.Literal["user_id"] | None: ...
 
-Global___UserGroupMemberId: typing_extensions.TypeAlias = UserGroupMemberId
+global___UserGroupMemberId = UserGroupMemberId
 
-@typing.final
 class UserGroupMember(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     MEMBER_ID_FIELD_NUMBER: builtins.int
     CREATED_TIME_FIELD_NUMBER: builtins.int
     @property
-    def member_id(self) -> Global___UserGroupMemberId: ...
+    def member_id(self) -> global___UserGroupMemberId: ...
     @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
         self,
         *,
-        member_id: Global___UserGroupMemberId | None = ...,
+        member_id: global___UserGroupMemberId | None = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time", b"created_time", "member_id", b"member_id"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time", b"created_time", "member_id", b"member_id"
         ],
     ) -> None: ...
 
-Global___UserGroupMember: typing_extensions.TypeAlias = UserGroupMember
+global___UserGroupMember = UserGroupMember
 
-@typing.final
 class ServiceAccount(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -768,6 +742,9 @@ class ServiceAccount(google.protobuf.message.Message):
     """The current version of the service account specification.
     The next update operation will have to include this version.
     """
+    @property
+    def spec(self) -> global___ServiceAccountSpec:
+        """The service account specification."""
     state_deprecated: builtins.str
     """The current state of the service account.
     Possible values: activating, activationfailed, active, updating, updatefailed, deleting, deletefailed, deleted, suspending, suspendfailed, suspended.
@@ -784,25 +761,19 @@ class ServiceAccount(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the service account, if any."""
     @property
-    def spec(self) -> Global___ServiceAccountSpec:
-        """The service account specification."""
-
-    @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the service account was created."""
-
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the service account was last modified
         Will not be set if the service account has never been modified.
         """
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
-        spec: Global___ServiceAccountSpec | None = ...,
+        spec: global___ServiceAccountSpec | None = ...,
         state_deprecated: builtins.str = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
@@ -811,7 +782,7 @@ class ServiceAccount(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time",
             b"created_time",
             "last_modified_time",
@@ -822,7 +793,7 @@ class ServiceAccount(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "created_time",
@@ -842,9 +813,8 @@ class ServiceAccount(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ServiceAccount: typing_extensions.TypeAlias = ServiceAccount
+global___ServiceAccount = ServiceAccount
 
-@typing.final
 class ServiceAccountSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -856,43 +826,41 @@ class ServiceAccountSpec(google.protobuf.message.Message):
     """The name associated with the service account.
     The name is mutable, but must be unique across all your active service accounts.
     """
-    description: builtins.str
-    """The description associated with the service account - optional.
-    The description is mutable.
-    """
     @property
-    def access(self) -> Global___Access:
+    def access(self) -> global___Access:
         """Note: one of `Access` or `NamespaceScopedAccess` must be provided, but not both.
         The access assigned to the service account.
         If set, creates an account scoped service account.
         The access is mutable.
         """
-
     @property
-    def namespace_scoped_access(self) -> Global___NamespaceScopedAccess:
+    def namespace_scoped_access(self) -> global___NamespaceScopedAccess:
         """The namespace scoped access assigned to the service account.
         If set, creates a namespace scoped service account (limited to a single namespace).
         The namespace scoped access is partially mutable.
         Refer to `NamespaceScopedAccess` for details.
         """
-
+    description: builtins.str
+    """The description associated with the service account - optional.
+    The description is mutable.
+    """
     def __init__(
         self,
         *,
         name: builtins.str = ...,
-        access: Global___Access | None = ...,
-        namespace_scoped_access: Global___NamespaceScopedAccess | None = ...,
+        access: global___Access | None = ...,
+        namespace_scoped_access: global___NamespaceScopedAccess | None = ...,
         description: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "access", b"access", "namespace_scoped_access", b"namespace_scoped_access"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "access",
             b"access",
             "description",
@@ -904,9 +872,8 @@ class ServiceAccountSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ServiceAccountSpec: typing_extensions.TypeAlias = ServiceAccountSpec
+global___ServiceAccountSpec = ServiceAccountSpec
 
-@typing.final
 class ApiKey(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -924,6 +891,9 @@ class ApiKey(google.protobuf.message.Message):
     """The current version of the API key specification.
     The next update operation will have to include this version.
     """
+    @property
+    def spec(self) -> global___ApiKeySpec:
+        """The API key specification."""
     state_deprecated: builtins.str
     """The current state of the API key.
     Possible values: activating, activationfailed, active, updating, updatefailed, deleting, deletefailed, deleted, suspending, suspendfailed, suspended.
@@ -939,25 +909,19 @@ class ApiKey(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the API key, if any."""
     @property
-    def spec(self) -> Global___ApiKeySpec:
-        """The API key specification."""
-
-    @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the API key was created."""
-
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the API key was last modified.
         Will not be set if the API key has never been modified.
         """
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
-        spec: Global___ApiKeySpec | None = ...,
+        spec: global___ApiKeySpec | None = ...,
         state_deprecated: builtins.str = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
@@ -966,7 +930,7 @@ class ApiKey(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time",
             b"created_time",
             "last_modified_time",
@@ -977,7 +941,7 @@ class ApiKey(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "created_time",
@@ -997,9 +961,8 @@ class ApiKey(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ApiKey: typing_extensions.TypeAlias = ApiKey
+global___ApiKey = ApiKey
 
-@typing.final
 class ApiKeySpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1023,7 +986,7 @@ class ApiKeySpec(google.protobuf.message.Message):
     Deprecated: Not supported after v0.3.0 api version. Use owner_type instead.
     temporal:versioning:max_version=v0.3.0
     """
-    owner_type: Global___OwnerType.ValueType
+    owner_type: global___OwnerType.ValueType
     """The type of the owner to create the API key for.
     temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=owner_type_deprecated
@@ -1032,29 +995,28 @@ class ApiKeySpec(google.protobuf.message.Message):
     """The display name of the API key."""
     description: builtins.str
     """The description of the API key."""
-    disabled: builtins.bool
-    """True if the API key is disabled."""
     @property
     def expiry_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The expiry time of the API key."""
-
+    disabled: builtins.bool
+    """True if the API key is disabled."""
     def __init__(
         self,
         *,
         owner_id: builtins.str = ...,
         owner_type_deprecated: builtins.str = ...,
-        owner_type: Global___OwnerType.ValueType = ...,
+        owner_type: global___OwnerType.ValueType = ...,
         display_name: builtins.str = ...,
         description: builtins.str = ...,
         expiry_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         disabled: builtins.bool = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["expiry_time", b"expiry_time"]
+        self, field_name: typing_extensions.Literal["expiry_time", b"expiry_time"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "description",
             b"description",
             "disabled",
@@ -1072,13 +1034,11 @@ class ApiKeySpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ApiKeySpec: typing_extensions.TypeAlias = ApiKeySpec
+global___ApiKeySpec = ApiKeySpec
 
-@typing.final
 class CustomRoleSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class Resources(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1087,8 +1047,6 @@ class CustomRoleSpec(google.protobuf.message.Message):
         ALLOW_ALL_FIELD_NUMBER: builtins.int
         resource_type: builtins.str
         """The resource type the permission applies to."""
-        allow_all: builtins.bool
-        """Whether the permission applies to all resources of the given type."""
         @property
         def resource_ids(
             self,
@@ -1096,7 +1054,8 @@ class CustomRoleSpec(google.protobuf.message.Message):
             builtins.str
         ]:
             """The resource IDs the permission applies to. Can be empty if allow_all is true."""
-
+        allow_all: builtins.bool
+        """Whether the permission applies to all resources of the given type."""
         def __init__(
             self,
             *,
@@ -1106,7 +1065,7 @@ class CustomRoleSpec(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing.Literal[
+            field_name: typing_extensions.Literal[
                 "allow_all",
                 b"allow_all",
                 "resource_ids",
@@ -1116,16 +1075,14 @@ class CustomRoleSpec(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
-    @typing.final
     class Permission(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         RESOURCES_FIELD_NUMBER: builtins.int
         ACTIONS_FIELD_NUMBER: builtins.int
         @property
-        def resources(self) -> Global___CustomRoleSpec.Resources:
+        def resources(self) -> global___CustomRoleSpec.Resources:
             """The resources the permission applies to."""
-
         @property
         def actions(
             self,
@@ -1133,19 +1090,18 @@ class CustomRoleSpec(google.protobuf.message.Message):
             builtins.str
         ]:
             """The actions allowed by the permission."""
-
         def __init__(
             self,
             *,
-            resources: Global___CustomRoleSpec.Resources | None = ...,
+            resources: global___CustomRoleSpec.Resources | None = ...,
             actions: collections.abc.Iterable[builtins.str] | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing.Literal["resources", b"resources"]
+            self, field_name: typing_extensions.Literal["resources", b"resources"]
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing.Literal[
+            field_name: typing_extensions.Literal[
                 "actions", b"actions", "resources", b"resources"
             ],
         ) -> None: ...
@@ -1161,21 +1117,20 @@ class CustomRoleSpec(google.protobuf.message.Message):
     def permissions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___CustomRoleSpec.Permission
+        global___CustomRoleSpec.Permission
     ]:
         """The permissions assigned to the custom role."""
-
     def __init__(
         self,
         *,
         name: builtins.str = ...,
         description: builtins.str = ...,
-        permissions: collections.abc.Iterable[Global___CustomRoleSpec.Permission]
+        permissions: collections.abc.Iterable[global___CustomRoleSpec.Permission]
         | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "description",
             b"description",
             "name",
@@ -1185,9 +1140,8 @@ class CustomRoleSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___CustomRoleSpec: typing_extensions.TypeAlias = CustomRoleSpec
+global___CustomRoleSpec = CustomRoleSpec
 
-@typing.final
 class CustomRole(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1204,6 +1158,9 @@ class CustomRole(google.protobuf.message.Message):
     """The current version of the custom role specification.
     The next update operation will have to include this version.
     """
+    @property
+    def spec(self) -> global___CustomRoleSpec:
+        """The custom role specification."""
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the custom role.
     For any failed state, reach out to Temporal Cloud support for remediation.
@@ -1211,25 +1168,19 @@ class CustomRole(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the custom role, if any."""
     @property
-    def spec(self) -> Global___CustomRoleSpec:
-        """The custom role specification."""
-
-    @property
     def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the custom role was created."""
-
     @property
     def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the custom role was last modified.
         Will not be set if the custom role has never been modified.
         """
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         resource_version: builtins.str = ...,
-        spec: Global___CustomRoleSpec | None = ...,
+        spec: global___CustomRoleSpec | None = ...,
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
@@ -1237,7 +1188,7 @@ class CustomRole(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "created_time",
             b"created_time",
             "last_modified_time",
@@ -1248,7 +1199,7 @@ class CustomRole(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "async_operation_id",
             b"async_operation_id",
             "created_time",
@@ -1266,9 +1217,8 @@ class CustomRole(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___CustomRole: typing_extensions.TypeAlias = CustomRole
+global___CustomRole = CustomRole
 
-@typing.final
 class UserNamespaceAssignment(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1281,29 +1231,29 @@ class UserNamespaceAssignment(google.protobuf.message.Message):
     """The ID of the user."""
     email: builtins.str
     """The email of the user."""
+    @property
+    def namespace_access(self) -> global___NamespaceAccess:
+        """The access assigned to the user at the namespace level."""
     inherited_access: builtins.bool
     """True if the user has inherited access to the namespace through an account or project role."""
     resource_version: builtins.str
     """The current resource version of the user."""
-    @property
-    def namespace_access(self) -> Global___NamespaceAccess:
-        """The access assigned to the user at the namespace level."""
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         email: builtins.str = ...,
-        namespace_access: Global___NamespaceAccess | None = ...,
+        namespace_access: global___NamespaceAccess | None = ...,
         inherited_access: builtins.bool = ...,
         resource_version: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["namespace_access", b"namespace_access"]
+        self,
+        field_name: typing_extensions.Literal["namespace_access", b"namespace_access"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "email",
             b"email",
             "id",
@@ -1317,9 +1267,8 @@ class UserNamespaceAssignment(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___UserNamespaceAssignment: typing_extensions.TypeAlias = UserNamespaceAssignment
+global___UserNamespaceAssignment = UserNamespaceAssignment
 
-@typing.final
 class ServiceAccountNamespaceAssignment(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1332,29 +1281,29 @@ class ServiceAccountNamespaceAssignment(google.protobuf.message.Message):
     """The ID of the service account."""
     name: builtins.str
     """The name of the service account."""
+    @property
+    def namespace_access(self) -> global___NamespaceAccess:
+        """The access assigned to the service account at the namespace level."""
     inherited_access: builtins.bool
     """True if the service account has inherited access to the namespace through an account or project role."""
     resource_version: builtins.str
     """The current resource version of the service account."""
-    @property
-    def namespace_access(self) -> Global___NamespaceAccess:
-        """The access assigned to the service account at the namespace level."""
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         name: builtins.str = ...,
-        namespace_access: Global___NamespaceAccess | None = ...,
+        namespace_access: global___NamespaceAccess | None = ...,
         inherited_access: builtins.bool = ...,
         resource_version: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["namespace_access", b"namespace_access"]
+        self,
+        field_name: typing_extensions.Literal["namespace_access", b"namespace_access"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "id",
             b"id",
             "inherited_access",
@@ -1368,11 +1317,8 @@ class ServiceAccountNamespaceAssignment(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___ServiceAccountNamespaceAssignment: typing_extensions.TypeAlias = (
-    ServiceAccountNamespaceAssignment
-)
+global___ServiceAccountNamespaceAssignment = ServiceAccountNamespaceAssignment
 
-@typing.final
 class UserGroupNamespaceAssignment(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1385,29 +1331,29 @@ class UserGroupNamespaceAssignment(google.protobuf.message.Message):
     """The ID of the group."""
     display_name: builtins.str
     """The display name of the group."""
+    @property
+    def namespace_access(self) -> global___NamespaceAccess:
+        """The access assigned to the group at the namespace level."""
     inherited_access: builtins.bool
     """True if the group has inherited access to the namespace through an account or project role."""
     resource_version: builtins.str
     """The current resource version of the group."""
-    @property
-    def namespace_access(self) -> Global___NamespaceAccess:
-        """The access assigned to the group at the namespace level."""
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
         display_name: builtins.str = ...,
-        namespace_access: Global___NamespaceAccess | None = ...,
+        namespace_access: global___NamespaceAccess | None = ...,
         inherited_access: builtins.bool = ...,
         resource_version: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["namespace_access", b"namespace_access"]
+        self,
+        field_name: typing_extensions.Literal["namespace_access", b"namespace_access"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "display_name",
             b"display_name",
             "id",
@@ -1421,6 +1367,4 @@ class UserGroupNamespaceAssignment(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___UserGroupNamespaceAssignment: typing_extensions.TypeAlias = (
-    UserGroupNamespaceAssignment
-)
+global___UserGroupNamespaceAssignment = UserGroupNamespaceAssignment

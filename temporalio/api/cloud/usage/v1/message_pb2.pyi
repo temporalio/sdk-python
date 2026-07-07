@@ -28,7 +28,7 @@ class _RecordType:
 class _RecordTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RecordType.ValueType],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RECORD_TYPE_UNSPECIFIED: _RecordType.ValueType  # 0
     RECORD_TYPE_ACTIONS: _RecordType.ValueType  # 1
@@ -41,7 +41,7 @@ RECORD_TYPE_UNSPECIFIED: RecordType.ValueType  # 0
 RECORD_TYPE_ACTIONS: RecordType.ValueType  # 1
 RECORD_TYPE_ACTIVE_STORAGE: RecordType.ValueType  # 2
 RECORD_TYPE_RETAINED_STORAGE: RecordType.ValueType  # 3
-Global___RecordType: typing_extensions.TypeAlias = RecordType
+global___RecordType = RecordType
 
 class _RecordUnit:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -50,7 +50,7 @@ class _RecordUnit:
 class _RecordUnitEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RecordUnit.ValueType],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RECORD_UNIT_UNSPECIFIED: _RecordUnit.ValueType  # 0
     RECORD_UNIT_NUMBER: _RecordUnit.ValueType  # 1
@@ -61,7 +61,7 @@ class RecordUnit(_RecordUnit, metaclass=_RecordUnitEnumTypeWrapper): ...
 RECORD_UNIT_UNSPECIFIED: RecordUnit.ValueType  # 0
 RECORD_UNIT_NUMBER: RecordUnit.ValueType  # 1
 RECORD_UNIT_BYTE_SECONDS: RecordUnit.ValueType  # 2
-Global___RecordUnit: typing_extensions.TypeAlias = RecordUnit
+global___RecordUnit = RecordUnit
 
 class _GroupByKey:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -70,7 +70,7 @@ class _GroupByKey:
 class _GroupByKeyEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_GroupByKey.ValueType],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     GROUP_BY_KEY_UNSPECIFIED: _GroupByKey.ValueType  # 0
     GROUP_BY_KEY_NAMESPACE: _GroupByKey.ValueType  # 1
@@ -79,9 +79,8 @@ class GroupByKey(_GroupByKey, metaclass=_GroupByKeyEnumTypeWrapper): ...
 
 GROUP_BY_KEY_UNSPECIFIED: GroupByKey.ValueType  # 0
 GROUP_BY_KEY_NAMESPACE: GroupByKey.ValueType  # 1
-Global___GroupByKey: typing_extensions.TypeAlias = GroupByKey
+global___GroupByKey = GroupByKey
 
-@typing.final
 class Summary(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -89,43 +88,40 @@ class Summary(google.protobuf.message.Message):
     END_TIME_FIELD_NUMBER: builtins.int
     RECORD_GROUPS_FIELD_NUMBER: builtins.int
     INCOMPLETE_FIELD_NUMBER: builtins.int
-    incomplete: builtins.bool
-    """True if data for given time window is not fully available yet (e.g. delays)
-    When true, records for the given time range could still be added/updated in the future (until false)
-    """
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Start of UTC day for now (inclusive)"""
-
     @property
     def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """End of UTC day for now (exclusive)"""
-
     @property
     def record_groups(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___RecordGroup
+        global___RecordGroup
     ]:
         """Records grouped by namespace"""
-
+    incomplete: builtins.bool
+    """True if data for given time window is not fully available yet (e.g. delays)
+    When true, records for the given time range could still be added/updated in the future (until false)
+    """
     def __init__(
         self,
         *,
         start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         end_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        record_groups: collections.abc.Iterable[Global___RecordGroup] | None = ...,
+        record_groups: collections.abc.Iterable[global___RecordGroup] | None = ...,
         incomplete: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "end_time", b"end_time", "start_time", b"start_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "end_time",
             b"end_time",
             "incomplete",
@@ -137,9 +133,8 @@ class Summary(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___Summary: typing_extensions.TypeAlias = Summary
+global___Summary = Summary
 
-@typing.final
 class RecordGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -149,69 +144,70 @@ class RecordGroup(google.protobuf.message.Message):
     def group_bys(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___GroupBy
+        global___GroupBy
     ]:
         """GroupBy keys and their values for this record group. Multiple fields are combined with logical AND."""
-
     @property
     def records(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___Record
+        global___Record
     ]: ...
     def __init__(
         self,
         *,
-        group_bys: collections.abc.Iterable[Global___GroupBy] | None = ...,
-        records: collections.abc.Iterable[Global___Record] | None = ...,
+        group_bys: collections.abc.Iterable[global___GroupBy] | None = ...,
+        records: collections.abc.Iterable[global___Record] | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal["group_bys", b"group_bys", "records", b"records"],
+        field_name: typing_extensions.Literal[
+            "group_bys", b"group_bys", "records", b"records"
+        ],
     ) -> None: ...
 
-Global___RecordGroup: typing_extensions.TypeAlias = RecordGroup
+global___RecordGroup = RecordGroup
 
-@typing.final
 class GroupBy(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     KEY_FIELD_NUMBER: builtins.int
     VALUE_FIELD_NUMBER: builtins.int
-    key: Global___GroupByKey.ValueType
+    key: global___GroupByKey.ValueType
     value: builtins.str
     def __init__(
         self,
         *,
-        key: Global___GroupByKey.ValueType = ...,
+        key: global___GroupByKey.ValueType = ...,
         value: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["key", b"key", "value", b"value"]
+        self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]
     ) -> None: ...
 
-Global___GroupBy: typing_extensions.TypeAlias = GroupBy
+global___GroupBy = GroupBy
 
-@typing.final
 class Record(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TYPE_FIELD_NUMBER: builtins.int
     UNIT_FIELD_NUMBER: builtins.int
     VALUE_FIELD_NUMBER: builtins.int
-    type: Global___RecordType.ValueType
-    unit: Global___RecordUnit.ValueType
+    type: global___RecordType.ValueType
+    unit: global___RecordUnit.ValueType
     value: builtins.float
     def __init__(
         self,
         *,
-        type: Global___RecordType.ValueType = ...,
-        unit: Global___RecordUnit.ValueType = ...,
+        type: global___RecordType.ValueType = ...,
+        unit: global___RecordUnit.ValueType = ...,
         value: builtins.float = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing.Literal["type", b"type", "unit", b"unit", "value", b"value"],
+        field_name: typing_extensions.Literal[
+            "type", b"type", "unit", b"unit", "value", b"value"
+        ],
     ) -> None: ...
 
-Global___Record: typing_extensions.TypeAlias = Record
+global___Record = Record

@@ -5,7 +5,6 @@ isort:skip_file
 
 import builtins
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.descriptor_pb2
@@ -13,14 +12,13 @@ import google.protobuf.internal.containers
 import google.protobuf.internal.extension_dict
 import google.protobuf.message
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class RequestHeaderAnnotation(google.protobuf.message.Message):
     """RequestHeaderAnnotation allows specifying that field values from a request
     should be propagated as outbound headers.
@@ -51,15 +49,16 @@ class RequestHeaderAnnotation(google.protobuf.message.Message):
         value: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["header", b"header", "value", b"value"]
+        self,
+        field_name: typing_extensions.Literal["header", b"header", "value", b"value"],
     ) -> None: ...
 
-Global___RequestHeaderAnnotation: typing_extensions.TypeAlias = RequestHeaderAnnotation
+global___RequestHeaderAnnotation = RequestHeaderAnnotation
 
 REQUEST_HEADER_FIELD_NUMBER: builtins.int
 request_header: google.protobuf.internal.extension_dict._ExtensionFieldDescriptor[
     google.protobuf.descriptor_pb2.MethodOptions,
     google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___RequestHeaderAnnotation
+        global___RequestHeaderAnnotation
     ],
 ]

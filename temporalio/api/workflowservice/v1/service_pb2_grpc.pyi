@@ -4,2110 +4,12 @@ isort:skip_file
 """
 
 import abc
-import collections.abc
-import sys
-import typing
 
 import grpc
-import grpc.aio
 
 import temporalio.api.workflowservice.v1.request_response_pb2
 
-if sys.version_info >= (3, 13):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
-_T = typing.TypeVar("_T")
-
-class _MaybeAsyncIterator(
-    collections.abc.AsyncIterator[_T],
-    collections.abc.Iterator[_T],
-    metaclass=abc.ABCMeta,
-): ...
-class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore[misc, type-arg]
-    ...
-
-GRPC_GENERATED_VERSION: str
-GRPC_VERSION: str
-_WorkflowServiceRegisterNamespaceType = typing_extensions.TypeVar(
-    "_WorkflowServiceRegisterNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
-    ],
-)
-
-_WorkflowServiceDescribeNamespaceType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
-    ],
-)
-
-_WorkflowServiceListNamespacesType = typing_extensions.TypeVar(
-    "_WorkflowServiceListNamespacesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
-    ],
-)
-
-_WorkflowServiceUpdateNamespaceType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-)
-
-_WorkflowServiceDeprecateNamespaceType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeprecateNamespaceType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
-    ],
-)
-
-_WorkflowServiceStartWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceStartWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceExecuteMultiOperationType = typing_extensions.TypeVar(
-    "_WorkflowServiceExecuteMultiOperationType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
-    ],
-)
-
-_WorkflowServiceGetWorkflowExecutionHistoryType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetWorkflowExecutionHistoryType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
-    ],
-)
-
-_WorkflowServiceGetWorkflowExecutionHistoryReverseType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetWorkflowExecutionHistoryReverseType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
-    ],
-)
-
-_WorkflowServicePollWorkflowTaskQueueType = typing_extensions.TypeVar(
-    "_WorkflowServicePollWorkflowTaskQueueType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
-    ],
-)
-
-_WorkflowServiceRespondWorkflowTaskCompletedType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondWorkflowTaskCompletedType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
-    ],
-)
-
-_WorkflowServiceRespondWorkflowTaskFailedType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondWorkflowTaskFailedType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
-    ],
-)
-
-_WorkflowServicePollActivityTaskQueueType = typing_extensions.TypeVar(
-    "_WorkflowServicePollActivityTaskQueueType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
-    ],
-)
-
-_WorkflowServiceRecordActivityTaskHeartbeatType = typing_extensions.TypeVar(
-    "_WorkflowServiceRecordActivityTaskHeartbeatType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
-    ],
-)
-
-_WorkflowServiceRecordActivityTaskHeartbeatByIdType = typing_extensions.TypeVar(
-    "_WorkflowServiceRecordActivityTaskHeartbeatByIdType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
-    ],
-)
-
-_WorkflowServiceRespondActivityTaskCompletedType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondActivityTaskCompletedType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
-    ],
-)
-
-_WorkflowServiceRespondActivityTaskCompletedByIdType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondActivityTaskCompletedByIdType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
-    ],
-)
-
-_WorkflowServiceRespondActivityTaskFailedType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondActivityTaskFailedType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
-    ],
-)
-
-_WorkflowServiceRespondActivityTaskFailedByIdType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondActivityTaskFailedByIdType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
-    ],
-)
-
-_WorkflowServiceRespondActivityTaskCanceledType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondActivityTaskCanceledType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
-    ],
-)
-
-_WorkflowServiceRespondActivityTaskCanceledByIdType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondActivityTaskCanceledByIdType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
-    ],
-)
-
-_WorkflowServiceRequestCancelWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceRequestCancelWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceSignalWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceSignalWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceSignalWithStartWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceSignalWithStartWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceResetWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceResetWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceTerminateWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceTerminateWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceDeleteWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeleteWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceListOpenWorkflowExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListOpenWorkflowExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceListClosedWorkflowExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListClosedWorkflowExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceListWorkflowExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListWorkflowExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceListArchivedWorkflowExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListArchivedWorkflowExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceScanWorkflowExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceScanWorkflowExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceCountWorkflowExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceCountWorkflowExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceGetSearchAttributesType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetSearchAttributesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
-    ],
-)
-
-_WorkflowServiceRespondQueryTaskCompletedType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondQueryTaskCompletedType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
-    ],
-)
-
-_WorkflowServiceResetStickyTaskQueueType = typing_extensions.TypeVar(
-    "_WorkflowServiceResetStickyTaskQueueType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
-    ],
-)
-
-_WorkflowServiceShutdownWorkerType = typing_extensions.TypeVar(
-    "_WorkflowServiceShutdownWorkerType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
-    ],
-)
-
-_WorkflowServiceQueryWorkflowType = typing_extensions.TypeVar(
-    "_WorkflowServiceQueryWorkflowType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
-    ],
-)
-
-_WorkflowServiceDescribeWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceDescribeTaskQueueType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeTaskQueueType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
-    ],
-)
-
-_WorkflowServiceGetClusterInfoType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetClusterInfoType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
-    ],
-)
-
-_WorkflowServiceGetSystemInfoType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetSystemInfoType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
-    ],
-)
-
-_WorkflowServiceListTaskQueuePartitionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListTaskQueuePartitionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
-    ],
-)
-
-_WorkflowServiceCreateScheduleType = typing_extensions.TypeVar(
-    "_WorkflowServiceCreateScheduleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
-    ],
-)
-
-_WorkflowServiceDescribeScheduleType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeScheduleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
-    ],
-)
-
-_WorkflowServiceUpdateScheduleType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateScheduleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
-    ],
-)
-
-_WorkflowServicePatchScheduleType = typing_extensions.TypeVar(
-    "_WorkflowServicePatchScheduleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
-    ],
-)
-
-_WorkflowServiceListScheduleMatchingTimesType = typing_extensions.TypeVar(
-    "_WorkflowServiceListScheduleMatchingTimesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
-    ],
-)
-
-_WorkflowServiceDeleteScheduleType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeleteScheduleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
-    ],
-)
-
-_WorkflowServiceListSchedulesType = typing_extensions.TypeVar(
-    "_WorkflowServiceListSchedulesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
-    ],
-)
-
-_WorkflowServiceCountSchedulesType = typing_extensions.TypeVar(
-    "_WorkflowServiceCountSchedulesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
-    ],
-)
-
-_WorkflowServiceUpdateWorkerBuildIdCompatibilityType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateWorkerBuildIdCompatibilityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
-    ],
-)
-
-_WorkflowServiceGetWorkerBuildIdCompatibilityType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetWorkerBuildIdCompatibilityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
-    ],
-)
-
-_WorkflowServiceUpdateWorkerVersioningRulesType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateWorkerVersioningRulesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
-    ],
-)
-
-_WorkflowServiceGetWorkerVersioningRulesType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetWorkerVersioningRulesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
-    ],
-)
-
-_WorkflowServiceGetWorkerTaskReachabilityType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetWorkerTaskReachabilityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
-    ],
-)
-
-_WorkflowServiceDescribeDeploymentType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeDeploymentType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
-    ],
-)
-
-_WorkflowServiceDescribeWorkerDeploymentVersionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeWorkerDeploymentVersionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
-    ],
-)
-
-_WorkflowServiceListDeploymentsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListDeploymentsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
-    ],
-)
-
-_WorkflowServiceGetDeploymentReachabilityType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetDeploymentReachabilityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
-    ],
-)
-
-_WorkflowServiceGetCurrentDeploymentType = typing_extensions.TypeVar(
-    "_WorkflowServiceGetCurrentDeploymentType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
-    ],
-)
-
-_WorkflowServiceSetCurrentDeploymentType = typing_extensions.TypeVar(
-    "_WorkflowServiceSetCurrentDeploymentType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
-    ],
-)
-
-_WorkflowServiceSetWorkerDeploymentCurrentVersionType = typing_extensions.TypeVar(
-    "_WorkflowServiceSetWorkerDeploymentCurrentVersionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
-    ],
-)
-
-_WorkflowServiceDescribeWorkerDeploymentType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeWorkerDeploymentType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
-    ],
-)
-
-_WorkflowServiceDeleteWorkerDeploymentType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeleteWorkerDeploymentType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
-    ],
-)
-
-_WorkflowServiceDeleteWorkerDeploymentVersionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeleteWorkerDeploymentVersionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
-    ],
-)
-
-_WorkflowServiceSetWorkerDeploymentRampingVersionType = typing_extensions.TypeVar(
-    "_WorkflowServiceSetWorkerDeploymentRampingVersionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
-    ],
-)
-
-_WorkflowServiceListWorkerDeploymentsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListWorkerDeploymentsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
-    ],
-)
-
-_WorkflowServiceCreateWorkerDeploymentType = typing_extensions.TypeVar(
-    "_WorkflowServiceCreateWorkerDeploymentType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
-    ],
-)
-
-_WorkflowServiceCreateWorkerDeploymentVersionType = typing_extensions.TypeVar(
-    "_WorkflowServiceCreateWorkerDeploymentVersionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
-    ],
-)
-
-_WorkflowServiceUpdateWorkerDeploymentVersionComputeConfigType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateWorkerDeploymentVersionComputeConfigType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-)
-
-_WorkflowServiceValidateWorkerDeploymentVersionComputeConfigType = typing_extensions.TypeVar(
-    "_WorkflowServiceValidateWorkerDeploymentVersionComputeConfigType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-)
-
-_WorkflowServiceUpdateWorkerDeploymentVersionMetadataType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateWorkerDeploymentVersionMetadataType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
-    ],
-)
-
-_WorkflowServiceSetWorkerDeploymentManagerType = typing_extensions.TypeVar(
-    "_WorkflowServiceSetWorkerDeploymentManagerType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
-    ],
-)
-
-_WorkflowServiceUpdateWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServicePollWorkflowExecutionUpdateType = typing_extensions.TypeVar(
-    "_WorkflowServicePollWorkflowExecutionUpdateType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
-    ],
-)
-
-_WorkflowServiceStartBatchOperationType = typing_extensions.TypeVar(
-    "_WorkflowServiceStartBatchOperationType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
-    ],
-)
-
-_WorkflowServiceStopBatchOperationType = typing_extensions.TypeVar(
-    "_WorkflowServiceStopBatchOperationType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
-    ],
-)
-
-_WorkflowServiceDescribeBatchOperationType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeBatchOperationType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
-    ],
-)
-
-_WorkflowServiceListBatchOperationsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListBatchOperationsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
-    ],
-)
-
-_WorkflowServicePollNexusTaskQueueType = typing_extensions.TypeVar(
-    "_WorkflowServicePollNexusTaskQueueType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
-    ],
-)
-
-_WorkflowServiceRespondNexusTaskCompletedType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondNexusTaskCompletedType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
-    ],
-)
-
-_WorkflowServiceRespondNexusTaskFailedType = typing_extensions.TypeVar(
-    "_WorkflowServiceRespondNexusTaskFailedType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
-    ],
-)
-
-_WorkflowServiceUpdateActivityOptionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateActivityOptionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
-    ],
-)
-
-_WorkflowServiceUpdateWorkflowExecutionOptionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateWorkflowExecutionOptionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
-    ],
-)
-
-_WorkflowServicePauseActivityType = typing_extensions.TypeVar(
-    "_WorkflowServicePauseActivityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
-    ],
-)
-
-_WorkflowServiceUnpauseActivityType = typing_extensions.TypeVar(
-    "_WorkflowServiceUnpauseActivityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
-    ],
-)
-
-_WorkflowServiceResetActivityType = typing_extensions.TypeVar(
-    "_WorkflowServiceResetActivityType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
-    ],
-)
-
-_WorkflowServiceCreateWorkflowRuleType = typing_extensions.TypeVar(
-    "_WorkflowServiceCreateWorkflowRuleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
-    ],
-)
-
-_WorkflowServiceDescribeWorkflowRuleType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeWorkflowRuleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
-    ],
-)
-
-_WorkflowServiceDeleteWorkflowRuleType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeleteWorkflowRuleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
-    ],
-)
-
-_WorkflowServiceListWorkflowRulesType = typing_extensions.TypeVar(
-    "_WorkflowServiceListWorkflowRulesType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
-    ],
-)
-
-_WorkflowServiceTriggerWorkflowRuleType = typing_extensions.TypeVar(
-    "_WorkflowServiceTriggerWorkflowRuleType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
-    ],
-)
-
-_WorkflowServiceRecordWorkerHeartbeatType = typing_extensions.TypeVar(
-    "_WorkflowServiceRecordWorkerHeartbeatType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
-    ],
-)
-
-_WorkflowServiceListWorkersType = typing_extensions.TypeVar(
-    "_WorkflowServiceListWorkersType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
-    ],
-)
-
-_WorkflowServiceCountWorkersType = typing_extensions.TypeVar(
-    "_WorkflowServiceCountWorkersType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
-    ],
-)
-
-_WorkflowServiceUpdateTaskQueueConfigType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateTaskQueueConfigType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
-    ],
-)
-
-_WorkflowServiceFetchWorkerConfigType = typing_extensions.TypeVar(
-    "_WorkflowServiceFetchWorkerConfigType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
-    ],
-)
-
-_WorkflowServiceUpdateWorkerConfigType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateWorkerConfigType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
-    ],
-)
-
-_WorkflowServiceDescribeWorkerType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeWorkerType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
-    ],
-)
-
-_WorkflowServicePauseWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServicePauseWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceUnpauseWorkflowExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceUnpauseWorkflowExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
-    ],
-)
-
-_WorkflowServiceStartActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceStartActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServiceStartNexusOperationExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceStartNexusOperationExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
-    ],
-)
-
-_WorkflowServiceDescribeActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServiceDescribeNexusOperationExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDescribeNexusOperationExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
-    ],
-)
-
-_WorkflowServicePollActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServicePollActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServicePollNexusOperationExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServicePollNexusOperationExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
-    ],
-)
-
-_WorkflowServiceListActivityExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListActivityExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceListNexusOperationExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceListNexusOperationExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceCountActivityExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceCountActivityExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceCountNexusOperationExecutionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceCountNexusOperationExecutionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
-    ],
-)
-
-_WorkflowServiceRequestCancelActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceRequestCancelActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServiceRequestCancelNexusOperationExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceRequestCancelNexusOperationExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
-    ],
-)
-
-_WorkflowServiceTerminateActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceTerminateActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServiceDeleteActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeleteActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServicePauseActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServicePauseActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServiceResetActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceResetActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServiceUnpauseActivityExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceUnpauseActivityExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
-    ],
-)
-
-_WorkflowServiceUpdateActivityExecutionOptionsType = typing_extensions.TypeVar(
-    "_WorkflowServiceUpdateActivityExecutionOptionsType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
-    ],
-)
-
-_WorkflowServiceTerminateNexusOperationExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceTerminateNexusOperationExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
-    ],
-)
-
-_WorkflowServiceDeleteNexusOperationExecutionType = typing_extensions.TypeVar(
-    "_WorkflowServiceDeleteNexusOperationExecutionType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
-    ],
-)
-
-class WorkflowServiceStub(
-    typing.Generic[
-        _WorkflowServiceRegisterNamespaceType,
-        _WorkflowServiceDescribeNamespaceType,
-        _WorkflowServiceListNamespacesType,
-        _WorkflowServiceUpdateNamespaceType,
-        _WorkflowServiceDeprecateNamespaceType,
-        _WorkflowServiceStartWorkflowExecutionType,
-        _WorkflowServiceExecuteMultiOperationType,
-        _WorkflowServiceGetWorkflowExecutionHistoryType,
-        _WorkflowServiceGetWorkflowExecutionHistoryReverseType,
-        _WorkflowServicePollWorkflowTaskQueueType,
-        _WorkflowServiceRespondWorkflowTaskCompletedType,
-        _WorkflowServiceRespondWorkflowTaskFailedType,
-        _WorkflowServicePollActivityTaskQueueType,
-        _WorkflowServiceRecordActivityTaskHeartbeatType,
-        _WorkflowServiceRecordActivityTaskHeartbeatByIdType,
-        _WorkflowServiceRespondActivityTaskCompletedType,
-        _WorkflowServiceRespondActivityTaskCompletedByIdType,
-        _WorkflowServiceRespondActivityTaskFailedType,
-        _WorkflowServiceRespondActivityTaskFailedByIdType,
-        _WorkflowServiceRespondActivityTaskCanceledType,
-        _WorkflowServiceRespondActivityTaskCanceledByIdType,
-        _WorkflowServiceRequestCancelWorkflowExecutionType,
-        _WorkflowServiceSignalWorkflowExecutionType,
-        _WorkflowServiceSignalWithStartWorkflowExecutionType,
-        _WorkflowServiceResetWorkflowExecutionType,
-        _WorkflowServiceTerminateWorkflowExecutionType,
-        _WorkflowServiceDeleteWorkflowExecutionType,
-        _WorkflowServiceListOpenWorkflowExecutionsType,
-        _WorkflowServiceListClosedWorkflowExecutionsType,
-        _WorkflowServiceListWorkflowExecutionsType,
-        _WorkflowServiceListArchivedWorkflowExecutionsType,
-        _WorkflowServiceScanWorkflowExecutionsType,
-        _WorkflowServiceCountWorkflowExecutionsType,
-        _WorkflowServiceGetSearchAttributesType,
-        _WorkflowServiceRespondQueryTaskCompletedType,
-        _WorkflowServiceResetStickyTaskQueueType,
-        _WorkflowServiceShutdownWorkerType,
-        _WorkflowServiceQueryWorkflowType,
-        _WorkflowServiceDescribeWorkflowExecutionType,
-        _WorkflowServiceDescribeTaskQueueType,
-        _WorkflowServiceGetClusterInfoType,
-        _WorkflowServiceGetSystemInfoType,
-        _WorkflowServiceListTaskQueuePartitionsType,
-        _WorkflowServiceCreateScheduleType,
-        _WorkflowServiceDescribeScheduleType,
-        _WorkflowServiceUpdateScheduleType,
-        _WorkflowServicePatchScheduleType,
-        _WorkflowServiceListScheduleMatchingTimesType,
-        _WorkflowServiceDeleteScheduleType,
-        _WorkflowServiceListSchedulesType,
-        _WorkflowServiceCountSchedulesType,
-        _WorkflowServiceUpdateWorkerBuildIdCompatibilityType,
-        _WorkflowServiceGetWorkerBuildIdCompatibilityType,
-        _WorkflowServiceUpdateWorkerVersioningRulesType,
-        _WorkflowServiceGetWorkerVersioningRulesType,
-        _WorkflowServiceGetWorkerTaskReachabilityType,
-        _WorkflowServiceDescribeDeploymentType,
-        _WorkflowServiceDescribeWorkerDeploymentVersionType,
-        _WorkflowServiceListDeploymentsType,
-        _WorkflowServiceGetDeploymentReachabilityType,
-        _WorkflowServiceGetCurrentDeploymentType,
-        _WorkflowServiceSetCurrentDeploymentType,
-        _WorkflowServiceSetWorkerDeploymentCurrentVersionType,
-        _WorkflowServiceDescribeWorkerDeploymentType,
-        _WorkflowServiceDeleteWorkerDeploymentType,
-        _WorkflowServiceDeleteWorkerDeploymentVersionType,
-        _WorkflowServiceSetWorkerDeploymentRampingVersionType,
-        _WorkflowServiceListWorkerDeploymentsType,
-        _WorkflowServiceCreateWorkerDeploymentType,
-        _WorkflowServiceCreateWorkerDeploymentVersionType,
-        _WorkflowServiceUpdateWorkerDeploymentVersionComputeConfigType,
-        _WorkflowServiceValidateWorkerDeploymentVersionComputeConfigType,
-        _WorkflowServiceUpdateWorkerDeploymentVersionMetadataType,
-        _WorkflowServiceSetWorkerDeploymentManagerType,
-        _WorkflowServiceUpdateWorkflowExecutionType,
-        _WorkflowServicePollWorkflowExecutionUpdateType,
-        _WorkflowServiceStartBatchOperationType,
-        _WorkflowServiceStopBatchOperationType,
-        _WorkflowServiceDescribeBatchOperationType,
-        _WorkflowServiceListBatchOperationsType,
-        _WorkflowServicePollNexusTaskQueueType,
-        _WorkflowServiceRespondNexusTaskCompletedType,
-        _WorkflowServiceRespondNexusTaskFailedType,
-        _WorkflowServiceUpdateActivityOptionsType,
-        _WorkflowServiceUpdateWorkflowExecutionOptionsType,
-        _WorkflowServicePauseActivityType,
-        _WorkflowServiceUnpauseActivityType,
-        _WorkflowServiceResetActivityType,
-        _WorkflowServiceCreateWorkflowRuleType,
-        _WorkflowServiceDescribeWorkflowRuleType,
-        _WorkflowServiceDeleteWorkflowRuleType,
-        _WorkflowServiceListWorkflowRulesType,
-        _WorkflowServiceTriggerWorkflowRuleType,
-        _WorkflowServiceRecordWorkerHeartbeatType,
-        _WorkflowServiceListWorkersType,
-        _WorkflowServiceCountWorkersType,
-        _WorkflowServiceUpdateTaskQueueConfigType,
-        _WorkflowServiceFetchWorkerConfigType,
-        _WorkflowServiceUpdateWorkerConfigType,
-        _WorkflowServiceDescribeWorkerType,
-        _WorkflowServicePauseWorkflowExecutionType,
-        _WorkflowServiceUnpauseWorkflowExecutionType,
-        _WorkflowServiceStartActivityExecutionType,
-        _WorkflowServiceStartNexusOperationExecutionType,
-        _WorkflowServiceDescribeActivityExecutionType,
-        _WorkflowServiceDescribeNexusOperationExecutionType,
-        _WorkflowServicePollActivityExecutionType,
-        _WorkflowServicePollNexusOperationExecutionType,
-        _WorkflowServiceListActivityExecutionsType,
-        _WorkflowServiceListNexusOperationExecutionsType,
-        _WorkflowServiceCountActivityExecutionsType,
-        _WorkflowServiceCountNexusOperationExecutionsType,
-        _WorkflowServiceRequestCancelActivityExecutionType,
-        _WorkflowServiceRequestCancelNexusOperationExecutionType,
-        _WorkflowServiceTerminateActivityExecutionType,
-        _WorkflowServiceDeleteActivityExecutionType,
-        _WorkflowServicePauseActivityExecutionType,
-        _WorkflowServiceResetActivityExecutionType,
-        _WorkflowServiceUnpauseActivityExecutionType,
-        _WorkflowServiceUpdateActivityExecutionOptionsType,
-        _WorkflowServiceTerminateNexusOperationExecutionType,
-        _WorkflowServiceDeleteNexusOperationExecutionType,
-    ]
-):
+class WorkflowServiceStub:
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
     to create and interact with workflows and activities.
 
@@ -2121,996 +23,11 @@ class WorkflowServiceStub(
     activity, responding with completion or failure.
     """
 
-    @typing.overload
-    def __init__(
-        self: WorkflowServiceStub[
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
-            ],
-        ],
-        channel: grpc.Channel,
-    ) -> None: ...
-    @typing.overload
-    def __init__(
-        self: WorkflowServiceStub[
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
-                temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
-            ],
-        ],
-        channel: grpc.aio.Channel,
-    ) -> None: ...
-
-    RegisterNamespace: _WorkflowServiceRegisterNamespaceType
+    def __init__(self, channel: grpc.Channel) -> None: ...
+    RegisterNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
+    ]
     """RegisterNamespace creates a new namespace which can be used as a container for all resources.
 
     A Namespace is a top level entity within Temporal, and is used as a container for resources
@@ -3118,19 +35,27 @@ class WorkflowServiceStub(
     isolation for all resources within the namespace. All resources belongs to exactly one
     namespace.
     """
-
-    DescribeNamespace: _WorkflowServiceDescribeNamespaceType
+    DescribeNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
+    ]
     """DescribeNamespace returns the information and configuration for a registered namespace."""
-
-    ListNamespaces: _WorkflowServiceListNamespacesType
+    ListNamespaces: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
+    ]
     """ListNamespaces returns the information and configuration for all namespaces."""
-
-    UpdateNamespace: _WorkflowServiceUpdateNamespaceType
+    UpdateNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
+    ]
     """UpdateNamespace is used to update the information and configuration of a registered
     namespace.
     """
-
-    DeprecateNamespace: _WorkflowServiceDeprecateNamespaceType
+    DeprecateNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
+    ]
     """DeprecateNamespace is used to update the state of a registered namespace to DEPRECATED.
 
     Once the namespace is deprecated it cannot be used to start new workflow executions. Existing
@@ -3140,16 +65,20 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Deprecated --)
     """
-
-    StartWorkflowExecution: _WorkflowServiceStartWorkflowExecutionType
+    StartWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
+    ]
     """StartWorkflowExecution starts a new workflow execution.
 
     It will create the execution with a `WORKFLOW_EXECUTION_STARTED` event in its history and
     also schedule the first workflow task. Returns `WorkflowExecutionAlreadyStarted`, if an
     instance already exists with same workflow id.
     """
-
-    ExecuteMultiOperation: _WorkflowServiceExecuteMultiOperationType
+    ExecuteMultiOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
+    ]
     """ExecuteMultiOperation executes multiple operations within a single workflow.
 
     Operations are started atomically, meaning if *any* operation fails to be started, none are,
@@ -3161,21 +90,25 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: To be exposed over HTTP in the future. --)
     """
-
-    GetWorkflowExecutionHistory: _WorkflowServiceGetWorkflowExecutionHistoryType
+    GetWorkflowExecutionHistory: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
+    ]
     """GetWorkflowExecutionHistory returns the history of specified workflow execution. Fails with
     `NotFound` if the specified workflow execution is unknown to the service.
     """
-
-    GetWorkflowExecutionHistoryReverse: (
-        _WorkflowServiceGetWorkflowExecutionHistoryReverseType
-    )
+    GetWorkflowExecutionHistoryReverse: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
+    ]
     """GetWorkflowExecutionHistoryReverse returns the history of specified workflow execution in reverse
     order (starting from last event). Fails with`NotFound` if the specified workflow execution is
     unknown to the service.
     """
-
-    PollWorkflowTaskQueue: _WorkflowServicePollWorkflowTaskQueueType
+    PollWorkflowTaskQueue: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
+    ]
     """PollWorkflowTaskQueue is called by workers to make progress on workflows.
 
     A WorkflowTask is dispatched to callers for active workflow executions with pending workflow
@@ -3186,8 +119,10 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    RespondWorkflowTaskCompleted: _WorkflowServiceRespondWorkflowTaskCompletedType
+    RespondWorkflowTaskCompleted: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
+    ]
     """RespondWorkflowTaskCompleted is called by workers to successfully complete workflow tasks
     they received from `PollWorkflowTaskQueue`.
 
@@ -3198,8 +133,10 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    RespondWorkflowTaskFailed: _WorkflowServiceRespondWorkflowTaskFailedType
+    RespondWorkflowTaskFailed: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
+    ]
     """RespondWorkflowTaskFailed is called by workers to indicate the processing of a workflow task
     failed.
 
@@ -3213,8 +150,10 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    PollActivityTaskQueue: _WorkflowServicePollActivityTaskQueueType
+    PollActivityTaskQueue: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
+    ]
     """PollActivityTaskQueue is called by workers to process activity tasks from a specific task
     queue.
 
@@ -3231,8 +170,10 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    RecordActivityTaskHeartbeat: _WorkflowServiceRecordActivityTaskHeartbeatType
+    RecordActivityTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
+    ]
     """RecordActivityTaskHeartbeat is optionally called by workers while they execute activities.
 
     If a worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
@@ -3247,16 +188,20 @@ class WorkflowServiceStub(
     used by the activity to checkpoint progress. The `cancel_requested` field in the response
     indicates whether cancellation has been requested for the activity.
     """
-
-    RecordActivityTaskHeartbeatById: _WorkflowServiceRecordActivityTaskHeartbeatByIdType
+    RecordActivityTaskHeartbeatById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
+    ]
     """See `RecordActivityTaskHeartbeat`. This version allows clients to record heartbeats by
     namespace/workflow id/activity id instead of task token.
 
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
-
-    RespondActivityTaskCompleted: _WorkflowServiceRespondActivityTaskCompletedType
+    RespondActivityTaskCompleted: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
+    ]
     """RespondActivityTaskCompleted is called by workers when they successfully complete an activity
     task.
 
@@ -3264,50 +209,60 @@ class WorkflowServiceStub(
     and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
     no longer valid due to activity timeout, already being completed, or never having existed.
     """
-
-    RespondActivityTaskCompletedById: (
-        _WorkflowServiceRespondActivityTaskCompletedByIdType
-    )
+    RespondActivityTaskCompletedById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
+    ]
     """See `RespondActivityTaskCompleted`. This version allows clients to record completions by
     namespace/workflow id/activity id instead of task token.
 
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
-
-    RespondActivityTaskFailed: _WorkflowServiceRespondActivityTaskFailedType
+    RespondActivityTaskFailed: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
+    ]
     """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
     This results in a new `ACTIVITY_TASK_FAILED` event being written to the workflow history and
     a new workflow task created for the workflow. Fails with `NotFound` if the task token is no
     longer valid due to activity timeout, already being completed, or never having existed.
     """
-
-    RespondActivityTaskFailedById: _WorkflowServiceRespondActivityTaskFailedByIdType
+    RespondActivityTaskFailedById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
+    ]
     """See `RecordActivityTaskFailed`. This version allows clients to record failures by
     namespace/workflow id/activity id instead of task token.
 
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
-
-    RespondActivityTaskCanceled: _WorkflowServiceRespondActivityTaskCanceledType
+    RespondActivityTaskCanceled: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
+    ]
     """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
     For workflow activities, this results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
     and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
     no longer valid due to activity timeout, already being completed, or never having existed.
     """
-
-    RespondActivityTaskCanceledById: _WorkflowServiceRespondActivityTaskCanceledByIdType
+    RespondActivityTaskCanceledById: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
+    ]
     """See `RespondActivityTaskCanceled`. This version allows clients to record failures by
     namespace/workflow id/activity id instead of task token.
 
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
-
-    RequestCancelWorkflowExecution: _WorkflowServiceRequestCancelWorkflowExecutionType
+    RequestCancelWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
+    ]
     """RequestCancelWorkflowExecution is called by workers when they want to request cancellation of
     a workflow execution.
 
@@ -3315,17 +270,19 @@ class WorkflowServiceStub(
     workflow history and a new workflow task created for the workflow. It returns success if the requested
     workflow is already closed. It fails with 'NotFound' if the requested workflow doesn't exist.
     """
-
-    SignalWorkflowExecution: _WorkflowServiceSignalWorkflowExecutionType
+    SignalWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
+    ]
     """SignalWorkflowExecution is used to send a signal to a running workflow execution.
 
     This results in a `WORKFLOW_EXECUTION_SIGNALED` event recorded in the history and a workflow
     task being created for the execution.
     """
-
-    SignalWithStartWorkflowExecution: (
-        _WorkflowServiceSignalWithStartWorkflowExecutionType
-    )
+    SignalWithStartWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+    ]
     """SignalWithStartWorkflowExecution is used to ensure a signal is sent to a workflow, even if
     it isn't yet started.
 
@@ -3339,22 +296,28 @@ class WorkflowServiceStub(
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "With" is used to indicate combined operation. --)
     """
-
-    ResetWorkflowExecution: _WorkflowServiceResetWorkflowExecutionType
+    ResetWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
+    ]
     """ResetWorkflowExecution will reset an existing workflow execution to a specified
     `WORKFLOW_TASK_COMPLETED` event (exclusive). It will immediately terminate the current
     execution instance. "Exclusive" means the identified completed event itself is not replayed
     in the reset history; the preceding `WORKFLOW_TASK_STARTED` event remains and will be marked as failed
     immediately, and a new workflow task will be scheduled to retry it.
     """
-
-    TerminateWorkflowExecution: _WorkflowServiceTerminateWorkflowExecutionType
+    TerminateWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
+    ]
     """TerminateWorkflowExecution terminates an existing workflow execution by recording a
     `WORKFLOW_EXECUTION_TERMINATED` event in the history and immediately terminating the
     execution instance.
     """
-
-    DeleteWorkflowExecution: _WorkflowServiceDeleteWorkflowExecutionType
+    DeleteWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
+    ]
     """DeleteWorkflowExecution asynchronously deletes a specific Workflow Execution (when
     WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
     WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
@@ -3363,28 +326,38 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Workflow deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
-
-    ListOpenWorkflowExecutions: _WorkflowServiceListOpenWorkflowExecutionsType
+    ListOpenWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
+    ]
     """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace.
 
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
     """
-
-    ListClosedWorkflowExecutions: _WorkflowServiceListClosedWorkflowExecutionsType
+    ListClosedWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
+    ]
     """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace.
 
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
     """
-
-    ListWorkflowExecutions: _WorkflowServiceListWorkflowExecutionsType
+    ListWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
+    ]
     """ListWorkflowExecutions is a visibility API to list workflow executions in a specific namespace."""
-
-    ListArchivedWorkflowExecutions: _WorkflowServiceListArchivedWorkflowExecutionsType
+    ListArchivedWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
+    ]
     """ListArchivedWorkflowExecutions is a visibility API to list archived workflow executions in a specific namespace."""
-
-    ScanWorkflowExecutions: _WorkflowServiceScanWorkflowExecutionsType
+    ScanWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
+    ]
     """ScanWorkflowExecutions _was_ a visibility API to list large amount of workflow executions in a specific namespace without order.
     It has since been deprecated in favor of `ListWorkflowExecutions` and rewritten to use `ListWorkflowExecutions` internally.
 
@@ -3392,18 +365,24 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
     """
-
-    CountWorkflowExecutions: _WorkflowServiceCountWorkflowExecutionsType
+    CountWorkflowExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
+    ]
     """CountWorkflowExecutions is a visibility API to count of workflow executions in a specific namespace."""
-
-    GetSearchAttributes: _WorkflowServiceGetSearchAttributesType
+    GetSearchAttributes: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
+    ]
     """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs
 
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose this search attribute API to HTTP (but may expose on OperatorService). --)
     """
-
-    RespondQueryTaskCompleted: _WorkflowServiceRespondQueryTaskCompletedType
+    RespondQueryTaskCompleted: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
+    ]
     """RespondQueryTaskCompleted is called by workers to complete queries which were delivered on
     the `query` (not `queries`) field of a `PollWorkflowTaskQueueResponse`.
 
@@ -3413,8 +392,10 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    ResetStickyTaskQueue: _WorkflowServiceResetStickyTaskQueueType
+    ResetStickyTaskQueue: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
+    ]
     """ResetStickyTaskQueue resets the sticky task queue related information in the mutable state of
     a given workflow. This is prudent for workers to perform if a workflow has been paged out of
     their cache.
@@ -3430,8 +411,10 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    ShutdownWorker: _WorkflowServiceShutdownWorkerType
+    ShutdownWorker: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
+    ]
     """ShutdownWorker is used to indicate that the given sticky task
     queue is no longer being polled by its worker. Following the completion of
     ShutdownWorker, newly-added workflow tasks will instead be placed
@@ -3446,58 +429,86 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    QueryWorkflow: _WorkflowServiceQueryWorkflowType
+    QueryWorkflow: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
+    ]
     """QueryWorkflow requests a query be executed for a specified workflow execution."""
-
-    DescribeWorkflowExecution: _WorkflowServiceDescribeWorkflowExecutionType
+    DescribeWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
+    ]
     """DescribeWorkflowExecution returns information about the specified workflow execution."""
-
-    DescribeTaskQueue: _WorkflowServiceDescribeTaskQueueType
+    DescribeTaskQueue: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
+    ]
     """DescribeTaskQueue returns the following information about the target task queue, broken down by Build ID:
       - List of pollers
       - Workflow Reachability status
       - Backlog info for Workflow and/or Activity tasks
     """
-
-    GetClusterInfo: _WorkflowServiceGetClusterInfoType
+    GetClusterInfo: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
+    ]
     """GetClusterInfo returns information about temporal cluster"""
-
-    GetSystemInfo: _WorkflowServiceGetSystemInfoType
+    GetSystemInfo: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
+    ]
     """GetSystemInfo returns information about the system."""
-
-    ListTaskQueuePartitions: _WorkflowServiceListTaskQueuePartitionsType
+    ListTaskQueuePartitions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
+    ]
     """(-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose this low-level API to HTTP. --)
     """
-
-    CreateSchedule: _WorkflowServiceCreateScheduleType
+    CreateSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
+    ]
     """Creates a new schedule."""
-
-    DescribeSchedule: _WorkflowServiceDescribeScheduleType
+    DescribeSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
+    ]
     """Returns the schedule description and current state of an existing schedule."""
-
-    UpdateSchedule: _WorkflowServiceUpdateScheduleType
+    UpdateSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
+    ]
     """Changes the configuration or state of an existing schedule."""
-
-    PatchSchedule: _WorkflowServicePatchScheduleType
+    PatchSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
+    ]
     """Makes a specific change to a schedule or triggers an immediate action."""
-
-    ListScheduleMatchingTimes: _WorkflowServiceListScheduleMatchingTimesType
+    ListScheduleMatchingTimes: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
+    ]
     """Lists matching times within a range."""
-
-    DeleteSchedule: _WorkflowServiceDeleteScheduleType
+    DeleteSchedule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
+    ]
     """Deletes a schedule, removing it from the system."""
-
-    ListSchedules: _WorkflowServiceListSchedulesType
+    ListSchedules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
+    ]
     """List all schedules in a namespace."""
-
-    CountSchedules: _WorkflowServiceCountSchedulesType
+    CountSchedules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
+    ]
     """CountSchedules is a visibility API to count schedules in a specific namespace."""
-
-    UpdateWorkerBuildIdCompatibility: (
-        _WorkflowServiceUpdateWorkerBuildIdCompatibilityType
-    )
+    UpdateWorkerBuildIdCompatibility: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
+    ]
     """Deprecated. Use `UpdateWorkerVersioningRules`.
     Will be removed in server version v1.32.0.
 
@@ -3517,14 +528,18 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
     """
-
-    GetWorkerBuildIdCompatibility: _WorkflowServiceGetWorkerBuildIdCompatibilityType
+    GetWorkerBuildIdCompatibility: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
+    ]
     """Deprecated. Use `GetWorkerVersioningRules`.
     Will be removed in server version v1.32.0.
     Fetches the worker build id versioning sets for a task queue.
     """
-
-    UpdateWorkerVersioningRules: _WorkflowServiceUpdateWorkerVersioningRulesType
+    UpdateWorkerVersioningRules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
+    ]
     """Use this API to manage Worker Versioning Rules for a given Task Queue. There are two types of
     rules: Build ID Assignment rules and Compatible Build ID Redirect rules.
 
@@ -3550,13 +565,17 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
     """
-
-    GetWorkerVersioningRules: _WorkflowServiceGetWorkerVersioningRulesType
+    GetWorkerVersioningRules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
+    ]
     """Fetches the Build ID assignment and redirect rules for a Task Queue.
     Will be removed in server version v1.32.0.
     """
-
-    GetWorkerTaskReachability: _WorkflowServiceGetWorkerTaskReachabilityType
+    GetWorkerTaskReachability: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
+    ]
     """Deprecated. Use `DescribeTaskQueue`.
     Will be removed in server version v1.32.0.
 
@@ -3573,26 +592,34 @@ class WorkflowServiceStub(
     Open source users can adjust this limit by setting the server's dynamic config value for
     `limit.reachabilityTaskQueueScan` with the caveat that this call can strain the visibility store.
     """
-
-    DescribeDeployment: _WorkflowServiceDescribeDeploymentType
+    DescribeDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
+    ]
     """Describes a worker deployment.
     Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
     """
-
-    DescribeWorkerDeploymentVersion: _WorkflowServiceDescribeWorkerDeploymentVersionType
+    DescribeWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
+    ]
     """Describes a worker deployment version.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    ListDeployments: _WorkflowServiceListDeploymentsType
+    ListDeployments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
+    ]
     """Lists worker deployments in the namespace. Optionally can filter based on deployment series
     name.
     Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced with `ListWorkerDeployments`.
     """
-
-    GetDeploymentReachability: _WorkflowServiceGetDeploymentReachabilityType
+    GetDeploymentReachability: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
+    ]
     """Returns the reachability level of a worker deployment to help users decide when it is time
     to decommission a deployment. Reachability level is calculated based on the deployment's
     `status` and existing workflows that depend on the given deployment for their execution.
@@ -3602,40 +629,50 @@ class WorkflowServiceStub(
     Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
     """
-
-    GetCurrentDeployment: _WorkflowServiceGetCurrentDeploymentType
+    GetCurrentDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
+    ]
     """Returns the current deployment (and its info) for a given deployment series.
     Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
     """
-
-    SetCurrentDeployment: _WorkflowServiceSetCurrentDeploymentType
+    SetCurrentDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
+    ]
     """Sets a deployment as the current deployment for its deployment series. Can optionally update
     the metadata of the deployment as well.
     Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
     """
-
-    SetWorkerDeploymentCurrentVersion: (
-        _WorkflowServiceSetWorkerDeploymentCurrentVersionType
-    )
+    SetWorkerDeploymentCurrentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
+    ]
     """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
     Version if it is the Version being set as Current.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    DescribeWorkerDeployment: _WorkflowServiceDescribeWorkerDeploymentType
+    DescribeWorkerDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
+    ]
     """Describes a Worker Deployment.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    DeleteWorkerDeployment: _WorkflowServiceDeleteWorkerDeploymentType
+    DeleteWorkerDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
+    ]
     """Deletes records of (an old) Deployment. A deployment can only be deleted if
     it has no Version in it.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    DeleteWorkerDeploymentVersion: _WorkflowServiceDeleteWorkerDeploymentVersionType
+    DeleteWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
+    ]
     """Used for manual deletion of Versions. User can delete a Version only when all the
     following conditions are met:
      - It is not the Current or Ramping Version of its Deployment.
@@ -3644,64 +681,76 @@ class WorkflowServiceStub(
        can be skipped by passing `skip-drainage=true`.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    SetWorkerDeploymentRampingVersion: (
-        _WorkflowServiceSetWorkerDeploymentRampingVersionType
-    )
+    SetWorkerDeploymentRampingVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
+    ]
     """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
     gradual ramp to unversioned workers too.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    ListWorkerDeployments: _WorkflowServiceListWorkerDeploymentsType
+    ListWorkerDeployments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
+    ]
     """Lists all Worker Deployments that are tracked in the Namespace.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    CreateWorkerDeployment: _WorkflowServiceCreateWorkerDeploymentType
+    CreateWorkerDeployment: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
+    ]
     """Creates a new Worker Deployment.
 
     Experimental. This API might significantly change or be removed in a
     future release.
     """
-
-    CreateWorkerDeploymentVersion: _WorkflowServiceCreateWorkerDeploymentVersionType
+    CreateWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
+    ]
     """Creates a new Worker Deployment Version.
 
     Experimental. This API might significantly change or be removed in a
     future release.
     """
-
-    UpdateWorkerDeploymentVersionComputeConfig: (
-        _WorkflowServiceUpdateWorkerDeploymentVersionComputeConfigType
-    )
+    UpdateWorkerDeploymentVersionComputeConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
+    ]
     """Updates the compute config attached to a Worker Deployment Version.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    ValidateWorkerDeploymentVersionComputeConfig: (
-        _WorkflowServiceValidateWorkerDeploymentVersionComputeConfigType
-    )
+    ValidateWorkerDeploymentVersionComputeConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
+    ]
     """Validates the compute config without attaching it to a Worker Deployment Version.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    UpdateWorkerDeploymentVersionMetadata: (
-        _WorkflowServiceUpdateWorkerDeploymentVersionMetadataType
-    )
+    UpdateWorkerDeploymentVersionMetadata: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
+    ]
     """Updates the user-given metadata attached to a Worker Deployment Version.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    SetWorkerDeploymentManager: _WorkflowServiceSetWorkerDeploymentManagerType
+    SetWorkerDeploymentManager: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
+    ]
     """Set/unset the ManagerIdentity of a Worker Deployment.
     Experimental. This API might significantly change or be removed in a future release.
     """
-
-    UpdateWorkflowExecution: _WorkflowServiceUpdateWorkflowExecutionType
+    UpdateWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
+    ]
     """Invokes the specified Update function on user Workflow code."""
-
-    PollWorkflowExecutionUpdate: _WorkflowServicePollWorkflowExecutionUpdateType
+    PollWorkflowExecutionUpdate: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
+    ]
     """Polls a Workflow Execution for the outcome of a Workflow Update
     previously issued through the UpdateWorkflowExecution RPC. The effective
     timeout on this call will be shorter of the the caller-supplied gRPC
@@ -3710,48 +759,68 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We don't expose update polling API to HTTP in favor of a potential future non-blocking form. --)
     """
-
-    StartBatchOperation: _WorkflowServiceStartBatchOperationType
+    StartBatchOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
+    ]
     """StartBatchOperation starts a new batch operation"""
-
-    StopBatchOperation: _WorkflowServiceStopBatchOperationType
+    StopBatchOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
+    ]
     """StopBatchOperation stops a batch operation"""
-
-    DescribeBatchOperation: _WorkflowServiceDescribeBatchOperationType
+    DescribeBatchOperation: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
+    ]
     """DescribeBatchOperation returns the information about a batch operation"""
-
-    ListBatchOperations: _WorkflowServiceListBatchOperationsType
+    ListBatchOperations: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
+    ]
     """ListBatchOperations returns a list of batch operations"""
-
-    PollNexusTaskQueue: _WorkflowServicePollNexusTaskQueueType
+    PollNexusTaskQueue: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
+    ]
     """PollNexusTaskQueue is a long poll call used by workers to receive Nexus tasks.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    RespondNexusTaskCompleted: _WorkflowServiceRespondNexusTaskCompletedType
+    RespondNexusTaskCompleted: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
+    ]
     """RespondNexusTaskCompleted is called by workers to respond to Nexus tasks received via PollNexusTaskQueue.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    RespondNexusTaskFailed: _WorkflowServiceRespondNexusTaskFailedType
+    RespondNexusTaskFailed: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
+    ]
     """RespondNexusTaskFailed is called by workers to fail Nexus tasks received via PollNexusTaskQueue.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
-
-    UpdateActivityOptions: _WorkflowServiceUpdateActivityOptionsType
+    UpdateActivityOptions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
+    ]
     """UpdateActivityOptions is called by the client to update the options of an activity by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be updated.
     This API will be deprecated soon and replaced with a newer UpdateActivityExecutionOptions that is better named and
     structured to work well for standalone activities.
     """
-
-    UpdateWorkflowExecutionOptions: _WorkflowServiceUpdateWorkflowExecutionOptionsType
+    UpdateWorkflowExecutionOptions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
+    ]
     """UpdateWorkflowExecutionOptions partially updates the WorkflowExecutionOptions of an existing workflow execution."""
-
-    PauseActivity: _WorkflowServicePauseActivityType
+    PauseActivity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
+    ]
     """PauseActivity pauses the execution of an activity specified by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be paused
 
@@ -3771,8 +840,10 @@ class WorkflowServiceStub(
     This API will be deprecated soon and replaced with a newer PauseActivityExecution that is better named and
     structured to work well for standalone activities.
     """
-
-    UnpauseActivity: _WorkflowServiceUnpauseActivityType
+    UnpauseActivity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
+    ]
     """UnpauseActivity unpauses the execution of an activity specified by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be unpaused.
 
@@ -3789,8 +860,10 @@ class WorkflowServiceStub(
     This API will be deprecated soon and replaced with a newer UnpauseActivityExecution that is better named and
     structured to work well for standalone activities.
     """
-
-    ResetActivity: _WorkflowServiceResetActivityType
+    ResetActivity: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
+    ]
     """ResetActivity resets the execution of an activity specified by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be reset.
 
@@ -3811,62 +884,88 @@ class WorkflowServiceStub(
     This API will be deprecated soon and replaced with a newer ResetActivityExecution that is better named and
     structured to work well for standalone activities.
     """
-
-    CreateWorkflowRule: _WorkflowServiceCreateWorkflowRuleType
+    CreateWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
+    ]
     """Create a new workflow rule. The rules are used to control the workflow execution.
     The rule will be applied to all running and new workflows in the namespace.
     If the rule with such ID already exist this call will fail
     Note: the rules are part of namespace configuration and will be stored in the namespace config.
     Namespace config is eventually consistent.
     """
-
-    DescribeWorkflowRule: _WorkflowServiceDescribeWorkflowRuleType
+    DescribeWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
+    ]
     """DescribeWorkflowRule return the rule specification for existing rule id.
     If there is no rule with such id - NOT FOUND error will be returned.
     """
-
-    DeleteWorkflowRule: _WorkflowServiceDeleteWorkflowRuleType
+    DeleteWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
+    ]
     """Delete rule by rule id"""
-
-    ListWorkflowRules: _WorkflowServiceListWorkflowRulesType
+    ListWorkflowRules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
+    ]
     """Return all namespace workflow rules"""
-
-    TriggerWorkflowRule: _WorkflowServiceTriggerWorkflowRuleType
+    TriggerWorkflowRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
+    ]
     """TriggerWorkflowRule allows to:
      * trigger existing rule for a specific workflow execution;
      * trigger rule for a specific workflow execution without creating a rule;
     This is useful for one-off operations.
     """
-
-    RecordWorkerHeartbeat: _WorkflowServiceRecordWorkerHeartbeatType
+    RecordWorkerHeartbeat: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
+    ]
     """WorkerHeartbeat receive heartbeat request from the worker."""
-
-    ListWorkers: _WorkflowServiceListWorkersType
+    ListWorkers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
+    ]
     """ListWorkers is a visibility API to list worker status information in a specific namespace."""
-
-    CountWorkers: _WorkflowServiceCountWorkersType
+    CountWorkers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
+    ]
     """CountWorkers counts the number of workers in a specific namespace."""
-
-    UpdateTaskQueueConfig: _WorkflowServiceUpdateTaskQueueConfigType
+    UpdateTaskQueueConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
+    ]
     """Updates task queue configuration.
     For the overall queue rate limit: the rate limit set by this api overrides the worker-set rate limit,
     which uncouples the rate limit from the worker lifecycle.
     If the overall queue rate limit is unset, the worker-set rate limit takes effect.
     """
-
-    FetchWorkerConfig: _WorkflowServiceFetchWorkerConfigType
+    FetchWorkerConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
+    ]
     """FetchWorkerConfig returns the worker configuration for a specific worker."""
-
-    UpdateWorkerConfig: _WorkflowServiceUpdateWorkerConfigType
+    UpdateWorkerConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
+    ]
     """UpdateWorkerConfig updates the worker configuration of one or more workers.
     Can be used to partially update the worker configuration.
     Can be used to update the configuration of multiple workers.
     """
-
-    DescribeWorker: _WorkflowServiceDescribeWorkerType
+    DescribeWorker: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
+    ]
     """DescribeWorker returns information about the specified worker."""
-
-    PauseWorkflowExecution: _WorkflowServicePauseWorkflowExecutionType
+    PauseWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
+    ]
     """Note: This is an experimental API and the behavior may change in a future release.
     PauseWorkflowExecution pauses the workflow execution specified in the request. Pausing a workflow execution results in
     - The workflow execution status changes to `PAUSED` and a new WORKFLOW_EXECUTION_PAUSED event is added to the history
@@ -3876,68 +975,92 @@ class WorkflowServiceStub(
     - All server-side events will continue to be processed by the server.
     - Queries & Updates on a paused workflow will be rejected.
     """
-
-    UnpauseWorkflowExecution: _WorkflowServiceUnpauseWorkflowExecutionType
+    UnpauseWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
+    ]
     """Note: This is an experimental API and the behavior may change in a future release.
     UnpauseWorkflowExecution unpauses a previously paused workflow execution specified in the request.
     Unpausing a workflow execution results in
     - The workflow execution status changes to `RUNNING` and a new WORKFLOW_EXECUTION_UNPAUSED event is added to the history
     - Workflow tasks and activity tasks are resumed.
     """
-
-    StartActivityExecution: _WorkflowServiceStartActivityExecutionType
+    StartActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
+    ]
     """StartActivityExecution starts a new activity execution.
 
     Returns an `ActivityExecutionAlreadyStarted` error if an instance already exists with same activity ID in this namespace
     unless permitted by the specified ID conflict policy.
     """
-
-    StartNexusOperationExecution: _WorkflowServiceStartNexusOperationExecutionType
+    StartNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
+    ]
     """StartNexusOperationExecution starts a new Nexus operation.
 
     Returns a `NexusOperationExecutionAlreadyStarted` error if an instance already exists with same operation ID in this
     namespace unless permitted by the specified ID conflict policy.
     """
-
-    DescribeActivityExecution: _WorkflowServiceDescribeActivityExecutionType
+    DescribeActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
+    ]
     """DescribeActivityExecution returns information about an activity execution.
     It can be used to:
     - Get current activity info without waiting
     - Long-poll for next state change and return new activity info
     Response can optionally include activity input or outcome (if the activity has completed).
     """
-
-    DescribeNexusOperationExecution: _WorkflowServiceDescribeNexusOperationExecutionType
+    DescribeNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
+    ]
     """DescribeNexusOperationExecution returns information about a Nexus operation.
     Supported use cases include:
     - Get current operation info without waiting
     - Long-poll for next state change and return new operation info
     Response can optionally include operation input or outcome (if the operation has completed).
     """
-
-    PollActivityExecution: _WorkflowServicePollActivityExecutionType
+    PollActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
+    ]
     """PollActivityExecution long-polls for an activity execution to complete and returns the
     outcome (result or failure).
     """
-
-    PollNexusOperationExecution: _WorkflowServicePollNexusOperationExecutionType
+    PollNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
+    ]
     """PollNexusOperationExecution long-polls for a Nexus operation for a given wait stage to complete and returns
     the outcome (result or failure).
     """
-
-    ListActivityExecutions: _WorkflowServiceListActivityExecutionsType
+    ListActivityExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
+    ]
     """ListActivityExecutions is a visibility API to list activity executions in a specific namespace."""
-
-    ListNexusOperationExecutions: _WorkflowServiceListNexusOperationExecutionsType
+    ListNexusOperationExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
+    ]
     """ListNexusOperationExecutions is a visibility API to list Nexus operations in a specific namespace."""
-
-    CountActivityExecutions: _WorkflowServiceCountActivityExecutionsType
+    CountActivityExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
+    ]
     """CountActivityExecutions is a visibility API to count activity executions in a specific namespace."""
-
-    CountNexusOperationExecutions: _WorkflowServiceCountNexusOperationExecutionsType
+    CountNexusOperationExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
+    ]
     """CountNexusOperationExecutions is a visibility API to count Nexus operations in a specific namespace."""
-
-    RequestCancelActivityExecution: _WorkflowServiceRequestCancelActivityExecutionType
+    RequestCancelActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
+    ]
     """RequestCancelActivityExecution requests cancellation of an activity execution.
 
     Cancellation is cooperative: this call records the request, but the activity must detect and
@@ -3945,25 +1068,29 @@ class WorkflowServiceStub(
     delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
     language-idiomatic mechanisms (context cancellation, exceptions, abort signals).
     """
-
-    RequestCancelNexusOperationExecution: (
-        _WorkflowServiceRequestCancelNexusOperationExecutionType
-    )
+    RequestCancelNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
+    ]
     """RequestCancelNexusOperationExecution requests cancellation of a Nexus operation.
 
     Requesting to cancel an operation does not automatically transition the operation to canceled status.
     The operation will only transition to canceled status if it supports cancellation and the handler
     processes the cancellation request.
     """
-
-    TerminateActivityExecution: _WorkflowServiceTerminateActivityExecutionType
+    TerminateActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
+    ]
     """TerminateActivityExecution terminates an existing activity execution immediately.
 
     Termination does not reach the worker and the activity code cannot react to it. A terminated activity may have a
     running attempt.
     """
-
-    DeleteActivityExecution: _WorkflowServiceDeleteActivityExecutionType
+    DeleteActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
+    ]
     """DeleteActivityExecution asynchronously deletes a specific activity execution (when
     ActivityExecution.run_id is provided) or the latest activity execution (when
     ActivityExecution.run_id is not provided). If the activity Execution is running, it will be
@@ -3972,8 +1099,10 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
-
-    PauseActivityExecution: _WorkflowServicePauseActivityExecutionType
+    PauseActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
+    ]
     """PauseActivityExecution pauses the execution of an activity specified by its ID.
     This API can be used to target a workflow activity or a standalone activity
 
@@ -3990,8 +1119,10 @@ class WorkflowServiceStub(
 
     Returns a `NotFound` error if there is no pending activity with the provided ID
     """
-
-    ResetActivityExecution: _WorkflowServiceResetActivityExecutionType
+    ResetActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
+    ]
     """ResetActivityExecution resets the execution of an activity specified by its ID.
     This API can be used to target a workflow activity or a standalone activity.
 
@@ -4003,8 +1134,10 @@ class WorkflowServiceStub(
 
     Returns a `NotFound` error if there is no pending activity with the provided ID or type.
     """
-
-    UnpauseActivityExecution: _WorkflowServiceUnpauseActivityExecutionType
+    UnpauseActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
+    ]
     """UnpauseActivityExecution unpauses the execution of an activity specified by its ID.
     This API can be used to target a workflow activity or a standalone activity.
 
@@ -4014,22 +1147,26 @@ class WorkflowServiceStub(
 
     Returns a `NotFound` error if there is no pending activity with the provided ID
     """
-
-    UpdateActivityExecutionOptions: _WorkflowServiceUpdateActivityExecutionOptionsType
+    UpdateActivityExecutionOptions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
+    ]
     """UpdateActivityExecutionOptions is called by the client to update the options of an activity by its ID.
     This API can be used to target a workflow activity or a standalone activity.
     """
-
-    TerminateNexusOperationExecution: (
-        _WorkflowServiceTerminateNexusOperationExecutionType
-    )
+    TerminateNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
+    ]
     """TerminateNexusOperationExecution terminates an existing Nexus operation immediately.
 
     Termination happens immediately and the operation handler cannot react to it. A terminated operation will have
     its outcome set to a failure with a termination reason.
     """
-
-    DeleteNexusOperationExecution: _WorkflowServiceDeleteNexusOperationExecutionType
+    DeleteNexusOperationExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
+    ]
     """DeleteNexusOperationExecution asynchronously deletes a specific Nexus operation run (when
     run_id is provided) or the latest run (when run_id is not provided). If the operation
     is running, it will be terminated before deletion.
@@ -4037,497 +1174,6 @@ class WorkflowServiceStub(
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Nexus operation deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
-
-WorkflowServiceAsyncStub: typing_extensions.TypeAlias = WorkflowServiceStub[
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
-    ],
-]
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -4547,13 +1193,10 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     def RegisterNamespace(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse
+    ):
         """RegisterNamespace creates a new namespace which can be used as a container for all resources.
 
         A Namespace is a top level entity within Temporal, and is used as a container for resources
@@ -4561,59 +1204,37 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         isolation for all resources within the namespace. All resources belongs to exactly one
         namespace.
         """
-
     @abc.abstractmethod
     def DescribeNamespace(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNamespaceResponse
+    ):
         """DescribeNamespace returns the information and configuration for a registered namespace."""
-
     @abc.abstractmethod
     def ListNamespaces(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListNamespacesResponse:
         """ListNamespaces returns the information and configuration for all namespaces."""
-
     @abc.abstractmethod
     def UpdateNamespace(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateNamespaceResponse:
         """UpdateNamespace is used to update the information and configuration of a registered
         namespace.
         """
-
     @abc.abstractmethod
     def DeprecateNamespace(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse:
         """DeprecateNamespace is used to update the state of a registered namespace to DEPRECATED.
 
         Once the namespace is deprecated it cannot be used to start new workflow executions. Existing
@@ -4623,36 +1244,24 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: Deprecated --)
         """
-
     @abc.abstractmethod
     def StartWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse:
         """StartWorkflowExecution starts a new workflow execution.
 
         It will create the execution with a `WORKFLOW_EXECUTION_STARTED` event in its history and
         also schedule the first workflow task. Returns `WorkflowExecutionAlreadyStarted`, if an
         instance already exists with same workflow id.
         """
-
     @abc.abstractmethod
     def ExecuteMultiOperation(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse:
         """ExecuteMultiOperation executes multiple operations within a single workflow.
 
         Operations are started atomically, meaning if *any* operation fails to be started, none are,
@@ -4664,49 +1273,31 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: To be exposed over HTTP in the future. --)
         """
-
     @abc.abstractmethod
     def GetWorkflowExecutionHistory(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryResponse:
         """GetWorkflowExecutionHistory returns the history of specified workflow execution. Fails with
         `NotFound` if the specified workflow execution is unknown to the service.
         """
-
     @abc.abstractmethod
     def GetWorkflowExecutionHistoryReverse(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse:
         """GetWorkflowExecutionHistoryReverse returns the history of specified workflow execution in reverse
         order (starting from last event). Fails with`NotFound` if the specified workflow execution is
         unknown to the service.
         """
-
     @abc.abstractmethod
     def PollWorkflowTaskQueue(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse:
         """PollWorkflowTaskQueue is called by workers to make progress on workflows.
 
         A WorkflowTask is dispatched to callers for active workflow executions with pending workflow
@@ -4717,18 +1308,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def RespondWorkflowTaskCompleted(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskCompletedResponse:
         """RespondWorkflowTaskCompleted is called by workers to successfully complete workflow tasks
         they received from `PollWorkflowTaskQueue`.
 
@@ -4739,18 +1324,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def RespondWorkflowTaskFailed(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondWorkflowTaskFailedResponse:
         """RespondWorkflowTaskFailed is called by workers to indicate the processing of a workflow task
         failed.
 
@@ -4764,18 +1343,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def PollActivityTaskQueue(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollActivityTaskQueueResponse:
         """PollActivityTaskQueue is called by workers to process activity tasks from a specific task
         queue.
 
@@ -4792,18 +1365,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def RecordActivityTaskHeartbeat(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse:
         """RecordActivityTaskHeartbeat is optionally called by workers while they execute activities.
 
         If a worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
@@ -4818,36 +1385,24 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         used by the activity to checkpoint progress. The `cancel_requested` field in the response
         indicates whether cancellation has been requested for the activity.
         """
-
     @abc.abstractmethod
     def RecordActivityTaskHeartbeatById(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdResponse:
         """See `RecordActivityTaskHeartbeat`. This version allows clients to record heartbeats by
         namespace/workflow id/activity id instead of task token.
 
         (-- api-linter: core::0136::prepositions=disabled
             aip.dev/not-precedent: "By" is used to indicate request type. --)
         """
-
     @abc.abstractmethod
     def RespondActivityTaskCompleted(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedResponse:
         """RespondActivityTaskCompleted is called by workers when they successfully complete an activity
         task.
 
@@ -4855,108 +1410,72 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
         no longer valid due to activity timeout, already being completed, or never having existed.
         """
-
     @abc.abstractmethod
     def RespondActivityTaskCompletedById(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse:
         """See `RespondActivityTaskCompleted`. This version allows clients to record completions by
         namespace/workflow id/activity id instead of task token.
 
         (-- api-linter: core::0136::prepositions=disabled
             aip.dev/not-precedent: "By" is used to indicate request type. --)
         """
-
     @abc.abstractmethod
     def RespondActivityTaskFailed(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse:
         """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
         This results in a new `ACTIVITY_TASK_FAILED` event being written to the workflow history and
         a new workflow task created for the workflow. Fails with `NotFound` if the task token is no
         longer valid due to activity timeout, already being completed, or never having existed.
         """
-
     @abc.abstractmethod
     def RespondActivityTaskFailedById(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedByIdResponse:
         """See `RecordActivityTaskFailed`. This version allows clients to record failures by
         namespace/workflow id/activity id instead of task token.
 
         (-- api-linter: core::0136::prepositions=disabled
             aip.dev/not-precedent: "By" is used to indicate request type. --)
         """
-
     @abc.abstractmethod
     def RespondActivityTaskCanceled(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse:
         """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
         For workflow activities, this results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
         and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
         no longer valid due to activity timeout, already being completed, or never having existed.
         """
-
     @abc.abstractmethod
     def RespondActivityTaskCanceledById(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse:
         """See `RespondActivityTaskCanceled`. This version allows clients to record failures by
         namespace/workflow id/activity id instead of task token.
 
         (-- api-linter: core::0136::prepositions=disabled
             aip.dev/not-precedent: "By" is used to indicate request type. --)
         """
-
     @abc.abstractmethod
     def RequestCancelWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelWorkflowExecutionResponse:
         """RequestCancelWorkflowExecution is called by workers when they want to request cancellation of
         a workflow execution.
 
@@ -4964,35 +1483,23 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         workflow history and a new workflow task created for the workflow. It returns success if the requested
         workflow is already closed. It fails with 'NotFound' if the requested workflow doesn't exist.
         """
-
     @abc.abstractmethod
     def SignalWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse:
         """SignalWorkflowExecution is used to send a signal to a running workflow execution.
 
         This results in a `WORKFLOW_EXECUTION_SIGNALED` event recorded in the history and a workflow
         task being created for the execution.
         """
-
     @abc.abstractmethod
     def SignalWithStartWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse:
         """SignalWithStartWorkflowExecution is used to ensure a signal is sent to a workflow, even if
         it isn't yet started.
 
@@ -5006,52 +1513,34 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0136::prepositions=disabled
             aip.dev/not-precedent: "With" is used to indicate combined operation. --)
         """
-
     @abc.abstractmethod
     def ResetWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse:
         """ResetWorkflowExecution will reset an existing workflow execution to a specified
         `WORKFLOW_TASK_COMPLETED` event (exclusive). It will immediately terminate the current
         execution instance. "Exclusive" means the identified completed event itself is not replayed
         in the reset history; the preceding `WORKFLOW_TASK_STARTED` event remains and will be marked as failed
         immediately, and a new workflow task will be scheduled to retry it.
         """
-
     @abc.abstractmethod
     def TerminateWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionResponse:
         """TerminateWorkflowExecution terminates an existing workflow execution by recording a
         `WORKFLOW_EXECUTION_TERMINATED` event in the history and immediately terminating the
         execution instance.
         """
-
     @abc.abstractmethod
     def DeleteWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowExecutionResponse:
         """DeleteWorkflowExecution asynchronously deletes a specific Workflow Execution (when
         WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
         WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
@@ -5060,78 +1549,48 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: Workflow deletion not exposed to HTTP, users should use cancel or terminate. --)
         """
-
     @abc.abstractmethod
     def ListOpenWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse:
         """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace.
 
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
         """
-
     @abc.abstractmethod
     def ListClosedWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse:
         """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace.
 
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
         """
-
     @abc.abstractmethod
     def ListWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowExecutionsResponse:
         """ListWorkflowExecutions is a visibility API to list workflow executions in a specific namespace."""
-
     @abc.abstractmethod
     def ListArchivedWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListArchivedWorkflowExecutionsResponse:
         """ListArchivedWorkflowExecutions is a visibility API to list archived workflow executions in a specific namespace."""
-
     @abc.abstractmethod
     def ScanWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse:
         """ScanWorkflowExecutions _was_ a visibility API to list large amount of workflow executions in a specific namespace without order.
         It has since been deprecated in favor of `ListWorkflowExecutions` and rewritten to use `ListWorkflowExecutions` internally.
 
@@ -5139,48 +1598,30 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
         """
-
     @abc.abstractmethod
     def CountWorkflowExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountWorkflowExecutionsResponse:
         """CountWorkflowExecutions is a visibility API to count of workflow executions in a specific namespace."""
-
     @abc.abstractmethod
     def GetSearchAttributes(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse:
         """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs
 
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose this search attribute API to HTTP (but may expose on OperatorService). --)
         """
-
     @abc.abstractmethod
     def RespondQueryTaskCompleted(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondQueryTaskCompletedResponse:
         """RespondQueryTaskCompleted is called by workers to complete queries which were delivered on
         the `query` (not `queries`) field of a `PollWorkflowTaskQueueResponse`.
 
@@ -5190,18 +1631,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def ResetStickyTaskQueue(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetStickyTaskQueueResponse:
         """ResetStickyTaskQueue resets the sticky task queue related information in the mutable state of
         a given workflow. This is prudent for workers to perform if a workflow has been paged out of
         their cache.
@@ -5217,18 +1652,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def ShutdownWorker(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ShutdownWorkerResponse:
         """ShutdownWorker is used to indicate that the given sticky task
         queue is no longer being polled by its worker. Following the completion of
         ShutdownWorker, newly-added workflow tasks will instead be placed
@@ -5243,206 +1672,120 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def QueryWorkflow(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.QueryWorkflowResponse:
         """QueryWorkflow requests a query be executed for a specified workflow execution."""
-
     @abc.abstractmethod
     def DescribeWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowExecutionResponse:
         """DescribeWorkflowExecution returns information about the specified workflow execution."""
-
     @abc.abstractmethod
     def DescribeTaskQueue(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeTaskQueueResponse
+    ):
         """DescribeTaskQueue returns the following information about the target task queue, broken down by Build ID:
         - List of pollers
         - Workflow Reachability status
         - Backlog info for Workflow and/or Activity tasks
         """
-
     @abc.abstractmethod
     def GetClusterInfo(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetClusterInfoResponse:
         """GetClusterInfo returns information about temporal cluster"""
-
     @abc.abstractmethod
     def GetSystemInfo(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetSystemInfoResponse:
         """GetSystemInfo returns information about the system."""
-
     @abc.abstractmethod
     def ListTaskQueuePartitions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListTaskQueuePartitionsResponse:
         """(-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose this low-level API to HTTP. --)
         """
-
     @abc.abstractmethod
     def CreateSchedule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateScheduleResponse:
         """Creates a new schedule."""
-
     @abc.abstractmethod
     def DescribeSchedule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeScheduleResponse
+    ):
         """Returns the schedule description and current state of an existing schedule."""
-
     @abc.abstractmethod
     def UpdateSchedule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateScheduleResponse:
         """Changes the configuration or state of an existing schedule."""
-
     @abc.abstractmethod
     def PatchSchedule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PatchScheduleResponse:
         """Makes a specific change to a schedule or triggers an immediate action."""
-
     @abc.abstractmethod
     def ListScheduleMatchingTimes(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListScheduleMatchingTimesResponse:
         """Lists matching times within a range."""
-
     @abc.abstractmethod
     def DeleteSchedule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteScheduleResponse:
         """Deletes a schedule, removing it from the system."""
-
     @abc.abstractmethod
     def ListSchedules(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse:
         """List all schedules in a namespace."""
-
     @abc.abstractmethod
     def CountSchedules(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse:
         """CountSchedules is a visibility API to count schedules in a specific namespace."""
-
     @abc.abstractmethod
     def UpdateWorkerBuildIdCompatibility(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse:
         """Deprecated. Use `UpdateWorkerVersioningRules`.
         Will be removed in server version v1.32.0.
 
@@ -5462,34 +1805,22 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
         """
-
     @abc.abstractmethod
     def GetWorkerBuildIdCompatibility(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerBuildIdCompatibilityResponse:
         """Deprecated. Use `GetWorkerVersioningRules`.
         Will be removed in server version v1.32.0.
         Fetches the worker build id versioning sets for a task queue.
         """
-
     @abc.abstractmethod
     def UpdateWorkerVersioningRules(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerVersioningRulesResponse:
         """Use this API to manage Worker Versioning Rules for a given Task Queue. There are two types of
         rules: Build ID Assignment rules and Compatible Build ID Redirect rules.
 
@@ -5515,33 +1846,21 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
         """
-
     @abc.abstractmethod
     def GetWorkerVersioningRules(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerVersioningRulesResponse:
         """Fetches the Build ID assignment and redirect rules for a Task Queue.
         Will be removed in server version v1.32.0.
         """
-
     @abc.abstractmethod
     def GetWorkerTaskReachability(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse:
         """Deprecated. Use `DescribeTaskQueue`.
         Will be removed in server version v1.32.0.
 
@@ -5558,66 +1877,42 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Open source users can adjust this limit by setting the server's dynamic config value for
         `limit.reachabilityTaskQueueScan` with the caveat that this call can strain the visibility store.
         """
-
     @abc.abstractmethod
     def DescribeDeployment(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse:
         """Describes a worker deployment.
         Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
         """
-
     @abc.abstractmethod
     def DescribeWorkerDeploymentVersion(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse:
         """Describes a worker deployment version.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def ListDeployments(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse:
         """Lists worker deployments in the namespace. Optionally can filter based on deployment series
         name.
         Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `ListWorkerDeployments`.
         """
-
     @abc.abstractmethod
     def GetDeploymentReachability(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetDeploymentReachabilityResponse:
         """Returns the reachability level of a worker deployment to help users decide when it is time
         to decommission a deployment. Reachability level is calculated based on the deployment's
         `status` and existing workflows that depend on the given deployment for their execution.
@@ -5627,98 +1922,62 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
         """
-
     @abc.abstractmethod
     def GetCurrentDeployment(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse:
         """Returns the current deployment (and its info) for a given deployment series.
         Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
         """
-
     @abc.abstractmethod
     def SetCurrentDeployment(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse:
         """Sets a deployment as the current deployment for its deployment series. Can optionally update
         the metadata of the deployment as well.
         Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
         """
-
     @abc.abstractmethod
     def SetWorkerDeploymentCurrentVersion(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse:
         """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
         Version if it is the Version being set as Current.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def DescribeWorkerDeployment(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse:
         """Describes a Worker Deployment.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def DeleteWorkerDeployment(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse:
         """Deletes records of (an old) Deployment. A deployment can only be deleted if
         it has no Version in it.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def DeleteWorkerDeploymentVersion(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionResponse:
         """Used for manual deletion of Versions. User can delete a Version only when all the
         following conditions are met:
          - It is not the Current or Ramping Version of its Deployment.
@@ -5727,156 +1986,96 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
            can be skipped by passing `skip-drainage=true`.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def SetWorkerDeploymentRampingVersion(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse:
         """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
         gradual ramp to unversioned workers too.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def ListWorkerDeployments(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse:
         """Lists all Worker Deployments that are tracked in the Namespace.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def CreateWorkerDeployment(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse:
         """Creates a new Worker Deployment.
 
         Experimental. This API might significantly change or be removed in a
         future release.
         """
-
     @abc.abstractmethod
     def CreateWorkerDeploymentVersion(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentVersionResponse:
         """Creates a new Worker Deployment Version.
 
         Experimental. This API might significantly change or be removed in a
         future release.
         """
-
     @abc.abstractmethod
     def UpdateWorkerDeploymentVersionComputeConfig(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionComputeConfigResponse:
         """Updates the compute config attached to a Worker Deployment Version.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def ValidateWorkerDeploymentVersionComputeConfig(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ValidateWorkerDeploymentVersionComputeConfigResponse:
         """Validates the compute config without attaching it to a Worker Deployment Version.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def UpdateWorkerDeploymentVersionMetadata(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse:
         """Updates the user-given metadata attached to a Worker Deployment Version.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def SetWorkerDeploymentManager(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse:
         """Set/unset the ManagerIdentity of a Worker Deployment.
         Experimental. This API might significantly change or be removed in a future release.
         """
-
     @abc.abstractmethod
     def UpdateWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionResponse:
         """Invokes the specified Update function on user Workflow code."""
-
     @abc.abstractmethod
     def PollWorkflowExecutionUpdate(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionUpdateResponse:
         """Polls a Workflow Execution for the outcome of a Workflow Update
         previously issued through the UpdateWorkflowExecution RPC. The effective
         timeout on this call will be shorter of the the caller-supplied gRPC
@@ -5885,148 +2084,88 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We don't expose update polling API to HTTP in favor of a potential future non-blocking form. --)
         """
-
     @abc.abstractmethod
     def StartBatchOperation(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartBatchOperationResponse:
         """StartBatchOperation starts a new batch operation"""
-
     @abc.abstractmethod
     def StopBatchOperation(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StopBatchOperationResponse:
         """StopBatchOperation stops a batch operation"""
-
     @abc.abstractmethod
     def DescribeBatchOperation(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeBatchOperationResponse:
         """DescribeBatchOperation returns the information about a batch operation"""
-
     @abc.abstractmethod
     def ListBatchOperations(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListBatchOperationsResponse:
         """ListBatchOperations returns a list of batch operations"""
-
     @abc.abstractmethod
     def PollNexusTaskQueue(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse:
         """PollNexusTaskQueue is a long poll call used by workers to receive Nexus tasks.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def RespondNexusTaskCompleted(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskCompletedResponse:
         """RespondNexusTaskCompleted is called by workers to respond to Nexus tasks received via PollNexusTaskQueue.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def RespondNexusTaskFailed(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondNexusTaskFailedResponse:
         """RespondNexusTaskFailed is called by workers to fail Nexus tasks received via PollNexusTaskQueue.
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: We do not expose worker API to HTTP. --)
         """
-
     @abc.abstractmethod
     def UpdateActivityOptions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse:
         """UpdateActivityOptions is called by the client to update the options of an activity by its ID or type.
         If there are multiple pending activities of the provided type - all of them will be updated.
         This API will be deprecated soon and replaced with a newer UpdateActivityExecutionOptions that is better named and
         structured to work well for standalone activities.
         """
-
     @abc.abstractmethod
     def UpdateWorkflowExecutionOptions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsResponse:
         """UpdateWorkflowExecutionOptions partially updates the WorkflowExecutionOptions of an existing workflow execution."""
-
     @abc.abstractmethod
     def PauseActivity(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityResponse:
         """PauseActivity pauses the execution of an activity specified by its ID or type.
         If there are multiple pending activities of the provided type - all of them will be paused
 
@@ -6046,18 +2185,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         This API will be deprecated soon and replaced with a newer PauseActivityExecution that is better named and
         structured to work well for standalone activities.
         """
-
     @abc.abstractmethod
     def UnpauseActivity(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityResponse:
         """UnpauseActivity unpauses the execution of an activity specified by its ID or type.
         If there are multiple pending activities of the provided type - all of them will be unpaused.
 
@@ -6074,18 +2207,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         This API will be deprecated soon and replaced with a newer UnpauseActivityExecution that is better named and
         structured to work well for standalone activities.
         """
-
     @abc.abstractmethod
     def ResetActivity(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityResponse:
         """ResetActivity resets the execution of an activity specified by its ID or type.
         If there are multiple pending activities of the provided type - all of them will be reset.
 
@@ -6106,192 +2233,118 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         This API will be deprecated soon and replaced with a newer ResetActivityExecution that is better named and
         structured to work well for standalone activities.
         """
-
     @abc.abstractmethod
     def CreateWorkflowRule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleResponse:
         """Create a new workflow rule. The rules are used to control the workflow execution.
         The rule will be applied to all running and new workflows in the namespace.
         If the rule with such ID already exist this call will fail
         Note: the rules are part of namespace configuration and will be stored in the namespace config.
         Namespace config is eventually consistent.
         """
-
     @abc.abstractmethod
     def DescribeWorkflowRule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkflowRuleResponse:
         """DescribeWorkflowRule return the rule specification for existing rule id.
         If there is no rule with such id - NOT FOUND error will be returned.
         """
-
     @abc.abstractmethod
     def DeleteWorkflowRule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkflowRuleResponse:
         """Delete rule by rule id"""
-
     @abc.abstractmethod
     def ListWorkflowRules(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkflowRulesResponse
+    ):
         """Return all namespace workflow rules"""
-
     @abc.abstractmethod
     def TriggerWorkflowRule(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TriggerWorkflowRuleResponse:
         """TriggerWorkflowRule allows to:
          * trigger existing rule for a specific workflow execution;
          * trigger rule for a specific workflow execution without creating a rule;
         This is useful for one-off operations.
         """
-
     @abc.abstractmethod
     def RecordWorkerHeartbeat(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RecordWorkerHeartbeatResponse:
         """WorkerHeartbeat receive heartbeat request from the worker."""
-
     @abc.abstractmethod
     def ListWorkers(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse:
         """ListWorkers is a visibility API to list worker status information in a specific namespace."""
-
     @abc.abstractmethod
     def CountWorkers(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountWorkersResponse:
         """CountWorkers counts the number of workers in a specific namespace."""
-
     @abc.abstractmethod
     def UpdateTaskQueueConfig(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse:
         """Updates task queue configuration.
         For the overall queue rate limit: the rate limit set by this api overrides the worker-set rate limit,
         which uncouples the rate limit from the worker lifecycle.
         If the overall queue rate limit is unset, the worker-set rate limit takes effect.
         """
-
     @abc.abstractmethod
     def FetchWorkerConfig(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse
+    ):
         """FetchWorkerConfig returns the worker configuration for a specific worker."""
-
     @abc.abstractmethod
     def UpdateWorkerConfig(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse:
         """UpdateWorkerConfig updates the worker configuration of one or more workers.
         Can be used to partially update the worker configuration.
         Can be used to update the configuration of multiple workers.
         """
-
     @abc.abstractmethod
     def DescribeWorker(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse:
         """DescribeWorker returns information about the specified worker."""
-
     @abc.abstractmethod
     def PauseWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse:
         """Note: This is an experimental API and the behavior may change in a future release.
         PauseWorkflowExecution pauses the workflow execution specified in the request. Pausing a workflow execution results in
         - The workflow execution status changes to `PAUSED` and a new WORKFLOW_EXECUTION_PAUSED event is added to the history
@@ -6301,188 +2354,116 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         - All server-side events will continue to be processed by the server.
         - Queries & Updates on a paused workflow will be rejected.
         """
-
     @abc.abstractmethod
     def UnpauseWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse:
         """Note: This is an experimental API and the behavior may change in a future release.
         UnpauseWorkflowExecution unpauses a previously paused workflow execution specified in the request.
         Unpausing a workflow execution results in
         - The workflow execution status changes to `RUNNING` and a new WORKFLOW_EXECUTION_UNPAUSED event is added to the history
         - Workflow tasks and activity tasks are resumed.
         """
-
     @abc.abstractmethod
     def StartActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse:
         """StartActivityExecution starts a new activity execution.
 
         Returns an `ActivityExecutionAlreadyStarted` error if an instance already exists with same activity ID in this namespace
         unless permitted by the specified ID conflict policy.
         """
-
     @abc.abstractmethod
     def StartNexusOperationExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartNexusOperationExecutionResponse:
         """StartNexusOperationExecution starts a new Nexus operation.
 
         Returns a `NexusOperationExecutionAlreadyStarted` error if an instance already exists with same operation ID in this
         namespace unless permitted by the specified ID conflict policy.
         """
-
     @abc.abstractmethod
     def DescribeActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse:
         """DescribeActivityExecution returns information about an activity execution.
         It can be used to:
         - Get current activity info without waiting
         - Long-poll for next state change and return new activity info
         Response can optionally include activity input or outcome (if the activity has completed).
         """
-
     @abc.abstractmethod
     def DescribeNexusOperationExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeNexusOperationExecutionResponse:
         """DescribeNexusOperationExecution returns information about a Nexus operation.
         Supported use cases include:
         - Get current operation info without waiting
         - Long-poll for next state change and return new operation info
         Response can optionally include operation input or outcome (if the operation has completed).
         """
-
     @abc.abstractmethod
     def PollActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse:
         """PollActivityExecution long-polls for an activity execution to complete and returns the
         outcome (result or failure).
         """
-
     @abc.abstractmethod
     def PollNexusOperationExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollNexusOperationExecutionResponse:
         """PollNexusOperationExecution long-polls for a Nexus operation for a given wait stage to complete and returns
         the outcome (result or failure).
         """
-
     @abc.abstractmethod
     def ListActivityExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse:
         """ListActivityExecutions is a visibility API to list activity executions in a specific namespace."""
-
     @abc.abstractmethod
     def ListNexusOperationExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListNexusOperationExecutionsResponse:
         """ListNexusOperationExecutions is a visibility API to list Nexus operations in a specific namespace."""
-
     @abc.abstractmethod
     def CountActivityExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse:
         """CountActivityExecutions is a visibility API to count activity executions in a specific namespace."""
-
     @abc.abstractmethod
     def CountNexusOperationExecutions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountNexusOperationExecutionsResponse:
         """CountNexusOperationExecutions is a visibility API to count Nexus operations in a specific namespace."""
-
     @abc.abstractmethod
     def RequestCancelActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse:
         """RequestCancelActivityExecution requests cancellation of an activity execution.
 
         Cancellation is cooperative: this call records the request, but the activity must detect and
@@ -6490,53 +2471,35 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
         language-idiomatic mechanisms (context cancellation, exceptions, abort signals).
         """
-
     @abc.abstractmethod
     def RequestCancelNexusOperationExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelNexusOperationExecutionResponse:
         """RequestCancelNexusOperationExecution requests cancellation of a Nexus operation.
 
         Requesting to cancel an operation does not automatically transition the operation to canceled status.
         The operation will only transition to canceled status if it supports cancellation and the handler
         processes the cancellation request.
         """
-
     @abc.abstractmethod
     def TerminateActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse:
         """TerminateActivityExecution terminates an existing activity execution immediately.
 
         Termination does not reach the worker and the activity code cannot react to it. A terminated activity may have a
         running attempt.
         """
-
     @abc.abstractmethod
     def DeleteActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse:
         """DeleteActivityExecution asynchronously deletes a specific activity execution (when
         ActivityExecution.run_id is provided) or the latest activity execution (when
         ActivityExecution.run_id is not provided). If the activity Execution is running, it will be
@@ -6545,18 +2508,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
         """
-
     @abc.abstractmethod
     def PauseActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PauseActivityExecutionResponse:
         """PauseActivityExecution pauses the execution of an activity specified by its ID.
         This API can be used to target a workflow activity or a standalone activity
 
@@ -6573,18 +2530,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
 
         Returns a `NotFound` error if there is no pending activity with the provided ID
         """
-
     @abc.abstractmethod
     def ResetActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityExecutionResponse:
         """ResetActivityExecution resets the execution of an activity specified by its ID.
         This API can be used to target a workflow activity or a standalone activity.
 
@@ -6596,18 +2547,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
 
         Returns a `NotFound` error if there is no pending activity with the provided ID or type.
         """
-
     @abc.abstractmethod
     def UnpauseActivityExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityExecutionResponse:
         """UnpauseActivityExecution unpauses the execution of an activity specified by its ID.
         This API can be used to target a workflow activity or a standalone activity.
 
@@ -6617,50 +2562,32 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
 
         Returns a `NotFound` error if there is no pending activity with the provided ID
         """
-
     @abc.abstractmethod
     def UpdateActivityExecutionOptions(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityExecutionOptionsResponse:
         """UpdateActivityExecutionOptions is called by the client to update the options of an activity by its ID.
         This API can be used to target a workflow activity or a standalone activity.
         """
-
     @abc.abstractmethod
     def TerminateNexusOperationExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TerminateNexusOperationExecutionResponse:
         """TerminateNexusOperationExecution terminates an existing Nexus operation immediately.
 
         Termination happens immediately and the operation handler cannot react to it. A terminated operation will have
         its outcome set to a failure with a termination reason.
         """
-
     @abc.abstractmethod
     def DeleteNexusOperationExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse,
-        collections.abc.Awaitable[
-            temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteNexusOperationExecutionResponse:
         """DeleteNexusOperationExecution asynchronously deletes a specific Nexus operation run (when
         run_id is provided) or the latest run (when run_id is not provided). If the operation
         is running, it will be terminated before deletion.
@@ -6670,6 +2597,5 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         """
 
 def add_WorkflowServiceServicer_to_server(
-    servicer: WorkflowServiceServicer,
-    server: typing.Union[grpc.Server, grpc.aio.Server],
+    servicer: WorkflowServiceServicer, server: grpc.Server
 ) -> None: ...

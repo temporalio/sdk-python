@@ -25,207 +25,24 @@ THE SOFTWARE.
 """
 
 import abc
-import collections.abc
-import sys
-import typing
 
 import google.protobuf.empty_pb2
 import grpc
-import grpc.aio
 
 import temporalio.api.testservice.v1.request_response_pb2
 
-if sys.version_info >= (3, 13):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
-_T = typing.TypeVar("_T")
-
-class _MaybeAsyncIterator(
-    collections.abc.AsyncIterator[_T],
-    collections.abc.Iterator[_T],
-    metaclass=abc.ABCMeta,
-): ...
-class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore[misc, type-arg]
-    ...
-
-GRPC_GENERATED_VERSION: str
-GRPC_VERSION: str
-_TestServiceLockTimeSkippingType = typing_extensions.TypeVar(
-    "_TestServiceLockTimeSkippingType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
-    ],
-)
-
-_TestServiceUnlockTimeSkippingType = typing_extensions.TypeVar(
-    "_TestServiceUnlockTimeSkippingType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
-    ],
-)
-
-_TestServiceSleepType = typing_extensions.TypeVar(
-    "_TestServiceSleepType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-)
-
-_TestServiceSleepUntilType = typing_extensions.TypeVar(
-    "_TestServiceSleepUntilType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-)
-
-_TestServiceUnlockTimeSkippingWithSleepType = typing_extensions.TypeVar(
-    "_TestServiceUnlockTimeSkippingWithSleepType",
-    grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-)
-
-_TestServiceGetCurrentTimeType = typing_extensions.TypeVar(
-    "_TestServiceGetCurrentTimeType",
-    grpc.UnaryUnaryMultiCallable[
-        google.protobuf.empty_pb2.Empty,
-        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        google.protobuf.empty_pb2.Empty,
-        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
-    ],
-    default=grpc.UnaryUnaryMultiCallable[
-        google.protobuf.empty_pb2.Empty,
-        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
-    ],
-)
-
-class TestServiceStub(
-    typing.Generic[
-        _TestServiceLockTimeSkippingType,
-        _TestServiceUnlockTimeSkippingType,
-        _TestServiceSleepType,
-        _TestServiceSleepUntilType,
-        _TestServiceUnlockTimeSkippingWithSleepType,
-        _TestServiceGetCurrentTimeType,
-    ]
-):
+class TestServiceStub:
     """TestService API defines an interface supported only by the Temporal Test Server.
     It provides functionality needed or supported for testing purposes only.
 
     This is an EXPERIMENTAL API.
     """
 
-    @typing.overload
-    def __init__(
-        self: TestServiceStub[
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-                temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-                temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-                temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-                temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-                temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-            ],
-            grpc.UnaryUnaryMultiCallable[
-                google.protobuf.empty_pb2.Empty,
-                temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
-            ],
-        ],
-        channel: grpc.Channel,
-    ) -> None: ...
-    @typing.overload
-    def __init__(
-        self: TestServiceStub[
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-                temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-                temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-                temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-                temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-                temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-            ],
-            grpc.aio.UnaryUnaryMultiCallable[
-                google.protobuf.empty_pb2.Empty,
-                temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
-            ],
-        ],
-        channel: grpc.aio.Channel,
-    ) -> None: ...
-
-    LockTimeSkipping: _TestServiceLockTimeSkippingType
+    def __init__(self, channel: grpc.Channel) -> None: ...
+    LockTimeSkipping: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
+        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
+    ]
     """LockTimeSkipping increments Time Locking Counter by one.
 
     If Time Locking Counter is positive, time skipping is locked (disabled).
@@ -234,8 +51,10 @@ class TestServiceStub(
 
     LockTimeSkipping and UnlockTimeSkipping calls are counted.
     """
-
-    UnlockTimeSkipping: _TestServiceUnlockTimeSkippingType
+    UnlockTimeSkipping: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
+        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
+    ]
     """UnlockTimeSkipping decrements Time Locking Counter by one.
 
     If the counter reaches 0, it unlocks time skipping and fast forwards time.
@@ -244,19 +63,25 @@ class TestServiceStub(
 
     Time Locking Counter can't be negative, unbalanced calls to UnlockTimeSkipping will lead to rpc call failure
     """
-
-    Sleep: _TestServiceSleepType
+    Sleep: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+    ]
     """This call returns only when the Test Server Time advances by the specified duration.
     This is an EXPERIMENTAL API.
     """
-
-    SleepUntil: _TestServiceSleepUntilType
+    SleepUntil: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+    ]
     """This call returns only when the Test Server Time advances to the specified timestamp.
     If the current Test Server Time is beyond the specified timestamp, returns immediately.
     This is an EXPERIMENTAL API.
     """
-
-    UnlockTimeSkippingWithSleep: _TestServiceUnlockTimeSkippingWithSleepType
+    UnlockTimeSkippingWithSleep: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+    ]
     """UnlockTimeSkippingWhileSleep decreases time locking counter by one and increases it back
     once the Test Server Time advances by the duration specified in the request.
 
@@ -267,39 +92,14 @@ class TestServiceStub(
       - 1, it will lead to fast forwarding of the time by the duration specified in the request and quick return of this rpc call.
       - 0 will lead to rpc call failure same way as an unbalanced UnlockTimeSkipping.
     """
-
-    GetCurrentTime: _TestServiceGetCurrentTimeType
+    GetCurrentTime: grpc.UnaryUnaryMultiCallable[
+        google.protobuf.empty_pb2.Empty,
+        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
+    ]
     """GetCurrentTime returns the current Temporal Test Server time
 
     This time might not be equal to {@link System#currentTimeMillis()} due to time skipping.
     """
-
-TestServiceAsyncStub: typing_extensions.TypeAlias = TestServiceStub[
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-    ],
-    grpc.aio.UnaryUnaryMultiCallable[
-        google.protobuf.empty_pb2.Empty,
-        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
-    ],
-]
 
 class TestServiceServicer(metaclass=abc.ABCMeta):
     """TestService API defines an interface supported only by the Temporal Test Server.
@@ -312,13 +112,8 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
     def LockTimeSkipping(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
-        collections.abc.Awaitable[
-            temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse:
         """LockTimeSkipping increments Time Locking Counter by one.
 
         If Time Locking Counter is positive, time skipping is locked (disabled).
@@ -327,18 +122,12 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
 
         LockTimeSkipping and UnlockTimeSkipping calls are counted.
         """
-
     @abc.abstractmethod
     def UnlockTimeSkipping(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
-        collections.abc.Awaitable[
-            temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse:
         """UnlockTimeSkipping decrements Time Locking Counter by one.
 
         If the counter reaches 0, it unlocks time skipping and fast forwards time.
@@ -347,49 +136,31 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
 
         Time Locking Counter can't be negative, unbalanced calls to UnlockTimeSkipping will lead to rpc call failure
         """
-
     @abc.abstractmethod
     def Sleep(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-        collections.abc.Awaitable[
-            temporalio.api.testservice.v1.request_response_pb2.SleepResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.testservice.v1.request_response_pb2.SleepResponse:
         """This call returns only when the Test Server Time advances by the specified duration.
         This is an EXPERIMENTAL API.
         """
-
     @abc.abstractmethod
     def SleepUntil(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-        collections.abc.Awaitable[
-            temporalio.api.testservice.v1.request_response_pb2.SleepResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.testservice.v1.request_response_pb2.SleepResponse:
         """This call returns only when the Test Server Time advances to the specified timestamp.
         If the current Test Server Time is beyond the specified timestamp, returns immediately.
         This is an EXPERIMENTAL API.
         """
-
     @abc.abstractmethod
     def UnlockTimeSkippingWithSleep(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
-        collections.abc.Awaitable[
-            temporalio.api.testservice.v1.request_response_pb2.SleepResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.testservice.v1.request_response_pb2.SleepResponse:
         """UnlockTimeSkippingWhileSleep decreases time locking counter by one and increases it back
         once the Test Server Time advances by the duration specified in the request.
 
@@ -400,23 +171,17 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
           - 1, it will lead to fast forwarding of the time by the duration specified in the request and quick return of this rpc call.
           - 0 will lead to rpc call failure same way as an unbalanced UnlockTimeSkipping.
         """
-
     @abc.abstractmethod
     def GetCurrentTime(
         self,
         request: google.protobuf.empty_pb2.Empty,
-        context: _ServicerContext,
-    ) -> typing.Union[
-        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
-        collections.abc.Awaitable[
-            temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse
-        ],
-    ]:
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse:
         """GetCurrentTime returns the current Temporal Test Server time
 
         This time might not be equal to {@link System#currentTimeMillis()} due to time skipping.
         """
 
 def add_TestServiceServicer_to_server(
-    servicer: TestServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]
+    servicer: TestServiceServicer, server: grpc.Server
 ) -> None: ...

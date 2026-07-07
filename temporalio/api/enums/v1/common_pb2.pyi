@@ -26,7 +26,7 @@ class _EncodingTypeEnumTypeWrapper(
         _EncodingType.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ENCODING_TYPE_UNSPECIFIED: _EncodingType.ValueType  # 0
     ENCODING_TYPE_PROTO3: _EncodingType.ValueType  # 1
@@ -37,7 +37,7 @@ class EncodingType(_EncodingType, metaclass=_EncodingTypeEnumTypeWrapper): ...
 ENCODING_TYPE_UNSPECIFIED: EncodingType.ValueType  # 0
 ENCODING_TYPE_PROTO3: EncodingType.ValueType  # 1
 ENCODING_TYPE_JSON: EncodingType.ValueType  # 2
-Global___EncodingType: typing_extensions.TypeAlias = EncodingType
+global___EncodingType = EncodingType
 
 class _IndexedValueType:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -48,7 +48,7 @@ class _IndexedValueTypeEnumTypeWrapper(
         _IndexedValueType.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     INDEXED_VALUE_TYPE_UNSPECIFIED: _IndexedValueType.ValueType  # 0
     INDEXED_VALUE_TYPE_TEXT: _IndexedValueType.ValueType  # 1
@@ -71,7 +71,7 @@ INDEXED_VALUE_TYPE_DOUBLE: IndexedValueType.ValueType  # 4
 INDEXED_VALUE_TYPE_BOOL: IndexedValueType.ValueType  # 5
 INDEXED_VALUE_TYPE_DATETIME: IndexedValueType.ValueType  # 6
 INDEXED_VALUE_TYPE_KEYWORD_LIST: IndexedValueType.ValueType  # 7
-Global___IndexedValueType: typing_extensions.TypeAlias = IndexedValueType
+global___IndexedValueType = IndexedValueType
 
 class _Severity:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -80,7 +80,7 @@ class _Severity:
 class _SeverityEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Severity.ValueType],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SEVERITY_UNSPECIFIED: _Severity.ValueType  # 0
     SEVERITY_HIGH: _Severity.ValueType  # 1
@@ -93,7 +93,7 @@ SEVERITY_UNSPECIFIED: Severity.ValueType  # 0
 SEVERITY_HIGH: Severity.ValueType  # 1
 SEVERITY_MEDIUM: Severity.ValueType  # 2
 SEVERITY_LOW: Severity.ValueType  # 3
-Global___Severity: typing_extensions.TypeAlias = Severity
+global___Severity = Severity
 
 class _CallbackState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -104,7 +104,7 @@ class _CallbackStateEnumTypeWrapper(
         _CallbackState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CALLBACK_STATE_UNSPECIFIED: _CallbackState.ValueType  # 0
     """Default value, unspecified state."""
@@ -138,7 +138,7 @@ CALLBACK_STATE_SUCCEEDED: CallbackState.ValueType  # 5
 """Callback has succeeded."""
 CALLBACK_STATE_BLOCKED: CallbackState.ValueType  # 6
 """Callback is blocked (eg: by circuit breaker)."""
-Global___CallbackState: typing_extensions.TypeAlias = CallbackState
+global___CallbackState = CallbackState
 
 class _PendingNexusOperationState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -149,7 +149,7 @@ class _PendingNexusOperationStateEnumTypeWrapper(
         _PendingNexusOperationState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PENDING_NEXUS_OPERATION_STATE_UNSPECIFIED: (
         _PendingNexusOperationState.ValueType
@@ -181,9 +181,7 @@ PENDING_NEXUS_OPERATION_STATE_STARTED: PendingNexusOperationState.ValueType  # 3
 """Operation was started and will complete asynchronously."""
 PENDING_NEXUS_OPERATION_STATE_BLOCKED: PendingNexusOperationState.ValueType  # 4
 """Operation is blocked (eg: by circuit breaker)."""
-Global___PendingNexusOperationState: typing_extensions.TypeAlias = (
-    PendingNexusOperationState
-)
+global___PendingNexusOperationState = PendingNexusOperationState
 
 class _NexusOperationCancellationState:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -194,7 +192,7 @@ class _NexusOperationCancellationStateEnumTypeWrapper(
         _NexusOperationCancellationState.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: (
         _NexusOperationCancellationState.ValueType
@@ -259,9 +257,7 @@ NEXUS_OPERATION_CANCELLATION_STATE_BLOCKED: (
     NexusOperationCancellationState.ValueType
 )  # 6
 """Cancellation request is blocked (eg: by circuit breaker)."""
-Global___NexusOperationCancellationState: typing_extensions.TypeAlias = (
-    NexusOperationCancellationState
-)
+global___NexusOperationCancellationState = NexusOperationCancellationState
 
 class _WorkflowRuleActionScope:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -272,7 +268,7 @@ class _WorkflowRuleActionScopeEnumTypeWrapper(
         _WorkflowRuleActionScope.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_RULE_ACTION_SCOPE_UNSPECIFIED: _WorkflowRuleActionScope.ValueType  # 0
     """Default value, unspecified scope."""
@@ -291,7 +287,7 @@ WORKFLOW_RULE_ACTION_SCOPE_WORKFLOW: WorkflowRuleActionScope.ValueType  # 1
 """The action will be applied to the entire workflow."""
 WORKFLOW_RULE_ACTION_SCOPE_ACTIVITY: WorkflowRuleActionScope.ValueType  # 2
 """The action will be applied to a specific activity."""
-Global___WorkflowRuleActionScope: typing_extensions.TypeAlias = WorkflowRuleActionScope
+global___WorkflowRuleActionScope = WorkflowRuleActionScope
 
 class _ApplicationErrorCategory:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -302,7 +298,7 @@ class _ApplicationErrorCategoryEnumTypeWrapper(
         _ApplicationErrorCategory.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     APPLICATION_ERROR_CATEGORY_UNSPECIFIED: _ApplicationErrorCategory.ValueType  # 0
     APPLICATION_ERROR_CATEGORY_BENIGN: _ApplicationErrorCategory.ValueType  # 1
@@ -315,9 +311,7 @@ class ApplicationErrorCategory(
 APPLICATION_ERROR_CATEGORY_UNSPECIFIED: ApplicationErrorCategory.ValueType  # 0
 APPLICATION_ERROR_CATEGORY_BENIGN: ApplicationErrorCategory.ValueType  # 1
 """Expected application error with little/no severity."""
-Global___ApplicationErrorCategory: typing_extensions.TypeAlias = (
-    ApplicationErrorCategory
-)
+global___ApplicationErrorCategory = ApplicationErrorCategory
 
 class _WorkerStatus:
     ValueType = typing.NewType("ValueType", builtins.int)
@@ -328,7 +322,7 @@ class _WorkerStatusEnumTypeWrapper(
         _WorkerStatus.ValueType
     ],
     builtins.type,
-):
+):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKER_STATUS_UNSPECIFIED: _WorkerStatus.ValueType  # 0
     WORKER_STATUS_RUNNING: _WorkerStatus.ValueType  # 1
@@ -344,4 +338,4 @@ WORKER_STATUS_UNSPECIFIED: WorkerStatus.ValueType  # 0
 WORKER_STATUS_RUNNING: WorkerStatus.ValueType  # 1
 WORKER_STATUS_SHUTTING_DOWN: WorkerStatus.ValueType  # 2
 WORKER_STATUS_SHUTDOWN: WorkerStatus.ValueType  # 3
-Global___WorkerStatus: typing_extensions.TypeAlias = WorkerStatus
+global___WorkerStatus = WorkerStatus

@@ -6,7 +6,6 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -22,14 +21,13 @@ import temporalio.api.enums.v1.reset_pb2
 import temporalio.api.rules.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class BatchOperationInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -44,11 +42,9 @@ class BatchOperationInfo(google.protobuf.message.Message):
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Batch operation start time"""
-
     @property
     def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Batch operation close time"""
-
     def __init__(
         self,
         *,
@@ -59,13 +55,13 @@ class BatchOperationInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "close_time", b"close_time", "start_time", b"start_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "close_time",
             b"close_time",
             "job_id",
@@ -77,9 +73,8 @@ class BatchOperationInfo(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___BatchOperationInfo: typing_extensions.TypeAlias = BatchOperationInfo
+global___BatchOperationInfo = BatchOperationInfo
 
-@typing.final
 class BatchOperationTermination(google.protobuf.message.Message):
     """BatchOperationTermination sends terminate requests to batch workflows.
     Keep the parameter in sync with temporalio.api.workflowservice.v1.TerminateWorkflowExecutionRequest.
@@ -90,12 +85,11 @@ class BatchOperationTermination(google.protobuf.message.Message):
 
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
-    identity: builtins.str
-    """The identity of the worker/client"""
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized value(s) to provide to the termination event"""
-
+    identity: builtins.str
+    """The identity of the worker/client"""
     def __init__(
         self,
         *,
@@ -103,17 +97,17 @@ class BatchOperationTermination(google.protobuf.message.Message):
         identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["details", b"details"]
+        self, field_name: typing_extensions.Literal["details", b"details"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["details", b"details", "identity", b"identity"]
+        self,
+        field_name: typing_extensions.Literal[
+            "details", b"details", "identity", b"identity"
+        ],
     ) -> None: ...
 
-Global___BatchOperationTermination: typing_extensions.TypeAlias = (
-    BatchOperationTermination
-)
+global___BatchOperationTermination = BatchOperationTermination
 
-@typing.final
 class BatchOperationSignal(google.protobuf.message.Message):
     """BatchOperationSignal sends signals to batch workflows.
     Keep the parameter in sync with temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest.
@@ -127,18 +121,16 @@ class BatchOperationSignal(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     signal: builtins.str
     """The workflow author-defined name of the signal to send to the workflow"""
-    identity: builtins.str
-    """The identity of the worker/client"""
     @property
     def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized value(s) to provide with the signal"""
-
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
         """Headers that are passed with the signal to the processing workflow.
         These can include things like auth or tracing tokens.
         """
-
+    identity: builtins.str
+    """The identity of the worker/client"""
     def __init__(
         self,
         *,
@@ -148,11 +140,12 @@ class BatchOperationSignal(google.protobuf.message.Message):
         identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["header", b"header", "input", b"input"]
+        self,
+        field_name: typing_extensions.Literal["header", b"header", "input", b"input"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "header",
             b"header",
             "identity",
@@ -164,9 +157,8 @@ class BatchOperationSignal(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___BatchOperationSignal: typing_extensions.TypeAlias = BatchOperationSignal
+global___BatchOperationSignal = BatchOperationSignal
 
-@typing.final
 class BatchOperationCancellation(google.protobuf.message.Message):
     """BatchOperationCancellation sends cancel requests to batch workflows.
     Keep the parameter in sync with temporalio.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest.
@@ -184,14 +176,11 @@ class BatchOperationCancellation(google.protobuf.message.Message):
         identity: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["identity", b"identity"]
+        self, field_name: typing_extensions.Literal["identity", b"identity"]
     ) -> None: ...
 
-Global___BatchOperationCancellation: typing_extensions.TypeAlias = (
-    BatchOperationCancellation
-)
+global___BatchOperationCancellation = BatchOperationCancellation
 
-@typing.final
 class BatchOperationDeletion(google.protobuf.message.Message):
     """BatchOperationDeletion sends deletion requests to batch workflows.
     Keep the parameter in sync with temporalio.api.workflowservice.v1.DeleteWorkflowExecutionRequest.
@@ -208,12 +197,11 @@ class BatchOperationDeletion(google.protobuf.message.Message):
         identity: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["identity", b"identity"]
+        self, field_name: typing_extensions.Literal["identity", b"identity"]
     ) -> None: ...
 
-Global___BatchOperationDeletion: typing_extensions.TypeAlias = BatchOperationDeletion
+global___BatchOperationDeletion = BatchOperationDeletion
 
-@typing.final
 class BatchOperationReset(google.protobuf.message.Message):
     """BatchOperationReset sends reset requests to batch workflows.
     Keep the parameter in sync with temporalio.api.workflowservice.v1.ResetWorkflowExecutionRequest.
@@ -228,14 +216,13 @@ class BatchOperationReset(google.protobuf.message.Message):
     POST_RESET_OPERATIONS_FIELD_NUMBER: builtins.int
     identity: builtins.str
     """The identity of the worker/client."""
+    @property
+    def options(self) -> temporalio.api.common.v1.message_pb2.ResetOptions:
+        """Describes what to reset to and how. If set, `reset_type` and `reset_reapply_type` are ignored."""
     reset_type: temporalio.api.enums.v1.reset_pb2.ResetType.ValueType
     """Deprecated. Use `options`."""
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
     """Deprecated. Use `options`."""
-    @property
-    def options(self) -> temporalio.api.common.v1.message_pb2.ResetOptions:
-        """Describes what to reset to and how. If set, `reset_type` and `reset_reapply_type` are ignored."""
-
     @property
     def post_reset_operations(
         self,
@@ -246,7 +233,6 @@ class BatchOperationReset(google.protobuf.message.Message):
         to the *new* run of the workflow execution in the order they are provided.
         All operations are applied to the workflow before the first new workflow task is generated
         """
-
     def __init__(
         self,
         *,
@@ -260,11 +246,11 @@ class BatchOperationReset(google.protobuf.message.Message):
         | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["options", b"options"]
+        self, field_name: typing_extensions.Literal["options", b"options"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "identity",
             b"identity",
             "options",
@@ -278,9 +264,8 @@ class BatchOperationReset(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___BatchOperationReset: typing_extensions.TypeAlias = BatchOperationReset
+global___BatchOperationReset = BatchOperationReset
 
-@typing.final
 class BatchOperationUpdateWorkflowExecutionOptions(google.protobuf.message.Message):
     """BatchOperationUpdateWorkflowExecutionOptions sends UpdateWorkflowExecutionOptions requests to batch workflows.
     Keep the parameters in sync with temporalio.api.workflowservice.v1.UpdateWorkflowExecutionOptionsRequest.
@@ -298,13 +283,11 @@ class BatchOperationUpdateWorkflowExecutionOptions(google.protobuf.message.Messa
         self,
     ) -> temporalio.api.workflow.v1.message_pb2.WorkflowExecutionOptions:
         """Update Workflow options that were originally specified via StartWorkflowExecution. Partial updates are accepted and controlled by update_mask."""
-
     @property
     def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
         """Controls which fields from `workflow_execution_options` will be applied.
         To unset a field, set it to null and use the update mask to indicate that it should be mutated.
         """
-
     def __init__(
         self,
         *,
@@ -315,7 +298,7 @@ class BatchOperationUpdateWorkflowExecutionOptions(google.protobuf.message.Messa
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "update_mask",
             b"update_mask",
             "workflow_execution_options",
@@ -324,7 +307,7 @@ class BatchOperationUpdateWorkflowExecutionOptions(google.protobuf.message.Messa
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "identity",
             b"identity",
             "update_mask",
@@ -334,11 +317,10 @@ class BatchOperationUpdateWorkflowExecutionOptions(google.protobuf.message.Messa
         ],
     ) -> None: ...
 
-Global___BatchOperationUpdateWorkflowExecutionOptions: typing_extensions.TypeAlias = (
+global___BatchOperationUpdateWorkflowExecutionOptions = (
     BatchOperationUpdateWorkflowExecutionOptions
 )
 
-@typing.final
 class BatchOperationUnpauseActivities(google.protobuf.message.Message):
     """BatchOperationUnpauseActivities sends unpause requests to batch workflows."""
 
@@ -363,7 +345,6 @@ class BatchOperationUnpauseActivities(google.protobuf.message.Message):
         """If set, the activity will start at a random time within the specified jitter
         duration, introducing variability to the start time.
         """
-
     def __init__(
         self,
         *,
@@ -376,7 +357,7 @@ class BatchOperationUnpauseActivities(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity",
             b"activity",
             "jitter",
@@ -389,7 +370,7 @@ class BatchOperationUnpauseActivities(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity",
             b"activity",
             "identity",
@@ -407,14 +388,11 @@ class BatchOperationUnpauseActivities(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["activity", b"activity"]
-    ) -> typing.Literal["type", "match_all"] | None: ...
+        self, oneof_group: typing_extensions.Literal["activity", b"activity"]
+    ) -> typing_extensions.Literal["type", "match_all"] | None: ...
 
-Global___BatchOperationUnpauseActivities: typing_extensions.TypeAlias = (
-    BatchOperationUnpauseActivities
-)
+global___BatchOperationUnpauseActivities = BatchOperationUnpauseActivities
 
-@typing.final
 class BatchOperationTriggerWorkflowRule(google.protobuf.message.Message):
     """BatchOperationTriggerWorkflowRule sends TriggerWorkflowRule requests to batch workflows."""
 
@@ -430,7 +408,6 @@ class BatchOperationTriggerWorkflowRule(google.protobuf.message.Message):
     @property
     def spec(self) -> temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec:
         """Rule specification to be applied to the workflow without creating a new rule."""
-
     def __init__(
         self,
         *,
@@ -439,23 +416,23 @@ class BatchOperationTriggerWorkflowRule(google.protobuf.message.Message):
         spec: temporalio.api.rules.v1.message_pb2.WorkflowRuleSpec | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["id", b"id", "rule", b"rule", "spec", b"spec"]
+        self,
+        field_name: typing_extensions.Literal[
+            "id", b"id", "rule", b"rule", "spec", b"spec"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "id", b"id", "identity", b"identity", "rule", b"rule", "spec", b"spec"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["rule", b"rule"]
-    ) -> typing.Literal["id", "spec"] | None: ...
+        self, oneof_group: typing_extensions.Literal["rule", b"rule"]
+    ) -> typing_extensions.Literal["id", "spec"] | None: ...
 
-Global___BatchOperationTriggerWorkflowRule: typing_extensions.TypeAlias = (
-    BatchOperationTriggerWorkflowRule
-)
+global___BatchOperationTriggerWorkflowRule = BatchOperationTriggerWorkflowRule
 
-@typing.final
 class BatchOperationResetActivities(google.protobuf.message.Message):
     """BatchOperationResetActivities sends activity reset requests in a batch.
     NOTE: keep in sync with temporalio.api.workflowservice.v1.ResetActivityRequest
@@ -481,17 +458,16 @@ class BatchOperationResetActivities(google.protobuf.message.Message):
     """Setting this flag will also reset the heartbeat details."""
     keep_paused: builtins.bool
     """If activity is paused, it will remain paused after reset"""
-    restore_original_options: builtins.bool
-    """If set, the activity options will be restored to the defaults.
-    Default options are then options activity was created with.
-    They are part of the first ActivityTaskScheduled event.
-    """
     @property
     def jitter(self) -> google.protobuf.duration_pb2.Duration:
         """If set, the activity will start at a random time within the specified jitter
         duration, introducing variability to the start time.
         """
-
+    restore_original_options: builtins.bool
+    """If set, the activity options will be restored to the defaults.
+    Default options are then options activity was created with.
+    They are part of the first ActivityTaskScheduled event.
+    """
     def __init__(
         self,
         *,
@@ -506,7 +482,7 @@ class BatchOperationResetActivities(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity",
             b"activity",
             "jitter",
@@ -519,7 +495,7 @@ class BatchOperationResetActivities(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity",
             b"activity",
             "identity",
@@ -541,14 +517,11 @@ class BatchOperationResetActivities(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["activity", b"activity"]
-    ) -> typing.Literal["type", "match_all"] | None: ...
+        self, oneof_group: typing_extensions.Literal["activity", b"activity"]
+    ) -> typing_extensions.Literal["type", "match_all"] | None: ...
 
-Global___BatchOperationResetActivities: typing_extensions.TypeAlias = (
-    BatchOperationResetActivities
-)
+global___BatchOperationResetActivities = BatchOperationResetActivities
 
-@typing.final
 class BatchOperationUpdateActivityOptions(google.protobuf.message.Message):
     """BatchOperationUpdateActivityOptions sends an update-activity-options requests in a batch.
     NOTE: keep in sync with temporalio.api.workflowservice.v1.UpdateActivityRequest
@@ -566,6 +539,14 @@ class BatchOperationUpdateActivityOptions(google.protobuf.message.Message):
     """The identity of the worker/client."""
     type: builtins.str
     match_all: builtins.bool
+    @property
+    def activity_options(
+        self,
+    ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
+        """Update Activity options. Partial updates are accepted and controlled by update_mask."""
+    @property
+    def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
+        """Controls which fields from `activity_options` will be applied"""
     restore_original: builtins.bool
     """If set, the activity options will be restored to the default.
     Default options are then options activity was created with.
@@ -573,16 +554,6 @@ class BatchOperationUpdateActivityOptions(google.protobuf.message.Message):
     This flag cannot be combined with any other option; if you supply
     restore_original together with other options, the request will be rejected.
     """
-    @property
-    def activity_options(
-        self,
-    ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
-        """Update Activity options. Partial updates are accepted and controlled by update_mask."""
-
-    @property
-    def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
-        """Controls which fields from `activity_options` will be applied"""
-
     def __init__(
         self,
         *,
@@ -596,7 +567,7 @@ class BatchOperationUpdateActivityOptions(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity",
             b"activity",
             "activity_options",
@@ -611,7 +582,7 @@ class BatchOperationUpdateActivityOptions(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity",
             b"activity",
             "activity_options",
@@ -629,9 +600,7 @@ class BatchOperationUpdateActivityOptions(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["activity", b"activity"]
-    ) -> typing.Literal["type", "match_all"] | None: ...
+        self, oneof_group: typing_extensions.Literal["activity", b"activity"]
+    ) -> typing_extensions.Literal["type", "match_all"] | None: ...
 
-Global___BatchOperationUpdateActivityOptions: typing_extensions.TypeAlias = (
-    BatchOperationUpdateActivityOptions
-)
+global___BatchOperationUpdateActivityOptions = BatchOperationUpdateActivityOptions

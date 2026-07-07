@@ -6,25 +6,22 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
-import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-@typing.final
 class WorkflowRuleAction(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class ActionActivityPause(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -34,35 +31,33 @@ class WorkflowRuleAction(google.protobuf.message.Message):
 
     ACTIVITY_PAUSE_FIELD_NUMBER: builtins.int
     @property
-    def activity_pause(self) -> Global___WorkflowRuleAction.ActionActivityPause: ...
+    def activity_pause(self) -> global___WorkflowRuleAction.ActionActivityPause: ...
     def __init__(
         self,
         *,
-        activity_pause: Global___WorkflowRuleAction.ActionActivityPause | None = ...,
+        activity_pause: global___WorkflowRuleAction.ActionActivityPause | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity_pause", b"activity_pause", "variant", b"variant"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity_pause", b"activity_pause", "variant", b"variant"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["variant", b"variant"]
-    ) -> typing.Literal["activity_pause"] | None: ...
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> typing_extensions.Literal["activity_pause"] | None: ...
 
-Global___WorkflowRuleAction: typing_extensions.TypeAlias = WorkflowRuleAction
+global___WorkflowRuleAction = WorkflowRuleAction
 
-@typing.final
 class WorkflowRuleSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    @typing.final
     class ActivityStartingTrigger(google.protobuf.message.Message):
         """Activity trigger will be triggered when an activity is about to start."""
 
@@ -91,7 +86,7 @@ class WorkflowRuleSpec(google.protobuf.message.Message):
             predicate: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing.Literal["predicate", b"predicate"]
+            self, field_name: typing_extensions.Literal["predicate", b"predicate"]
         ) -> None: ...
 
     ID_FIELD_NUMBER: builtins.int
@@ -103,6 +98,8 @@ class WorkflowRuleSpec(google.protobuf.message.Message):
     """The id of the new workflow rule. Must be unique within the namespace.
     Can be set by the user, and can have business meaning.
     """
+    @property
+    def activity_start(self) -> global___WorkflowRuleSpec.ActivityStartingTrigger: ...
     visibility_query: builtins.str
     """Restricted Visibility query.
     This query is used to filter workflows in this namespace to which this rule should apply.
@@ -114,33 +111,29 @@ class WorkflowRuleSpec(google.protobuf.message.Message):
     - ExecutionStatus
     """
     @property
-    def activity_start(self) -> Global___WorkflowRuleSpec.ActivityStartingTrigger: ...
-    @property
     def actions(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        Global___WorkflowRuleAction
+        global___WorkflowRuleAction
     ]:
         """WorkflowRuleAction to be taken when the rule is triggered and predicate is matched."""
-
     @property
     def expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Expiration time of the rule. After this time, the rule will be deleted.
         Can be empty if the rule should never expire.
         """
-
     def __init__(
         self,
         *,
         id: builtins.str = ...,
-        activity_start: Global___WorkflowRuleSpec.ActivityStartingTrigger | None = ...,
+        activity_start: global___WorkflowRuleSpec.ActivityStartingTrigger | None = ...,
         visibility_query: builtins.str = ...,
-        actions: collections.abc.Iterable[Global___WorkflowRuleAction] | None = ...,
+        actions: collections.abc.Iterable[global___WorkflowRuleAction] | None = ...,
         expiration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "activity_start",
             b"activity_start",
             "expiration_time",
@@ -151,7 +144,7 @@ class WorkflowRuleSpec(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "actions",
             b"actions",
             "activity_start",
@@ -167,12 +160,11 @@ class WorkflowRuleSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing.Literal["trigger", b"trigger"]
-    ) -> typing.Literal["activity_start"] | None: ...
+        self, oneof_group: typing_extensions.Literal["trigger", b"trigger"]
+    ) -> typing_extensions.Literal["activity_start"] | None: ...
 
-Global___WorkflowRuleSpec: typing_extensions.TypeAlias = WorkflowRuleSpec
+global___WorkflowRuleSpec = WorkflowRuleSpec
 
-@typing.final
 class WorkflowRule(google.protobuf.message.Message):
     """WorkflowRule describes a rule that can be applied to any workflow in this namespace."""
 
@@ -182,6 +174,12 @@ class WorkflowRule(google.protobuf.message.Message):
     SPEC_FIELD_NUMBER: builtins.int
     CREATED_BY_IDENTITY_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
+    @property
+    def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Rule creation time."""
+    @property
+    def spec(self) -> global___WorkflowRuleSpec:
+        """Rule specification"""
     created_by_identity: builtins.str
     """Identity of the actor that created the rule
     (-- api-linter: core::0140::prepositions=disabled
@@ -191,28 +189,23 @@ class WorkflowRule(google.protobuf.message.Message):
     """
     description: builtins.str
     """Rule description."""
-    @property
-    def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Rule creation time."""
-
-    @property
-    def spec(self) -> Global___WorkflowRuleSpec:
-        """Rule specification"""
-
     def __init__(
         self,
         *,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        spec: Global___WorkflowRuleSpec | None = ...,
+        spec: global___WorkflowRuleSpec | None = ...,
         created_by_identity: builtins.str = ...,
         description: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["create_time", b"create_time", "spec", b"spec"]
+        self,
+        field_name: typing_extensions.Literal[
+            "create_time", b"create_time", "spec", b"spec"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing.Literal[
+        field_name: typing_extensions.Literal[
             "create_time",
             b"create_time",
             "created_by_identity",
@@ -224,4 +217,4 @@ class WorkflowRule(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-Global___WorkflowRule: typing_extensions.TypeAlias = WorkflowRule
+global___WorkflowRule = WorkflowRule
