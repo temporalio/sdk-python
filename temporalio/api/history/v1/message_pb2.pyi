@@ -20,6 +20,7 @@ import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
@@ -78,7 +79,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     EAGER_EXECUTION_ACCEPTED_FIELD_NUMBER: builtins.int
     DECLINED_TARGET_VERSION_UPGRADE_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
-    INITIAL_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_STATE_PROPAGATION_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     parent_workflow_namespace: builtins.str
@@ -305,7 +306,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     @property
     def time_skipping_config(
         self,
-    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
         """Initial time-skipping configuration for this workflow execution, recorded at start time.
         This may have been set explicitly via the start workflow request, or propagated from a
         parent/previous execution.
@@ -314,9 +315,11 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         will be reflected in the WorkflowExecutionOptionsUpdatedEvent.
         """
     @property
-    def initial_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
-        """The time skipped by the previous execution that started this workflow.
-        It can happen in cases of child workflows and continue-as-new workflows.
+    def time_skipping_state_propagation(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation:
+        """The time-skipping state propagated from a previous run of this workflow. This can be nil
+        if no time skipping has occurred or there is no previous run.
         """
     def __init__(
         self,
@@ -374,9 +377,10 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         eager_execution_accepted: builtins.bool = ...,
         declined_target_version_upgrade: global___DeclinedTargetVersionUpgrade
         | None = ...,
-        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
         | None = ...,
-        initial_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        time_skipping_state_propagation: temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -393,8 +397,6 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"inherited_auto_upgrade_info",
             "inherited_pinned_version",
             b"inherited_pinned_version",
-            "initial_skipped_duration",
-            b"initial_skipped_duration",
             "input",
             b"input",
             "last_completion_result",
@@ -419,6 +421,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "versioning_override",
             b"versioning_override",
             "workflow_execution_expiration_time",
@@ -464,8 +468,6 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"inherited_build_id",
             "inherited_pinned_version",
             b"inherited_pinned_version",
-            "initial_skipped_duration",
-            b"initial_skipped_duration",
             "initiator",
             b"initiator",
             "input",
@@ -504,6 +506,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "versioning_override",
             b"versioning_override",
             "workflow_execution_expiration_time",
@@ -2643,7 +2647,7 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     INHERIT_BUILD_ID_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
-    INITIAL_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_STATE_PROPAGATION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the child workflow.
     SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
@@ -2700,11 +2704,15 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     @property
     def time_skipping_config(
         self,
-    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
         """The propagated time-skipping configuration for the child workflow."""
     @property
-    def initial_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
-        """Propagate the duration skipped to the child workflow."""
+    def time_skipping_state_propagation(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation:
+        """The time-skipping state propagated from the parent workflow. This can be nil if no time skipping
+        has occurred or there is no previous run.
+        """
     def __init__(
         self,
         *,
@@ -2729,17 +2737,16 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
         | None = ...,
         inherit_build_id: builtins.bool = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
-        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
         | None = ...,
-        initial_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        time_skipping_state_propagation: temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "header",
             b"header",
-            "initial_skipped_duration",
-            b"initial_skipped_duration",
             "input",
             b"input",
             "memo",
@@ -2754,6 +2761,8 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -2775,8 +2784,6 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
             b"header",
             "inherit_build_id",
             b"inherit_build_id",
-            "initial_skipped_duration",
-            b"initial_skipped_duration",
             "input",
             b"input",
             "memo",
@@ -2797,6 +2804,8 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",
@@ -3368,6 +3377,7 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     IDENTITY_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_UPDATED_FIELD_NUMBER: builtins.int
     WORKFLOW_UPDATE_OPTIONS_FIELD_NUMBER: builtins.int
     @property
     def versioning_override(
@@ -3399,8 +3409,12 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     @property
     def time_skipping_config(
         self,
-    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
-        """If set, the time-skipping configuration was changed. Contains the full updated configuration."""
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
+        """TimeSkippingConfig override upserted in this event. Represents the full config."""
+    time_skipping_config_updated: builtins.bool
+    """Indicates the time skipping config was updated by the recent call to update
+    workflow execution options.
+    """
     @property
     def workflow_update_options(
         self,
@@ -3421,8 +3435,9 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
         | None = ...,
         identity: builtins.str = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
-        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
         | None = ...,
+        time_skipping_config_updated: builtins.bool = ...,
         workflow_update_options: collections.abc.Iterable[
             global___WorkflowExecutionOptionsUpdatedEventAttributes.WorkflowUpdateOptionsUpdate
         ]
@@ -3452,6 +3467,8 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
             b"priority",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_config_updated",
+            b"time_skipping_config_updated",
             "unset_versioning_override",
             b"unset_versioning_override",
             "versioning_override",
@@ -3820,20 +3837,20 @@ class WorkflowExecutionTimeSkippingTransitionedEventAttributes(
     google.protobuf.message.Message
 ):
     """Attributes for an event indicating that time skipping state changed for a workflow execution,
-    either time was advanced or time skipping was disabled automatically due to a bound being reached.
+    either time was advanced or time skipping was disabled automatically due to the fast_forward completing.
     The worker_may_ignore field in HistoryEvent should always be set true for this event.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TARGET_TIME_FIELD_NUMBER: builtins.int
-    DISABLED_AFTER_BOUND_FIELD_NUMBER: builtins.int
+    DISABLED_AFTER_FAST_FORWARD_FIELD_NUMBER: builtins.int
     WALL_CLOCK_TIME_FIELD_NUMBER: builtins.int
     @property
     def target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The virtual time after time skipping was applied."""
-    disabled_after_bound: builtins.bool
-    """when true, time skipping was disabled automatically due to a bound being reached.
+        """The virtual time point that time skipping advanced to."""
+    disabled_after_fast_forward: builtins.bool
+    """When true, time skipping has been disabled automatically due to a call to fast_forward completing.
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: "after" is used to indicate temporal ordering. --)
     """
@@ -3844,7 +3861,7 @@ class WorkflowExecutionTimeSkippingTransitionedEventAttributes(
         self,
         *,
         target_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        disabled_after_bound: builtins.bool = ...,
+        disabled_after_fast_forward: builtins.bool = ...,
         wall_clock_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
@@ -3856,8 +3873,8 @@ class WorkflowExecutionTimeSkippingTransitionedEventAttributes(
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "disabled_after_bound",
-            b"disabled_after_bound",
+            "disabled_after_fast_forward",
+            b"disabled_after_fast_forward",
             "target_time",
             b"target_time",
             "wall_clock_time",
@@ -4358,6 +4375,7 @@ class HistoryEvent(google.protobuf.message.Message):
     USER_METADATA_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
     PRINCIPAL_FIELD_NUMBER: builtins.int
+    EVENT_GROUP_MARKERS_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_STARTED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -4468,6 +4486,13 @@ class HistoryEvent(google.protobuf.message.Message):
     @property
     def principal(self) -> temporalio.api.common.v1.message_pb2.Principal:
         """Server-computed authenticated caller identity associated with this event."""
+    @property
+    def event_group_markers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+    ]:
+        """Event group markers attached to this event."""
     @property
     def workflow_execution_started_event_attributes(
         self,
@@ -4720,6 +4745,10 @@ class HistoryEvent(google.protobuf.message.Message):
         links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
         principal: temporalio.api.common.v1.message_pb2.Principal | None = ...,
+        event_group_markers: collections.abc.Iterable[
+            temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+        ]
+        | None = ...,
         workflow_execution_started_event_attributes: global___WorkflowExecutionStartedEventAttributes
         | None = ...,
         workflow_execution_completed_event_attributes: global___WorkflowExecutionCompletedEventAttributes
@@ -5006,6 +5035,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"child_workflow_execution_terminated_event_attributes",
             "child_workflow_execution_timed_out_event_attributes",
             b"child_workflow_execution_timed_out_event_attributes",
+            "event_group_markers",
+            b"event_group_markers",
             "event_id",
             b"event_id",
             "event_time",
