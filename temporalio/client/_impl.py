@@ -200,6 +200,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
+        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
+        if nexus_ctx is not None:
+            nexus_ctx._add_start_workflow_response_link(handle)
         return handle
 
     async def _build_start_workflow_execution_request(
@@ -214,33 +217,37 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if input.request_id:
             req.request_id = input.request_id
 
-        # Server currently only supports workflow_event and batch_job
-        # link types. This filter should be removed or adapted as
-        # server-side support comes online.
-        # See https://github.com/temporalio/temporal/issues/10345
-        links = [
-            link
-            for link in input.links
-            if link.HasField("workflow_event") or link.HasField("batch_job")
-        ]
-
         req.completion_callbacks.extend(
             temporalio.api.common.v1.Callback(
                 nexus=temporalio.api.common.v1.Callback.Nexus(
                     url=callback.url,
                     header=callback.headers,
                 ),
-                links=links,
+                links=input.links,
             )
             for callback in input.callbacks
         )
         # Links are duplicated on request for compatibility with older server versions.
-        req.links.extend(links)
+        req.links.extend(input.links)
 
-        if temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
+        if nexus_ctx is not None:
+            # This start was issued from inside a Nexus operation handler. If the workflow ID
+            # conflict policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING and a conflict is
+            # detected, attach this request's request ID, completion callbacks, and links to
+            # the existing run. The TemporalNexusClient and WorkflowRunOperationContext are
+            # responsible for setting the callbacks correctly, so it is safe to enable all
+            # on-conflict options whenever we are invoked from an operation handler.
             req.on_conflict_options.attach_request_id = True
             req.on_conflict_options.attach_completion_callbacks = True
             req.on_conflict_options.attach_links = True
+            # The nexus-backing workflow already carries its inbound links via input.links
+            # (start_workflow forwards them as links=...). A plain start_workflow issued from
+            # inside a Nexus operation handler must forward the inbound Nexus task links
+            # explicitly so the started callee's WorkflowExecutionStarted event links back to
+            # the caller.
+            if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+                req.links.extend(nexus_ctx._get_request_links())
 
         return req
 
@@ -267,6 +274,15 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 await data_converter.encode(input.start_signal_args)
             )
         await self._populate_start_workflow_execution_request(req, input)
+        # If this signal-with-start is issued from inside a Nexus operation handler (but not the
+        # nexus-backing workflow), forward the inbound Nexus task links so both the callee's
+        # WorkflowExecutionStarted and WorkflowExecutionSignaled events link back to the caller.
+        if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+            nexus_ctx = (
+                temporalio.nexus._operation_context._try_start_operation_context()
+            )
+            if nexus_ctx is not None:
+                req.links.extend(nexus_ctx._get_request_links())
         return req
 
     async def _build_update_with_start_start_workflow_execution_request(
@@ -500,9 +516,18 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.input.payloads.extend(await data_converter.encode(input.args))
         if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.header.fields)
-        await self._client.workflow_service.signal_workflow_execution(
+        # If this signal is issued from inside a Nexus operation handler, forward the inbound
+        # Nexus task links so the WorkflowExecutionSignaled event links back to the caller.
+        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
+        if nexus_ctx is not None:
+            req.links.extend(nexus_ctx._get_request_links())
+        resp = await self._client.workflow_service.signal_workflow_execution(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
+        # Server >= 1.31 with EnableCHASMSignalBacklinks returns a response link pointing at the
+        # signal event; older servers leave it unset. Propagate when present.
+        if nexus_ctx is not None and resp.HasField("link"):
+            nexus_ctx._add_response_link(resp.link)
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
         data_converter = self._client.data_converter._with_contexts(

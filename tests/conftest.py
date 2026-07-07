@@ -30,7 +30,7 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
         f"Expected {temporalio.__file__} to be in {sys.prefix}"
     )
 
-# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x lib
+# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x/6.x/7.x lib
 import google.protobuf
 
 protobuf_version = google.protobuf.__version__
@@ -43,7 +43,8 @@ else:
         protobuf_version.startswith("4.")
         or protobuf_version.startswith("5.")
         or protobuf_version.startswith("6.")
-    ), f"Expected protobuf 4.x/5.x/6.x, got {protobuf_version}"
+        or protobuf_version.startswith("7.")
+    ), f"Expected protobuf 4.x/5.x/6.x/7.x, got {protobuf_version}"
 
 
 def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
@@ -132,6 +133,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "history.enableTransitionHistory=true",
                 "--dynamic-config-value",
                 "history.enableChasmCallbacks=true",
+                "--dynamic-config-value",
+                "history.enableCHASMSignalBacklinks=true",
                 "--dynamic-config-value",
                 "nexusoperation.enableStandalone=true",
                 "--dynamic-config-value",

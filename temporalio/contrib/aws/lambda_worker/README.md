@@ -48,6 +48,24 @@ pre-populated with Lambda-appropriate defaults. Override any field directly in
 the callback. The `task_queue` key in `worker_config` is pre-populated from the
 `TEMPORAL_TASK_QUEUE` environment variable if set.
 
+### Sync, async, and async-generator configure
+
+The configure callback runs **once per invocation, inside that invocation's
+event loop**, before the client connects. It may be:
+
+- a plain function `def configure(config) -> None`;
+- an `async def configure(config) -> None` coroutine — awaited for setup (pair
+  with `shutdown_hooks` for teardown);
+- an `async def configure(config): ...; yield; ...` async generator — statements
+  before the single `yield` run before the client connects, the worker runs
+  while the generator is suspended at the `yield`, and statements after the
+  `yield` run as teardown once the worker has stopped.
+
+The callback runs per invocation (rather than once at process start) because
+event-loop-bound resources cannot be created before an event loop exists and
+cannot be shared across invocations — each invocation runs under a fresh
+`asyncio.run` loop.
+
 ## Lambda-tuned worker defaults
 
 The package applies conservative concurrency limits suited to Lambda's resource

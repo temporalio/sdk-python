@@ -283,7 +283,9 @@ class DefaultFailureConverter(FailureConverter):
             failure.metadata
             and failure.metadata.get("type") == _TEMPORAL_FAILURE_PROTO_TYPE
         ):
-            google.protobuf.json_format.ParseDict(failure.details, temporal_failure)
+            google.protobuf.json_format.ParseDict(
+                dict(failure.details or {}), temporal_failure
+            )
         else:
             temporal_failure.application_failure_info.SetInParent()
             temporal_failure.application_failure_info.type = "NexusFailure"

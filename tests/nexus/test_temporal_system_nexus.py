@@ -15,6 +15,10 @@ import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice
 import temporalio.converter
 import temporalio.nexus.system as nexus_system
 from temporalio import workflow
+from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import (
+    WorkflowActivationCompletion,
+)
 from temporalio.client import Client
 from temporalio.converter import ExternalStorage, PayloadCodec
 from temporalio.testing import WorkflowEnvironment
@@ -139,6 +143,89 @@ def _assert_start_nexus_operation_interceptor_trace() -> None:
     assert request.workflow_type.name == "test-workflow"
 
 
+class _MarkingPayloadVisitor:
+    def __init__(self) -> None:
+        self.visited_payload_count = 0
+        self.system_envelope_count = 0
+
+    async def visit_payload(self, payload: temporalio.api.common.v1.Payload) -> None:
+        self.visited_payload_count += 1
+        payload.metadata["visited"] = b"true"
+
+    async def visit_payloads(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> None:
+        for payload in payloads:
+            await self.visit_payload(payload)
+
+    async def visit_system_nexus_envelope(
+        self, payload: temporalio.api.common.v1.Payload
+    ) -> None:
+        _ = payload
+        self.system_envelope_count += 1
+
+
+def _new_schedule_nexus_completion(
+    endpoint: str, payload: temporalio.api.common.v1.Payload
+) -> WorkflowActivationCompletion:
+    completion = WorkflowActivationCompletion()
+    command = completion.successful.commands.add()
+    schedule = command.schedule_nexus_operation
+    schedule.seq = 1
+    schedule.endpoint = endpoint
+    schedule.service = "not-a-registered-system-service"
+    schedule.operation = "NotARegisteredSystemOperation"
+    schedule.input.CopyFrom(payload)
+    return completion
+
+
+def _new_system_nexus_request_payload() -> temporalio.api.common.v1.Payload:
+    nested_payload = temporalio.converter.PayloadConverter.default.to_payload(
+        "workflow-input"
+    )
+    assert nested_payload is not None
+    request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest()
+    request.input.payloads.add().CopyFrom(nested_payload)
+    payload = nexus_system.get_payload_converter().to_payload(request)
+    assert payload is not None
+    return payload
+
+
+async def test_schedule_system_nexus_endpoint_ignores_operation_registry() -> None:
+    completion = _new_schedule_nexus_completion(
+        nexus_system.TEMPORAL_SYSTEM_ENDPOINT,
+        _new_system_nexus_request_payload(),
+    )
+    visitor = _MarkingPayloadVisitor()
+
+    await PayloadVisitor().visit(visitor, completion)
+
+    schedule = completion.successful.commands[0].schedule_nexus_operation
+    decoded = nexus_system.get_payload_converter().from_payload(schedule.input)
+    assert isinstance(
+        decoded, workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
+    )
+    assert decoded.input.payloads[0].metadata["visited"] == b"true"
+    assert "visited" not in schedule.input.metadata
+    assert visitor.visited_payload_count == 1
+    assert visitor.system_envelope_count == 1
+
+
+async def test_schedule_non_system_nexus_visits_input_as_regular_payload() -> None:
+    completion = _new_schedule_nexus_completion(
+        "not-the-system-endpoint",
+        _new_system_nexus_request_payload(),
+    )
+    visitor = _MarkingPayloadVisitor()
+
+    await PayloadVisitor().visit(visitor, completion)
+
+    schedule = completion.successful.commands[0].schedule_nexus_operation
+    assert schedule.input.metadata["visited"] == b"true"
+    assert visitor.visited_payload_count == 1
+    assert visitor.system_envelope_count == 0
+
+
 def _build_proto_sample(message_type: type[Message]) -> Message:
     message = message_type()
     _populate_proto_sample(message)
@@ -147,12 +234,13 @@ def _build_proto_sample(message_type: type[Message]) -> Message:
 
 def _populate_proto_sample(message: Message, *, path: str = "value") -> None:
     seen_oneofs: set[str] = set()
-    for field in message.DESCRIPTOR.fields:
+    for raw_field in message.DESCRIPTOR.fields:
+        field = cast(FieldDescriptor, raw_field)
         if field.containing_oneof is not None:
             if field.containing_oneof.name in seen_oneofs:
                 continue
             seen_oneofs.add(field.containing_oneof.name)
-        if field.label == FieldDescriptor.LABEL_REPEATED:
+        if _field_is_repeated(field):
             if (
                 field.message_type is not None
                 and field.message_type.GetOptions().map_entry
@@ -186,8 +274,10 @@ def _populate_proto_map_entry(
     *,
     path: str,
 ) -> None:
-    key_field = field.message_type.fields_by_name["key"]
-    value_field = field.message_type.fields_by_name["value"]
+    message_type = field.message_type
+    assert message_type is not None
+    key_field = message_type.fields_by_name["key"]
+    value_field = message_type.fields_by_name["value"]
     key = _proto_scalar_sample(key_field, path=f"{path}.{field.name}.key")
     container = getattr(message, field.name)
     if value_field.cpp_type == FieldDescriptor.CPPTYPE_MESSAGE:
@@ -222,11 +312,23 @@ def _proto_scalar_sample(field: FieldDescriptor, *, path: str) -> Any:
     ):
         return 1.5
     if field.cpp_type == FieldDescriptor.CPPTYPE_ENUM:
-        for enum_value in field.enum_type.values:
+        enum_type = field.enum_type
+        assert enum_type is not None
+        for enum_value in enum_type.values:
             if enum_value.number != 0:
                 return enum_value.number
-        return field.enum_type.values[0].number
+        return enum_type.values[0].number
     raise TypeError(f"Unhandled proto scalar sample at {path}: {field!r}")
+
+
+def _field_is_repeated(field: FieldDescriptor) -> bool:
+    return bool(
+        getattr(
+            field,
+            "is_repeated",
+            getattr(field, "label") == FieldDescriptor.LABEL_REPEATED,
+        )
+    )
 
 
 @pytest.mark.parametrize(

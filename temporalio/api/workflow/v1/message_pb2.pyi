@@ -1886,17 +1886,26 @@ class WorkflowExecutionOptions(google.protobuf.message.Message):
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """If set, overrides the workflow's priority sent by the SDK."""
     @property
-    def time_skipping_config(self) -> global___TimeSkippingConfig:
-        """Time-skipping configuration for this workflow execution.
-        If not set, the time-skipping configuration is not updated by this request;
-        the existing configuration is preserved.
+    def time_skipping_config(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
+        """The time-skipping configuration for this workflow execution.
+        When `fast_forward` is set, time will be fast-forwarded to a future point relative
+        to the current workflow timestamp. Each call takes effect, even if
+        `fast_forward` is set to the same duration, since the target time is recalculated
+        from the current timestamp on every call.
+
+        This field must be updated as a whole; updating individual sub-fields is not supported.
+        When setting the update mask in `UpdateWorkflowExecutionOptionsRequest`,
+        `BatchOperationUpdateWorkflowExecutionOptions`, etc., use a mask that covers the entire field.
         """
     def __init__(
         self,
         *,
         versioning_override: global___VersioningOverride | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
-        time_skipping_config: global___TimeSkippingConfig | None = ...,
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1922,81 +1931,6 @@ class WorkflowExecutionOptions(google.protobuf.message.Message):
     ) -> None: ...
 
 global___WorkflowExecutionOptions = WorkflowExecutionOptions
-
-class TimeSkippingConfig(google.protobuf.message.Message):
-    """Configuration for time skipping during a workflow execution.
-    When enabled, virtual time advances automatically whenever there is no in-flight work.
-    In-flight work includes activities, child workflows, Nexus operations, signal/cancel external workflow operations,
-    and possibly other features added in the future.
-    User timers are not classified as in-flight work and will be skipped over.
-    When time advances, it skips to the earlier of the next user timer or the configured bound, if either exists.
-
-    Propagation behavior of time skipping:
-    The enabled flag, bound fields, and accumulated skipped duration are propagated to related executions as follows:
-    (1) Child workflows and continue-as-new: both the configuration and the accumulated skipped duration are
-        inherited from the current execution. The configured bound is shared between the inherited skipped
-        duration and any additional duration skipped by the new run.
-    (2) Retry and cron: the configuration and accumulated skipped duration are inherited as recorded when the
-        current workflow started; the accumulated skipped duration of the current run is not propagated.
-    (3) Reset: the new run retains the time-skipping configuration of the current execution. Because reset replays
-        all events up to the reset point and re-applies any UpdateWorkflowExecutionOptions changes made after that
-        point, the resulting run ends up with the same final time-skipping configuration as the previous run.
-    """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    ENABLED_FIELD_NUMBER: builtins.int
-    MAX_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
-    MAX_ELAPSED_DURATION_FIELD_NUMBER: builtins.int
-    enabled: builtins.bool
-    """Enables or disables time skipping for this workflow execution."""
-    @property
-    def max_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
-        """Maximum total virtual time that can be skipped."""
-    @property
-    def max_elapsed_duration(self) -> google.protobuf.duration_pb2.Duration:
-        """Maximum elapsed time since time skipping was enabled.
-        This includes both skipped time and real time elapsing.
-        (-- api-linter: core::0142::time-field-names=disabled --)
-        """
-    def __init__(
-        self,
-        *,
-        enabled: builtins.bool = ...,
-        max_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
-        max_elapsed_duration: google.protobuf.duration_pb2.Duration | None = ...,
-    ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "bound",
-            b"bound",
-            "max_elapsed_duration",
-            b"max_elapsed_duration",
-            "max_skipped_duration",
-            b"max_skipped_duration",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "bound",
-            b"bound",
-            "enabled",
-            b"enabled",
-            "max_elapsed_duration",
-            b"max_elapsed_duration",
-            "max_skipped_duration",
-            b"max_skipped_duration",
-        ],
-    ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["bound", b"bound"]
-    ) -> (
-        typing_extensions.Literal["max_skipped_duration", "max_elapsed_duration"] | None
-    ): ...
-
-global___TimeSkippingConfig = TimeSkippingConfig
 
 class VersioningOverride(google.protobuf.message.Message):
     """Used to override the versioning behavior (and pinned deployment version, if applicable) of a
@@ -2083,16 +2017,78 @@ class VersioningOverride(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    class OneTimeOverride(google.protobuf.message.Message):
+        """Routes Workflow Tasks for this execution to `target_deployment_version`
+        until a Workflow Task completes on that version, then clears the override.
+
+        This does not force the workflow's normal Versioning Behavior to become
+        Pinned. After the Workflow Task completes on `target_deployment_version`,
+        the workflow execution's normal Versioning Behavior and Deployment Version
+        are taken from the worker's completion response.
+
+        Example: if an execution is one-time moved from version X to version Y, and
+        version Z later becomes current:
+        - if worker Y reports Pinned, the execution stays on Y;
+        - if worker Y reports AutoUpgrade, the execution routes to Z on a future
+          Workflow Task;
+        - if worker Y reports Pinned and the workflow uses upgrade-on-continue-as-new,
+          the current run stays on Y and the execution can route to Z after
+          continue-as-new.
+
+        If no Workflow Task completes on `target_deployment_version`, this override
+        remains pending.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        TARGET_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
+        @property
+        def target_deployment_version(
+            self,
+        ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion:
+            """Required. Worker Deployment Version to receive the one-time Workflow Task."""
+        def __init__(
+            self,
+            *,
+            target_deployment_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
+            | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "target_deployment_version", b"target_deployment_version"
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "target_deployment_version", b"target_deployment_version"
+            ],
+        ) -> None: ...
+
     PINNED_FIELD_NUMBER: builtins.int
     AUTO_UPGRADE_FIELD_NUMBER: builtins.int
+    ONE_TIME_FIELD_NUMBER: builtins.int
     BEHAVIOR_FIELD_NUMBER: builtins.int
     DEPLOYMENT_FIELD_NUMBER: builtins.int
     PINNED_VERSION_FIELD_NUMBER: builtins.int
     @property
     def pinned(self) -> global___VersioningOverride.PinnedOverride:
-        """Override the workflow to have Pinned behavior."""
+        """Override the workflow to have Pinned behavior. This is a sticky override:
+        Workflow Tasks continue to route according to this override until it is
+        explicitly removed.
+        """
     auto_upgrade: builtins.bool
     """Override the workflow to have AutoUpgrade behavior."""
+    @property
+    def one_time(self) -> global___VersioningOverride.OneTimeOverride:
+        """Override Workflow Task routing to a specific Worker Deployment Version until
+        one Workflow Task completes there. After completion, the workflow execution's
+        Versioning Behavior and Deployment Version come from the worker's completion
+        response.
+        (-- api-linter: core::0142::time-field-type=disabled
+            aip.dev/not-precedent: one_time describes one-time routing semantics, not a timestamp or duration. --)
+        """
     behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType
     """Required.
     Deprecated. Use `override`.
@@ -2114,6 +2110,7 @@ class VersioningOverride(google.protobuf.message.Message):
         *,
         pinned: global___VersioningOverride.PinnedOverride | None = ...,
         auto_upgrade: builtins.bool = ...,
+        one_time: global___VersioningOverride.OneTimeOverride | None = ...,
         behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType = ...,
         deployment: temporalio.api.deployment.v1.message_pb2.Deployment | None = ...,
         pinned_version: builtins.str = ...,
@@ -2125,6 +2122,8 @@ class VersioningOverride(google.protobuf.message.Message):
             b"auto_upgrade",
             "deployment",
             b"deployment",
+            "one_time",
+            b"one_time",
             "override",
             b"override",
             "pinned",
@@ -2140,6 +2139,8 @@ class VersioningOverride(google.protobuf.message.Message):
             b"behavior",
             "deployment",
             b"deployment",
+            "one_time",
+            b"one_time",
             "override",
             b"override",
             "pinned",
@@ -2150,7 +2151,7 @@ class VersioningOverride(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["override", b"override"]
-    ) -> typing_extensions.Literal["pinned", "auto_upgrade"] | None: ...
+    ) -> typing_extensions.Literal["pinned", "auto_upgrade", "one_time"] | None: ...
 
 global___VersioningOverride = VersioningOverride
 

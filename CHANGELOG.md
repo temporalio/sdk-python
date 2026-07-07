@@ -3,9 +3,8 @@ High-level release notes.
 Loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 When your PR includes a user-facing change, add an entry below under the
-appropriate heading (create the heading if it does not yet exist). Within
-each heading content can be free-form. Feel free to include examples, links
-to docs, or any other relevant information.
+appropriate heading. Within each heading content can be free-form. Feel free
+to include examples, links to docs, or any other relevant information.
 
 ### Added            — new features
 ### Changed          — changes in existing functionality
@@ -18,6 +17,45 @@ to docs, or any other relevant information.
 # Changelog
 
 ## [Unreleased]
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.30.0] - 2026-07-01
+
+### Added
+
+- Nexus operation link propagation for signals. When a Nexus operation handler signals a workflow
+  (including signal-with-start), the inbound Nexus request links are now forwarded onto the signaled
+  workflow so its history events link back to the caller, and the link the server returns for the
+  signaled event is attached to the caller workflow's Nexus operation history event. This makes the
+  caller and callee mutually navigable in the UI for signal-based Nexus operations.
+- Exposed `backoff_start_interval` for continue-as-new, to allow the new workflow to start after a delay.
+
+### Changed
+
+- AWS Lambda worker `configure` parameter supports sync, async, and async
+  generator style functions. This callback is invoked on the asyncio event
+  loop.
+- Relaxed the protobuf dependency bounds to allow protobuf 7 where compatible
+  with the selected optional dependencies.
+- Standalone Nexus operation links are now forwarded on start workflow and signal requests.
+
+### Breaking Changes
+
+- AWS Lambda worker `configure` parameter has been changed to be invoked
+  per-invocation of the worker instead of only at startup. It is advised that
+  any shared, heavy-weight operations are performed outside of the callback
+  before `run_worker` is invoked.
 
 ## [1.29.0] - 2026-06-17
 

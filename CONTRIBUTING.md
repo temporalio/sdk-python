@@ -14,7 +14,7 @@ User-facing changes are recorded in [`CHANGELOG.md`](CHANGELOG.md), loosely foll
 
 If your PR includes a user-facing change (new feature, behavior change, deprecation, breaking
 change, notable bug fix, or security fix), add a short, high-level entry to the `## [Unreleased]`
-section at the top of `CHANGELOG.md` under the appropriate heading, creating it if needed:
+section at the top of `CHANGELOG.md` under the appropriate heading:
 Added, Changed, Deprecated, Breaking Changes, Fixed, or Security.
 
 Keep entries high-level and written for users. The full commit log is appended at release time,

@@ -31,16 +31,20 @@ from temporalio import activity
 from temporalio.api.common.v1 import Payload
 from temporalio.client import (
     Client,
+    WorkflowExecutionDescription,
     WorkflowExecutionStatus,
     WorkflowHandle,
     WorkflowUpdateFailedError,
     WorkflowUpdateRPCTimeoutOrCancelledError,
+    WorkflowUpdateStage,
 )
 from temporalio.converter import DataConverter, PayloadConverter
 from temporalio.service import RPCError, RPCStatusCode
 
 from ._topic_handle import TopicHandle
 from ._types import (
+    STREAM_DRAINING_ERROR_TYPE,
+    TRUNCATED_OFFSET_ERROR_TYPE,
     PollInput,
     PollResult,
     PublishEntry,
@@ -127,6 +131,10 @@ class WorkflowStreamClient:
         self._pending_seq: int = 0
         self._pending_since: float | None = None
         self._topic_types: dict[str, type[Any]] = {}
+        # Run id the most recent poll's update was admitted to. Captured before
+        # waiting for the outcome so a mid-poll continue-as-new can be detected by
+        # describing that specific run. None until the first poll is admitted.
+        self._polled_run_id: str | None = None
 
     @classmethod
     def create(
@@ -504,9 +512,11 @@ class WorkflowStreamClient:
                 ``Payload`` — useful for heterogeneous topics where
                 the caller dispatches on ``Payload.metadata`` or wants
                 to forward the bytes without decoding.
-            poll_cooldown: Minimum interval between polls to avoid
-                overwhelming the workflow when items arrive faster
-                than the poll round-trip. Defaults to 100ms.
+            poll_cooldown: Minimum interval between polls when caught
+                up (backlogs always drain at full speed). Defaults to
+                100ms. Avoid ``timedelta(0)``: an idle subscriber
+                busy-loops, and each poll grows workflow history toward
+                its limit. Use 0 only in tests.
 
         Yields:
             :class:`WorkflowStreamItem` for each matching item.
@@ -528,21 +538,36 @@ class WorkflowStreamClient:
         offset = from_offset
         while True:
             try:
-                result: PollResult = await self._handle.execute_update(
+                # Wait only for ACCEPTED so the handle (and the run id it was
+                # admitted to) is available before we block on the outcome; if
+                # the run continues-as-new mid-poll, result() fails but we still
+                # know which run to inspect.
+                handle = await self._handle.start_update(
                     "__temporal_workflow_stream_poll",
                     PollInput(topics=topic_filter, from_offset=offset),
+                    wait_for_stage=WorkflowUpdateStage.ACCEPTED,
                     result_type=PollResult,
                 )
+                self._polled_run_id = handle.workflow_run_id
+                result: PollResult = await handle.result()
             except asyncio.CancelledError:
                 return
             except WorkflowUpdateFailedError as e:
                 cause_type = getattr(e.cause, "type", None)
-                if cause_type == "TruncatedOffset":
+                if cause_type == TRUNCATED_OFFSET_ERROR_TYPE:
                     # Subscriber fell behind truncation. Retry from
                     # offset 0 which the stream treats as "from the
                     # beginning of whatever exists" (i.e., from
                     # base_offset).
                     offset = 0
+                    continue
+                if cause_type == STREAM_DRAINING_ERROR_TYPE:
+                    # Workflow is detaching for continue-as-new. Back off and
+                    # retry; the poll lands on the successor run once the
+                    # rollover completes.
+                    cooldown_secs = poll_cooldown.total_seconds()
+                    if cooldown_secs > 0:
+                        await asyncio.sleep(cooldown_secs)
                     continue
                 if cause_type == "AcceptedUpdateCompletedWorkflow":
                     # Workflow returned (or continued-as-new) before
@@ -586,15 +611,32 @@ class WorkflowStreamClient:
             if not result.more_ready and cooldown_secs > 0:
                 await asyncio.sleep(cooldown_secs)
 
-    async def _follow_continue_as_new(self) -> bool:
-        """Check if the workflow continued-as-new and re-target the handle.
+    async def _describe_polled_run(self) -> WorkflowExecutionDescription:
+        """Describe the specific run the most recent poll was admitted to.
 
-        Returns True if the handle was updated (caller should retry).
+        Describing that run (rather than the latest) is what lets a
+        continue-as-new be detected: a rolled-over run is closed with status
+        CONTINUED_AS_NEW, whereas the latest run would report RUNNING. Falls
+        back to the latest run when no run id has been captured yet, or when no
+        client is available to target a specific run.
+        """
+        if self._client is not None:
+            return await self._client.get_workflow_handle(
+                self._workflow_id, run_id=self._polled_run_id
+            ).describe()
+        return await self._handle.describe()
+
+    async def _follow_continue_as_new(self) -> bool:
+        """Check if the polled run continued-as-new and re-target the handle.
+
+        Returns True if the handle was updated (caller should retry). The
+        successor run id is not needed — re-targeting to an unpinned handle
+        makes the next poll address the latest (successor) run.
         """
         if self._client is None:
             return False
         try:
-            desc = await self._handle.describe()
+            desc = await self._describe_polled_run()
         except Exception:
             return False
         if desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW:
@@ -603,14 +645,14 @@ class WorkflowStreamClient:
         return False
 
     async def _workflow_in_terminal_state(self) -> bool:
-        """Return True if the workflow has reached a terminal state.
+        """Return True if the polled run has reached a terminal state.
 
         Used by ``subscribe()`` to distinguish "workflow finished —
         stream is done" from "wrong workflow id" when a poll RPC
         returns NOT_FOUND.
         """
         try:
-            desc = await self._handle.describe()
+            desc = await self._describe_polled_run()
         except Exception:
             return False
         return desc.status in (

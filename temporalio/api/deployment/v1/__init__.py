@@ -1,4 +1,5 @@
 from .message_pb2 import (
+    ComputeStatus,
     Deployment,
     DeploymentInfo,
     DeploymentListInfo,
@@ -14,6 +15,7 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "ComputeStatus",
     "Deployment",
     "DeploymentInfo",
     "DeploymentListInfo",
