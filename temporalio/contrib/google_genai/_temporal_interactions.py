@@ -131,6 +131,7 @@ class TemporalAsyncInteractions:
         self,
         activity_config: ActivityConfig | None = None,
     ) -> None:
+        """Initialize with activity config for interaction operation timeouts."""
         self._activity_config = (
             ActivityConfig(start_to_close_timeout=_DEFAULT_INTERACTION_TIMEOUT)
             if activity_config is None

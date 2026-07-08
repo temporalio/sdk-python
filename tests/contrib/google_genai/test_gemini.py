@@ -24,14 +24,14 @@ import io
 import json
 import uuid
 from datetime import timedelta
-from typing import Any
+from typing import Any, Callable, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from google.genai import Client as GeminiClient
 from google.genai import types
 from google.genai.interactions import (
-    Agent,
+    Agent,  # pyright: ignore[reportPrivateImportUsage]
     Interaction,
     InteractionSSEEvent,
 )
@@ -1612,7 +1612,7 @@ class _StatefulTool:
 async def test_closure_if_bound_method_unbinds_and_mutates_original():
     """A bound method becomes a plain function that still mutates the real instance."""
     obj = _StatefulTool()
-    wrapped = _closure_if_bound_method(obj.lookup_city)
+    wrapped = cast(Callable[..., Any], _closure_if_bound_method(obj.lookup_city))
 
     # No longer a bound method (so deepcopy leaves it — and its captured self —
     # intact), but name/doc/signature are preserved for AFC schema building.
@@ -1632,7 +1632,9 @@ def test_closure_survives_deepcopy_bound_method_does_not():
     obj = _StatefulTool()
 
     # Raw bound method: deepcopy clones __self__ (the 2.8.0 failure mode).
-    assert copy.deepcopy(obj.lookup_city).__self__ is not obj
+    copied_method = copy.deepcopy(obj.lookup_city)
+    assert inspect.ismethod(copied_method)
+    assert copied_method.__self__ is not obj
 
     # Closure: deepcopy is a no-op, so the captured instance is preserved.
     wrapped = _closure_if_bound_method(obj.lookup_city)
@@ -1657,15 +1659,20 @@ def test_wrap_bound_method_tools_config_forms():
     # Model config: bound method wrapped, caller's config left as-is.
     config = types.GenerateContentConfig(tools=[obj.lookup_city])
     wrapped = _wrap_bound_method_tools(config)
+    assert isinstance(wrapped, types.GenerateContentConfig)
     assert wrapped is not config
     assert config.tools == [obj.lookup_city]  # original untouched
+    assert wrapped.tools is not None
     assert not inspect.ismethod(wrapped.tools[0])
 
     # Dict config: same, and the original dict/list are not mutated.
-    dict_config: dict[str, Any] = {"tools": [obj.lookup_city]}
+    dict_config: types.GenerateContentConfigDict = {"tools": [obj.lookup_city]}
     wrapped_dict = _wrap_bound_method_tools(dict_config)
-    assert dict_config["tools"] == [obj.lookup_city]
-    assert not inspect.ismethod(wrapped_dict["tools"][0])
+    assert isinstance(wrapped_dict, dict)
+    assert dict_config.get("tools") == [obj.lookup_city]
+    wrapped_tools = wrapped_dict.get("tools")
+    assert wrapped_tools is not None
+    assert not inspect.ismethod(wrapped_tools[0])
 
     # No bound methods -> returned unchanged (no needless copy).
     def plain(city: str) -> str:
