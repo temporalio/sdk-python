@@ -35,6 +35,36 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 _ACTIVITY_OPTION_KEYS: frozenset[str] = frozenset(
     {"execute_in", *inspect.signature(workflow.execute_activity).parameters}
 )
+# Node/task option keys beyond the raw execute_activity parameters:
+# 'summary_fn' is a callable consumed in the workflow (not a Temporal
+# option), so it must be split out of Graph API metadata too.
+_LANGGRAPH_OPTION_KEYS: frozenset[str] = _ACTIVITY_OPTION_KEYS | frozenset(
+    {"summary_fn"}
+)
+
+
+def _constant_summary_fn(
+    value: str,
+) -> Callable[[tuple[Any, ...], dict[str, Any]], str]:
+    """Adapt a static summary string to the summary_fn interface."""
+    return lambda args, kwargs: value
+
+
+def _merge_activity_opts(
+    defaults: dict[str, Any] | None, specific: dict[str, Any]
+) -> dict[str, Any]:
+    """Layer per-node/task options over the plugin defaults.
+
+    ``summary`` and ``summary_fn`` are two forms of one setting, so a node or
+    task that supplies either form overrides an inherited default of *either*
+    form, rather than coexisting with it and tripping the exclusivity check.
+    """
+    merged = dict(defaults or {})
+    if "summary" in specific or "summary_fn" in specific:
+        merged.pop("summary", None)
+        merged.pop("summary_fn", None)
+    merged.update(specific)
+    return merged
 
 
 class LangGraphPlugin(SimplePlugin):
@@ -69,7 +99,9 @@ class LangGraphPlugin(SimplePlugin):
             Functional API has no per-task ``metadata`` channel.
         default_activity_options: Activity options applied to every
             activity-bound node and task, overridable per-node (Graph API
-            ``metadata``) or per-task (``activity_options[name]``).
+            ``metadata``) or per-task (``activity_options[name]``). A
+            node/task that sets ``summary`` or ``summary_fn`` overrides an
+            inherited default of either form.
         streaming_topic: When set, ``langgraph.config.get_stream_writer()``
             inside a node publishes to this topic on the workflow's
             :class:`WorkflowStream`. The workflow must construct
@@ -130,6 +162,16 @@ class LangGraphPlugin(SimplePlugin):
                 "activity_options[task_name] (Functional API)."
             )
 
+        if (
+            default_activity_options
+            and "summary" in default_activity_options
+            and "summary_fn" in default_activity_options
+        ):
+            raise ValueError(
+                "Set either 'summary' or 'summary_fn' in default_activity_options, "
+                "not both."
+            )
+
         self.activities: list = []
         self._streaming_topic = streaming_topic
         self._streaming_batch_interval = streaming_batch_interval
@@ -168,12 +210,14 @@ class LangGraphPlugin(SimplePlugin):
                     # the node function via config["metadata"].
                     node_meta = node.metadata or {}
                     node_opts = {
-                        k: v for k, v in node_meta.items() if k in _ACTIVITY_OPTION_KEYS
+                        k: v
+                        for k, v in node_meta.items()
+                        if k in _LANGGRAPH_OPTION_KEYS
                     }
                     node.metadata = {
                         k: v
                         for k, v in node_meta.items()
-                        if k not in _ACTIVITY_OPTION_KEYS
+                        if k not in _LANGGRAPH_OPTION_KEYS
                     }
                     if "execute_in" not in node_opts:
                         raise ValueError(
@@ -181,7 +225,7 @@ class LangGraphPlugin(SimplePlugin):
                             f"'execute_in' in metadata. Set it to 'activity' or "
                             f"'workflow'."
                         )
-                    opts = {**(default_activity_options or {}), **node_opts}
+                    opts = _merge_activity_opts(default_activity_options, node_opts)
                     # Route all LangGraph node calls through afunc so the async
                     # activity wrapper is always used. wrap_activity handles
                     # sync vs. async user functions inside the activity itself.
@@ -208,10 +252,7 @@ class LangGraphPlugin(SimplePlugin):
                         f"activity_options[{name!r}]. Set it to 'activity' or "
                         f"'workflow'."
                     )
-                opts = {
-                    **(default_activity_options or {}),
-                    **task_opts,
-                }
+                opts = _merge_activity_opts(default_activity_options, task_opts)
 
                 task.func = self.execute(task_id(task.func), task.func, opts)
                 task.func.__name__ = name
@@ -253,6 +294,18 @@ class LangGraphPlugin(SimplePlugin):
         """Prepare a node or task to execute as an activity or inline in the workflow."""
         opts = kwargs or {}
         execute_in = opts.pop("execute_in")
+        # Normalize the node's summary to a single summary_fn. Both keys are
+        # popped so neither reaches workflow.execute_activity (which takes no
+        # summary_fn, and would get a duplicate summary kwarg); a static
+        # summary becomes a summary_fn that ignores its input.
+        summary_fn = opts.pop("summary_fn", None)
+        static_summary = opts.pop("summary", None)
+        if summary_fn is not None and static_summary is not None:
+            raise ValueError(
+                f"{activity_name}: set either 'summary' or 'summary_fn', not both."
+            )
+        if static_summary is not None:
+            summary_fn = _constant_summary_fn(static_summary)
 
         if execute_in == "activity":
             wrapped = wrap_activity(
@@ -262,9 +315,13 @@ class LangGraphPlugin(SimplePlugin):
             )
             a = activity.defn(name=activity_name)(wrapped)
             self.activities.append(a)
-            return wrap_execute_activity(a, task_id=task_id(func), **opts)
+            return wrap_execute_activity(
+                a, task_id=task_id(func), summary_fn=summary_fn, **opts
+            )
         elif execute_in == "workflow":
-            return wrap_workflow(func, streaming_topic=self._streaming_topic)
+            return wrap_workflow(
+                func, streaming_topic=self._streaming_topic, summary_fn=summary_fn
+            )
         else:
             raise ValueError(f"Invalid execute_in value: {execute_in}")
 
