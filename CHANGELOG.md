@@ -20,6 +20,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the experimental `Worker` `patch_activation_callback` option, allowing workers
+  to decide whether a first non-replay `workflow.patched` call should activate a patch
+  during rolling deployments.
+
 ### Changed
 
 ### Deprecated
