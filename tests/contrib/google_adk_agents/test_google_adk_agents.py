@@ -286,40 +286,60 @@ async def test_single_agent(client: Client, use_local_model: bool):
 
 
 class ResearchModel(TestModel):
+    """Scripted coordinator -> researcher -> writer flow.
+
+    Responses are keyed off which agent is calling (via its instruction text in
+    the request's system instruction) rather than deduped against conversation
+    history, since the ADK rewrites cross-agent history between versions (e.g.
+    2.4 converts prior transfer calls into "For context:" text parts).
+    """
+
+    _responses_by_instruction = {
+        "You are a coordinator": LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"agent_name": "researcher"},
+                            name="transfer_to_agent",
+                        )
+                    )
+                ],
+            )
+        ),
+        "You are a researcher": LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"agent_name": "writer"}, name="transfer_to_agent"
+                        )
+                    )
+                ],
+            )
+        ),
+        "You are a poet": LlmResponse(
+            content=Content(
+                role="model",
+                parts=[Part(text="haiku")],
+            )
+        ),
+    }
+
     def responses(self) -> list[LlmResponse]:
-        return [
-            LlmResponse(
-                content=Content(
-                    role="model",
-                    parts=[
-                        Part(
-                            function_call=FunctionCall(
-                                args={"agent_name": "researcher"},
-                                name="transfer_to_agent",
-                            )
-                        )
-                    ],
-                )
-            ),
-            LlmResponse(
-                content=Content(
-                    role="model",
-                    parts=[
-                        Part(
-                            function_call=FunctionCall(
-                                args={"agent_name": "writer"}, name="transfer_to_agent"
-                            )
-                        )
-                    ],
-                )
-            ),
-            LlmResponse(
-                content=Content(
-                    role="model",
-                    parts=[Part(text="haiku")],
-                )
-            ),
-        ]
+        return list(self._responses_by_instruction.values())
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        instruction = str(llm_request.config.system_instruction or "")
+        for phrase, response in self._responses_by_instruction.items():
+            if phrase in instruction:
+                yield response
+                return
+        raise ValueError(f"No scripted response for instruction: {instruction!r}")
 
     @classmethod
     def supported_models(cls) -> list[str]:
