@@ -928,6 +928,10 @@ async def wait_condition(
     This function returns when the callback returns true (invoked each loop
     iteration) or the timeout has been reached.
 
+    Importantly, using a `0` or `None` value for `timeout` means that no Temporal timer is created.
+    This means changing from either of those values to a positive value (or the inverse) constitutes
+    a nondeterministic change to workflow code.
+
     Args:
         fn: Non-async callback that accepts no parameters and returns a boolean.
         timeout: Optional number of seconds to wait until throwing
