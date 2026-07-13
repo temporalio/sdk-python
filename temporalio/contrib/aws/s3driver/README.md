@@ -58,9 +58,23 @@ driver = S3StorageDriver(client=MyS3Client(), bucket="my-temporal-payloads")
 
 ### Key structure
 
-Payloads are stored under content-addressable keys derived from a SHA-256 hash of the serialized payload bytes, segmented by namespace and workflow/activity identifiers when serialization context is available, e.g.:
+Payloads are stored under content-addressable keys derived from a SHA-256 hash of the serialized payload bytes, segmented by namespace and workflow/activity identifiers when serialization context is available.
 
-    v0/ns/my-namespace/wfi/my-workflow-id/d/sha256/<hash>
+Workflow key:
+
+    v0/ns/{namespace}/wt/{workflow-type}/wi/{workflow-id}/ri/{run-id}/d/{hash-algorithm}/{hex-digest}
+
+Activity key:
+
+    v0/ns/{namespace}/at/{activity-type}/ai/{activity-id}/ri/{run-id}/d/{hash-algorithm}/{hex-digest}
+
+Fallback key (used when no namespace, workflow, or activity information is available):
+
+    v0/d/{hash-algorithm}/{hex-digest}
+
+- Missing values (including a missing run ID) are encoded as the literal `null`.
+- `hex-digest` is the lower-case SHA-256 hex digest (64 characters).
+- Dynamic path segments are percent-encoded: any byte outside S3's [safe character set](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html) (`0-9`, `a-z`, `A-Z`, and `! - _ . * ' ( )`) is escaped as `%XX` over its UTF-8 bytes.
 
 ### Notes
 

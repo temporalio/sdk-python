@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import urllib.parse
+import string
 from collections.abc import Callable, Coroutine, Sequence
 from typing import Any, TypeVar
 
@@ -24,6 +24,26 @@ from temporalio.converter import (
 )
 
 _T = TypeVar("_T")
+
+# S3's safe character set for object key names. See
+# https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
+_S3_SAFE_CHARS = frozenset(string.ascii_letters + string.digits + "!-_.*'()")
+
+
+def _percent_encode(val: str | None) -> str | None:
+    """Percent-encode a path segment per the S3 key spec.
+
+    Encodes every byte outside :data:`_S3_SAFE_CHARS` as ``%XX`` with
+    upper-case hex digits, operating on the UTF-8 bytes so non-ASCII
+    characters are escaped byte by byte. Returns ``None`` for empty or
+    missing values so callers can substitute ``"null"``.
+    """
+    if not val:
+        return None
+    return "".join(
+        chr(byte) if chr(byte) in _S3_SAFE_CHARS else f"%{byte:02X}"
+        for byte in val.encode("utf-8")
+    )
 
 
 def _format_client_context(client: S3StorageDriverClient) -> str:
@@ -127,24 +147,20 @@ class S3StorageDriver(StorageDriver):
         (e.g. proto binary). The returned list is the same length as
         ``payloads``.
         """
-
-        def _quote(val: str | None) -> str | None:
-            return urllib.parse.quote(val, safe="") if val else None
-
         # Build context segments from the target identity.
         context_segments = ""
         target = context.target
-        namespace = _quote(target.namespace) if target is not None else None
+        namespace = _percent_encode(target.namespace) if target is not None else None
         namespace_segment = f"/ns/{namespace}" if namespace else ""
         if isinstance(target, StorageDriverWorkflowInfo):
-            wf_type = _quote(target.type) or "null"
-            wf_id = _quote(target.id) or "null"
-            wf_run_id = _quote(target.run_id) or "null"
+            wf_type = _percent_encode(target.type) or "null"
+            wf_id = _percent_encode(target.id) or "null"
+            wf_run_id = _percent_encode(target.run_id) or "null"
             context_segments = f"/wt/{wf_type}/wi/{wf_id}/ri/{wf_run_id}"
         elif isinstance(target, StorageDriverActivityInfo):
-            act_type = _quote(target.type) or "null"
-            act_id = _quote(target.id) or "null"
-            act_run_id = _quote(target.run_id) or "null"
+            act_type = _percent_encode(target.type) or "null"
+            act_id = _percent_encode(target.id) or "null"
+            act_run_id = _percent_encode(target.run_id) or "null"
             context_segments = f"/at/{act_type}/ai/{act_id}/ri/{act_run_id}"
 
         async def _upload(payload: Payload) -> StorageDriverClaim:
