@@ -447,17 +447,13 @@ class _ActivityWorker:
                         temporalio.activity.logger.debug(
                             "Completing activity as failed",
                             exc_info=True,
-                            extra={
-                                "__temporal_error_identifier": "ActivityFailure"
-                            },
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
                     else:
                         temporalio.activity.logger.warning(
                             "Completing activity as failed",
                             exc_info=True,
-                            extra={
-                                "__temporal_error_identifier": "ActivityFailure"
-                            },
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
                     await data_converter.encode_failure(
                         err, completion.result.failed.failure
