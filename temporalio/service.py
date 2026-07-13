@@ -208,8 +208,8 @@ class ConnectConfig:
     http_connect_proxy_config: HttpConnectProxyConfig | None = None
     dns_load_balancing_config: DnsLoadBalancingConfig | None = None
     grpc_compression: GrpcCompression = GrpcCompression.GZIP
-    payloads_size_warn: int = 512 * 1024
-    memo_size_warn: int = 2 * 1024
+    payloads_warn_size: int = 512 * 1024
+    memo_warn_size: int = 2 * 1024
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -273,8 +273,8 @@ class ConnectConfig:
                 else None
             ),
             grpc_compression=self.grpc_compression._to_bridge_config(),
-            payloads_size_warn=self.payloads_size_warn,
-            memo_size_warn=self.memo_size_warn,
+            payloads_warn_size=self.payloads_warn_size,
+            memo_warn_size=self.memo_warn_size,
         )
 
 
