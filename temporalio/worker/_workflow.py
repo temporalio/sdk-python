@@ -26,7 +26,6 @@ import temporalio.converter._extstore
 import temporalio.converter._payload_limits
 import temporalio.exceptions
 import temporalio.workflow
-from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
@@ -206,15 +205,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             else:
                 self._dynamic_workflow = defn
 
-    async def run(
-        self,
-        payload_error_limits: temporalio.converter._payload_limits._ServerPayloadErrorLimits
-        | None,
-    ) -> None:
-        self._data_converter = self._data_converter._with_payload_error_limits(
-            payload_error_limits
-        )
-
+    async def run(self) -> None:
         # Continually poll for workflow work
         task_tag = object()
         try:
@@ -486,18 +477,12 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         upload_metrics = temporalio.converter._extstore.StorageOperationMetrics()
         try:
-            try:
-                upload_metrics = await temporalio.bridge.worker.encode_completion(
-                    completion,
-                    data_converter,
-                    encode_headers=self._encode_headers,
-                    storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
-                )
-            except temporalio.converter._payload_limits._PayloadSizeError as err:
-                logger.warning(err.message)
-                completion.failed.Clear()
-                await data_converter.encode_failure(err, completion.failed.failure)
-                completion.failed.force_cause = WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE
+            upload_metrics = await temporalio.bridge.worker.encode_completion(
+                completion,
+                data_converter,
+                encode_headers=self._encode_headers,
+                storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
+            )
         except Exception as err:
             logger.exception(
                 "Failed encoding completion on workflow with run ID %s", act.run_id
@@ -1019,12 +1004,6 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         return await self._get_current_dc()._decode_payload_sequence(payloads)
-
-    def _validate_payload_limits(
-        self,
-        payloads: Sequence[temporalio.api.common.v1.Payload],
-    ) -> None:
-        self._get_current_dc()._validate_payload_limits(payloads)
 
 
 class _InterruptDeadlockError(BaseException):

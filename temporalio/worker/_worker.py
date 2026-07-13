@@ -29,7 +29,6 @@ from temporalio.common import (
     VersioningBehavior,
     WorkerDeploymentVersion,
 )
-from temporalio.converter._payload_limits import _ServerPayloadErrorLimits
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -666,6 +665,9 @@ class Worker:
                 ]._to_bridge(),  # type: ignore[reportTypedDictNotRequiredAccess,reportOptionalMemberAccess]
                 plugins=deduped_plugin_names,
                 storage_drivers=deduped_storage_driver_types,
+                disable_payload_error_limit=config.get(
+                    "disable_payload_error_limit", False
+                ),
             ),
         )
 
@@ -767,17 +769,8 @@ class Worker:
         await next_function(self)
 
     async def _run(self):
-        # Eagerly validate which will do a namespace check in Core
-        namespace_info = await self._bridge_worker.validate()
-        payload_error_limits = (
-            _ServerPayloadErrorLimits(
-                memo_size_error=namespace_info.limits.memo_size_limit_error,
-                payload_size_error=namespace_info.limits.blob_size_limit_error,
-            )
-            if namespace_info.HasField("limits")
-            and not self._config.get("disable_payload_error_limit", False)
-            else None
-        )
+        # Eagerly validate which will do a namespace check in Core.
+        await self._bridge_worker.validate()
 
         if self._started:
             raise RuntimeError("Already started")
@@ -797,16 +790,14 @@ class Worker:
         # Create tasks for workers
         if self._activity_worker:
             tasks[self._activity_worker] = asyncio.create_task(
-                self._activity_worker.run(payload_error_limits)
+                self._activity_worker.run()
             )
         if self._workflow_worker:
             tasks[self._workflow_worker] = asyncio.create_task(
-                self._workflow_worker.run(payload_error_limits)
+                self._workflow_worker.run()
             )
         if self._nexus_worker:
-            tasks[self._nexus_worker] = asyncio.create_task(
-                self._nexus_worker.run(payload_error_limits)
-            )
+            tasks[self._nexus_worker] = asyncio.create_task(self._nexus_worker.run())
 
         # Wait for either worker or shutdown requested
         wait_task = asyncio.wait(tasks.values(), return_when=asyncio.FIRST_EXCEPTION)

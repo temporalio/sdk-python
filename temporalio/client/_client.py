@@ -232,6 +232,8 @@ class Client:
             http_connect_proxy_config=http_connect_proxy_config,
             dns_load_balancing_config=dns_load_balancing_config,
             grpc_compression=grpc_compression,
+            payloads_size_warn=data_converter.payload_limits.payload_size_warning,
+            memo_size_warn=data_converter.payload_limits.memo_size_warning,
         )
 
         def make_lambda(
