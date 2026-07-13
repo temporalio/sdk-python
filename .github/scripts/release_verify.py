@@ -75,9 +75,9 @@ def verify_dist(args: argparse.Namespace) -> None:
     expected_sdist = f"temporalio-{args.version}.tar.gz"
     if sdists != [expected_sdist]:
         raise RuntimeError(f"Expected only sdist {expected_sdist!r}, found {sdists!r}")
-    if len(wheels) != 5:
+    if len(wheels) != 7:
         raise RuntimeError(
-            f"Expected 5 platform wheels, found {len(wheels)}: {wheels!r}"
+            f"Expected 7 platform wheels, found {len(wheels)}: {wheels!r}"
         )
 
     for name in files:
@@ -90,6 +90,8 @@ def verify_dist(args: argparse.Namespace) -> None:
     expected_platforms = {
         "linux-x86_64": lambda name: "manylinux" in name and "x86_64" in name,
         "linux-aarch64": lambda name: "manylinux" in name and "aarch64" in name,
+        "linux-musl-x86_64": lambda name: "musllinux" in name and "x86_64" in name,
+        "linux-musl-aarch64": lambda name: "musllinux" in name and "aarch64" in name,
         "macos-x86_64": lambda name: "macosx" in name and "x86_64" in name,
         "macos-arm64": lambda name: "macosx" in name and "arm64" in name,
         "windows-amd64": lambda name: "win_amd64" in name,
