@@ -86,6 +86,10 @@ class WorkflowStream:
     - ``__temporal_workflow_stream_poll`` update — long-poll subscription
     - ``__temporal_workflow_stream_offset`` query — current log length
 
+    Workflow code can also read the log back directly via
+    :meth:`read`, with :attr:`base_offset` / :attr:`end_offset`
+    exposing the retained offset range.
+
     Note:
         Because the publish handler is registered dynamically from
         ``__init__``, on the activation where the stream is
@@ -233,6 +237,157 @@ class WorkflowStream:
             )
         self._topic_types[name] = bound
         return WorkflowTopicHandle(self, name, bound)
+
+    @property
+    def base_offset(self) -> int:
+        """Global offset of the oldest entry still retained in the log.
+
+        Starts at 0, advances when :meth:`truncate` discards a prefix,
+        and carries across continue-as-new via ``prior_state``. Entries
+        at global offsets before this value have been discarded; reads
+        and polls that request an older (non-zero) offset fail with a
+        ``TruncatedOffset`` error.
+        """
+        return self._base_offset
+
+    @property
+    def end_offset(self) -> int:
+        """Global offset one past the newest entry in the log.
+
+        Equal to :attr:`base_offset` plus the number of retained
+        entries; the next published item lands at this offset. This is
+        the same value the ``__temporal_workflow_stream_offset`` query
+        reports. It is monotonic — :meth:`truncate` moves
+        :attr:`base_offset`, not the end — which makes it suitable for
+        :func:`temporalio.workflow.wait_condition` predicates; see
+        :meth:`read`.
+        """
+        return self._base_offset + len(self._log)
+
+    @overload
+    def read(
+        self,
+        topics: str | list[str] | None = ...,
+        from_offset: int = ...,
+        *,
+        result_type: type[T],
+    ) -> list[WorkflowStreamItem[T]]: ...
+    @overload
+    def read(
+        self,
+        topics: str | list[str] | None = ...,
+        from_offset: int = ...,
+        *,
+        result_type: None = None,
+    ) -> list[WorkflowStreamItem[Any]]: ...
+
+    def read(
+        self,
+        topics: str | list[str] | None = None,
+        from_offset: int = 0,
+        *,
+        result_type: type | None = None,
+    ) -> list[WorkflowStreamItem[Any]]:
+        """Return retained entries at global offsets >= ``from_offset``.
+
+        The workflow-side read path: a deterministic, non-blocking
+        snapshot of the in-memory log with no I/O and no history
+        events, safe to call from workflow code. External consumers
+        should keep using :meth:`WorkflowStreamClient.subscribe`; this
+        method is for workflows that consume their own stream — e.g.
+        items an activity publishes back to the workflow that
+        scheduled it.
+
+        To consume entries as they land, combine with
+        :attr:`end_offset` and
+        :func:`temporalio.workflow.wait_condition`:
+
+        .. code-block:: python
+
+            cursor = self.stream.end_offset
+            while not done:
+                await workflow.wait_condition(
+                    lambda: self.stream.end_offset > cursor
+                )
+                for item in self.stream.read(from_offset=cursor):
+                    ...  # item.offset is the item's global offset
+                cursor = self.stream.end_offset
+
+        Args:
+            topics: Topic filter. A single topic name, a list of topic
+                names, or None. None or empty list means all topics.
+            from_offset: Global offset to start reading from. ``0``
+                means "from the beginning of whatever is retained"
+                (i.e. from :attr:`base_offset`), matching poll
+                semantics. Offsets at or past :attr:`end_offset`
+                return an empty list.
+            result_type: Optional target type. Each returned
+                :class:`WorkflowStreamItem` has its ``data`` decoded
+                via the workflow's payload converter. When omitted,
+                the converter's default ``Any`` decoding is used. Pass
+                ``result_type=temporalio.common.RawValue`` for an
+                opaque ``RawValue`` wrapping the original ``Payload``
+                — useful for heterogeneous topics where the caller
+                dispatches on ``Payload.metadata`` or wants per-entry
+                control over decode errors.
+
+        Returns:
+            Matching entries in log order, each with its global
+            ``offset`` populated.
+
+        Raises:
+            RuntimeError: If ``result_type`` is ``Payload`` — the
+                payload converter has no Payload decode path; use
+                ``result_type=RawValue`` instead.
+            ApplicationError: If ``from_offset`` is non-zero and below
+                :attr:`base_offset` (type ``TruncatedOffset``) — the
+                requested entries have been truncated. Callers that
+                may lag behind :meth:`truncate` can compare against
+                :attr:`base_offset` first.
+        """
+        if result_type is Payload:
+            raise RuntimeError(
+                "Cannot read with result_type=Payload: the payload "
+                "converter has no Payload decode path. Omit result_type "
+                "for default decoding, or pass result_type=RawValue to "
+                "receive a RawValue wrapping the raw Payload."
+            )
+        log_offset = from_offset - self._base_offset
+        if log_offset < 0:
+            if from_offset == 0:
+                # "From the beginning" — start at whatever is retained.
+                log_offset = 0
+            else:
+                raise ApplicationError(
+                    f"Requested offset {from_offset} has been truncated. "
+                    f"Current base offset is {self._base_offset}.",
+                    type=TRUNCATED_OFFSET_ERROR_TYPE,
+                )
+        topic_set: set[str] | None
+        if topics is None:
+            topic_set = None
+        elif isinstance(topics, str):
+            topic_set = {topics}
+        else:
+            topic_set = set(topics) or None
+        converter = workflow.payload_converter()
+        items: list[WorkflowStreamItem[Any]] = []
+        for i, entry in enumerate(self._log[log_offset:]):
+            if topic_set is not None and entry.topic not in topic_set:
+                continue
+            data: Any = (
+                converter.from_payload(entry.data)
+                if result_type is None
+                else converter.from_payload(entry.data, result_type)
+            )
+            items.append(
+                WorkflowStreamItem(
+                    topic=entry.topic,
+                    data=data,
+                    offset=self._base_offset + log_offset + i,
+                )
+            )
+        return items
 
     def get_state(
         self, *, publisher_ttl: timedelta = timedelta(seconds=900)

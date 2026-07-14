@@ -57,15 +57,16 @@ class WorkflowStreamItem(Generic[T]):
         This class is experimental and may change in future versions.
 
     The ``data`` field carries the decoded value produced by
-    :meth:`WorkflowStreamClient.subscribe`. The generic parameter ``T``
-    matches the ``result_type`` passed to ``subscribe``: an instance of
-    ``T`` when ``result_type=T``, the converter's default ``Any``
-    decoding when ``result_type`` is omitted, or a
+    :meth:`WorkflowStreamClient.subscribe` and
+    :meth:`WorkflowStream.read`. The generic parameter ``T`` matches
+    the ``result_type`` passed to either: an instance of ``T`` when
+    ``result_type=T``, the converter's default ``Any`` decoding when
+    ``result_type`` is omitted, or a
     :class:`temporalio.common.RawValue` wrapping the original
     ``Payload`` when ``result_type=RawValue``.
 
-    The ``offset`` field is populated at poll time from the item's
-    position in the global log.
+    The ``offset`` field is populated at poll/read time from the
+    item's position in the global log.
     """
 
     topic: str

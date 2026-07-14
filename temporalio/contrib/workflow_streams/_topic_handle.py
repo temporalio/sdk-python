@@ -123,7 +123,9 @@ class WorkflowTopicHandle(Generic[T]):
         This class is experimental and may change in future versions.
 
     Constructed via :meth:`WorkflowStream.topic`. Has no
-    ``subscribe`` — workflows do not consume their own stream.
+    ``subscribe`` — long-poll subscription is the external consumption
+    path. Workflow code that consumes its own stream reads the log
+    directly via :meth:`WorkflowStream.read`.
     """
 
     def __init__(

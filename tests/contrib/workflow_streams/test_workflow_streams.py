@@ -2698,6 +2698,210 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
         await handle.signal(BasicWorkflowStreamWorkflow.close)
 
 
+# ---------------------------------------------------------------------------
+# Workflow-side read API
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class WorkflowReadResult:
+    values: list[str]
+    offsets: list[int]
+    base_offset: int
+    end_offset: int
+
+
+@workflow.defn
+class WorkflowReadConsumerWorkflow:
+    """Consumes its own stream from workflow code while an activity publishes.
+
+    The read loop is the documented pattern from ``WorkflowStream.read``:
+    wait for ``end_offset`` to advance, drain with ``read``, repeat. The
+    test runs the worker with ``max_cached_workflows=0`` so every
+    activation replays the loop from history, proving the read path is
+    deterministic.
+    """
+
+    @workflow.init
+    def __init__(self, count: int) -> None:
+        self.stream = WorkflowStream()
+
+    @workflow.run
+    async def run(self, count: int) -> WorkflowReadResult:
+        activity_handle = workflow.start_activity(
+            "publish_items",
+            count,
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=10),
+        )
+        values: list[str] = []
+        offsets: list[int] = []
+        cursor = self.stream.end_offset
+        while len(values) < count:
+            await workflow.wait_condition(lambda: self.stream.end_offset > cursor)
+            for item in self.stream.read("events", cursor, result_type=bytes):
+                values.append(item.data.decode())
+                offsets.append(item.offset)
+            cursor = self.stream.end_offset
+        await activity_handle
+        return WorkflowReadResult(
+            values=values,
+            offsets=offsets,
+            base_offset=self.stream.base_offset,
+            end_offset=self.stream.end_offset,
+        )
+
+
+@pytest.mark.asyncio
+async def test_workflow_reads_activity_published_items(client: Client) -> None:
+    """A workflow consumes items an activity publishes to its own stream via
+    the workflow-side read API, and the loop survives replay
+    (``max_cached_workflows=0``)."""
+    count = 10
+    async with new_worker(
+        client,
+        WorkflowReadConsumerWorkflow,
+        activities=[publish_items],
+        max_cached_workflows=0,
+    ) as worker:
+        result = await client.execute_workflow(
+            WorkflowReadConsumerWorkflow.run,
+            count,
+            id=f"workflow-stream-wf-read-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result.values == [f"item-{i}" for i in range(count)]
+        assert result.offsets == list(range(count))
+        assert result.base_offset == 0
+        assert result.end_offset == count
+
+
+@dataclass
+class ReadProbeResult:
+    all_topics: list[str]
+    all_values: list[str]
+    all_offsets: list[int]
+    a_offsets: list[int]
+    suffix_values: list[str]
+    empty_read_len: int
+    base_before: int
+    end_before: int
+    default_values: list[str]
+    raw_values_ok: bool
+    payload_reject_error: str
+    base_after_truncate: int
+    end_after_truncate: int
+    from_zero_offsets_after_truncate: list[int]
+    truncated_error_type: str
+
+
+@workflow.defn
+class ReadProbeWorkflow:
+    """Exercises ``WorkflowStream.read`` entirely inside workflow code.
+
+    Covers global offsets with and without topic filtering, suffix and
+    empty reads, ``base_offset`` / ``end_offset`` before and after
+    ``truncate``, default / ``RawValue`` decoding, the ``Payload``
+    ``result_type`` rejection, and the ``TruncatedOffset`` error for a
+    non-zero ``from_offset`` that fell behind truncation. Publishing is
+    workflow-side, so the whole scenario is synchronous and
+    deterministic — no external round trips.
+    """
+
+    @workflow.init
+    def __init__(self) -> None:
+        self.stream = WorkflowStream()
+
+    @workflow.run
+    async def run(self) -> ReadProbeResult:
+        from temporalio.api.common.v1 import Payload
+
+        topic_a = self.stream.topic("a", type=str)
+        topic_b = self.stream.topic("b", type=str)
+        for i in range(3):
+            topic_a.publish(f"a-{i}")  # global offsets 0, 2, 4
+            topic_b.publish(f"b-{i}")  # global offsets 1, 3, 5
+
+        all_items = self.stream.read(result_type=str)
+        a_items = self.stream.read("a", result_type=str)
+        suffix_items = self.stream.read(from_offset=4, result_type=str)
+        empty_items = self.stream.read(
+            from_offset=self.stream.end_offset, result_type=str
+        )
+        default_items = self.stream.read(["a", "b"], 4)
+        raw_items = self.stream.read("a", result_type=RawValue)
+        try:
+            self.stream.read(result_type=Payload)
+        except RuntimeError as e:
+            payload_reject_error = str(e)
+        else:
+            payload_reject_error = ""
+        base_before = self.stream.base_offset
+        end_before = self.stream.end_offset
+
+        self.stream.truncate(4)
+        try:
+            self.stream.read(from_offset=2)
+        except ApplicationError as e:
+            truncated_error_type = e.type or ""
+        else:
+            truncated_error_type = ""
+        from_zero_items = self.stream.read(result_type=str)
+
+        return ReadProbeResult(
+            all_topics=[item.topic for item in all_items],
+            all_values=[item.data for item in all_items],
+            all_offsets=[item.offset for item in all_items],
+            a_offsets=[item.offset for item in a_items],
+            suffix_values=[item.data for item in suffix_items],
+            empty_read_len=len(empty_items),
+            base_before=base_before,
+            end_before=end_before,
+            default_values=[item.data for item in default_items],
+            raw_values_ok=len(raw_items) == 3
+            and all(isinstance(item.data, RawValue) for item in raw_items),
+            payload_reject_error=payload_reject_error,
+            base_after_truncate=self.stream.base_offset,
+            end_after_truncate=self.stream.end_offset,
+            from_zero_offsets_after_truncate=[item.offset for item in from_zero_items],
+            truncated_error_type=truncated_error_type,
+        )
+
+
+@pytest.mark.asyncio
+async def test_workflow_read_offsets_filters_decode_and_truncation(
+    client: Client,
+) -> None:
+    """``read`` returns global offsets (also under topic filters), honors
+    ``from_offset`` and decode modes, and is truncation-aware: after
+    ``truncate``, ``from_offset=0`` reads from ``base_offset`` while a
+    non-zero truncated offset raises ``TruncatedOffset``."""
+    async with new_worker(client, ReadProbeWorkflow) as worker:
+        result = await client.execute_workflow(
+            ReadProbeWorkflow.run,
+            id=f"workflow-stream-read-probe-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result.all_topics == ["a", "b", "a", "b", "a", "b"]
+        assert result.all_values == ["a-0", "b-0", "a-1", "b-1", "a-2", "b-2"]
+        assert result.all_offsets == [0, 1, 2, 3, 4, 5]
+        # Filtered reads keep global (not per-topic) offsets.
+        assert result.a_offsets == [0, 2, 4]
+        assert result.suffix_values == ["a-2", "b-2"]
+        assert result.empty_read_len == 0
+        assert result.base_before == 0
+        assert result.end_before == 6
+        # Default decoding of str payloads yields the strings back.
+        assert result.default_values == ["a-2", "b-2"]
+        assert result.raw_values_ok is True
+        assert "result_type=Payload" in result.payload_reject_error
+        # truncate(4) moves base_offset, not the end.
+        assert result.base_after_truncate == 4
+        assert result.end_after_truncate == 6
+        assert result.from_zero_offsets_after_truncate == [4, 5]
+        assert result.truncated_error_type == "TruncatedOffset"
+
+
 @pytest.mark.asyncio
 async def test_cross_namespace_nexus_stream(
     client: Client, env: WorkflowEnvironment

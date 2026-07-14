@@ -20,6 +20,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Workflow Streams: `WorkflowStream` now has a public workflow-side read API — `read()` plus the
+  `base_offset` / `end_offset` properties — so workflow code can deterministically consume entries
+  from its own stream (for example, items a streaming activity publishes back to the workflow that
+  scheduled it). `read()` supports topic filtering and the same `result_type` decoding as
+  `subscribe`, and `end_offset` composes with `workflow.wait_condition` to consume entries as they
+  land.
+
 ### Changed
 
 ### Deprecated
