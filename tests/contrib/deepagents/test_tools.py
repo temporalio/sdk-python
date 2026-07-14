@@ -11,6 +11,7 @@ import sys
 import uuid
 from datetime import timedelta
 from types import SimpleNamespace
+from typing import Any, Sequence
 
 import pytest
 
@@ -33,6 +34,11 @@ with workflow.unsafe.imports_passed_through():
     from temporalio.contrib.deepagents._tools import warn_unwrapped_tools  # noqa: E402
 
 INVOKE_TOOL = "deepagents.invoke_tool"
+
+
+def pairing_weather(city: str) -> str:
+    """Return the weather for a city."""
+    return f"weather:{city}"
 
 
 @activity.defn
@@ -61,8 +67,9 @@ class ToolAsActivityWorkflow:
         tool = tool_as_activity(
             get_weather, start_to_close_timeout=timedelta(seconds=10)
         )
-        message = await tool.ainvoke({"city": city})
-        return message.content
+        # The wrapper returns plain CONTENT (the tool node stamps the model's
+        # tool_call_id onto it) — not a pre-built ToolMessage.
+        return str(await tool.ainvoke({"city": city}))
 
 
 @pytest.mark.asyncio
@@ -118,3 +125,99 @@ def test_builtin_tool_in_workflow(recwarn) -> None:
 
     warn_unwrapped_tools([SimpleNamespace(name="scrape_website")])
     assert any("scrape_website" in str(w.message) for w in recwarn)
+
+
+# Turn-2 requests observed by the fake model, captured activity-side. Module
+# state is shared with the in-process worker, same as the tool registries.
+_captured_requests: list[list] = []
+
+
+@workflow.defn
+class ToolCallIdPairingWorkflow:
+    @workflow.run
+    async def run(self, city: str) -> str:
+        from deepagents import create_deep_agent
+
+        weather_tool = tool_as_activity(
+            pairing_weather, start_to_close_timeout=timedelta(seconds=10)
+        )
+        agent = create_deep_agent(
+            model="anthropic:claude-sonnet-4-5",
+            tools=[weather_tool],
+            system_prompt="Use the weather tool.",
+        )
+        result = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": f"Weather in {city}?"}]}
+        )
+        return str(result["messages"][-1].content)
+
+
+@pytest.mark.asyncio
+async def test_wrapped_tool_result_pairs_with_model_tool_call_id(env) -> None:
+    """The tool_result the model sees on turn 2 must carry the model's OWN
+    tool_call_id. Regression: ``tool_as_activity`` returned the activity-built
+    ``ToolMessage`` whose workflow-generated id a real provider (Anthropic)
+    rejects as an unpaired ``tool_result`` — offline fakes never validate the
+    pairing, so only a live-model run surfaced it. The wrapper now returns
+    plain content and the tool node stamps the correct id.
+    """
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    from temporalio.contrib.deepagents.testing import FakeModel
+
+    _captured_requests.clear()
+
+    class RecordingModel(FakeModel):
+        def __init__(self, responses: Sequence[Any]) -> None:
+            super().__init__(responses)
+
+        async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+            _captured_requests.append(list(messages))
+            return await super()._agenerate(
+                messages, stop=stop, run_manager=run_manager, **kwargs
+            )
+
+    tool_turn = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "pairing_weather",
+                "args": {"city": "Paris"},
+                "id": "toolu_scripted_pairing_id",
+            }
+        ],
+    )
+    final = AIMessage(content="It is sunny in Paris.")
+    responses = [tool_turn, final]
+    cursor = {"i": 0}
+
+    def provider(_model_name: str) -> RecordingModel:
+        reply = responses[cursor["i"] % len(responses)]
+        cursor["i"] += 1
+        return RecordingModel([reply])
+
+    plugin = DeepAgentsPlugin(model_provider=provider)
+    async with Worker(
+        env.client,
+        task_queue="da-toolcall-pairing",
+        workflows=[ToolCallIdPairingWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            ToolCallIdPairingWorkflow.run,
+            "Paris",
+            id=f"da-toolcall-pairing-{uuid.uuid4()}",
+            task_queue="da-toolcall-pairing",
+        )
+        out = await handle.result()
+
+    assert "sunny" in out.lower()
+    # Turn 2's request must contain the tool result under the MODEL's id.
+    assert len(_captured_requests) >= 2, len(_captured_requests)
+    tool_messages = [m for m in _captured_requests[1] if isinstance(m, ToolMessage)]
+    assert tool_messages, _captured_requests[1]
+    assert tool_messages[0].tool_call_id == "toolu_scripted_pairing_id", tool_messages[
+        0
+    ].tool_call_id
+    assert "weather:Paris" in str(tool_messages[0].content)

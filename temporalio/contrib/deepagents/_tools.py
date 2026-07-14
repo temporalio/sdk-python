@@ -282,7 +282,18 @@ def tool_as_activity(
             summary=f"tool:{tool_name}",
             **opts,
         )
-        return _serde.load_object(output.message)
+        message = _serde.load_object(output.message)
+        # Return CONTENT, not the pre-built ToolMessage: the activity cannot
+        # know the model's real tool_call_id, so a ToolMessage assembled there
+        # carries a generated id that a real provider rejects as an unpaired
+        # tool_result. Given plain content, the tool node stamps the model's
+        # own id — exactly as it does for unwrapped tools.
+        with workflow.unsafe.imports_passed_through():
+            from langchain_core.messages import ToolMessage
+
+        if isinstance(message, ToolMessage):
+            return message.content
+        return message
 
     _ROUTED_TOOL_NAMES.add(tool_name)
     return StructuredTool(
