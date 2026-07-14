@@ -343,7 +343,6 @@ async def encode_completion(
     Returns:
         Metrics from any external storage store operations that occurred.
     """
-
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True,
         skip_headers=not encode_headers,
