@@ -210,3 +210,62 @@ async def test_agent_builtin_file_tools_route_backend_ops(env, tmp_path) -> None
     # Exactly one backend_op per file tool call (awrite + aread), three model turns.
     assert counts[BACKEND_OP] == 2, counts
     assert counts["deepagents.invoke_model"] == 3, counts
+
+
+@workflow.defn
+class DefaultBackendGrepWorkflow:
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        # No backend argument: deepagents uses its default state-only backend.
+        agent = create_deep_agent(model="anthropic:claude-sonnet-4-5")
+        result = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": prompt}]}
+        )
+        return str(result["messages"][-1].content)
+
+
+@pytest.mark.asyncio
+async def test_builtin_tool_on_default_backend_runs_in_workflow(env) -> None:
+    """A built-in tool call (grep) on the DEFAULT state backend runs inline
+    in the workflow — no activity, no thread hop — under
+    ``max_cached_workflows=0`` so every task replays from history.
+
+    Regression: ``BackendProtocol``'s async defaults wrap their sync twins in
+    ``asyncio.to_thread``, which the deterministic workflow event loop
+    rejects with ``NotImplementedError``. A real model's first spontaneous
+    ``grep``/``read_file`` call crashed the workflow task; scripted tests
+    that never invoked built-ins on the default backend sailed past it. The
+    plugin now runs the sync twin inline when ``workflow.in_workflow()``.
+    """
+    from langchain_core.messages import AIMessage
+
+    from temporalio.contrib.deepagents.testing import mock_model_provider
+
+    grep_turn = AIMessage(
+        content="",
+        tool_calls=[{"name": "grep", "args": {"pattern": "hello"}, "id": "call-grep"}],
+    )
+    final = AIMessage(content="No matches found; done.")
+    plugin = DeepAgentsPlugin(
+        model_provider=mock_model_provider([grep_turn, final]),
+    )
+    async with Worker(
+        env.client,
+        task_queue="da-default-backend",
+        workflows=[DefaultBackendGrepWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            DefaultBackendGrepWorkflow.run,
+            "Grep the workspace for 'hello'.",
+            id=f"da-default-backend-{uuid.uuid4()}",
+            task_queue="da-default-backend",
+        )
+        out = await handle.result()
+
+    assert "done" in out
+    counts = await count_scheduled_activities(handle)
+    # The state-backend op stays in-workflow: model turns are the ONLY activities.
+    assert counts[BACKEND_OP] == 0, counts
+    assert counts["deepagents.invoke_model"] == 2, counts

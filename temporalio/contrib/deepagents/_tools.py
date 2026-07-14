@@ -303,6 +303,74 @@ def _is_coroutine(fn: Any) -> bool:
 # TemporalBackend
 # ---------------------------------------------------------------------------
 
+# Async protocol methods and their sync twins. deepagents' ``BackendProtocol``
+# implements each async DEFAULT as ``asyncio.to_thread(sync_twin, ...)``; the
+# deterministic workflow event loop has no thread executor, so any built-in
+# tool call against an unwrapped in-workflow backend (e.g. the default
+# ``StateBackend``) raises ``NotImplementedError``. A real model hits this on
+# its first spontaneous ``grep``/``read_file`` call; scripted-model tests that
+# never call built-ins sail past it.
+_ASYNC_TO_SYNC_OPS: dict[str, str] = {
+    "als": "ls",
+    "als_info": "ls_info",
+    "aread": "read",
+    "awrite": "write",
+    "aedit": "edit",
+    "aglob": "glob",
+    "aglob_info": "glob_info",
+    "agrep": "grep",
+    "agrep_raw": "grep_raw",
+    "adownload_files": "download_files",
+    "aupload_files": "upload_files",
+    "aexecute": "execute",
+}
+
+_original_backend_async_defaults: dict[str, Any] = {}
+
+
+def install_backend_async_patch() -> None:
+    """Make ``BackendProtocol``'s async defaults workflow-safe.
+
+    Inside a workflow, run the sync twin inline: for state-only backends that
+    is deterministic and semantically identical to the upstream default,
+    which merely moves the same sync call onto a worker thread. Outside a
+    workflow (activities, clients) the upstream default — thread hop plus
+    timeout guard — is used unchanged. Subclasses that override an async
+    method natively are unaffected; only the protocol defaults are replaced.
+    Idempotent.
+    """
+    from deepagents.backends.protocol import BackendProtocol
+
+    if _original_backend_async_defaults:
+        return
+    for async_name, sync_name in _ASYNC_TO_SYNC_OPS.items():
+        original = BackendProtocol.__dict__.get(async_name)
+        if original is None:
+            continue
+
+        def _make(sync_name: str, original: Any) -> Any:
+            async def patched(self: Any, *args: Any, **kwargs: Any) -> Any:
+                if workflow.in_workflow():
+                    return getattr(self, sync_name)(*args, **kwargs)
+                return await original(self, *args, **kwargs)
+
+            return patched
+
+        _original_backend_async_defaults[async_name] = original
+        setattr(BackendProtocol, async_name, _make(sync_name, original))
+
+
+def uninstall_backend_async_patch() -> None:
+    """Restore ``BackendProtocol``'s upstream async defaults."""
+    if not _original_backend_async_defaults:
+        return
+    from deepagents.backends.protocol import BackendProtocol
+
+    for async_name, original in _original_backend_async_defaults.items():
+        setattr(BackendProtocol, async_name, original)
+    _original_backend_async_defaults.clear()
+
+
 # Backend METHOD names (deepagents ``BackendProtocol`` +
 # ``SandboxBackendProtocol``) whose calls must cross the activity boundary:
 # every sync I/O method, its async ``a``-prefixed twin, and the sandbox/shell

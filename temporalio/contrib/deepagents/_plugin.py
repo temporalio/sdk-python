@@ -180,9 +180,10 @@ class DeepAgentsPlugin(SimplePlugin):
         # worker must still start — it simply runs without the auto-wrap patch.
         patched = False
         try:
-            from temporalio.contrib.deepagents import _model
+            from temporalio.contrib.deepagents import _model, _tools
 
             _model.install_model_patch()
+            _tools.install_backend_async_patch()
             patched = True
         except Exception:  # LangChain / deepagents not importable on this worker
             warnings.warn(
@@ -197,9 +198,10 @@ class DeepAgentsPlugin(SimplePlugin):
         finally:
             if patched:
                 # Import is cached: patched=True implies the import above succeeded.
-                from temporalio.contrib.deepagents import _model
+                from temporalio.contrib.deepagents import _model, _tools
 
                 _model.uninstall_model_patch()
+                _tools.uninstall_backend_async_patch()
             if langsmith_patched:
                 _uninstall_langsmith_temporal_override()
 
