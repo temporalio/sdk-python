@@ -27,8 +27,10 @@ worker-wide wiring, not per-workflow state.
 from __future__ import annotations
 
 import importlib
+import threading
 import uuid as _uuid
 import warnings
+import weakref
 from collections.abc import Mapping
 from datetime import timedelta
 from functools import wraps
@@ -53,6 +55,9 @@ if TYPE_CHECKING:
 
 _TOOL_REGISTRY: dict[str, "BaseTool"] = {}
 _BACKEND_REGISTRY: dict[str, Any] = {}
+# Serializes registration against the GC-time unregister in
+# _unregister_backend, which may run on another thread.
+_BACKEND_REGISTRY_LOCK = threading.Lock()
 
 # Worker-wide default activity options for tools wrapped with tool_as_activity,
 # set by the plugin. Not per-workflow state: fixed for the worker's lifetime, and
@@ -144,7 +149,23 @@ def get_registered_tool(name: str) -> BaseTool | None:
 
 def register_backend(ref: str, backend: Any) -> None:
     """Record a backend so :meth:`DeepAgentActivities.backend_op` can reach it."""
-    _BACKEND_REGISTRY[ref] = backend
+    with _BACKEND_REGISTRY_LOCK:
+        _BACKEND_REGISTRY[ref] = backend
+
+
+def _unregister_backend(ref: str, inner: Any) -> None:
+    """Drop ``ref`` from the registry if it still maps to ``inner``.
+
+    GC hook for :class:`TemporalBackend` (via ``weakref.finalize``): a wrapper
+    is typically constructed per workflow run, so without cleanup a long-lived
+    worker accumulates one registry entry per run. The identity guard is
+    load-bearing: refs are deterministic per run, so after a cache eviction a
+    replay re-registers the *same* ref with a fresh inner backend — the evicted
+    wrapper's finalizer must not remove that live registration.
+    """
+    with _BACKEND_REGISTRY_LOCK:
+        if _BACKEND_REGISTRY.get(ref) is inner:
+            del _BACKEND_REGISTRY[ref]
 
 
 def registered_backends() -> dict[str, Any]:
@@ -459,6 +480,12 @@ class TemporalBackend:
         self._opts: dict[str, Any] = dict(activity_options or {})
         self._opts.setdefault("start_to_close_timeout", timedelta(minutes=1))
         register_backend(self._ref, inner)
+        # Balance the registration when this wrapper is garbage-collected
+        # (workflow completion / cache eviction) so per-run backends do not
+        # accumulate in the worker-global registry. The finalizer captures
+        # (ref, inner) — not ``self`` — so it cannot keep the wrapper alive,
+        # and it only removes its own registration (see _unregister_backend).
+        self._finalizer = weakref.finalize(self, _unregister_backend, self._ref, inner)
 
     async def _dispatch(self, op: str, *args: Any, **kwargs: Any) -> Any:
         from temporalio.contrib.deepagents.workflow import call_backend_op

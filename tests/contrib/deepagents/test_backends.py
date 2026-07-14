@@ -12,6 +12,7 @@ A state-only backend needs no wrapping — that path is covered against the real
 
 from __future__ import annotations
 
+import gc
 import sys
 import uuid
 from datetime import timedelta
@@ -29,6 +30,10 @@ pytest.importorskip("langchain_core")
 
 from temporalio import workflow
 from temporalio.contrib.deepagents import DeepAgentsPlugin, TemporalBackend
+from temporalio.contrib.deepagents._tools import (
+    register_backend,
+    registered_backends,
+)
 from temporalio.worker import Worker
 from tests.contrib.deepagents.helpers import count_scheduled_activities
 
@@ -132,6 +137,34 @@ async def test_temporal_backend_op_activity(env: WorkflowEnvironment) -> None:
     counts = await count_scheduled_activities(handle)
     # One activity per op — the sync read AND the async aread both cross.
     assert counts[BACKEND_OP] == 2, counts
+
+
+def test_temporal_backend_unregisters_on_gc() -> None:
+    # A wrapper is typically constructed per workflow run; its registry entry
+    # must not outlive it, or a long-lived worker leaks one entry per run.
+    inner = RecordingBackend()
+    before = set(registered_backends())
+    wrapper = TemporalBackend(inner)
+    (ref,) = set(registered_backends()) - before
+    assert registered_backends()[ref] is inner
+    del wrapper
+    gc.collect()
+    assert ref not in registered_backends()
+
+
+def test_temporal_backend_gc_keeps_reregistered_ref() -> None:
+    # Refs are deterministic per run: after a cache eviction, a replay
+    # re-registers the SAME ref with a fresh inner backend. The evicted
+    # wrapper's GC cleanup must leave that live registration alone.
+    before = set(registered_backends())
+    wrapper = TemporalBackend(RecordingBackend())
+    (ref,) = set(registered_backends()) - before
+    replacement = RecordingBackend()
+    register_backend(ref, replacement)
+    del wrapper
+    gc.collect()
+    assert registered_backends().get(ref) is replacement
+    registered_backends().pop(ref, None)
 
 
 @pytest.mark.asyncio

@@ -191,14 +191,20 @@ class DeepAgentsPlugin(SimplePlugin):
             _model.install_model_patch()
             _tools.install_backend_async_patch()
             patched = True
-        except Exception:  # LangChain / deepagents not importable on this worker
+        except ImportError as exc:  # LangChain / deepagents absent on this worker
+            # Deliberately ImportError only: a *missing* optional dependency
+            # must not stop the worker, but a genuine patch-installation bug
+            # (e.g. upstream renaming the seam raises AttributeError) must
+            # surface at startup, not degrade into silent in-workflow calls.
             warnings.warn(
-                "DeepAgentsPlugin could not patch create_deep_agent; use explicit "
-                "TemporalModel(...) instances to route model calls through "
-                "activities.",
+                f"DeepAgentsPlugin could not patch create_deep_agent ({exc}); "
+                "use explicit TemporalModel(...) instances to route model calls "
+                "through activities.",
                 stacklevel=2,
             )
-        langsmith_patched = _install_langsmith_temporal_override()
+        # Installed for the life of the process, never uninstalled — see
+        # _install_langsmith_temporal_override for why.
+        _install_langsmith_temporal_override()
         try:
             yield
         finally:
@@ -208,8 +214,6 @@ class DeepAgentsPlugin(SimplePlugin):
 
                 _model.uninstall_model_patch()
                 _tools.uninstall_backend_async_patch()
-            if langsmith_patched:
-                _uninstall_langsmith_temporal_override()
 
     # -- worker config -------------------------------------------------------
 
@@ -246,28 +250,28 @@ async def _temporal_aio_to_thread(
         return ctx.run(func, *args, **kwargs)
 
 
-def _install_langsmith_temporal_override() -> bool:
-    """Route LangSmith's thread hop inline while in a workflow. Returns success.
+def _install_langsmith_temporal_override() -> None:
+    """Route LangSmith's thread hop inline while in a workflow.
 
     ``set_runtime_overrides`` mutates a module global in the sandbox-passthrough
     ``langsmith`` package, so the in-workflow tracer sees it too. No-op (and
-    harmless) when LangSmith is not installed.
+    harmless) when LangSmith is not installed or too old to expose
+    ``set_runtime_overrides``.
+
+    The override is deliberately installed for the life of the process and
+    never uninstalled: LangSmith exposes a single process-wide override slot
+    (each ``set_runtime_overrides`` call replaces it wholesale), and
+    ``temporalio.contrib.langsmith`` installs a behaviorally identical override
+    exactly once, without reinstalling. Resetting the slot on this worker's
+    shutdown would therefore permanently strip a composed LangSmith plugin's
+    workflow-safety override. Leaving it installed is safe: the override defers
+    to LangSmith's default thread hop whenever ``workflow.in_workflow()`` is
+    false, so it is inert outside workflows.
     """
     try:
         import langsmith
 
         langsmith.set_runtime_overrides(aio_to_thread=_temporal_aio_to_thread)
-        return True
-    except Exception:
-        return False
-
-
-def _uninstall_langsmith_temporal_override() -> None:
-    """Restore LangSmith's default runtime behavior."""
-    try:
-        import langsmith
-
-        langsmith.set_runtime_overrides()
     except Exception:
         pass
 

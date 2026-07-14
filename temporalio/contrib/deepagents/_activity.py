@@ -150,6 +150,11 @@ def _auto_heartbeater(fn: Callable) -> Callable:
         finally:
             if beat_task is not None:
                 beat_task.cancel()
+                # Let the cancellation land before returning so no pending task
+                # outlives the activity (a bare ``cancel()`` leaves the task to
+                # be destroyed while pending if the loop shuts down first).
+                # ``asyncio.wait`` never re-raises the task's CancelledError.
+                await asyncio.wait([beat_task])
 
     return wrapped
 
