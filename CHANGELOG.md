@@ -28,6 +28,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Schedule policies now omit an unspecified catch-up window so the Temporal Server applies its
+  default (currently one year).
+
 ### Security
 
 ## [1.30.0] - 2026-07-01

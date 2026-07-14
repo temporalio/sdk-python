@@ -956,9 +956,13 @@ class SchedulePolicy:
     """Controls what happens when an action is started while another is still
     running."""
 
-    catchup_window: timedelta = timedelta(days=365)
+    catchup_window: timedelta | None = None
     """After a Temporal server is unavailable, amount of time in the past to
-    execute missed actions."""
+    execute missed actions.
+
+    If unset, this is omitted so the Temporal Server applies its default
+    (currently one year).
+    """
 
     pause_on_failure: bool = False
     """Whether to pause the schedule if an action fails or times out.
@@ -971,20 +975,24 @@ class SchedulePolicy:
     def _from_proto(pol: temporalio.api.schedule.v1.SchedulePolicies) -> SchedulePolicy:
         return SchedulePolicy(
             overlap=ScheduleOverlapPolicy(int(pol.overlap_policy)),
-            catchup_window=pol.catchup_window.ToTimedelta(),
+            catchup_window=(
+                pol.catchup_window.ToTimedelta()
+                if pol.HasField("catchup_window")
+                else None
+            ),
             pause_on_failure=pol.pause_on_failure,
         )
 
     def _to_proto(self) -> temporalio.api.schedule.v1.SchedulePolicies:
-        catchup_window = google.protobuf.duration_pb2.Duration()
-        catchup_window.FromTimedelta(self.catchup_window)
-        return temporalio.api.schedule.v1.SchedulePolicies(
+        ret = temporalio.api.schedule.v1.SchedulePolicies(
             overlap_policy=temporalio.api.enums.v1.ScheduleOverlapPolicy.ValueType(
                 self.overlap
             ),
-            catchup_window=catchup_window,
             pause_on_failure=self.pause_on_failure,
         )
+        if self.catchup_window is not None:
+            ret.catchup_window.FromTimedelta(self.catchup_window)
+        return ret
 
 
 @dataclass
@@ -1060,8 +1068,6 @@ class Schedule:
         )
 
     async def _to_proto(self, client: Client) -> temporalio.api.schedule.v1.Schedule:
-        catchup_window = google.protobuf.duration_pb2.Duration()
-        catchup_window.FromTimedelta(self.policy.catchup_window)
         return temporalio.api.schedule.v1.Schedule(
             spec=self.spec._to_proto(),
             action=await self.action._to_proto(client),

@@ -837,6 +837,15 @@ def test_history_from_json():
     )
 
 
+def test_schedule_policy_default_catchup_window_is_omitted():
+    policy = SchedulePolicy()
+    assert policy.catchup_window is None
+    assert not policy._to_proto().HasField("catchup_window")
+
+    policy.catchup_window = timedelta(minutes=5)
+    assert policy._to_proto().catchup_window.ToTimedelta() == timedelta(minutes=5)
+
+
 async def test_schedule_basics(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
@@ -987,12 +996,15 @@ async def test_schedule_basics(
         state=ScheduleState(paused=True),
     )
     assert isinstance(new_schedule.action, ScheduleActionStartWorkflow)
+    assert new_schedule.policy.catchup_window is None
 
     async def update_schedule_basic(_input: ScheduleUpdateInput) -> ScheduleUpdate:
         return ScheduleUpdate(new_schedule)
 
     await handle.update(update_schedule_basic)
     desc = await handle.describe()
+    assert desc.schedule.policy.catchup_window == timedelta(days=365)
+    new_schedule.policy.catchup_window = timedelta(days=365)
     new_schedule.action.args = await DataConverter.default.encode(
         new_schedule.action.args
     )
