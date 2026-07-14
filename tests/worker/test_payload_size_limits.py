@@ -42,7 +42,7 @@ class LargePayloadActivityInput:
 
 
 @activity.defn
-async def large_payload_activity(input: LargePayloadActivityInput) -> None:
+async def large_payload_activity(_input: LargePayloadActivityInput) -> None:
     return None
 
 

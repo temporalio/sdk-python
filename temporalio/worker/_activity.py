@@ -32,7 +32,6 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
 import temporalio.converter
-import temporalio.converter._payload_limits
 import temporalio.exceptions
 from temporalio.converter import (
     StorageDriverActivityInfo,

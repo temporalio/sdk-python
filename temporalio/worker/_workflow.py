@@ -23,7 +23,6 @@ import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
 import temporalio.converter._extstore
-import temporalio.converter._payload_limits
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.bridge.worker import PollShutdownError
