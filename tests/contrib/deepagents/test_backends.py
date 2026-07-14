@@ -10,19 +10,12 @@ A state-only backend needs no wrapping — that path is covered against the real
 ``deepagents.StateBackend`` when it is importable.
 """
 
-# The deepagents / langchain optional deps cannot install on Python 3.10
-# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
-# runtime collection is guarded by importorskip below.
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
-# pyright: reportImplicitRelativeImport=false
-
 from __future__ import annotations
 
 import sys
 import uuid
 from datetime import timedelta
 from pathlib import Path
-from typing import cast
 
 import pytest
 
@@ -70,10 +63,15 @@ class BackendWorkflow:
         return f"{sync_out}|{async_out}"
 
 
-with workflow.unsafe.imports_passed_through():
-    from deepagents import create_deep_agent
-    from deepagents.backends import FilesystemBackend, StateBackend
-    from deepagents.backends.protocol import BackendProtocol
+# Bind deepagents symbols off the module importorskip returns: a static
+# `from deepagents import ...` cannot resolve on Python 3.10 (deepagents
+# needs >= 3.11), and with the package absent the type checkers mis-resolve
+# the name against this same-named test directory.
+_deepagents_mod = pytest.importorskip("deepagents")
+_backends_mod = pytest.importorskip("deepagents.backends")
+create_deep_agent = _deepagents_mod.create_deep_agent
+FilesystemBackend = _backends_mod.FilesystemBackend
+StateBackend = _backends_mod.StateBackend
 
 
 # A state-only backend is pure workflow state and must NOT schedule an activity.
@@ -104,9 +102,7 @@ class FilesystemAgentWorkflow:
         )
         agent = create_deep_agent(
             model="anthropic:claude-sonnet-4-5",
-            # TemporalBackend satisfies the protocol structurally via
-            # __getattr__ forwarding, which nominal type checking can't see.
-            backend=cast(BackendProtocol, cast(object, backend)),
+            backend=backend,
             system_prompt="Write the note, read it back, then report it.",
         )
         result = await agent.ainvoke(

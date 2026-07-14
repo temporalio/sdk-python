@@ -7,12 +7,6 @@ replay-safe, so the plugin warns (respecting the choice rather than hard-failing
 and points at the snapshot + continue-as-new path.
 """
 
-# The deepagents / langchain optional deps cannot install on Python 3.10
-# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
-# runtime collection is guarded by importorskip below.
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
-# pyright: reportImplicitRelativeImport=false
-
 from __future__ import annotations
 
 import sys
@@ -32,8 +26,11 @@ pytest.importorskip("langchain_core")
 from temporalio import workflow
 from temporalio.contrib.deepagents.workflow import warn_durable_checkpointer
 
-with workflow.unsafe.imports_passed_through():
-    from deepagents import create_deep_agent
+# Bind deepagents symbols off the module importorskip returns: a static
+# `from deepagents import ...` cannot resolve on Python 3.10 (deepagents
+# needs >= 3.11), and with the package absent the type checkers mis-resolve
+# the name against this same-named test directory.
+create_deep_agent = pytest.importorskip("deepagents").create_deep_agent
 
 
 class _DurableSaver:

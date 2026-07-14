@@ -5,12 +5,6 @@ runs a real workflow that invokes the wrapped tool and asserts it scheduled the
 expected activity.
 """
 
-# The deepagents / langchain optional deps cannot install on Python 3.10
-# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
-# runtime collection is guarded by importorskip below.
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
-# pyright: reportImplicitRelativeImport=false
-
 from __future__ import annotations
 
 import sys
@@ -43,6 +37,12 @@ with workflow.unsafe.imports_passed_through():
     from temporalio.contrib.deepagents._tools import warn_unwrapped_tools  # noqa: E402
 
 INVOKE_TOOL = "deepagents.invoke_tool"
+
+# Bind deepagents symbols off the module importorskip returns: a static
+# `from deepagents import ...` cannot resolve on Python 3.10 (deepagents
+# needs >= 3.11), and with the package absent the type checkers mis-resolve
+# the name against this same-named test directory.
+create_deep_agent = pytest.importorskip("deepagents").create_deep_agent
 
 
 def pairing_weather(city: str) -> str:
@@ -145,8 +145,6 @@ _captured_requests: list[list] = []
 class ToolCallIdPairingWorkflow:
     @workflow.run
     async def run(self, city: str) -> str:
-        from deepagents import create_deep_agent
-
         weather_tool = tool_as_activity(
             pairing_weather, start_to_close_timeout=timedelta(seconds=10)
         )

@@ -11,12 +11,6 @@ the assertion is the robust invariant: the configured agent runs and at least on
 model call went through an activity.
 """
 
-# The deepagents / langchain optional deps cannot install on Python 3.10
-# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
-# runtime collection is guarded by importorskip below.
-# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
-# pyright: reportImplicitRelativeImport=false
-
 from __future__ import annotations
 
 import sys
@@ -37,9 +31,13 @@ from temporalio import workflow  # noqa: E402
 from temporalio.worker import Worker  # noqa: E402
 from tests.contrib.deepagents.helpers import count_scheduled_activities  # noqa: E402
 
-with workflow.unsafe.imports_passed_through():
-    from deepagents import create_deep_agent
+# Bind deepagents symbols off the module importorskip returns: a static
+# `from deepagents import ...` cannot resolve on Python 3.10 (deepagents
+# needs >= 3.11), and with the package absent the type checkers mis-resolve
+# the name against this same-named test directory.
+create_deep_agent = pytest.importorskip("deepagents").create_deep_agent
 
+with workflow.unsafe.imports_passed_through():
     from temporalio.contrib.deepagents import DeepAgentsPlugin
     from temporalio.contrib.deepagents.testing import mock_model_provider
 
