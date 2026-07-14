@@ -11,6 +11,7 @@ and points at the snapshot + continue-as-new path.
 # (deepagents pins >=3.11), so pyright cannot resolve their imports there;
 # runtime collection is guarded by importorskip below.
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+# pyright: reportImplicitRelativeImport=false
 
 from __future__ import annotations
 

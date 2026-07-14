@@ -160,7 +160,7 @@ def dump_backend_result(value: Any) -> Any:
 
     Backend protocol results (``WriteResult`` / ``ReadResult`` / ``GrepResult``
     and their nested ``FileInfo`` / ``GrepMatch`` items, …) are plain
-    dataclasses — not LangChain ``Serializable``s — and the filesystem
+    dataclasses — not LangChain ``Serializable`` objects — and the filesystem
     middleware reads their ATTRIBUTES in-workflow, so a plain JSON round-trip
     (which decays them to dicts) breaks the seam at the first real backend op.
     Tag deepagents dataclasses with their import path so

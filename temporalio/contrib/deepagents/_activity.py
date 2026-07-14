@@ -221,7 +221,7 @@ def _default_model_provider(model_name: str) -> Any:
 class DeepAgentActivities:
     """Holds the worker-side dependencies and exposes the four activities.
 
-    An instance is created by :class:`~temporalio.contrib.deepagents.DeepAgentsPlugin`
+    An instance is created by ``DeepAgentsPlugin``
     and its bound methods are registered on the worker.
     """
 

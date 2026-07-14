@@ -4,7 +4,8 @@ Unit-testing a Deep Agent under Temporal should not require a live LLM endpoint
 or a paid API key. This module ships:
 
 * :class:`FakeModel` — a real ``BaseChatModel`` returning scripted replies (plain
-  text or full ``AIMessage``s carrying ``tool_calls``), cycling when exhausted;
+  text or full ``AIMessage`` objects carrying ``tool_calls``), cycling when
+  exhausted;
 * :func:`fake_model_factory` — a one-liner for the common text-only case;
 * :func:`mock_model_provider` — a ``model_provider`` (name → model) you pass to
   ``DeepAgentsPlugin(model_provider=...)`` so the model activity runs offline;
