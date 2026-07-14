@@ -16,6 +16,8 @@ from typing import Any
 
 import pytest
 
+from temporalio.testing import WorkflowEnvironment
+
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
 )
@@ -59,7 +61,7 @@ class ContinueAsNewWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_can_threshold_and_cache(env) -> None:
+async def test_can_threshold_and_cache(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,

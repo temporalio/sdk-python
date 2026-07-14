@@ -7,6 +7,11 @@ replay-safe, so the plugin warns (respecting the choice rather than hard-failing
 and points at the snapshot + continue-as-new path.
 """
 
+# The deepagents / langchain optional deps cannot install on Python 3.10
+# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
+# runtime collection is guarded by importorskip below.
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import sys
@@ -14,6 +19,8 @@ import uuid
 import warnings
 
 import pytest
+
+from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
@@ -61,7 +68,7 @@ def test_durable_checkpointer_warns() -> None:
 
 
 @pytest.mark.asyncio
-async def test_default_saver_rehydrates(env) -> None:
+async def test_default_saver_rehydrates(env: WorkflowEnvironment) -> None:
     # Against the real deepagents default (in-workflow InMemorySaver): the agent
     # runs and its recorded history replays cleanly, proving replay rehydrates
     # the in-workflow checkpoint state with no external checkpointer.

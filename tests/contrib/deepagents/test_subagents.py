@@ -11,12 +11,19 @@ the assertion is the robust invariant: the configured agent runs and at least on
 model call went through an activity.
 """
 
+# The deepagents / langchain optional deps cannot install on Python 3.10
+# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
+# runtime collection is guarded by importorskip below.
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import sys
 import uuid
 
 import pytest
+
+from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
@@ -60,7 +67,7 @@ class SubAgentWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_subagent_calls_route_to_activities(env) -> None:
+async def test_subagent_calls_route_to_activities(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin(
         model_provider=mock_model_provider(["Coordinated answer."]),
     )

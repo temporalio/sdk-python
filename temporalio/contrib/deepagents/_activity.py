@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import importlib
 from datetime import timedelta
 from functools import wraps
 from typing import Any, Callable
@@ -209,7 +210,10 @@ def _default_model_provider(model_name: str) -> Any:
     logical attempt fans out into nested retry storms that Temporal can neither
     see nor bound.
     """
-    from langchain.chat_models import init_chat_model
+    # importlib: `langchain` (unlike langchain-core) is absent on Python 3.10
+    # environments where the deepagents extra cannot install; a static import
+    # here fails type-checking there.
+    init_chat_model = importlib.import_module("langchain.chat_models").init_chat_model
 
     return init_chat_model(model_name, max_retries=0)
 

@@ -15,6 +15,8 @@ from datetime import timedelta
 
 import pytest
 
+from temporalio.testing import WorkflowEnvironment
+
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
 )
@@ -30,7 +32,7 @@ class TwoOpBackend:
     """Protocol-named ops: one async (``awrite``, as the filesystem
     middleware calls it) and one sync (``read``)."""
 
-    async def awrite(self, file_path: str, content: str) -> str:
+    async def awrite(self, file_path: str, _content: str) -> str:
         return f"wrote:{file_path}"
 
     def read(self, file_path: str) -> str:
@@ -50,7 +52,7 @@ class TwoOpWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_activity_schedule_counts(env) -> None:
+async def test_activity_schedule_counts(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,

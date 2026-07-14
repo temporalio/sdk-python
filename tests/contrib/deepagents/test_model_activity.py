@@ -12,6 +12,8 @@ from datetime import timedelta
 
 import pytest
 
+from temporalio.testing import WorkflowEnvironment
+
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
 )
@@ -53,7 +55,7 @@ class ExplicitTimeoutWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_model_call_is_activity(env) -> None:
+async def test_model_call_is_activity(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin(
         model_provider=mock_model_provider(["The capital of France is Paris."]),
         model_activity_options={"start_to_close_timeout": timedelta(seconds=30)},
@@ -77,7 +79,7 @@ async def test_model_call_is_activity(env) -> None:
 
 
 @pytest.mark.asyncio
-async def test_temporal_model_explicit(env) -> None:
+async def test_temporal_model_explicit(env: WorkflowEnvironment) -> None:
     # The explicit escape hatch routes through the same activity, with a
     # per-model timeout override rather than the plugin default.
     plugin = DeepAgentsPlugin(

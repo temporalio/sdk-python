@@ -10,14 +10,22 @@ A state-only backend needs no wrapping — that path is covered against the real
 ``deepagents.StateBackend`` when it is importable.
 """
 
+# The deepagents / langchain optional deps cannot install on Python 3.10
+# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
+# runtime collection is guarded by importorskip below.
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import sys
 import uuid
 from datetime import timedelta
+from pathlib import Path
 from typing import cast
 
 import pytest
+
+from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
@@ -71,10 +79,12 @@ with workflow.unsafe.imports_passed_through():
 @workflow.defn
 class StateBackendWorkflow:
     @workflow.run
-    async def run(self) -> bool:
+    async def run(self) -> str:
         backend = StateBackend()
-        # Merely holding a StateBackend schedules no activity; it is not wrapped.
-        return backend is not None
+        # Merely holding a StateBackend schedules no activity; it is not
+        # wrapped. Return the class provenance so the assertion is on a real
+        # runtime property rather than a statically-decidable comparison.
+        return type(backend).__module__
 
 
 # The full agent-level seam: a REAL Deep Agent whose BUILT-IN file tools drive a
@@ -105,7 +115,7 @@ class FilesystemAgentWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_temporal_backend_op_activity(env) -> None:
+async def test_temporal_backend_op_activity(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,
@@ -128,7 +138,7 @@ async def test_temporal_backend_op_activity(env) -> None:
 
 
 @pytest.mark.asyncio
-async def test_state_backend_in_workflow(env) -> None:
+async def test_state_backend_in_workflow(env: WorkflowEnvironment) -> None:
     # A state-only backend is pure workflow state and must NOT schedule an
     # activity. Exercised against the real StateBackend when deepagents is present.
     plugin = DeepAgentsPlugin()
@@ -143,13 +153,15 @@ async def test_state_backend_in_workflow(env) -> None:
             id=f"da-state-backend-{uuid.uuid4()}",
             task_queue="da-state-backend",
         )
-        assert await handle.result() is True
+        assert (await handle.result()).startswith("deepagents")
     counts = await count_scheduled_activities(handle)
     assert counts[BACKEND_OP] == 0, counts
 
 
 @pytest.mark.asyncio
-async def test_agent_builtin_file_tools_route_backend_ops(env, tmp_path) -> None:
+async def test_agent_builtin_file_tools_route_backend_ops(
+    env: WorkflowEnvironment, tmp_path: Path
+) -> None:
     """An unmodified agent's built-in write_file/read_file tools cross the
     activity boundary when the backend is TemporalBackend-wrapped — under
     ``max_cached_workflows=0``, so every workflow task replays from history.
@@ -225,7 +237,9 @@ class DefaultBackendGrepWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_builtin_tool_on_default_backend_runs_in_workflow(env) -> None:
+async def test_builtin_tool_on_default_backend_runs_in_workflow(
+    env: WorkflowEnvironment,
+) -> None:
     """A built-in tool call (grep) on the DEFAULT state backend runs inline
     in the workflow — no activity, no thread hop — under
     ``max_cached_workflows=0`` so every task replays from history.

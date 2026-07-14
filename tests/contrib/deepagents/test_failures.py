@@ -15,6 +15,8 @@ from datetime import timedelta
 
 import pytest
 
+from temporalio.testing import WorkflowEnvironment
+
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
 )
@@ -78,7 +80,7 @@ class FailingWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_workflow_failure_type(env) -> None:
+async def test_workflow_failure_type(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,
@@ -101,7 +103,7 @@ async def test_workflow_failure_type(env) -> None:
 
 
 @pytest.mark.asyncio
-async def test_unwrappable_model_instance(env) -> None:
+async def test_unwrappable_model_instance() -> None:
     pytest.importorskip("langchain_core")
     from langchain_core.language_models.fake_chat_models import FakeListChatModel
 

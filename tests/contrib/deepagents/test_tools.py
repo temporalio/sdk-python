@@ -5,15 +5,23 @@ runs a real workflow that invokes the wrapped tool and asserts it scheduled the
 expected activity.
 """
 
+# The deepagents / langchain optional deps cannot install on Python 3.10
+# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
+# runtime collection is guarded by importorskip below.
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import sys
 import uuid
+from collections.abc import Sequence
 from datetime import timedelta
 from types import SimpleNamespace
-from typing import Any, Sequence
+from typing import Any
 
 import pytest
+
+from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
@@ -73,7 +81,7 @@ class ToolAsActivityWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_activity_as_tool(env) -> None:
+async def test_activity_as_tool(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,
@@ -96,7 +104,7 @@ async def test_activity_as_tool(env) -> None:
 
 
 @pytest.mark.asyncio
-async def test_tool_as_activity(env) -> None:
+async def test_tool_as_activity(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,
@@ -117,7 +125,7 @@ async def test_tool_as_activity(env) -> None:
     assert counts[INVOKE_TOOL] == 1, counts
 
 
-def test_builtin_tool_in_workflow(recwarn) -> None:
+def test_builtin_tool_in_workflow(recwarn: pytest.WarningsRecorder) -> None:
     # Built-in tool names never warn (they are pure, in-workflow); an unwrapped
     # user tool does warn so the Workflow-vs-Activity choice is conscious.
     warn_unwrapped_tools([SimpleNamespace(name="write_todos")])
@@ -153,7 +161,9 @@ class ToolCallIdPairingWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_wrapped_tool_result_pairs_with_model_tool_call_id(env) -> None:
+async def test_wrapped_tool_result_pairs_with_model_tool_call_id(
+    env: WorkflowEnvironment,
+) -> None:
     """The tool_result the model sees on turn 2 must carry the model's OWN
     tool_call_id. Regression: ``tool_as_activity`` returned the activity-built
     ``ToolMessage`` whose workflow-generated id a real provider (Anthropic)
@@ -171,7 +181,13 @@ async def test_wrapped_tool_result_pairs_with_model_tool_call_id(env) -> None:
         def __init__(self, responses: Sequence[Any]) -> None:
             super().__init__(responses)
 
-        async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        async def _agenerate(
+            self,
+            messages: list[Any],
+            stop: list[str] | None = None,
+            run_manager: Any = None,
+            **kwargs: Any,
+        ) -> Any:
             _captured_requests.append(list(messages))
             return await super()._agenerate(
                 messages, stop=stop, run_manager=run_manager, **kwargs

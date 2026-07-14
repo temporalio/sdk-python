@@ -26,8 +26,10 @@ passes through, so the object the workflow reads is the same one the plugin set.
 
 from __future__ import annotations
 
+import importlib
+from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from datetime import timedelta
-from typing import Any, AsyncIterator, Iterator, Mapping, Sequence
+from typing import Any
 
 from temporalio import workflow
 from temporalio.contrib.deepagents import _activity, _serde
@@ -323,18 +325,20 @@ def install_model_patch() -> None:
     deepagents on a plain client / activity worker is unaffected. Idempotent.
     """
     global _original_create_deep_agent, _original_resolve_model
-    import deepagents
-    import deepagents.graph as _graph
+    # importlib: `deepagents` is absent on Python 3.10 environments (its floor
+    # is 3.11), so static imports here fail type-checking there.
+    deepagents = importlib.import_module("deepagents")
+    _graph = importlib.import_module("deepagents.graph")
 
     if _original_resolve_model is None:
-        _original_resolve_model = _graph.resolve_model  # pyright: ignore[reportPrivateImportUsage]
+        _original_resolve_model = _graph.resolve_model
 
         def patched_resolve_model(model: Any) -> Any:
             if workflow.in_workflow():
                 return _wrap_model_arg(model)
             return _original_resolve_model(model)
 
-        _graph.resolve_model = patched_resolve_model  # pyright: ignore[reportPrivateImportUsage]
+        setattr(_graph, "resolve_model", patched_resolve_model)
 
     if _original_create_deep_agent is None:
         _original_create_deep_agent = deepagents.create_deep_agent
@@ -350,19 +354,19 @@ def install_model_patch() -> None:
                 warn_durable_checkpointer(kwargs.get("checkpointer"))
             return _original_create_deep_agent(*args, **kwargs)
 
-        deepagents.create_deep_agent = patched
+        setattr(deepagents, "create_deep_agent", patched)
 
 
 def uninstall_model_patch() -> None:
     """Restore the original ``resolve_model`` / ``create_deep_agent``."""
     global _original_create_deep_agent, _original_resolve_model
     if _original_resolve_model is not None:
-        import deepagents.graph as _graph
+        _graph = importlib.import_module("deepagents.graph")
 
-        _graph.resolve_model = _original_resolve_model  # pyright: ignore[reportPrivateImportUsage]
+        setattr(_graph, "resolve_model", _original_resolve_model)
         _original_resolve_model = None
     if _original_create_deep_agent is not None:
-        import deepagents
+        deepagents = importlib.import_module("deepagents")
 
-        deepagents.create_deep_agent = _original_create_deep_agent
+        setattr(deepagents, "create_deep_agent", _original_create_deep_agent)
         _original_create_deep_agent = None

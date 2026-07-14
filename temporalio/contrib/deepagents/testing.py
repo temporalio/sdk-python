@@ -15,7 +15,8 @@ Importing this module has no process-wide side effects.
 
 from __future__ import annotations
 
-from typing import Any, Callable, List, Optional, Sequence, Union
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from langchain_core.callbacks import (
     AsyncCallbackManagerForLLMRun,
@@ -29,7 +30,7 @@ from pydantic import PrivateAttr
 
 __all__ = ["FakeModel", "fake_model_factory", "mock_model_provider", "MockTool"]
 
-Response = Union[str, AIMessage]
+Response = str | AIMessage
 
 
 class FakeModel(BaseChatModel):
@@ -41,7 +42,7 @@ class FakeModel(BaseChatModel):
             can script ``tool_calls`` to drive the agent's tool path).
     """
 
-    responses: List[Any]
+    responses: list[Any]
     _cursor: int = PrivateAttr(default=0)
 
     def __init__(self, responses: Sequence[Response], **kwargs: Any) -> None:
@@ -70,18 +71,18 @@ class FakeModel(BaseChatModel):
 
     def _generate(
         self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         return ChatResult(generations=[ChatGeneration(message=self._next())])
 
     async def _agenerate(
         self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         return ChatResult(generations=[ChatGeneration(message=self._next())])

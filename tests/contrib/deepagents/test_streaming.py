@@ -16,6 +16,8 @@ from datetime import timedelta
 
 import pytest
 
+from temporalio.testing import WorkflowEnvironment
+
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
 )
@@ -48,7 +50,7 @@ class StreamWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_stream_chunks_published(env) -> None:
+async def test_stream_chunks_published(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin(
         model_provider=mock_model_provider(["Streamed answer."]),
         streaming_topic="da-stream-topic",
@@ -76,7 +78,7 @@ async def test_stream_chunks_published(env) -> None:
 
 
 @pytest.mark.asyncio
-async def test_batch_interval_coalesces(env) -> None:
+async def test_batch_interval_coalesces(env: WorkflowEnvironment) -> None:
     # A custom batch interval is threaded into the streaming activity that
     # coalesces chunks; streaming still returns the aggregated message.
     plugin = DeepAgentsPlugin(

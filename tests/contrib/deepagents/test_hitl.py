@@ -15,6 +15,11 @@ State lives on the workflow instance (per-execution), which is the idiomatic
 Temporal pattern for state shared between the run method and its handlers.
 """
 
+# The deepagents / langchain optional deps cannot install on Python 3.10
+# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
+# runtime collection is guarded by importorskip below.
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import asyncio
@@ -24,6 +29,8 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+
+from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
@@ -96,7 +103,7 @@ class HitlWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_interrupt_query_then_resume(env) -> None:
+async def test_interrupt_query_then_resume(env: WorkflowEnvironment) -> None:
     approve = AIMessage(
         content="",
         tool_calls=[{"name": "book_trip", "args": {"city": "Rome"}, "id": "c1"}],

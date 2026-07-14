@@ -26,10 +26,11 @@ from __future__ import annotations
 
 import sys
 import warnings
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
-from typing import Any, AsyncIterator, Callable, Mapping, Sequence
+from typing import Any, Callable
 
 from temporalio import activity as activity_mod
 from temporalio.contrib.deepagents import _serde, _tools
@@ -38,6 +39,11 @@ from temporalio.contrib.deepagents.workflow import DeepAgentsWorkflowError
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+# Runtime floor for the Deep Agents control loop. Kept in a constant so
+# static checkers do not narrow `sys.version_info` comparisons into
+# unreachable-code findings on new interpreters.
+_MIN_PYTHON = (3, 11)
 
 
 class DeepAgentsPlugin(SimplePlugin):
@@ -75,7 +81,7 @@ class DeepAgentsPlugin(SimplePlugin):
         data_converter: Any = None,
     ) -> None:
         """Configure the plugin; see the class docstring for parameters."""
-        if sys.version_info < (3, 11):
+        if sys.version_info < _MIN_PYTHON:
             warnings.warn(
                 "DeepAgentsPlugin requires Python >= 3.11 (deepagents pins "
                 ">=3.11); the Deep Agents control loop relies on contextvars "

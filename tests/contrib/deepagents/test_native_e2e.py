@@ -11,6 +11,11 @@ because they are the plugin's own runtime dependency and may be absent on a
 docs-only checkout — there is no env-var gate.
 """
 
+# The deepagents / langchain optional deps cannot install on Python 3.10
+# (deepagents pins >=3.11), so pyright cannot resolve their imports there;
+# runtime collection is guarded by importorskip below.
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import sys
@@ -19,14 +24,14 @@ from datetime import timedelta
 
 import pytest
 
+from temporalio.testing import WorkflowEnvironment
+
 pytestmark = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="deepagents requires Python >= 3.11"
 )
 
 pytest.importorskip("deepagents")
 pytest.importorskip("langchain_core")
-
-import deepagents  # noqa: E402,F401  (cardinal rule: import the SDK directly)
 
 from temporalio import workflow  # noqa: E402
 from temporalio.worker import Worker  # noqa: E402
@@ -80,7 +85,7 @@ class ToolLoopWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_deep_agent_runs_via_plugin(env) -> None:
+async def test_deep_agent_runs_via_plugin(env: WorkflowEnvironment) -> None:
     plugin = DeepAgentsPlugin(
         model_provider=mock_model_provider(["The answer is 42."]),
     )
@@ -105,7 +110,7 @@ async def test_deep_agent_runs_via_plugin(env) -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_tool_loop_routes_to_activities(env) -> None:
+async def test_agent_tool_loop_routes_to_activities(env: WorkflowEnvironment) -> None:
     # Script the model: first turn asks for the tool, second turn answers. This
     # forces model -> tool -> model, proving each call routes through an activity.
     tool_call = AIMessage(

@@ -26,11 +26,13 @@ worker-wide wiring, not per-workflow state.
 
 from __future__ import annotations
 
+import importlib
 import uuid as _uuid
 import warnings
+from collections.abc import Mapping
 from datetime import timedelta
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable
 
 from temporalio import activity as activity_mod
 from temporalio import workflow
@@ -350,7 +352,11 @@ def install_backend_async_patch() -> None:
     method natively are unaffected; only the protocol defaults are replaced.
     Idempotent.
     """
-    from deepagents.backends.protocol import BackendProtocol
+    # importlib: `deepagents` is absent on Python 3.10 environments (its floor
+    # is 3.11), so a static import here fails type-checking there.
+    BackendProtocol = importlib.import_module(
+        "deepagents.backends.protocol"
+    ).BackendProtocol
 
     if _original_backend_async_defaults:
         return
@@ -375,7 +381,9 @@ def uninstall_backend_async_patch() -> None:
     """Restore ``BackendProtocol``'s upstream async defaults."""
     if not _original_backend_async_defaults:
         return
-    from deepagents.backends.protocol import BackendProtocol
+    BackendProtocol = importlib.import_module(
+        "deepagents.backends.protocol"
+    ).BackendProtocol
 
     for async_name, original in _original_backend_async_defaults.items():
         setattr(BackendProtocol, async_name, original)

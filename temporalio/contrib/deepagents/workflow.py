@@ -14,7 +14,8 @@ still works without it.
 from __future__ import annotations
 
 import warnings
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from temporalio import workflow
 from temporalio.contrib.deepagents import _activity, _serde
