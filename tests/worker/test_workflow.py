@@ -3625,10 +3625,11 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
     env: WorkflowEnvironment,
     env_type: str,
 ):
-    # This test always creates its own OTS env below; only run it in the v1
-    # matrix step to avoid redundant work in the other env matrix cells.
+    # This test always creates its own time-skipping v1 env below; only run
+    # it in the v1 matrix step to avoid redundant work in the other env
+    # matrix cells.
     if env_type != "time-skipping-v1":
-        pytest.skip("Only run under time-skipping-v1; test creates its own OTS env")
+        pytest.skip("Only run under time-skipping-v1; test creates its own v1 env")
 
     # TODO(cretz): There is a bug in the Java test server, probably
     # https://github.com/temporalio/sdk-java/issues/1138 where the first

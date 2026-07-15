@@ -2,7 +2,7 @@
 
 These mirror the ``env.start_time_skipping()`` tests in ``test_workflow.py``
 that have a meaningful per-workflow analog. Each spawns a per-test
-NTS-enabled ``WorkflowEnvironment`` and uses ``env.fast_forward`` and
+v2-enabled ``WorkflowEnvironment`` and uses ``env.fast_forward`` and
 ``env.with_time_skipping_disabled`` instead of the Java test server's
 env-level sleep / clock / disable APIs.
 """
@@ -30,7 +30,7 @@ _TS_EXTRA_ARGS = [
 async def test_workflow_env_time_skipping_basic_v2():
     """Per-workflow auto-skip drives the 100,000s sleep to completion.
 
-    The Java original asserts on ``env.get_current_time()`` — NTS has no
+    The Java original asserts on ``env.get_current_time()`` — v2 has no
     env-level clock, so we assert on the workflow's own virtual clock via
     its existing ``current_time`` query.
     """

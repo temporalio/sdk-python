@@ -34,7 +34,7 @@ from tests.helpers.time_skipping import (
 
 @pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
 async def env() -> AsyncGenerator[WorkflowEnvironment, None]:
-    """Spawn a module-scoped NTS-enabled dev server for the tests in this file."""
+    """Spawn a module-scoped time-skipping v2 dev server for the tests in this file."""
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[

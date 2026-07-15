@@ -107,8 +107,8 @@ class WorkflowEnvironment:
         :py:class:`TimeSkipper` that stamps ``time_skipping_config`` on every
         workflow started via :py:attr:`client`, and exposes
         :py:meth:`fast_forward` and :py:meth:`set_disable_propagation` for
-        driving TS on running workflows. In contrast to :py:meth:`start_time_skipping` (OTS,
-        server-wide clock), each workflow has its own virtual clock.
+        driving TS on running workflows. In contrast to :py:meth:`start_time_skipping`
+        (time-skipping v1, server-wide clock), each workflow has its own virtual clock.
 
         Internally, this uses the Temporal CLI dev server from
         https://github.com/temporalio/cli. This is a self-contained binary for
@@ -163,7 +163,7 @@ class WorkflowEnvironment:
             ts_config: Per-workflow time-skipping config stamped on every
                 workflow started via :py:attr:`client`. Off by default (no
                 time skipping). If set, the returned environment supports
-                :py:meth:`fast_forward` and related NTS methods.
+                :py:meth:`fast_forward` and related v2 methods.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -500,7 +500,7 @@ class WorkflowEnvironment:
     ) -> bool:
         """Fast-forward this workflow's virtual clock by ``duration``, and wait for it to complete.
 
-        Only supported on NTS environments (created via
+        Only supported on time-skipping v2 environments (created via
         :py:meth:`start_time_skipping_v2`).
 
         Args:
@@ -514,7 +514,7 @@ class WorkflowEnvironment:
             workflow terminates first.
 
         Raises:
-            RuntimeError: If called on an OTS or non-TS environment.
+            RuntimeError: If called on a v1 or non-TS environment.
         """
         if self._ts_skipper is None:
             raise RuntimeError(
@@ -531,7 +531,7 @@ class WorkflowEnvironment:
     ) -> None:
         """Set the ``disable_propagation`` flag on a running workflow.
 
-        Only supported on NTS environments (created via
+        Only supported on time-skipping v2 environments (created via
         :py:meth:`start_time_skipping_v2`).
 
         Args:
@@ -539,7 +539,7 @@ class WorkflowEnvironment:
             disable_propagation: New value for the flag.
 
         Raises:
-            RuntimeError: If called on an OTS or non-TS environment.
+            RuntimeError: If called on a v1 or non-TS environment.
         """
         if self._ts_skipper is None:
             raise RuntimeError(
@@ -554,7 +554,7 @@ class WorkflowEnvironment:
 
         Workflows started via :py:attr:`client` during the block do not
         receive a ``time_skipping_config`` on their start request. Existing
-        workflows and OTS auto-behavior are unaffected. No-op on non-NTS
+        workflows and v1 auto-behavior are unaffected. No-op on non-v2
         environments.
         """
         if self._ts_skipper is None:
@@ -588,19 +588,19 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def sleep(self, duration: timedelta | float) -> None:
         """Sleep in this environment.
 
-        Uses ``asyncio.sleep`` on non-TS envs or the OTS test server's
-        virtual sleep on OTS envs. Unsupported on NTS envs — use
+        Uses ``asyncio.sleep`` on non-TS envs or the v1 test server's
+        virtual sleep on v1 envs. Unsupported on v2 envs — use
         :py:meth:`fast_forward` on a specific workflow handle instead.
 
         Args:
             duration: Amount of time to sleep.
 
         Raises:
-            RuntimeError: If called on an NTS environment.
+            RuntimeError: If called on a time-skipping v2 environment.
         """
         if self._ts_skipper is not None:
             raise RuntimeError(
-                "env.sleep is not supported in NTS environments; use "
+                "env.sleep is not supported in time-skipping v2 environments; use "
                 "env.fast_forward(handle, duration) on a specific workflow."
             )
         # Use regular sleep if no time skipping
@@ -615,19 +615,20 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def get_current_time(self) -> datetime:
         """Current time known to this environment.
 
-        System time on non-TS envs; the OTS test server's virtual clock on
-        OTS envs. Unsupported on NTS envs — read history events
+        System time on non-TS envs; the v1 test server's virtual clock on
+        v1 envs. Unsupported on v2 envs — read history events
         (``WorkflowExecutionTimeSkippingTransitioned``) or define a
         workflow-side query returning ``workflow.now()``.
 
         Raises:
-            RuntimeError: If called on an NTS environment.
+            RuntimeError: If called on a time-skipping v2 environment.
         """
         if self._ts_skipper is not None:
             raise RuntimeError(
-                "env.get_current_time is not supported in NTS environments; "
-                "read history events (WorkflowExecutionTimeSkippingTransitioned) "
-                "or define a workflow.query returning workflow.now()."
+                "env.get_current_time is not supported in time-skipping v2 "
+                "environments; read history events "
+                "(WorkflowExecutionTimeSkippingTransitioned) or define a "
+                "workflow.query returning workflow.now()."
             )
         # Use regular time if no time skipping
         if not self._supports_time_skipping:
@@ -643,20 +644,21 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
 
     @contextmanager
     def auto_time_skipping_disabled(self) -> Iterator[None]:
-        """Disable OTS's SDK-driven auto-unlock-on-result-await for the block.
+        """Disable v1's SDK-driven auto-unlock-on-result-await for the block.
 
-        Only meaningful on OTS envs. Unsupported on NTS envs — use
-        :py:meth:`with_time_skipping_disabled` to suspend TS-config
+        Only meaningful on time-skipping v1 envs. Unsupported on v2 envs —
+        use :py:meth:`with_time_skipping_disabled` to suspend TS-config
         stamping on newly-started workflows instead.
 
         Raises:
-            RuntimeError: If called on an NTS environment.
+            RuntimeError: If called on a time-skipping v2 environment.
         """
         if self._ts_skipper is not None:
             raise RuntimeError(
-                "env.auto_time_skipping_disabled is not supported in NTS "
-                "environments; use env.with_time_skipping_disabled() to "
-                "suspend TS-config stamping on newly-started workflows."
+                "env.auto_time_skipping_disabled is not supported in "
+                "time-skipping v2 environments; use "
+                "env.with_time_skipping_disabled() to suspend TS-config "
+                "stamping on newly-started workflows."
             )
         already_disabled = not self._auto_time_skipping
         self._auto_time_skipping = False
