@@ -32,6 +32,31 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
+from temporalio.contrib._langchain._converter import (
+    LangChainPayloadConverter,
+)
+from temporalio.contrib._langchain._converter import (
+    build_data_converter as _shared_build_data_converter,
+)
+from temporalio.contrib._langchain._converter import (
+    data_converter as data_converter,
+)
+from temporalio.contrib._langchain._messages import (
+    dump_messages as dump_messages,
+)
+from temporalio.contrib._langchain._messages import (
+    dump_object as dump_object,
+)
+from temporalio.contrib._langchain._messages import (
+    load_messages as load_messages,
+)
+from temporalio.contrib._langchain._messages import (
+    load_object as load_object,
+)
+from temporalio.contrib._langchain._messages import (
+    tool_to_schema as tool_to_schema,
+)
+from temporalio.contrib._langchain._passthrough import merge_passthrough_modules
 from temporalio.contrib._langchain._runnable_config import is_jsonish
 from temporalio.contrib._langchain._runnable_config import (
     rebuild_runnable_config as rebuild_runnable_config,
@@ -41,7 +66,6 @@ from temporalio.contrib._langchain._runnable_config import (
 )
 from temporalio.contrib._langchain._task_cache import TaskResultCache
 from temporalio.contrib._langchain._task_cache import cache_key as _shared_cache_key
-from temporalio.contrib.pydantic import PydanticPayloadConverter, ToJsonOptions
 from temporalio.converter import DataConverter
 
 # ---------------------------------------------------------------------------
@@ -88,23 +112,8 @@ def get_settings() -> Settings:
 # ---------------------------------------------------------------------------
 
 
-class DeepAgentsPayloadConverter(PydanticPayloadConverter):
-    """Pydantic payload converter pinned to ``exclude_unset=True``.
-
-    LangChain request/response types (and ``DeepAgentState``) are deeply nested
-    with many ``Optional[...] = None`` fields. Shipping every unset default
-    inflates payloads several-fold and some peers reject the explicit nulls on
-    round-trip, so we exclude unset fields by convention.
-    """
-
-    def __init__(self) -> None:
-        """Construct the converter with ``exclude_unset`` serialization."""
-        super().__init__(ToJsonOptions(exclude_unset=True))
-
-
-data_converter = DataConverter(payload_converter_class=DeepAgentsPayloadConverter)
-"""The plugin's default data converter (LangChain messages are shipped as their
-``dumpd`` JSON form, so the Pydantic converter only ever sees plain containers)."""
+# The family converter, kept under this plugin's historical name.
+DeepAgentsPayloadConverter = LangChainPayloadConverter
 
 
 def build_data_converter(
@@ -112,43 +121,15 @@ def build_data_converter(
 ) -> DataConverter:
     """Compose the plugin's converter with whatever the caller already set.
 
-    * ``None`` — install the plugin default.
-    * the SDK default converter — swap in the LangChain-aware Pydantic
-      converter via :func:`dataclasses.replace`.
-    * a custom converter — refuse rather than silently clobber it; the caller
-      must fold :class:`DeepAgentsPayloadConverter` into their own converter.
+    Delegates to the shared family implementation; see its docstring for the
+    None / SDK-default / custom-converter contract.
     """
-    if user_converter is None:
-        return data_converter
-    if user_converter is DataConverter.default:
-        return dataclasses.replace(
-            user_converter, payload_converter_class=DeepAgentsPayloadConverter
-        )
-    raise ValueError(
-        "DeepAgentsPlugin cannot compose with a custom data_converter "
-        "automatically. Set payload_converter_class=DeepAgentsPayloadConverter "
-        "on your own DataConverter (so LangChain messages serialize with "
-        "exclude_unset=True), or omit data_converter to use the plugin default."
-    )
+    return _shared_build_data_converter(user_converter, plugin_name="DeepAgentsPlugin")
 
 
 # ---------------------------------------------------------------------------
 # LangChain object (de)serialization
 # ---------------------------------------------------------------------------
-
-
-def dump_object(obj: Any) -> Any:
-    """Serialize a single LangChain ``Serializable`` (message, tool call, …)."""
-    from langchain_core.load import dumpd
-
-    return dumpd(obj)
-
-
-def load_object(data: Any) -> Any:
-    """Rehydrate a value produced by :func:`dump_object`, preserving subtype."""
-    from langchain_core.load import load
-
-    return load(data)
 
 
 # ---------------------------------------------------------------------------
@@ -234,31 +215,6 @@ def load_backend_result(value: Any) -> Any:
     if isinstance(value, dict):
         return {k: load_backend_result(v) for k, v in value.items()}
     return value
-
-
-def dump_messages(messages: Any) -> list[Any]:
-    """Serialize a sequence of LangChain messages to their ``dumpd`` form."""
-    from langchain_core.load import dumpd
-
-    return [dumpd(m) for m in messages]
-
-
-def load_messages(dumped: list[Any]) -> list[Any]:
-    """Rehydrate messages serialized by :func:`dump_messages`."""
-    from langchain_core.load import load
-
-    return [load(d) for d in dumped]
-
-
-def tool_to_schema(tool: Any) -> dict[str, Any]:
-    """Advertise a tool to the model as a full OpenAI tool schema.
-
-    Carries name + description + argument JSON schema so the model can build
-    valid arguments, not just select the tool by name.
-    """
-    from langchain_core.utils.function_calling import convert_to_openai_tool
-
-    return convert_to_openai_tool(tool)
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +324,4 @@ def default_passthrough_modules() -> tuple[str, ...]:
 
 def resolve_passthrough_modules(user: Any) -> tuple[str, ...]:
     """Merge caller-supplied passthrough modules with the plugin defaults."""
-    merged = [*_DEFAULT_PASSTHROUGH, *(user or ())]
-    # dict.fromkeys preserves order while de-duplicating.
-    return tuple(dict.fromkeys(merged))
+    return merge_passthrough_modules(_DEFAULT_PASSTHROUGH, user)

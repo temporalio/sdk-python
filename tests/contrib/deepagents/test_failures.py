@@ -22,8 +22,10 @@ pytestmark = pytest.mark.skipif(
 )
 from temporalio import workflow
 from temporalio.client import WorkflowFailureError
+from temporalio.contrib._langchain._activity_helpers import (
+    translate_api_error as _translate_api_error,
+)
 from temporalio.contrib.deepagents import DeepAgentsPlugin, DeepAgentsWorkflowError
-from temporalio.contrib.deepagents._activity import _translate_api_error
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
