@@ -76,8 +76,8 @@ class InteractionWorkflow:
         return self.signals_received
 
 
-async def test_pattern_basic(env: WorkflowEnvironment) -> None:
-    """Pattern 1: enable time skipping, let workflow run to completion."""
+async def test_skip_full_run(env: WorkflowEnvironment) -> None:
+    """Enable time skipping, let workflow run to completion."""
     async with new_worker(env.client, SingleTimerWorkflow) as worker:
         wall_start = monotonic()
         handle = await env.client.start_workflow(
@@ -99,7 +99,7 @@ async def test_pattern_basic(env: WorkflowEnvironment) -> None:
     await assert_time_skipping_engaged(handle)
 
 
-async def test_pattern_basic_no_skipping_times_out(
+async def test_with_time_skipping_disabled(
     env: WorkflowEnvironment,
 ) -> None:
     """Without time skipping, the 1h timer does not complete in 3s."""
@@ -114,14 +114,8 @@ async def test_pattern_basic_no_skipping_times_out(
             await asyncio.wait_for(handle.result(), timeout=3)
 
 
-async def test_pattern2_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
-    """Pattern 2: fast-forward 1h, signal, resume +1h, signal, workflow completes.
-
-    The workflow would otherwise sit on a 10-hour timer waiting for two
-    signals. The fast-forward advances virtual time to each interaction
-    point; the test sends a signal once skipping pauses after the
-    fast-forward completes.
-    """
+async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
+    """Fast-forward 1h, signal, resume +1h, signal, workflow completes."""
     async with new_worker(env.client, InteractionWorkflow) as worker:
         wall_start = monotonic()
         # Start the workflow with TS stamping suspended, then issue an
