@@ -14,7 +14,7 @@ from tests.helpers import new_worker
 from tests.worker.test_workflow import CancelSignalAndTimerFiredInSameTaskWorkflow
 
 
-async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts():
+async def test_workflow_cancel_signal_and_timer_fired_in_same_task_v2():
     """Cancel-signal and timer fire delivered to the worker in the same task.
 
     The Java original explicitly advances the env clock to drive the 1h

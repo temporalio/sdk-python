@@ -26,7 +26,7 @@ _TS_EXTRA_ARGS = [
 ]
 
 
-async def test_workflow_env_time_skipping_basic_ts():
+async def test_workflow_env_time_skipping_basic_v2():
     """Per-workflow auto-skip drives the 100,000s sleep to completion.
 
     The Java original asserts on ``env.get_current_time()`` — NTS has no
@@ -51,7 +51,7 @@ async def test_workflow_env_time_skipping_basic_ts():
             )
 
 
-async def test_workflow_env_time_skipping_manual_ts():
+async def test_workflow_env_time_skipping_manual_v2():
     """One-shot fast-forward of 1000s, asserted against the workflow's clock.
 
     The Java original advances the env clock via ``env.sleep(1000)``; the
@@ -84,7 +84,7 @@ async def test_workflow_env_time_skipping_manual_ts():
             await handle.cancel()
 
 
-async def test_workflow_env_time_skipping_disabled_ts():
+async def test_workflow_env_time_skipping_disabled_v2():
     """With and without per-workflow auto-skip, same workflow timing.
 
     Maps onto the Java ``env.auto_time_skipping_disabled()`` toggle: use
