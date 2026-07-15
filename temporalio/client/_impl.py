@@ -356,6 +356,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.priority.CopyFrom(input.priority._to_proto())
         if input.versioning_override is not None:
             req.versioning_override.CopyFrom(input.versioning_override._to_proto())
+        if input.time_skipping_config is not None:
+            req.time_skipping_config.CopyFrom(input.time_skipping_config)
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         await self._client.workflow_service.request_cancel_workflow_execution(

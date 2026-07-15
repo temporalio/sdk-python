@@ -2017,7 +2017,7 @@ class SearchAttributeWorkflow:
 
 
 async def test_workflow_search_attributes(client: Client, env_type: str):
-    if env_type != "local":
+    if env_type != "local" and env_type != "time-skipping-v2":
         pytest.skip("Only testing search attributes on local which disables cache")
     await ensure_search_attributes_present(
         client,
@@ -2202,7 +2202,7 @@ class NoSearchAttributesWorkflow:
 
 
 async def test_workflow_no_initial_search_attributes(client: Client, env_type: str):
-    if env_type != "local":
+    if env_type != "local" and env_type != "time-skipping-v2":
         pytest.skip("Only testing search attributes on local which disables cache")
     await ensure_search_attributes_present(
         client,
@@ -3623,10 +3623,12 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
 
 async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
     env: WorkflowEnvironment,
+    env_type: str,
 ):
-    # This test only works when we support time skipping
-    if not env.supports_time_skipping:
-        pytest.skip("Need to skip time to validate this test")
+    # This test always creates its own OTS env below; only run it in the v1
+    # matrix step to avoid redundant work in the other env matrix cells.
+    if env_type != "time-skipping-v1":
+        pytest.skip("Only run under time-skipping-v1; test creates its own OTS env")
 
     # TODO(cretz): There is a bug in the Java test server, probably
     # https://github.com/temporalio/sdk-java/issues/1138 where the first
@@ -8700,7 +8702,7 @@ class SearchAttributeCodecChildWorkflow:
 
 
 async def test_search_attribute_codec(client: Client, env_type: str):
-    if env_type != "local":
+    if env_type != "local" and env_type != "time-skipping-v2":
         pytest.skip("Only testing search attributes on local which disables cache")
     await ensure_search_attributes_present(
         client,

@@ -58,7 +58,7 @@ def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
         "-E",
         "--workflow-environment",
         default="local",
-        help="Which workflow environment to use ('local', 'time-skipping', or ip:port for existing server)",
+        help="Which workflow environment to use ('local', 'time-skipping-v1', 'time-skipping-v2', or ip:port for existing server)",
     )
 
 
@@ -100,52 +100,60 @@ def env_type(request: pytest.FixtureRequest) -> str:
 
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
+    dev_server_extra_args = [
+        "--dynamic-config-value",
+        "system.forceSearchAttributesCacheRefreshOnRead=true",
+        "--dynamic-config-value",
+        f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
+        "--dynamic-config-value",
+        "system.enableEagerWorkflowStart=true",
+        "--dynamic-config-value",
+        "frontend.enableExecuteMultiOperation=true",
+        "--dynamic-config-value",
+        "frontend.workerVersioningWorkflowAPIs=true",
+        "--dynamic-config-value",
+        "frontend.workerVersioningDataAPIs=true",
+        "--dynamic-config-value",
+        "system.enableDeploymentVersions=true",
+        "--dynamic-config-value",
+        "frontend.activityAPIsEnabled=true",
+        "--dynamic-config-value",
+        "frontend.enableCancelWorkerPollsOnShutdown=true",
+        "--dynamic-config-value",
+        "component.nexusoperations.recordCancelRequestCompletionEvents=true",
+        "--dynamic-config-value",
+        "activity.enableStandalone=true",
+        "--dynamic-config-value",
+        "activity.startDelayEnabled=true",
+        "--dynamic-config-value",
+        "history.enableChasm=true",
+        "--dynamic-config-value",
+        "history.enableTransitionHistory=true",
+        "--dynamic-config-value",
+        "history.enableChasmCallbacks=true",
+        "--dynamic-config-value",
+        "history.enableCHASMSignalBacklinks=true",
+        "--dynamic-config-value",
+        "nexusoperation.enableStandalone=true",
+        "--dynamic-config-value",
+        'system.system.refreshNexusEndpointsMinWait="0s"',
+        "--dynamic-config-value",
+        "frontend.TimeSkippingEnabled=true",
+        "--dynamic-config-value",
+        "history.enableSignalWithStartFromWorkflow=true",
+    ]
     if env_type == "local":
         env = await WorkflowEnvironment.start_local(
-            dev_server_extra_args=[
-                "--dynamic-config-value",
-                "system.forceSearchAttributesCacheRefreshOnRead=true",
-                "--dynamic-config-value",
-                f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
-                "--dynamic-config-value",
-                "system.enableEagerWorkflowStart=true",
-                "--dynamic-config-value",
-                "frontend.enableExecuteMultiOperation=true",
-                "--dynamic-config-value",
-                "frontend.workerVersioningWorkflowAPIs=true",
-                "--dynamic-config-value",
-                "frontend.workerVersioningDataAPIs=true",
-                "--dynamic-config-value",
-                "system.enableDeploymentVersions=true",
-                "--dynamic-config-value",
-                "frontend.activityAPIsEnabled=true",
-                "--dynamic-config-value",
-                "frontend.enableCancelWorkerPollsOnShutdown=true",
-                "--dynamic-config-value",
-                "component.nexusoperations.recordCancelRequestCompletionEvents=true",
-                "--dynamic-config-value",
-                "activity.enableStandalone=true",
-                "--dynamic-config-value",
-                "activity.startDelayEnabled=true",
-                "--dynamic-config-value",
-                "history.enableChasm=true",
-                "--dynamic-config-value",
-                "history.enableTransitionHistory=true",
-                "--dynamic-config-value",
-                "history.enableChasmCallbacks=true",
-                "--dynamic-config-value",
-                "history.enableCHASMSignalBacklinks=true",
-                "--dynamic-config-value",
-                "nexusoperation.enableStandalone=true",
-                "--dynamic-config-value",
-                'system.system.refreshNexusEndpointsMinWait="0s"',
-                "--dynamic-config-value",
-                "history.enableSignalWithStartFromWorkflow=true",
-            ],
+            dev_server_extra_args=dev_server_extra_args,
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
-    elif env_type == "time-skipping":
+    elif env_type == "time-skipping-v1":
         env = await WorkflowEnvironment.start_time_skipping()
+    elif env_type == "time-skipping-v2":
+        env = await WorkflowEnvironment.start_time_skipping_v2(
+            dev_server_extra_args=dev_server_extra_args,
+            dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+        )
     else:
         env = WorkflowEnvironment.from_client(await Client.connect(env_type))
 

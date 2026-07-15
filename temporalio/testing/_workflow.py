@@ -26,6 +26,10 @@ import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
 import temporalio.worker
+from temporalio.testing._timeskipping import (
+    TimeSkipper,
+    TimeSkippingConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +98,17 @@ class WorkflowEnvironment:
         dev_server_extra_args: Sequence[str] = [],
         dev_server_download_ttl: timedelta | None = None,
         ui_port: int | None = None,
+        ts_config: TimeSkippingConfig | None = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
-        This environment is good for testing full server capabilities, but does
-        not support time skipping like :py:meth:`start_time_skipping` does.
-        :py:attr:`supports_time_skipping` will always return ``False`` for this
-        environment. :py:meth:`sleep` will sleep the actual amount of time and
-        :py:meth:`get_current_time` will return the current time.
+        Per-workflow time skipping is off by default. Pass ``ts_config``
+        to enable it — the returned environment wraps :py:attr:`client` with a
+        :py:class:`TimeSkipper` that stamps ``time_skipping_config`` on every
+        workflow started via :py:attr:`client`, and exposes
+        :py:meth:`fast_forward` and :py:meth:`set_disable_propagation` for
+        driving TS on running workflows. In contrast to :py:meth:`start_time_skipping` (OTS,
+        server-wide clock), each workflow has its own virtual clock.
 
         Internally, this uses the Temporal CLI dev server from
         https://github.com/temporalio/cli. This is a self-contained binary for
@@ -153,6 +160,10 @@ class WorkflowEnvironment:
             dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
                 cached indefinitely.
             ui_port: UI port to use if UI is enabled.
+            ts_config: Per-workflow time-skipping config stamped on every
+                workflow started via :py:attr:`client`. Off by default (no
+                time skipping). If set, the returned environment supports
+                :py:meth:`fast_forward` and related NTS methods.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -206,7 +217,7 @@ class WorkflowEnvironment:
 
         # If we can't connect to the server, we should shut it down
         try:
-            return _EphemeralServerWorkflowEnvironment(
+            env = _EphemeralServerWorkflowEnvironment(
                 await temporalio.client.Client.connect(
                     server.target,
                     namespace=namespace,
@@ -222,6 +233,10 @@ class WorkflowEnvironment:
                 ),
                 server,
             )
+            if ts_config is not None:
+                env._ts_skipper = TimeSkipper(env._client, config=ts_config)
+                env._client = env._ts_skipper.client
+            return env
         except:
             try:
                 await server.shutdown()
@@ -352,6 +367,21 @@ class WorkflowEnvironment:
                 )
             raise
 
+    @classmethod
+    async def start_time_skipping_v2(
+        cls,
+        *,
+        ts_config: TimeSkippingConfig = TimeSkippingConfig(),
+        **kwargs: Any,
+    ) -> WorkflowEnvironment:
+        """Start a local Temporal server with per-workflow time skipping enabled.
+
+        Equivalent to :py:meth:`start_local` with a non-``None`` ``ts_config``.
+        See :py:meth:`start_local` for available keyword arguments and TS
+        behavior details.
+        """
+        return await cls.start_local(ts_config=ts_config, **kwargs)
+
     def __init__(self, client: temporalio.client.Client) -> None:
         """Create a workflow environment from a client.
 
@@ -359,6 +389,7 @@ class WorkflowEnvironment:
 
         """
         self._client = client
+        self._ts_skipper: TimeSkipper | None = None
 
     async def __aenter__(self) -> WorkflowEnvironment:
         """Noop for ``async with`` support."""
@@ -461,6 +492,77 @@ class WorkflowEnvironment:
         # It's always disabled for this base class
         yield None
 
+    async def fast_forward(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any],
+        duration: timedelta | float | None = None,
+        /,
+    ) -> bool:
+        """Fast-forward this workflow's virtual clock by ``duration``, and wait for it to complete.
+
+        Only supported on NTS environments (created via
+        :py:meth:`start_time_skipping_v2`).
+
+        Args:
+            handle: Target workflow execution.
+            duration: One-shot advance by this amount (``timedelta`` or
+                seconds as a ``float``). If ``None``, re-enable unbounded
+                skipping.
+
+        Returns:
+            True if the fast-forward transition is observed; False if the
+            workflow terminates first.
+
+        Raises:
+            RuntimeError: If called on an OTS or non-TS environment.
+        """
+        if self._ts_skipper is None:
+            raise RuntimeError(
+                "fast_forward requires a time-skipping environment; use "
+                "WorkflowEnvironment.start_time_skipping_v2()."
+            )
+        return await self._ts_skipper.fast_forward(handle, duration)
+
+    async def set_disable_propagation(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any],
+        disable_propagation: bool,
+        /,
+    ) -> None:
+        """Set the ``disable_propagation`` flag on a running workflow.
+
+        Only supported on NTS environments (created via
+        :py:meth:`start_time_skipping_v2`).
+
+        Args:
+            handle: Target workflow execution.
+            disable_propagation: New value for the flag.
+
+        Raises:
+            RuntimeError: If called on an OTS or non-TS environment.
+        """
+        if self._ts_skipper is None:
+            raise RuntimeError(
+                "set_disable_propagation requires a time-skipping environment; "
+                "use WorkflowEnvironment.start_time_skipping_v2()."
+            )
+        await self._ts_skipper.set_disable_propagation(handle, disable_propagation)
+
+    @contextmanager
+    def with_time_skipping_disabled(self) -> Iterator[None]:
+        """Suspend TS-config stamping on newly-started workflows within the block.
+
+        Workflows started via :py:attr:`client` during the block do not
+        receive a ``time_skipping_config`` on their start request. Existing
+        workflows and OTS auto-behavior are unaffected. No-op on non-NTS
+        environments.
+        """
+        if self._ts_skipper is None:
+            yield None
+            return
+        with self._ts_skipper.with_time_skipping_disabled():
+            yield None
+
 
 class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     def __init__(
@@ -484,6 +586,23 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         await self._server.shutdown()
 
     async def sleep(self, duration: timedelta | float) -> None:
+        """Sleep in this environment.
+
+        Uses ``asyncio.sleep`` on non-TS envs or the OTS test server's
+        virtual sleep on OTS envs. Unsupported on NTS envs — use
+        :py:meth:`fast_forward` on a specific workflow handle instead.
+
+        Args:
+            duration: Amount of time to sleep.
+
+        Raises:
+            RuntimeError: If called on an NTS environment.
+        """
+        if self._ts_skipper is not None:
+            raise RuntimeError(
+                "env.sleep is not supported in NTS environments; use "
+                "env.fast_forward(handle, duration) on a specific workflow."
+            )
         # Use regular sleep if no time skipping
         if not self._supports_time_skipping:
             return await super().sleep(duration)
@@ -494,6 +613,22 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         await self._client.test_service.unlock_time_skipping_with_sleep(req)
 
     async def get_current_time(self) -> datetime:
+        """Current time known to this environment.
+
+        System time on non-TS envs; the OTS test server's virtual clock on
+        OTS envs. Unsupported on NTS envs — read history events
+        (``WorkflowExecutionTimeSkippingTransitioned``) or define a
+        workflow-side query returning ``workflow.now()``.
+
+        Raises:
+            RuntimeError: If called on an NTS environment.
+        """
+        if self._ts_skipper is not None:
+            raise RuntimeError(
+                "env.get_current_time is not supported in NTS environments; "
+                "read history events (WorkflowExecutionTimeSkippingTransitioned) "
+                "or define a workflow.query returning workflow.now()."
+            )
         # Use regular time if no time skipping
         if not self._supports_time_skipping:
             return await super().get_current_time()
@@ -508,6 +643,21 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
 
     @contextmanager
     def auto_time_skipping_disabled(self) -> Iterator[None]:
+        """Disable OTS's SDK-driven auto-unlock-on-result-await for the block.
+
+        Only meaningful on OTS envs. Unsupported on NTS envs — use
+        :py:meth:`with_time_skipping_disabled` to suspend TS-config
+        stamping on newly-started workflows instead.
+
+        Raises:
+            RuntimeError: If called on an NTS environment.
+        """
+        if self._ts_skipper is not None:
+            raise RuntimeError(
+                "env.auto_time_skipping_disabled is not supported in NTS "
+                "environments; use env.with_time_skipping_disabled() to "
+                "suspend TS-config stamping on newly-started workflows."
+            )
         already_disabled = not self._auto_time_skipping
         self._auto_time_skipping = False
         try:
