@@ -180,7 +180,13 @@ class ChildTimeSkippingWorkflow:
 
 @workflow.defn
 class ParentTimeSkippingWorkflow:
-    """1h sleep, spawn child (1h sleep), 1h sleep. All three should auto-skip."""
+    """1h sleep, spawn child (1h sleep), 1h sleep.
+
+    All three waits auto-skip, but the parent's virtual clock only advances
+    during its own waits — waiting for the child does not skip the parent's
+    clock forward to match the child's end time. Each workflow owns its own
+    clock and TS propagates forward at spawn but not backward at completion.
+    """
 
     @workflow.run
     async def run(self, child_id: str, task_queue: str) -> dict[str, float]:
@@ -244,6 +250,20 @@ async def test_child_workflow_propagates_time_skipping(
     assert 3590 < result["parent_end"] - result["parent_after_child"] < 3610, (
         f"parent second wait: expected ~3600s, got "
         f"{result['parent_end'] - result['parent_after_child']:.1f}s"
+    )
+
+    # Parent does not skip while child workflow is running
+    child_start_gap = result["child_start"] - result["parent_after_wait_1"]
+    assert -10 < child_start_gap < 10, (
+        f"child virtual clock at start should match parent's clock at spawn "
+        f"(within 10s); got gap of {child_start_gap:.1f}s"
+    )
+    parent_frozen_during_child = (
+        result["parent_after_child"] - result["parent_after_wait_1"]
+    )
+    assert -5 < parent_frozen_during_child < 5, (
+        f"parent virtual clock should not advance while waiting for child "
+        f"(within 5s); got drift of {parent_frozen_during_child:.1f}s"
     )
 
     # TS engaged on both workflows.
