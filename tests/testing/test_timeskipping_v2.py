@@ -75,6 +75,10 @@ class InteractionWorkflow:
     def get_signal_count(self) -> int:
         return self.signals_received
 
+    @workflow.query
+    def current_time(self) -> float:
+        return workflow.now().timestamp()
+
 
 async def test_skip_full_run(env: WorkflowEnvironment) -> None:
     """Enable time skipping, let workflow run to completion."""
@@ -128,18 +132,29 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
                 task_queue=worker.task_queue,
             )
 
+        # Baseline: workflow's virtual clock before any fast-forward.
+        t0 = await handle.query(InteractionWorkflow.current_time)
+
         # Fast-forward 1h; skipping pauses so we can interact.
         assert await env.fast_forward(handle, timedelta(hours=1)), (
             "expected first fast-forward to complete at 1h"
         )
         await handle.signal(InteractionWorkflow.proceed)
         assert await handle.query(InteractionWorkflow.get_signal_count) == 1
+        t1 = await handle.query(InteractionWorkflow.current_time)
+        assert 3590 < t1 - t0 < 3610, (
+            f"expected virtual clock ~+3600s after first fast-forward, got {t1 - t0:.1f}s"
+        )
 
         # Fast-forward another 1h, then send the second signal to release.
         assert await env.fast_forward(handle, timedelta(hours=1)), (
             "expected second fast-forward to complete at 2h total"
         )
         await handle.signal(InteractionWorkflow.proceed)
+        t2 = await handle.query(InteractionWorkflow.current_time)
+        assert 7190 < t2 - t0 < 7210, (
+            f"expected virtual clock ~+7200s after second fast-forward, got {t2 - t0:.1f}s"
+        )
 
         result = await handle.result()
         wall_elapsed = monotonic() - wall_start
