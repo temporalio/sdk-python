@@ -7,10 +7,17 @@ NTS-enabled ``WorkflowEnvironment`` and uses ``env.fast_forward`` and
 env-level sleep / clock / disable APIs.
 """
 
+import asyncio
 import uuid
 from datetime import timedelta
 from time import monotonic
 
+import pytest
+
+from temporalio import activity, workflow
+from temporalio.client import WorkflowFailureError
+from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError, TimeoutError, TimeoutType
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
@@ -121,3 +128,59 @@ async def test_workflow_env_time_skipping_disabled_v2():
                 )
             assert "all done" == await handle.result()
             assert monotonic() - start > 2.5
+
+
+class HeartbeatTimeoutActivities:
+    def __init__(self, env: WorkflowEnvironment) -> None:
+        self.env = env
+
+    @activity.defn
+    async def fast_forward_own_workflow_and_wait(self, ff_seconds: float) -> str:
+        info = activity.info()
+        parent_handle = self.env.client.get_workflow_handle(
+            info.workflow_id, run_id=info.workflow_run_id
+        )
+        await self.env.fast_forward(parent_handle, timedelta(seconds=ff_seconds))
+        # Fast-forward advanced the workflow clock past heartbeat_timeout.
+        await asyncio.Event().wait()
+        return "unexpected: activity was not cancelled"
+
+
+@workflow.defn
+class HeartbeatTimeoutV2Workflow:
+    @workflow.run
+    async def run(self, ff_seconds: float) -> str:
+        return await workflow.execute_activity_method(
+            HeartbeatTimeoutActivities.fast_forward_own_workflow_and_wait,
+            ff_seconds,
+            schedule_to_close_timeout=timedelta(seconds=1000),
+            heartbeat_timeout=timedelta(seconds=20),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+
+async def test_workflow_env_time_skipping_heartbeat_timeout_v2():
+    """Activity-driven fast-forward pushes the workflow clock past heartbeat_timeout."""
+    async with await WorkflowEnvironment.start_time_skipping_v2(
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+        dev_server_extra_args=_TS_EXTRA_ARGS,
+    ) as env:
+        activities = HeartbeatTimeoutActivities(env)
+        async with new_worker(
+            env.client,
+            HeartbeatTimeoutV2Workflow,
+            activities=[activities.fast_forward_own_workflow_and_wait],
+        ) as worker:
+            handle = await env.client.start_workflow(
+                HeartbeatTimeoutV2Workflow.run,
+                40.0,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            with pytest.raises(WorkflowFailureError) as err:
+                await handle.result()
+            assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, TimeoutError)
+            assert err.value.cause.cause.type == TimeoutType.HEARTBEAT
+            # Don't call assert_time_skipping_engaged(), since it didn't
+            # get a chance to emit that.
