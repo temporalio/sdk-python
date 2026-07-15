@@ -20,6 +20,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
+  instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
+  HTTP/2 authority values, which keep following the connected host, so it can be used when the
+  server's certificate does not carry the dialed name but on-path infrastructure (e.g. an
+  SNI-inspecting egress proxy) needs the SNI to remain resolvable. Requires
+  `server_root_ca_cert`.
+
 ### Changed
 
 ### Deprecated

@@ -2520,6 +2520,7 @@ dependencies = [
  "temporalio-common",
  "temporalio-sdk-core",
  "tokio",
+ "tokio-rustls",
  "tokio-stream",
  "tonic",
  "tracing",
