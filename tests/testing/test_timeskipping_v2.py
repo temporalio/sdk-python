@@ -164,3 +164,89 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
         f"workflow took {wall_elapsed:.1f}s wall time; expected fast finish"
     )
     await assert_time_skipping_engaged(handle)
+
+
+@workflow.defn
+class ChildTimeSkippingWorkflow:
+    """1h sleep. Returns virtual clock at start and end for the caller to check."""
+
+    @workflow.run
+    async def run(self) -> dict[str, float]:
+        t_start = workflow.now().timestamp()
+        await workflow.sleep(timedelta(hours=1))
+        t_end = workflow.now().timestamp()
+        return {"child_start": t_start, "child_end": t_end}
+
+
+@workflow.defn
+class ParentTimeSkippingWorkflow:
+    """1h sleep, spawn child (1h sleep), 1h sleep. All three should auto-skip."""
+
+    @workflow.run
+    async def run(self, child_id: str, task_queue: str) -> dict[str, float]:
+        parent_start = workflow.now().timestamp()
+        await workflow.sleep(timedelta(hours=1))
+        parent_after_wait_1 = workflow.now().timestamp()
+
+        child_times = await workflow.execute_child_workflow(
+            ChildTimeSkippingWorkflow.run,
+            id=child_id,
+            task_queue=task_queue,
+        )
+        parent_after_child = workflow.now().timestamp()
+
+        await workflow.sleep(timedelta(hours=1))
+        parent_end = workflow.now().timestamp()
+
+        return {
+            "parent_start": parent_start,
+            "parent_after_wait_1": parent_after_wait_1,
+            "parent_after_child": parent_after_child,
+            "parent_end": parent_end,
+            **child_times,
+        }
+
+
+async def test_child_workflow_propagates_time_skipping(
+    env: WorkflowEnvironment,
+) -> None:
+    """Parent 1h + child 1h + parent 1h all auto-skip; child inherits TS from parent."""
+    async with new_worker(
+        env.client, ParentTimeSkippingWorkflow, ChildTimeSkippingWorkflow
+    ) as worker:
+        child_id = f"child-{uuid.uuid4()}"
+        parent_id = f"parent-{uuid.uuid4()}"
+
+        wall_start = monotonic()
+        parent_handle = await env.client.start_workflow(
+            ParentTimeSkippingWorkflow.run,
+            args=[child_id, worker.task_queue],
+            id=parent_id,
+            task_queue=worker.task_queue,
+        )
+        result = await parent_handle.result()
+        wall_elapsed = monotonic() - wall_start
+
+    # Total 3h of virtual work should complete in a few seconds of wall time.
+    assert wall_elapsed < 10, (
+        f"parent+child took {wall_elapsed:.1f}s wall time; expected < 10s"
+    )
+
+    # Each 1h wait should have advanced the workflow's clock by ~3600s.
+    assert 3590 < result["parent_after_wait_1"] - result["parent_start"] < 3610, (
+        f"parent first wait: expected ~3600s, got "
+        f"{result['parent_after_wait_1'] - result['parent_start']:.1f}s"
+    )
+    assert 3590 < result["child_end"] - result["child_start"] < 3610, (
+        f"child wait: expected ~3600s, got "
+        f"{result['child_end'] - result['child_start']:.1f}s"
+    )
+    assert 3590 < result["parent_end"] - result["parent_after_child"] < 3610, (
+        f"parent second wait: expected ~3600s, got "
+        f"{result['parent_end'] - result['parent_after_child']:.1f}s"
+    )
+
+    # TS engaged on both workflows.
+    await assert_time_skipping_engaged(parent_handle)
+    child_handle = env.client.get_workflow_handle(child_id)
+    await assert_time_skipping_engaged(child_handle)
