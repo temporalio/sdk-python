@@ -3,7 +3,7 @@
 # pyright: reportMissingTypeStubs=false
 
 import dataclasses
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from langchain_core.runnables.config import var_child_runnable_config
 from langgraph._internal._constants import (
@@ -23,6 +23,23 @@ from langgraph.graph.state import RunnableConfig
 from langgraph.pregel._algo import LazyAtomicCounter
 from langgraph.runtime import ExecutionInfo, Runtime
 
+from temporalio.contrib._langchain._runnable_config import (
+    strip_runnable_config as _shared_strip_runnable_config,
+)
+
+# The configurable keys the langgraph plugin ships across activity
+# boundaries (checkpoint/resumption state); everything else in
+# ``configurable`` is a live handle that stays behind.
+_KEPT_CONFIGURABLE_KEYS = (
+    CONFIG_KEY_CHECKPOINT_NS,
+    CONFIG_KEY_CHECKPOINT_ID,
+    CONFIG_KEY_CHECKPOINT_MAP,
+    CONFIG_KEY_THREAD_ID,
+    CONFIG_KEY_TASK_ID,
+    CONFIG_KEY_RESUMING,
+    CONFIG_KEY_DURABILITY,
+)
+
 
 def strip_runnable_config(config: RunnableConfig | None) -> RunnableConfig:
     """Return a serializable subset of a RunnableConfig.
@@ -31,38 +48,21 @@ def strip_runnable_config(config: RunnableConfig | None) -> RunnableConfig:
     config kwarg. The full object holds non-serializable things (callbacks,
     checkpointer/store/cache handles, pregel send/read callables) that can't
     cross an activity boundary, so we keep only primitive fields and the
-    serializable subset of configurable.
+    serializable subset of configurable. Delegates to the shared
+    implementation with this plugin's checkpoint-key whitelist; the output is
+    byte-identical to the pre-refactor behavior.
     """
-    orig = config or {}
-    configurable = orig.get("configurable") or {}
-
-    result: RunnableConfig = {
-        "tags": list(orig.get("tags") or []),
-        "metadata": dict(orig.get("metadata") or {}),
-    }
-    if run_name := orig.get("run_name"):
-        result["run_name"] = run_name
-    if run_id := orig.get("run_id"):
-        result["run_id"] = run_id
-    if (recursion_limit := orig.get("recursion_limit")) is not None:
-        result["recursion_limit"] = recursion_limit
-
-    stripped_configurable: dict[str, Any] = {
-        key: configurable[key]
-        for key in (
-            CONFIG_KEY_CHECKPOINT_NS,
-            CONFIG_KEY_CHECKPOINT_ID,
-            CONFIG_KEY_CHECKPOINT_MAP,
-            CONFIG_KEY_THREAD_ID,
-            CONFIG_KEY_TASK_ID,
-            CONFIG_KEY_RESUMING,
-            CONFIG_KEY_DURABILITY,
-        )
-        if key in configurable
-    }
-    if stripped_configurable:
-        result["configurable"] = stripped_configurable
-    return result
+    # Double cast: a TypedDict and dict[str, Any] "insufficiently overlap"
+    # for basedpyright's reportInvalidCast; object is the sanctioned bridge.
+    return cast(
+        "RunnableConfig",
+        cast(
+            object,
+            _shared_strip_runnable_config(
+                config, configurable_keys=_KEPT_CONFIGURABLE_KEYS
+            ),
+        ),
+    )
 
 
 def get_langgraph_config() -> dict[str, Any]:
@@ -124,17 +124,7 @@ def set_langgraph_config(
     )
 
     restored_configurable: dict[str, Any] = {
-        key: configurable[key]
-        for key in (
-            CONFIG_KEY_CHECKPOINT_NS,
-            CONFIG_KEY_CHECKPOINT_ID,
-            CONFIG_KEY_CHECKPOINT_MAP,
-            CONFIG_KEY_THREAD_ID,
-            CONFIG_KEY_TASK_ID,
-            CONFIG_KEY_RESUMING,
-            CONFIG_KEY_DURABILITY,
-        )
-        if key in configurable
+        key: configurable[key] for key in _KEPT_CONFIGURABLE_KEYS if key in configurable
     }
     restored_configurable[CONFIG_KEY_SCRATCHPAD] = PregelScratchpad(
         step=scratchpad.get("step", 0),

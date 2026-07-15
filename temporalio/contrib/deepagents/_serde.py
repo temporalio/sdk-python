@@ -30,11 +30,15 @@ installed on the machine assembling the worker.
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
-if TYPE_CHECKING:
-    from langchain_core.runnables import RunnableConfig
-
+from temporalio.contrib._langchain._runnable_config import is_jsonish
+from temporalio.contrib._langchain._runnable_config import (
+    rebuild_runnable_config as rebuild_runnable_config,
+)
+from temporalio.contrib._langchain._runnable_config import (
+    strip_runnable_config as _shared_strip_runnable_config,
+)
 from temporalio.contrib._langchain._task_cache import TaskResultCache
 from temporalio.contrib._langchain._task_cache import cache_key as _shared_cache_key
 from temporalio.contrib.pydantic import PydanticPayloadConverter, ToJsonOptions
@@ -262,64 +266,31 @@ def tool_to_schema(tool: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _is_jsonish(value: Any) -> bool:
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return True
-    if isinstance(value, (list, tuple)):
-        return all(_is_jsonish(v) for v in value)
-    if isinstance(value, dict):
-        return all(isinstance(k, str) and _is_jsonish(v) for k, v in value.items())
-    return False
+# Shared with the other LangChain-family plugins; kept under the old private
+# name because sibling modules reference it.
+_is_jsonish = is_jsonish
+
+
+def _keep_configurable(key: str, value: Any) -> bool:
+    """Keep non-dunder, JSON-safe configurable entries."""
+    return not key.startswith("__") and is_jsonish(value)
 
 
 def strip_runnable_config(config: Any) -> dict[str, Any]:
     """Reduce a live ``RunnableConfig`` to its JSON-safe subset for shipping.
 
-    Keeps ``tags``, ``run_name``, ``run_id``, ``recursion_limit``, JSON-safe
-    ``metadata`` and the JSON-safe (non-dunder) ``configurable`` keys. Drops
-    callbacks, checkpointer / store / cache handles and every other live
-    reference — those are reconstructed activity-side.
+    Keeps ``tags`` and ``metadata`` (always present, values filtered to
+    JSON-safe ones), truthy ``run_name`` / ``run_id``, ``recursion_limit``,
+    and the JSON-safe non-dunder ``configurable`` keys. Drops callbacks,
+    checkpointer / store / cache handles and every other live reference —
+    those are reconstructed activity-side. Output shape follows the shared
+    (langgraph-vetted) implementation.
     """
-    if not config:
-        return {}
-    out: dict[str, Any] = {}
-    if config.get("tags"):
-        out["tags"] = list(config["tags"])
-    for key in ("run_id", "run_name"):
-        if config.get(key) is not None:
-            out[key] = str(config[key])
-    if config.get("recursion_limit") is not None:
-        out["recursion_limit"] = config["recursion_limit"]
-    metadata = config.get("metadata")
-    if isinstance(metadata, dict):
-        out["metadata"] = {k: v for k, v in metadata.items() if _is_jsonish(v)}
-    configurable = config.get("configurable")
-    if isinstance(configurable, dict):
-        kept = {
-            k: v
-            for k, v in configurable.items()
-            if not k.startswith("__") and _is_jsonish(v)
-        }
-        if kept:
-            out["configurable"] = kept
-    return out
-
-
-def rebuild_runnable_config(data: dict[str, Any]) -> "RunnableConfig":
-    """Reconstruct a minimal ``RunnableConfig`` from :func:`strip_runnable_config`."""
-    config: dict[str, Any] = {"metadata": dict(data.get("metadata", {}))}
-    if data.get("tags"):
-        config["tags"] = list(data["tags"])
-    for key in ("run_id", "run_name"):
-        if data.get(key) is not None:
-            config[key] = data[key]
-    if data.get("recursion_limit") is not None:
-        config["recursion_limit"] = data["recursion_limit"]
-    if data.get("configurable"):
-        config["configurable"] = dict(data["configurable"])
-    # Double cast: a TypedDict and dict[str, Any] "insufficiently overlap"
-    # for basedpyright's reportInvalidCast; object is the sanctioned bridge.
-    return cast("RunnableConfig", cast(object, config))
+    return _shared_strip_runnable_config(
+        config,
+        configurable_filter=_keep_configurable,
+        metadata_filter=is_jsonish,
+    )
 
 
 # ---------------------------------------------------------------------------
