@@ -29,15 +29,14 @@ installed on the machine assembling the worker.
 
 from __future__ import annotations
 
-import contextvars
 import dataclasses
-import hashlib
-import json
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
 
+from temporalio.contrib._langchain._task_cache import TaskResultCache
+from temporalio.contrib._langchain._task_cache import cache_key as _shared_cache_key
 from temporalio.contrib.pydantic import PydanticPayloadConverter, ToJsonOptions
 from temporalio.converter import DataConverter
 
@@ -328,44 +327,37 @@ def rebuild_runnable_config(data: dict[str, Any]) -> "RunnableConfig":
 # ---------------------------------------------------------------------------
 
 # Per-workflow state: set at the top of the workflow run, read by the model and
-# tool dispatch paths, snapshotted for continue-as-new. A ContextVar (not a
-# module-global keyed by run id) so update / signal handler tasks spawned by the
-# workflow inherit the same cache automatically.
-_result_cache: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
-    "_deepagents_result_cache", default=None
-)
+# tool dispatch paths, snapshotted for continue-as-new. Built on the shared
+# ContextVar-backed cache (update / signal handler tasks spawned by the
+# workflow inherit it automatically); this plugin's instance is distinct from
+# the langgraph plugin's.
+_result_cache = TaskResultCache("_deepagents_result_cache")
 
 
 def set_result_cache(cache: dict[str, Any] | None) -> None:
     """Seed the workflow-scoped result cache (e.g. carried across CAN)."""
-    _result_cache.set(dict(cache) if cache else {})
+    _result_cache.set_cache(dict(cache) if cache else {})
 
 
 def result_cache_snapshot() -> dict[str, Any] | None:
     """Return a serializable copy of the cache, or ``None`` when empty."""
-    cache = _result_cache.get()
+    cache = _result_cache.get_cache()
     return dict(cache) if cache else None
 
 
 def cache_key(kind: str, call_id: str, args: Any) -> str:
     """Stable key over ``(kind, call_id, args)`` for cache lookups."""
-    blob = json.dumps([kind, call_id, args], default=str, sort_keys=True)
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+    return _shared_cache_key(kind, (call_id, args), {})
 
 
 def cache_lookup(key: str) -> tuple[bool, Any]:
     """Return ``(hit, value)`` for ``key`` in the active cache."""
-    cache = _result_cache.get()
-    if cache is not None and key in cache:
-        return True, cache[key]
-    return False, None
+    return _result_cache.lookup(key)
 
 
 def cache_put(key: str, value: Any) -> None:
     """Record ``value`` under ``key`` when a cache is active for this run."""
-    cache = _result_cache.get()
-    if cache is not None:
-        cache[key] = value
+    _result_cache.put(key, value)
 
 
 # ---------------------------------------------------------------------------
