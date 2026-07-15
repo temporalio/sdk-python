@@ -22,7 +22,7 @@ from temporalio.runtime import (
 )
 from temporalio.testing._workflow import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
-from tests.helpers import LogCapturer, new_worker
+from tests.helpers import LogCapturer, assert_eventually, new_worker
 
 # Payload/memo size-limit enforcement lives in sdk-rust. These tests only assert that the SDK's
 # plumbing reaches core: oversized completions are failed proactively, the worker opt-out lets
@@ -96,6 +96,13 @@ async def test_oversized_payload_fails_task_with_error_log(env: WorkflowEnvironm
             runtime=_forwarding_runtime(worker_logger),
         )
 
+        def predicate(record: logging.LogRecord) -> bool:
+            return (
+                record.levelname == "ERROR"
+                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
+                in record.msg
+            )
+
         with LogCapturer().logs_captured(worker_logger) as capturer:
             async with new_worker(
                 worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
@@ -116,14 +123,11 @@ async def test_oversized_payload_fails_task_with_error_log(env: WorkflowEnvironm
                 assert isinstance(err.value.cause, TimeoutError)
                 assert err.value.cause.type == TimeoutType.START_TO_CLOSE
 
-        def predicate(record: logging.LogRecord) -> bool:
-            return (
-                record.levelname == "ERROR"
-                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
-                in record.msg
-            )
+                # Core forwards logs on a buffered interval; poll while the capturer is attached.
+                async def error_forwarded() -> None:
+                    assert capturer.find(predicate) is not None
 
-        assert capturer.find(predicate)
+                await assert_eventually(error_forwarded)
 
 
 async def test_disable_payload_error_limit_sends_to_server(env: WorkflowEnvironment):
@@ -173,6 +177,13 @@ async def test_payload_size_warning_forwarded(env: WorkflowEnvironment):
         ),
     )
 
+    def predicate(record: logging.LogRecord) -> bool:
+        return (
+            record.levelname == "WARNING"
+            and "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
+            in record.msg
+        )
+
     with LogCapturer().logs_captured(worker_logger) as capturer:
         async with new_worker(
             worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
@@ -188,11 +199,8 @@ async def test_payload_size_warning_forwarded(env: WorkflowEnvironment):
                 execution_timeout=timedelta(seconds=5),
             )
 
-    def predicate(record: logging.LogRecord) -> bool:
-        return (
-            record.levelname == "WARNING"
-            and "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
-            in record.msg
-        )
+            # Core forwards logs on a buffered interval; poll while the capturer is attached.
+            async def warning_forwarded() -> None:
+                assert capturer.find(predicate) is not None
 
-    assert capturer.find(predicate)
+            await assert_eventually(warning_forwarded)
