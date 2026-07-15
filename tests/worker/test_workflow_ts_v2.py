@@ -11,6 +11,7 @@ import uuid
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
+from tests.helpers.time_skipping import assert_time_skipping_engaged
 from tests.worker.test_workflow import CancelSignalAndTimerFiredInSameTaskWorkflow
 
 
@@ -60,3 +61,4 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task_v2():
             # Previously this hung because a signal-driven cancel was not
             # respected after the timer fired.
             await result_task
+            await assert_time_skipping_engaged(handle)

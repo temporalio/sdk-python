@@ -26,6 +26,7 @@ from temporalio import workflow
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
+from tests.helpers.time_skipping import assert_time_skipping_engaged
 
 
 @pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
@@ -79,11 +80,12 @@ async def test_pattern_basic(env: WorkflowEnvironment) -> None:
     """Pattern 1: enable time skipping, let workflow run to completion."""
     async with new_worker(env.client, SingleTimerWorkflow) as worker:
         wall_start = monotonic()
-        result = await env.client.execute_workflow(
+        handle = await env.client.start_workflow(
             SingleTimerWorkflow.run,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+        result = await handle.result()
         wall_elapsed = monotonic() - wall_start
 
     # Virtual time advanced by ~1h even though wall time was just a few seconds.
@@ -94,6 +96,7 @@ async def test_pattern_basic(env: WorkflowEnvironment) -> None:
     assert wall_elapsed < 3, (
         f"workflow took {wall_elapsed:.3f}s wall time; time skipping did not engage"
     )
+    await assert_time_skipping_engaged(handle)
 
 
 async def test_pattern_basic_no_skipping_times_out(
@@ -151,3 +154,4 @@ async def test_pattern2_fast_forward_with_resume(env: WorkflowEnvironment) -> No
     assert wall_elapsed < 60, (
         f"workflow took {wall_elapsed:.1f}s wall time; expected fast finish"
     )
+    await assert_time_skipping_engaged(handle)
