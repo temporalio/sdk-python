@@ -25,7 +25,7 @@ import pytest_asyncio
 from temporalio import workflow
 from temporalio.testing import TimeSkippingConfig, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
-from tests.helpers import new_worker
+from tests.helpers import assert_duration_same, new_worker
 from tests.helpers.time_skipping import (
     assert_time_was_not_skipped,
     assert_time_was_skipped,
@@ -145,9 +145,7 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
         await handle.signal(InteractionWorkflow.proceed)
         assert await handle.query(InteractionWorkflow.get_signal_count) == 1
         t1 = await handle.query(InteractionWorkflow.current_time)
-        assert 3590 < t1 - t0 < 3610, (
-            f"expected virtual clock ~+3600s after first fast-forward, got {t1 - t0:.1f}s"
-        )
+        assert_duration_same(3600, t1 - t0, tolerance=10)
 
         # Fast-forward another 1h, then send the second signal to release.
         assert await env.fast_forward(handle, timedelta(hours=1)), (
@@ -155,9 +153,7 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
         )
         await handle.signal(InteractionWorkflow.proceed)
         t2 = await handle.query(InteractionWorkflow.current_time)
-        assert 7190 < t2 - t0 < 7210, (
-            f"expected virtual clock ~+7200s after second fast-forward, got {t2 - t0:.1f}s"
-        )
+        assert_duration_same(7200, t2 - t0, tolerance=10)
 
         result = await handle.result()
         wall_elapsed = monotonic() - wall_start
@@ -246,31 +242,24 @@ async def test_child_workflow_propagates_time_skipping(
     )
 
     # Each 1h wait should have advanced the workflow's clock by ~3600s.
-    assert 3590 < result["parent_after_wait_1"] - result["parent_start"] < 3610, (
-        f"parent first wait: expected ~3600s, got "
-        f"{result['parent_after_wait_1'] - result['parent_start']:.1f}s"
+    assert_duration_same(
+        3600, result["parent_after_wait_1"] - result["parent_start"], tolerance=10
     )
-    assert 3590 < result["child_end"] - result["child_start"] < 3610, (
-        f"child wait: expected ~3600s, got "
-        f"{result['child_end'] - result['child_start']:.1f}s"
+    assert_duration_same(
+        3600, result["child_end"] - result["child_start"], tolerance=10
     )
-    assert 3590 < result["parent_end"] - result["parent_after_child"] < 3610, (
-        f"parent second wait: expected ~3600s, got "
-        f"{result['parent_end'] - result['parent_after_child']:.1f}s"
+    assert_duration_same(
+        3600, result["parent_end"] - result["parent_after_child"], tolerance=10
     )
 
-    # Parent does not skip while child workflow is running
-    child_start_gap = result["child_start"] - result["parent_after_wait_1"]
-    assert -10 < child_start_gap < 10, (
-        f"child virtual clock at start should match parent's clock at spawn "
-        f"(within 10s); got gap of {child_start_gap:.1f}s"
+    # Forward propagation: child's clock at start matches parent's clock at spawn.
+    assert_duration_same(
+        0, result["child_start"] - result["parent_after_wait_1"], tolerance=10
     )
-    parent_frozen_during_child = (
-        result["parent_after_child"] - result["parent_after_wait_1"]
-    )
-    assert -5 < parent_frozen_during_child < 5, (
-        f"parent virtual clock should not advance while waiting for child "
-        f"(within 5s); got drift of {parent_frozen_during_child:.1f}s"
+    # Parent's clock does not advance while child is running (no backward
+    # propagation from child at completion).
+    assert_duration_same(
+        0, result["parent_after_child"] - result["parent_after_wait_1"], tolerance=5
     )
 
     # TS engaged on both workflows.
