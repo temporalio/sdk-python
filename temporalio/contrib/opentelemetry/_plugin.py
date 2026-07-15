@@ -34,7 +34,9 @@ class OpenTelemetryPlugin(SimplePlugin):
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
-                raise ValueError("No WorkflowRunner provided to the OpenAI plugin.")
+                raise ValueError(
+                    "No WorkflowRunner provided to the OpenTelemetry plugin."
+                )
 
             # If in sandbox, add additional passthrough
             if isinstance(runner, SandboxedWorkflowRunner):
