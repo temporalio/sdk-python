@@ -14,7 +14,7 @@ from time import monotonic
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
-from tests.helpers.time_skipping import assert_time_skipping_engaged
+from tests.helpers.time_skipping import assert_time_was_skipped
 from tests.testing.test_workflow import (
     ReallySlowWorkflow,
     ShortSleepWorkflow,
@@ -50,7 +50,7 @@ async def test_workflow_env_time_skipping_basic_v2():
             assert_timestamp_from_now(
                 await handle.query(ReallySlowWorkflow.current_time), 100000
             )
-            await assert_time_skipping_engaged(handle)
+            await assert_time_was_skipped(handle)
 
 
 async def test_workflow_env_time_skipping_manual_v2():
@@ -82,7 +82,7 @@ async def test_workflow_env_time_skipping_manual_v2():
 
             assert await env.fast_forward(handle, timedelta(seconds=1000))
             assert_timestamp_from_now(await workflow_current_time(), 1000)
-            await assert_time_skipping_engaged(handle)
+            await assert_time_was_skipped(handle)
 
             await handle.cancel()
 
@@ -108,7 +108,7 @@ async def test_workflow_env_time_skipping_disabled_v2():
             )
             assert "all done" == await ts_on_handle.result()
             assert monotonic() - start < 2.5
-            await assert_time_skipping_engaged(ts_on_handle)
+            await assert_time_was_skipped(ts_on_handle)
 
             # Without time-skipping, the workflow's 3s timer waits real
             # wall time.
@@ -121,5 +121,5 @@ async def test_workflow_env_time_skipping_disabled_v2():
                 )
             assert "all done" == await handle.result()
             assert monotonic() - start > 2.5
-            # Don't call assert_time_skipping_engaged(), since it didn't
+            # Don't call assert_time_was_skipped(), since it didn't
             # get a chance to emit that.

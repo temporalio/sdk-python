@@ -23,10 +23,13 @@ import pytest
 import pytest_asyncio
 
 from temporalio import workflow
-from temporalio.testing import WorkflowEnvironment
+from temporalio.testing import TimeSkippingConfig, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
-from tests.helpers.time_skipping import assert_time_skipping_engaged
+from tests.helpers.time_skipping import (
+    assert_time_was_not_skipped,
+    assert_time_was_skipped,
+)
 
 
 @pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
@@ -100,7 +103,7 @@ async def test_skip_full_run(env: WorkflowEnvironment) -> None:
     assert wall_elapsed < 3, (
         f"workflow took {wall_elapsed:.3f}s wall time; time skipping did not engage"
     )
-    await assert_time_skipping_engaged(handle)
+    await assert_time_was_skipped(handle)
 
 
 async def test_with_time_skipping_disabled(
@@ -163,39 +166,43 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
     assert wall_elapsed < 60, (
         f"workflow took {wall_elapsed:.1f}s wall time; expected fast finish"
     )
-    await assert_time_skipping_engaged(handle)
+    await assert_time_was_skipped(handle)
 
 
 @workflow.defn
-class ChildTimeSkippingWorkflow:
-    """1h sleep. Returns virtual clock at start and end for the caller to check."""
+class SleepingChildWorkflow:
+    """Sleeps a parameterized duration. Returns virtual clock at start and end."""
 
     @workflow.run
-    async def run(self) -> dict[str, float]:
+    async def run(self, sleep_seconds: float) -> dict[str, float]:
         t_start = workflow.now().timestamp()
-        await workflow.sleep(timedelta(hours=1))
+        await workflow.sleep(timedelta(seconds=sleep_seconds))
         t_end = workflow.now().timestamp()
         return {"child_start": t_start, "child_end": t_end}
 
 
 @workflow.defn
 class ParentTimeSkippingWorkflow:
-    """1h sleep, spawn child (1h sleep), 1h sleep.
+    """1h sleep, spawn child (parameterized sleep), 1h sleep.
 
-    All three waits auto-skip, but the parent's virtual clock only advances
-    during its own waits — waiting for the child does not skip the parent's
-    clock forward to match the child's end time. Each workflow owns its own
-    clock and TS propagates forward at spawn but not backward at completion.
+    All three waits auto-skip when TS is on for both parent and child. The
+    parent's virtual clock only advances during its own waits, though —
+    waiting for the child does not skip the parent's clock forward to match
+    the child's end time. TS propagates forward at spawn but not backward
+    at completion.
     """
 
     @workflow.run
-    async def run(self, child_id: str, task_queue: str) -> dict[str, float]:
+    async def run(
+        self, child_id: str, task_queue: str, child_sleep_seconds: float
+    ) -> dict[str, float]:
         parent_start = workflow.now().timestamp()
         await workflow.sleep(timedelta(hours=1))
         parent_after_wait_1 = workflow.now().timestamp()
 
         child_times = await workflow.execute_child_workflow(
-            ChildTimeSkippingWorkflow.run,
+            SleepingChildWorkflow.run,
+            child_sleep_seconds,
             id=child_id,
             task_queue=task_queue,
         )
@@ -218,7 +225,7 @@ async def test_child_workflow_propagates_time_skipping(
 ) -> None:
     """Parent 1h + child 1h + parent 1h all auto-skip; child inherits TS from parent."""
     async with new_worker(
-        env.client, ParentTimeSkippingWorkflow, ChildTimeSkippingWorkflow
+        env.client, ParentTimeSkippingWorkflow, SleepingChildWorkflow
     ) as worker:
         child_id = f"child-{uuid.uuid4()}"
         parent_id = f"parent-{uuid.uuid4()}"
@@ -226,7 +233,7 @@ async def test_child_workflow_propagates_time_skipping(
         wall_start = monotonic()
         parent_handle = await env.client.start_workflow(
             ParentTimeSkippingWorkflow.run,
-            args=[child_id, worker.task_queue],
+            args=[child_id, worker.task_queue, 3600.0],
             id=parent_id,
             task_queue=worker.task_queue,
         )
@@ -267,6 +274,46 @@ async def test_child_workflow_propagates_time_skipping(
     )
 
     # TS engaged on both workflows.
-    await assert_time_skipping_engaged(parent_handle)
+    await assert_time_was_skipped(parent_handle)
     child_handle = env.client.get_workflow_handle(child_id)
-    await assert_time_skipping_engaged(child_handle)
+    await assert_time_was_skipped(child_handle)
+
+
+async def test_child_workflow_with_propagation_disabled() -> None:
+    """With ``disable_propagation=True`` on the env, child does NOT inherit TS
+    and runs in real time."""
+    
+    async with await WorkflowEnvironment.start_time_skipping_v2(
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+        dev_server_extra_args=[
+            "--dynamic-config-value",
+            "frontend.TimeSkippingEnabled=true",
+        ],
+        ts_config=TimeSkippingConfig(disable_propagation=True),
+    ) as env:
+        async with new_worker(
+            env.client, ParentTimeSkippingWorkflow, SleepingChildWorkflow
+        ) as worker:
+            child_id = f"child-{uuid.uuid4()}"
+            parent_id = f"parent-{uuid.uuid4()}"
+
+            wall_start = monotonic()
+            parent_handle = await env.client.start_workflow(
+                ParentTimeSkippingWorkflow.run,
+                args=[child_id, worker.task_queue, 5.0],
+                id=parent_id,
+                task_queue=worker.task_queue,
+            )
+            await parent_handle.result()
+            wall_elapsed = monotonic() - wall_start
+
+        # Child's 5s sleep runs in real time; parent's two 1h waits skip.
+        # Total wall time is dominated by the child's real sleep.
+        assert 4 < wall_elapsed < 15, (
+            f"expected ~5s wall time (child didn't skip), got {wall_elapsed:.1f}s"
+        )
+
+        # Parent had TS engaged (its own waits skipped); child did not.
+        await assert_time_was_skipped(parent_handle)
+        child_handle = env.client.get_workflow_handle(child_id)
+        await assert_time_was_not_skipped(child_handle)
