@@ -23,7 +23,7 @@ import pytest
 import pytest_asyncio
 
 from temporalio import workflow
-from temporalio.testing import TimeSkippingConfig, WorkflowEnvironment
+from temporalio.testing import TimeSkipper, TimeSkippingConfig, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import assert_duration_same, new_worker
 from tests.helpers.time_skipping import (
@@ -359,3 +359,43 @@ async def test_child_workflow_with_propagation_disabled() -> None:
         await assert_time_was_skipped(parent_handle)
         child_handle = env.client.get_workflow_handle(child_id)
         await assert_time_was_not_skipped(child_handle)
+
+
+async def test_timeskipper_wrapping_local_env_client() -> None:
+    """Start a plain local server, wrap its client with a TimeSkipper, run a workflow.
+
+    Exercises the public ``TimeSkipper(client)`` entry point directly:
+    no ``ts_config`` on the env, so ``env.client`` has no TS interceptor,
+    but the ``TimeSkipper`` instance we build ourselves provides one.
+    Workflows started via ``skipper.client`` should get TS stamped and
+    the server should skip their idle time.
+    """
+    async with await WorkflowEnvironment.start_local(
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+        dev_server_extra_args=[
+            "--dynamic-config-value",
+            "frontend.TimeSkippingEnabled=true",
+        ],
+    ) as env:
+        assert not env.supports_time_skipping
+
+        skipper = TimeSkipper(env.client)
+        async with new_worker(skipper.client, SleepWorkflow) as worker:
+            wall_start = monotonic()
+            handle = await skipper.client.start_workflow(
+                SleepWorkflow.run,
+                3600.0,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            result = await handle.result()
+            wall_elapsed = monotonic() - wall_start
+
+        # Virtual clock advanced ~1h.
+        assert_duration_same(3600, result["end"] - result["start"], tolerance=10)
+        # But wall time was seconds, not an hour.
+        assert wall_elapsed < 10, (
+            f"expected fast wall finish under TS, got {wall_elapsed:.1f}s"
+        )
+        # And the workflow's history has the TS transition event.
+        await assert_time_was_skipped(handle)
