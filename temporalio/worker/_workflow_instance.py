@@ -132,6 +132,17 @@ class WorkflowRunner(ABC):
 
 
 @dataclass(frozen=True)
+class PatchActivationInput:
+    """Input for the worker patch activation callback."""
+
+    workflow_info: temporalio.workflow.Info
+    """Information about the workflow execution calling ``patched``."""
+
+    patch_id: str
+    """Patch ID passed to ``patched``."""
+
+
+@dataclass(frozen=True)
 class WorkflowInstanceDetails:
     """Immutable details for creating a workflow instance."""
 
@@ -144,6 +155,7 @@ class WorkflowInstanceDetails:
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[type[BaseException]]
+    patch_activation_callback: Callable[[PatchActivationInput], bool] | None
     last_completion_result: temporalio.api.common.v1.Payloads
     last_failure: Failure | None
 
@@ -264,6 +276,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._worker_level_failure_exception_types = (
             det.worker_level_failure_exception_types
         )
+        self._patch_activation_callback = det.patch_activation_callback
         self._primary_task: asyncio.Task[None] | None = None
         self._time_ns = 0
         self._cancel_reason: str | None = None
@@ -1363,7 +1376,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if use_patch is not None:
             return use_patch
 
-        use_patch = not self._is_replaying or id in self._patches_notified
+        # Replay and history markers already determine the branch, and deprecation must
+        # keep existing patch semantics, so only a genuinely new patch consults the
+        # callback.
+        if deprecated or self._is_replaying or id in self._patches_notified:
+            use_patch = not self._is_replaying or id in self._patches_notified
+        elif self._patch_activation_callback is not None:
+            with self._as_read_only(in_query_or_validator=False):
+                use_patch = self._patch_activation_callback(
+                    PatchActivationInput(workflow_info=self._info, patch_id=id)
+                )
+            if type(use_patch) is not bool:
+                raise TypeError("Patch activation callback must return true or false")
+        else:
+            use_patch = True
         self._patches_memoized[id] = use_patch
         if use_patch:
             command = self._add_command()
@@ -1873,6 +1899,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def workflow_register_random_seed_callback(
         self, callback: Callable[[int], None]
     ) -> None:
+        self._assert_not_read_only("register random seed callback")
         self._seed_callbacks.append(callback)
 
     #### Calls from outbound impl ####

@@ -40,7 +40,11 @@ from ._workflow import (
     _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
     _WorkflowWorker,
 )
-from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from ._workflow_instance import (
+    PatchActivationInput,
+    UnsandboxedWorkflowRunner,
+    WorkflowRunner,
+)
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -135,6 +139,7 @@ class Worker:
         use_worker_versioning: bool = False,
         disable_safe_workflow_eviction: bool = False,
         deployment_config: WorkerDeploymentConfig | None = None,
+        patch_activation_callback: Callable[[PatchActivationInput], bool] | None = None,
         workflow_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
@@ -307,6 +312,12 @@ class Worker:
             deployment_config: Deployment config for the worker. Exclusive with ``build_id`` and
                 ``use_worker_versioning``.
                 WARNING: This is an experimental feature and may change in the future.
+            patch_activation_callback: Callback to decide whether the first non-replay
+                call to :py:func:`workflow.patched<temporalio.workflow.patched>` for a
+                patch ID should activate that patch. The callback receives a
+                :py:class:`PatchActivationInput` and must return ``True`` to activate the
+                patch or ``False`` to leave it inactive.
+                WARNING: This is an experimental feature and may change in the future.
             workflow_task_poller_behavior: Specify the behavior of workflow task polling.
                 Defaults to a 5-poller maximum.
             activity_task_poller_behavior: Specify the behavior of activity task polling.
@@ -368,6 +379,7 @@ class Worker:
             use_worker_versioning=use_worker_versioning,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             deployment_config=deployment_config,
+            patch_activation_callback=patch_activation_callback,
             workflow_task_poller_behavior=workflow_task_poller_behavior,
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
@@ -528,6 +540,7 @@ class Worker:
                 workflow_failure_exception_types=config[
                     "workflow_failure_exception_types"
                 ],  # type: ignore[reportTypedDictNotRequiredAccess]
+                patch_activation_callback=config.get("patch_activation_callback"),
                 debug_mode=config["debug_mode"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 disable_eager_activity_execution=config[
                     "disable_eager_activity_execution"
@@ -982,6 +995,7 @@ class WorkerConfig(TypedDict, total=False):
     use_worker_versioning: bool
     disable_safe_workflow_eviction: bool
     deployment_config: WorkerDeploymentConfig | None
+    patch_activation_callback: Callable[[PatchActivationInput], bool] | None
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
