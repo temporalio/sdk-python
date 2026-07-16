@@ -57,15 +57,15 @@ class SingleTimerWorkflow:
 
 @workflow.defn
 class InteractionWorkflow:
-    """Completes after receiving two ``proceed`` signals; otherwise waits up to 10h."""
+    """Completes after receiving ``required_signals`` ``proceed`` signals; otherwise waits up to 10h."""
 
     def __init__(self) -> None:
         self.signals_received = 0
 
     @workflow.run
-    async def run(self) -> str:
+    async def run(self, required_signals: int) -> str:
         await workflow.wait_condition(
-            lambda: self.signals_received >= 2,
+            lambda: self.signals_received >= required_signals,
             timeout=timedelta(hours=10),
         )
         return "done"
@@ -131,6 +131,7 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
                 InteractionWorkflow.run,
+                2,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
@@ -163,6 +164,37 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
         f"workflow took {wall_elapsed:.1f}s wall time; expected fast finish"
     )
     await assert_time_was_skipped(handle)
+
+
+async def test_multi_fast_forward_accumulation(env: WorkflowEnvironment) -> None:
+    """Three sequential 1h fast-forwards accumulate to ~3h virtual time.
+
+    Catches off-by-one bugs where each FF's target might be computed from a
+    stale reference (e.g. the start time, or the last FF's target) instead
+    of the workflow's current virtual clock.
+    """
+    async with new_worker(env.client, InteractionWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                InteractionWorkflow.run,
+                3,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+        t0 = await handle.query(InteractionWorkflow.current_time)
+
+        for i, expected in enumerate((3600, 7200, 10800), start=1):
+            assert await env.fast_forward(handle, timedelta(hours=1)), (
+                f"expected fast-forward {i} to complete"
+            )
+            await handle.signal(InteractionWorkflow.proceed)
+            assert await handle.query(InteractionWorkflow.get_signal_count) == i
+            t = await handle.query(InteractionWorkflow.current_time)
+            assert_duration_same(expected, t - t0, tolerance=10)
+
+        assert await handle.result() == "done"
+        await assert_time_was_skipped(handle)
 
 
 @workflow.defn
