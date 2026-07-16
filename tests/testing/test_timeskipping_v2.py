@@ -166,15 +166,67 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
 
 
 @workflow.defn
-class SleepingChildWorkflow:
-    """Sleeps a parameterized duration. Returns virtual clock at start and end."""
+class SleepWorkflow:
+    """Sleeps a parameterized duration. Returns the virtual clock at start and end.
+
+    ``tick`` signal + ``current_time`` query exist so external callers can
+    force a non-query WFT and read ``workflow.now()`` mid-run. Used both as
+    a standalone workflow and as a child of ``ParentTimeSkippingWorkflow``.
+    """
 
     @workflow.run
     async def run(self, sleep_seconds: float) -> dict[str, float]:
         t_start = workflow.now().timestamp()
         await workflow.sleep(timedelta(seconds=sleep_seconds))
         t_end = workflow.now().timestamp()
-        return {"child_start": t_start, "child_end": t_end}
+        return {"start": t_start, "end": t_end}
+
+    @workflow.signal
+    def tick(self) -> None:
+        pass
+
+    @workflow.query
+    def current_time(self) -> float:
+        return workflow.now().timestamp()
+
+
+async def test_partial_fast_forward_then_unbounded(
+    env: WorkflowEnvironment,
+) -> None:
+    """30m fast-forward, verify +30m, then unbounded resume to completion at +1h."""
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                SleepWorkflow.run,
+                3600.0,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+        async def wf_now() -> float:
+            # Signal first so the query reads workflow.now() as of a fresh
+            # non-query workflow task, not the workflow's initial one.
+            await handle.signal(SleepWorkflow.tick)
+            return await handle.query(SleepWorkflow.current_time)
+
+        t0 = await wf_now()
+
+        # Fast-forward 30m; TS auto-disables at that point.
+        assert await env.fast_forward(handle, timedelta(minutes=30))
+        t1 = await wf_now()
+        assert_duration_same(30 * 60, t1 - t0, tolerance=10)
+
+        # Unbounded resume — the workflow's remaining 30m timer fires and it
+        # completes. fast_forward returns False (terminal, no
+        # disabled_after_fast_forward event) which we don't need to check.
+        await env.fast_forward(handle, None)
+        await handle.result()
+
+        # Final virtual time on the closed workflow is ~+1h from start.
+        t_end = await handle.query(SleepWorkflow.current_time)
+        assert_duration_same(3600, t_end - t0, tolerance=10)
+
+        await assert_time_was_skipped(handle)
 
 
 @workflow.defn
@@ -197,7 +249,7 @@ class ParentTimeSkippingWorkflow:
         parent_after_wait_1 = workflow.now().timestamp()
 
         child_times = await workflow.execute_child_workflow(
-            SleepingChildWorkflow.run,
+            SleepWorkflow.run,
             child_sleep_seconds,
             id=child_id,
             task_queue=task_queue,
@@ -212,7 +264,8 @@ class ParentTimeSkippingWorkflow:
             "parent_after_wait_1": parent_after_wait_1,
             "parent_after_child": parent_after_child,
             "parent_end": parent_end,
-            **child_times,
+            "child_start": child_times["start"],
+            "child_end": child_times["end"],
         }
 
 
@@ -221,7 +274,7 @@ async def test_child_workflow_propagates_time_skipping(
 ) -> None:
     """Parent 1h + child 1h + parent 1h all auto-skip; child inherits TS from parent."""
     async with new_worker(
-        env.client, ParentTimeSkippingWorkflow, SleepingChildWorkflow
+        env.client, ParentTimeSkippingWorkflow, SleepWorkflow
     ) as worker:
         child_id = f"child-{uuid.uuid4()}"
         parent_id = f"parent-{uuid.uuid4()}"
@@ -281,7 +334,7 @@ async def test_child_workflow_with_propagation_disabled() -> None:
         ts_config=TimeSkippingConfig(disable_propagation=True),
     ) as env:
         async with new_worker(
-            env.client, ParentTimeSkippingWorkflow, SleepingChildWorkflow
+            env.client, ParentTimeSkippingWorkflow, SleepWorkflow
         ) as worker:
             child_id = f"child-{uuid.uuid4()}"
             parent_id = f"parent-{uuid.uuid4()}"
