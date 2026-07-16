@@ -27,10 +27,10 @@ import asyncio
 import dataclasses
 import importlib
 from datetime import timedelta
-from functools import wraps
 from typing import Any, Callable
 
 from temporalio import activity
+from temporalio.contrib._langchain import _activity_helpers
 from temporalio.contrib.deepagents import _serde
 from temporalio.exceptions import ApplicationError
 
@@ -124,90 +124,6 @@ class BackendOpOutput:
 # ---------------------------------------------------------------------------
 
 
-def _auto_heartbeater(fn: Callable) -> Callable:
-    """Heartbeat at half the configured ``heartbeat_timeout`` while ``fn`` runs.
-
-    Long LLM calls (thinking mode, long context, streaming accumulation) can run
-    well past a scheduler's patience; without a heartbeat Temporal would cancel
-    them and surface a ``HeartbeatTimeoutError`` instead of the real problem.
-    """
-
-    @wraps(fn)
-    async def wrapped(*args: Any, **kwargs: Any) -> Any:
-        heartbeat_timeout = activity.info().heartbeat_timeout
-        beat_task: asyncio.Task | None = None
-        if heartbeat_timeout:
-            interval = heartbeat_timeout.total_seconds() / 2
-
-            async def beat() -> None:
-                while True:
-                    activity.heartbeat()
-                    await asyncio.sleep(interval)
-
-            beat_task = asyncio.create_task(beat())
-        try:
-            return await fn(*args, **kwargs)
-        finally:
-            if beat_task is not None:
-                beat_task.cancel()
-                # Let the cancellation land before returning so no pending task
-                # outlives the activity (a bare ``cancel()`` leaves the task to
-                # be destroyed while pending if the loop shuts down first).
-                # ``asyncio.wait`` never re-raises the task's CancelledError.
-                await asyncio.wait([beat_task])
-
-    return wrapped
-
-
-def _translate_api_error(exc: Exception) -> ApplicationError | None:
-    """Map an LLM SDK HTTP error onto Temporal's retry contract.
-
-    Works by duck typing so neither ``openai`` nor ``anthropic`` needs to be
-    imported here: both expose ``status_code`` and ``response.headers``. Returns
-    ``None`` when ``exc`` is not a recognizable HTTP status error, so the caller
-    can fall through to its generic handling.
-    """
-    status = getattr(exc, "status_code", None)
-    if status is None:
-        return None
-    headers: dict[str, Any] = {}
-    response = getattr(exc, "response", None)
-    if response is not None:
-        headers = dict(getattr(response, "headers", {}) or {})
-    # Case-insensitive header access.
-    lower = {str(k).lower(): v for k, v in headers.items()}
-
-    retryable = status in (408, 409, 429) or 500 <= status < 600
-    should_retry = lower.get("x-should-retry")
-    if should_retry == "false":
-        retryable = False
-    elif should_retry == "true":
-        retryable = True
-
-    delay_ms = lower.get("retry-after-ms")
-    retry_after = lower.get("retry-after")
-    next_delay: timedelta | None = None
-    try:
-        if delay_ms is not None:
-            next_delay = timedelta(milliseconds=int(delay_ms))
-        elif retry_after is not None:
-            next_delay = timedelta(seconds=int(retry_after))
-    except (TypeError, ValueError):
-        next_delay = None
-
-    return ApplicationError(
-        str(exc),
-        type=type(exc).__name__,
-        non_retryable=not retryable,
-        next_retry_delay=next_delay,
-    )
-
-
-# ---------------------------------------------------------------------------
-# The activities
-# ---------------------------------------------------------------------------
-
-
 def _default_model_provider(model_name: str) -> Any:
     """Build a chat model from a name string with LLM-SDK retries disabled.
 
@@ -249,7 +165,7 @@ class DeepAgentActivities:
         return model
 
     @activity.defn(name=INVOKE_MODEL)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def invoke_model(self, input: ModelActivityInput) -> ModelActivityOutput:
         """Run exactly one LLM call and return the resulting ``AIMessage``."""
         messages = _serde.load_messages(input.messages)
@@ -258,7 +174,7 @@ class DeepAgentActivities:
         try:
             message = await model.ainvoke(messages, config=config)
         except Exception as exc:
-            translated = _translate_api_error(exc)
+            translated = _activity_helpers.translate_api_error(exc)
             if translated is not None:
                 activity.logger.warning(
                     "Model call failed with an HTTP status error", exc_info=True
@@ -268,7 +184,7 @@ class DeepAgentActivities:
         return ModelActivityOutput(message=_serde.dump_object(message))
 
     @activity.defn(name=INVOKE_MODEL_STREAMING)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def invoke_model_streaming(
         self, input: ModelActivityInput
     ) -> ModelActivityOutput:
@@ -300,7 +216,7 @@ class DeepAgentActivities:
                         topic.publish(_serde.dump_object(chunk))
                     final = chunk if final is None else final + chunk
         except Exception as exc:
-            translated = _translate_api_error(exc)
+            translated = _activity_helpers.translate_api_error(exc)
             if translated is not None:
                 activity.logger.warning(
                     "Streaming model call failed with an HTTP status error",
@@ -311,7 +227,7 @@ class DeepAgentActivities:
         return ModelActivityOutput(message=_serde.dump_object(final))
 
     @activity.defn(name=INVOKE_TOOL)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def invoke_tool(self, input: ToolActivityInput) -> ToolActivityOutput:
         """Execute one registered tool and return its ``ToolMessage``."""
         from temporalio.contrib.deepagents._tools import get_registered_tool
@@ -335,7 +251,7 @@ class DeepAgentActivities:
         return ToolActivityOutput(message=_serde.dump_object(message))
 
     @activity.defn(name=BACKEND_OP)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def backend_op(self, input: BackendOpInput) -> BackendOpOutput:
         """Run one operation against a registered (real-I/O) backend."""
         from temporalio.contrib.deepagents._tools import registered_backends

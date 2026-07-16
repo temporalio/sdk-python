@@ -29,17 +29,52 @@ installed on the machine assembling the worker.
 
 from __future__ import annotations
 
-import contextvars
 import dataclasses
-import hashlib
-import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
-if TYPE_CHECKING:
-    from langchain_core.runnables import RunnableConfig
-
-from temporalio.contrib.pydantic import PydanticPayloadConverter, ToJsonOptions
+from temporalio.contrib._langchain import _converter, _runnable_config, _task_cache
+from temporalio.contrib._langchain._converter import (
+    LangChainPayloadConverter,
+    data_converter,
+)
+from temporalio.contrib._langchain._messages import (
+    dump_messages,
+    dump_object,
+    load_messages,
+    load_object,
+    tool_to_schema,
+)
+from temporalio.contrib._langchain._passthrough import merge_passthrough_modules
+from temporalio.contrib._langchain._runnable_config import (
+    is_jsonish,
+    rebuild_runnable_config,
+)
 from temporalio.converter import DataConverter
+
+__all__ = [
+    "DeepAgentsPayloadConverter",
+    "Settings",
+    "build_data_converter",
+    "cache_key",
+    "cache_lookup",
+    "cache_put",
+    "data_converter",
+    "default_passthrough_modules",
+    "dump_backend_result",
+    "dump_messages",
+    "dump_object",
+    "get_settings",
+    "load_backend_result",
+    "load_messages",
+    "load_object",
+    "rebuild_runnable_config",
+    "resolve_passthrough_modules",
+    "result_cache_snapshot",
+    "set_result_cache",
+    "set_settings",
+    "strip_runnable_config",
+    "tool_to_schema",
+]
 
 # ---------------------------------------------------------------------------
 # Worker-wide dispatch settings
@@ -85,23 +120,8 @@ def get_settings() -> Settings:
 # ---------------------------------------------------------------------------
 
 
-class DeepAgentsPayloadConverter(PydanticPayloadConverter):
-    """Pydantic payload converter pinned to ``exclude_unset=True``.
-
-    LangChain request/response types (and ``DeepAgentState``) are deeply nested
-    with many ``Optional[...] = None`` fields. Shipping every unset default
-    inflates payloads several-fold and some peers reject the explicit nulls on
-    round-trip, so we exclude unset fields by convention.
-    """
-
-    def __init__(self) -> None:
-        """Construct the converter with ``exclude_unset`` serialization."""
-        super().__init__(ToJsonOptions(exclude_unset=True))
-
-
-data_converter = DataConverter(payload_converter_class=DeepAgentsPayloadConverter)
-"""The plugin's default data converter (LangChain messages are shipped as their
-``dumpd`` JSON form, so the Pydantic converter only ever sees plain containers)."""
+# The family converter, kept under this plugin's historical name.
+DeepAgentsPayloadConverter = LangChainPayloadConverter
 
 
 def build_data_converter(
@@ -109,43 +129,17 @@ def build_data_converter(
 ) -> DataConverter:
     """Compose the plugin's converter with whatever the caller already set.
 
-    * ``None`` — install the plugin default.
-    * the SDK default converter — swap in the LangChain-aware Pydantic
-      converter via :func:`dataclasses.replace`.
-    * a custom converter — refuse rather than silently clobber it; the caller
-      must fold :class:`DeepAgentsPayloadConverter` into their own converter.
+    Delegates to the shared family implementation; see its docstring for the
+    None / SDK-default / custom-converter contract.
     """
-    if user_converter is None:
-        return data_converter
-    if user_converter is DataConverter.default:
-        return dataclasses.replace(
-            user_converter, payload_converter_class=DeepAgentsPayloadConverter
-        )
-    raise ValueError(
-        "DeepAgentsPlugin cannot compose with a custom data_converter "
-        "automatically. Set payload_converter_class=DeepAgentsPayloadConverter "
-        "on your own DataConverter (so LangChain messages serialize with "
-        "exclude_unset=True), or omit data_converter to use the plugin default."
+    return _converter.build_data_converter(
+        user_converter, plugin_name="DeepAgentsPlugin"
     )
 
 
 # ---------------------------------------------------------------------------
 # LangChain object (de)serialization
 # ---------------------------------------------------------------------------
-
-
-def dump_object(obj: Any) -> Any:
-    """Serialize a single LangChain ``Serializable`` (message, tool call, …)."""
-    from langchain_core.load import dumpd
-
-    return dumpd(obj)
-
-
-def load_object(data: Any) -> Any:
-    """Rehydrate a value produced by :func:`dump_object`, preserving subtype."""
-    from langchain_core.load import load
-
-    return load(data)
 
 
 # ---------------------------------------------------------------------------
@@ -233,94 +227,36 @@ def load_backend_result(value: Any) -> Any:
     return value
 
 
-def dump_messages(messages: Any) -> list[Any]:
-    """Serialize a sequence of LangChain messages to their ``dumpd`` form."""
-    from langchain_core.load import dumpd
-
-    return [dumpd(m) for m in messages]
-
-
-def load_messages(dumped: list[Any]) -> list[Any]:
-    """Rehydrate messages serialized by :func:`dump_messages`."""
-    from langchain_core.load import load
-
-    return [load(d) for d in dumped]
-
-
-def tool_to_schema(tool: Any) -> dict[str, Any]:
-    """Advertise a tool to the model as a full OpenAI tool schema.
-
-    Carries name + description + argument JSON schema so the model can build
-    valid arguments, not just select the tool by name.
-    """
-    from langchain_core.utils.function_calling import convert_to_openai_tool
-
-    return convert_to_openai_tool(tool)
-
-
 # ---------------------------------------------------------------------------
 # RunnableConfig strip / rebuild
 # ---------------------------------------------------------------------------
 
 
-def _is_jsonish(value: Any) -> bool:
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return True
-    if isinstance(value, (list, tuple)):
-        return all(_is_jsonish(v) for v in value)
-    if isinstance(value, dict):
-        return all(isinstance(k, str) and _is_jsonish(v) for k, v in value.items())
-    return False
+# Shared with the other LangChain-family plugins; kept under the old private
+# name because sibling modules reference it.
+_is_jsonish = is_jsonish
+
+
+def _keep_configurable(key: str, value: Any) -> bool:
+    """Keep non-dunder, JSON-safe configurable entries."""
+    return not key.startswith("__") and is_jsonish(value)
 
 
 def strip_runnable_config(config: Any) -> dict[str, Any]:
     """Reduce a live ``RunnableConfig`` to its JSON-safe subset for shipping.
 
-    Keeps ``tags``, ``run_name``, ``run_id``, ``recursion_limit``, JSON-safe
-    ``metadata`` and the JSON-safe (non-dunder) ``configurable`` keys. Drops
-    callbacks, checkpointer / store / cache handles and every other live
-    reference — those are reconstructed activity-side.
+    Keeps ``tags`` and ``metadata`` (always present, values filtered to
+    JSON-safe ones), truthy ``run_name`` / ``run_id``, ``recursion_limit``,
+    and the JSON-safe non-dunder ``configurable`` keys. Drops callbacks,
+    checkpointer / store / cache handles and every other live reference —
+    those are reconstructed activity-side. Output shape follows the shared
+    (langgraph-vetted) implementation.
     """
-    if not config:
-        return {}
-    out: dict[str, Any] = {}
-    if config.get("tags"):
-        out["tags"] = list(config["tags"])
-    for key in ("run_id", "run_name"):
-        if config.get(key) is not None:
-            out[key] = str(config[key])
-    if config.get("recursion_limit") is not None:
-        out["recursion_limit"] = config["recursion_limit"]
-    metadata = config.get("metadata")
-    if isinstance(metadata, dict):
-        out["metadata"] = {k: v for k, v in metadata.items() if _is_jsonish(v)}
-    configurable = config.get("configurable")
-    if isinstance(configurable, dict):
-        kept = {
-            k: v
-            for k, v in configurable.items()
-            if not k.startswith("__") and _is_jsonish(v)
-        }
-        if kept:
-            out["configurable"] = kept
-    return out
-
-
-def rebuild_runnable_config(data: dict[str, Any]) -> "RunnableConfig":
-    """Reconstruct a minimal ``RunnableConfig`` from :func:`strip_runnable_config`."""
-    config: dict[str, Any] = {"metadata": dict(data.get("metadata", {}))}
-    if data.get("tags"):
-        config["tags"] = list(data["tags"])
-    for key in ("run_id", "run_name"):
-        if data.get(key) is not None:
-            config[key] = data[key]
-    if data.get("recursion_limit") is not None:
-        config["recursion_limit"] = data["recursion_limit"]
-    if data.get("configurable"):
-        config["configurable"] = dict(data["configurable"])
-    # Double cast: a TypedDict and dict[str, Any] "insufficiently overlap"
-    # for basedpyright's reportInvalidCast; object is the sanctioned bridge.
-    return cast("RunnableConfig", cast(object, config))
+    return _runnable_config.strip_runnable_config(
+        config,
+        configurable_filter=_keep_configurable,
+        metadata_filter=is_jsonish,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -328,44 +264,37 @@ def rebuild_runnable_config(data: dict[str, Any]) -> "RunnableConfig":
 # ---------------------------------------------------------------------------
 
 # Per-workflow state: set at the top of the workflow run, read by the model and
-# tool dispatch paths, snapshotted for continue-as-new. A ContextVar (not a
-# module-global keyed by run id) so update / signal handler tasks spawned by the
-# workflow inherit the same cache automatically.
-_result_cache: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
-    "_deepagents_result_cache", default=None
-)
+# tool dispatch paths, snapshotted for continue-as-new. Built on the shared
+# ContextVar-backed cache (update / signal handler tasks spawned by the
+# workflow inherit it automatically); this plugin's instance is distinct from
+# the langgraph plugin's.
+_result_cache = _task_cache.TaskResultCache("_deepagents_result_cache")
 
 
 def set_result_cache(cache: dict[str, Any] | None) -> None:
     """Seed the workflow-scoped result cache (e.g. carried across CAN)."""
-    _result_cache.set(dict(cache) if cache else {})
+    _result_cache.set_cache(dict(cache) if cache else {})
 
 
 def result_cache_snapshot() -> dict[str, Any] | None:
     """Return a serializable copy of the cache, or ``None`` when empty."""
-    cache = _result_cache.get()
+    cache = _result_cache.get_cache()
     return dict(cache) if cache else None
 
 
 def cache_key(kind: str, call_id: str, args: Any) -> str:
     """Stable key over ``(kind, call_id, args)`` for cache lookups."""
-    blob = json.dumps([kind, call_id, args], default=str, sort_keys=True)
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+    return _task_cache.cache_key(kind, (call_id, args), {})
 
 
 def cache_lookup(key: str) -> tuple[bool, Any]:
     """Return ``(hit, value)`` for ``key`` in the active cache."""
-    cache = _result_cache.get()
-    if cache is not None and key in cache:
-        return True, cache[key]
-    return False, None
+    return _result_cache.lookup(key)
 
 
 def cache_put(key: str, value: Any) -> None:
     """Record ``value`` under ``key`` when a cache is active for this run."""
-    cache = _result_cache.get()
-    if cache is not None:
-        cache[key] = value
+    _result_cache.put(key, value)
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +334,4 @@ def default_passthrough_modules() -> tuple[str, ...]:
 
 def resolve_passthrough_modules(user: Any) -> tuple[str, ...]:
     """Merge caller-supplied passthrough modules with the plugin defaults."""
-    merged = [*_DEFAULT_PASSTHROUGH, *(user or ())]
-    # dict.fromkeys preserves order while de-duplicating.
-    return tuple(dict.fromkeys(merged))
+    return merge_passthrough_modules(_DEFAULT_PASSTHROUGH, user)
