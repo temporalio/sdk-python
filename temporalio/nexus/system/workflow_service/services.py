@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from nexusrpc import Operation, service
 
-import temporalio.api.workflowservice.v1.request_response_pb2
+from .models import (
+    SignalWithStartWorkflowRequest,
+    SignalWithStartWorkflowResponse,
+)
 
 
 @service(name="temporal.api.workflowservice.v1.WorkflowService")
@@ -16,6 +19,6 @@ class WorkflowService:
 
     # .. warning:: This API is experimental and subject to change.
     signal_with_start_workflow: Operation[
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
-        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+        SignalWithStartWorkflowRequest,
+        SignalWithStartWorkflowResponse,
     ] = Operation(name="SignalWithStartWorkflowExecution")

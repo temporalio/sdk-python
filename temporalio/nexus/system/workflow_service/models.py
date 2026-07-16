@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+# pyright: reportPrivateUsage=false
 import collections.abc
 import dataclasses
 import datetime
@@ -12,20 +13,31 @@ import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.common
 
 from ._support import (
+    duration_from_proto,
     duration_to_proto,
+    memo_from_proto,
     memo_to_proto,
     payload_from_proto,
     payload_to_proto,
+    payloads_from_proto,
     payloads_to_proto,
+    priority_from_proto,
     priority_to_proto,
+    retry_policy_from_proto,
     retry_policy_to_proto,
+    search_attributes_from_proto,
     search_attributes_to_proto,
     signal_function_to_proto,
+    task_queue_from_proto,
     task_queue_to_proto,
+    versioning_override_from_proto,
     versioning_override_to_proto,
+    workflow_id_conflict_policy_from_proto,
     workflow_id_conflict_policy_to_proto,
+    workflow_id_reuse_policy_from_proto,
     workflow_id_reuse_policy_to_proto,
     workflow_namespace,
+    workflow_type_from_proto,
     workflow_type_to_proto,
 )
 
@@ -59,8 +71,84 @@ class SignalWithStartWorkflowRequest:
     versioning_override: temporalio.common.VersioningOverride | None = None
     start_delay: datetime.timedelta | None = None
     user_metadata: UserMetadata | None = None
+    namespace: str = dataclasses.field(default_factory=workflow_namespace)
 
-    def to_proto(
+    @classmethod
+    def _temporal_from_intermediate(
+        cls,
+        proto: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
+    ) -> SignalWithStartWorkflowRequest:
+        if not proto.HasField("workflow_type"):
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowRequest.workflow"
+            )
+        workflow = workflow_type_from_proto(proto.workflow_type)
+        if not proto.workflow_id:
+            raise ValueError("missing required field SignalWithStartWorkflowRequest.id")
+        id = proto.workflow_id
+        if not proto.HasField("task_queue"):
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowRequest.task_queue"
+            )
+        task_queue = task_queue_from_proto(proto.task_queue)
+        if not proto.signal_name:
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowRequest.signal"
+            )
+        signal = proto.signal_name
+        return cls(
+            workflow=workflow,
+            args=payloads_from_proto(proto.input) if proto.HasField("input") else None,
+            id=id,
+            task_queue=task_queue,
+            signal=signal,
+            signal_args=payloads_from_proto(proto.signal_input)
+            if proto.HasField("signal_input")
+            else None,
+            execution_timeout=duration_from_proto(proto.workflow_execution_timeout)
+            if proto.HasField("workflow_execution_timeout")
+            else None,
+            run_timeout=duration_from_proto(proto.workflow_run_timeout)
+            if proto.HasField("workflow_run_timeout")
+            else None,
+            task_timeout=duration_from_proto(proto.workflow_task_timeout)
+            if proto.HasField("workflow_task_timeout")
+            else None,
+            request_id=proto.request_id if bool(proto.request_id) else None,
+            id_reuse_policy=workflow_id_reuse_policy_from_proto(
+                proto.workflow_id_reuse_policy
+            ),
+            id_conflict_policy=workflow_id_conflict_policy_from_proto(
+                proto.workflow_id_conflict_policy
+            )
+            if proto.workflow_id_conflict_policy != 0
+            else None,
+            retry_policy=retry_policy_from_proto(proto.retry_policy)
+            if proto.HasField("retry_policy")
+            else None,
+            cron_schedule=proto.cron_schedule if bool(proto.cron_schedule) else None,
+            memo=memo_from_proto(proto.memo) if proto.HasField("memo") else None,
+            search_attributes=search_attributes_from_proto(proto.search_attributes)
+            if proto.HasField("search_attributes")
+            else None,
+            priority=priority_from_proto(proto.priority)
+            if proto.HasField("priority")
+            else None,
+            versioning_override=versioning_override_from_proto(
+                proto.versioning_override
+            )
+            if proto.HasField("versioning_override")
+            else None,
+            start_delay=duration_from_proto(proto.workflow_start_delay)
+            if proto.HasField("workflow_start_delay")
+            else None,
+            user_metadata=UserMetadata._temporal_from_intermediate(proto.user_metadata)
+            if proto.HasField("user_metadata")
+            else None,
+            namespace=proto.namespace,
+        )
+
+    def _temporal_to_intermediate(
         self,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest:
         message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest()
@@ -108,8 +196,10 @@ class SignalWithStartWorkflowRequest:
         if self.start_delay is not None:
             message.workflow_start_delay.CopyFrom(duration_to_proto(self.start_delay))
         if self.user_metadata is not None:
-            message.user_metadata.CopyFrom(self.user_metadata.to_proto())
-        message.namespace = workflow_namespace()
+            message.user_metadata.CopyFrom(
+                self.user_metadata._temporal_to_intermediate()
+            )
+        message.namespace = self.namespace
         return message
 
 
@@ -119,7 +209,7 @@ class UserMetadata:
     static_details: typing.Any | None = None
 
     @classmethod
-    def from_proto(
+    def _temporal_from_intermediate(
         cls,
         proto: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata,
     ) -> UserMetadata:
@@ -132,10 +222,43 @@ class UserMetadata:
             else None,
         )
 
-    def to_proto(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+    def _temporal_to_intermediate(
+        self,
+    ) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         message = temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata()
         if self.static_summary is not None:
             message.summary.CopyFrom(payload_to_proto(self.static_summary))
         if self.static_details is not None:
             message.details.CopyFrom(payload_to_proto(self.static_details))
+        return message
+
+
+@dataclasses.dataclass(slots=True)
+class SignalWithStartWorkflowResponse:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    run_id: str | None = None
+    started: bool | None = None
+
+    @classmethod
+    def _temporal_from_intermediate(
+        cls,
+        proto: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+    ) -> SignalWithStartWorkflowResponse:
+        return cls(
+            run_id=proto.run_id if bool(proto.run_id) else None,
+            started=proto.started if bool(proto.started) else None,
+        )
+
+    def _temporal_to_intermediate(
+        self,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse:
+        message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse()
+        if self.run_id is not None:
+            message.run_id = self.run_id
+        if self.started is not None:
+            message.started = self.started
         return message

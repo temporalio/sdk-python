@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import service as _service
+from . import services as _services
 from .operations.signal_with_start_workflow import signal_with_start_workflow
 
 __all__ = [
@@ -14,5 +14,5 @@ __nexus_operation_registry__ = {
     (
         "temporal.api.workflowservice.v1.WorkflowService",
         "SignalWithStartWorkflowExecution",
-    ): _service.WorkflowService.signal_with_start_workflow,
+    ): _services.WorkflowService.signal_with_start_workflow,
 }
