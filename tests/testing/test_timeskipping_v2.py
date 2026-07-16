@@ -399,3 +399,25 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
         )
         # And the workflow's history has the TS transition event.
         await assert_time_was_skipped(handle)
+
+
+async def test_fast_forward_returns_false_when_workflow_terminates_first(
+    env: WorkflowEnvironment,
+) -> None:
+    """Workflow's own 1h timer fires before FF's 2h target → FF returns False.
+
+    Exercises the False-return branch of
+    ``_wait_for_fast_forward_completed``: the FF's update RPC lands while
+    the workflow is still alive, then the workflow's timer fires and
+    terminates it before the FF reaches its target, so the wait loop sees
+    a terminal event before any ``disabled_after_fast_forward`` transition.
+    """
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                SleepWorkflow.run,
+                3600.0,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert (await env.fast_forward(handle, timedelta(hours=2))) is False
