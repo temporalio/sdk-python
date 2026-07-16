@@ -580,7 +580,7 @@ class TestComprehensiveTracing:
         user_pipeline only wraps start_workflow (completing before the worker
         starts), so poll/signal/query traces are naturally separate root traces.
         """
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip("Time-skipping server doesn't persist headers.")
 
         task_queue = f"comprehensive-{uuid.uuid4()}"
@@ -773,7 +773,7 @@ class TestComprehensiveTracing:
         Only @traceable runs appear. Context propagation via headers still works.
         user_pipeline only wraps start_workflow, so poll traces are separate roots.
         """
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip("Time-skipping server doesn't persist headers.")
 
         task_queue = f"comprehensive-no-runs-{uuid.uuid4()}"
@@ -1150,7 +1150,7 @@ class TestNexusInboundTracing:
         tracing_context — the interceptor's tracing_context setup (or lack
         thereof) is the only thing that should provide context to the handler.
         """
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip("Time-skipping server doesn't persist headers.")
 
         task_queue = f"nexus-direct-{uuid.uuid4()}"

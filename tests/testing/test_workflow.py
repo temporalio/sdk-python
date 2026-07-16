@@ -255,7 +255,7 @@ async def test_workflow_env_assert(client: Client):
 async def test_search_attributes_on_dev_server(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Only testing for local dev server")
 
     # Search attributes

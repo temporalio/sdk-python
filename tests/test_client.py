@@ -113,7 +113,7 @@ async def test_start_id_reuse(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
         )
@@ -169,7 +169,7 @@ async def test_start_with_signal(client: Client, worker: ExternalWorker):
 async def test_start_delay(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not support start delay")
     start_delay = timedelta(hours=1, minutes=20, seconds=30)
     handle = await client.start_workflow(
@@ -192,7 +192,7 @@ async def test_start_delay(
 async def test_signal_with_start_delay(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not support start delay")
     start_delay = timedelta(hours=1, minutes=20, seconds=30)
     handle = await client.start_workflow(
@@ -217,7 +217,7 @@ async def test_result_follow_continue_as_new(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
         )
@@ -336,7 +336,7 @@ async def test_describe(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1425"
         )
@@ -558,7 +558,7 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
 
 async def test_lazy_client(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1094"
         )
@@ -651,7 +651,7 @@ class ListableWorkflow:
 async def test_list_workflows_and_fetch_history(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support newer workflow listing")
 
     # Run 5 workflows. Use the same workflow ID over and over to make sure we
@@ -707,7 +707,7 @@ class CountableWorkflow:
 
 
 async def test_count_workflows(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support newer workflow listing")
 
     # 3 workflows that complete, 2 that don't
@@ -840,7 +840,7 @@ def test_history_from_json():
 async def test_schedule_basics(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
     elif os.getenv("TEMPORAL_TEST_PROTO3"):
         pytest.skip("Older proto library cannot compare repeated fields")
@@ -1092,7 +1092,7 @@ async def test_schedule_basics(
 async def test_schedule_calendar_spec_defaults(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
     await assert_no_schedules(client)
 
@@ -1130,7 +1130,7 @@ async def test_schedule_calendar_spec_defaults(
 async def test_schedule_trigger_immediately(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
     await assert_no_schedules(client)
 
@@ -1171,7 +1171,7 @@ async def test_schedule_trigger_immediately(
 async def test_schedule_backfill(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
     await assert_no_schedules(client)
 
@@ -1254,7 +1254,7 @@ async def test_schedule_create_limited_actions_validation(
 async def test_schedule_workflow_search_attribute_update(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
     await assert_no_schedules(client)
 
@@ -1365,7 +1365,7 @@ async def test_schedule_workflow_search_attribute_update(
 async def test_schedule_search_attribute_update(
     client: Client, env: WorkflowEnvironment, test_case: str
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
     await assert_no_schedules(client)
 
@@ -1498,7 +1498,7 @@ async def assert_no_schedules(client: Client) -> None:
 
 
 async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not support worker versioning")
     if not await worker_versioning_enabled(client):
         pytest.skip("This server does not have worker versioning enabled")
@@ -1559,7 +1559,7 @@ class LastCompletionResultWorkflow:
 async def test_schedule_last_completion_result(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
 
     async with new_worker(client, LastCompletionResultWorkflow) as worker:

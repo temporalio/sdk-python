@@ -53,7 +53,7 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())

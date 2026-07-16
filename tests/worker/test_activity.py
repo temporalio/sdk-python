@@ -176,7 +176,7 @@ async def test_activity_info(
     shared_state_manager: SharedStateManager,
 ):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1426"
         )
@@ -780,7 +780,7 @@ async def test_activity_heartbeat_details(
     env: WorkflowEnvironment,
     shared_state_manager: SharedStateManager,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
 
     @activity.defn
@@ -841,7 +841,7 @@ async def test_activity_heartbeat_details_timeout(
     shared_state_manager: SharedStateManager,
 ):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1427"
         )
@@ -889,7 +889,7 @@ async def test_sync_activity_thread_heartbeat_details(
     env: WorkflowEnvironment,
     shared_state_manager: SharedStateManager,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
 
     with concurrent.futures.ThreadPoolExecutor(
@@ -912,7 +912,7 @@ async def test_sync_activity_process_heartbeat_details(
     env: WorkflowEnvironment,
     shared_state_manager: SharedStateManager,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -1309,7 +1309,7 @@ async def test_activity_async_heartbeat_and_fail(
     use_task_token: bool,
     shared_state_manager: SharedStateManager,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
 
     wrapper = AsyncActivityWrapper()
@@ -1726,7 +1726,7 @@ async def test_activity_reset_catch(
     env: WorkflowEnvironment,
     shared_state_manager: SharedStateManager,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time skipping server doesn't support activity reset")
 
     @activity.defn
@@ -1798,7 +1798,7 @@ async def test_activity_reset_history(
     env: WorkflowEnvironment,
     shared_state_manager: SharedStateManager,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time skipping server doesn't support activity reset")
 
     @activity.defn

@@ -477,7 +477,7 @@ async def test_nexus_tool_workflow(
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     model = nexus_weather_mock_model() if use_local_model else None
@@ -1582,7 +1582,7 @@ async def test_alternative_model(client: Client):
 
 
 async def test_heartbeat(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Relies on real timing, skip.")
 
     async with AgentEnvironment(

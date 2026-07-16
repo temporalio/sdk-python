@@ -625,7 +625,7 @@ class ErrorTestCallerWorkflow:
 async def test_errors_raised_by_nexus_operation(
     client: Client, env: WorkflowEnvironment, test_case: ErrorTestCase
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())

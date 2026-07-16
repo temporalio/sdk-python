@@ -120,7 +120,7 @@ class ShutdownTestCallerWorkflow:
 
 async def test_nexus_worker_shutdown(env: WorkflowEnvironment):
     """Test that Nexus operations are cancelled when worker shuts down without graceful timeout."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     # Use separate task queues for caller and handler workers
@@ -175,7 +175,7 @@ async def test_nexus_worker_shutdown(env: WorkflowEnvironment):
 
 async def test_nexus_worker_shutdown_graceful(env: WorkflowEnvironment):
     """Test that async Nexus operations complete gracefully during shutdown."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     # Use separate task queues for caller and handler workers
@@ -231,7 +231,7 @@ async def test_nexus_worker_shutdown_graceful(env: WorkflowEnvironment):
 
 async def test_sync_nexus_operation_worker_shutdown_graceful(env: WorkflowEnvironment):
     """Test that sync (ThreadPoolExecutor) Nexus operations complete gracefully during shutdown."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     # Use separate task queues for caller and handler workers
@@ -291,7 +291,7 @@ async def test_sync_nexus_operation_worker_shutdown_graceful(env: WorkflowEnviro
 
 async def test_is_worker_shutdown(env: WorkflowEnvironment):
     """Test that is_worker_shutdown returns correct values."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     # Use separate task queues for caller and handler workers

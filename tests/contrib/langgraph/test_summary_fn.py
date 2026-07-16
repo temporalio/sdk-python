@@ -260,7 +260,7 @@ class WorkflowNodeSummaryWorkflow:
 async def test_workflow_node_sets_current_details(
     client: Client, env: WorkflowEnvironment
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("metadata query unreliable on the time-skipping test server")
     g: StateGraph[State, None, State, State] = StateGraph(State)
     g.add_node(
@@ -300,7 +300,7 @@ async def test_workflow_node_sets_current_details(
 async def test_workflow_node_clears_current_details_on_empty(
     client: Client, env: WorkflowEnvironment
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("metadata query unreliable on the time-skipping test server")
     g: StateGraph[State, None, State, State] = StateGraph(State)
     g.add_node(

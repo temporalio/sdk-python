@@ -239,7 +239,7 @@ async def test_opentelemetry_comprehensive_tracing(
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
 ):
     """Test OpenTelemetry v2 integration across all workflow operations."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Fails on java test server.")
 
     exporter = InMemorySpanExporter()
@@ -572,7 +572,7 @@ async def test_otel_standalone_activity_tracing(
     env: WorkflowEnvironment,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
         )

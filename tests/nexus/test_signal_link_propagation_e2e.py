@@ -267,7 +267,7 @@ async def test_sync_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -316,7 +316,7 @@ async def test_async_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -401,7 +401,7 @@ async def test_standalone_sync_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -440,7 +440,7 @@ async def test_standalone_async_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -498,7 +498,7 @@ async def test_start_from_handler_attaches_on_conflict_options(
     client: Client,
     env: WorkflowEnvironment,
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())

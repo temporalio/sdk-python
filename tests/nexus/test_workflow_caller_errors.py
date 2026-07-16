@@ -171,7 +171,7 @@ class RPCErrorCallerWorkflow:
 async def test_nexus_operation_is_retried(
     client: Client, env: WorkflowEnvironment, operation_name: str
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     input = ErrorTestInput(
@@ -232,7 +232,7 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
     handler_error_type: nexusrpc.HandlerErrorType,
     handler_error_message: str,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     input = ErrorTestInput(
@@ -315,7 +315,7 @@ class StartTimeoutTestCallerWorkflow:
 async def test_error_raised_by_timeout_of_nexus_start_operation(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -397,7 +397,7 @@ class ScheduleToStartTimeoutTestCallerWorkflow:
 async def test_error_raised_by_schedule_to_start_timeout_of_nexus_operation(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -473,7 +473,7 @@ class StartToCloseTimeoutTestCallerWorkflow:
 async def test_error_raised_by_start_to_close_timeout_of_nexus_operation(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -554,7 +554,7 @@ class CancellationTimeoutTestCallerWorkflow:
 async def test_error_raised_by_timeout_of_nexus_cancel_operation(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -606,7 +606,7 @@ async def test_rpc_error_fails_without_retry(
     status_code: RPCStatusCode,
     expected_handler_error_type: nexusrpc.HandlerErrorType,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     input = RPCErrorInput(
@@ -665,7 +665,7 @@ async def test_rpc_error_is_retried(
     env: WorkflowEnvironment,
     status_code: RPCStatusCode,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     input = RPCErrorInput(
@@ -741,7 +741,7 @@ class FailingFromPayloadsConverter(DefaultPayloadConverter):
 async def test_nexus_operation_retried_on_codec_decode_failure(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -785,7 +785,7 @@ async def test_nexus_operation_retried_on_codec_decode_failure(
 async def test_nexus_operation_fails_without_retry_on_converter_failure(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())

@@ -286,7 +286,7 @@ async def test_replayer_workflow_not_registered(client: Client) -> None:
 async def test_replayer_multiple_from_client(
     client: Client, env: WorkflowEnvironment
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support newer workflow listing")
 
     # Run 5 say-hello's, with 2nd and 4th having non-det errors. Reuse the same

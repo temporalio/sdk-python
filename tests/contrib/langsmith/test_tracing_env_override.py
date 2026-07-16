@@ -169,7 +169,7 @@ class TestTracingEnvOverride:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """With LANGSMITH_TRACING=false, nexus start handler emits no runs."""
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip("Time-skipping server doesn't persist headers.")
 
         monkeypatch.setenv("LANGSMITH_TRACING", "false")

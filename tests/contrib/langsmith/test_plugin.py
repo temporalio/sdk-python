@@ -61,7 +61,7 @@ class TestPluginIntegration:
         user_pipeline only wraps start_workflow, so poll/query/signal/update
         traces are naturally separate root traces.
         """
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip("Time-skipping server doesn't persist headers.")
 
         temporal_client, collector, mock_ls_client = _make_client_and_collector(

@@ -169,7 +169,7 @@ async def test_payload_size_warning_workflow_memo(client: Client):
 
 
 async def test_payload_size_error_disabled_workflow_payload(env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not report payload limits.")
 
     async with await WorkflowEnvironment.start_local(
@@ -205,7 +205,7 @@ async def test_payload_size_error_disabled_workflow_payload(env: WorkflowEnviron
 
 
 async def test_payload_size_error_workflow_result(env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not report payload limits.")
 
     async with await WorkflowEnvironment.start_local(
@@ -316,7 +316,7 @@ async def test_payload_size_warning_workflow_result(client: Client):
 
 
 async def test_payload_size_error_activity_input(env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not report payload limits.")
 
     async with await WorkflowEnvironment.start_local(
@@ -425,7 +425,7 @@ async def test_payload_size_warning_activity_input(client: Client):
 
 
 async def test_payload_size_error_activity_exception(env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not report payload limits.")
 
     async with await WorkflowEnvironment.start_local(
@@ -491,7 +491,7 @@ async def test_payload_size_error_activity_exception(env: WorkflowEnvironment):
 
 
 async def test_payload_size_error_activity_result(env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not report payload limits.")
 
     async with await WorkflowEnvironment.start_local(

@@ -57,8 +57,9 @@ class WorkflowEnvironment:
     def from_client(cls, client: temporalio.client.Client) -> Self:
         """Create a workflow environment from the given client.
 
-        :py:attr:`supports_time_skipping` will always return ``False`` for this
-        environment. :py:meth:`sleep` will sleep the actual amount of time and
+        :py:attr:`supports_time_skipping_v1` and :py:attr:`supports_time_skipping_v2`
+        will both return ``False`` for this environment.
+        :py:meth:`sleep` will sleep the actual amount of time and
         :py:meth:`get_current_time` will return the current time.
 
         Args:
@@ -430,9 +431,19 @@ class WorkflowEnvironment:
         return datetime.now(timezone.utc)
 
     @property
-    def supports_time_skipping(self) -> bool:
-        """Whether this environment supports time skipping."""
+    def supports_time_skipping_v1(self) -> bool:
+        """True if this environment uses the deprecated V1 Java time-skipping server (which has limited server features)."""
         return False
+
+    @property
+    def supports_time_skipping_v2(self) -> bool:
+        """True if this environment uses the V2 time-skipping server."""
+        return False
+
+    @property
+    def supports_time_skipping(self) -> bool:
+        """Whether this environment supports any form of time skipping (v1 or v2)."""
+        return self.supports_time_skipping_v1 or self.supports_time_skipping_v2
 
     async def create_nexus_endpoint(
         self, endpoint_name: str, task_queue: str
@@ -572,11 +583,11 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     ) -> None:
         # Add assertion interceptor to client and if time skipping is supported,
         # add time skipping interceptor
-        self._supports_time_skipping = server.has_test_service
+        self._supports_time_skipping_v1 = server.has_test_service
         interceptors: list[temporalio.client.Interceptor] = [
             _AssertionErrorInterceptor()
         ]
-        if self._supports_time_skipping:
+        if self._supports_time_skipping_v1:
             interceptors.append(_TimeSkippingClientInterceptor(self))
         super().__init__(_client_with_interceptors(client, *interceptors))
         self._server = server
@@ -604,7 +615,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
                 "env.fast_forward(handle, duration) on a specific workflow."
             )
         # Use regular sleep if no time skipping
-        if not self._supports_time_skipping:
+        if not self._supports_time_skipping_v1:
             return await super().sleep(duration)
         req = temporalio.api.testservice.v1.SleepRequest()
         req.duration.FromTimedelta(
@@ -631,7 +642,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
                 "workflow.query returning workflow.now()."
             )
         # Use regular time if no time skipping
-        if not self._supports_time_skipping:
+        if not self._supports_time_skipping_v1:
             return await super().get_current_time()
         resp = await self._client.test_service.get_current_time(
             google.protobuf.empty_pb2.Empty()
@@ -639,8 +650,12 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         return resp.time.ToDatetime().replace(tzinfo=timezone.utc)
 
     @property
-    def supports_time_skipping(self) -> bool:
-        return self._supports_time_skipping
+    def supports_time_skipping_v1(self) -> bool:
+        return self._supports_time_skipping_v1
+
+    @property
+    def supports_time_skipping_v2(self) -> bool:
+        return self._ts_skipper is not None
 
     @contextmanager
     def auto_time_skipping_disabled(self) -> Iterator[None]:
@@ -672,7 +687,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def time_skipping_unlocked(self) -> AsyncIterator[None]:
         # If it's disabled or not supported, no locking/unlocking, just yield
         # and return
-        if not self._supports_time_skipping or not self._auto_time_skipping:
+        if not self._supports_time_skipping_v1 or not self._auto_time_skipping:
             yield None
             return
         # Unlock to start time skipping, lock again to stop it

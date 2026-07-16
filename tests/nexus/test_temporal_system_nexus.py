@@ -353,7 +353,7 @@ def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
 async def test_external_workflow_handle_signal_with_start_workflow_uses_system_nexus(
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     codec = RejectOuterSystemNexusCodec()

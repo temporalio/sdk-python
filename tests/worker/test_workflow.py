@@ -227,7 +227,7 @@ class InfoWorkflow:
 
 async def test_workflow_info(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1426"
         )
@@ -309,7 +309,7 @@ class HistoryInfoWorkflow:
 async def test_workflow_history_info(
     client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not support should continue as new")
     async with new_worker(client, HistoryInfoWorkflow) as worker:
         handle = await client.start_workflow(
@@ -1899,7 +1899,7 @@ class ContinueAsNewWorkflow:
 
 async def test_workflow_continue_as_new(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
         )
@@ -2650,7 +2650,7 @@ class DataClassTypedWorkflow(DataClassTypedWorkflowAbstract):
 
 async def test_workflow_dataclass_typed(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-rust/issues/390"
         )
@@ -2722,7 +2722,7 @@ async def test_workflow_separate_abstract(client: Client):
 
 async def test_workflow_already_started(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
         )
@@ -2757,7 +2757,7 @@ class ChildAlreadyStartedWorkflow:
 
 async def test_workflow_child_already_started(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
         )
@@ -4806,7 +4806,7 @@ class UpdateRespectsFirstExecutionRunIdWorkflow:
 async def test_workflow_update_respects_first_execution_run_id(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
@@ -5163,7 +5163,7 @@ class BuildIDInfoWorkflow:
 async def test_workflow_current_build_id_appropriately_set(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not support worker versioning")
 
     task_queue = str(uuid.uuid4())
@@ -5514,7 +5514,7 @@ class TickingWorkflow:
 
 
 async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Only testing against two real servers")
     # We are going to start a second ephemeral server and then replace the
     # client. So we will start a no-cache ticking workflow with the current
@@ -6038,7 +6038,7 @@ async def test_unfinished_handler_on_workflow_termination(
         "-cancellation-", "-failure-", "-continue-as-new-"
     ],
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Issues with update: https://github.com/temporalio/sdk-python/issues/826"
         )
@@ -6660,7 +6660,7 @@ class UserMetadataWorkflow:
 
 
 async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
         )
@@ -6757,7 +6757,7 @@ async def test_workflow_sleep(client: Client, env: WorkflowEnvironment):
             task_queue=worker.task_queue,
         )
         assert workflow_elapsed >= 1
-        if not env.supports_time_skipping:
+        if not env.supports_time_skipping_v1:
             assert (datetime.now() - start_time) >= timedelta(seconds=1)
 
 
@@ -6801,7 +6801,7 @@ class ConcurrentSleepsWorkflow:
 async def test_concurrent_sleeps_use_proper_options(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
         )
@@ -6983,7 +6983,7 @@ async def test_async_loop_ordering(client: Client, env: WorkflowEnvironment):
     """This test mostly exists to generate histories for test_replayer_async_ordering.
     See that test for more."""
 
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("This test doesn't work right with time skipping for some reason")
     task_queue = f"tq-{uuid.uuid4()}"
     handle = await client.start_workflow(
@@ -7042,7 +7042,7 @@ async def test_alternate_async_loop_ordering(client: Client, env: WorkflowEnviro
     """This test mostly exists to generate histories for test_replayer_alternate_async_ordering.
     See that test for more."""
 
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("This test doesn't work right with time skipping for some reason")
     task_queue = f"tq-{uuid.uuid4()}"
     activity_tq = f"tq-{uuid.uuid4()}"
@@ -7231,7 +7231,7 @@ async def _do_update_handler_lock_or_semaphore_test(
     n_updates: int,
     expectation: LockOrSemaphoreWorkflowConcurrencySummary,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1903"
         )
@@ -7730,7 +7730,7 @@ class WorkflowUsingPriorities:
 
 
 async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2453"
         )
@@ -7812,7 +7812,7 @@ class ExposeRootWorkflow:
 
 
 async def test_expose_root_execution(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server needs release with: https://github.com/temporalio/sdk-java/pull/2441"
         )
@@ -8066,7 +8066,7 @@ class ActivityHeartbeatWorkflow:
 async def test_activity_pause_cancellation_details(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not support pause API yet")
     with concurrent.futures.ThreadPoolExecutor() as executor:
         async with Worker(
@@ -8145,7 +8145,7 @@ class ActivityHeartbeatPauseUnpauseWorkflow:
 
 
 async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not support pause API yet")
 
     async def check_heartbeat_details_exist(
@@ -8243,7 +8243,7 @@ class ExternalActivityWorkflow:
 async def test_external_activity_cancellation_details(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not support pause API yet")
     async with Worker(
         client,
@@ -8523,7 +8523,7 @@ class HeaderClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
 async def test_workflow_headers_with_codec(
     client: Client, env: WorkflowEnvironment, header_codec_behavior: HeaderCodecBehavior
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time skipping server doesn't persist headers.")
 
     header_payload = Payload(data=b"bar")
@@ -8892,7 +8892,7 @@ class RandomSeedTestWorkflow:
 async def test_random_seed_functionality(
     client: Client, worker: Worker, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support reset")
     async with new_worker(
         client, RandomSeedTestWorkflow, activities=[say_hello], max_cached_workflows=0

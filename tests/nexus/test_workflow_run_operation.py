@@ -135,7 +135,7 @@ async def test_workflow_run_operation(
     env: WorkflowEnvironment,
     service_handler_cls: type[Any],
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -162,7 +162,7 @@ async def test_request_deadline_is_accessible_in_workflow_run_operation(
     env: WorkflowEnvironment,
 ):
     """Test that request_deadline is accessible in WorkflowRunOperationContext."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -195,7 +195,7 @@ async def test_workflow_run_operation_includes_token_in_callback(
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())

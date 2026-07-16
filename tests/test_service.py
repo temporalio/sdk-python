@@ -150,7 +150,7 @@ async def test_check_health(client: Client):
 
 
 async def test_grpc_status(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1557"
         )

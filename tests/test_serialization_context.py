@@ -1737,7 +1737,7 @@ async def test_nexus_payload_codec_operations_lack_context(
     """
     encode() and decode() on nexus payloads should not have any context set.
     """
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     config = env.client.config()

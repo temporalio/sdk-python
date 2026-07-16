@@ -61,7 +61,7 @@ class MyClientPlugin(temporalio.client.Plugin):
 
 
 async def test_client_plugin(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Client connect is only designed for local")
 
     plugin = MyClientPlugin()
