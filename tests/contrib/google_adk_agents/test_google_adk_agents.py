@@ -14,6 +14,7 @@
 
 """Integration tests for ADK Temporal support."""
 
+import inspect
 import json
 import logging
 import os
@@ -285,40 +286,60 @@ async def test_single_agent(client: Client, use_local_model: bool):
 
 
 class ResearchModel(TestModel):
+    """Scripted coordinator -> researcher -> writer flow.
+
+    Responses are keyed off which agent is calling (via its instruction text in
+    the request's system instruction) rather than deduped against conversation
+    history, since the ADK rewrites cross-agent history between versions (e.g.
+    2.4 converts prior transfer calls into "For context:" text parts).
+    """
+
+    _responses_by_instruction = {
+        "You are a coordinator": LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"agent_name": "researcher"},
+                            name="transfer_to_agent",
+                        )
+                    )
+                ],
+            )
+        ),
+        "You are a researcher": LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"agent_name": "writer"}, name="transfer_to_agent"
+                        )
+                    )
+                ],
+            )
+        ),
+        "You are a poet": LlmResponse(
+            content=Content(
+                role="model",
+                parts=[Part(text="haiku")],
+            )
+        ),
+    }
+
     def responses(self) -> list[LlmResponse]:
-        return [
-            LlmResponse(
-                content=Content(
-                    role="model",
-                    parts=[
-                        Part(
-                            function_call=FunctionCall(
-                                args={"agent_name": "researcher"},
-                                name="transfer_to_agent",
-                            )
-                        )
-                    ],
-                )
-            ),
-            LlmResponse(
-                content=Content(
-                    role="model",
-                    parts=[
-                        Part(
-                            function_call=FunctionCall(
-                                args={"agent_name": "writer"}, name="transfer_to_agent"
-                            )
-                        )
-                    ],
-                )
-            ),
-            LlmResponse(
-                content=Content(
-                    role="model",
-                    parts=[Part(text="haiku")],
-                )
-            ),
-        ]
+        return list(self._responses_by_instruction.values())
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        instruction = str(llm_request.config.system_instruction or "")
+        for phrase, response in self._responses_by_instruction.items():
+            if phrase in instruction:
+                yield response
+                return
+        raise ValueError(f"No scripted response for instruction: {instruction!r}")
 
     @classmethod
     def supported_models(cls) -> list[str]:
@@ -1099,3 +1120,41 @@ def test_explicitly_set_none_preserved() -> None:
 
     assert "cache_config" in serialized, "Explicitly-set None should be preserved"
     assert serialized["cache_config"] is None
+
+
+def test_activity_tool_preserves_metadata() -> None:
+    """activity_tool wrapper preserves the original function's metadata.
+
+    This ensures ADK's tool schema generation can inspect __annotations__
+    and __module__ on the wrapper, which are needed by
+    ``_handle_params_as_deferred_annotations`` to resolve type hints.
+    """
+
+    @activity.defn
+    async def my_activity(city: str, count: int = 1) -> str:
+        """Get info for a city."""
+        return f"{city}: {count}"
+
+    tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+        my_activity, start_to_close_timeout=timedelta(seconds=30)
+    )
+
+    # __name__ and __doc__
+    assert tool.__name__ == "my_activity"
+    assert tool.__doc__ == "Get info for a city."
+
+    # __annotations__ — critical for ADK type introspection
+    assert "city" in tool.__annotations__
+    assert tool.__annotations__["city"] is str
+    assert tool.__annotations__["count"] is int
+    assert tool.__annotations__["return"] is str
+
+    # __module__ — needed by _handle_params_as_deferred_annotations
+    assert tool.__module__ == my_activity.__module__
+
+    # __signature__ — must match the original, not *args/**kw
+    sig = inspect.signature(tool)
+    params = list(sig.parameters.keys())
+    assert params == ["city", "count"]
+    assert sig.parameters["city"].annotation is str
+    assert sig.parameters["count"].default == 1

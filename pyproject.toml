@@ -29,7 +29,7 @@ grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.17.5", "mcp>=1.9.4, <2"]
-google-adk = ["google-adk>=1.27.0,<2"]
+google-adk = ["google-adk>=2.2.0,<3"]
 langgraph = ["langgraph>=1.1.0"]
 langsmith = ["langsmith>=0.7.34,<0.9"]
 lambda-worker-otel = [
@@ -40,6 +40,7 @@ lambda-worker-otel = [
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
 ]
 aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
+google-genai = ["google-genai>=2.10.0,<3.0.0"]
 strands-agents = ["strands-agents>=1.39.0"]
 
 [project.urls]
@@ -88,6 +89,7 @@ dev = [
   "async-timeout>=4.0,<6; python_version < '3.11'",
   "strands-agents>=1.39.0",
   "strands-agents-tools>=0.5.2",
+  "mcp>=1.9.4,<2",
 ]
 
 [tool.poe.tasks]
@@ -151,16 +153,20 @@ filterwarnings = [
 
 [tool.cibuildwheel]
 before-all = "pip install protoc-wheel-0"
-build = "cp310-win_amd64 cp310-manylinux_x86_64 cp310-manylinux_aarch64 cp310-macosx_x86_64 cp310-macosx_arm64"
+build = "cp310-win_amd64 cp310-manylinux_x86_64 cp310-manylinux_aarch64 cp310-musllinux_x86_64 cp310-musllinux_aarch64 cp310-macosx_x86_64 cp310-macosx_arm64"
 build-verbosity = 1
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
 
 [tool.cibuildwheel.linux]
-before-all = "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && yum install -y openssl-devel"
-before-build = "pip install protoc-wheel-0"
+before-all = "sh scripts/cibuildwheel_before_all_linux.sh"
+before-build = "sh scripts/cibuildwheel_before_build_linux.sh"
 environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
+
+[[tool.cibuildwheel.overrides]]
+select = "*musllinux*"
+environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true", RUSTFLAGS = "-C target-feature=-crt-static" }
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -260,4 +266,3 @@ exclude = ["temporalio/bridge/target/**/*"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
-exclude-newer-package = { openai-agents = false }

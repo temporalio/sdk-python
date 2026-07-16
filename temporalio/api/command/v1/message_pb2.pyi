@@ -16,6 +16,7 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.command_type_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
@@ -1083,6 +1084,7 @@ class Command(google.protobuf.message.Message):
 
     COMMAND_TYPE_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
+    EVENT_GROUP_MARKERS_FIELD_NUMBER: builtins.int
     SCHEDULE_ACTIVITY_TASK_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_TIMER_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
     COMPLETE_WORKFLOW_EXECUTION_COMMAND_ATTRIBUTES_FIELD_NUMBER: builtins.int
@@ -1116,6 +1118,13 @@ class Command(google.protobuf.message.Message):
          * start_timer_command_attributes - populates temporalio.api.history.v1.HistoryEvent for timer
            started where the summary is used to identify the timer.
         """
+    @property
+    def event_group_markers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+    ]:
+        """Event Group Markers attached to the command by the workflow author."""
     @property
     def schedule_activity_task_command_attributes(
         self,
@@ -1190,6 +1199,10 @@ class Command(google.protobuf.message.Message):
         *,
         command_type: temporalio.api.enums.v1.command_type_pb2.CommandType.ValueType = ...,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        event_group_markers: collections.abc.Iterable[
+            temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+        ]
         | None = ...,
         schedule_activity_task_command_attributes: global___ScheduleActivityTaskCommandAttributes
         | None = ...,
@@ -1284,6 +1297,8 @@ class Command(google.protobuf.message.Message):
             b"complete_workflow_execution_command_attributes",
             "continue_as_new_workflow_execution_command_attributes",
             b"continue_as_new_workflow_execution_command_attributes",
+            "event_group_markers",
+            b"event_group_markers",
             "fail_workflow_execution_command_attributes",
             b"fail_workflow_execution_command_attributes",
             "modify_workflow_properties_command_attributes",

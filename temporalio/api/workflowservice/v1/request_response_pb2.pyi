@@ -710,7 +710,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     @property
     def time_skipping_config(
         self,
-    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
         """Time-skipping configuration. If not set, time skipping is disabled."""
     def __init__(
         self,
@@ -753,7 +753,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         eager_worker_deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
-        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -3342,7 +3342,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     @property
     def time_skipping_config(
         self,
-    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
         """Time-skipping configuration. If not set, time skipping is disabled."""
     def __init__(
         self,
@@ -3376,7 +3376,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
         versioning_override: temporalio.api.workflow.v1.message_pb2.VersioningOverride
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
-        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -8927,27 +8927,40 @@ class UpdateWorkflowExecutionOptionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     WORKFLOW_EXECUTION_OPTIONS_FIELD_NUMBER: builtins.int
+    UPDATE_TIME_FIELD_NUMBER: builtins.int
     @property
     def workflow_execution_options(
         self,
     ) -> temporalio.api.workflow.v1.message_pb2.WorkflowExecutionOptions:
         """Workflow Execution options after update."""
+    @property
+    def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The Workflow Execution time when the options were updated. When time skipping is
+        enabled, this is the workflow's virtual time rather than wall-clock time.
+        """
     def __init__(
         self,
         *,
         workflow_execution_options: temporalio.api.workflow.v1.message_pb2.WorkflowExecutionOptions
         | None = ...,
+        update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "workflow_execution_options", b"workflow_execution_options"
+            "update_time",
+            b"update_time",
+            "workflow_execution_options",
+            b"workflow_execution_options",
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "workflow_execution_options", b"workflow_execution_options"
+            "update_time",
+            b"update_time",
+            "workflow_execution_options",
+            b"workflow_execution_options",
         ],
     ) -> None: ...
 
@@ -11544,6 +11557,59 @@ class DescribeWorkerResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___DescribeWorkerResponse = DescribeWorkerResponse
+
+class CountWorkersRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    QUERY_FIELD_NUMBER: builtins.int
+    INCLUDE_SYSTEM_WORKERS_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    query: builtins.str
+    """Query to filter workers before counting.
+    Supported filter fields are the same as in ListWorkersRequest.
+    """
+    include_system_workers: builtins.bool
+    """When true, the count will include system workers that are created implicitly
+    by the server and not by the user. By default, system workers are excluded.
+    """
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        query: builtins.str = ...,
+        include_system_workers: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "include_system_workers",
+            b"include_system_workers",
+            "namespace",
+            b"namespace",
+            "query",
+            b"query",
+        ],
+    ) -> None: ...
+
+global___CountWorkersRequest = CountWorkersRequest
+
+class CountWorkersResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COUNT_FIELD_NUMBER: builtins.int
+    count: builtins.int
+    """Number of workers matching the query."""
+    def __init__(
+        self,
+        *,
+        count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["count", b"count"]
+    ) -> None: ...
+
+global___CountWorkersResponse = CountWorkersResponse
 
 class PauseWorkflowExecutionRequest(google.protobuf.message.Message):
     """Request to pause a workflow execution."""

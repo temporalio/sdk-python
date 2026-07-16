@@ -20,17 +20,29 @@ jobs:
         include:
           - os: ubuntu-latest
             package-suffix: linux-amd64
+            cibw-build: cp310-manylinux_x86_64
           - os: ubuntu-arm
             package-suffix: linux-aarch64
+            cibw-build: cp310-manylinux_aarch64
+            runsOn: ubuntu-24.04-arm64-2-core
+          - os: ubuntu-latest
+            package-suffix: linux-musl-amd64
+            cibw-build: cp310-musllinux_x86_64
+          - os: ubuntu-arm
+            package-suffix: linux-musl-aarch64
+            cibw-build: cp310-musllinux_aarch64
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
             package-suffix: macos-amd64
+            cibw-build: cp310-macosx_x86_64
             runsOn: macos-15-intel
           - os: macos-arm
             package-suffix: macos-aarch64
+            cibw-build: cp310-macosx_arm64
             runsOn: macos-14
           - os: windows-latest
             package-suffix: windows-amd64
+            cibw-build: cp310-win_amd64
     runs-on: ${{ matrix.runsOn || matrix.os }}
     permissions:
       contents: read
@@ -63,9 +75,12 @@ jobs:
 
       # Build the wheel
       - run: uv run cibuildwheel --output-dir dist
+        env:
+          CIBW_BUILD: ${{ matrix.cibw-build }}
 
       # Install the wheel in a new venv and run a test
       - name: Test wheel
+        if: ${{ !contains(matrix.package-suffix, 'musl') }}
         shell: bash
         run: |
           mkdir __test_wheel__
@@ -79,6 +94,12 @@ jobs:
           ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk
           ./.venv/$bindir/pip install --prefer-binary ../dist/*.whl
           ./.venv/$bindir/python -m pytest -s tests/worker/test_workflow.py -k test_workflow_hello
+
+      - name: Test Alpine wheel
+        if: ${{ contains(matrix.package-suffix, 'musl') }}
+        uses: ./.github/actions/alpine-package-smoke
+        with:
+          wheel-dir: dist
 
       # Upload dist
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -200,11 +221,36 @@ jobs:
           index-url: https://test.pypi.org/simple/
           dependency-index-url: https://pypi.org/simple/
 
+  smoke_testpypi_alpine:
+    name: Smoke test TestPyPI package on Alpine (${{ matrix.arch }})
+    needs:
+      - verify_artifacts
+      - publish_testpypi
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runsOn: ubuntu-latest
+          - arch: arm64
+            runsOn: ubuntu-24.04-arm64-2-core
+    runs-on: ${{ matrix.runsOn }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Install and load package
+        uses: ./.github/actions/alpine-package-smoke
+        with:
+          version: ${{ needs.verify_artifacts.outputs.version }}
+          index-url: https://test.pypi.org/simple/
+          dependency-index-url: https://pypi.org/simple/
+
   publish_pypi:
     name: Publish to PyPI
     needs:
       - verify_artifacts
       - smoke_testpypi
+      - smoke_testpypi_alpine
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
@@ -247,11 +293,35 @@ jobs:
           version: ${{ needs.verify_artifacts.outputs.version }}
           index-url: https://pypi.org/simple/
 
+  smoke_pypi_alpine:
+    name: Smoke test PyPI package on Alpine (${{ matrix.arch }})
+    needs:
+      - verify_artifacts
+      - publish_pypi
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runsOn: ubuntu-latest
+          - arch: arm64
+            runsOn: ubuntu-24.04-arm64-2-core
+    runs-on: ${{ matrix.runsOn }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Install and load package
+        uses: ./.github/actions/alpine-package-smoke
+        with:
+          version: ${{ needs.verify_artifacts.outputs.version }}
+          index-url: https://pypi.org/simple/
+
   create_draft_release:
     name: Create draft GitHub Release
     needs:
       - verify_artifacts
       - smoke_pypi
+      - smoke_pypi_alpine
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

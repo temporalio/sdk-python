@@ -1,5 +1,6 @@
 """Workflow utilities for Google ADK agents integration with Temporal."""
 
+import functools
 import inspect
 from typing import Any, Callable
 
@@ -18,6 +19,7 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
     while marking it as a tool that executes via 'workflow.execute_activity'.
     """
 
+    @functools.wraps(activity_def)
     async def wrapper(*args: Any, **kw: Any):
         # Inspect signature to bind arguments
         sig = inspect.signature(activity_def)
@@ -48,9 +50,8 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
             activity_def, args=activity_args, **options
         )
 
-    # Copy metadata
-    wrapper.__name__ = activity_def.__name__
-    wrapper.__doc__ = activity_def.__doc__
+    # functools.wraps copies name/doc/module/annotations/qualname/dict.
+    # Signature must be set explicitly since the wrapper uses *args/**kw.
     setattr(wrapper, "__signature__", inspect.signature(activity_def))
 
     return wrapper
