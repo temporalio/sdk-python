@@ -10,8 +10,7 @@ if TYPE_CHECKING:
 
 
 def is_jsonish(value: Any) -> bool:
-    """Return True for values that survive a plain JSON round-trip unchanged."""
-    if value is None or isinstance(value, (str, int, float, bool)):
+    """Return True for values that are JSON-serializable with the standard encoder."""
         return True
     if isinstance(value, (list, tuple)):
         return all(is_jsonish(v) for v in value)
