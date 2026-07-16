@@ -29,6 +29,7 @@ from temporalio.converter._payload_codec import (
 )
 from temporalio.converter._payload_converter import (
     PayloadConverter,
+    TemporalIntermediatePayloadConverter,
 )
 from temporalio.converter._payload_limits import (
     PayloadLimitsConfig,
@@ -103,7 +104,11 @@ class DataConverter(WithSerializationContext):
     """Server-reported limits for payloads."""
 
     def __post_init__(self) -> None:  # noqa: D105
-        object.__setattr__(self, "payload_converter", self.payload_converter_class())
+        object.__setattr__(
+            self,
+            "payload_converter",
+            TemporalIntermediatePayloadConverter.wrap(self.payload_converter_class()),
+        )
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
 
     async def encode(

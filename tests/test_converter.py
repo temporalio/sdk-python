@@ -44,6 +44,8 @@ from temporalio.converter import (
     JSONTypeConverter,
     JSONTypeConverterUnhandled,
     PayloadCodec,
+    PayloadConverter,
+    TemporalIntermediatePayloadConverter,
     decode_search_attributes,
     encode_search_attribute_values,
     value_to_type,
@@ -252,6 +254,58 @@ def test_binary_proto():
     assert payload.data == proto.SerializeToString()
     decoded = conv.from_payload(payload)
     assert decoded == proto
+
+
+@dataclass
+class TemporalIntermediateModel:
+    value: str
+
+    @classmethod
+    def _temporal_from_intermediate(
+        cls,
+        intermediate: temporalio.api.common.v1.WorkflowExecution,
+        *,
+        payload_converter: PayloadConverter | None = None,
+    ) -> TemporalIntermediateModel:
+        assert payload_converter is not None
+        return cls(value=intermediate.workflow_id)
+
+    def _temporal_to_intermediate(
+        self, *, payload_converter: PayloadConverter | None = None
+    ) -> temporalio.api.common.v1.WorkflowExecution:
+        assert payload_converter is not None
+        return temporalio.api.common.v1.WorkflowExecution(
+            workflow_id=self.value,
+            run_id="run-id",
+        )
+
+
+class CustomDefaultPayloadConverter(DefaultPayloadConverter):
+    pass
+
+
+def test_temporal_intermediate_payload_converter_wraps_user_converter():
+    data_converter = DataConverter(
+        payload_converter_class=CustomDefaultPayloadConverter
+    )
+    converter = data_converter.payload_converter
+    assert isinstance(converter, TemporalIntermediatePayloadConverter)
+    value = TemporalIntermediateModel("workflow-id")
+
+    payload = converter.to_payload(value)
+
+    assert payload.metadata["encoding"] == b"json/protobuf"
+    assert (
+        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
+    )
+    assert all("temporal-wire" not in key for key in payload.metadata)
+    assert all(b"temporal-wire" not in value for value in payload.metadata.values())
+    assert converter.from_payload(payload, TemporalIntermediateModel) == value
+
+    plain_proto_payload = converter.to_payload(
+        temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
+    )
+    assert plain_proto_payload.metadata["encoding"] == b"json/protobuf"
 
 
 def test_encode_search_attribute_values():

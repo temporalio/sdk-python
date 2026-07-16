@@ -33,6 +33,7 @@ from temporalio.converter._payload_converter import (
     JSONTypeConverter,
     JSONTypeConverterUnhandled,
     PayloadConverter,
+    TemporalIntermediatePayloadConverter,
     value_to_type,
 )
 from temporalio.converter._payload_limits import (
@@ -83,6 +84,7 @@ __all__ = [
     "PayloadLimitsConfig",
     "PayloadSizeWarning",
     "SerializationContext",
+    "TemporalIntermediatePayloadConverter",
     "WithSerializationContext",
     "WorkflowSerializationContext",
     "decode_search_attributes",

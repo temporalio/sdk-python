@@ -514,6 +514,83 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
+class TemporalIntermediatePayloadConverter(PayloadConverter, WithSerializationContext):
+    """Payload converter wrapper for generated Temporal intermediate hooks.
+
+    Values with a ``_temporal_to_intermediate`` method are first converted to
+    their intermediate value, then encoded by the wrapped payload converter. When
+    decoding to a type with ``_temporal_from_intermediate``, the wrapped
+    converter first decodes the payload to the intermediate value and this
+    wrapper constructs the requested user-facing type from it.
+    """
+
+    _inner_payload_converter: PayloadConverter
+
+    def __init__(self, inner_payload_converter: PayloadConverter) -> None:
+        """Create a Temporal intermediate payload converter."""
+        self._inner_payload_converter = inner_payload_converter
+
+    @staticmethod
+    def wrap(payload_converter: PayloadConverter) -> PayloadConverter:
+        """Wrap a payload converter unless it is already wrapped."""
+        if isinstance(payload_converter, TemporalIntermediatePayloadConverter):
+            return payload_converter
+        return TemporalIntermediatePayloadConverter(payload_converter)
+
+    def to_payloads(
+        self, values: Sequence[Any]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """See base class."""
+        intermediate_values: list[Any] = []
+        for value in values:
+            to_intermediate = getattr(value, "_temporal_to_intermediate", None)
+            if to_intermediate is not None:
+                value = to_intermediate(payload_converter=self._inner_payload_converter)
+            intermediate_values.append(value)
+        return self._inner_payload_converter.to_payloads(intermediate_values)
+
+    def from_payloads(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
+        """See base class."""
+        if type_hints is None:
+            return self._inner_payload_converter.from_payloads(payloads, None)
+        normalized_type_hints: list[type | None] = list(type_hints)
+        if len(normalized_type_hints) < len(payloads):
+            normalized_type_hints.extend([None] * (len(payloads) - len(type_hints)))
+        inner_type_hints = [
+            None
+            if getattr(type_hint, "_temporal_from_intermediate", None) is not None
+            else type_hint
+            for type_hint in normalized_type_hints
+        ]
+        values = self._inner_payload_converter.from_payloads(
+            payloads, typing.cast("list[type]", inner_type_hints)
+        )
+        return [
+            from_intermediate(value, payload_converter=self._inner_payload_converter)
+            if (
+                from_intermediate := getattr(
+                    type_hint, "_temporal_from_intermediate", None
+                )
+            )
+            is not None
+            else value
+            for value, type_hint in zip(values, normalized_type_hints)
+        ]
+
+    def with_context(self, context: SerializationContext) -> Self:
+        """Return a new instance with context set on the inner converter."""
+        if not isinstance(self._inner_payload_converter, WithSerializationContext):
+            return self
+        inner_payload_converter = self._inner_payload_converter.with_context(context)
+        if inner_payload_converter is self._inner_payload_converter:
+            return self
+        return type(self)(inner_payload_converter)
+
+
 class AdvancedJSONEncoder(json.JSONEncoder):
     """Advanced JSON encoder.
 
