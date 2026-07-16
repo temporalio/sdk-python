@@ -10,7 +10,12 @@ if TYPE_CHECKING:
 
 
 def is_jsonish(value: Any) -> bool:
-    """Return True for values that survive a plain JSON round-trip unchanged."""
+    """Return True for values representable as plain JSON.
+
+    Containers are checked recursively. Tuples are accepted — they encode
+    as JSON arrays and rehydrate as lists, so a round-trip preserves
+    content but may change the container type.
+    """
     if value is None or isinstance(value, (str, int, float, bool)):
         return True
     if isinstance(value, (list, tuple)):
