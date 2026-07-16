@@ -336,6 +336,88 @@ class TestS3StorageDriverKeyConstruction:
             == f"v0/ns/my%2Fns%231/wt/null/wi/wf1/ri/null/d/sha256/{expected_hash}"
         )
 
+    async def test_key_preserves_s3_safe_special_chars(
+        self, driver_client: S3StorageDriverClient
+    ) -> None:
+        """S3's safe special characters are left unescaped per the key spec."""
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        # Every special character S3 lists as safe: ! - _ . * ' ( )
+        ctx = make_workflow_context(namespace="ns1", workflow_id="!-_.*'()")
+        [claim] = await driver.store(ctx, [payload])
+        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert (
+            claim.claim_data["key"]
+            == f"v0/ns/ns1/wt/null/wi/!-_.*'()/ri/null/d/sha256/{expected_hash}"
+        )
+
+    async def test_key_escapes_tilde(
+        self, driver_client: S3StorageDriverClient
+    ) -> None:
+        """Tilde is not in S3's safe set and must be percent-encoded (%7E)."""
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        ctx = make_workflow_context(namespace="ns1", workflow_id="wf~1")
+        [claim] = await driver.store(ctx, [payload])
+        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert (
+            claim.claim_data["key"]
+            == f"v0/ns/ns1/wt/null/wi/wf%7E1/ri/null/d/sha256/{expected_hash}"
+        )
+
+    async def test_key_escapes_non_ascii_as_utf8_bytes(
+        self, driver_client: S3StorageDriverClient
+    ) -> None:
+        """Non-ASCII characters are percent-encoded byte by byte from UTF-8."""
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        # "é" is U+00E9, which is 0xC3 0xA9 in UTF-8.
+        ctx = make_workflow_context(namespace="ns1", workflow_id="café")
+        [claim] = await driver.store(ctx, [payload])
+        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert (
+            claim.claim_data["key"]
+            == f"v0/ns/ns1/wt/null/wi/caf%C3%A9/ri/null/d/sha256/{expected_hash}"
+        )
+
+    async def test_key_matches_spec_workflow_example(
+        self, driver_client: S3StorageDriverClient
+    ) -> None:
+        """Reproduces the workflow key example from the S3 key spec."""
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        ctx = make_workflow_context(
+            namespace="payments prod",
+            workflow_type="ChargeWorkflow",
+            workflow_id="order+123=abc",
+            run_id="3f1d6c7a-8b2e-4f7a-9d0a-87a6f95e4d31",
+        )
+        [claim] = await driver.store(ctx, [payload])
+        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert claim.claim_data["key"] == (
+            "v0/ns/payments%20prod/wt/ChargeWorkflow/wi/order%2B123%3Dabc"
+            f"/ri/3f1d6c7a-8b2e-4f7a-9d0a-87a6f95e4d31/d/sha256/{expected_hash}"
+        )
+
+    async def test_key_matches_spec_activity_example(
+        self, driver_client: S3StorageDriverClient
+    ) -> None:
+        """Reproduces the activity key example from the S3 key spec."""
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        ctx = make_activity_context(
+            namespace="payments prod",
+            activity_type="Capture/Charge",
+            activity_id="activity id+42",
+            run_id="9e1d1fd9-2f8a-4c40-93e2-731f31b9268b",
+        )
+        [claim] = await driver.store(ctx, [payload])
+        expected_hash = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert claim.claim_data["key"] == (
+            "v0/ns/payments%20prod/at/Capture%2FCharge/ai/activity%20id%2B42"
+            f"/ri/9e1d1fd9-2f8a-4c40-93e2-731f31b9268b/d/sha256/{expected_hash}"
+        )
+
     async def test_key_urlencoded_roundtrip(
         self, driver_client: S3StorageDriverClient
     ) -> None:

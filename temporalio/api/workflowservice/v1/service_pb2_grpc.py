@@ -503,6 +503,11 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.FromString,
         )
+        self.CountWorkers = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/CountWorkers",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountWorkersRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountWorkersResponse.FromString,
+        )
         self.UpdateTaskQueueConfig = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateTaskQueueConfig",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateTaskQueueConfigRequest.SerializeToString,
@@ -1650,6 +1655,12 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def CountWorkers(self, request, context):
+        """CountWorkers counts the number of workers in a specific namespace."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def UpdateTaskQueueConfig(self, request, context):
         """Updates task queue configuration.
         For the overall queue rate limit: the rate limit set by this api overrides the worker-set rate limit,
@@ -2392,6 +2403,11 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.ListWorkers,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.SerializeToString,
+        ),
+        "CountWorkers": grpc.unary_unary_rpc_method_handler(
+            servicer.CountWorkers,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountWorkersRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountWorkersResponse.SerializeToString,
         ),
         "UpdateTaskQueueConfig": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateTaskQueueConfig,
@@ -5290,6 +5306,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/ListWorkers",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CountWorkers(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/CountWorkers",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountWorkersRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountWorkersResponse.FromString,
             options,
             channel_credentials,
             insecure,

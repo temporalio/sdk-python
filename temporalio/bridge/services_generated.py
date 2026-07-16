@@ -81,6 +81,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def count_workers(
+        self,
+        req: temporalio.api.workflowservice.v1.CountWorkersRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.CountWorkersResponse:
+        """Invokes the WorkflowService.count_workers rpc method."""
+        return await self._client._rpc_call(
+            rpc="count_workers",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.CountWorkersResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def count_workflow_executions(
         self,
         req: temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest,
