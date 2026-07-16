@@ -78,7 +78,7 @@ async def test_workflow_env_time_skipping_manual_v2():
                 await handle.signal(ReallySlowWorkflow.some_signal)
                 return await handle.query(ReallySlowWorkflow.current_time)
 
-            assert_timestamp_from_now(await workflow_current_time(), 0)
+            assert_timestamp_from_now(await workflow_current_time(), 0, max_delta=1)
 
             assert await env.fast_forward(handle, timedelta(seconds=1000))
             assert_timestamp_from_now(await workflow_current_time(), 1000)
