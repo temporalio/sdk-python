@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 
 import nexusrpc
 import pytest
@@ -10,6 +11,7 @@ from typing_extensions import override
 
 import temporalio.exceptions
 from temporalio import nexus, workflow
+from temporalio.api.common.v1 import Link
 from temporalio.client import Client, WorkflowExecutionStatus, WorkflowFailureError
 from temporalio.common import NexusOperationExecutionStatus, WorkflowIDConflictPolicy
 from temporalio.nexus._token import OperationToken, OperationTokenType
@@ -25,6 +27,7 @@ class Input:
     task_queue: str
     update_value: str = ""
     update_id: str = ""
+    expect_sync_response: bool = False
 
 
 def test_temporal_operation_result_validates_single_result_kind() -> None:
@@ -227,9 +230,11 @@ class TestServiceHandler:
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
         # input.value carries the target workflow_id, input.update_value has actual update
-        update_id = input.update_id or str(uuid.uuid4())
         return await client.start_workflow_update(
-            input.value, UpdatableWorkflow.do_update, input.update_value, id=update_id
+            input.value,
+            UpdatableWorkflow.do_update,
+            input.update_value,
+            update_id=input.update_id,
         )
 
 
@@ -241,19 +246,6 @@ class EchoWorkflowCaller:
             service=TestService, endpoint=make_nexus_endpoint_name(input.task_queue)
         )
         return await client.execute_operation(TestService.echo, input)
-
-
-@workflow.defn
-class UpdateWorkflowCaller:
-    """Simple caller workflow that triggers a workflow update via nexus op"""
-
-    @workflow.run
-    async def run(self, input: Input) -> str:
-        client = workflow.create_nexus_client(
-            service=TestService,
-            endpoint=make_nexus_endpoint_name(input.task_queue),
-        )
-        return await client.execute_operation(TestService.update_op, input)
 
 
 async def test_temporal_operation_start_workflow(
@@ -290,6 +282,10 @@ async def test_temporal_operation_start_workflow(
 async def test_temporal_operation_update_workflow(
     client: Client, env: WorkflowEnvironment
 ) -> None:
+    if (
+        env.supports_time_skipping
+    ):  # time skipping server uses different dynamic configs
+        pytest.skip("Update workflow tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
     await env.create_nexus_endpoint(endpoint_name, task_queue)
@@ -300,72 +296,264 @@ async def test_temporal_operation_update_workflow(
         workflows=[UpdatableWorkflow, UpdateWorkflowCaller],
     ):
         update_workflow_id = f"updatable-workflow-{uuid.uuid4()}"
-        await client.start_workflow(
+        target_handle = await client.start_workflow(
             UpdatableWorkflow.run, id=update_workflow_id, task_queue=task_queue
         )
-        wf_handle = await client.start_workflow(
-            UpdateWorkflowCaller.run,
-            Input(
-                value=update_workflow_id, task_queue=task_queue, update_value="Created"
-            ),
-            task_queue=task_queue,
-            id=f"update-workflow-caller-created",
-        )
-        result = await wf_handle.result()
-        assert result == "Updated workflow status from Pending to Created"
 
-        # await assert_event_subsequence(
-        #     wf_handle,
-        #     [
-        #         EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
-        #         EventType.EVENT_TYPE_NEXUS_OPERATION_STARTED,
-        #         EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
-        #     ],
-        # )
-
-        stable_update_id = str(uuid.uuid4())
-        wf_handle = await client.start_workflow(
-            UpdateWorkflowCaller.run,
-            Input(
-                value=update_workflow_id,
+        async def check_simple_update_and_links():
+            """Run an update, check state changes from pending to created, verify forward and back links are correct"""
+            wf_handle = await client.start_workflow(
+                UpdateWorkflowCaller.run,
+                Input(
+                    value=update_workflow_id,
+                    task_queue=task_queue,
+                    update_value="Created",
+                ),
                 task_queue=task_queue,
-                update_value="Processed",
-                update_id=stable_update_id,
-            ),
-            task_queue=task_queue,
-            id=f"update-workflow-caller-processed",
-        )
-        result = await wf_handle.result()
-        assert result == "Updated workflow status from Created to Processed"
+                id=f"update-workflow-caller-created-{uuid.uuid4()}",
+            )
+            result = await wf_handle.result()
+            assert result == "Updated workflow status from Pending to Created"
+            # assert expected events are in expected sequence in caller history
+            await assert_event_subsequence(
+                wf_handle,
+                [
+                    EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                    EventType.EVENT_TYPE_NEXUS_OPERATION_STARTED,
+                    EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
+                ],
+            )
+            # now, check the links
+            caller_history = await wf_handle.fetch_history()
+            handler_history = await target_handle.fetch_history()
+            scheduled_event = next(
+                e
+                for e in caller_history.events
+                if e.event_type == EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
+            )
+            caller_request_id = (
+                scheduled_event.nexus_operation_scheduled_event_attributes.request_id
+            )
+            assert target_handle.result_run_id is not None
+            # from caller ns to target ns
+            expected_forward_link = Link(
+                workflow_event=Link.WorkflowEvent(
+                    namespace=client.namespace,
+                    workflow_id=update_workflow_id,
+                    run_id=target_handle.result_run_id,
+                    request_id_ref=Link.WorkflowEvent.RequestIdReference(
+                        request_id=caller_request_id,
+                        event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED,
+                    ),
+                )
+            )
+            assert wf_handle.result_run_id is not None
+            # from target ns back to caller ns
+            expected_backward_link = Link(
+                workflow_event=Link.WorkflowEvent(
+                    namespace=client.namespace,
+                    workflow_id=wf_handle.id,
+                    run_id=wf_handle.result_run_id,
+                    event_ref=Link.WorkflowEvent.EventReference(
+                        event_id=scheduled_event.event_id,
+                        event_type=EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                    ),
+                )
+            )
+            caller_links = [
+                link
+                for e in caller_history.events
+                if e.event_type == EventType.EVENT_TYPE_NEXUS_OPERATION_STARTED
+                for link in e.links
+            ]
+            handler_links = [
+                link
+                for e in handler_history.events
+                if e.event_type
+                == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED
+                for link in e.links
+            ]
+            assert expected_forward_link in caller_links
+            assert expected_backward_link in handler_links
 
-        # same update_id -> wont be processed again, receives a sync result
-        wf_handle = await client.start_workflow(
-            UpdateWorkflowCaller.run,
-            Input(
-                value=update_workflow_id,
+        async def check_sequential_updates_consistent():
+            """Run updates back-to-back, verify update isnt re-processed"""
+            stable_update_id = "sequential-update"
+            wf_handle = await client.start_workflow(
+                UpdateWorkflowCaller.run,
+                Input(
+                    value=update_workflow_id,
+                    task_queue=task_queue,
+                    update_value="Processed",
+                    update_id=stable_update_id,
+                ),
                 task_queue=task_queue,
-                update_value="Processed",
-                update_id=stable_update_id,
-            ),
-            task_queue=task_queue,
-            id=f"update-workflow-caller-processed",
-        )
-        # wf_handle.
-        result = await wf_handle.result()
-        assert result == "Updated workflow status from Created to Processed"
+                id="sequential-update-workflow-caller-processed-0",
+            )
+            result = await wf_handle.result()
+            assert result == "Updated workflow status from Created to Processed"
 
-        wf_handle = await client.start_workflow(
-            UpdateWorkflowCaller.run,
-            Input(
-                value=update_workflow_id,
+            # same update_id -> wont be processed again, receives a sync result
+            wf_handle = await client.start_workflow(
+                UpdateWorkflowCaller.run,
+                Input(
+                    value=update_workflow_id,
+                    task_queue=task_queue,
+                    update_value="Processed",
+                    update_id=stable_update_id,
+                    expect_sync_response=True,
+                ),
                 task_queue=task_queue,
-                update_value="Completed",
-            ),
+                id="sequential-update-workflow-caller-processed-1",
+            )
+            result = await wf_handle.result()
+            assert result == "Updated workflow status from Created to Processed"
+
+        async def check_parallel_updates_idempotent_and_finish():
+            """Run multiple updates in parallel, verify they are idempotent and finish with same result"""
+            stable_id = "parallel-updates-id"
+            num_parallel = 3
+            gate = asyncio.Event()
+
+            async def run_update(i: int) -> str:
+                await gate.wait()
+                wf_handle = await client.start_workflow(
+                    UpdateWorkflowCaller.run,
+                    Input(
+                        value=update_workflow_id,
+                        task_queue=task_queue,
+                        update_value="Completed",
+                        update_id=stable_id,
+                    ),
+                    task_queue=task_queue,
+                    id=f"parallel-update-workflow-caller-completed-{i}",
+                )
+                return await wf_handle.result()
+
+            tasks = [asyncio.create_task(run_update(i)) for i in range(num_parallel)]
+            gate.set()
+            results = await asyncio.gather(*tasks)
+
+            for result in results:
+                assert result == "Updated workflow status from Processed to Completed"
+
+        async def check_updates_on_completed_workflows_fail():
+            """The handler workflow already finished at this point, further updaes should just fail"""
+            wf_handle = await client.start_workflow(
+                UpdateWorkflowCaller.run,
+                Input(
+                    value=update_workflow_id,
+                    task_queue=task_queue,
+                    update_value="dummy, will fail anyway",
+                ),
+                task_queue=task_queue,
+                id=f"{uuid.uuid4()}",
+            )
+            with pytest.raises(WorkflowFailureError):
+                await wf_handle.result()
+
+        await check_simple_update_and_links()
+        await check_sequential_updates_consistent()
+        await check_parallel_updates_idempotent_and_finish()
+        await check_updates_on_completed_workflows_fail()
+
+
+async def test_temporal_operation_update_workflow_delayed(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    if (
+        env.supports_time_skipping
+    ):  # time skipping server uses different dynamic configs
+        pytest.skip("Update workflow tests don't work with time-skipping server")
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+    update_workflow_id = f"another-updatable-workflow-{uuid.uuid4()}"
+
+    # start both caller and handler without starting worker
+    wf_handle = await client.start_workflow(
+        UpdateWorkflowCaller.run,
+        Input(
+            value=update_workflow_id,
             task_queue=task_queue,
-            id=f"update-workflow-caller-completed",
-        )
+            update_value="Completed",
+        ),
+        task_queue=task_queue,
+        id=f"update-workflow-caller-created-{uuid.uuid4()}",
+    )
+    target_handle = await client.start_workflow(
+        UpdatableWorkflow.run, id=update_workflow_id, task_queue=task_queue
+    )
+
+    # now, start the worker, it should process both the handler
+    # and the caller and finish the enqueued update
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[UpdatableWorkflow, UpdateWorkflowCaller],
+    ):
         result = await wf_handle.result()
-        assert result == "Updated workflow status from Processed to Completed"
+        assert result == "Updated workflow status from Pending to Completed"
+
+        await assert_event_subsequence(
+            wf_handle,
+            [
+                EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                EventType.EVENT_TYPE_NEXUS_OPERATION_STARTED,
+                EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
+            ],
+        )
+
+        caller_history = await wf_handle.fetch_history()
+        handler_history = await target_handle.fetch_history()
+        scheduled_event = next(
+            e
+            for e in caller_history.events
+            if e.event_type == EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
+        )
+        caller_request_id = (
+            scheduled_event.nexus_operation_scheduled_event_attributes.request_id
+        )
+        assert target_handle.result_run_id is not None
+        expected_forward_link = Link(
+            workflow_event=Link.WorkflowEvent(
+                namespace=client.namespace,
+                workflow_id=update_workflow_id,
+                run_id=target_handle.result_run_id,
+                request_id_ref=Link.WorkflowEvent.RequestIdReference(
+                    request_id=caller_request_id,
+                    event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED,
+                ),
+            )
+        )
+        assert wf_handle.result_run_id is not None
+        expected_backward_link = Link(
+            workflow_event=Link.WorkflowEvent(
+                namespace=client.namespace,
+                workflow_id=wf_handle.id,
+                run_id=wf_handle.result_run_id,
+                event_ref=Link.WorkflowEvent.EventReference(
+                    event_id=scheduled_event.event_id,
+                    event_type=EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                ),
+            )
+        )
+        caller_links = [
+            link
+            for e in caller_history.events
+            if e.event_type == EventType.EVENT_TYPE_NEXUS_OPERATION_STARTED
+            for link in e.links
+        ]
+        handler_links = [
+            link
+            for e in handler_history.events
+            if e.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED
+            for link in e.links
+        ]
+        assert expected_forward_link in caller_links
+        assert expected_backward_link in handler_links
 
 
 @workflow.defn
@@ -837,6 +1025,28 @@ async def test_temporal_operation_includes_token_in_callback(
 
 
 @workflow.defn
+class UpdateWorkflowCaller:
+    """Simple caller workflow that triggers a workflow update via nexus op"""
+
+    @workflow.run
+    async def run(self, input: Input) -> str:
+        client = workflow.create_nexus_client(
+            service=TestService,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        op_handle = await client.start_operation(TestService.update_op, input)
+        if input.expect_sync_response:
+            if op_handle.operation_token:
+                raise RuntimeError("unexpected operation token on a sync operation")
+        else:
+            if not op_handle.operation_token:
+                raise RuntimeError(
+                    "unexpected empty operation token on an async operation"
+                )
+        return await op_handle
+
+
+@workflow.defn
 class UpdatableWorkflow:
     """Workflow that accepts updates and exits when it receives a specific status"""
 
@@ -851,6 +1061,9 @@ class UpdatableWorkflow:
     @workflow.update
     async def do_update(self, value: str) -> str:
         status = self.order_status
+        await workflow.sleep(
+            timedelta(seconds=1)
+        )  # small sleep to ensure updates are async and backlinks are to STARTED events
         self.order_status = value
         update_result = f"Updated workflow status from {status} to {value}"
         return update_result

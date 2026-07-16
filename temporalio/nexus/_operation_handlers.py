@@ -234,14 +234,14 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
         )
         await workflow_handle.cancel()
 
-    # draft-review: maybe just move it inline, no need for a function just to error out
-    # check after review in case theres some other way to override/supply custom cancels
     async def cancel_workflow_update(
         self,
         ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
         options: CancelUpdateWorkflowOptions,  # pyright: ignore[reportUnusedParameter]
     ) -> None:
-        """Cancels the workflow update backing the Nexus operation.
+        """Cancels the workflow update backing the Nexus operation. Cancellation is not natively supported for update-workflow Nexus operations.
+        Inherit a TemporalOperationHandler and override this method to run cancellable workflow updates.
+
 
         .. warning::
            This API is experimental and unstable.
@@ -249,7 +249,7 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
         raise HandlerError(
             """
                 Cancellation is not natively supported for update-workflow Nexus operations.
-                Override a TemporalOperationHandler and implement this method to run cancellable workflow updates.
+                Inherit a TemporalOperationHandler and override this method to run cancellable workflow updates.
             """,
             type=HandlerErrorType.NOT_IMPLEMENTED,
         )

@@ -7,7 +7,6 @@ import pytest
 from temporalio.nexus._token import (
     OperationToken,
     OperationTokenType,
-    UpdateHandle,
     WorkflowHandle,
 )
 
@@ -41,13 +40,6 @@ def test_workflow_handle_to_from_token_round_trip():
     handle = WorkflowHandle[str](namespace="default", workflow_id="workflow-id")
 
     assert WorkflowHandle[str].from_token(handle.to_token()) == handle
-
-
-def test_update_handle_to_from_token_round_trip():
-    handle = UpdateHandle[str](
-        namespace="default", workflow_id="workflow-id", update_id="update-id"
-    )
-    assert UpdateHandle[str].from_token(handle.to_token()) == handle
 
 
 @pytest.mark.parametrize(
