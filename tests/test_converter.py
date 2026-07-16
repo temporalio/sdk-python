@@ -264,16 +264,10 @@ class TemporalIntermediateModel:
     def _temporal_from_intermediate(
         cls,
         intermediate: temporalio.api.common.v1.WorkflowExecution,
-        *,
-        payload_converter: PayloadConverter | None = None,
     ) -> TemporalIntermediateModel:
-        assert payload_converter is not None
         return cls(value=intermediate.workflow_id)
 
-    def _temporal_to_intermediate(
-        self, *, payload_converter: PayloadConverter | None = None
-    ) -> temporalio.api.common.v1.WorkflowExecution:
-        assert payload_converter is not None
+    def _temporal_to_intermediate(self) -> temporalio.api.common.v1.WorkflowExecution:
         return temporalio.api.common.v1.WorkflowExecution(
             workflow_id=self.value,
             run_id="run-id",

@@ -545,7 +545,7 @@ class TemporalIntermediatePayloadConverter(PayloadConverter, WithSerializationCo
         for value in values:
             to_intermediate = getattr(value, "_temporal_to_intermediate", None)
             if to_intermediate is not None:
-                value = to_intermediate(payload_converter=self._inner_payload_converter)
+                value = to_intermediate()
             intermediate_values.append(value)
         return self._inner_payload_converter.to_payloads(intermediate_values)
 
@@ -570,7 +570,7 @@ class TemporalIntermediatePayloadConverter(PayloadConverter, WithSerializationCo
             payloads, typing.cast("list[type]", inner_type_hints)
         )
         return [
-            from_intermediate(value, payload_converter=self._inner_payload_converter)
+            from_intermediate(value)
             if (
                 from_intermediate := getattr(
                     type_hint, "_temporal_from_intermediate", None
