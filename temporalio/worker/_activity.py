@@ -775,6 +775,20 @@ class _ThreadExceptionRaiser:
         with self._lock:
             self._thread_id = thread_id
 
+    @contextmanager
+    def active_thread(self) -> Iterator[None]:
+        thread_id = threading.current_thread().ident
+        if thread_id is not None:
+            self.set_thread_id(thread_id)
+        try:
+            yield None
+        finally:
+            if thread_id is not None:
+                with self._lock:
+                    if self._thread_id == thread_id:
+                        self._thread_id = None
+                        self._pending_exception = None
+
     def raise_in_thread(self, exc_type: type[Exception]) -> None:
         with self._lock:
             self._pending_exception = exc_type
@@ -939,10 +953,6 @@ def _execute_sync_activity(
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
-    if cancel_thread_raiser:
-        thread_id = threading.current_thread().ident
-        if thread_id is not None:
-            cancel_thread_raiser.set_thread_id(thread_id)
     if isinstance(heartbeat, SharedHeartbeatSender):
 
         def heartbeat_fn(*details: Any) -> None:
@@ -968,7 +978,11 @@ def _execute_sync_activity(
             cancellation_details=cancellation_details,
         )
     )
-    return fn(*args)
+    if not cancel_thread_raiser:
+        return fn(*args)
+    else:
+        with cancel_thread_raiser.active_thread():
+            return fn(*args)
 
 
 class SharedStateManager(ABC):

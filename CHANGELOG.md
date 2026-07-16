@@ -27,6 +27,10 @@ to include examples, links to docs, or any other relevant information.
   SNI-inspecting egress proxy) needs the SNI to remain resolvable. Requires
   `server_root_ca_cert`.
 
+- Added the experimental `Worker` `patch_activation_callback` option, allowing workers
+  to decide whether a first non-replay `workflow.patched` call should activate a patch
+  during rolling deployments.
+
 ### Changed
 
 ### Deprecated
