@@ -6,8 +6,7 @@ from datetime import timedelta
 import pytest
 
 from temporalio import activity, workflow
-from temporalio.client import Client, WorkflowFailureError
-from temporalio.converter import DataConverter, PayloadLimitsConfig
+from temporalio.client import Client, PayloadLimitsConfig, WorkflowFailureError
 from temporalio.exceptions import (
     TerminatedError,
     TimeoutError,
@@ -172,9 +171,7 @@ async def test_payload_size_warning_forwarded(env: WorkflowEnvironment):
         env.client.service_client.config.target_host,
         namespace=env.client.namespace,
         runtime=_forwarding_runtime(worker_logger),
-        data_converter=DataConverter(
-            payload_limits=PayloadLimitsConfig(payload_size_warning=1024),
-        ),
+        payload_limits=PayloadLimitsConfig(payloads_warn_size=1024),
     )
 
     def predicate(record: logging.LogRecord) -> bool:

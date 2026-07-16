@@ -35,6 +35,7 @@ from temporalio.service import (
     GrpcCompression,
     HttpConnectProxyConfig,
     KeepAliveConfig,
+    PayloadLimitsConfig,
     RetryConfig,
     ServiceClient,
     TLSConfig,
@@ -154,6 +155,7 @@ class Client:
         http_connect_proxy_config: HttpConnectProxyConfig | None = None,
         dns_load_balancing_config: DnsLoadBalancingConfig | None = None,
         grpc_compression: GrpcCompression = GrpcCompression.GZIP,
+        payload_limits: PayloadLimitsConfig = PayloadLimitsConfig(),
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> Self:
         """Connect to a Temporal server.
@@ -217,6 +219,8 @@ class Client:
             grpc_compression: Transport-level gRPC compression for the client
                 connection. Default is gzip. Set to
                 :py:attr:`GrpcCompression.NONE` to disable compression.
+            payload_limits: Warning thresholds for outbound payload/memo sizes. Over-threshold
+                fields are logged but still sent. Set a threshold to 0 to disable it.
             header_codec_behavior: Encoding behavior for headers sent by the client.
         """
         connect_config = temporalio.service.ConnectConfig(
@@ -232,8 +236,7 @@ class Client:
             http_connect_proxy_config=http_connect_proxy_config,
             dns_load_balancing_config=dns_load_balancing_config,
             grpc_compression=grpc_compression,
-            payloads_warn_size=data_converter.payload_limits.payload_size_warning,
-            memo_warn_size=data_converter.payload_limits.memo_size_warning,
+            payload_limits=payload_limits,
         )
 
         def make_lambda(
@@ -3051,6 +3054,7 @@ class ClientConnectConfig(TypedDict, total=False):
     http_connect_proxy_config: HttpConnectProxyConfig | None
     dns_load_balancing_config: DnsLoadBalancingConfig | None
     grpc_compression: GrpcCompression
+    payload_limits: PayloadLimitsConfig
     header_codec_behavior: HeaderCodecBehavior
 
 

@@ -29,9 +29,6 @@ from temporalio.converter._payload_codec import (
 from temporalio.converter._payload_converter import (
     PayloadConverter,
 )
-from temporalio.converter._payload_limits import (
-    PayloadLimitsConfig,
-)
 from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
@@ -81,9 +78,6 @@ class DataConverter(WithSerializationContext):
 
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""
-
-    payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
-    """Settings for payload size limits."""
 
     external_storage: ExternalStorage | None = None
     """Options for external storage. If None, external storage is disabled.

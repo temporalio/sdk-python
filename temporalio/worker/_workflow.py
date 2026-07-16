@@ -961,7 +961,6 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
             payload_converter_class=workflow_context_dc.payload_converter_class,
             payload_codec=workflow_context_dc.payload_codec,
             failure_converter_class=workflow_context_dc.failure_converter_class,
-            payload_limits=workflow_context_dc.payload_limits,
             external_storage=workflow_context_dc.external_storage,
             _ca_instance=instance,
             _ca_context_free_dc=context_free_dc,
