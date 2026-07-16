@@ -20,9 +20,10 @@ from types import TracebackType
 from typing import Any, cast
 
 import pydantic
-from google.genai.interactions import Interaction, InteractionSSEEvent
+from google.genai.interactions import InteractionSSEEvent
 
 from temporalio import workflow as temporal_workflow
+from temporalio.contrib.google_genai._compat import Interaction
 from temporalio.contrib.google_genai._models import (
     _GeminiInteractionIdRequest,
     _GeminiInteractionRequest,
