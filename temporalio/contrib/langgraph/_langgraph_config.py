@@ -23,9 +23,7 @@ from langgraph.graph.state import RunnableConfig
 from langgraph.pregel._algo import LazyAtomicCounter
 from langgraph.runtime import ExecutionInfo, Runtime
 
-from temporalio.contrib._langchain._runnable_config import (
-    strip_runnable_config as _shared_strip_runnable_config,
-)
+from temporalio.contrib._langchain import _runnable_config
 
 # The configurable keys the langgraph plugin ships across activity
 # boundaries (checkpoint/resumption state); everything else in
@@ -58,7 +56,7 @@ def strip_runnable_config(config: RunnableConfig | None) -> RunnableConfig:
         "RunnableConfig",
         cast(
             object,
-            _shared_strip_runnable_config(
+            _runnable_config.strip_runnable_config(
                 config, configurable_keys=_KEPT_CONFIGURABLE_KEYS
             ),
         ),

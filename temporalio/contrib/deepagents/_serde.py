@@ -32,41 +32,49 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
+from temporalio.contrib._langchain import _converter, _runnable_config, _task_cache
 from temporalio.contrib._langchain._converter import (
     LangChainPayloadConverter,
-)
-from temporalio.contrib._langchain._converter import (
-    build_data_converter as _shared_build_data_converter,
-)
-from temporalio.contrib._langchain._converter import (
-    data_converter as data_converter,
+    data_converter,
 )
 from temporalio.contrib._langchain._messages import (
-    dump_messages as dump_messages,
-)
-from temporalio.contrib._langchain._messages import (
-    dump_object as dump_object,
-)
-from temporalio.contrib._langchain._messages import (
-    load_messages as load_messages,
-)
-from temporalio.contrib._langchain._messages import (
-    load_object as load_object,
-)
-from temporalio.contrib._langchain._messages import (
-    tool_to_schema as tool_to_schema,
+    dump_messages,
+    dump_object,
+    load_messages,
+    load_object,
+    tool_to_schema,
 )
 from temporalio.contrib._langchain._passthrough import merge_passthrough_modules
-from temporalio.contrib._langchain._runnable_config import is_jsonish
 from temporalio.contrib._langchain._runnable_config import (
-    rebuild_runnable_config as rebuild_runnable_config,
+    is_jsonish,
+    rebuild_runnable_config,
 )
-from temporalio.contrib._langchain._runnable_config import (
-    strip_runnable_config as _shared_strip_runnable_config,
-)
-from temporalio.contrib._langchain._task_cache import TaskResultCache
-from temporalio.contrib._langchain._task_cache import cache_key as _shared_cache_key
 from temporalio.converter import DataConverter
+
+__all__ = [
+    "DeepAgentsPayloadConverter",
+    "Settings",
+    "build_data_converter",
+    "cache_key",
+    "cache_lookup",
+    "cache_put",
+    "data_converter",
+    "default_passthrough_modules",
+    "dump_backend_result",
+    "dump_messages",
+    "dump_object",
+    "get_settings",
+    "load_backend_result",
+    "load_messages",
+    "load_object",
+    "rebuild_runnable_config",
+    "resolve_passthrough_modules",
+    "result_cache_snapshot",
+    "set_result_cache",
+    "set_settings",
+    "strip_runnable_config",
+    "tool_to_schema",
+]
 
 # ---------------------------------------------------------------------------
 # Worker-wide dispatch settings
@@ -124,7 +132,9 @@ def build_data_converter(
     Delegates to the shared family implementation; see its docstring for the
     None / SDK-default / custom-converter contract.
     """
-    return _shared_build_data_converter(user_converter, plugin_name="DeepAgentsPlugin")
+    return _converter.build_data_converter(
+        user_converter, plugin_name="DeepAgentsPlugin"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +252,7 @@ def strip_runnable_config(config: Any) -> dict[str, Any]:
     those are reconstructed activity-side. Output shape follows the shared
     (langgraph-vetted) implementation.
     """
-    return _shared_strip_runnable_config(
+    return _runnable_config.strip_runnable_config(
         config,
         configurable_filter=_keep_configurable,
         metadata_filter=is_jsonish,
@@ -258,7 +268,7 @@ def strip_runnable_config(config: Any) -> dict[str, Any]:
 # ContextVar-backed cache (update / signal handler tasks spawned by the
 # workflow inherit it automatically); this plugin's instance is distinct from
 # the langgraph plugin's.
-_result_cache = TaskResultCache("_deepagents_result_cache")
+_result_cache = _task_cache.TaskResultCache("_deepagents_result_cache")
 
 
 def set_result_cache(cache: dict[str, Any] | None) -> None:
@@ -274,7 +284,7 @@ def result_cache_snapshot() -> dict[str, Any] | None:
 
 def cache_key(kind: str, call_id: str, args: Any) -> str:
     """Stable key over ``(kind, call_id, args)`` for cache lookups."""
-    return _shared_cache_key(kind, (call_id, args), {})
+    return _task_cache.cache_key(kind, (call_id, args), {})
 
 
 def cache_lookup(key: str) -> tuple[bool, Any]:

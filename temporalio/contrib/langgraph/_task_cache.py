@@ -13,9 +13,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from temporalio.contrib._langchain._task_cache import TaskResultCache
-from temporalio.contrib._langchain._task_cache import cache_key as cache_key
-from temporalio.contrib._langchain._task_cache import task_id as task_id
+from temporalio.contrib._langchain._task_cache import (
+    TaskResultCache,
+    cache_key,
+    task_id,
+)
+
+__all__ = [
+    "cache_key",
+    "cache_lookup",
+    "cache_put",
+    "get_task_cache",
+    "set_task_cache",
+    "task_id",
+]
 
 _cache = TaskResultCache("_temporal_task_cache")
 

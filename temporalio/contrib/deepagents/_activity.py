@@ -30,12 +30,7 @@ from datetime import timedelta
 from typing import Any, Callable
 
 from temporalio import activity
-from temporalio.contrib._langchain._activity_helpers import (
-    auto_heartbeater as _auto_heartbeater,
-)
-from temporalio.contrib._langchain._activity_helpers import (
-    translate_api_error as _translate_api_error,
-)
+from temporalio.contrib._langchain import _activity_helpers
 from temporalio.contrib.deepagents import _serde
 from temporalio.exceptions import ApplicationError
 
@@ -170,7 +165,7 @@ class DeepAgentActivities:
         return model
 
     @activity.defn(name=INVOKE_MODEL)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def invoke_model(self, input: ModelActivityInput) -> ModelActivityOutput:
         """Run exactly one LLM call and return the resulting ``AIMessage``."""
         messages = _serde.load_messages(input.messages)
@@ -179,7 +174,7 @@ class DeepAgentActivities:
         try:
             message = await model.ainvoke(messages, config=config)
         except Exception as exc:
-            translated = _translate_api_error(exc)
+            translated = _activity_helpers.translate_api_error(exc)
             if translated is not None:
                 activity.logger.warning(
                     "Model call failed with an HTTP status error", exc_info=True
@@ -189,7 +184,7 @@ class DeepAgentActivities:
         return ModelActivityOutput(message=_serde.dump_object(message))
 
     @activity.defn(name=INVOKE_MODEL_STREAMING)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def invoke_model_streaming(
         self, input: ModelActivityInput
     ) -> ModelActivityOutput:
@@ -221,7 +216,7 @@ class DeepAgentActivities:
                         topic.publish(_serde.dump_object(chunk))
                     final = chunk if final is None else final + chunk
         except Exception as exc:
-            translated = _translate_api_error(exc)
+            translated = _activity_helpers.translate_api_error(exc)
             if translated is not None:
                 activity.logger.warning(
                     "Streaming model call failed with an HTTP status error",
@@ -232,7 +227,7 @@ class DeepAgentActivities:
         return ModelActivityOutput(message=_serde.dump_object(final))
 
     @activity.defn(name=INVOKE_TOOL)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def invoke_tool(self, input: ToolActivityInput) -> ToolActivityOutput:
         """Execute one registered tool and return its ``ToolMessage``."""
         from temporalio.contrib.deepagents._tools import get_registered_tool
@@ -256,7 +251,7 @@ class DeepAgentActivities:
         return ToolActivityOutput(message=_serde.dump_object(message))
 
     @activity.defn(name=BACKEND_OP)
-    @_auto_heartbeater
+    @_activity_helpers.auto_heartbeater
     async def backend_op(self, input: BackendOpInput) -> BackendOpOutput:
         """Run one operation against a registered (real-I/O) backend."""
         from temporalio.contrib.deepagents._tools import registered_backends
