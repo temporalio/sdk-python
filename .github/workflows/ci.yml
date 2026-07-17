@@ -68,8 +68,6 @@ jobs:
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping-v1 --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping-v1.xml
         timeout-minutes: 10
-      # Per-workflow time skipping (v2) runs against the real Temporal
-      # server, so it works on ARM too.
       - run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping-v2 --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping-v2.xml
         timeout-minutes: 10
       - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}

@@ -102,9 +102,6 @@ class StartWorkflowInput:
     links: Sequence[temporalio.api.common.v1.Link]
     request_id: str | None
     versioning_override: temporalio.common.VersioningOverride | None = None
-    # Test-only: per-workflow time-skipping configuration. Set by the
-    # ``TimeSkipper`` outbound interceptor in ``temporalio.testing``;
-    # not exposed on the public ``Client.start_workflow`` signature.
     time_skipping_config: temporalio.api.common.v1.TimeSkippingConfig | None = None
 
 
@@ -370,7 +367,6 @@ class UpdateWithStartStartWorkflowInput:
     ret_type: type | None
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None = None
-    # See note on ``StartWorkflowInput.time_skipping_config``.
     time_skipping_config: temporalio.api.common.v1.TimeSkippingConfig | None = None
 
 

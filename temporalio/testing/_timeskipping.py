@@ -26,7 +26,7 @@ class TimeSkippingConfig:
 
     fast_forward: timedelta | None = None
     """One-shot advance of virtual time by this duration. TS auto-disables at
-    the target time."""
+    the target time. `timedelta=None` means unbounded advance until completion."""
 
     disable_propagation: bool = False
     """If true, child workflows do not inherit the ``enabled`` flag. Virtual
@@ -112,7 +112,7 @@ class TimeSkipper:
         duration: timedelta | float | None = None,
         /,
     ) -> bool:
-        """Issue a fast-forward and wait for it to complete.
+        """Issue a fast-forward on a workflow and wait for it to complete.
 
         Sends an ``UpdateWorkflowExecutionOptions`` with the new
         ``TimeSkippingConfig``, then waits for the resulting
@@ -220,13 +220,12 @@ class TimeSkipper:
         Workflows started via :py:attr:`client` inside the block do not get
         their ``time_skipping_config`` set; existing workflows are unaffected.
         """
-        already_disabled = not self._ts_enabled
+        was_enabled = self._ts_enabled
         self._ts_enabled = False
         try:
             yield None
         finally:
-            if not already_disabled:
-                self._ts_enabled = True
+            self._ts_enabled = was_enabled
 
 
 class _TimeSkippingConfigInterceptor(temporalio.client.Interceptor):
