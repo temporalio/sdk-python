@@ -123,3 +123,34 @@ async def test_workflow_env_time_skipping_disabled_v2():
             assert monotonic() - start > 2.5
             # Don't call assert_time_was_skipped(), since it didn't
             # get a chance to emit that.
+
+
+async def test_workflow_env_time_skipping_basic_via_update_v2():
+    """Start TS-off, turn on via update, workflow's 100,000s sleep auto-skips.
+
+    Parallel to :py:func:`test_workflow_env_time_skipping_basic_v2` but
+    exercises the ``UpdateWorkflowExecutionOptions`` path: the workflow
+    starts with no ``time_skipping_config`` and is switched on mid-flight
+    via ``env.fast_forward(handle, None)`` (unbounded resume).
+    """
+    async with await WorkflowEnvironment.start_time_skipping_v2(
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+        dev_server_extra_args=_TS_EXTRA_ARGS,
+    ) as env:
+        async with new_worker(env.client, ReallySlowWorkflow) as worker:
+            with env.with_time_skipping_disabled():
+                handle = await env.client.start_workflow(
+                    ReallySlowWorkflow.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+
+            # Enable unbounded skipping mid-flight. Returns False because
+            # the workflow terminates before a ``disabled_after_fast_forward``
+            # transition can fire (there's no target).
+            assert not await env.fast_forward(handle, None)
+            assert "all done" == await handle.result()
+            assert_timestamp_from_now(
+                await handle.query(ReallySlowWorkflow.current_time), 100000
+            )
+            await assert_time_was_skipped(handle)
