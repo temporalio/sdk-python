@@ -3193,6 +3193,329 @@ async def test_workflow_patch_memoized(client: Client):
 
 
 @workflow.defn
+class PatchActivationWorkflow:
+    @workflow.run
+    async def run(self, patch_id: str, sleep_after_first: bool = False) -> list[bool]:
+        first = workflow.patched(patch_id)
+        if sleep_after_first:
+            await workflow.sleep(0.001)
+        return [first, workflow.patched(patch_id)]
+
+
+@workflow.defn
+class PatchActivationDeprecateWorkflow:
+    @workflow.run
+    async def run(self, patch_id: str) -> bool:
+        workflow.deprecate_patch(patch_id)
+        return workflow.patched(patch_id)
+
+
+@workflow.defn(name="PatchActivationRolloutWorkflow")
+class PatchActivationRolloutWorkflow:
+    def __init__(self) -> None:
+        self._ready = False
+        self._released = False
+
+    @workflow.run
+    async def run(self) -> str:
+        workflow.patched("rollout-patch")
+        self._ready = True
+        await workflow.wait_condition(lambda: self._released)
+        return "new" if workflow.patched("rollout-patch") else "old"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.signal
+    def release(self) -> None:
+        self._released = True
+
+
+@workflow.defn(name="PatchActivationRolloutWorkflow")
+class PatchActivationOldRolloutWorkflow:
+    def __init__(self) -> None:
+        self._ready = False
+        self._released = False
+
+    @workflow.run
+    async def run(self) -> str:
+        self._ready = True
+        await workflow.wait_condition(lambda: self._released)
+        return "old"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.signal
+    def release(self) -> None:
+        self._released = True
+
+
+async def patch_marker_count(handle: WorkflowHandle) -> int:
+    count = 0
+    async for event in handle.fetch_history_events():
+        if event.event_type is EventType.EVENT_TYPE_MARKER_RECORDED:
+            count += 1
+    return count
+
+
+async def has_completed_workflow_task(handle: WorkflowHandle) -> bool:
+    async for event in handle.fetch_history_events():
+        if event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
+            return True
+    return False
+
+
+def recording_patch_activation_callback(
+    calls: list[temporalio.worker.PatchActivationInput], decision: bool
+) -> typing.Callable[[temporalio.worker.PatchActivationInput], bool]:
+    def callback(input: temporalio.worker.PatchActivationInput) -> bool:
+        calls.append(input)
+        return decision
+
+    return callback
+
+
+async def test_workflow_patch_activation_callback(client: Client):
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    calls: list[temporalio.worker.PatchActivationInput] = []
+    async with new_worker(
+        client,
+        PatchActivationWorkflow,
+        patch_activation_callback=recording_patch_activation_callback(calls, True),
+    ) as worker:
+        result = await client.execute_workflow(
+            PatchActivationWorkflow.run,
+            args=["my-patch", False],
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+    assert result == [True, True]
+    assert len(calls) == 1
+    assert calls[0].workflow_info.workflow_id == workflow_id
+    assert calls[0].patch_id == "my-patch"
+
+
+async def test_workflow_patch_activation_callback_can_decline(client: Client):
+    calls: list[temporalio.worker.PatchActivationInput] = []
+    async with new_worker(
+        client,
+        PatchActivationWorkflow,
+        patch_activation_callback=recording_patch_activation_callback(calls, False),
+    ) as worker:
+        handle = await client.start_workflow(
+            PatchActivationWorkflow.run,
+            args=["my-patch", False],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.result() == [False, False]
+
+    assert len(calls) == 1
+    assert await patch_marker_count(handle) == 0
+
+
+async def test_workflow_patch_activation_default_activates(client: Client):
+    async with new_worker(client, PatchActivationWorkflow) as worker:
+        handle = await client.start_workflow(
+            PatchActivationWorkflow.run,
+            args=["my-patch", False],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.result() == [True, True]
+
+    assert await patch_marker_count(handle) == 1
+
+
+async def test_workflow_patch_activation_callback_not_recalled_on_replay(
+    client: Client,
+):
+    calls: list[temporalio.worker.PatchActivationInput] = []
+    async with new_worker(
+        client,
+        PatchActivationWorkflow,
+        max_cached_workflows=0,
+        patch_activation_callback=recording_patch_activation_callback(calls, False),
+    ) as worker:
+        result = await client.execute_workflow(
+            PatchActivationWorkflow.run,
+            args=["my-patch", True],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == [False, False]
+
+    assert len(calls) == 1
+
+
+async def test_workflow_patch_activation_callback_bypassed_for_deprecate(
+    client: Client,
+):
+    def unexpected_callback(_: temporalio.worker.PatchActivationInput) -> bool:
+        raise AssertionError("Patch activation callback should not be called")
+
+    async with new_worker(
+        client,
+        PatchActivationDeprecateWorkflow,
+        patch_activation_callback=unexpected_callback,
+    ) as worker:
+        result = await client.execute_workflow(
+            PatchActivationDeprecateWorkflow.run,
+            "my-patch",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    assert result is True
+
+
+async def test_workflow_patch_activation_callback_must_return_bool(client: Client):
+    def invalid_callback(_: temporalio.worker.PatchActivationInput) -> bool:
+        return "not a bool"  # type: ignore[return-value]  # pyright: ignore[reportReturnType]
+
+    async with new_worker(
+        client,
+        PatchActivationWorkflow,
+        patch_activation_callback=invalid_callback,
+    ) as worker:
+        handle = await client.start_workflow(
+            PatchActivationWorkflow.run,
+            args=["my-patch", False],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await assert_task_fail_eventually(
+            handle,
+            message_contains="Patch activation callback must return true or false",
+        )
+
+
+async def test_workflow_patch_activation_callback_is_read_only(client: Client):
+    def make_command(_: temporalio.worker.PatchActivationInput) -> bool:
+        workflow.upsert_memo({"foo": "bar"})
+        return True
+
+    def schedule_task(_: temporalio.worker.PatchActivationInput) -> bool:
+        asyncio.get_running_loop().call_soon(lambda: None)
+        return True
+
+    def wait_condition(_: temporalio.worker.PatchActivationInput) -> bool:
+        coroutine = workflow.wait_condition(lambda: True)
+        try:
+            coroutine.send(None)
+        finally:
+            coroutine.close()
+        return True
+
+    def use_random(_: temporalio.worker.PatchActivationInput) -> bool:
+        workflow.random().random()
+        return True
+
+    def register_random_seed_callback(
+        _: temporalio.worker.PatchActivationInput,
+    ) -> bool:
+        workflow.register_random_seed_callback(lambda _seed: None)
+        return True
+
+    def create_new_random(_: temporalio.worker.PatchActivationInput) -> bool:
+        workflow.new_random()
+        return True
+
+    callbacks = [
+        (make_command, "action attempted: add command"),
+        (schedule_task, "action attempted: schedule task"),
+        (wait_condition, "action attempted: wait condition"),
+        (use_random, "action attempted: random"),
+        (
+            register_random_seed_callback,
+            "action attempted: register random seed callback",
+        ),
+        (create_new_random, "action attempted: register random seed callback"),
+    ]
+    for callback, message in callbacks:
+        async with new_worker(
+            client,
+            PatchActivationWorkflow,
+            patch_activation_callback=callback,
+        ) as worker:
+            handle = await client.start_workflow(
+                PatchActivationWorkflow.run,
+                args=["my-patch", False],
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await assert_task_fail_eventually(handle, message_contains=message)
+
+
+async def test_workflow_declined_patch_rolls_out_to_old_worker(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+    calls: list[temporalio.worker.PatchActivationInput] = []
+    async with new_worker(
+        client,
+        PatchActivationRolloutWorkflow,
+        task_queue=task_queue,
+        max_cached_workflows=0,
+        patch_activation_callback=recording_patch_activation_callback(calls, False),
+    ):
+        handle = await client.start_workflow(
+            PatchActivationRolloutWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        await assert_eq_eventually(True, lambda: has_completed_workflow_task(handle))
+
+    assert len(calls) == 1
+    async with new_worker(
+        client,
+        PatchActivationOldRolloutWorkflow,
+        task_queue=task_queue,
+        max_cached_workflows=0,
+    ):
+        await handle.signal("release")
+        assert await handle.result() == "old"
+
+
+async def test_workflow_activated_patch_ignores_declining_worker(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+    activated_calls: list[temporalio.worker.PatchActivationInput] = []
+    declining_calls: list[temporalio.worker.PatchActivationInput] = []
+    async with new_worker(
+        client,
+        PatchActivationRolloutWorkflow,
+        task_queue=task_queue,
+        max_cached_workflows=0,
+        patch_activation_callback=recording_patch_activation_callback(
+            activated_calls, True
+        ),
+    ):
+        handle = await client.start_workflow(
+            PatchActivationRolloutWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        await assert_eq_eventually(True, lambda: has_completed_workflow_task(handle))
+
+    assert len(activated_calls) == 1
+    async with new_worker(
+        client,
+        PatchActivationRolloutWorkflow,
+        task_queue=task_queue,
+        max_cached_workflows=0,
+        patch_activation_callback=recording_patch_activation_callback(
+            declining_calls, False
+        ),
+    ):
+        await handle.signal(PatchActivationRolloutWorkflow.release)
+        assert await handle.result() == "new"
+
+    assert not declining_calls
+
+
+@workflow.defn
 class UUIDWorkflow:
     def __init__(self) -> None:
         self._result = "<unset>"
@@ -4178,6 +4501,8 @@ class QueriesDoingBadThingsWorkflow:
             workflow.set_query_handler("some-handler", lambda: "whatever")
         elif bad_thing == "patch":
             workflow.patched("some-patch")
+        elif bad_thing == "register_random_seed_callback":
+            workflow.register_random_seed_callback(lambda _seed: None)
         elif bad_thing == "signal_external_handle":
             await workflow.get_external_workflow_handle("some-id").signal("some-signal")
         return "should never get here"
@@ -4206,6 +4531,7 @@ async def test_workflow_queries_doing_bad_things(client: Client):
         await assert_bad_query("random")
         await assert_bad_query("set_query_handler")
         await assert_bad_query("patch")
+        await assert_bad_query("register_random_seed_callback")
         await assert_bad_query("signal_external_handle")
 
 

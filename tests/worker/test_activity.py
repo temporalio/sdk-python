@@ -1420,6 +1420,154 @@ async def test_sync_activity_contextvars(
 
 
 @activity.defn
+def post_return_cancel_activity() -> str:
+    return "done"
+
+
+@activity.defn
+def post_return_cancel_probe_activity() -> str:
+    return "probe"
+
+
+class PostReturnCancelInterceptor(Interceptor):
+    def __init__(
+        self, after_return_started: asyncio.Event, allow_completion: asyncio.Event
+    ) -> None:
+        super().__init__()
+        self.after_return_started = after_return_started
+        self.allow_completion = allow_completion
+
+    def intercept_activity(
+        self, next: ActivityInboundInterceptor
+    ) -> ActivityInboundInterceptor:
+        return PostReturnCancelActivityInbound(
+            next, self.after_return_started, self.allow_completion
+        )
+
+
+class PostReturnCancelActivityInbound(ActivityInboundInterceptor):
+    def __init__(
+        self,
+        next: ActivityInboundInterceptor,
+        after_return_started: asyncio.Event,
+        allow_completion: asyncio.Event,
+    ) -> None:
+        super().__init__(next)
+        self.after_return_started = after_return_started
+        self.allow_completion = allow_completion
+
+    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
+        result = await super().execute_activity(input)
+        if activity.info().activity_type == "post_return_cancel_activity":
+            self.after_return_started.set()
+            await self.allow_completion.wait()
+        return result
+
+
+async def test_sync_activity_cancel_after_return_does_not_kill_thread_pool_worker(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test requires real worker-side timeout cancellation delivery")
+
+    def alive_thread_count(executor: ThreadPoolExecutor) -> int:
+        return sum(1 for thread in list(executor._threads) if thread.is_alive())
+
+    after_return_started = asyncio.Event()
+    allow_completion = asyncio.Event()
+    act_task_queue = str(uuid.uuid4())
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with pytest.warns(
+            UserWarning,
+            match="Worker max_concurrent_activities is 2 but activity_executor's max_workers is only",
+        ):
+            act_worker = Worker(
+                client,
+                task_queue=act_task_queue,
+                activities=[
+                    post_return_cancel_activity,
+                    post_return_cancel_probe_activity,
+                ],
+                activity_executor=executor,
+                interceptors=[
+                    PostReturnCancelInterceptor(after_return_started, allow_completion)
+                ],
+                max_concurrent_activities=2,
+                shared_state_manager=shared_state_manager,
+            )
+
+        async with act_worker:
+            try:
+                timed_out_workflow = asyncio.create_task(
+                    client.execute_workflow(
+                        "kitchen_sink",
+                        KSWorkflowParams(
+                            actions=[
+                                KSAction(
+                                    execute_activity=KSExecuteActivityAction(
+                                        name="post_return_cancel_activity",
+                                        task_queue=act_task_queue,
+                                        start_to_close_timeout_ms=200,
+                                        retry_max_attempts=1,
+                                    )
+                                )
+                            ]
+                        ),
+                        id=str(uuid.uuid4()),
+                        task_queue=worker.task_queue,
+                    )
+                )
+                await asyncio.wait_for(after_return_started.wait(), timeout=5)
+
+                with pytest.raises(WorkflowFailureError) as err:
+                    await timed_out_workflow
+                timeout = assert_activity_error(err.value)
+                assert isinstance(timeout, TimeoutError)
+                assert timeout.type == TimeoutType.START_TO_CLOSE
+
+                activity_worker = act_worker._activity_worker
+                assert activity_worker
+                for _ in range(50):
+                    if any(
+                        running.cancelled_event and running.cancelled_event.is_set()
+                        for running in activity_worker._running_activities.values()
+                    ):
+                        break
+                    await asyncio.sleep(0.1)
+                else:
+                    pytest.fail("Timed out waiting for activity cancellation")
+
+                probe_result = await asyncio.wait_for(
+                    client.execute_workflow(
+                        "kitchen_sink",
+                        KSWorkflowParams(
+                            actions=[
+                                KSAction(
+                                    execute_activity=KSExecuteActivityAction(
+                                        name="post_return_cancel_probe_activity",
+                                        task_queue=act_task_queue,
+                                        start_to_close_timeout_ms=30000,
+                                        retry_max_attempts=1,
+                                    )
+                                )
+                            ]
+                        ),
+                        id=str(uuid.uuid4()),
+                        task_queue=worker.task_queue,
+                    ),
+                    timeout=5,
+                )
+                assert probe_result == "probe"
+                assert alive_thread_count(executor) == 1
+            finally:
+                allow_completion.set()
+
+
+@activity.defn
 async def local_without_schedule_to_close_activity() -> str:
     return "some-activity"
 

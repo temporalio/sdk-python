@@ -12,11 +12,6 @@ resolution-markers = [
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P2W"
 
-[options.exclude-newer-package]
-google-adk = false
-google-genai = false
-openai-agents = false
-
 [[package]]
 name = "aioboto3"
 version = "15.5.0"

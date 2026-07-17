@@ -658,10 +658,14 @@ impl WorkerRef {
         enter_sync!(self.runtime);
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
-        self.worker
-            .as_ref()
-            .unwrap()
-            .record_activity_heartbeat(heartbeat);
+        let worker = self.worker.as_ref().unwrap().clone();
+        // Detach from the GIL during the core call. Core may block on internal
+        // locks whose holders can call back into Python (e.g. a custom slot
+        // supplier's mark_slot_used runs while core's outstanding-activity
+        // lock is held); holding the GIL here would deadlock the worker.
+        proto
+            .py()
+            .detach(move || worker.record_activity_heartbeat(heartbeat));
         Ok(())
     }
 

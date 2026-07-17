@@ -589,6 +589,95 @@ async def test_blocking_slot_supplier(client: Client):
         await asyncio.sleep(1)
 
 
+@activity.defn
+async def heartbeating_activity(beats: int) -> None:
+    for i in range(beats):
+        activity.heartbeat(i)
+        await asyncio.sleep(0)
+
+
+@workflow.defn
+class HeartbeatingFanOutWorkflow:
+    @workflow.run
+    async def run(self, total: int, beats: int, window: int) -> None:
+        in_flight = asyncio.Semaphore(window)
+
+        async def run_one() -> None:
+            async with in_flight:
+                await workflow.execute_activity(
+                    heartbeating_activity,
+                    beats,
+                    start_to_close_timeout=timedelta(minutes=1),
+                    heartbeat_timeout=timedelta(seconds=30),
+                )
+
+        await asyncio.gather(*(run_one() for _ in range(total)))
+
+
+async def test_custom_slot_supplier_with_heartbeating_activities(client: Client):
+    """Regression test for the GIL <-> core-mutex deadlock (#1642).
+
+    Any custom slot supplier plus heartbeating activities used to wedge the
+    worker permanently: the heartbeat FFI held the GIL while blocking on
+    core's outstanding-activity lock, while an activity task start invoked
+    mark_slot_used (which acquires the GIL) under that same lock. The
+    supplier below is deliberately trivial - the deadlock was in the calling
+    convention, not in what the callbacks do.
+
+    NOTE: on regression this test HANGS rather than fails - the deadlock
+    freezes the event loop, so no in-process timeout (including the
+    wait_for below) can fire, and only a CI-level job timeout kills it.
+    """
+
+    class CappedSlotSupplier(CustomSlotSupplier):
+        def __init__(self, max_slots: int) -> None:
+            self.max_slots = max_slots
+            self.used = 0
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            while True:
+                permit = self.try_reserve_slot(ctx)
+                if permit is not None:
+                    return permit
+                await asyncio.sleep(0.005)
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
+            # Called with the GIL held, so no extra lock is needed
+            if self.used >= self.max_slots:
+                return None
+            self.used += 1
+            return SlotPermit()
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            return None
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            self.used = max(0, self.used - 1)
+
+    fixed = FixedSizeSlotSupplier(100)
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=fixed,
+        # A small cap keeps activity starts (and thus mark_slot_used calls)
+        # churning against the heartbeat FFI
+        activity_supplier=CappedSlotSupplier(8),
+        local_activity_supplier=fixed,
+        nexus_supplier=fixed,
+    )
+    async with new_worker(
+        client,
+        HeartbeatingFanOutWorkflow,
+        activities=[heartbeating_activity],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            HeartbeatingFanOutWorkflow.run,
+            args=[600, 50, 150],
+            id=f"heartbeating-slot-supplier-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await asyncio.wait_for(wf1.result(), timeout=120)
+
+
 @workflow.defn(
     name="DeploymentVersioningWorkflow",
     versioning_behavior=VersioningBehavior.AUTO_UPGRADE,
