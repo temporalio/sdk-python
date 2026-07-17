@@ -196,6 +196,8 @@ GrpcCompression.GZIP = _GzipGrpcCompression()
 class PayloadLimitsConfig:
     """Warning thresholds for outbound payload/memo sizes."""
 
+    # Defaults mirror the Temporal server's `limit.blobSize.warn` (512 KiB) and `limit.memoSize.warn`
+    # (2 KiB) dynamic-config defaults, so the SDK warns at the same sizes the server would.
     payloads_warn_size: int = 512 * 1024
     """Warning threshold, in bytes, for the size of an outbound payload-bearing field. Set to 0 to
     disable."""
