@@ -48,7 +48,7 @@ async def test_workflow_env_time_skipping_basic_v2():
             # Closed-workflow query: returns workflow.now() as of the final
             # workflow task, which is ~100,000s after start.
             assert_timestamp_from_now(
-                await handle.query(SleepWorkflow.current_time), 100000
+                await handle.query(SleepWorkflow.now), 100000
             )
             await assert_time_was_skipped(handle)
 
@@ -77,7 +77,7 @@ async def test_workflow_env_time_skipping_manual_v2():
                 # Signal first so the next query timestamp is from a
                 # non-query-only workflow task.
                 await handle.signal(SleepWorkflow.tick)
-                return await handle.query(SleepWorkflow.current_time)
+                return await handle.query(SleepWorkflow.now)
 
             assert_timestamp_from_now(await workflow_current_time(), 0, max_delta=1)
 
@@ -155,6 +155,6 @@ async def test_workflow_env_time_skipping_basic_via_update_v2():
             assert not await env.fast_forward(handle, None)
             assert (await handle.result()) is not None
             assert_timestamp_from_now(
-                await handle.query(SleepWorkflow.current_time), 100000
+                await handle.query(SleepWorkflow.now), 100000
             )
             await assert_time_was_skipped(handle)

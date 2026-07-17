@@ -54,7 +54,7 @@ class SleepWorkflow:
         pass
 
     @workflow.query
-    def current_time(self) -> float:
+    def now(self) -> float:
         return workflow.now().timestamp()
 
 
@@ -98,7 +98,7 @@ async def test_workflow_env_time_skipping_manual():
                 # We send signal first since query timestamp is based on last
                 # non-query-only workflow task
                 await handle.signal(SleepWorkflow.tick)
-                return await handle.query(SleepWorkflow.current_time)
+                return await handle.query(SleepWorkflow.now)
 
             # Confirm query will say we're near current time
             assert_timestamp_from_now(await workflow_current_time(), 0)

@@ -215,7 +215,7 @@ async def test_partial_fast_forward_then_unbounded(
             # Signal first so the query reads workflow.now() as of a fresh
             # non-query workflow task, not the workflow's initial one.
             await handle.signal(SleepWorkflow.tick)
-            return await handle.query(SleepWorkflow.current_time)
+            return await handle.query(SleepWorkflow.now)
 
         t0 = await wf_now()
 
@@ -231,7 +231,7 @@ async def test_partial_fast_forward_then_unbounded(
         await handle.result()
 
         # Final virtual time on the closed workflow is ~+1h from start.
-        t_end = await handle.query(SleepWorkflow.current_time)
+        t_end = await handle.query(SleepWorkflow.now)
         assert_duration_same(3600, t_end - t0, tolerance=10)
 
         await assert_time_was_skipped(handle)
