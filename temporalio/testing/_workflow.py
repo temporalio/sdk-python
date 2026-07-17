@@ -164,7 +164,7 @@ class WorkflowEnvironment:
             ts_config: Per-workflow time-skipping config stamped on every
                 workflow started via :py:attr:`client`. Off by default (no
                 time skipping). If set, the returned environment supports
-                :py:meth:`fast_forward` and related v2 methods.
+                :py:meth:`fast_forward` and related time-skipping v2 methods.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -234,6 +234,7 @@ class WorkflowEnvironment:
                 ),
                 server,
             )
+            # Wrap the client, if time-skipping v2 is being used.
             if ts_config is not None:
                 env._ts_skipper = TimeSkipper(env._client, config=ts_config)
                 env._client = env._ts_skipper.client
@@ -442,7 +443,7 @@ class WorkflowEnvironment:
 
     @property
     def supports_time_skipping(self) -> bool:
-        """Whether this environment supports any form of time skipping (v1 or v2)."""
+        """Whether this environment supports either v1 or v2 time skipping."""
         return self.supports_time_skipping_v1 or self.supports_time_skipping_v2
 
     async def create_nexus_endpoint(
@@ -517,8 +518,8 @@ class WorkflowEnvironment:
         Args:
             handle: Target workflow execution.
             duration: One-shot advance by this amount (``timedelta`` or
-                seconds as a ``float``). If ``None``, re-enable unbounded
-                skipping.
+                seconds as a ``float``). If ``None``, skip time until workflow
+                completion.
 
         Returns:
             True if the fast-forward transition is observed; False if the
