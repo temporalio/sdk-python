@@ -5424,6 +5424,11 @@ aioboto3 = [
     { name = "aioboto3" },
     { name = "types-aioboto3", extra = ["s3"] },
 ]
+gcp-opentelemetry = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "opentelemetry-sdk" },
+]
 google-adk = [
     { name = "google-adk" },
 ]
@@ -5510,9 +5515,12 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
     { name = "nexus-rpc", specifier = "==1.4.0" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.17.1" },
+    { name = "opentelemetry-api", marker = "extra == 'gcp-opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'gcp-opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
+    { name = "opentelemetry-sdk", marker = "extra == 'gcp-opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk-extension-aws", marker = "extra == 'lambda-worker-otel'", specifier = ">=2.0.0,<3" },
@@ -5525,7 +5533,7 @@ requires-dist = [
     { name = "types-protobuf", specifier = ">=3.20,<7.0.0" },
     { name = "typing-extensions", specifier = ">=4.2.0,<5" },
 ]
-provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "lambda-worker-otel", "aioboto3", "strands-agents"]
+provides-extras = ["grpc", "opentelemetry", "gcp-opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "lambda-worker-otel", "aioboto3", "strands-agents"]
 
 [package.metadata.requires-dev]
 dev = [
