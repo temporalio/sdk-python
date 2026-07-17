@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import pytest
 
+import temporalio.api.enums.v1
 from temporalio import activity, workflow
 from temporalio.client import Client, PayloadLimitsConfig, WorkflowFailureError
 from temporalio.exceptions import (
@@ -128,6 +129,16 @@ async def test_oversized_payload_fails_task_with_error_log(env: WorkflowEnvironm
 
                 await assert_eventually(error_forwarded)
 
+                # Confirm worker reported a WorkflowTaskFailed with cause PAYLOADS_TOO_LARGE.
+                history = await handle.fetch_history()
+                assert any(
+                    event.event_type
+                    == temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED
+                    and event.workflow_task_failed_event_attributes.cause
+                    == temporalio.api.enums.v1.WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE
+                    for event in history.events
+                )
+
 
 async def test_disable_payload_error_limit_sends_to_server(env: WorkflowEnvironment):
     """With the opt-out, worker does not pre-fail; the oversized payload reaches (and is rejected by)
@@ -194,6 +205,47 @@ async def test_payload_size_warning_forwarded(env: WorkflowEnvironment):
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=5),
+            )
+
+            # Core forwards logs on a buffered interval; poll while the capturer is attached.
+            async def warning_forwarded() -> None:
+                assert capturer.find(predicate) is not None
+
+            await assert_eventually(warning_forwarded)
+
+
+async def test_memo_size_warning_forwarded(env: WorkflowEnvironment):
+    """The connection's memo warn threshold produces a forwarded [TMPRL1103] warning for an
+    over-threshold memo."""
+    worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
+    worker_client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        runtime=_forwarding_runtime(worker_logger),
+        payload_limits=PayloadLimitsConfig(memo_warn_size=1024),
+    )
+
+    def predicate(record: logging.LogRecord) -> bool:
+        return (
+            record.levelname == "WARNING"
+            and "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit."
+            in record.msg
+        )
+
+    with LogCapturer().logs_captured(worker_logger) as capturer:
+        async with new_worker(
+            worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
+        ) as worker:
+            await worker_client.execute_workflow(
+                LargePayloadWorkflow.run,
+                LargePayloadWorkflowInput(
+                    activity_input_data_size=0,
+                    workflow_output_data_size=0,
+                ),
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=5),
+                memo={"key": "a" * 2048},
             )
 
             # Core forwards logs on a buffered interval; poll while the capturer is attached.
