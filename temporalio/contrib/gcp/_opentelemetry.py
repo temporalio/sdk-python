@@ -49,7 +49,7 @@ DEFAULT_OTLP_ENDPOINT = "http://localhost:4317"
 DEFAULT_SERVICE_NAME = "temporal-worker"
 """Service name used outside a recognized Cloud Run environment."""
 
-DEFAULT_METRIC_PERIODICITY = timedelta(seconds=1)
+DEFAULT_METRIC_PERIODICITY = timedelta(seconds=60)
 """Default interval between Temporal Core metric exports."""
 
 DEFAULT_FLUSH_TIMEOUT = timedelta(seconds=10)
@@ -94,7 +94,7 @@ class OpenTelemetryPlugin(TemporalOpenTelemetryPlugin):
                 ``OTEL_SERVICE_NAME``, ``CLOUD_RUN_WORKER_POOL``, ``K_SERVICE``,
                 then ``temporal-worker``.
             metric_periodicity: How often Temporal Core metrics are exported.
-                Defaults to one second. Cannot be used with ``runtime``.
+                Defaults to 60 seconds. Cannot be used with ``runtime``.
             flush_timeout: Default tracing force-flush timeout.
             flush_on_worker_stop: Whether to force-flush traces after each
                 worker stops. Disabled by default because one plugin can be used
@@ -283,7 +283,7 @@ def build_metrics_telemetry_config(
             :py:class:`OpenTelemetryPlugin`.
         service_name: Service name, with the same resolution order as
             :py:class:`OpenTelemetryPlugin`.
-        metric_periodicity: Metric export interval. Defaults to one second.
+        metric_periodicity: Metric export interval. Defaults to 60 seconds.
 
     Returns:
         Telemetry configuration ready for a Temporal runtime.

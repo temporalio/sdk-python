@@ -75,9 +75,21 @@ and shuts down a tracer provider created by the plugin. An application-owned
 provider is force-flushed but remains the application's responsibility.
 
 The Python SDK Core runtime exports metrics periodically and currently has no
-explicit metrics-flush API. The default one-second metric periodicity is intended
-to keep the final export close to worker shutdown; tune it with
-`metric_periodicity` if needed.
+explicit metrics-flush API. The default metric periodicity is 60 seconds,
+matching the upstream OpenTelemetry SDK default. This avoids sending multiple
+cumulative snapshots of the same Temporal series too frequently. Tune it with
+`metric_periodicity` when the metrics backend semantics support a different
+interval.
+
+Do not use a collector batch processor on the Google Managed Service for
+Prometheus metrics pipeline. A runtime shutdown can force a metrics export
+immediately after a periodic export, regardless of the periodicity. If the
+collector combines both cumulative snapshots into one write, Google Managed
+Service for Prometheus can reject it with `Duplicate TimeSeries`. Send each
+OTLP metrics export directly through the memory limiter, GCP resource detection,
+and any required resource/metric transforms to the Google Managed Prometheus
+exporter. Keep a separate batch processor on the traces pipeline; trace batching
+does not have the cumulative time-series collision.
 
 `flush_on_worker_stop=True` enables a best-effort trace flush after an
 individual worker stops. It is disabled by default because one plugin can be
@@ -122,10 +134,11 @@ or exporters to the worker process.
 
 Google publishes the Google-Built OpenTelemetry Collector as a container image.
 Configure it as a second Cloud Run container, listen for OTLP gRPC on
-`localhost:4317`, and use its GCP exporters for metrics and traces. For the
-image, recommended collector configuration, IAM roles, health check, and Secret
-Manager mount, see [Deploy Google-Built OpenTelemetry Collector on Cloud
-Run](https://cloud.google.com/stackdriver/docs/instrumentation/opentelemetry-collector-cloud-run).
+`localhost:4317`, and use its GCP exporters for metrics and traces. Configure
+separate pipelines: metrics without a batch processor, and traces with a
+dedicated batch processor. For the image, collector configuration, IAM roles,
+health check, and Secret Manager mount, see [Deploy Google-Built OpenTelemetry
+Collector on Cloud Run](https://cloud.google.com/stackdriver/docs/instrumentation/opentelemetry-collector-cloud-run).
 That guide demonstrates a Cloud Run service; adapt its collector container and
 configuration when deploying a worker pool.
 

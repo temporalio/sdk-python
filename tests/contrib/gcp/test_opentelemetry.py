@@ -138,6 +138,18 @@ def test_build_metrics_telemetry_config(monkeypatch: pytest.MonkeyPatch) -> None
     assert config.global_tags == {"service_name": "worker-pool"}
 
 
+def test_default_metric_periodicity_is_sixty_seconds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_environment(monkeypatch)
+
+    config = build_metrics_telemetry_config()
+
+    assert DEFAULT_METRIC_PERIODICITY == timedelta(seconds=60)
+    assert isinstance(config.metrics, OpenTelemetryConfig)
+    assert config.metrics.metric_periodicity == timedelta(seconds=60)
+
+
 @pytest.mark.asyncio
 async def test_connect_service_client_installs_runtime(
     tracer_provider: ReplaySafeTracerProvider,
