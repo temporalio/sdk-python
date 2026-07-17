@@ -825,11 +825,13 @@ fn convert_tuner_holder(
     }
 
     Ok(temporalio_sdk_core::TunerHolderOptions::builder()
-        .maybe_resource_based_options(first.map(|first| {
-            temporalio_sdk_core::ResourceBasedSlotsOptions::builder()
-                .target_mem_usage(first.target_memory_usage)
-                .target_cpu_usage(first.target_cpu_usage)
-                .build()
+        .maybe_resource_based_config(first.map(|first| {
+            temporalio_sdk_core::ResourceBasedTunerConfig::Options(
+                temporalio_sdk_core::ResourceBasedSlotsOptions::builder()
+                    .target_mem_usage(first.target_memory_usage)
+                    .target_cpu_usage(first.target_cpu_usage)
+                    .build(),
+            )
         }))
         .workflow_slot_options(convert_slot_supplier(
             holder.workflow_slot_supplier,
@@ -897,10 +899,11 @@ fn convert_versioning_strategy(
                     use_worker_versioning: options.use_worker_versioning,
                     default_versioning_behavior: if options.use_worker_versioning {
                         Some(
-                            options
-                                .default_versioning_behavior
-                                .try_into()
-                                .unwrap_or_default(),
+                            temporalio_common::protos::temporal::api::enums::v1::VersioningBehavior::try_from(
+                                options.default_versioning_behavior,
+                            )
+                            .unwrap_or_default()
+                            .into(),
                         )
                     } else {
                         None
