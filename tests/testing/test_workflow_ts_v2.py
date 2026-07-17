@@ -16,8 +16,7 @@ from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
 from tests.helpers.time_skipping import assert_time_was_skipped
 from tests.testing.test_workflow import (
-    ReallySlowWorkflow,
-    ShortSleepWorkflow,
+    SleepWorkflow,
     assert_timestamp_from_now,
 )
 
@@ -38,17 +37,18 @@ async def test_workflow_env_time_skipping_basic_v2():
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,
     ) as env:
-        async with new_worker(env.client, ReallySlowWorkflow) as worker:
+        async with new_worker(env.client, SleepWorkflow) as worker:
             handle = await env.client.start_workflow(
-                ReallySlowWorkflow.run,
+                SleepWorkflow.run,
+                100000.0,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            assert "all done" == await handle.result()
+            assert (await handle.result()) is not None
             # Closed-workflow query: returns workflow.now() as of the final
             # workflow task, which is ~100,000s after start.
             assert_timestamp_from_now(
-                await handle.query(ReallySlowWorkflow.current_time), 100000
+                await handle.query(SleepWorkflow.current_time), 100000
             )
             await assert_time_was_skipped(handle)
 
@@ -64,10 +64,11 @@ async def test_workflow_env_time_skipping_manual_v2():
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,
     ) as env:
-        async with new_worker(env.client, ReallySlowWorkflow) as worker:
+        async with new_worker(env.client, SleepWorkflow) as worker:
             with env.with_time_skipping_disabled():
                 handle = await env.client.start_workflow(
-                    ReallySlowWorkflow.run,
+                    SleepWorkflow.run,
+                    100000.0,
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
                 )
@@ -75,8 +76,8 @@ async def test_workflow_env_time_skipping_manual_v2():
             async def workflow_current_time() -> float:
                 # Signal first so the next query timestamp is from a
                 # non-query-only workflow task.
-                await handle.signal(ReallySlowWorkflow.some_signal)
-                return await handle.query(ReallySlowWorkflow.current_time)
+                await handle.signal(SleepWorkflow.tick)
+                return await handle.query(SleepWorkflow.current_time)
 
             assert_timestamp_from_now(await workflow_current_time(), 0, max_delta=1)
 
@@ -98,15 +99,16 @@ async def test_workflow_env_time_skipping_disabled_v2():
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,
     ) as env:
-        async with new_worker(env.client, ShortSleepWorkflow) as worker:
+        async with new_worker(env.client, SleepWorkflow) as worker:
             # With time-skipping enabled (env default), fast finish.
             start = monotonic()
             ts_on_handle = await env.client.start_workflow(
-                ShortSleepWorkflow.run,
+                SleepWorkflow.run,
+                3.0,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            assert "all done" == await ts_on_handle.result()
+            assert (await ts_on_handle.result()) is not None
             assert monotonic() - start < 2.5
             await assert_time_was_skipped(ts_on_handle)
 
@@ -115,11 +117,12 @@ async def test_workflow_env_time_skipping_disabled_v2():
             start = monotonic()
             with env.with_time_skipping_disabled():
                 handle = await env.client.start_workflow(
-                    ShortSleepWorkflow.run,
+                    SleepWorkflow.run,
+                    3.0,
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
                 )
-            assert "all done" == await handle.result()
+            assert (await handle.result()) is not None
             assert monotonic() - start > 2.5
             # Don't call assert_time_was_skipped(), since it didn't
             # get a chance to emit that.
@@ -137,10 +140,11 @@ async def test_workflow_env_time_skipping_basic_via_update_v2():
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,
     ) as env:
-        async with new_worker(env.client, ReallySlowWorkflow) as worker:
+        async with new_worker(env.client, SleepWorkflow) as worker:
             with env.with_time_skipping_disabled():
                 handle = await env.client.start_workflow(
-                    ReallySlowWorkflow.run,
+                    SleepWorkflow.run,
+                    100000.0,
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
                 )
@@ -149,8 +153,8 @@ async def test_workflow_env_time_skipping_basic_via_update_v2():
             # the workflow terminates before a ``disabled_after_fast_forward``
             # transition can fire (there's no target).
             assert not await env.fast_forward(handle, None)
-            assert "all done" == await handle.result()
+            assert (await handle.result()) is not None
             assert_timestamp_from_now(
-                await handle.query(ReallySlowWorkflow.current_time), 100000
+                await handle.query(SleepWorkflow.current_time), 100000
             )
             await assert_time_was_skipped(handle)

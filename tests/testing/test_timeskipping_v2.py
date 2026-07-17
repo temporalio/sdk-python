@@ -30,6 +30,7 @@ from tests.helpers.time_skipping import (
     assert_time_was_not_skipped,
     assert_time_was_skipped,
 )
+from tests.testing.test_workflow import SleepWorkflow
 
 
 @pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
@@ -195,31 +196,6 @@ async def test_multi_fast_forward_accumulation(env: WorkflowEnvironment) -> None
 
         assert await handle.result() == "done"
         await assert_time_was_skipped(handle)
-
-
-@workflow.defn
-class SleepWorkflow:
-    """Sleeps a parameterized duration. Returns the virtual clock at start and end.
-
-    ``tick`` signal + ``current_time`` query exist so external callers can
-    force a non-query WFT and read ``workflow.now()`` mid-run. Used both as
-    a standalone workflow and as a child of ``ParentTimeSkippingWorkflow``.
-    """
-
-    @workflow.run
-    async def run(self, sleep_seconds: float) -> dict[str, float]:
-        t_start = workflow.now().timestamp()
-        await workflow.sleep(timedelta(seconds=sleep_seconds))
-        t_end = workflow.now().timestamp()
-        return {"start": t_start, "end": t_end}
-
-    @workflow.signal
-    def tick(self) -> None:
-        pass
-
-    @workflow.query
-    def current_time(self) -> float:
-        return workflow.now().timestamp()
 
 
 async def test_partial_fast_forward_then_unbounded(
