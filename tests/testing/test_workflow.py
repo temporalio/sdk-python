@@ -38,8 +38,8 @@ from tests.helpers import new_worker
 class SleepWorkflow:
     """Sleeps a parameterized duration. Returns the virtual clock at start and end.
 
-    ``tick`` signal + ``current_time`` query exist so external callers can
-    force a non-query WFT and read ``workflow.now()`` mid-run.
+    The `tick` signal is a non-query WFT that is causes `workflow.now` to have the
+    correct value.
     """
 
     @workflow.run

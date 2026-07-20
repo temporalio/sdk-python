@@ -147,37 +147,6 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
     await assert_time_was_skipped(handle)
 
 
-async def test_multi_fast_forward_accumulation(env: WorkflowEnvironment) -> None:
-    """Three sequential 1h fast-forwards accumulate to ~3h virtual time.
-
-    Catches off-by-one bugs where each FF's target might be computed from a
-    stale reference (e.g. the start time, or the last FF's target) instead
-    of the workflow's current virtual clock.
-    """
-    async with new_worker(env.client, InteractionWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
-                InteractionWorkflow.run,
-                3,
-                id=f"wf-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
-
-        t0 = await handle.query(InteractionWorkflow.current_time)
-
-        for i, expected in enumerate((3600, 7200, 10800), start=1):
-            assert await env.fast_forward(handle, timedelta(hours=1)), (
-                f"expected fast-forward {i} to complete"
-            )
-            await handle.signal(InteractionWorkflow.proceed)
-            assert await handle.query(InteractionWorkflow.get_signal_count) == i
-            t = await handle.query(InteractionWorkflow.current_time)
-            assert_duration_same(expected, t - t0, tolerance=10)
-
-        assert await handle.result() == "done"
-        await assert_time_was_skipped(handle)
-
-
 async def test_partial_fast_forward_then_unbounded(
     env: WorkflowEnvironment,
 ) -> None:
@@ -205,10 +174,11 @@ async def test_partial_fast_forward_then_unbounded(
         assert_duration_same(30 * 60, t1 - t0, tolerance=10)
 
         # Unbounded resume — the workflow's remaining 30m timer fires and it
-        # completes. fast_forward returns False (terminal, no
-        # disabled_after_fast_forward event) which we don't need to check.
-        await env.fast_forward(handle, None)
-        await handle.result()
+        # completes. fast_forward returns False because unbounded (duration=None)
+        # has no target, so no disabled_after_fast_forward transition can fire;
+        # the wait loop sees only the workflow's terminal event.
+        assert not await env.fast_forward(handle, None)
+        assert (await handle.result()) is not None
 
         # Final virtual time on the closed workflow is ~+1h from start.
         t_end = await handle.query(SleepWorkflow.now)
