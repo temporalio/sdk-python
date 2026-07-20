@@ -1,11 +1,4 @@
-"""Time-skipping tests adapted to run against a per-workflow-TS-capable server.
-
-These mirror the ``env.start_time_skipping()`` tests in ``test_workflow.py``
-that have a meaningful per-workflow analog. Each spawns a per-test
-v2-enabled ``WorkflowEnvironment`` and uses ``env.fast_forward`` and
-``env.with_time_skipping_disabled`` instead of the Java test server's
-env-level sleep / clock / disable APIs.
-"""
+"""Ports of time-skipping tests in testing/test_workflow.py"""
 
 import uuid
 from datetime import timedelta
@@ -27,12 +20,7 @@ _TS_EXTRA_ARGS = [
 
 
 async def test_workflow_env_time_skipping_basic_v2():
-    """Per-workflow auto-skip drives the 100,000s sleep to completion.
-
-    The Java original asserts on ``env.get_current_time()`` — v2 has no
-    env-level clock, so we assert on the workflow's own virtual clock via
-    its existing ``current_time`` query.
-    """
+    """Time-skip a very long sleep."""
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,
@@ -45,8 +33,6 @@ async def test_workflow_env_time_skipping_basic_v2():
                 task_queue=worker.task_queue,
             )
             assert (await handle.result()) is not None
-            # Closed-workflow query: returns workflow.now() as of the final
-            # workflow task, which is ~100,000s after start.
             assert_timestamp_from_now(
                 await handle.query(SleepWorkflow.now), 100000
             )
@@ -54,12 +40,7 @@ async def test_workflow_env_time_skipping_basic_v2():
 
 
 async def test_workflow_env_time_skipping_manual_v2():
-    """One-shot fast-forward of 1000s, asserted against the workflow's clock.
-
-    The Java original advances the env clock via ``env.sleep(1000)``; the
-    per-workflow equivalent is a ``env.fast_forward`` that auto-disables
-    skipping once it completes.
-    """
+    """Start a very long sleep, then fast forward the first 1000s."""
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,
@@ -89,12 +70,7 @@ async def test_workflow_env_time_skipping_manual_v2():
 
 
 async def test_workflow_env_time_skipping_disabled_v2():
-    """With and without per-workflow auto-skip, same workflow timing.
-
-    Maps onto the Java ``env.auto_time_skipping_disabled()`` toggle: use
-    ``env.with_time_skipping_disabled()`` to start a workflow without
-    TS stamping.
-    """
+    """With and without per-workflow auto-skip."""
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,
@@ -124,18 +100,12 @@ async def test_workflow_env_time_skipping_disabled_v2():
                 )
             assert (await handle.result()) is not None
             assert monotonic() - start > 2.5
-            # Don't call assert_time_was_skipped(), since it didn't
-            # get a chance to emit that.
+            await assert_time_was_not_skipped(handle)
 
 
 async def test_workflow_env_time_skipping_basic_via_update_v2():
-    """Start TS-off, turn on via update, workflow's 100,000s sleep auto-skips.
-
-    Parallel to :py:func:`test_workflow_env_time_skipping_basic_v2` but
-    exercises the ``UpdateWorkflowExecutionOptions`` path: the workflow
-    starts with no ``time_skipping_config`` and is switched on mid-flight
-    via ``env.fast_forward(handle, None)`` (unbounded resume).
-    """
+    """Start a very long sleep with time skipping off, then enable it
+    and run to completion."""
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=_TS_EXTRA_ARGS,

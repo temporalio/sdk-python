@@ -189,14 +189,7 @@ async def test_partial_fast_forward_then_unbounded(
 
 @workflow.defn
 class ParentTimeSkippingWorkflow:
-    """1h sleep, spawn child (parameterized sleep), 1h sleep.
-
-    All three waits auto-skip when TS is on for both parent and child. The
-    parent's virtual clock only advances during its own waits, though —
-    waiting for the child does not skip the parent's clock forward to match
-    the child's end time. TS propagates forward at spawn but not backward
-    at completion.
-    """
+    """Parent 1h + child 1h + parent 1h all auto-skip; child inherits TS from parent."""
 
     @workflow.run
     async def run(
@@ -212,7 +205,7 @@ class ParentTimeSkippingWorkflow:
             id=child_id,
             task_queue=task_queue,
         )
-        parent_after_child = workflow.now().timestamp()
+        parent_after_child_start = workflow.now().timestamp()
 
         await workflow.sleep(timedelta(hours=1))
         parent_end = workflow.now().timestamp()
@@ -220,7 +213,7 @@ class ParentTimeSkippingWorkflow:
         return {
             "parent_start": parent_start,
             "parent_after_wait_1": parent_after_wait_1,
-            "parent_after_child": parent_after_child,
+            "parent_after_child_start": parent_after_child_start,
             "parent_end": parent_end,
             "child_start": child_times["start"],
             "child_end": child_times["end"],
@@ -260,7 +253,7 @@ async def test_child_workflow_propagates_time_skipping(
         3600, result["child_end"] - result["child_start"], tolerance=10
     )
     assert_duration_same(
-        3600, result["parent_end"] - result["parent_after_child"], tolerance=10
+        3600, result["parent_end"] - result["parent_after_child_start"], tolerance=10
     )
 
     # Forward propagation: child's clock at start matches parent's clock at spawn.
@@ -270,7 +263,7 @@ async def test_child_workflow_propagates_time_skipping(
     # Parent's clock does not advance while child is running (no backward
     # propagation from child at completion).
     assert_duration_same(
-        0, result["parent_after_child"] - result["parent_after_wait_1"], tolerance=5
+        0, result["parent_after_child_start"] - result["parent_after_wait_1"], tolerance=5
     )
 
     # TS engaged on both workflows.
@@ -282,7 +275,7 @@ async def test_child_workflow_propagates_time_skipping(
 async def test_child_workflow_with_propagation_disabled() -> None:
     """With ``disable_propagation=True`` on the env, child does NOT inherit TS
     and runs in real time."""
-    
+
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
@@ -320,14 +313,10 @@ async def test_child_workflow_with_propagation_disabled() -> None:
 
 
 async def test_timeskipper_wrapping_local_env_client() -> None:
-    """Start a plain local server, wrap its client with a TimeSkipper, run a workflow.
-
-    Exercises the public ``TimeSkipper(client)`` entry point directly:
-    no ``ts_config`` on the env, so ``env.client`` has no TS interceptor,
-    but the ``TimeSkipper`` instance we build ourselves provides one.
-    Workflows started via ``skipper.client`` should get TS stamped and
-    the server should skip their idle time.
+    """Test timeskipping through direct use of a TimeSkipper, instead of
+    indirectly through the time skipping v2 test env.
     """
+
     async with await WorkflowEnvironment.start_local(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
@@ -363,13 +352,8 @@ async def test_fast_forward_returns_false_when_workflow_terminates_first(
     env: WorkflowEnvironment,
 ) -> None:
     """Workflow's own 1h timer fires before FF's 2h target → FF returns False.
-
-    Exercises the False-return branch of
-    ``_wait_for_fast_forward_completed``: the FF's update RPC lands while
-    the workflow is still alive, then the workflow's timer fires and
-    terminates it before the FF reaches its target, so the wait loop sees
-    a terminal event before any ``disabled_after_fast_forward`` transition.
     """
+
     async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
