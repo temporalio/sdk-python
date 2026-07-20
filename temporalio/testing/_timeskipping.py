@@ -131,6 +131,11 @@ class TimeSkipper:
         """
         if duration is not None and not isinstance(duration, timedelta):
             duration = timedelta(seconds=duration)
+        # Capture the most recent transition event's id before we issue this
+        # FF. The wait loop will only consider transition events with a
+        # higher event_id, ensuring we don't spuriously return True from a
+        # transition left in history by a previous FF on the same workflow.
+        latest_transition_event_id = await self._latest_transition_event_id(handle)
         await self._update_time_skipping_config(
             handle,
             TimeSkippingConfig(
@@ -139,7 +144,9 @@ class TimeSkipper:
                 disable_propagation=self._config.disable_propagation,
             ),
         )
-        return await self._wait_for_fast_forward_completed(handle)
+        return await self._wait_for_fast_forward_completed(
+            handle, latest_transition_event_id
+        )
 
     async def set_disable_propagation(
         self,
@@ -161,19 +168,48 @@ class TimeSkipper:
             ),
         )
 
+    async def _latest_transition_event_id(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any],
+    ) -> int:
+        """Return the event_id of the most recent time-skipping transition event.
+
+        Returns 0 if the workflow has no such events yet.
+        """
+        latest = 0
+        async for event in handle.fetch_history_events():
+            if (
+                event.event_type
+                == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED
+            ):
+                latest = event.event_id
+        return latest
+
     async def _wait_for_fast_forward_completed(
         self,
         handle: temporalio.client.WorkflowHandle[Any, Any],
+        last_transition_event_id: int = 0,
     ) -> bool:
         """Wait for a ``disabled_after_fast_forward`` transition event.
 
-        Returns True on the transition; False if the workflow terminates first.
+        Args:
+            handle: Target workflow execution.
+            last_transition_event_id: Ignore transition events with an
+                ``event_id`` at or below this value — they belong to earlier
+                FFs on this workflow and shouldn't be treated as this FF's
+                completion.
+
+        Returns:
+            True on a fresh ``disabled_after_fast_forward`` transition;
+            False if the workflow terminates first.
         """
         async for event in handle.fetch_history_events(wait_new_event=True):
             if (
                 event.event_type
                 == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED
             ):
+                if event.event_id <= last_transition_event_id:
+                    continue
                 attrs = (
                     event.workflow_execution_time_skipping_transitioned_event_attributes
                 )
