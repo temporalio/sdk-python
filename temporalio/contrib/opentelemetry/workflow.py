@@ -30,7 +30,7 @@ def completed_span(
     span and this interceptor is configured on the worker and the span is on
     the context).
 
-    To create a long-running span or to create a span that actually spans other code use OpenTelemetryPlugin and tracer().
+    To create a long-running span or to create a span that actually spans other code use OpenTelemetryPlugin and opentelemetry.trace.get_tracer().
 
     Args:
         name: Name of the span.

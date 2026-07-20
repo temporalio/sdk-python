@@ -18,7 +18,7 @@ class OpenTelemetryPlugin(SimplePlugin):
     It uses the new OpenTelemetryInterceptor implementation.
 
     Unlike the prior TracingInterceptor, this allows for accurate duration spans and parenting inside a workflow
-    with temporalio.contrib.opentelemetry.workflow.tracer()
+    using opentelemetry.trace.get_tracer() directly.
 
     Your tracer provider should be created with `create_tracer_provider` for it to be used within a Temporal worker.
     """
