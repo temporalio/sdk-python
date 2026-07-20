@@ -1,17 +1,4 @@
-"""Tests for per-workflow time skipping via the test env API.
-
-Two usage patterns are exercised:
-
-- **Basic**: default env (TS enabled) allows waits to auto-skip until completion.
-- **Interactive**: fast-forward by a duration; when that fast-forward
-  completes, signal or update the workflow, then resume — either with
-  another fast-forward duration, or with no argument to let time skipping
-  forward idle time until completion.
-
-In either case, time skipping only happens when there is no in-flight work,
-so even when a fast-forward is set, a workflow with no idle time can simply
-run to completion.
-"""
+"""Tests for per-workflow time skipping via the v2 test env."""
 
 import asyncio
 import uuid
@@ -47,16 +34,6 @@ async def env() -> AsyncGenerator[WorkflowEnvironment, None]:
 
 
 @workflow.defn
-class SingleTimerWorkflow:
-    @workflow.run
-    async def run(self) -> float:
-        """Sleep 1h of virtual time and return the elapsed virtual seconds."""
-        start = workflow.now()
-        await workflow.sleep(timedelta(hours=1))
-        return (workflow.now() - start).total_seconds()
-
-
-@workflow.defn
 class InteractionWorkflow:
     """Completes after receiving ``required_signals`` ``proceed`` signals; otherwise waits up to 10h."""
 
@@ -86,10 +63,11 @@ class InteractionWorkflow:
 
 async def test_skip_full_run(env: WorkflowEnvironment) -> None:
     """Enable time skipping, let workflow run to completion."""
-    async with new_worker(env.client, SingleTimerWorkflow) as worker:
+    async with new_worker(env.client, SleepWorkflow) as worker:
         wall_start = monotonic()
         handle = await env.client.start_workflow(
-            SingleTimerWorkflow.run,
+            SleepWorkflow.run,
+            3600.0,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -97,8 +75,9 @@ async def test_skip_full_run(env: WorkflowEnvironment) -> None:
         wall_elapsed = monotonic() - wall_start
 
     # Virtual time advanced by ~1h even though wall time was just a few seconds.
-    assert result >= 3600, (
-        f"virtual elapsed was {result}s; expected >= 3600s (timer did not fire fully)"
+    virtual_elapsed = result["end"] - result["start"]
+    assert virtual_elapsed >= 3600, (
+        f"virtual elapsed was {virtual_elapsed}s; expected >= 3600s (timer did not fire fully)"
     )
     # 1-hour timer should be auto-skipped in well under 3s of wall time.
     assert wall_elapsed < 3, (
@@ -111,10 +90,11 @@ async def test_with_time_skipping_disabled(
     env: WorkflowEnvironment,
 ) -> None:
     """Without time skipping, the 1h timer does not complete in 3s."""
-    async with new_worker(env.client, SingleTimerWorkflow) as worker:
+    async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
-                SingleTimerWorkflow.run,
+                SleepWorkflow.run,
+                3600.0,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
