@@ -109,6 +109,7 @@ def wrap_activity(
 def wrap_execute_activity(
     afunc: Callable[[ActivityInput], Awaitable[ActivityOutput]],
     task_id: str = "",
+    summary_fn: Callable[[tuple[Any, ...], dict[str, Any]], str | None] | None = None,
     **execute_activity_kwargs: Any,
 ) -> Callable[..., Any]:
     """Wrap an activity function to be called via workflow.execute_activity with caching."""
@@ -156,9 +157,15 @@ def wrap_execute_activity(
         input = ActivityInput(
             args=args, kwargs=kwargs, langgraph_config=langgraph_config
         )
-        output = await workflow.execute_activity(
-            afunc, input, **execute_activity_kwargs
-        )
+        # Compute a dynamic activity summary (if configured) on the schedule
+        # path only; a cache hit above returns before reaching here, so no
+        # activity is scheduled and no summary is needed.
+        call_kwargs = dict(execute_activity_kwargs)
+        if summary_fn is not None:
+            summary = summary_fn(args, kwargs)
+            if summary:
+                call_kwargs["summary"] = summary
+        output = await workflow.execute_activity(afunc, input, **call_kwargs)
         if output.langgraph_interrupts is not None:
             raise GraphInterrupt(output.langgraph_interrupts)
 

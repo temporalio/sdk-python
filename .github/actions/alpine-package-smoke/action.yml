@@ -1,0 +1,72 @@
+name: Alpine package smoke test
+description: Install a local or published temporalio package in Alpine and run a minimal SDK workflow.
+inputs:
+  wheel-dir:
+    description: "Directory containing local wheel files to install"
+    required: false
+    default: ""
+  version:
+    description: "Published package version to install and verify"
+    required: false
+    default: ""
+  index-url:
+    description: "Primary package index URL for published package installs"
+    required: false
+    default: ""
+  dependency-index-url:
+    description: "Optional dependency package index URL for published package installs"
+    required: false
+    default: ""
+  python-image:
+    description: "Alpine Python Docker image"
+    required: false
+    default: "python:3.10-alpine"
+runs:
+  using: composite
+  steps:
+    - name: Install package and run SDK smoke test
+      shell: bash
+      env:
+        WHEEL_DIR: ${{ inputs.wheel-dir }}
+        VERSION: ${{ inputs.version }}
+        INDEX_URL: ${{ inputs.index-url }}
+        DEPENDENCY_INDEX_URL: ${{ inputs.dependency-index-url }}
+        PYTHON_IMAGE: ${{ inputs.python-image }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "$WHEEL_DIR" && ( -z "$VERSION" || -z "$INDEX_URL" ) ]]; then
+          echo "Either wheel-dir or both version and index-url must be provided" >&2
+          exit 1
+        fi
+
+        docker run --rm -v "$(pwd):/workspace" -w /tmp \
+          -e WHEEL_DIR="$WHEEL_DIR" \
+          -e VERSION="$VERSION" \
+          -e INDEX_URL="$INDEX_URL" \
+          -e DEPENDENCY_INDEX_URL="$DEPENDENCY_INDEX_URL" \
+          "$PYTHON_IMAGE" sh -c '
+            set -eu
+            python -m venv /tmp/alpine-smoke
+            /tmp/alpine-smoke/bin/python -m pip install --upgrade pip
+
+            if [ -n "$WHEEL_DIR" ]; then
+              /tmp/alpine-smoke/bin/python -m pip install --prefer-binary /workspace/$WHEEL_DIR/*.whl
+            elif [ -n "$DEPENDENCY_INDEX_URL" ]; then
+              /tmp/alpine-smoke/bin/python /workspace/.github/scripts/install_release_package.py \
+                --version "$VERSION" \
+                --index-url "$INDEX_URL" \
+                --dependency-index-url "$DEPENDENCY_INDEX_URL"
+            else
+              /tmp/alpine-smoke/bin/python /workspace/.github/scripts/install_release_package.py \
+                --version "$VERSION" \
+                --index-url "$INDEX_URL"
+            fi
+
+            if [ -z "$VERSION" ]; then
+              VERSION=$(/tmp/alpine-smoke/bin/python -c "import importlib.metadata; print(importlib.metadata.version(\"temporalio\"))")
+              export VERSION
+            fi
+
+            /tmp/alpine-smoke/bin/python /workspace/.github/scripts/release_smoke_package.py
+          '
