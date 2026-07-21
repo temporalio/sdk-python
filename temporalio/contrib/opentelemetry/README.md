@@ -68,7 +68,7 @@ worker = Worker(
 - **Accurate Duration Spans**: Workflow spans have real durations reflecting actual execution time
 - **Direct OpenTelemetry Usage**: Use `opentelemetry.trace.get_tracer()` directly within workflows
 - **Better Span Hierarchy**: More accurate parent-child relationships within workflows
-- **Workflow Context Access**: Access spans within workflows using `temporalio.contrib.opentelemetry.workflow.tracer()`
+- **Workflow Context Access**: Access spans within workflows using `opentelemetry.trace.get_tracer()`
 
 #### ⚠️ Considerations:
 - **Experimental Status**: Subject to breaking changes in future versions
