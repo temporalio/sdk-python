@@ -58,6 +58,7 @@ class WorkerConfig:
     nexus_task_poller_behavior: PollerBehavior
     plugins: Sequence[str]
     storage_drivers: set[str]
+    disable_payload_error_limit: bool
 
 
 @dataclass
@@ -284,10 +285,8 @@ class _Visitor(VisitorFunctions):
     def __init__(
         self,
         f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
-        visit_system_nexus_envelope: Callable[[Payload], Awaitable[None]] | None = None,
     ):
         self._f = f
-        self._visit_system_nexus_envelope = visit_system_nexus_envelope
 
     async def visit_payload(self, payload: Payload) -> None:
         new_payload = (await self._f([payload]))[0]
@@ -302,10 +301,6 @@ class _Visitor(VisitorFunctions):
             return
         del payloads[:]
         payloads.extend(new_payloads)
-
-    async def visit_system_nexus_envelope(self, payload: Payload) -> None:
-        if self._visit_system_nexus_envelope is not None:
-            await self._visit_system_nexus_envelope(payload)
 
 
 async def decode_activation(
@@ -348,27 +343,13 @@ async def encode_completion(
     Returns:
         Metrics from any external storage store operations that occurred.
     """
-
-    async def _validate_system_nexus_envelope(payload: Payload) -> None:
-        data_converter._validate_payload_limits([payload])
-
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True,
         skip_headers=not encode_headers,
     ).visit(
-        _Visitor(
-            data_converter._encode_payload_sequence,
-            visit_system_nexus_envelope=_validate_system_nexus_envelope,
-        ),
+        _Visitor(data_converter._encode_payload_sequence),
         completion,
     )
-
-    async def _store_and_validate(
-        payloads: Sequence[Payload],
-    ) -> list[Payload]:
-        stored = await data_converter._external_store_payload_sequence(payloads)
-        data_converter._validate_payload_limits(stored)
-        return stored
 
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
@@ -377,10 +358,7 @@ async def encode_completion(
             skip_headers=not encode_headers,
             concurrency_limit=storage_concurrency_limit,
         ).visit(
-            _Visitor(
-                _store_and_validate,
-                visit_system_nexus_envelope=_validate_system_nexus_envelope,
-            ),
+            _Visitor(data_converter._external_store_payload_sequence),
             completion,
         )
 

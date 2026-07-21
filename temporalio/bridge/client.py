@@ -82,6 +82,8 @@ class ClientConfig:
     http_connect_proxy_config: ClientHttpConnectProxyConfig | None
     dns_load_balancing_config: ClientDnsLoadBalancingConfig | None
     grpc_compression: str
+    payloads_warn_size: int
+    memo_warn_size: int
 
 
 @dataclass

@@ -180,6 +180,7 @@ class TelemetryFilter:
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
         targets = [
+            "temporalio_common",
             "temporalio_sdk_core",
             "temporalio_client",
             "temporalio_sdk",

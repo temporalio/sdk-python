@@ -308,6 +308,7 @@ class Replayer:
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
                     no_remote_activities=True,
+                    disable_payload_error_limit=True,
                     task_types=temporalio.bridge.worker.WorkerTaskTypes(
                         enable_workflows=True,
                         enable_local_activities=False,
@@ -340,7 +341,7 @@ class Replayer:
             bridge_worker_scope = bridge_worker
 
             # Start worker
-            workflow_worker_task = asyncio.create_task(workflow_worker.run(None))
+            workflow_worker_task = asyncio.create_task(workflow_worker.run())
 
             # Yield iterator
             async def replay_iterator() -> AsyncIterator[WorkflowReplayResult]:

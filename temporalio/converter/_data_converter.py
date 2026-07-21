@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from logging import getLogger
@@ -29,12 +28,6 @@ from temporalio.converter._payload_codec import (
 )
 from temporalio.converter._payload_converter import (
     PayloadConverter,
-)
-from temporalio.converter._payload_limits import (
-    PayloadLimitsConfig,
-    PayloadSizeWarning,
-    _PayloadSizeError,
-    _ServerPayloadErrorLimits,
 )
 from temporalio.converter._serialization_context import (
     SerializationContext,
@@ -86,9 +79,6 @@ class DataConverter(WithSerializationContext):
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""
 
-    payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
-    """Settings for payload size limits."""
-
     external_storage: ExternalStorage | None = None
     """Options for external storage. If None, external storage is disabled.
         
@@ -98,9 +88,6 @@ class DataConverter(WithSerializationContext):
 
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
-
-    _payload_error_limits: _ServerPayloadErrorLimits | None = None
-    """Server-reported limits for payloads."""
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
@@ -124,7 +111,6 @@ class DataConverter(WithSerializationContext):
         payloads = self.payload_converter.to_payloads(values)
         payloads = await self._encode_payload_sequence(payloads)
         payloads = await self._external_store_payload_sequence(payloads)
-        self._validate_payload_limits(payloads)
         return payloads
 
     async def decode(
@@ -230,11 +216,6 @@ class DataConverter(WithSerializationContext):
         """Return an instance with both serialization and store contexts applied."""
         return self.with_context(serialization_ctx)._with_store_context(store_ctx)
 
-    def _with_payload_error_limits(
-        self, limits: _ServerPayloadErrorLimits | None
-    ) -> DataConverter:
-        return dataclasses.replace(self, _payload_error_limits=limits)
-
     async def _decode_memo(
         self,
         source: temporalio.api.common.v1.Memo,
@@ -273,16 +254,6 @@ class DataConverter(WithSerializationContext):
             if not isinstance(v, temporalio.api.common.v1.Payload):
                 payload = (await self.encode([v]))[0]
             memo.fields[k].CopyFrom(payload)
-        # Memos have their field payloads validated all together in one unit
-        DataConverter._validate_limits(
-            list(memo.fields.values()),
-            self._payload_error_limits.memo_size_error
-            if self._payload_error_limits
-            else None,
-            "[TMPRL1103] Attempted to upload memo with size that exceeded the error limit.",
-            self.payload_limits.memo_size_warning,
-            "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit.",
-        )
 
     async def _transform_outbound_payload(
         self, payload: temporalio.api.common.v1.Payload
@@ -291,7 +262,6 @@ class DataConverter(WithSerializationContext):
             payload = (await self.payload_codec.encode([payload]))[0]
         if self.external_storage:
             payload = await self.external_storage._store_payload(payload)
-        self._validate_payload_limits([payload])
         return payload
 
     async def _transform_outbound_payloads(
@@ -301,7 +271,6 @@ class DataConverter(WithSerializationContext):
             await self.payload_codec.encode_wrapper(payloads)
         if self.external_storage:
             await self.external_storage._store_payloads(payloads)
-        self._validate_payload_limits(payloads.payloads)
 
     async def _transform_inbound_payload(
         self, payload: temporalio.api.common.v1.Payload
@@ -375,42 +344,6 @@ class DataConverter(WithSerializationContext):
     @property
     def _decode_payload_has_effect(self) -> bool:
         return self.payload_codec is not None or self.external_storage is not None
-
-    def _validate_payload_limits(
-        self,
-        payloads: Sequence[temporalio.api.common.v1.Payload],
-    ):
-        DataConverter._validate_limits(
-            payloads,
-            self._payload_error_limits.payload_size_error
-            if self._payload_error_limits
-            else None,
-            "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit.",
-            self.payload_limits.payload_size_warning,
-            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit.",
-        )
-
-    @staticmethod
-    def _validate_limits(
-        payloads: Sequence[temporalio.api.common.v1.Payload],
-        error_limit: int | None,
-        error_message: str,
-        warning_limit: int,
-        warning_message: str,
-    ):
-        total_size = sum(payload.ByteSize() for payload in payloads)
-
-        if error_limit and error_limit > 0 and total_size > error_limit:
-            raise _PayloadSizeError(
-                f"{error_message} Size: {total_size} bytes, Limit: {error_limit} bytes"
-            )
-
-        if warning_limit > 0 and total_size > warning_limit:
-            # TODO: Use a context aware logger to log extra information about workflow/activity/etc
-            warnings.warn(
-                f"{warning_message} Size: {total_size} bytes, Limit: {warning_limit} bytes",
-                PayloadSizeWarning,
-            )
 
 
 def default() -> DataConverter:

@@ -192,6 +192,20 @@ GrpcCompression.NONE = _NoGrpcCompression()
 GrpcCompression.GZIP = _GzipGrpcCompression()
 
 
+@dataclass(frozen=True)
+class PayloadLimitsConfig:
+    """Warning thresholds for outbound payload/memo sizes."""
+
+    # Defaults mirror the Temporal server's `limit.blobSize.warn` (512 KiB) and `limit.memoSize.warn`
+    # (2 KiB) dynamic-config defaults, so the SDK warns at the same sizes the server would.
+    payloads_warn_size: int = 512 * 1024
+    """Warning threshold, in bytes, for the size of an outbound payload-bearing field. Set to 0 to
+    disable."""
+
+    memo_warn_size: int = 2 * 1024
+    """Warning threshold, in bytes, for outbound memo size. Set to 0 to disable."""
+
+
 @dataclass
 class ConnectConfig:
     """Config for connecting to the server."""
@@ -208,6 +222,7 @@ class ConnectConfig:
     http_connect_proxy_config: HttpConnectProxyConfig | None = None
     dns_load_balancing_config: DnsLoadBalancingConfig | None = None
     grpc_compression: GrpcCompression = GrpcCompression.GZIP
+    payload_limits: PayloadLimitsConfig = field(default_factory=PayloadLimitsConfig)
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -271,6 +286,8 @@ class ConnectConfig:
                 else None
             ),
             grpc_compression=self.grpc_compression._to_bridge_config(),
+            payloads_warn_size=self.payload_limits.payloads_warn_size,
+            memo_warn_size=self.payload_limits.memo_warn_size,
         )
 
 
