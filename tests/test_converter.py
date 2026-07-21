@@ -38,12 +38,14 @@ from temporalio.converter import (
     BinaryProtoPayloadConverter,
     CompositePayloadConverter,
     DataConverter,
+    DataModelConverter,
     DefaultFailureConverterWithEncodedAttributes,
     DefaultPayloadConverter,
     JSONPlainPayloadConverter,
     JSONTypeConverter,
     JSONTypeConverterUnhandled,
     PayloadCodec,
+    data_model_convertible,
     decode_search_attributes,
     encode_search_attribute_values,
     value_to_type,
@@ -256,21 +258,65 @@ def test_binary_proto():
 
 
 @dataclass
-class TemporalIntermediateModel:
+class TemporalDataModelValue:
     value: str
 
-    @classmethod
-    def _temporal_from_data_model(
-        cls,
-        data_model: temporalio.api.common.v1.WorkflowExecution,
-    ) -> TemporalIntermediateModel:
-        return cls(value=data_model.workflow_id)
 
-    def _temporal_to_data_model(self) -> temporalio.api.common.v1.WorkflowExecution:
+class TemporalDataModelValueConverter(
+    DataModelConverter[
+        TemporalDataModelValue,
+        temporalio.api.common.v1.WorkflowExecution,
+    ]
+):
+    data_model_type = temporalio.api.common.v1.WorkflowExecution
+
+    def to_data_model(
+        self, value: TemporalDataModelValue
+    ) -> temporalio.api.common.v1.WorkflowExecution:
         return temporalio.api.common.v1.WorkflowExecution(
-            workflow_id=self.value,
+            workflow_id=value.value,
             run_id="run-id",
         )
+
+    def from_data_model(
+        self,
+        value: temporalio.api.common.v1.WorkflowExecution,
+    ) -> TemporalDataModelValue:
+        return TemporalDataModelValue(value=value.workflow_id)
+
+
+@dataclass
+class TemporalDataModelValueWithoutHint:
+    value: str
+
+
+data_model_convertible(TemporalDataModelValueConverter())(TemporalDataModelValue)
+
+
+class TemporalDataModelValueWithoutHintConverter(
+    DataModelConverter[
+        TemporalDataModelValueWithoutHint,
+        temporalio.api.common.v1.WorkflowExecution,
+    ]
+):
+    def to_data_model(
+        self, value: TemporalDataModelValueWithoutHint
+    ) -> temporalio.api.common.v1.WorkflowExecution:
+        return temporalio.api.common.v1.WorkflowExecution(
+            workflow_id=value.value,
+            run_id="run-id",
+        )
+
+    def from_data_model(
+        self,
+        value: temporalio.api.common.v1.WorkflowExecution,
+    ) -> TemporalDataModelValueWithoutHint:
+        return TemporalDataModelValueWithoutHint(value=value.workflow_id)
+
+
+data_model_convertible(TemporalDataModelValueWithoutHintConverter())(
+    TemporalDataModelValueWithoutHint
+)
 
 
 class CustomDefaultPayloadConverter(DefaultPayloadConverter):
@@ -283,7 +329,7 @@ def test_temporal_data_model_payload_converter_wraps_user_converter():
     )
     converter = data_converter.payload_converter
     assert isinstance(converter, _TemporalDataModelPayloadConverter)
-    value = TemporalIntermediateModel("workflow-id")
+    value = TemporalDataModelValue("workflow-id")
 
     payload = converter.to_payload(value)
 
@@ -293,12 +339,32 @@ def test_temporal_data_model_payload_converter_wraps_user_converter():
     )
     assert all("temporal-wire" not in key for key in payload.metadata)
     assert all(b"temporal-wire" not in value for value in payload.metadata.values())
-    assert converter.from_payload(payload, TemporalIntermediateModel) == value
+    assert converter.from_payload(payload, TemporalDataModelValue) == value
 
     plain_proto_payload = converter.to_payload(
         temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
     )
     assert plain_proto_payload.metadata["encoding"] == b"json/protobuf"
+
+
+def test_temporal_data_model_payload_converter_without_data_model_type():
+    converter = DataConverter.default.payload_converter
+    value = TemporalDataModelValueWithoutHint("workflow-id")
+
+    payload = converter.to_payload(value)
+
+    assert payload.metadata["encoding"] == b"json/protobuf"
+    assert (
+        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
+    )
+    assert converter.from_payload(payload, TemporalDataModelValueWithoutHint) == value
+
+
+def test_data_model_convertible_rejects_existing_converter():
+    with pytest.raises(TypeError, match="already has a data model converter"):
+        data_model_convertible(TemporalDataModelValueConverter())(
+            TemporalDataModelValue
+        )
 
 
 def test_encode_search_attribute_values():

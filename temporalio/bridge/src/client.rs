@@ -2,6 +2,7 @@ use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 use temporalio_client::tonic::{
     self,
@@ -11,6 +12,14 @@ use temporalio_client::{
     ClientKeepAliveOptions as CoreClientKeepAliveConfig, Connection, ConnectionOptions,
     DnsLoadBalancingOptions, GrpcCompression, HttpConnectProxyOptions, RetryOptions,
 };
+use tokio_rustls::rustls::client::danger::{
+    HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
+};
+use tokio_rustls::rustls::client::WebPkiServerVerifier;
+use tokio_rustls::rustls::crypto::CryptoProvider;
+use tokio_rustls::rustls::pki_types::pem::PemObject;
+use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use tokio_rustls::rustls::{self, DigitallySignedStruct, RootCertStore, SignatureScheme};
 use tracing::warn;
 use url::Url;
 
@@ -48,6 +57,7 @@ struct ClientTlsConfig {
     domain: Option<String>,
     client_cert: Option<Vec<u8>>,
     client_private_key: Option<Vec<u8>>,
+    verification_server_name: Option<String>,
 }
 
 #[derive(FromPyObject)]
@@ -301,8 +311,22 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
     type Error = PyErr;
 
     fn try_from(conf: ClientTlsConfig) -> PyResult<Self> {
+        let mut server_root_ca_cert = conf.server_root_ca_cert;
+        let server_cert_verifier = match conf.verification_server_name {
+            None => None,
+            Some(name) => {
+                // The CA bundle is consumed by the verifier's own root store; a
+                // custom verifier cannot be combined with roots on the connection.
+                let ca_cert = server_root_ca_cert.take().ok_or_else(|| {
+                    PyValueError::new_err(
+                        "Must have server root CA cert when verification server name is set",
+                    )
+                })?;
+                Some(fixed_server_name_verifier(&name, &ca_cert)?)
+            }
+        };
         Ok(temporalio_client::TlsOptions {
-            server_root_ca_cert: conf.server_root_ca_cert,
+            server_root_ca_cert,
             domain: conf.domain,
             client_tls_options: match (conf.client_cert, conf.client_private_key) {
                 (None, None) => None,
@@ -318,8 +342,89 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
                     ))
                 }
             },
-            server_cert_verifier: None,
+            server_cert_verifier,
         })
+    }
+}
+
+/// Builds a standard WebPKI verifier over the given root CA bundle that
+/// checks the certificate against `verification_server_name` rather than the
+/// connection's server name, leaving SNI/`:authority` to follow the
+/// connected host (or `domain` when set).
+fn fixed_server_name_verifier(
+    verification_server_name: &str,
+    ca_cert_pem: &[u8],
+) -> PyResult<Arc<dyn ServerCertVerifier>> {
+    let certs = CertificateDer::pem_slice_iter(ca_cert_pem)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| {
+            PyValueError::new_err(format!("Invalid server root CA cert PEM: {err:?}"))
+        })?;
+    // Root loading and provider selection mirror tonic's default (no custom
+    // verifier) client path: unparsable certificates in the bundle are
+    // skipped, and the provider is the process default if one is installed,
+    // else ring, as with the connection's `tls-ring` feature.
+    let mut roots = RootCertStore::empty();
+    roots.add_parsable_certificates(certs);
+    let provider = CryptoProvider::get_default()
+        .cloned()
+        .unwrap_or_else(|| Arc::new(rustls::crypto::ring::default_provider()));
+    let inner = WebPkiServerVerifier::builder_with_provider(roots.into(), provider)
+        .build()
+        .map_err(|err| {
+            PyValueError::new_err(format!("Failed building certificate verifier: {err}"))
+        })?;
+    let server_name = ServerName::try_from(verification_server_name.to_owned())
+        .map_err(|err| PyValueError::new_err(format!("Invalid verification server name: {err}")))?;
+    Ok(Arc::new(FixedServerNameVerifier { inner, server_name }))
+}
+
+/// Delegates to the standard WebPKI verifier, but verifies the certificate
+/// against a fixed server name instead of the connection's server name.
+#[derive(Debug)]
+struct FixedServerNameVerifier {
+    inner: Arc<WebPkiServerVerifier>,
+    server_name: ServerName<'static>,
+}
+
+impl ServerCertVerifier for FixedServerNameVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        ocsp_response: &[u8],
+        now: UnixTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
+        self.inner.verify_server_cert(
+            end_entity,
+            intermediates,
+            &self.server_name,
+            ocsp_response,
+            now,
+        )
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        self.inner.verify_tls12_signature(message, cert, dss)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, rustls::Error> {
+        self.inner.verify_tls13_signature(message, cert, dss)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.inner.supported_verify_schemes()
     }
 }
 

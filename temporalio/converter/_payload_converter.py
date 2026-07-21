@@ -21,6 +21,7 @@ from types import UnionType
 from typing import (
     Any,
     ClassVar,
+    Generic,
     Literal,
     NewType,
     TypeVar,
@@ -51,6 +52,69 @@ from temporalio.converter._serialization_context import (
 )
 
 _sym_db = google.protobuf.symbol_database.Default()
+ValueT = TypeVar("ValueT")
+DataModelT = TypeVar("DataModelT")
+_DATA_MODEL_CONVERTER_ATTR = "__temporal_data_model_converter"
+
+
+class DataModelConverter(Generic[ValueT, DataModelT], ABC):
+    """Converter between a user-facing value and a data model value.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    data_model_type: type[DataModelT] | None = None
+    """Optional data model type hint to use when decoding payloads.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    @abstractmethod
+    def to_data_model(self, value: ValueT) -> DataModelT:
+        """Convert a user-facing value to its data model value.
+
+        .. warning::
+            This API is experimental and subject to change.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def from_data_model(self, value: DataModelT) -> ValueT:
+        """Convert a data model value to its user-facing value.
+
+        .. warning::
+            This API is experimental and subject to change.
+        """
+        raise NotImplementedError
+
+
+def data_model_convertible(
+    converter: DataModelConverter[ValueT, DataModelT],
+) -> Callable[[type[ValueT]], type[ValueT]]:
+    """Decorate a class with a data model converter.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    def decorator(cls: type[ValueT]) -> type[ValueT]:
+        if hasattr(cls, _DATA_MODEL_CONVERTER_ATTR):
+            raise TypeError("class already has a data model converter")
+        setattr(cls, _DATA_MODEL_CONVERTER_ATTR, converter)
+        return cls
+
+    return decorator
+
+
+def _get_data_model_converter(
+    value_type: object,
+) -> DataModelConverter[Any, Any] | None:
+    converter = getattr(value_type, _DATA_MODEL_CONVERTER_ATTR, None)
+    if isinstance(converter, DataModelConverter):
+        return converter
+    return None
 
 
 class PayloadConverter(ABC):
@@ -515,13 +579,13 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
 
 
 class _TemporalDataModelPayloadConverter(PayloadConverter, WithSerializationContext):
-    """Payload converter wrapper for generated Temporal data model hooks.
+    """Payload converter wrapper for registered Temporal data model converters.
 
-    Values with a ``_temporal_to_data_model`` method are first converted to
-    their data model value, then encoded by the wrapped payload converter. When
-    decoding to a type with ``_temporal_from_data_model``, the wrapped
-    converter first decodes the payload to the data model value and this
-    wrapper constructs the requested user-facing type from it.
+    Values with a registered data model converter are first converted to their
+    data model value, then encoded by the wrapped payload converter. When
+    decoding to a type with a registered data model converter, the wrapped
+    converter first decodes the payload to the data model value and this wrapper
+    constructs the requested user-facing type from it.
     """
 
     _inner_payload_converter: PayloadConverter
@@ -543,9 +607,9 @@ class _TemporalDataModelPayloadConverter(PayloadConverter, WithSerializationCont
         """See base class."""
         data_model_values: list[Any] = []
         for value in values:
-            to_data_model = getattr(value, "_temporal_to_data_model", None)
-            if to_data_model is not None:
-                value = to_data_model()
+            converter = _get_data_model_converter(type(value))
+            if converter is not None:
+                value = converter.to_data_model(value)
             data_model_values.append(value)
         return self._inner_payload_converter.to_payloads(data_model_values)
 
@@ -557,26 +621,17 @@ class _TemporalDataModelPayloadConverter(PayloadConverter, WithSerializationCont
         """See base class."""
         if type_hints is None:
             return self._inner_payload_converter.from_payloads(payloads, None)
-        normalized_type_hints: list[type | None] = list(type_hints)
-        if len(normalized_type_hints) < len(payloads):
-            normalized_type_hints.extend([None] * (len(payloads) - len(type_hints)))
+        converters = [_get_data_model_converter(type_hint) for type_hint in type_hints]
         inner_type_hints = [
-            None
-            if getattr(type_hint, "_temporal_from_data_model", None) is not None
-            else type_hint
-            for type_hint in normalized_type_hints
+            converter.data_model_type if converter is not None else type_hint
+            for converter, type_hint in zip(converters, type_hints)
         ]
         values = self._inner_payload_converter.from_payloads(
             payloads, typing.cast("list[type]", inner_type_hints)
         )
         return [
-            from_data_model(value)
-            if (
-                from_data_model := getattr(type_hint, "_temporal_from_data_model", None)
-            )
-            is not None
-            else value
-            for value, type_hint in zip(values, normalized_type_hints)
+            converter.from_data_model(value) if converter is not None else value
+            for value, converter in zip(values, converters)
         ]
 
     def with_context(self, context: SerializationContext) -> Self:

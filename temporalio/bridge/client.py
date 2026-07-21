@@ -27,6 +27,7 @@ class ClientTlsConfig:
     domain: str | None
     client_cert: bytes | None
     client_private_key: bytes | None
+    verification_server_name: str | None
 
 
 @dataclass

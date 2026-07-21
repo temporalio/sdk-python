@@ -1,4 +1,8 @@
-"""System Nexus operation helpers."""
+"""System Nexus operation helpers.
+
+.. warning::
+    This API is experimental and subject to change.
+"""
 
 from __future__ import annotations
 
@@ -47,7 +51,7 @@ class _SystemNexusOuterPayloadConverter(CompositePayloadConverter):
         super().__init__(BinaryProtoPayloadConverter())
 
 
-class SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
+class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
     """Payload converter for system Nexus outer envelopes."""
 
     _user_payload_converter: temporalio.converter.PayloadConverter
@@ -80,11 +84,15 @@ class SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
 
 
 def is_system_endpoint(endpoint: str) -> bool:
-    """Return whether a Nexus endpoint is the Temporal system endpoint."""
+    """Return whether a Nexus endpoint is the Temporal system endpoint.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
     return endpoint == TEMPORAL_SYSTEM_ENDPOINT
 
 
-async def maybe_visit_payload(
+async def _maybe_visit_payload(  # pyright: ignore[reportUnusedFunction]
     endpoint: str,
     payload: temporalio.api.common.v1.Payload,
     visitor_functions: VisitorFunctions,
@@ -104,17 +112,14 @@ async def maybe_visit_payload(
     return payload_converter.to_payload(value)
 
 
-def get_payload_converter(
+def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
     user_payload_converter: temporalio.converter.PayloadConverter,
 ) -> temporalio.converter.PayloadConverter:
     """Return the fixed payload converter for system Nexus outer envelopes."""
-    return SystemNexusPayloadConverter(user_payload_converter)
+    return _SystemNexusPayloadConverter(user_payload_converter)
 
 
 __all__ = [
     "TEMPORAL_SYSTEM_ENDPOINT",
-    "get_payload_converter",
     "is_system_endpoint",
-    "maybe_visit_payload",
-    "SystemNexusPayloadConverter",
 ]

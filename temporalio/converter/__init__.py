@@ -26,6 +26,7 @@ from temporalio.converter._payload_converter import (
     BinaryPlainPayloadConverter,
     BinaryProtoPayloadConverter,
     CompositePayloadConverter,
+    DataModelConverter,
     DefaultPayloadConverter,
     EncodingPayloadConverter,
     JSONPlainPayloadConverter,
@@ -33,6 +34,7 @@ from temporalio.converter._payload_converter import (
     JSONTypeConverter,
     JSONTypeConverterUnhandled,
     PayloadConverter,
+    data_model_convertible,
     value_to_type,
 )
 from temporalio.converter._search_attributes import (
@@ -64,6 +66,7 @@ __all__ = [
     "BinaryPlainPayloadConverter",
     "BinaryProtoPayloadConverter",
     "CompositePayloadConverter",
+    "DataModelConverter",
     "DataConverter",
     "DefaultFailureConverter",
     "DefaultFailureConverterWithEncodedAttributes",
@@ -79,6 +82,7 @@ __all__ = [
     "SerializationContext",
     "WithSerializationContext",
     "WorkflowSerializationContext",
+    "data_model_convertible",
     "decode_search_attributes",
     "decode_typed_search_attributes",
     "default",

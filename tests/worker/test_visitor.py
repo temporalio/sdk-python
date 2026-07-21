@@ -357,7 +357,7 @@ async def test_system_nexus_envelope_visit_is_bounded():
             finally:
                 active_visits -= 1
 
-    payload_converter = nexus_system.get_payload_converter(
+    payload_converter = nexus_system._get_payload_converter(
         temporalio.converter.PayloadConverter.default
     )
     system_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest(
