@@ -35,6 +35,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Breaking Changes
 
+- Payload size limits have moved from `DataConverter` to `Client.connect`. Pass
+  `payload_limits=PayloadLimitsConfig(...)` (now exported from
+  `temporalio.client`) instead of setting `payload_limits` on `DataConverter`.
+  Config fields were renamed to `payloads_warn_size` and `memo_warn_size`, and
+  the deprecated `PayloadSizeWarning` was removed.
+
 ### Fixed
 
 ### Security

@@ -31,7 +31,7 @@ def _user_payload_converter_context(
         _user_payload_converter.reset(token)
 
 
-def _current_user_payload_converter() -> temporalio.converter.PayloadConverter:
+def _current_user_payload_converter() -> temporalio.converter.PayloadConverter:  # pyright: ignore[reportUnusedFunction]
     """Return the active user payload converter for system Nexus model conversion."""
     payload_converter = _user_payload_converter.get()
     if payload_converter is None:

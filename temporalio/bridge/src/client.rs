@@ -38,6 +38,8 @@ pub struct ClientConfig {
     http_connect_proxy_config: Option<ClientHttpConnectProxyConfig>,
     dns_load_balancing_config: Option<ClientDnsLoadBalancingConfig>,
     grpc_compression: String,
+    payloads_warn_size: u64,
+    memo_warn_size: u64,
 }
 
 #[derive(FromPyObject)]
@@ -268,6 +270,10 @@ impl ClientConfig {
         .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
         .dns_load_balancing(dns_load_balancing)
         .grpc_compression(grpc_compression_from_str(&self.grpc_compression)?)
+        .payload_limits(temporalio_client::PayloadLimitsOptions {
+            payloads_warn_size: self.payloads_warn_size,
+            memo_warn_size: self.memo_warn_size,
+        })
         .headers(ascii_headers)
         .binary_headers(binary_headers)
         .maybe_api_key(self.api_key)

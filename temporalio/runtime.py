@@ -180,6 +180,7 @@ class TelemetryFilter:
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
         targets = [
+            "temporalio_common",
             "temporalio_sdk_core",
             "temporalio_client",
             "temporalio_sdk",
@@ -335,6 +336,10 @@ class OpenTelemetryConfig:
             When enabled, the ``url`` should point to the HTTP endpoint
             (e.g. ``"http://localhost:4318/v1/metrics"``).
             Defaults to ``False`` (gRPC).
+        histogram_bucket_overrides: Override the default histogram bucket
+            boundaries for specific metrics. Keys are metric names and
+            values are sequences of bucket boundaries (e.g.
+            ``{"workflow_task_schedule_to_start_latency": [0.01, 0.05, 0.1, 0.5, 1.0, 5.0]}``).
     """
 
     url: str
@@ -345,6 +350,7 @@ class OpenTelemetryConfig:
     )
     durations_as_seconds: bool = False
     http: bool = False
+    histogram_bucket_overrides: Mapping[str, Sequence[float]] | None = None
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.OpenTelemetryConfig:
         return temporalio.bridge.runtime.OpenTelemetryConfig(
@@ -360,6 +366,7 @@ class OpenTelemetryConfig:
             ),
             durations_as_seconds=self.durations_as_seconds,
             http=self.http,
+            histogram_bucket_overrides=self.histogram_bucket_overrides,
         )
 
 

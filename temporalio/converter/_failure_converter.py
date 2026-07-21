@@ -17,7 +17,6 @@ import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 import temporalio.exceptions
 from temporalio.converter._payload_converter import PayloadConverter
-from temporalio.converter._payload_limits import _PayloadSizeError
 
 logger = getLogger("temporalio.converter")
 
@@ -108,9 +107,7 @@ class DefaultFailureConverter(FailureConverter):
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
                 str(exception),
-                type="PayloadSizeError"
-                if isinstance(exception, _PayloadSizeError)
-                else exception.__class__.__name__,
+                type=exception.__class__.__name__,
             )
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__

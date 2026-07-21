@@ -86,6 +86,17 @@ logger = logging.getLogger(__name__)
 LOG_IGNORE_DURING_DELETE = False
 
 
+async def _shield_await(fut: asyncio.Future[Any]) -> Any:
+    """Await a future without cancelling it if the awaiting task is cancelled.
+
+    This behaves like ``asyncio.shield(fut)`` but avoids the spurious
+    "exception in shielded future" error log on Python 3.11+ when the
+    awaiting task is cancelled and the future eventually fails.
+    """
+    await asyncio.wait([fut])
+    return fut.result()
+
+
 class WorkflowRunner(ABC):
     """Abstract runner for workflows that creates workflow instances to run.
 
@@ -1927,9 +1938,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # be marked as unstarted
                 handle._started = True
                 try:
-                    # We have to shield because we don't want the underlying
-                    # result future to be cancelled
-                    return await asyncio.shield(handle._result_fut)
+                    # We use _shield_await instead of asyncio.shield to prevent
+                    # the underlying result future from being cancelled while avoiding
+                    # a spurious error log on Python 3.11+ (see issue #1600).
+                    return await _shield_await(handle._result_fut)
                 except _ActivityDoBackoffError as err:
                     # We have to sleep then reschedule. Note this sleep can be
                     # cancelled like any other timer.
@@ -2043,9 +2055,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def run_child() -> Any:
             while True:
                 try:
-                    # We have to shield because we don't want the future itself
-                    # to be cancelled
-                    return await asyncio.shield(handle._result_fut)
+                    # We use _shield_await instead of asyncio.shield to prevent
+                    # the future itself from being cancelled while avoiding a
+                    # spurious error log on Python 3.11+ (see issue #1600).
+                    return await _shield_await(handle._result_fut)
                 except asyncio.CancelledError as err:
                     apply_child_cancel_error(err)
                     # Clear the cancellation counter on Python 3.11+ so the
@@ -2066,9 +2079,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Wait on start before returning
         while True:
             try:
-                # We have to shield because we don't want the future itself
-                # to be cancelled
-                await asyncio.shield(handle._start_fut)
+                # We use _shield_await instead of asyncio.shield to prevent
+                # the future itself from being cancelled while avoiding a
+                # spurious error log on Python 3.11+ (see issue #1600).
+                await _shield_await(handle._start_fut)
                 return handle
             except asyncio.CancelledError as err:
                 apply_child_cancel_error(err)
@@ -2103,7 +2117,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def operation_handle_fn() -> OutputT:
             while True:
                 try:
-                    return cast(OutputT, await asyncio.shield(handle._result_fut))
+                    return cast(OutputT, await _shield_await(handle._result_fut))
                 except asyncio.CancelledError:
                     cancel_command = self._add_command()
                     handle._apply_cancel_command(cancel_command)
@@ -2134,7 +2148,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         while True:
             try:
-                await asyncio.shield(handle._start_fut)
+                # We use _shield_await instead of asyncio.shield to prevent
+                # the future itself from being cancelled while avoiding a
+                # spurious error log on Python 3.11+ (see issue #1600).
+                await _shield_await(handle._start_fut)
                 return handle
             except asyncio.CancelledError:
                 cancel_command = self._add_command()
@@ -2673,9 +2690,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Wait until completed or cancelled
         while True:
             try:
-                # We have to shield because we don't want the future itself
-                # to be cancelled
-                return await asyncio.shield(done_fut)
+                # We use _shield_await instead of asyncio.shield to prevent
+                # the future itself from being cancelled while avoiding a
+                # spurious error log on Python 3.11+ (see issue #1600).
+                return await _shield_await(done_fut)
             except asyncio.CancelledError:
                 cancel_command = self._add_command()
                 cancel_command.cancel_signal_workflow.seq = seq
