@@ -4,9 +4,12 @@ import asyncio
 import concurrent.futures
 import multiprocessing
 import multiprocessing.context
+import os
 import uuid
+from collections.abc import Awaitable, Callable, Sequence
+from contextlib import contextmanager
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional, Sequence
+from typing import Any
 from urllib.request import urlopen
 
 import nexusrpc
@@ -19,16 +22,14 @@ from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
     DescribeWorkerDeploymentRequest,
     DescribeWorkerDeploymentResponse,
-    ListWorkersRequest,
     SetWorkerDeploymentCurrentVersionRequest,
     SetWorkerDeploymentCurrentVersionResponse,
     SetWorkerDeploymentRampingVersionRequest,
     SetWorkerDeploymentRampingVersionResponse,
 )
 from temporalio.client import (
-    BuildIdOpAddNewDefault,
     Client,
-    TaskReachabilityType,
+    WorkflowHandle,
 )
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import (
@@ -58,15 +59,15 @@ from temporalio.worker import (
     WorkerTuner,
     WorkflowSlotInfo,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from temporalio.workflow import DynamicWorkflowConfig, VersioningIntent
 from tests.helpers import (
     assert_eventually,
     find_free_port,
     new_worker,
-    worker_versioning_enabled,
 )
 from tests.helpers.fork import _ForkTestResult, _TestFork
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 def test_load_default_worker_binary_id():
@@ -86,6 +87,16 @@ class NeverRunWorkflow:
     @workflow.run
     async def run(self) -> None:
         raise NotImplementedError
+
+
+@workflow.defn
+class TestClientUpdateWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            "capture_client_activity",
+            start_to_close_timeout=timedelta(seconds=10),
+        )
 
 
 @nexusrpc.handler.service_handler
@@ -170,7 +181,7 @@ async def test_worker_fatal_error_with(client: Client):
 
 
 async def test_worker_fatal_error_callback(client: Client):
-    callback_err: Optional[BaseException] = None
+    callback_err: BaseException | None = None
 
     async def on_fatal_error(exc: BaseException) -> None:
         nonlocal callback_err
@@ -238,7 +249,7 @@ async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
     assert str(err.value).startswith("Worker validation failed")
 
 
-async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnvironment):
+async def test_can_run_resource_based_worker(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -261,7 +272,7 @@ async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnviro
         await wf1.result()
 
 
-async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvironment):
+async def test_can_run_composite_tuner_worker(client: Client):
     resource_based_options = ResourceBasedTunerConfig(0.5, 0.5)
     tuner = WorkerTuner.create_composite(
         workflow_supplier=FixedSizeSlotSupplier(5),
@@ -298,9 +309,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
         await wf1.result()
 
 
-async def test_cant_specify_max_concurrent_and_tuner(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_cant_specify_max_concurrent_and_tuner(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -319,7 +328,7 @@ async def test_cant_specify_max_concurrent_and_tuner(
     assert "when also specifying tuner" in str(err.value)
 
 
-async def test_warns_when_workers_too_low(client: Client, env: WorkflowEnvironment):
+async def test_warns_when_workers_too_low(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -417,7 +426,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             self.reserves += 1
             return MyPermit(self.reserves)
 
-        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             self.reserve_asserts(ctx)
             return None
 
@@ -473,7 +482,8 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         tuner=tuner,
         identity="myworker",
     ) as w:
-        await create_nexus_endpoint(w.task_queue, client)
+        endpoint_name = make_nexus_endpoint_name(w.task_queue)
+        await env.create_nexus_endpoint(endpoint_name, w.task_queue)
         wf1 = await client.start_workflow(
             CustomSlotSupplierWorkflow.run,
             id=f"custom-slot-supplier-{uuid.uuid4()}",
@@ -502,7 +512,7 @@ class SimpleWorkflow:
         return "hi"
 
 
-async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
+async def test_throwing_slot_supplier(client: Client):
     """Ensures a (mostly) broken slot supplier doesn't hose everything up"""
 
     class ThrowingSlotSupplier(CustomSlotSupplier):
@@ -514,7 +524,7 @@ async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
                 return SlotPermit()
             raise ValueError("I always throw")
 
-        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             raise ValueError("I always throw")
 
         def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
@@ -545,7 +555,7 @@ async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
         await wf1.result()
 
 
-async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
+async def test_blocking_slot_supplier(client: Client):
     class BlockingSlotSupplier(CustomSlotSupplier):
         marked_used = False
 
@@ -553,7 +563,7 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
             await asyncio.get_event_loop().create_future()
             raise ValueError("Should be unreachable")
 
-        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             return None
 
         def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
@@ -577,6 +587,95 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
         tuner=tuner,
     ) as _w:
         await asyncio.sleep(1)
+
+
+@activity.defn
+async def heartbeating_activity(beats: int) -> None:
+    for i in range(beats):
+        activity.heartbeat(i)
+        await asyncio.sleep(0)
+
+
+@workflow.defn
+class HeartbeatingFanOutWorkflow:
+    @workflow.run
+    async def run(self, total: int, beats: int, window: int) -> None:
+        in_flight = asyncio.Semaphore(window)
+
+        async def run_one() -> None:
+            async with in_flight:
+                await workflow.execute_activity(
+                    heartbeating_activity,
+                    beats,
+                    start_to_close_timeout=timedelta(minutes=1),
+                    heartbeat_timeout=timedelta(seconds=30),
+                )
+
+        await asyncio.gather(*(run_one() for _ in range(total)))
+
+
+async def test_custom_slot_supplier_with_heartbeating_activities(client: Client):
+    """Regression test for the GIL <-> core-mutex deadlock (#1642).
+
+    Any custom slot supplier plus heartbeating activities used to wedge the
+    worker permanently: the heartbeat FFI held the GIL while blocking on
+    core's outstanding-activity lock, while an activity task start invoked
+    mark_slot_used (which acquires the GIL) under that same lock. The
+    supplier below is deliberately trivial - the deadlock was in the calling
+    convention, not in what the callbacks do.
+
+    NOTE: on regression this test HANGS rather than fails - the deadlock
+    freezes the event loop, so no in-process timeout (including the
+    wait_for below) can fire, and only a CI-level job timeout kills it.
+    """
+
+    class CappedSlotSupplier(CustomSlotSupplier):
+        def __init__(self, max_slots: int) -> None:
+            self.max_slots = max_slots
+            self.used = 0
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            while True:
+                permit = self.try_reserve_slot(ctx)
+                if permit is not None:
+                    return permit
+                await asyncio.sleep(0.005)
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
+            # Called with the GIL held, so no extra lock is needed
+            if self.used >= self.max_slots:
+                return None
+            self.used += 1
+            return SlotPermit()
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            return None
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            self.used = max(0, self.used - 1)
+
+    fixed = FixedSizeSlotSupplier(100)
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=fixed,
+        # A small cap keeps activity starts (and thus mark_slot_used calls)
+        # churning against the heartbeat FFI
+        activity_supplier=CappedSlotSupplier(8),
+        local_activity_supplier=fixed,
+        nexus_supplier=fixed,
+    )
+    async with new_worker(
+        client,
+        HeartbeatingFanOutWorkflow,
+        activities=[heartbeating_activity],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            HeartbeatingFanOutWorkflow.run,
+            args=[600, 50, 150],
+            id=f"heartbeating-slot-supplier-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await asyncio.wait_for(wf1.result(), timeout=120)
 
 
 @workflow.defn(
@@ -827,7 +926,7 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
 @workflow.defn(dynamic=True, versioning_behavior=VersioningBehavior.PINNED)
 class DynamicWorkflowVersioningOnDefn:
     @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> str:
+    async def run(self, _args: Sequence[RawValue]) -> str:
         return "dynamic"
 
 
@@ -840,7 +939,7 @@ class DynamicWorkflowVersioningOnConfigMethod:
         )
 
     @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> str:
+    async def run(self, _args: Sequence[RawValue]) -> str:
         return "dynamic"
 
 
@@ -921,12 +1020,12 @@ class NoVersioningAnnotationWorkflow:
 @workflow.defn(dynamic=True)
 class NoVersioningAnnotationDynamicWorkflow:
     @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> str:
+    async def run(self, _args: Sequence[RawValue]) -> str:
         return "whee"
 
 
 async def test_workflows_must_have_versioning_behavior_when_feature_turned_on(
-    client: Client, env: WorkflowEnvironment
+    client: Client,
 ):
     with pytest.raises(ValueError) as exc_info:
         Worker(
@@ -1001,6 +1100,63 @@ async def test_workflows_can_use_default_versioning_behavior(
         )
 
 
+async def test_worker_deployment_config_without_versioning(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    build_id = "my-custom-build-id-1.0"
+    deployment_name = f"deployment-no-versioning-{uuid.uuid4()}"
+
+    async with new_worker(
+        client,
+        NoVersioningAnnotationWorkflow,
+        deployment_config=WorkerDeploymentConfig(
+            version=WorkerDeploymentVersion(
+                deployment_name=deployment_name, build_id=build_id
+            ),
+            use_worker_versioning=False,
+        ),
+    ) as worker:
+        handle = await client.start_workflow(
+            NoVersioningAnnotationWorkflow.run,
+            id=f"no-versioning-build-id-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "whee"
+
+        history = await handle.fetch_history()
+        assert any(
+            event.workflow_task_completed_event_attributes
+            and event.workflow_task_completed_event_attributes.worker_version
+            and event.workflow_task_completed_event_attributes.worker_version.build_id
+            == build_id
+            for event in history.events
+        ), "Expected build ID to appear in workflow history"
+
+
+async def test_deployment_config_rejects_versioning_behavior_without_versioning(
+    client: Client,
+):
+    with pytest.raises(
+        ValueError, match="default_versioning_behavior must be UNSPECIFIED"
+    ):
+        Worker(
+            client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            workflows=[NoVersioningAnnotationWorkflow],
+            deployment_config=WorkerDeploymentConfig(
+                version=WorkerDeploymentVersion(
+                    deployment_name="whatever", build_id="1.0"
+                ),
+                use_worker_versioning=False,
+                default_versioning_behavior=VersioningBehavior.AUTO_UPGRADE,
+            ),
+        )
+
+
 async def test_workflows_can_use_versioning_override(
     client: Client, env: WorkflowEnvironment
 ):
@@ -1050,9 +1206,7 @@ async def test_workflows_can_use_versioning_override(
         )
 
 
-async def test_can_run_autoscaling_polling_worker(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_can_run_autoscaling_polling_worker(client: Client):
     # Create new runtime with Prom server
     prom_addr = f"127.0.0.1:{find_free_port()}"
     runtime = Runtime(
@@ -1158,9 +1312,57 @@ async def set_ramping_version(
     return response
 
 
+async def wait_for_worker_deployment_routing_config_propagation(
+    client: Client,
+    deployment_name: str,
+    expected_current_build_id: str,
+    expected_ramping_build_id: str = "",
+) -> None:
+    """Wait for routing config to be propagated to all task queues."""
+    import temporalio.api.enums.v1
+
+    async def check() -> bool:
+        resp = await client.workflow_service.describe_worker_deployment(
+            DescribeWorkerDeploymentRequest(
+                namespace=client.namespace,
+                deployment_name=deployment_name,
+            )
+        )
+        routing_config = resp.worker_deployment_info.routing_config
+        if (
+            routing_config.current_deployment_version.build_id
+            != expected_current_build_id
+        ):
+            return False
+        if (
+            routing_config.ramping_deployment_version.build_id
+            != expected_ramping_build_id
+        ):
+            return False
+        state = resp.worker_deployment_info.routing_config_update_state
+        if (
+            state
+            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+        ):
+            return True
+        if (
+            state
+            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+        ):
+            return True  # unimplemented
+        if (
+            state
+            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+        ):
+            return False
+        return False
+
+    await assert_eventually(check)
+
+
 def create_worker(
     client: Client,
-    on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,
+    on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
 ) -> Worker:
     return Worker(
         client,
@@ -1192,8 +1394,8 @@ class PollFailureInjector:
         self.poll_fail_queue: asyncio.Queue[Exception] = asyncio.Queue()
         self.orig_poll_call = getattr(worker._bridge_worker, attr)
         setattr(worker._bridge_worker, attr, self.patched_poll_call)
-        self.next_poll_task: Optional[asyncio.Task] = None
-        self.next_exception_task: Optional[asyncio.Task] = None
+        self.next_poll_task: asyncio.Task | None = None
+        self.next_exception_task: asyncio.Task | None = None
 
     async def patched_poll_call(self) -> Any:
         if not self.next_poll_task:
@@ -1227,7 +1429,7 @@ class PollFailureInjector:
 
 class TestForkCreateWorker(_TestFork):
     async def coro(self):
-        self._worker = Worker(
+        self._worker = Worker(  # type:ignore[reportUninitializedInstanceVariable]
             self._client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             activities=[never_run_activity],
@@ -1241,7 +1443,7 @@ class TestForkCreateWorker(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create worker across forks"
         )
-        self._client = client
+        self._client = client  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)
 
 
@@ -1255,7 +1457,7 @@ class TestForkUseWorker(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use worker across forks"
         )
-        self._pre_fork_worker = Worker(
+        self._pre_fork_worker = Worker(  # type:ignore[reportUninitializedInstanceVariable]
             client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             activities=[never_run_activity],
@@ -1263,3 +1465,334 @@ class TestForkUseWorker(_TestFork):
             nexus_service_handlers=[],
         )
         self.run(mp_fork_ctx)
+
+
+async def test_activity_client_updates_when_worker_client_changes(client: Client):
+    """Test that activities get the updated client when worker.client is changed."""
+    # Create a second client (simulating a new client after cert rotation)
+    # Must use the same runtime
+    client2 = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        data_converter=client.data_converter,
+        runtime=client.service_client.config.runtime,
+    )
+
+    captured_clients: list[Client] = []
+
+    @activity.defn
+    async def capture_client_activity() -> None:
+        captured_clients.append(activity.client())
+
+    # Create worker with activities
+    worker = Worker(
+        client,
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        activities=[capture_client_activity],
+        workflows=[TestClientUpdateWorkflow],
+    )
+
+    async with worker:
+        # Execute activity with original client
+        await client.execute_workflow(
+            TestClientUpdateWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Update worker's client
+        worker.client = client2
+
+        # Execute activity again - should get the new client
+        await client2.execute_workflow(
+            TestClientUpdateWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Should have captured both clients
+    assert len(captured_clients) == 2
+    assert captured_clients[0] is client
+    assert captured_clients[1] is client2  # This will fail before the fix
+
+
+@workflow.defn(
+    name="ContinueAsNewWithVersionUpgrade",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithVersionUpgradeV1:
+    @workflow.run
+    async def run(self, attempt: int) -> str:
+        if attempt > 0:
+            return "v1.0"
+
+        # Loop waiting for CAN suggestion with version changed
+        while True:
+            # Trigger a WFT when timer expires, thereby refreshing the continue-as-new-suggested flag
+            await asyncio.sleep(0.01)
+            info = workflow.info()
+            if info.is_target_worker_deployment_version_changed():
+                workflow.continue_as_new(
+                    arg=attempt + 1,
+                    initial_versioning_behavior=workflow.ContinueAsNewVersioningBehavior.AUTO_UPGRADE,
+                )
+
+
+@workflow.defn(
+    name="ContinueAsNewWithVersionUpgrade",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithVersionUpgradeV2:
+    @workflow.run
+    async def run(self, attempt: int) -> str:  # type:ignore[reportUnusedParameter]
+        return "v2.0"
+
+
+@workflow.defn(
+    name="ContinueAsNewWithRampingVersion",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithRampingVersionV1:
+    def __init__(self) -> None:
+        self._should_continue_as_new = False
+
+    @workflow.run
+    async def run(self, attempt: int) -> str:
+        if attempt > 0:
+            return "v1.0"
+
+        await workflow.wait_condition(lambda: self._should_continue_as_new)
+        workflow.continue_as_new(
+            arg=attempt + 1,
+            initial_versioning_behavior=workflow.ContinueAsNewVersioningBehavior.USE_RAMPING_VERSION,
+        )
+
+    @workflow.signal
+    def do_continue_as_new(self) -> None:
+        self._should_continue_as_new = True
+
+
+@workflow.defn(
+    name="ContinueAsNewWithRampingVersion",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithRampingVersionV2:
+    @workflow.run
+    async def run(self, attempt: int) -> str:  # type:ignore[reportUnusedParameter]
+        return "v2.0"
+
+
+async def wait_for_workflow_running_on_version(
+    handle: WorkflowHandle[Any, Any], expected_build_id: str
+) -> None:
+    """Wait until workflow is RUNNING with expected build ID."""
+
+    async def check() -> bool:
+        desc = await handle.describe()
+        if (
+            desc.status
+            != temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING
+        ):
+            return False
+        versioning_info = desc.raw_description.workflow_execution_info.versioning_info
+        if not versioning_info.HasField("deployment_version"):
+            return False
+        return versioning_info.deployment_version.build_id == expected_build_id
+
+    await assert_eventually(check)
+
+
+async def test_continue_as_new_with_version_upgrade(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"deployment-can-upgrade-{uuid.uuid4()}"
+    v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+    v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
+
+    async with (
+        new_worker(
+            client,
+            ContinueAsNewWithVersionUpgradeV1,
+            deployment_config=WorkerDeploymentConfig(
+                version=v1,
+                use_worker_versioning=True,
+            ),
+        ) as w1,
+        new_worker(
+            client,
+            ContinueAsNewWithVersionUpgradeV2,
+            deployment_config=WorkerDeploymentConfig(
+                version=v2,
+                use_worker_versioning=True,
+            ),
+            task_queue=w1.task_queue,
+        ),
+    ):
+        # Wait for the deployment to be ready
+        describe_resp = await wait_until_worker_deployment_visible(client, v1)
+
+        # Set version 1.0 as current
+        resp2 = await set_current_deployment_version(
+            client, describe_resp.conflict_token, v1
+        )
+
+        # Wait for v1.0-as-Current routing config to be propagated
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id
+        )
+
+        # Start workflow with v1 as current
+        handle = await client.start_workflow(
+            "ContinueAsNewWithVersionUpgrade",
+            0,
+            id=f"test-can-version-upgrade-{uuid.uuid4()}",
+            task_queue=w1.task_queue,
+        )
+
+        # Wait for workflow to complete one WFT on v1.0
+        await wait_for_workflow_running_on_version(handle, v1.build_id)
+
+        # Wait for version 2.0 to be ready
+        await wait_until_worker_deployment_visible(client, v2)
+
+        # Set version 2.0 as current
+        await set_current_deployment_version(client, resp2.conflict_token, v2)
+
+        # Wait for v2.0-as-Current routing config to be propagated
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v2.build_id
+        )
+
+        # Expect workflow to return "v2.0", indicating that it continued-as-new and completed on v2
+        result = await handle.result()
+        assert result == "v2.0"
+
+
+async def test_continue_as_new_with_ramping_version(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"deployment-can-ramping-{uuid.uuid4()}"
+    v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+    v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
+
+    async with (
+        new_worker(
+            client,
+            ContinueAsNewWithRampingVersionV1,
+            deployment_config=WorkerDeploymentConfig(
+                version=v1,
+                use_worker_versioning=True,
+            ),
+        ) as w1,
+        new_worker(
+            client,
+            ContinueAsNewWithRampingVersionV2,
+            deployment_config=WorkerDeploymentConfig(
+                version=v2,
+                use_worker_versioning=True,
+            ),
+            task_queue=w1.task_queue,
+        ),
+    ):
+        describe_resp = await wait_until_worker_deployment_visible(client, v1)
+
+        resp2 = await set_current_deployment_version(
+            client, describe_resp.conflict_token, v1
+        )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id
+        )
+
+        handle = await client.start_workflow(
+            "ContinueAsNewWithRampingVersion",
+            0,
+            id=f"test-can-ramping-version-{uuid.uuid4()}",
+            task_queue=w1.task_queue,
+        )
+        await wait_for_workflow_running_on_version(handle, v1.build_id)
+
+        await wait_until_worker_deployment_visible(client, v2)
+        await set_ramping_version(client, resp2.conflict_token, v2, 0)
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id
+        )
+
+        await handle.signal(ContinueAsNewWithRampingVersionV1.do_continue_as_new)
+
+        result = await handle.result()
+        assert result == "v2.0"
+
+
+def test_worker_config_matches_init_params():
+    """WorkerConfig TypedDict keys must match Worker.__init__ kwargs."""
+    import inspect
+
+    from temporalio.worker import Worker, WorkerConfig
+
+    init_params = set(inspect.signature(Worker.__init__).parameters.keys()) - {"self"}
+    config_keys = set(WorkerConfig.__annotations__.keys())
+    assert config_keys == init_params, (
+        f"WorkerConfig is out of sync with Worker.__init__. "
+        f"Missing from config: {init_params - config_keys}. "
+        f"Extra in config: {config_keys - init_params}."
+    )
+
+
+async def test_worker_debug_mode(client: Client):
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds == 2
+    assert isinstance(worker._workflow_worker._workflow_runner, SandboxedWorkflowRunner)
+    assert (
+        "_pydevd_bundle"
+        not in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+    )
+
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        debug_mode=True,
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds is None
+    assert isinstance(worker._workflow_worker._workflow_runner, SandboxedWorkflowRunner)
+    assert (
+        "_pydevd_bundle"
+        in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+    )
+
+    @contextmanager
+    def debug_envvar():
+        os.environ["TEMPORAL_DEBUG"] = "true"
+        try:
+            yield
+        finally:
+            os.environ.pop("TEMPORAL_DEBUG")
+
+    with debug_envvar():
+        worker = Worker(
+            client,
+            workflows=[SimpleWorkflow],
+            task_queue=f"task-queue-{uuid.uuid4()}",
+        )
+        assert worker._workflow_worker
+        assert worker._workflow_worker._deadlock_timeout_seconds is None
+        assert isinstance(
+            worker._workflow_worker._workflow_runner,
+            SandboxedWorkflowRunner,
+        )
+        assert (
+            "_pydevd_bundle"
+            in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+        )

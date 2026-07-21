@@ -6,25 +6,26 @@ and environment variables.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Literal, Mapping, Optional, Union, cast
+from typing import Any, Literal, TypeAlias, cast
 
-from typing_extensions import Self, TypeAlias, TypedDict
+from typing_extensions import Self, TypedDict
 
 import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
 
-DataSource: TypeAlias = Union[
-    Path, str, bytes
-]  # str represents a file contents, bytes represents raw data
+DataSource: TypeAlias = (
+    Path | str | bytes
+)  # str represents a file contents, bytes represents raw data
 
 
 # We define typed dictionaries for what these configs look like as TOML.
 class ClientConfigTLSDict(TypedDict, total=False):
     """Dictionary representation of TLS config for TOML."""
 
-    disabled: Optional[bool]
+    disabled: bool | None
     server_name: str
     server_ca_cert: Mapping[str, str]
     client_cert: Mapping[str, str]
@@ -41,7 +42,7 @@ class ClientConfigProfileDict(TypedDict, total=False):
     grpc_meta: Mapping[str, str]
 
 
-def _from_dict_to_source(d: Optional[Mapping[str, Any]]) -> Optional[DataSource]:
+def _from_dict_to_source(d: Mapping[str, Any] | None) -> DataSource | None:
     if not d:
         return None
     if "data" in d:
@@ -52,8 +53,8 @@ def _from_dict_to_source(d: Optional[Mapping[str, Any]]) -> Optional[DataSource]
 
 
 def _source_to_dict(
-    source: Optional[DataSource],
-) -> Optional[Mapping[str, str]]:
+    source: DataSource | None,
+) -> Mapping[str, str] | None:
     if isinstance(source, Path):
         return {"path": str(source)}
     if isinstance(source, str):
@@ -64,10 +65,10 @@ def _source_to_dict(
 
 
 def _source_to_path_and_data(
-    source: Optional[DataSource],
-) -> tuple[Optional[str], Optional[bytes]]:
-    path: Optional[str] = None
-    data: Optional[bytes] = None
+    source: DataSource | None,
+) -> tuple[str | None, bytes | None]:
+    path: str | None = None
+    data: bytes | None = None
     if isinstance(source, Path):
         path = str(source)
     elif isinstance(source, str):
@@ -75,14 +76,14 @@ def _source_to_path_and_data(
     elif isinstance(source, bytes):
         data = source
     elif source is not None:
-        raise TypeError(
+        raise TypeError(  # type: ignore[reportUnreachable]
             "config_source must be one of pathlib.Path, str, bytes, or None, "
             f"but got {type(source).__name__}"
         )
     return path, data
 
 
-def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
+def _read_source(source: DataSource | None) -> bytes | None:
     if source is None:
         return None
     if isinstance(source, Path):
@@ -92,28 +93,24 @@ def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
         return source.encode("utf-8")
     if isinstance(source, bytes):
         return source
-    raise TypeError(
+    raise TypeError(  # type: ignore[reportUnreachable]
         f"Source must be one of pathlib.Path, str, or bytes, but got {type(source).__name__}"
     )
 
 
 @dataclass(frozen=True)
 class ClientConfigTLS:
-    """TLS configuration as specified as part of client configuration
+    """TLS configuration as specified as part of client configuration"""
 
-    .. warning::
-        Experimental API.
-    """
-
-    disabled: Optional[bool] = None
+    disabled: bool | None = None
     """If True, TLS is explicitly disabled. If False, TLS is explicitly enabled. If None, TLS behavior was not configured."""
-    server_name: Optional[str] = None
+    server_name: str | None = None
     """SNI override."""
-    server_root_ca_cert: Optional[DataSource] = None
+    server_root_ca_cert: DataSource | None = None
     """Server CA certificate source."""
-    client_cert: Optional[DataSource] = None
+    client_cert: DataSource | None = None
     """Client certificate source."""
-    client_private_key: Optional[DataSource] = None
+    client_private_key: DataSource | None = None
     """Client key source."""
 
     def to_dict(self) -> ClientConfigTLSDict:
@@ -126,7 +123,7 @@ class ClientConfigTLS:
 
         def set_source(
             key: Literal["server_ca_cert", "client_cert", "client_key"],
-            source: Optional[DataSource],
+            source: DataSource | None,
         ):
             if source is not None and (val := _source_to_dict(source)):
                 d[key] = val
@@ -136,7 +133,7 @@ class ClientConfigTLS:
         set_source("client_key", self.client_private_key)
         return d
 
-    def to_connect_tls_config(self) -> Union[bool, temporalio.service.TLSConfig]:
+    def to_connect_tls_config(self) -> bool | temporalio.service.TLSConfig:
         """Create a `temporalio.service.TLSConfig` from this profile."""
         if self.disabled is True:
             return False
@@ -149,7 +146,7 @@ class ClientConfigTLS:
         )
 
     @classmethod
-    def from_dict(cls, d: Optional[ClientConfigTLSDict]) -> Optional[Self]:
+    def from_dict(cls, d: ClientConfigTLSDict | None) -> Self | None:
         """Create a ClientConfigTLS from a dictionary."""
         if not d:
             return None
@@ -167,15 +164,12 @@ class ClientConfigTLS:
 class ClientConnectConfig(TypedDict, total=False):
     """Arguments for `temporalio.client.Client.connect` that are configurable via
     environment configuration.
-
-    .. warning::
-        Experimental API.
     """
 
     target_host: str
     namespace: str
     api_key: str
-    tls: Union[bool, temporalio.service.TLSConfig]
+    tls: bool | temporalio.service.TLSConfig
     rpc_metadata: Mapping[str, str]
 
 
@@ -184,20 +178,17 @@ class ClientConfigProfile:
     """Represents a client configuration profile.
 
     This class holds the configuration as loaded from a file or environment.
-    See `to_connect_config` to transform the profile to `ClientConnectConfig`,
+    See `to_client_connect_config` to transform the profile to `ClientConnectConfig`,
     which can be used to create a client.
-
-    .. warning::
-        Experimental API.
     """
 
-    address: Optional[str] = None
+    address: str | None = None
     """Client address."""
-    namespace: Optional[str] = None
+    namespace: str | None = None
     """Client namespace."""
-    api_key: Optional[str] = None
+    api_key: str | None = None
     """Client API key."""
-    tls: Optional[ClientConfigTLS] = None
+    tls: ClientConfigTLS | None = None
     """TLS configuration."""
     grpc_meta: Mapping[str, str] = field(default_factory=dict)
     """gRPC metadata."""
@@ -231,7 +222,7 @@ class ClientConfigProfile:
     def to_client_connect_config(self) -> ClientConnectConfig:
         """Create a `ClientConnectConfig` from this profile."""
         # Only include non-None values
-        config: Dict[str, Any] = {}
+        config: dict[str, Any] = {}
         if self.address:
             config["target_host"] = self.address
         if self.namespace is not None:
@@ -247,17 +238,17 @@ class ClientConfigProfile:
             config["rpc_metadata"] = self.grpc_meta
 
         # Cast to ClientConnectConfig - this is safe because we've only included non-None values
-        return cast(ClientConnectConfig, config)
+        return cast(ClientConnectConfig, config)  # type: ignore[reportInvalidCast]
 
     @staticmethod
     def load(
-        profile: Optional[str] = None,
+        profile: str | None = None,
         *,
-        config_source: Optional[DataSource] = None,
+        config_source: DataSource | None = None,
         disable_file: bool = False,
         disable_env: bool = False,
         config_file_strict: bool = False,
-        override_env_vars: Optional[Mapping[str, str]] = None,
+        override_env_vars: Mapping[str, str] | None = None,
     ) -> ClientConfigProfile:
         """Load a single client profile from given sources, applying env
         overrides.
@@ -304,11 +295,8 @@ class ClientConfig:
     """Client configuration loaded from TOML and environment variables.
 
     This contains a mapping of profile names to client profiles. Use
-    `ClientConfigProfile.to_connect_config` to create a `ClientConnectConfig`
-    from a profile. See `load_profile` to load an individual profile.
-
-    .. warning::
-        Experimental API.
+    `ClientConfigProfile.to_client_connect_config` to create a `ClientConnectConfig`
+    from a profile. See `ClientConfigProfile.load` to load an individual profile.
     """
 
     profiles: Mapping[str, ClientConfigProfile]
@@ -336,9 +324,9 @@ class ClientConfig:
     @staticmethod
     def load(
         *,
-        config_source: Optional[DataSource] = None,
+        config_source: DataSource | None = None,
         config_file_strict: bool = False,
-        override_env_vars: Optional[Mapping[str, str]] = None,
+        override_env_vars: Mapping[str, str] | None = None,
     ) -> ClientConfig:
         """Load all client profiles from given sources.
 
@@ -372,13 +360,13 @@ class ClientConfig:
 
     @staticmethod
     def load_client_connect_config(
-        profile: Optional[str] = None,
+        profile: str | None = None,
         *,
-        config_file: Optional[str] = None,
+        config_file: str | None = None,
         disable_file: bool = False,
         disable_env: bool = False,
         config_file_strict: bool = False,
-        override_env_vars: Optional[Mapping[str, str]] = None,
+        override_env_vars: Mapping[str, str] | None = None,
     ) -> ClientConnectConfig:
         """Load a single client profile and convert to connect config.
 
@@ -406,7 +394,7 @@ class ClientConfig:
             TypedDict of keyword arguments for
             :py:meth:`temporalio.client.Client.connect`.
         """
-        config_source: Optional[DataSource] = None
+        config_source: DataSource | None = None
         if config_file and not disable_file:
             config_source = Path(config_file)
 

@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from temporalio.api.common.v1 import Payload
+from temporalio.api.common.v1 import RetryPolicy as RetryPolicyProto
 from temporalio.common import (
     Priority,
     RawValue,
@@ -38,19 +39,19 @@ def test_retry_policy_validate():
         RetryPolicy(maximum_attempts=-1)._validate()
 
 
-def some_hinted_func(foo: str) -> DefinedLater:
+def some_hinted_func(_foo: str) -> DefinedLater:
     return DefinedLater()
 
 
-async def some_hinted_func_async(foo: str) -> DefinedLater:
+async def some_hinted_func_async(_foo: str) -> DefinedLater:
     return DefinedLater()
 
 
 class MyCallableClass:
-    def __call__(self, foo: str) -> DefinedLater:
+    def __call__(self, _foo: str) -> DefinedLater:
         raise NotImplementedError
 
-    def some_method(self, foo: str) -> DefinedLater:
+    def some_method(self, _foo: str) -> DefinedLater:
         raise NotImplementedError
 
 
@@ -123,3 +124,26 @@ def test_cant_construct_bad_priority():
         Priority(priority_key=1.1)  # type: ignore
     with pytest.raises(ValueError):
         Priority(priority_key=-1)
+
+
+def test_retry_policy_from_proto_pickle():
+    """Test that RetryPolicy.from_proto() creates a picklable object when non_retryable_error_types is set."""
+    # Create a protobuf with non_retryable_error_types
+    proto = RetryPolicyProto()
+    proto.initial_interval.seconds = 1
+    proto.backoff_coefficient = 2.0
+    proto.maximum_attempts = 3
+    proto.non_retryable_error_types.extend(["SomeError", "AnotherError"])
+
+    # Convert from proto
+    retry_policy = RetryPolicy.from_proto(proto)
+
+    # This should not raise a PickleError
+    pickled = pickle.dumps(retry_policy)
+    unpickled = pickle.loads(pickled)
+
+    # Verify the data is intact
+    assert unpickled.initial_interval == timedelta(seconds=1)
+    assert unpickled.backoff_coefficient == 2.0
+    assert unpickled.maximum_attempts == 3
+    assert unpickled.non_retryable_error_types == ["SomeError", "AnotherError"]

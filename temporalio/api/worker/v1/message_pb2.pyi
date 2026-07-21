@@ -134,21 +134,19 @@ class WorkerHostInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     HOST_NAME_FIELD_NUMBER: builtins.int
-    PROCESS_KEY_FIELD_NUMBER: builtins.int
+    WORKER_GROUPING_KEY_FIELD_NUMBER: builtins.int
     PROCESS_ID_FIELD_NUMBER: builtins.int
     CURRENT_HOST_CPU_USAGE_FIELD_NUMBER: builtins.int
     CURRENT_HOST_MEM_USAGE_FIELD_NUMBER: builtins.int
     host_name: builtins.str
     """Worker host identifier."""
-    process_key: builtins.str
-    """Worker process identifier. This id should be unique for all _processes_
-    running workers in the namespace, and should be shared by all workers
-    in the same process.
+    worker_grouping_key: builtins.str
+    """Worker grouping identifier. A key to group workers that share the same client+namespace+process.
     This will be used to build the worker command nexus task queue name:
-    "temporal-sys/worker-commands/{process_key}"
+    "temporal-sys/worker-commands/{worker_grouping_key}"
     """
     process_id: builtins.str
-    """Worker process identifier. Unlike process_key, this id only needs to be unique
+    """Worker process identifier. This id only needs to be unique
     within one host (so using e.g. a unix pid would be appropriate).
     """
     current_host_cpu_usage: builtins.float
@@ -163,7 +161,7 @@ class WorkerHostInfo(google.protobuf.message.Message):
         self,
         *,
         host_name: builtins.str = ...,
-        process_key: builtins.str = ...,
+        worker_grouping_key: builtins.str = ...,
         process_id: builtins.str = ...,
         current_host_cpu_usage: builtins.float = ...,
         current_host_mem_usage: builtins.float = ...,
@@ -179,8 +177,8 @@ class WorkerHostInfo(google.protobuf.message.Message):
             b"host_name",
             "process_id",
             b"process_id",
-            "process_key",
-            b"process_key",
+            "worker_grouping_key",
+            b"worker_grouping_key",
         ],
     ) -> None: ...
 
@@ -218,6 +216,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     TOTAL_STICKY_CACHE_MISS_FIELD_NUMBER: builtins.int
     CURRENT_STICKY_CACHE_SIZE_FIELD_NUMBER: builtins.int
     PLUGINS_FIELD_NUMBER: builtins.int
+    DRIVERS_FIELD_NUMBER: builtins.int
     worker_instance_key: builtins.str
     """Worker identifier, should be unique for the namespace.
     It is distinct from worker identity, which is not necessarily namespace-unique.
@@ -281,6 +280,13 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         global___PluginInfo
     ]:
         """Plugins currently in use by this SDK."""
+    @property
+    def drivers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StorageDriverInfo
+    ]:
+        """Storage drivers in use by this SDK."""
     def __init__(
         self,
         *,
@@ -309,6 +315,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         total_sticky_cache_miss: builtins.int = ...,
         current_sticky_cache_size: builtins.int = ...,
         plugins: collections.abc.Iterable[global___PluginInfo] | None = ...,
+        drivers: collections.abc.Iterable[global___StorageDriverInfo] | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -352,6 +359,8 @@ class WorkerHeartbeat(google.protobuf.message.Message):
             b"current_sticky_cache_size",
             "deployment_version",
             b"deployment_version",
+            "drivers",
+            b"drivers",
             "elapsed_since_last_heartbeat",
             b"elapsed_since_last_heartbeat",
             "heartbeat_time",
@@ -396,6 +405,8 @@ class WorkerHeartbeat(google.protobuf.message.Message):
 global___WorkerHeartbeat = WorkerHeartbeat
 
 class WorkerInfo(google.protobuf.message.Message):
+    """Detailed worker information."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
@@ -416,6 +427,132 @@ class WorkerInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___WorkerInfo = WorkerInfo
+
+class WorkerListInfo(google.protobuf.message.Message):
+    """Limited worker information returned in the list response.
+    When adding fields here, ensure that it is also added to WorkerInfo (as it carries the full worker information).
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKER_INSTANCE_KEY_FIELD_NUMBER: builtins.int
+    WORKER_IDENTITY_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
+    SDK_NAME_FIELD_NUMBER: builtins.int
+    SDK_VERSION_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    START_TIME_FIELD_NUMBER: builtins.int
+    HOST_NAME_FIELD_NUMBER: builtins.int
+    WORKER_GROUPING_KEY_FIELD_NUMBER: builtins.int
+    PROCESS_ID_FIELD_NUMBER: builtins.int
+    PLUGINS_FIELD_NUMBER: builtins.int
+    DRIVERS_FIELD_NUMBER: builtins.int
+    worker_instance_key: builtins.str
+    """Worker identifier, should be unique for the namespace.
+    It is distinct from worker identity, which is not necessarily namespace-unique.
+    """
+    worker_identity: builtins.str
+    """Worker identity, set by the client, may not be unique.
+    Usually host_name+(user group name)+process_id, but can be overwritten by the user.
+    """
+    task_queue: builtins.str
+    """Task queue this worker is polling for tasks."""
+    @property
+    def deployment_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
+    sdk_name: builtins.str
+    sdk_version: builtins.str
+    status: temporalio.api.enums.v1.common_pb2.WorkerStatus.ValueType
+    """Worker status. Defined by SDK."""
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Worker start time.
+        It can be used to determine worker uptime. (current time - start time)
+        """
+    host_name: builtins.str
+    """Worker host identifier."""
+    worker_grouping_key: builtins.str
+    """Worker grouping identifier. A key to group workers that share the same client+namespace+process.
+    This will be used to build the worker command nexus task queue name:
+    "temporal-sys/worker-commands/{worker_grouping_key}"
+    """
+    process_id: builtins.str
+    """Worker process identifier. This id only needs to be unique
+    within one host (so using e.g. a unix pid would be appropriate).
+    """
+    @property
+    def plugins(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___PluginInfo
+    ]:
+        """Plugins currently in use by this SDK."""
+    @property
+    def drivers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StorageDriverInfo
+    ]:
+        """Storage drivers in use by this SDK."""
+    def __init__(
+        self,
+        *,
+        worker_instance_key: builtins.str = ...,
+        worker_identity: builtins.str = ...,
+        task_queue: builtins.str = ...,
+        deployment_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
+        | None = ...,
+        sdk_name: builtins.str = ...,
+        sdk_version: builtins.str = ...,
+        status: temporalio.api.enums.v1.common_pb2.WorkerStatus.ValueType = ...,
+        start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        host_name: builtins.str = ...,
+        worker_grouping_key: builtins.str = ...,
+        process_id: builtins.str = ...,
+        plugins: collections.abc.Iterable[global___PluginInfo] | None = ...,
+        drivers: collections.abc.Iterable[global___StorageDriverInfo] | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment_version", b"deployment_version", "start_time", b"start_time"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment_version",
+            b"deployment_version",
+            "drivers",
+            b"drivers",
+            "host_name",
+            b"host_name",
+            "plugins",
+            b"plugins",
+            "process_id",
+            b"process_id",
+            "sdk_name",
+            b"sdk_name",
+            "sdk_version",
+            b"sdk_version",
+            "start_time",
+            b"start_time",
+            "status",
+            b"status",
+            "task_queue",
+            b"task_queue",
+            "worker_grouping_key",
+            b"worker_grouping_key",
+            "worker_identity",
+            b"worker_identity",
+            "worker_instance_key",
+            b"worker_instance_key",
+        ],
+    ) -> None: ...
+
+global___WorkerListInfo = WorkerListInfo
 
 class PluginInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -438,3 +575,113 @@ class PluginInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___PluginInfo = PluginInfo
+
+class StorageDriverInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TYPE_FIELD_NUMBER: builtins.int
+    type: builtins.str
+    """The type of the driver, required."""
+    def __init__(
+        self,
+        *,
+        type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["type", b"type"]
+    ) -> None: ...
+
+global___StorageDriverInfo = StorageDriverInfo
+
+class WorkerCommand(google.protobuf.message.Message):
+    """A command sent from the server to a worker."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CANCEL_ACTIVITY_FIELD_NUMBER: builtins.int
+    @property
+    def cancel_activity(self) -> global___CancelActivityCommand: ...
+    def __init__(
+        self,
+        *,
+        cancel_activity: global___CancelActivityCommand | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["type", b"type"]
+    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
+
+global___WorkerCommand = WorkerCommand
+
+class CancelActivityCommand(google.protobuf.message.Message):
+    """Cancel an activity if it is still running. Otherwise, do nothing."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_TOKEN_FIELD_NUMBER: builtins.int
+    task_token: builtins.bytes
+    def __init__(
+        self,
+        *,
+        task_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["task_token", b"task_token"]
+    ) -> None: ...
+
+global___CancelActivityCommand = CancelActivityCommand
+
+class WorkerCommandResult(google.protobuf.message.Message):
+    """The result of executing a WorkerCommand."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CANCEL_ACTIVITY_FIELD_NUMBER: builtins.int
+    @property
+    def cancel_activity(self) -> global___CancelActivityResult: ...
+    def __init__(
+        self,
+        *,
+        cancel_activity: global___CancelActivityResult | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_activity", b"cancel_activity", "type", b"type"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["type", b"type"]
+    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
+
+global___WorkerCommandResult = WorkerCommandResult
+
+class CancelActivityResult(google.protobuf.message.Message):
+    """Result of a CancelActivityCommand.
+    Treat both successful cancellation and no-op (activity is no longer running) as success.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___CancelActivityResult = CancelActivityResult

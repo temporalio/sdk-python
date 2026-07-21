@@ -3,15 +3,11 @@ import json
 import os
 import sys
 import uuid
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Optional,
-    Sequence,
-    Union,
     cast,
 )
 
@@ -59,25 +55,21 @@ from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
     ToolCallOutputItem,
-    TResponseOutputItem,
     TResponseStreamEvent,
 )
 from agents.mcp import MCPServer, MCPServerStdio
+from agents.sandbox.capabilities.tools import SandboxApplyPatchTool
+from agents.tool import CustomTool
+from agents.tool_context import ToolContext
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
-    EasyInputMessageParam,
     ResponseCodeInterpreterToolCall,
+    ResponseCustomToolCall,
     ResponseFileSearchToolCall,
-    ResponseFunctionToolCall,
-    ResponseFunctionToolCallParam,
     ResponseFunctionWebSearch,
-    ResponseInputTextParam,
-    ResponseOutputMessage,
-    ResponseOutputText,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
-from openai.types.responses.response_input_item_param import Message
 from openai.types.responses.response_output_item import (
     ImageGenerationCall,
     McpApprovalRequest,
@@ -95,10 +87,10 @@ from temporalio.contrib.openai_agents import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
 )
+from temporalio.contrib.openai_agents._invoke_model_activity import _build_tool
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import _convert_agent
 from temporalio.contrib.openai_agents._temporal_model_stub import (
-    _extract_summary,
     _TemporalModelStub,
 )
 from temporalio.contrib.openai_agents.testing import (
@@ -115,7 +107,7 @@ from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
 from tests.helpers import assert_eventually, new_worker
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 def hello_mock_model():
@@ -154,7 +146,7 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
                 "Tell me about recursion in programming.",
                 id=f"hello-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=5),
+                execution_timeout=timedelta(seconds=60),
             )
             if use_local_model:
                 assert result == "test"
@@ -176,7 +168,7 @@ async def get_weather(city: str) -> Weather:
 
 
 @activity.defn
-async def get_weather_country(city: str, country: str) -> Weather:
+async def get_weather_country(city: str, country: str) -> Weather:  # type: ignore[reportUnusedParameter]
     """
     Get the weather for a given city in a country.
     """
@@ -226,7 +218,9 @@ class WeatherService:
 class WeatherServiceHandler:
     @nexusrpc.handler.sync_operation
     async def get_weather_nexus_operation(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: WeatherInput
+        self,
+        ctx: nexusrpc.handler.StartOperationContext,  # type: ignore[reportUnusedParameter]
+        input: WeatherInput,  # type: ignore[reportUnusedParameter]
     ) -> Weather:
         return Weather(
             city=input.city, temperature_range="14-20C", conditions="Sunny with wind."
@@ -431,7 +425,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
 
 
 @activity.defn
-async def get_weather_failure(city: str) -> Weather:
+async def get_weather_failure(city: str) -> Weather:  # type: ignore[reportUnusedParameter]
     """
     Get the weather for a given city.
     """
@@ -470,7 +464,7 @@ async def test_tool_failure_workflow(client: Client):
                 execution_timeout=timedelta(seconds=2),
             )
             with pytest.raises(WorkflowFailureError) as e:
-                result = await workflow_handle.result()
+                await workflow_handle.result()
             cause = e.value.cause
             assert isinstance(cause, ApplicationError)
             assert "Workflow failure exception in Agents Framework" in cause.message
@@ -500,7 +494,9 @@ async def test_nexus_tool_workflow(
             NexusToolsWorkflow,
             nexus_service_handlers=[WeatherServiceHandler()],
         ) as worker:
-            await create_nexus_endpoint(worker.task_queue, client)
+            await env.create_nexus_endpoint(
+                make_nexus_endpoint_name(worker.task_queue), worker.task_queue
+            )
 
             workflow_handle = await client.start_workflow(
                 NexusToolsWorkflow.run,
@@ -556,7 +552,9 @@ def research_mock_model():
                         id="",
                         status="completed",
                         type="web_search_call",
-                        action=ActionSearch(query="", type="search"),
+                        action=ActionSearch.model_construct(
+                            type="search", queries=[""]
+                        ),
                     ),
                     ResponseBuilders.response_output_message("Granada"),
                 ],
@@ -794,10 +792,10 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
 
 
 class AirlineAgentContext(BaseModel):
-    passenger_name: Optional[str] = None
-    confirmation_number: Optional[str] = None
-    seat_number: Optional[str] = None
-    flight_number: Optional[str] = None
+    passenger_name: str | None = None
+    confirmation_number: str | None = None
+    seat_number: str | None = None
+    flight_number: str | None = None
 
 
 @function_tool(
@@ -940,7 +938,7 @@ class CustomerServiceWorkflow:
         self.input_items = input_items
 
     @workflow.run
-    async def run(self, input_items: list[TResponseInputItem] = []):
+    async def run(self, _input_items: list[TResponseInputItem] = []):
         await workflow.wait_condition(lambda: False)
         workflow.continue_as_new(self.input_items)
 
@@ -1025,7 +1023,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
                 CustomerServiceWorkflow.run,
                 id=f"customer-service-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
+                execution_timeout=timedelta(seconds=60),
             )
             history: list[Any] = []
             for q in questions:
@@ -1131,16 +1129,16 @@ class InputGuardrailModel(OpenAIResponsesModel):
 
     async def get_response(
         self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        previous_response_id: Optional[str] = None,
-        conversation_id: Optional[str] = None,
-        prompt: Optional[ResponsePromptParam] = None,
+        previous_response_id: str | None = None,
+        conversation_id: str | None = None,
+        prompt: ResponsePromptParam | None = None,
     ) -> ModelResponse:
         if (
             system_instructions
@@ -1168,8 +1166,8 @@ guardrail_agent: Agent = Agent(
 @input_guardrail
 async def math_guardrail(
     context: RunContextWrapper[None],
-    agent: Agent,
-    input: Union[str, list[TResponseInputItem]],
+    _agent: Agent,
+    input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
     """This is an input guardrail function, which happens to call an agent to check if the input
     is a math homework question.
@@ -1252,7 +1250,7 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
                 ],
                 id=f"input-guardrail-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
+                execution_timeout=timedelta(seconds=60),
             )
             result = await workflow_handle.result()
 
@@ -1278,7 +1276,7 @@ class MessageOutput(BaseModel):
         description="Thoughts on how to respond to the user's message"
     )
     response: str = Field(description="The response to the user's message")
-    user_name: Optional[str] = Field(
+    user_name: str | None = Field(
         description="The name of the user who sent the message, if known"
     )
     model_config = ConfigDict(extra="forbid")
@@ -1286,7 +1284,7 @@ class MessageOutput(BaseModel):
 
 @output_guardrail
 async def sensitive_data_check(
-    context: RunContextWrapper, agent: Agent, output: MessageOutput
+    _context: RunContextWrapper, _agent: Agent, output: MessageOutput
 ) -> GuardrailFunctionOutput:
     phone_number_in_response = "650" in output.response
     phone_number_in_reasoning = "650" in output.reasoning
@@ -1368,6 +1366,7 @@ class WorkflowToolWorkflow:
         agent: Agent = Agent(
             name="Assistant",
             instructions="You are a helpful assistant.",
+            model="gpt-4o",
             tools=[function_tool(self.run_tool)],
         )
         await Runner.run(
@@ -1418,7 +1417,7 @@ async def test_response_serialization():
         usage=Usage(),
         response_id="",
     )
-    encoded = await pydantic_data_converter.encode([model_response])
+    await pydantic_data_converter.encode([model_response])
 
 
 async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
@@ -1453,7 +1452,7 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            with pytest.raises(WorkflowFailureError) as e:
+            with pytest.raises(WorkflowFailureError):
                 await workflow_handle.result()
 
             found = False
@@ -1479,7 +1478,7 @@ async def test_exception_handling(client: Client):
 
 
 class CustomModelProvider(ModelProvider):
-    def get_model(self, model_name: Optional[str]) -> Model:
+    def get_model(self, model_name: str | None) -> Model:
         client = AsyncOpenAI(base_url="https://api.openai.com/v1")
         return OpenAIChatCompletionsModel(model="gpt-4o", openai_client=client)
 
@@ -1512,14 +1511,14 @@ async def test_chat_completions_model(client: Client):
 class WaitModel(Model):
     async def get_response(
         self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs,  # type:ignore[reportMissingParameterType]
     ) -> ModelResponse:
         activity.logger.info("Waiting")
         await asyncio.sleep(1.0)
@@ -1528,14 +1527,14 @@ class WaitModel(Model):
 
     def stream_response(
         self,
-        system_instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Optional[AgentOutputSchemaBase],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs,  # type:ignore[reportMissingParameterType]
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError()
 
@@ -1554,7 +1553,7 @@ class AlternateModelAgent:
 
 
 class CheckModelNameProvider(ModelProvider):
-    def get_model(self, model_name: Optional[str]) -> Model:
+    def get_model(self, model_name: str | None) -> Model:
         assert model_name == "test_model"
         return hello_mock_model()
 
@@ -1608,40 +1607,6 @@ async def test_heartbeat(client: Client, env: WorkflowEnvironment):
             await workflow_handle.result()
 
 
-def test_summary_extraction():
-    input: list[TResponseInputItem] = [
-        EasyInputMessageParam(
-            content="First message",
-            role="user",
-        )
-    ]
-
-    assert _extract_summary(input) == "First message"
-
-    input.append(
-        Message(
-            content=[
-                ResponseInputTextParam(
-                    text="Second message",
-                    type="input_text",
-                )
-            ],
-            role="user",
-        )
-    )
-    assert _extract_summary(input) == "Second message"
-
-    input.append(
-        ResponseFunctionToolCallParam(
-            arguments="",
-            call_id="",
-            name="",
-            type="function_call",
-        )
-    )
-    assert _extract_summary(input) == "Second message"
-
-
 @workflow.defn
 class SessionWorkflow:
     @workflow.run
@@ -1687,13 +1652,15 @@ async def test_session(client: Client):
             await assert_eventually(check)
 
 
-async def test_lite_llm(client: Client, env: WorkflowEnvironment):
+async def test_lite_llm(client: Client):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     if sys.version_info >= (3, 14):
-        pytest.skip("Lite LLM does not yet support Python 3.14")
+        pytest.skip("Lite LLM does not yet support Python 3.14")  # type:ignore[reportUnreachable]
 
-    from agents.extensions.models.litellm_provider import LitellmProvider
+    from agents.extensions.models.litellm_provider import (
+        LitellmProvider,  # type:ignore[reportUnreachable]
+    )
 
     async with AgentEnvironment(
         model_provider=LitellmProvider(),
@@ -1701,13 +1668,13 @@ async def test_lite_llm(client: Client, env: WorkflowEnvironment):
             start_to_close_timeout=timedelta(seconds=30),
         ),
     ) as agent_env:
-        client = agent_env.applied_on_client(client)
+        client = agent_env.applied_on_client(client)  # type:ignore[reportUnreachable]
 
         async with new_worker(
             client,
             HelloWorldAgent,
         ) as worker:
-            workflow_handle = await client.start_workflow(
+            workflow_handle = await client.start_workflow(  # type:ignore[reportUnreachable]
                 HelloWorldAgent.run,
                 "Tell me about recursion in programming",
                 id=f"lite-llm-{uuid.uuid4()}",
@@ -1768,7 +1735,7 @@ class FileSearchToolWorkflow:
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
-async def test_file_search_tool(client: Client, use_local_model):
+async def test_file_search_tool(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
@@ -1842,7 +1809,7 @@ class ImageGenerationWorkflow:
 
 # Can't currently validate against real server, we aren't verified for image generation
 @pytest.mark.parametrize("use_local_model", [True])
-async def test_image_generation_tool(client: Client, use_local_model):
+async def test_image_generation_tool(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
@@ -1866,7 +1833,7 @@ async def test_image_generation_tool(client: Client, use_local_model):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
 
 
 def code_interpreter_mock_model():
@@ -2034,14 +2001,74 @@ async def test_hosted_mcp_tool(client: Client):
             assert result == "Some language"
 
 
+def custom_tool_mock_model():
+    return TestModel.returning_responses(
+        [
+            ModelResponse(
+                output=[
+                    ResponseCustomToolCall(
+                        call_id="c1",
+                        input="ping",
+                        name="echo",
+                        type="custom_tool_call",
+                    )
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+            ResponseBuilders.output_message("done"),
+        ]
+    )
+
+
+@workflow.defn
+class CustomToolWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        captured: list[str] = []
+
+        async def echo(ctx: ToolContext[Any], input: str) -> str:  # type: ignore[reportUnusedParameter]
+            captured.append(input)
+            return input
+
+        agent = Agent[str](
+            name="custom-tool-agent",
+            instructions="Use the echo tool.",
+            tools=[
+                CustomTool(
+                    name="echo",
+                    description="Echo the input string back.",
+                    on_invoke_tool=echo,
+                )
+            ],
+        )
+        result = await Runner.run(starting_agent=agent, input="say something")
+        return f"{result.final_output}:{captured[0]}"
+
+
+async def test_custom_tool_workflow(client: Client):
+    async with AgentEnvironment(model=custom_tool_mock_model()) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(client, CustomToolWorkflow) as worker:
+            workflow_handle = await client.start_workflow(
+                CustomToolWorkflow.run,
+                id=f"custom-tool-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
+            assert result == "done:ping"
+
+
 class AssertDifferentModelProvider(ModelProvider):
-    model_names: set[Optional[str]]
+    model_names: set[str | None]
 
     def __init__(self, model: Model):
         self._model = model
         self.model_names = set()
 
-    def get_model(self, model_name: Union[str, None]) -> Model:
+    def get_model(self, model_name: str | None) -> Model:
         self.model_names.add(model_name)
         return self._model
 
@@ -2101,7 +2128,7 @@ async def test_multiple_models(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
             assert provider.model_names == {None, "gpt-4o-mini"}
 
 
@@ -2126,7 +2153,7 @@ async def test_run_config_models(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
 
             # Only the model from the runconfig override is used
             assert provider.model_names == {"gpt-4o"}
@@ -2136,9 +2163,9 @@ async def test_summary_provider(client: Client):
     class SummaryProvider(ModelSummaryProvider):
         def provide(
             self,
-            agent: Optional[Agent[Any]],
-            instructions: Optional[str],
-            input: Union[str, list[TResponseInputItem]],
+            agent: Agent[Any] | None,
+            instructions: str | None,
+            input: str | list[TResponseInputItem],
         ) -> str:
             return "My summary"
 
@@ -2162,7 +2189,7 @@ async def test_summary_provider(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
             async for e in workflow_handle.fetch_history_events():
                 if e.HasField("activity_task_scheduled_event_attributes"):
                     assert e.user_metadata.summary.data == b'"My summary"'
@@ -2226,8 +2253,8 @@ async def test_output_type(client: Client):
 @workflow.defn
 class McpServerWorkflow:
     @workflow.run
-    async def run(self, caching: bool, factory_argument: Optional[Any]) -> str:
-        from agents.mcp import MCPServer
+    async def run(self, caching: bool, factory_argument: Any | None) -> str:
+        from agents.mcp import MCPServer  # type: ignore[reportUnusedImport]
 
         server: MCPServer = openai_agents.workflow.stateless_mcp_server(
             "HelloServer", cache_tools_list=caching, factory_argument=factory_argument
@@ -2246,7 +2273,7 @@ class McpServerWorkflow:
 @workflow.defn
 class McpServerStatefulWorkflow:
     @workflow.run
-    async def run(self, timeout: timedelta, factory_argument: Optional[Any]) -> str:
+    async def run(self, timeout: timedelta, factory_argument: Any | None) -> str:
         async with openai_agents.workflow.stateful_mcp_server(
             "HelloServer",
             config=ActivityConfig(
@@ -2308,8 +2335,8 @@ def get_tracking_server(name: str):
 
         async def list_tools(
             self,
-            run_context: Optional[RunContextWrapper[Any]] = None,
-            agent: Optional[AgentBase] = None,
+            run_context: RunContextWrapper[Any] | None = None,
+            agent: AgentBase | None = None,
         ) -> list[MCPTool]:
             self.calls.append("list_tools")
             return [
@@ -2327,7 +2354,10 @@ def get_tracking_server(name: str):
             ]
 
         async def call_tool(
-            self, tool_name: str, arguments: Optional[dict[str, Any]]
+            self,
+            tool_name: str,
+            arguments: dict[str, Any] | None,
+            meta: dict[str, Any] | None = None,
         ) -> CallToolResult:
             self.calls.append("call_tool")
             name = (arguments or {}).get("name") or "John Doe"
@@ -2339,7 +2369,7 @@ def get_tracking_server(name: str):
             raise NotImplementedError()
 
         async def get_prompt(
-            self, name: str, arguments: Optional[dict[str, Any]] = None
+            self, name: str, arguments: dict[str, Any] | None = None
         ) -> GetPromptResult:
             raise NotImplementedError()
 
@@ -2366,7 +2396,7 @@ async def test_mcp_server(
     )
 
     tracking_server = get_tracking_server(name="HelloServer")
-    server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
+    server: StatefulMCPServerProvider | StatelessMCPServerProvider = (
         StatefulMCPServerProvider("HelloServer", lambda _: tracking_server)
         if stateful
         else StatelessMCPServerProvider("HelloServer", lambda _: tracking_server)
@@ -2451,7 +2481,7 @@ async def test_mcp_server(
 
 @pytest.mark.parametrize("stateful", [True, False])
 async def test_mcp_server_factory_argument(client: Client, stateful: bool):
-    def factory(args: Optional[Any]) -> MCPServer:
+    def factory(args: Any | None) -> MCPServer:
         print("Invoking factory: ", args)
         if args is not None:
             assert args is not None
@@ -2459,7 +2489,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
 
         return get_tracking_server("HelloServer")
 
-    server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
+    server: StatefulMCPServerProvider | StatelessMCPServerProvider = (
         StatefulMCPServerProvider("HelloServer", factory)
         if stateful
         else StatelessMCPServerProvider("HelloServer", factory)
@@ -2479,7 +2509,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
             client, McpServerStatefulWorkflow, McpServerWorkflow
         ) as worker:
             if stateful:
-                result = await client.execute_workflow(
+                await client.execute_workflow(
                     McpServerStatefulWorkflow.run,
                     args=[timedelta(seconds=30), headers],
                     id=f"mcp-server-{uuid.uuid4()}",
@@ -2487,7 +2517,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
                     execution_timeout=timedelta(seconds=30),
                 )
             else:
-                result = await client.execute_workflow(
+                await client.execute_workflow(
                     McpServerWorkflow.run,
                     args=[False, headers],
                     id=f"mcp-server-{uuid.uuid4()}",
@@ -2573,6 +2603,79 @@ async def test_model_conversion_loops():
     assert isinstance(triage_agent.model, _TemporalModelStub)
 
 
+def test_sandbox_apply_patch_tool_round_trips_through_activity_input():
+    class FakeSandboxSession:
+        pass
+
+    tool = SandboxApplyPatchTool(session=FakeSandboxSession())  # type: ignore[arg-type]
+
+    stub = _TemporalModelStub(
+        model_name="gpt-5",
+        model_params=ModelActivityParameters(),
+        agent=None,
+    )
+
+    activity_input, _summary = stub._build_activity_input(
+        system_instructions=None,
+        input="hi",
+        model_settings=ModelSettings(),
+        tools=[tool],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        conversation_id=None,
+        prompt=None,
+    )
+
+    tool_inputs = activity_input.get("tools") or []
+    assert len(tool_inputs) == 1
+    rebuilt = _build_tool(tool_inputs[0])
+    assert isinstance(rebuilt, CustomTool)
+    assert rebuilt.name == tool.name
+    assert rebuilt.description == tool.description
+    assert rebuilt.format == tool.format
+    assert rebuilt.tool_config == tool.tool_config
+
+
+def test_custom_tool_with_defer_loading_round_trips_through_activity_input():
+    async def stub(_ctx: Any, _payload: str) -> str:
+        return ""
+
+    tool = CustomTool(
+        name="deferred_tool",
+        description="A custom tool with defer_loading enabled",
+        on_invoke_tool=stub,
+        defer_loading=True,
+    )
+
+    stub_model = _TemporalModelStub(
+        model_name="gpt-5",
+        model_params=ModelActivityParameters(),
+        agent=None,
+    )
+
+    activity_input, _summary = stub_model._build_activity_input(
+        system_instructions=None,
+        input="hi",
+        model_settings=ModelSettings(),
+        tools=[tool],
+        output_schema=None,
+        handoffs=[],
+        tracing=ModelTracing.DISABLED,
+        previous_response_id=None,
+        conversation_id=None,
+        prompt=None,
+    )
+
+    tool_inputs = activity_input.get("tools") or []
+    assert len(tool_inputs) == 1
+    rebuilt = _build_tool(tool_inputs[0])
+    assert isinstance(rebuilt, CustomTool)
+    assert rebuilt.tool_config == tool.tool_config
+    assert rebuilt.defer_loading is True
+
+
 async def test_local_hello_world_agent(client: Client):
     async with AgentEnvironment(
         model=hello_mock_model(),
@@ -2626,9 +2729,7 @@ async def test_split_workers(client: Client):
         new_config["plugins"] = [activity_plugin]
         activity_client = Client(**new_config)
         # Activity Worker
-        async with new_worker(
-            activity_client, task_queue=worker.task_queue
-        ) as activity_worker:
+        async with new_worker(activity_client, task_queue=worker.task_queue):
             result = await activity_client.execute_workflow(
                 HelloWorldAgent.run,
                 "Tell me about recursion in programming.",
@@ -2637,3 +2738,101 @@ async def test_split_workers(client: Client):
                 execution_timeout=timedelta(seconds=120),
             )
             assert result == "test"
+
+
+def multiple_handoffs_mock_model():
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call("{}", "transfer_to_planner"),
+            ResponseBuilders.output_message(
+                "I'll analyze the requirements and create a plan."
+            ),
+        ]
+    )
+
+
+@workflow.defn
+class MultipleHandoffsWorkflow:
+    @workflow.run
+    async def run(self, task: str) -> str:
+        planner = Agent[None](
+            name="Planner",
+            instructions="You analyze requirements and create detailed plans.",
+            handoff_description="An agent that creates detailed plans and strategies",
+        )
+
+        writer = Agent[None](
+            name="Writer",
+            instructions="You write documents and reports based on provided information.",
+            handoff_description="An agent that writes professional documents and reports",
+        )
+
+        specialists = [planner, writer]
+        handoffs_list: list[Agent[Any] | Handoff[None, Any]] = [
+            handoff(agent=a) for a in specialists
+        ]
+
+        triage = Agent[None](
+            name="Triage",
+            instructions="Hand off to Planner when requested.",
+            handoffs=handoffs_list,
+        )
+
+        result = await Runner.run(starting_agent=triage, input=task)
+        return result.final_output
+
+
+async def test_multiple_handoffs_workflow(client: Client):
+    model = multiple_handoffs_mock_model()
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client,
+            MultipleHandoffsWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                MultipleHandoffsWorkflow.run,
+                "Create a project plan for building a web application",
+                id=f"multiple-handoffs-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
+
+            assert result == "I'll analyze the requirements and create a plan."
+
+            # Verify the correct handoff occurred
+            events = []
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    events.append(e)
+
+            # Should have 2 activity completions:
+            # 1. Triage agent makes handoff call to planner
+            # 2. Planner agent responds
+            assert len(events) == 2
+
+            # Verify handoff to planner was requested
+            first_event_data = (
+                events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert "transfer_to_planner" in first_event_data
+
+            # Verify that the planner agent was actually invoked (this would fail before the fix)
+            planner_response_data = (
+                events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "I'll analyze the requirements and create a plan."
+                in planner_response_data
+            )

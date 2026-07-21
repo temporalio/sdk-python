@@ -1,4 +1,4 @@
-![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
+![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
 [![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
@@ -54,6 +54,10 @@ informal introduction to the features and their implementation.
       - [Data Conversion](#data-conversion)
         - [Pydantic Support](#pydantic-support)
         - [Custom Type Data Conversion](#custom-type-data-conversion)
+        - [External Storage](#external-storage)
+          - [Driver Selection](#driver-selection)
+          - [Built-in Drivers](#built-in-drivers)
+          - [Custom Drivers](#custom-drivers)
     - [Workers](#workers)
     - [Workflows](#workflows)
       - [Definition](#definition)
@@ -78,6 +82,7 @@ informal introduction to the features and their implementation.
         - [Customizing the Sandbox](#customizing-the-sandbox)
           - [Passthrough Modules](#passthrough-modules)
           - [Invalid Module Members](#invalid-module-members)
+        - [Debugging Workflows with `breakpoint()` / `pdb`](#debugging-workflows-with-breakpoint--pdb)
         - [Known Sandbox Issues](#known-sandbox-issues)
           - [Global Import/Builtins](#global-importbuiltins)
           - [Sandbox is not Secure](#sandbox-is-not-secure)
@@ -164,7 +169,7 @@ from temporalio import workflow
 
 # Import our activity, passing it through the sandbox
 with workflow.unsafe.imports_passed_through():
-    from .activities import say_hello
+    from activities import say_hello
 
 @workflow.defn
 class SayHello:
@@ -184,8 +189,8 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 # Import the activity and workflow from our other files
-from .activities import say_hello
-from .workflows import SayHello
+from activities import say_hello
+from workflows import SayHello
 
 async def main():
     # Create client connected to server at the given address
@@ -220,7 +225,7 @@ import asyncio
 from temporalio.client import Client
 
 # Import the workflow from the previous code
-from .workflows import SayHello
+from workflows import SayHello
 
 async def main():
     # Create client connected to server at the given address
@@ -309,8 +314,9 @@ other_ns_client = Client(**config)
 
 Data converters are used to convert raw Temporal payloads to/from actual Python types. A custom data converter of type
 `temporalio.converter.DataConverter` can be set via the `data_converter` parameter of the `Client` constructor. Data
-converters are a combination of payload converters, payload codecs, and failure converters. Payload converters convert
-Python values to/from serialized bytes. Payload codecs convert bytes to bytes (e.g. for compression or encryption).
+converters are a combination of payload converters, external storage, payload codecs, and failure converters. Payload
+converters convert Python values to/from serialized bytes. External payload storage optionally stores and retrieves payloads
+to/from external storage services using drivers. Payload codecs convert bytes to bytes (e.g. for compression or encryption).
 Failure converters convert exceptions to/from serialized failures.
 
 The default data converter supports converting multiple types including:
@@ -427,7 +433,7 @@ class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
 class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
         self, hint: Type, value: Any
-    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+    ) -> Union[Optional[Any], JSONTypeConverterUnhandled]:
         if issubclass(hint, ipaddress.IPv4Address):
             return ipaddress.IPv4Address(value)
         return JSONTypeConverter.Unhandled
@@ -454,6 +460,145 @@ my_data_converter = dataclasses.replace(
 ```
 
 Now `IPv4Address` can be used in type hints including collections, optionals, etc.
+
+##### External Storage
+
+⚠️ **External storage support is currently at an experimental release stage.** ⚠️
+
+External storage allows large payloads to be offloaded to an external storage service (such as Amazon S3) rather than stored inline in workflow history. This is useful when workflows or activities work with data that would otherwise exceed Temporal's payload size limits.
+
+External storage is configured via the `external_storage` parameter on `DataConverter`.  It should be configured on the `Client` both for clients of your workflow as well as on the worker -- anywhere large payloads may be uploaded or downloaded.
+
+A `StorageDriver` handles uploading and downloading payloads. Temporal provides [built-in drivers](#built-in-drivers) for common storage solutions, or you may implement a [custom driver](#custom-drivers). Here's an example using the built-in `S3StorageDriver` with the SDK's `aioboto3` client:
+
+```python
+import aioboto3
+import dataclasses
+from temporalio.client import Client, ClientConfig
+from temporalio.contrib.aws.s3driver import S3StorageDriver
+from temporalio.contrib.aws.s3driver.aioboto3 import new_aioboto3_client
+from temporalio.converter import DataConverter
+from temporalio.converter import ExternalStorage
+
+client_config = ClientConfig.load_client_connect_config()
+
+session = aioboto3.Session()
+async with session.client("s3") as s3_client:
+    driver = S3StorageDriver(
+        client=new_aioboto3_client(s3_client),
+        bucket="my-bucket",
+    )
+    client = await Client.connect(
+        **client_config,
+        data_converter=dataclasses.replace(
+            DataConverter.default,
+            external_storage=ExternalStorage(drivers=[driver]),
+        ),
+    )
+```
+
+See the [S3 driver README](temporalio/contrib/aws/s3driver/) for further details.
+
+Some things to note about external storage:
+
+* Only payloads that meet or exceed `ExternalStorage.payload_size_threshold` (default 256 KiB) are offloaded. Smaller payloads are stored inline as normal.
+* External storage applies transparently to all payloads, whether they are workflow inputs/outputs, activity inputs/outputs, signal inputs, query outputs, update inputs/outputs, or failure details.
+* The `DataConverter`'s `payload_codec` (if configured) is applied to the payload *before* it is handed to the storage driver, so the driver always stores encoded bytes. The reference payload written to workflow history is not encoded by the `DataConverter` codec.
+* Setting `ExternalStorage.payload_size_threshold` to `0` causes every payload to be considered for external storage regardless of size.
+
+###### Driver Selection
+
+When multiple storage backends are needed, list all drivers in `ExternalStorage.drivers` and provide a `driver_selector` to control which driver stores new payloads. Any driver in the list not chosen for storing is still available for retrieval, which is useful when migrating between storage backends.
+
+```python
+from temporalio.converter import ExternalStorage
+
+options = ExternalStorage(
+    drivers=[hot_driver, cold_driver],
+    driver_selector=lambda context, payload: (
+        hot_driver if payload.ByteSize() < 5 * 1024 * 1024 else cold_driver
+    ),
+)
+```
+
+For more complex selection logic, use a plain callable that reads from the `StorageDriverStoreContext`:
+
+```python
+import temporalio.converter
+from temporalio.api.common.v1 import Payload
+
+def feature_flag_is_on(workflow_id: str | None) -> bool:
+    """Check whether external storage is enabled for this workflow via a feature flag service."""
+    return workflow_id is not None and len(workflow_id) % 2 == 0
+
+def feature_flag_selector(
+    context: temporalio.converter.StorageDriverStoreContext, _payload: Payload
+) -> temporalio.converter.StorageDriver | None:
+    workflow_id = (
+        context.target.id
+        if isinstance(context.target, temporalio.converter.StorageDriverWorkflowInfo)
+        else None
+    )
+    return my_driver if feature_flag_is_on(workflow_id) else None
+
+options = ExternalStorage(
+    drivers=[my_driver],
+    driver_selector=feature_flag_selector,
+)
+```
+
+Some things to note about driver selection:
+
+* A `driver_selector` is required when more than one driver is registered. With a single driver, `driver_selector` may be omitted and that driver is used for all store operations.
+* Returning `None` from a selector leaves the payload stored inline in workflow history rather than offloading it.
+* The driver instance returned by the selector must be one of the instances registered in `ExternalStorage.drivers`. If it is not, an error is raised.
+
+###### Built-in Drivers
+
+- **[S3 Storage Driver](temporalio/contrib/aws/s3driver/)**: ⚠️ **Experimental** ⚠️ Amazon S3 driver. Ships with an aioboto3 client, or bring your own by subclassing `S3StorageDriverClient`.
+
+###### Custom Drivers
+
+Implement `temporalio.converter.StorageDriver` to integrate with an external storage system:
+
+```python
+from collections.abc import Sequence
+from temporalio.converter import StorageDriver, StorageDriverClaim, StorageDriverRetrieveContext, StorageDriverStoreContext
+from temporalio.api.common.v1 import Payload
+
+class MyDriver(StorageDriver):
+    def __init__(self, driver_name: str | None = None):
+        self._driver_name = driver_name or "my-org:driver:my-driver"
+
+    def name(self) -> str:
+        return self._driver_name
+
+    async def store(
+        self, context: StorageDriverStoreContext, payloads: Sequence[Payload]
+    ) -> list[StorageDriverClaim]:
+        claims = []
+        for payload in payloads:
+            key = await my_storage.put(payload.SerializeToString())
+            claims.append(StorageDriverClaim(claim_data={"key": key}))
+        return claims
+
+    async def retrieve(
+        self, context: StorageDriverRetrieveContext, claims: Sequence[StorageDriverClaim]
+    ) -> list[Payload]:
+        payloads = []
+        for claim in claims:
+            data = await my_storage.get(claim.claim_data["key"])
+            p = Payload()
+            p.ParseFromString(data)
+            payloads.append(p)
+        return payloads
+```
+
+Some things to note about implementing a custom driver:
+
+* `StorageDriver.name()` must return a string that is unique among all drivers in `ExternalStorage.drivers`. This name is embedded in the reference payload stored in workflow history and used to look up the correct driver during retrieval — changing it after payloads have been stored will break retrieval.
+* `StorageDriver.type()` is automatically implemented to return the name of the class. This can be overridden in subclasses but must remain consistent across all instances of the subclass.
+* Use `StorageDriverStoreContext.target` inside `store()` when you need workflow or activity identity (namespace, workflow ID, activity ID, etc.) to choose where or how to store payloads.
 
 ### Workers
 
@@ -684,7 +829,6 @@ Some things to note about the above code:
   capabilities are needed.
 * Local activities work very similarly except the functions are `workflow.start_local_activity()` and
   `workflow.execute_local_activity()`
-  * ⚠️Local activities are currently experimental
 * Activities can be methods of a class. Invokers should use `workflow.start_activity_method()`,
   `workflow.execute_activity_method()`, `workflow.start_local_activity_method()`, and
   `workflow.execute_local_activity_method()` instead.
@@ -1101,6 +1245,80 @@ my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_
 
 See the API for more details on exact fields and their meaning.
 
+##### Debugging Workflows with `breakpoint()` / `pdb`
+
+Setting `debug_mode=True` on the `Worker` (or `TEMPORAL_DEBUG=1` in the environment) routes workflow activations
+onto the asyncio main thread instead of a worker thread pool. This lets `breakpoint()` and `pdb.set_trace()`
+inside workflow code open an interactive REPL — without it, pdb hangs because its `input()` call would run on a
+thread that does not own the controlling TTY.
+
+A minimal runnable example:
+
+```python
+import asyncio
+from datetime import timedelta
+
+from temporalio import workflow
+from temporalio.client import Client
+from temporalio.worker import Worker
+
+
+@workflow.defn
+class DebugMeWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        x = 42
+        breakpoint()  # interactive pdb prompt opens at this line
+        return f"x was {x}"
+
+
+async def main() -> None:
+    client = await Client.connect("localhost:7233")
+    async with Worker(
+        client,
+        task_queue="debug-me",
+        workflows=[DebugMeWorkflow],
+        debug_mode=True,
+    ):
+        result = await client.execute_workflow(
+            DebugMeWorkflow.run,
+            id="debug-me-wf",
+            task_queue="debug-me",
+            task_timeout=timedelta(minutes=10),  # see caveat below
+        )
+        print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Run with `python debug_me.py`, or under pytest with `pytest -s` (the `-s` flag disables pytest's stdin
+capture). At the `(Pdb)` prompt you'll land at the line where `breakpoint()` was called, with workflow
+locals in scope. Try `p x`, `n`, `c`, `q`.
+
+**Quitting cleanly.** Typing `q` or hitting Ctrl-D continues the workflow rather than raising `BdbQuit`
+(which would fail the workflow task). To genuinely abort, kill the outer process with Ctrl-C.
+
+Two caveats when pausing at a breakpoint inside a workflow:
+
+1. **Workflow task timeout.** Temporal expires a workflow task after ~10 seconds by default. If you sit at the
+   `(Pdb)` prompt longer than that, the server reassigns the task and your workflow replays from the start when
+   you continue — re-hitting the breakpoint. Pass `task_timeout=timedelta(minutes=N)` to `execute_workflow` /
+   `start_workflow` to give yourself debugging headroom:
+
+   ```python
+   await client.execute_workflow(MyWorkflow.run, ..., task_timeout=timedelta(minutes=10))
+   ```
+
+2. **Deterministic replay.** Workflows are deterministic and replay from history; any wall-clock pause violates
+   that contract. For post-mortem debugging without these caveats, use the [Replayer](#replayer) on a recorded
+   history instead of live debugging.
+
+Calling `breakpoint()` from sandboxed workflow code without `debug_mode` raises a sandbox
+`RestrictedWorkflowAccessError` with a message pointing at `debug_mode=True`, so the failure mode is loud
+and the fix is obvious.
+
 ##### Known Sandbox Issues
 
 Below are known sandbox issues. As the sandbox is developed and matures, some may be resolved.
@@ -1388,8 +1606,6 @@ code](https://github.com/temporalio/samples-python/blob/main/context_propagation
 
 
 ### Nexus
-
-⚠️  **Nexus support is currently at an experimental release stage. Backwards-incompatible changes are anticipated until a stable release is announced.** ⚠️
 
 [Nexus](https://github.com/nexus-rpc/) is a synchronous RPC protocol. Arbitrary duration operations that can respond
 asynchronously are modeled on top of a set of pre-defined synchronous RPCs.
@@ -1799,7 +2015,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 # Development
 
 The Python SDK is built to work with Python 3.9 and newer. It is built using
-[SDK Core](https://github.com/temporalio/sdk-core/) which is written in Rust.
+[SDK Core](https://github.com/temporalio/sdk-rust/) which is written in Rust.
 
 ### Building
 
@@ -1921,20 +2137,32 @@ The environment is now ready to develop in.
 
 #### Testing
 
-To execute tests:
+To execute tests (in parallel if possible):
 
 ```bash
 poe test
 ```
 
-This runs against [Temporalite](https://github.com/temporalio/temporalite). To run against the time-skipping test
-server, pass `--workflow-environment time-skipping`. To run against the `default` namespace of an already-running
-server, pass the `host:port` to `--workflow-environment`. Can also use regular pytest arguments. For example, here's how
-to run a single test with debug logs on the console:
+To execute tests serially:
+
+```bash
+uv run pytest
+```
+
+To execute a single test:
 
 ```bash
 poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 ```
+
+**Temporal Server**
+
+- Tests that use the workflow test environment run against the [Temporal CLI dev server](https://docs.temporal.io/cli#start-dev-server).
+- By default, workflow-environment tests automatically start a local dev server.
+- On first run, the dev server binary may be downloaded so network access is required if no server is currently running.
+- To run workflow-environment tests against the time-skipping test server, pass `--workflow-environment time-skipping`. 
+- To run workflow-environment tests against the `default` namespace of an already-running server, pass the `host:port` to `--workflow-environment`.
+- Unit tests that do not use the workflow environment do not start a dev server.
 
 #### Proto Generation and Testing
 
@@ -1952,6 +2180,11 @@ run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` 
 tests.
 
 ### Style
+
+```
+# runs ruff + cargo fmt
+poe format
+```
 
 * Mostly [Google Style Guide](https://google.github.io/styleguide/pyguide.html). Notable exceptions:
   * We use [ruff](https://docs.astral.sh/ruff/) for formatting, so that takes precedence

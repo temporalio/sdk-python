@@ -4,13 +4,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import List, Mapping
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
-    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "common" / "protos"
+    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "protos" / "protos"
 )
 api_proto_dir = proto_dir / "api_upstream"
 api_cloud_proto_dir = proto_dir / "api_cloud_upstream"
@@ -40,16 +40,36 @@ py_fixes = [
         re.compile(r"from dependencies\.").sub, r"from temporalio.api.dependencies."
     ),
     partial(
+        re.compile(r"from protoc_gen_openapiv2\.").sub,
+        r"from temporalio.api.dependencies.protoc_gen_openapiv2.",
+    ),
+    partial(
+        re.compile(r"from nexusannotations\.").sub,
+        r"from temporalio.api.dependencies.nexusannotations.",
+    ),
+    partial(
         re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
     ),
     partial(
         re.compile(r"'__module__' : 'temporal\.api\.").sub,
         r"'__module__' : 'temporalio.api.",
     ),
+    partial(
+        re.compile(r"'__module__' : 'nexusannotations\.").sub,
+        r"'__module__' : 'temporalio.api.dependencies.nexusannotations.",
+    ),
 ]
 
 pyi_fixes = [
     partial(re.compile(r"temporal\.api\.").sub, r"temporalio.api."),
+    partial(
+        re.compile(r"protoc_gen_openapiv2\.").sub,
+        r"temporalio.api.dependencies.protoc_gen_openapiv2.",
+    ),
+    partial(
+        re.compile(r"nexusannotations\.").sub,
+        r"temporalio.api.dependencies.nexusannotations.",
+    ),
     partial(re.compile(r"temporal\.sdk\.core\.").sub, r"temporalio.bridge.proto."),
 ]
 
@@ -64,7 +84,7 @@ def fix_generated_output(base_path: Path):
     - protoc doesn't generate the correct import paths
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
-    imports: Mapping[str, List[str]] = collections.defaultdict(list)
+    imports: Mapping[str, list[str]] = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():
             fix_generated_output(p)
@@ -145,12 +165,12 @@ def check_proto_toolchain_versions():
             _, _, proto_version = line.partition("==")
         elif line.startswith("grpcio-tools"):
             _, _, grpcio_tools_version = line.partition("==")
-    assert proto_version.startswith(
-        "3."
-    ), f"expected 3.x protobuf, found {proto_version}"
-    assert grpcio_tools_version.startswith(
-        "1.48."
-    ), f"expected 1.48.x grpcio-tools, found {grpcio_tools_version}"
+    assert proto_version.startswith("3."), (
+        f"expected 3.x protobuf, found {proto_version}"
+    )
+    assert grpcio_tools_version.startswith("1.48."), (
+        f"expected 1.48.x grpcio-tools, found {grpcio_tools_version}"
+    )
 
 
 def generate_protos(output_dir: Path):
@@ -163,6 +183,7 @@ def generate_protos(output_dir: Path):
             f"--proto_path={core_proto_dir}",
             f"--proto_path={testsrv_proto_dir}",
             f"--proto_path={health_proto_dir}",
+            f"--proto_path={proto_dir}",
             f"--proto_path={test_proto_dir}",
             f"--proto_path={additional_proto_dir}",
             f"--python_out={output_dir}",
@@ -182,11 +203,18 @@ def generate_protos(output_dir: Path):
             grpc_file.unlink()
     # Apply fixes before moving code
     fix_generated_output(output_dir)
+    # Move dependency protos
+    deps_out_dir = api_out_dir / "dependencies"
+    shutil.rmtree(deps_out_dir / "protoc_gen_openapiv2", ignore_errors=True)
+    shutil.rmtree(deps_out_dir / "nexusannotations", ignore_errors=True)
+    deps_out_dir.mkdir(exist_ok=True)
+    (output_dir / "protoc_gen_openapiv2").replace(deps_out_dir / "protoc_gen_openapiv2")
+    (output_dir / "nexusannotations").replace(deps_out_dir / "nexusannotations")
+    (deps_out_dir / "__init__.py").touch()
     # Move protos
     for p in (output_dir / "temporal" / "api").iterdir():
         shutil.rmtree(api_out_dir / p.name, ignore_errors=True)
         p.replace(api_out_dir / p.name)
-    shutil.rmtree(api_out_dir / "dependencies", ignore_errors=True)
     for p in (output_dir / "temporal" / "sdk" / "core").iterdir():
         shutil.rmtree(sdk_out_dir / p.name, ignore_errors=True)
         p.replace(sdk_out_dir / p.name)

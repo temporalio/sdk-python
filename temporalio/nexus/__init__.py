@@ -1,20 +1,57 @@
 """Temporal Nexus support
 
-.. warning::
-    Nexus APIs are experimental and unstable.
-
 See https://github.com/temporalio/sdk-python/tree/main#nexus
 """
 
-from ._decorators import workflow_run_operation as workflow_run_operation
-from ._operation_context import Info as Info
-from ._operation_context import LoggerAdapter as LoggerAdapter
-from ._operation_context import NexusCallback as NexusCallback
-from ._operation_context import (
-    WorkflowRunOperationContext as WorkflowRunOperationContext,
+from ._decorators import (
+    TemporalOperationStartHandlerFunc,
+    temporal_operation,
+    workflow_run_operation,
 )
-from ._operation_context import client as client
-from ._operation_context import in_operation as in_operation
-from ._operation_context import info as info
-from ._operation_context import logger as logger
-from ._token import WorkflowHandle as WorkflowHandle
+from ._operation_context import (
+    Info,
+    LoggerAdapter,
+    NexusCallback,
+    TemporalCancelOperationContext,
+    TemporalStartOperationContext,
+    WorkflowRunOperationContext,
+    client,
+    in_operation,
+    info,
+    is_worker_shutdown,
+    logger,
+    metric_meter,
+    wait_for_worker_shutdown,
+    wait_for_worker_shutdown_sync,
+)
+from ._operation_handlers import (
+    CancelWorkflowRunOptions,
+    TemporalOperationHandler,
+)
+from ._temporal_client import TemporalNexusClient, TemporalOperationResult
+from ._token import WorkflowHandle
+
+__all__ = (
+    "workflow_run_operation",
+    "CancelWorkflowRunOptions",
+    "Info",
+    "LoggerAdapter",
+    "NexusCallback",
+    "WorkflowRunOperationContext",
+    "TemporalCancelOperationContext",
+    "TemporalStartOperationContext",
+    "client",
+    "in_operation",
+    "info",
+    "is_worker_shutdown",
+    "logger",
+    "metric_meter",
+    "wait_for_worker_shutdown",
+    "wait_for_worker_shutdown_sync",
+    "WorkflowHandle",
+    "TemporalNexusClient",
+    "TemporalOperationStartHandlerFunc",
+    "TemporalOperationHandler",
+    "TemporalOperationResult",
+    "temporal_operation",
+)

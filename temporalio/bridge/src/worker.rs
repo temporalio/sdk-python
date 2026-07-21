@@ -5,25 +5,22 @@ use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use temporalio_common::errors::PollError;
-use temporalio_common::errors::WorkflowErrorType;
 use temporalio_common::protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporalio_common::protos::coresdk::{
     nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
 };
 use temporalio_common::protos::temporal::api::history::v1::History;
-use temporalio_common::protos::temporal::api::worker::v1::PluginInfo;
-use temporalio_common::worker::{
-    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
-    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
-};
-use temporalio_common::Worker;
+use temporalio_common::protos::temporal::api::worker::v1::{PluginInfo, StorageDriverInfo};
 use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
+use temporalio_sdk_core::{
+    PollError, SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext,
+    SlotReleaseContext, SlotReservationContext, SlotSupplier as SlotSupplierTrait,
+    SlotSupplierPermit, WorkflowErrorType,
+};
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::error;
@@ -65,6 +62,7 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
     plugins: Vec<String>,
+    storage_drivers: HashSet<String>,
 }
 
 #[derive(FromPyObject)]
@@ -79,31 +77,29 @@ pub struct PollerBehaviorAutoscaling {
     pub initial: usize,
 }
 
-/// Recreates [temporalio_common::worker::PollerBehavior]
+/// Recreates [temporalio_sdk_core::PollerBehavior]
 #[derive(FromPyObject)]
 pub enum PollerBehavior {
     SimpleMaximum(PollerBehaviorSimpleMaximum),
     Autoscaling(PollerBehaviorAutoscaling),
 }
 
-impl From<PollerBehavior> for temporalio_common::worker::PollerBehavior {
+impl From<PollerBehavior> for temporalio_sdk_core::PollerBehavior {
     fn from(value: PollerBehavior) -> Self {
         match value {
             PollerBehavior::SimpleMaximum(simple) => {
-                temporalio_common::worker::PollerBehavior::SimpleMaximum(simple.simple_maximum)
+                temporalio_sdk_core::PollerBehavior::SimpleMaximum(simple.simple_maximum)
             }
-            PollerBehavior::Autoscaling(auto) => {
-                temporalio_common::worker::PollerBehavior::Autoscaling {
-                    minimum: auto.minimum,
-                    maximum: auto.maximum,
-                    initial: auto.initial,
-                }
-            }
+            PollerBehavior::Autoscaling(auto) => temporalio_sdk_core::PollerBehavior::Autoscaling {
+                minimum: auto.minimum,
+                maximum: auto.maximum,
+                initial: auto.initial,
+            },
         }
     }
 }
 
-/// Recreates [temporalio_common::worker::WorkerVersioningStrategy]
+/// Recreates [temporalio_sdk_core::WorkerVersioningStrategy]
 #[derive(FromPyObject)]
 pub enum WorkerVersioningStrategy {
     None(WorkerVersioningNone),
@@ -183,8 +179,8 @@ pub struct WorkerTaskTypes {
     enable_nexus: bool,
 }
 
-impl From<&WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
-    fn from(t: &WorkerTaskTypes) -> Self {
+impl From<WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
+    fn from(t: WorkerTaskTypes) -> Self {
         Self {
             enable_workflows: t.enable_workflows,
             enable_local_activities: t.enable_local_activities,
@@ -235,9 +231,9 @@ impl SlotReserveCtx {
 #[pyclass]
 pub struct SlotMarkUsedCtx {
     #[pyo3(get)]
-    slot_info: PyObject,
+    slot_info: Py<PyAny>,
     #[pyo3(get)]
-    permit: PyObject,
+    permit: Py<PyAny>,
 }
 
 // NOTE: this is dumb because we already have the generated proto code, we just can't use
@@ -272,9 +268,9 @@ pub struct NexusSlotInfo {
 #[pyclass]
 pub struct SlotReleaseCtx {
     #[pyo3(get)]
-    slot_info: Option<PyObject>,
+    slot_info: Option<Py<PyAny>>,
     #[pyo3(get)]
-    permit: PyObject,
+    permit: Py<PyAny>,
 }
 
 fn slot_info_to_py_obj<'py>(py: Python<'py>, info: SlotInfo) -> PyResult<Bound<'py, PyAny>> {
@@ -304,14 +300,14 @@ fn slot_info_to_py_obj<'py>(py: Python<'py>, info: SlotInfo) -> PyResult<Bound<'
     })
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CustomSlotSupplier {
-    inner: Arc<PyObject>,
+    inner: Arc<Py<PyAny>>,
 }
 
 struct CustomSlotSupplierOfType<SK: SlotKind> {
-    inner: Arc<PyObject>,
+    inner: Arc<Py<PyAny>>,
     event_loop_task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
     _phantom: PhantomData<SK>,
 }
@@ -319,7 +315,7 @@ struct CustomSlotSupplierOfType<SK: SlotKind> {
 #[pymethods]
 impl CustomSlotSupplier {
     #[new]
-    fn new(inner: PyObject) -> Self {
+    fn new(inner: Py<PyAny>) -> Self {
         CustomSlotSupplier {
             inner: Arc::new(inner),
         }
@@ -333,23 +329,23 @@ impl CustomSlotSupplier {
 
 #[pyclass]
 struct CreatedTaskForSlotCallback {
-    stored_task: Arc<OnceLock<PyObject>>,
+    stored_task: Arc<OnceLock<Py<PyAny>>>,
 }
 
 #[pymethods]
 impl CreatedTaskForSlotCallback {
-    fn __call__(&self, task: PyObject) -> PyResult<()> {
+    fn __call__(&self, task: Py<PyAny>) -> PyResult<()> {
         self.stored_task.set(task).expect("must only be set once");
         Ok(())
     }
 }
 
 struct TaskCanceller {
-    stored_task: Arc<OnceLock<PyObject>>,
+    stored_task: Arc<OnceLock<Py<PyAny>>>,
 }
 
 impl TaskCanceller {
-    fn new(stored_task: Arc<OnceLock<PyObject>>) -> Self {
+    fn new(stored_task: Arc<OnceLock<Py<PyAny>>>) -> Self {
         TaskCanceller { stored_task }
     }
 }
@@ -357,7 +353,7 @@ impl TaskCanceller {
 impl Drop for TaskCanceller {
     fn drop(&mut self) {
         if let Some(task) = self.stored_task.get() {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 task.call_method0(py, "cancel")
                     .expect("Failed to cancel task");
             });
@@ -373,7 +369,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
         loop {
             let stored_task = Arc::new(OnceLock::new());
             let _task_canceller = TaskCanceller::new(stored_task.clone());
-            let pypermit = match Python::with_gil(|py| {
+            let pypermit = match Python::attach(|py| {
                 let py_obj = self.inner.bind(py);
                 let called = py_obj.call_method1(
                     "reserve_slot",
@@ -408,7 +404,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let py_obj = self.inner.bind(py);
             let pa = py_obj.call_method1(
                 "try_reserve_slot",
@@ -429,10 +425,10 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn mark_slot_used(&self, ctx: &dyn SlotMarkUsedContext<SlotKind = Self::SlotKind>) {
-        if let Err(e) = Python::with_gil(|py| {
+        if let Err(e) = Python::attach(|py| {
             let permit = ctx
                 .permit()
-                .user_data::<PyObject>()
+                .user_data::<Py<PyAny>>()
                 .map(|o| o.clone_ref(py))
                 .unwrap_or_else(|| py.None());
             let py_obj = self.inner.bind(py);
@@ -450,10 +446,10 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn release_slot(&self, ctx: &dyn SlotReleaseContext<SlotKind = Self::SlotKind>) {
-        if let Err(e) = Python::with_gil(|py| {
+        if let Err(e) = Python::attach(|py| {
             let permit = ctx
                 .permit()
-                .user_data::<PyObject>()
+                .user_data::<Py<PyAny>>()
                 .map(|o| o.clone_ref(py))
                 .unwrap_or_else(|| py.None());
             let py_obj = self.inner.bind(py);
@@ -483,7 +479,7 @@ pub struct ResourceBasedTunerConfig {
 macro_rules! enter_sync {
     ($runtime:expr) => {
         if let Some(subscriber) = $runtime.core.telemetry().trace_subscriber() {
-            temporalio_sdk_core::telemetry::set_trace_subscriber_for_current_thread(subscriber);
+            temporalio_common::telemetry::set_trace_subscriber_for_current_thread(subscriber);
         }
         let _guard = $runtime.core.tokio_handle().enter();
     };
@@ -501,7 +497,7 @@ pub fn new_worker(
     let worker = temporalio_sdk_core::init_worker(
         &runtime_ref.runtime.core,
         config,
-        client.retry_client.clone().into_inner(),
+        client.connection.clone(),
     )
     .context("Failed creating worker")?;
     Ok(WorkerRef {
@@ -544,7 +540,7 @@ pub fn new_replay_worker<'a>(
 
 #[pymethods]
 impl WorkerRef {
-    fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<PyAny, 'p>> {
+    fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
         self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         // Set custom slot supplier task locals so they can run futures.
@@ -556,11 +552,15 @@ impl WorkerRef {
             .expect("must only be set once");
 
         self.runtime.future_into_py(py, async move {
-            worker
-                .validate()
-                .await
-                .context("Worker validation failed")
-                .map_err(Into::into)
+            let bytes = match worker.validate().await {
+                Ok(info) => info.encode_to_vec(),
+                Err(err) => {
+                    return Err(PyRuntimeError::new_err(format!(
+                        "Worker validation failed: {err}"
+                    )))
+                }
+            };
+            Ok(bytes)
         })
     }
 
@@ -658,10 +658,14 @@ impl WorkerRef {
         enter_sync!(self.runtime);
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
-        self.worker
-            .as_ref()
-            .unwrap()
-            .record_activity_heartbeat(heartbeat);
+        let worker = self.worker.as_ref().unwrap().clone();
+        // Detach from the GIL during the core call. Core may block on internal
+        // locks whose holders can call back into Python (e.g. a custom slot
+        // supplier's mark_slot_used runs while core's outstanding-activity
+        // lock is held); holding the GIL here would deadlock the worker.
+        proto
+            .py()
+            .detach(move || worker.record_activity_heartbeat(heartbeat));
         Ok(())
     }
 
@@ -679,11 +683,12 @@ impl WorkerRef {
         self.worker
             .as_ref()
             .expect("missing worker")
-            .replace_client(client.retry_client.clone().into_inner())
+            .replace_client(client.connection.clone())
             .map_err(|err| PyValueError::new_err(format!("Failed replacing client: {err}")))
     }
 
     fn initiate_shutdown(&self) -> PyResult<()> {
+        enter_sync!(self.runtime);
         let worker = self.worker.as_ref().unwrap().clone();
         worker.initiate_shutdown();
         Ok(())
@@ -711,17 +716,17 @@ fn convert_worker_config(
 ) -> PyResult<temporalio_sdk_core::WorkerConfig> {
     let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
     let converted_versioning_strategy = convert_versioning_strategy(conf.versioning_strategy);
-    temporalio_sdk_core::WorkerConfigBuilder::default()
+    temporalio_sdk_core::WorkerConfig::builder()
         .namespace(conf.namespace)
         .task_queue(conf.task_queue)
         .versioning_strategy(converted_versioning_strategy)
-        .client_identity_override(conf.identity_override)
+        .maybe_client_identity_override(conf.identity_override)
         .max_cached_workflows(conf.max_cached_workflows)
-        .workflow_task_poller_behavior(conf.workflow_task_poller_behavior)
+        .workflow_task_poller_behavior(conf.workflow_task_poller_behavior.into())
         .tuner(Arc::new(converted_tuner))
         .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-        .activity_task_poller_behavior(conf.activity_task_poller_behavior)
-        .task_types(&conf.task_types)
+        .activity_task_poller_behavior(conf.activity_task_poller_behavior.into())
+        .task_types(conf.task_types.into())
         .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
             conf.sticky_queue_schedule_to_start_timeout_millis,
         ))
@@ -731,8 +736,8 @@ fn convert_worker_config(
         .default_heartbeat_throttle_interval(Duration::from_millis(
             conf.default_heartbeat_throttle_interval_millis,
         ))
-        .max_worker_activities_per_second(conf.max_activities_per_second)
-        .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
+        .maybe_max_worker_activities_per_second(conf.max_activities_per_second)
+        .maybe_max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
         // Even though grace period is optional, if it is not set then the
         // auto-cancel-activity behavior of shutdown will not occur, so we
         // always set it even if 0.
@@ -751,9 +756,9 @@ fn convert_worker_config(
                         HashSet::from([WorkflowErrorType::Nondeterminism]),
                     )
                 })
-                .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
+                .collect(),
         )
-        .nexus_task_poller_behavior(conf.nexus_task_poller_behavior)
+        .nexus_task_poller_behavior(conf.nexus_task_poller_behavior.into())
         .plugins(
             conf.plugins
                 .into_iter()
@@ -761,7 +766,13 @@ fn convert_worker_config(
                     name,
                     version: String::new(),
                 })
-                .collect::<Vec<_>>(),
+                .collect(),
+        )
+        .storage_drivers(
+            conf.storage_drivers
+                .into_iter()
+                .map(|r#type| StorageDriverInfo { r#type })
+                .collect::<HashSet<_>>(),
         )
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
@@ -815,17 +826,13 @@ fn convert_tuner_holder(
         ));
     }
 
-    let mut options = temporalio_sdk_core::TunerHolderOptionsBuilder::default();
-    if let Some(first) = first {
-        options.resource_based_options(
-            temporalio_sdk_core::ResourceBasedSlotsOptionsBuilder::default()
+    Ok(temporalio_sdk_core::TunerHolderOptions::builder()
+        .maybe_resource_based_options(first.map(|first| {
+            temporalio_sdk_core::ResourceBasedSlotsOptions::builder()
                 .target_mem_usage(first.target_memory_usage)
                 .target_cpu_usage(first.target_cpu_usage)
                 .build()
-                .expect("Building ResourceBasedSlotsOptions is infallible"),
-        );
-    };
-    options
+        }))
         .workflow_slot_options(convert_slot_supplier(
             holder.workflow_slot_supplier,
             task_locals.clone(),
@@ -841,8 +848,7 @@ fn convert_tuner_holder(
         .nexus_slot_options(convert_slot_supplier(
             holder.nexus_slot_supplier,
             task_locals,
-        )?);
-    Ok(options
+        )?)
         .build()
         .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {e}")))?
         .build_tuner_holder()
@@ -878,32 +884,34 @@ fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
 
 fn convert_versioning_strategy(
     strategy: WorkerVersioningStrategy,
-) -> temporalio_common::worker::WorkerVersioningStrategy {
+) -> temporalio_sdk_core::WorkerVersioningStrategy {
     match strategy {
-        WorkerVersioningStrategy::None(vn) => {
-            temporalio_common::worker::WorkerVersioningStrategy::None {
-                build_id: vn.build_id_no_versioning,
-            }
-        }
+        WorkerVersioningStrategy::None(vn) => temporalio_sdk_core::WorkerVersioningStrategy::None {
+            build_id: vn.build_id_no_versioning,
+        },
         WorkerVersioningStrategy::DeploymentBased(options) => {
-            temporalio_common::worker::WorkerVersioningStrategy::WorkerDeploymentBased(
+            temporalio_sdk_core::WorkerVersioningStrategy::WorkerDeploymentBased(
                 temporalio_common::worker::WorkerDeploymentOptions {
                     version: temporalio_common::worker::WorkerDeploymentVersion {
                         deployment_name: options.version.deployment_name,
                         build_id: options.version.build_id,
                     },
                     use_worker_versioning: options.use_worker_versioning,
-                    default_versioning_behavior: Some(
-                        options
-                            .default_versioning_behavior
-                            .try_into()
-                            .unwrap_or_default(),
-                    ),
+                    default_versioning_behavior: if options.use_worker_versioning {
+                        Some(
+                            options
+                                .default_versioning_behavior
+                                .try_into()
+                                .unwrap_or_default(),
+                        )
+                    } else {
+                        None
+                    },
                 },
             )
         }
         WorkerVersioningStrategy::LegacyBuildIdBased(lb) => {
-            temporalio_common::worker::WorkerVersioningStrategy::LegacyBuildIdBased {
+            temporalio_sdk_core::WorkerVersioningStrategy::LegacyBuildIdBased {
                 build_id: lb.build_id_with_versioning,
             }
         }

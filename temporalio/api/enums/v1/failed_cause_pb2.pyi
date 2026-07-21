@@ -170,6 +170,10 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
         _WorkflowTaskFailedCause.ValueType
     )  # 36
     """A workflow task failed because a grpc message was too large."""
+    WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: (
+        _WorkflowTaskFailedCause.ValueType
+    )  # 37
+    """A workflow task failed because payloads were too large."""
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -314,6 +318,8 @@ WORKFLOW_TASK_FAILED_CAUSE_GRPC_MESSAGE_TOO_LARGE: (
     WorkflowTaskFailedCause.ValueType
 )  # 36
 """A workflow task failed because a grpc message was too large."""
+WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: WorkflowTaskFailedCause.ValueType  # 37
+"""A workflow task failed because payloads were too large."""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:
@@ -469,6 +475,10 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
     """Circuit breaker is open/half-open."""
     RESOURCE_EXHAUSTED_CAUSE_OPS_LIMIT: _ResourceExhaustedCause.ValueType  # 9
     """Namespace exceeds operations rate limit."""
+    RESOURCE_EXHAUSTED_CAUSE_WORKER_DEPLOYMENT_LIMITS: (
+        _ResourceExhaustedCause.ValueType
+    )  # 10
+    """Limits related to Worker Deployments are reached."""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -495,6 +505,10 @@ RESOURCE_EXHAUSTED_CAUSE_CIRCUIT_BREAKER_OPEN: ResourceExhaustedCause.ValueType 
 """Circuit breaker is open/half-open."""
 RESOURCE_EXHAUSTED_CAUSE_OPS_LIMIT: ResourceExhaustedCause.ValueType  # 9
 """Namespace exceeds operations rate limit."""
+RESOURCE_EXHAUSTED_CAUSE_WORKER_DEPLOYMENT_LIMITS: (
+    ResourceExhaustedCause.ValueType
+)  # 10
+"""Limits related to Worker Deployments are reached."""
 global___ResourceExhaustedCause = ResourceExhaustedCause
 
 class _ResourceExhaustedScope:

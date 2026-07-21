@@ -5,23 +5,12 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import (
-    Awaitable,
-    Callable,
-    List,
-    MutableSequence,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
+    TypeAlias,
 )
 
-from typing_extensions import TypeAlias
-
-import temporalio.api.common.v1
-import temporalio.api.history.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
@@ -31,13 +20,15 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
-import temporalio.exceptions
+import temporalio.converter._extstore
 from temporalio.api.common.v1.message_pb2 import Payload
-from temporalio.bridge._visitor import VisitorFunctions
+from temporalio.bridge._visitor_functions import PayloadSequence, VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
-from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
+from temporalio.bridge.temporal_sdk_bridge import (
+    PollShutdownError,  # type: ignore # noqa: F401
+)
 from temporalio.worker._command_aware_visitor import CommandAwarePayloadVisitor
 
 
@@ -48,7 +39,7 @@ class WorkerConfig:
     namespace: str
     task_queue: str
     versioning_strategy: WorkerVersioningStrategy
-    identity_override: Optional[str]
+    identity_override: str | None
     max_cached_workflows: int
     tuner: TunerHolder
     workflow_task_poller_behavior: PollerBehavior
@@ -59,13 +50,14 @@ class WorkerConfig:
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int
     default_heartbeat_throttle_interval_millis: int
-    max_activities_per_second: Optional[float]
-    max_task_queue_activities_per_second: Optional[float]
+    max_activities_per_second: float | None
+    max_task_queue_activities_per_second: float | None
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
-    nondeterminism_as_workflow_fail_for_types: Set[str]
+    nondeterminism_as_workflow_fail_for_types: set[str]
     nexus_task_poller_behavior: PollerBehavior
     plugins: Sequence[str]
+    storage_drivers: set[str]
 
 
 @dataclass
@@ -84,10 +76,7 @@ class PollerBehaviorAutoscaling:
     initial: int
 
 
-PollerBehavior: TypeAlias = Union[
-    PollerBehaviorSimpleMaximum,
-    PollerBehaviorAutoscaling,
-]
+PollerBehavior: TypeAlias = PollerBehaviorSimpleMaximum | PollerBehaviorAutoscaling
 
 
 @dataclass
@@ -122,11 +111,11 @@ class WorkerVersioningStrategyLegacyBuildIdBased:
     build_id_with_versioning: str
 
 
-WorkerVersioningStrategy: TypeAlias = Union[
-    WorkerVersioningStrategyNone,
-    WorkerDeploymentOptions,
-    WorkerVersioningStrategyLegacyBuildIdBased,
-]
+WorkerVersioningStrategy: TypeAlias = (
+    WorkerVersioningStrategyNone
+    | WorkerDeploymentOptions
+    | WorkerVersioningStrategyLegacyBuildIdBased
+)
 
 
 @dataclass
@@ -154,11 +143,9 @@ class FixedSizeSlotSupplier:
     num_slots: int
 
 
-SlotSupplier: TypeAlias = Union[
-    FixedSizeSlotSupplier,
-    ResourceBasedSlotSupplier,
-    BridgeCustomSlotSupplier,
-]
+SlotSupplier: TypeAlias = (
+    FixedSizeSlotSupplier | ResourceBasedSlotSupplier | BridgeCustomSlotSupplier
+)
 
 
 @dataclass
@@ -197,7 +184,7 @@ class Worker:
     def for_replay(
         runtime: temporalio.bridge.runtime.Runtime,
         config: WorkerConfig,
-    ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
+    ) -> tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
         """Create a bridge replay worker."""
         [
             replay_worker,
@@ -211,9 +198,13 @@ class Worker:
         """Create SDK core worker from a bridge worker."""
         self._ref = ref
 
-    async def validate(self) -> None:
+    async def validate(
+        self,
+    ) -> temporalio.bridge.proto.NamespaceInfo:
         """Validate the bridge worker."""
-        await self._ref.validate()
+        return temporalio.bridge.proto.NamespaceInfo.FromString(
+            await self._ref.validate()  # type: ignore[reportOptionalMemberAccess]
+        )
 
     async def poll_workflow_activation(
         self,
@@ -221,7 +212,7 @@ class Worker:
         """Poll for a workflow activation."""
         return (
             temporalio.bridge.proto.workflow_activation.WorkflowActivation.FromString(
-                await self._ref.poll_workflow_activation()
+                await self._ref.poll_workflow_activation()  # type: ignore[reportOptionalMemberAccess]
             )
         )
 
@@ -230,7 +221,7 @@ class Worker:
     ) -> temporalio.bridge.proto.activity_task.ActivityTask:
         """Poll for an activity task."""
         return temporalio.bridge.proto.activity_task.ActivityTask.FromString(
-            await self._ref.poll_activity_task()
+            await self._ref.poll_activity_task()  # type: ignore[reportOptionalMemberAccess]
         )
 
     async def poll_nexus_task(
@@ -238,7 +229,7 @@ class Worker:
     ) -> temporalio.bridge.proto.nexus.NexusTask:
         """Poll for a nexus task."""
         return temporalio.bridge.proto.nexus.NexusTask.FromString(
-            await self._ref.poll_nexus_task()
+            await self._ref.poll_nexus_task()  # type: ignore[reportOptionalMemberAccess]
         )
 
     async def complete_workflow_activation(
@@ -246,37 +237,37 @@ class Worker:
         comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     ) -> None:
         """Complete a workflow activation."""
-        await self._ref.complete_workflow_activation(comp.SerializeToString())
+        await self._ref.complete_workflow_activation(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     async def complete_activity_task(
         self, comp: temporalio.bridge.proto.ActivityTaskCompletion
     ) -> None:
         """Complete an activity task."""
-        await self._ref.complete_activity_task(comp.SerializeToString())
+        await self._ref.complete_activity_task(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     async def complete_nexus_task(
         self, comp: temporalio.bridge.proto.nexus.NexusTaskCompletion
     ) -> None:
         """Complete a nexus task."""
-        await self._ref.complete_nexus_task(comp.SerializeToString())
+        await self._ref.complete_nexus_task(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     def record_activity_heartbeat(
         self, comp: temporalio.bridge.proto.ActivityHeartbeat
     ) -> None:
         """Record an activity heartbeat."""
-        self._ref.record_activity_heartbeat(comp.SerializeToString())
+        self._ref.record_activity_heartbeat(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     def request_workflow_eviction(self, run_id: str) -> None:
         """Request a workflow be evicted."""
-        self._ref.request_workflow_eviction(run_id)
+        self._ref.request_workflow_eviction(run_id)  # type: ignore[reportOptionalMemberAccess]
 
     def replace_client(self, client: temporalio.bridge.client.Client) -> None:
         """Replace the worker client."""
-        self._ref.replace_client(client._ref)
+        self._ref.replace_client(client._ref)  # type: ignore[reportOptionalMemberAccess]
 
     def initiate_shutdown(self) -> None:
         """Start shutdown of the worker."""
-        self._ref.initiate_shutdown()
+        self._ref.initiate_shutdown()  # type: ignore[reportOptionalMemberAccess]
 
     async def finalize_shutdown(self) -> None:
         """Finalize the worker.
@@ -286,19 +277,24 @@ class Worker:
         """
         ref = self._ref
         self._ref = None
-        await ref.finalize_shutdown()
+        await ref.finalize_shutdown()  # type: ignore[reportOptionalMemberAccess]
 
 
 class _Visitor(VisitorFunctions):
-    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[List[Payload]]]):
+    def __init__(
+        self,
+        f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
+        visit_system_nexus_envelope: Callable[[Payload], Awaitable[None]] | None = None,
+    ):
         self._f = f
+        self._visit_system_nexus_envelope = visit_system_nexus_envelope
 
     async def visit_payload(self, payload: Payload) -> None:
         new_payload = (await self._f([payload]))[0]
         if new_payload is not payload:
             payload.CopyFrom(new_payload)
 
-    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+    async def visit_payloads(self, payloads: PayloadSequence) -> None:
         if len(payloads) == 0:
             return
         new_payloads = await self._f(payloads)
@@ -307,24 +303,85 @@ class _Visitor(VisitorFunctions):
         del payloads[:]
         payloads.extend(new_payloads)
 
+    async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+        if self._visit_system_nexus_envelope is not None:
+            await self._visit_system_nexus_envelope(payload)
+
 
 async def decode_activation(
     activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-    codec: temporalio.converter.PayloadCodec,
+    data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
-) -> None:
-    """Decode all payloads in the activation."""
+    storage_concurrency_limit: int,
+) -> temporalio.converter._extstore.StorageOperationMetrics:
+    """Decode all payloads in the activation.
+
+    Returns:
+        Metrics from any external storage retrieval operations that occurred.
+    """
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
+    with metrics.track():
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True,
+            skip_headers=not decode_headers,
+            concurrency_limit=storage_concurrency_limit,
+        ).visit(
+            _Visitor(data_converter._external_retrieve_payload_sequence), activation
+        )
+
     await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit(_Visitor(codec.decode), activation)
+        skip_search_attributes=True,
+        skip_headers=not decode_headers,
+    ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+
+    return metrics
 
 
 async def encode_completion(
     completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
-    codec: temporalio.converter.PayloadCodec,
+    data_converter: temporalio.converter.DataConverter,
     encode_headers: bool,
-) -> None:
-    """Encode all payloads in the completion."""
+    storage_concurrency_limit: int,
+) -> temporalio.converter._extstore.StorageOperationMetrics:
+    """Encode all payloads in the completion.
+
+    Returns:
+        Metrics from any external storage store operations that occurred.
+    """
+
+    async def _validate_system_nexus_envelope(payload: Payload) -> None:
+        data_converter._validate_payload_limits([payload])
+
     await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit(_Visitor(codec.encode), completion)
+        skip_search_attributes=True,
+        skip_headers=not encode_headers,
+    ).visit(
+        _Visitor(
+            data_converter._encode_payload_sequence,
+            visit_system_nexus_envelope=_validate_system_nexus_envelope,
+        ),
+        completion,
+    )
+
+    async def _store_and_validate(
+        payloads: Sequence[Payload],
+    ) -> list[Payload]:
+        stored = await data_converter._external_store_payload_sequence(payloads)
+        data_converter._validate_payload_limits(stored)
+        return stored
+
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
+    with metrics.track():
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True,
+            skip_headers=not encode_headers,
+            concurrency_limit=storage_concurrency_limit,
+        ).visit(
+            _Visitor(
+                _store_and_validate,
+                visit_system_nexus_envelope=_validate_system_nexus_envelope,
+            ),
+            completion,
+        )
+
+    return metrics

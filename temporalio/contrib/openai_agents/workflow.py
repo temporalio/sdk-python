@@ -4,9 +4,10 @@ import functools
 import inspect
 import json
 import typing
+from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
-from typing import Any, Callable, Optional, Type
+from typing import Any
 
 import nexusrpc
 from agents import (
@@ -21,6 +22,9 @@ from agents.tool import (
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_client import (
+    TemporalSandboxClient,
+)
 from temporalio.exceptions import ApplicationError, TemporalError
 from temporalio.workflow import (
     ActivityCancellationType,
@@ -35,24 +39,20 @@ if typing.TYPE_CHECKING:
 def activity_as_tool(
     fn: Callable,
     *,
-    task_queue: Optional[str] = None,
-    schedule_to_close_timeout: Optional[timedelta] = None,
-    schedule_to_start_timeout: Optional[timedelta] = None,
-    start_to_close_timeout: Optional[timedelta] = None,
-    heartbeat_timeout: Optional[timedelta] = None,
-    retry_policy: Optional[RetryPolicy] = None,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: RetryPolicy | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: Optional[str] = None,
-    versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
     priority: Priority = Priority.default,
     strict_json_schema: bool = True,
 ) -> Tool:
     """Convert a single Temporal activity function to an OpenAI agent tool.
-
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
 
     This function takes a Temporal activity function and converts it into an
     OpenAI agent tool that can be used by the agent to execute the activity
@@ -60,11 +60,13 @@ def activity_as_tool(
     of inputs and outputs between the agent and the activity. Note that if you take a context,
     mutation will not be persisted, as the activity may not be running in the same location.
 
+    For undocumented arguments, refer to :py:mod:`workflow` and :py:meth:`start_activity`
+
     Args:
         fn: A Temporal activity function to convert to a tool.
         strict_json_schema: Whether the tool should follow a strict schema.
             See https://openai.github.io/openai-agents-python/ref/tool/#agents.tool.FunctionTool.strict_json_schema
-        For other arguments, refer to :py:mod:`workflow` :py:meth:`start_activity`
+
 
     Returns:
         An OpenAI agent tool that wraps the provided activity.
@@ -161,16 +163,12 @@ def activity_as_tool(
 def nexus_operation_as_tool(
     operation: nexusrpc.Operation[Any, Any],
     *,
-    service: Type[Any],
+    service: type[Any],
     endpoint: str,
-    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_close_timeout: timedelta | None = None,
     strict_json_schema: bool = True,
 ) -> Tool:
     """Convert a Nexus operation into an OpenAI agent tool.
-
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
 
     This function takes a Nexus operation and converts it into an
     OpenAI agent tool that can be used by the agent to execute the operation
@@ -178,7 +176,7 @@ def nexus_operation_as_tool(
     of inputs and outputs between the agent and the operation.
 
     Args:
-        fn: A Nexus operation to convert into a tool.
+        operation: A Nexus operation to convert into a tool.
         service: The Nexus service class that contains the operation.
         endpoint: The Nexus endpoint to use for the operation.
         strict_json_schema: Whether the tool should follow a strict schema
@@ -200,7 +198,7 @@ def nexus_operation_as_tool(
         >>> # Use tool with an OpenAI agent
     """
 
-    def operation_callable(input):
+    def operation_callable(input: Any):  # type: ignore[reportUnusedParameter]
         raise NotImplementedError("This function definition is used as a type only")
 
     operation_callable.__annotations__ = {
@@ -211,7 +209,7 @@ def nexus_operation_as_tool(
 
     schema = function_schema(operation_callable)
 
-    async def run_operation(ctx: RunContextWrapper[Any], input: str) -> Any:
+    async def run_operation(_ctx: RunContextWrapper[Any], input: str) -> Any:
         try:
             json_data = json.loads(input)
         except Exception as e:
@@ -246,17 +244,45 @@ def nexus_operation_as_tool(
     )
 
 
-def stateless_mcp_server(
+def temporal_sandbox_client(
     name: str,
-    config: Optional[ActivityConfig] = None,
-    cache_tools_list: bool = False,
-    factory_argument: Optional[Any] = None,
-) -> "MCPServer":
-    """A stateless MCP server implementation for Temporal workflows.
+    config: ActivityConfig | None = None,
+) -> Any:
+    """Create a sandbox client reference for use in a Temporal workflow ``RunConfig``.
 
     .. warning::
-        This API is experimental and may change in future versions.
+        This is experimental and may change in future versions.
         Use with caution in production environments.
+
+    This returns a ``BaseSandboxClient`` that dispatches all sandbox operations
+    as Temporal activities, targeting the ``SandboxClientProvider`` registered
+    on the worker with the matching ``name``.
+
+    Example::
+
+        run_config = RunConfig(
+            sandbox=SandboxRunConfig(
+                client=temporal_sandbox_client("daytona"),
+                options=DaytonaSandboxClientOptions(...),
+            ),
+        )
+
+    Args:
+        name: The name of the ``SandboxClientProvider`` registered on the
+            worker.  Must match exactly.
+        config: Optional activity configuration for controlling timeouts,
+            retries, etc.  Defaults to a 5-minute ``start_to_close_timeout``.
+    """
+    return TemporalSandboxClient(name=name, config=config)
+
+
+def stateless_mcp_server(
+    name: str,
+    config: ActivityConfig | None = None,
+    cache_tools_list: bool = False,
+    factory_argument: Any | None = None,
+) -> "MCPServer":
+    """A stateless MCP server implementation for Temporal workflows.
 
     This uses a TemporalMCPServer of the same name registered with the OpenAIAgents plugin to implement
     durable MCP operations statelessly.
@@ -283,15 +309,11 @@ def stateless_mcp_server(
 
 def stateful_mcp_server(
     name: str,
-    config: Optional[ActivityConfig] = None,
-    server_session_config: Optional[ActivityConfig] = None,
-    factory_argument: Optional[Any] = None,
+    config: ActivityConfig | None = None,
+    server_session_config: ActivityConfig | None = None,
+    factory_argument: Any | None = None,
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
-
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
 
     This wraps an MCP server to maintain a persistent connection throughout
     the workflow execution. It creates a dedicated worker that stays connected to
@@ -324,10 +346,6 @@ def stateful_mcp_server(
 class ToolSerializationError(TemporalError):
     """Error that occurs when a tool output could not be serialized.
 
-    .. warning::
-        This exception is experimental and may change in future versions.
-        Use with caution in production environments.
-
     This exception is raised when a tool (created from an activity or Nexus operation)
     returns a value that cannot be properly serialized for use by the OpenAI agent.
     All tool outputs must be convertible to strings for the agent to process them.
@@ -348,9 +366,4 @@ class ToolSerializationError(TemporalError):
 
 
 class AgentsWorkflowError(TemporalError):
-    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow or update.
-
-    .. warning::
-        This exception is experimental and may change in future versions.
-        Use with caution in production environments.
-    """
+    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow or update."""

@@ -7,15 +7,17 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Sequence, Type
+from typing import Any
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.workflow
+from temporalio.converter._extstore import StorageDriverStoreContext
 from temporalio.worker import _command_aware_visitor
 
 from ...api.common.v1.message_pb2 import Payloads
@@ -64,7 +66,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
     restrictions: SandboxRestrictions = SandboxRestrictions.default
     """Set of restrictions to apply to this sandbox"""
 
-    runner_class: Type[WorkflowRunner] = UnsandboxedWorkflowRunner
+    runner_class: type[WorkflowRunner] = UnsandboxedWorkflowRunner
     """The class for underlying runner the sandbox will instantiate and  use to run workflows. Note, this class is
     re-imported and instantiated for *each* workflow run."""
 
@@ -87,6 +89,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 extern_functions={},
                 disable_eager_activity_execution=False,
                 worker_level_failure_exception_types=self._worker_level_failure_exception_types,
+                patch_activation_callback=None,
                 last_completion_result=Payloads(),
                 last_failure=Failure(),
             ),
@@ -109,14 +112,14 @@ class _Instance(WorkflowInstance):
     def __init__(
         self,
         instance_details: WorkflowInstanceDetails,
-        runner_class: Type[WorkflowRunner],
+        runner_class: type[WorkflowRunner],
         restrictions: SandboxRestrictions,
     ) -> None:
         self.instance_details = instance_details
         self.runner_class = runner_class
         self.importer = Importer(restrictions, RestrictionContext())
 
-        self._current_thread_id: Optional[int] = None
+        self._current_thread_id: int | None = None
 
         # Create the instance
         self.globals_and_locals = {
@@ -185,13 +188,16 @@ class _Instance(WorkflowInstance):
             for k, v in extra_globals.items():
                 self.globals_and_locals.pop(k, None)
 
-    def get_thread_id(self) -> Optional[int]:
+    def get_info(self) -> temporalio.workflow.Info:
+        return self.instance_details.info
+
+    def get_thread_id(self) -> int | None:
         return self._current_thread_id
 
     def get_serialization_context(
         self,
-        command_info: Optional[_command_aware_visitor.CommandInfo],
-    ) -> Optional[temporalio.converter.SerializationContext]:
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> temporalio.converter.SerializationContext | None:
         # Forward call to the sandboxed instance
         self.importer.restriction_context.is_runtime = True
         try:
@@ -202,5 +208,24 @@ class _Instance(WorkflowInstance):
                 __temporal_command_info=command_info,
             )
             return self.globals_and_locals.pop("__temporal_context", None)  # type: ignore
+        finally:
+            self.importer.restriction_context.is_runtime = False
+
+    def get_external_store_context(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> StorageDriverStoreContext:
+        # Forward call to the sandboxed instance
+        self.importer.restriction_context.is_runtime = True
+        try:
+            self._run_code(
+                "with __temporal_importer.applied():\n"
+                "  __temporal_context = __temporal_in_sandbox.get_external_store_context(__temporal_command_info)\n",
+                __temporal_importer=self.importer,
+                __temporal_command_info=command_info,
+            )
+            return self.globals_and_locals.pop(
+                "__temporal_context", StorageDriverStoreContext(target=None)
+            )  # type: ignore
         finally:
             self.importer.restriction_context.is_runtime = False

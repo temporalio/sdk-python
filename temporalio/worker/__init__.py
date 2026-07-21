@@ -1,16 +1,20 @@
 """Worker for processing Temporal workflows and/or activities."""
 
+from ..common import WorkerDeploymentVersion
 from ._activity import SharedHeartbeatSender, SharedStateManager
 from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
     ContinueAsNewInput,
     ExecuteActivityInput,
+    ExecuteNexusOperationCancelInput,
+    ExecuteNexusOperationStartInput,
     ExecuteWorkflowInput,
     HandleQueryInput,
     HandleSignalInput,
     HandleUpdateInput,
     Interceptor,
+    NexusOperationInboundInterceptor,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
     StartActivityInput,
@@ -52,9 +56,9 @@ from ._worker import (
     Worker,
     WorkerConfig,
     WorkerDeploymentConfig,
-    WorkerDeploymentVersion,
 )
 from ._workflow_instance import (
+    PatchActivationInput,
     UnsandboxedWorkflowRunner,
     WorkflowInstance,
     WorkflowInstanceDetails,
@@ -74,12 +78,14 @@ __all__ = [
     "PollerBehavior",
     "PollerBehaviorSimpleMaximum",
     "PollerBehaviorAutoscaling",
+    "PatchActivationInput",
     # Interceptor base classes
     "Interceptor",
     "ActivityInboundInterceptor",
     "ActivityOutboundInterceptor",
     "WorkflowInboundInterceptor",
     "WorkflowOutboundInterceptor",
+    "NexusOperationInboundInterceptor",
     "Plugin",
     # Interceptor input
     "ContinueAsNewInput",
@@ -95,6 +101,8 @@ __all__ = [
     "StartLocalActivityInput",
     "StartNexusOperationInput",
     "WorkflowInterceptorClassInput",
+    "ExecuteNexusOperationStartInput",
+    "ExecuteNexusOperationCancelInput",
     # Advanced activity classes
     "SharedStateManager",
     "SharedHeartbeatSender",

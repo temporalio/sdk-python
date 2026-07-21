@@ -1,6 +1,7 @@
 """Test that CommandAwarePayloadVisitor handles all commands with seq fields that have payloads."""
 
-from typing import Any, Iterator, Type
+from collections.abc import Iterator
+from typing import Any
 
 from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge.proto.workflow_activation import workflow_activation_pb2
@@ -14,8 +15,6 @@ def test_command_aware_visitor_has_methods_for_all_seq_protos_with_payloads():
     We only override methods when the base class has a visitor method (i.e., there are payloads to visit).
     Commands without payloads don't need overrides since there's nothing to visit.
     """
-    visitor = CommandAwarePayloadVisitor()
-
     # Find all protos with seq
     command_protos = list(_get_workflow_command_protos_with_seq())
     job_protos = list(_get_workflow_activation_job_protos_with_seq())
@@ -66,24 +65,24 @@ def test_command_aware_visitor_has_methods_for_all_seq_protos_with_payloads():
 
     # Sanity check: we should have fewer overrides than total protos with seq
     # (because some don't have payloads)
-    assert len(commands_with_payloads) < len(
-        command_protos
-    ), "Should have some commands without payloads"
+    assert len(commands_with_payloads) < len(command_protos), (
+        "Should have some commands without payloads"
+    )
     # All activation jobs except FireTimer have payloads
-    assert (
-        len(jobs_with_payloads) == len(job_protos) - 1
-    ), "Should have exactly one activation job without payloads (FireTimer)"
+    assert len(jobs_with_payloads) == len(job_protos) - 1, (
+        "Should have exactly one activation job without payloads (FireTimer)"
+    )
 
 
-def _get_workflow_command_protos_with_seq() -> Iterator[Type[Any]]:
+def _get_workflow_command_protos_with_seq() -> Iterator[type[Any]]:
     """Get concrete classes of all workflow command protos with a seq field."""
     for descriptor in workflow_commands_pb2.DESCRIPTOR.message_types_by_name.values():
         if "seq" in descriptor.fields_by_name:
-            yield descriptor._concrete_class
+            yield getattr(descriptor, "_concrete_class")
 
 
-def _get_workflow_activation_job_protos_with_seq() -> Iterator[Type[Any]]:
+def _get_workflow_activation_job_protos_with_seq() -> Iterator[type[Any]]:
     """Get concrete classes of all workflow activation job protos with a seq field."""
     for descriptor in workflow_activation_pb2.DESCRIPTOR.message_types_by_name.values():
         if "seq" in descriptor.fields_by_name:
-            yield descriptor._concrete_class
+            yield getattr(descriptor, "_concrete_class")

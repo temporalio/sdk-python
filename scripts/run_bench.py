@@ -5,9 +5,9 @@ import logging
 import sys
 import time
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from typing import AsyncIterator
 
 from temporalio import activity, workflow
 from temporalio.testing import WorkflowEnvironment

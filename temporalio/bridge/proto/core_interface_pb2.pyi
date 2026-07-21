@@ -165,3 +165,54 @@ class NexusSlotInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___NexusSlotInfo = NexusSlotInfo
+
+class NamespaceInfo(google.protobuf.message.Message):
+    """Info about a namespace"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class Limits(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        BLOB_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
+        MEMO_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
+        blob_size_limit_error: builtins.int
+        """Maximum size in bytes for payload fields in workflow history events
+        (e.g., workflow/activity inputs and results, failure details, signal payloads).
+        When exceeded, the server will reject the operation with an error.
+        """
+        memo_size_limit_error: builtins.int
+        """Maximum total memo size in bytes per workflow execution."""
+        def __init__(
+            self,
+            *,
+            blob_size_limit_error: builtins.int = ...,
+            memo_size_limit_error: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "blob_size_limit_error",
+                b"blob_size_limit_error",
+                "memo_size_limit_error",
+                b"memo_size_limit_error",
+            ],
+        ) -> None: ...
+
+    LIMITS_FIELD_NUMBER: builtins.int
+    @property
+    def limits(self) -> global___NamespaceInfo.Limits:
+        """Namespace configured limits"""
+    def __init__(
+        self,
+        *,
+        limits: global___NamespaceInfo.Limits | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["limits", b"limits"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["limits", b"limits"]
+    ) -> None: ...
+
+global___NamespaceInfo = NamespaceInfo

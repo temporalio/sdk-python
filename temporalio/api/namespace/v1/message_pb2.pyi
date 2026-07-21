@@ -53,6 +53,14 @@ class NamespaceInfo(google.protobuf.message.Message):
         ASYNC_UPDATE_FIELD_NUMBER: builtins.int
         WORKER_HEARTBEATS_FIELD_NUMBER: builtins.int
         REPORTED_PROBLEMS_SEARCH_ATTRIBUTE_FIELD_NUMBER: builtins.int
+        WORKFLOW_PAUSE_FIELD_NUMBER: builtins.int
+        STANDALONE_ACTIVITIES_FIELD_NUMBER: builtins.int
+        WORKER_POLL_COMPLETE_ON_SHUTDOWN_FIELD_NUMBER: builtins.int
+        POLLER_AUTOSCALING_FIELD_NUMBER: builtins.int
+        WORKER_COMMANDS_FIELD_NUMBER: builtins.int
+        STANDALONE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+        WORKFLOW_UPDATE_CALLBACKS_FIELD_NUMBER: builtins.int
+        POLLER_AUTOSCALING_AUTO_ENROLL_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -63,6 +71,27 @@ class NamespaceInfo(google.protobuf.message.Message):
         """True if the namespace supports worker heartbeats"""
         reported_problems_search_attribute: builtins.bool
         """True if the namespace supports reported problems search attribute"""
+        workflow_pause: builtins.bool
+        """True if the namespace supports pausing workflows"""
+        standalone_activities: builtins.bool
+        """True if the namespace supports standalone activities"""
+        worker_poll_complete_on_shutdown: builtins.bool
+        """True if the namespace supports server-side completion of outstanding worker polls on shutdown.
+        When enabled, the server will complete polls for workers that send WorkerInstanceKey in their
+        poll requests and call ShutdownWorker with the same WorkerInstanceKey. The poll will return
+        an empty response. When this flag is true, workers should allow polls to return gracefully
+        rather than terminating any open polls on shutdown.
+        """
+        poller_autoscaling: builtins.bool
+        """True if the namespace supports poller autoscaling"""
+        worker_commands: builtins.bool
+        """True if the namespace supports worker commands (server-to-worker communication via control queues)."""
+        standalone_nexus_operation: builtins.bool
+        """True if the namespace supports standalone Nexus operations."""
+        workflow_update_callbacks: builtins.bool
+        """True if the namespace supports attaching callbacks on workflow updates"""
+        poller_autoscaling_auto_enroll: builtins.bool
+        """When true, workers should use poller autoscaling by default unless explicitly configured otherwise."""
         def __init__(
             self,
             *,
@@ -71,6 +100,14 @@ class NamespaceInfo(google.protobuf.message.Message):
             async_update: builtins.bool = ...,
             worker_heartbeats: builtins.bool = ...,
             reported_problems_search_attribute: builtins.bool = ...,
+            workflow_pause: builtins.bool = ...,
+            standalone_activities: builtins.bool = ...,
+            worker_poll_complete_on_shutdown: builtins.bool = ...,
+            poller_autoscaling: builtins.bool = ...,
+            worker_commands: builtins.bool = ...,
+            standalone_nexus_operation: builtins.bool = ...,
+            workflow_update_callbacks: builtins.bool = ...,
+            poller_autoscaling_auto_enroll: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -79,12 +116,56 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"async_update",
                 "eager_workflow_start",
                 b"eager_workflow_start",
+                "poller_autoscaling",
+                b"poller_autoscaling",
+                "poller_autoscaling_auto_enroll",
+                b"poller_autoscaling_auto_enroll",
                 "reported_problems_search_attribute",
                 b"reported_problems_search_attribute",
+                "standalone_activities",
+                b"standalone_activities",
+                "standalone_nexus_operation",
+                b"standalone_nexus_operation",
                 "sync_update",
                 b"sync_update",
+                "worker_commands",
+                b"worker_commands",
                 "worker_heartbeats",
                 b"worker_heartbeats",
+                "worker_poll_complete_on_shutdown",
+                b"worker_poll_complete_on_shutdown",
+                "workflow_pause",
+                b"workflow_pause",
+                "workflow_update_callbacks",
+                b"workflow_update_callbacks",
+            ],
+        ) -> None: ...
+
+    class Limits(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        BLOB_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
+        MEMO_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
+        blob_size_limit_error: builtins.int
+        """Maximum size in bytes for payload fields in workflow history events
+        (e.g., workflow/activity inputs and results, failure details, signal payloads).
+        When exceeded, the server will reject the operation with an error.
+        """
+        memo_size_limit_error: builtins.int
+        """Maximum total memo size in bytes per workflow execution."""
+        def __init__(
+            self,
+            *,
+            blob_size_limit_error: builtins.int = ...,
+            memo_size_limit_error: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "blob_size_limit_error",
+                b"blob_size_limit_error",
+                "memo_size_limit_error",
+                b"memo_size_limit_error",
             ],
         ) -> None: ...
 
@@ -95,6 +176,7 @@ class NamespaceInfo(google.protobuf.message.Message):
     DATA_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
     CAPABILITIES_FIELD_NUMBER: builtins.int
+    LIMITS_FIELD_NUMBER: builtins.int
     SUPPORTS_SCHEDULES_FIELD_NUMBER: builtins.int
     name: builtins.str
     state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
@@ -109,6 +191,9 @@ class NamespaceInfo(google.protobuf.message.Message):
     @property
     def capabilities(self) -> global___NamespaceInfo.Capabilities:
         """All capabilities the namespace supports."""
+    @property
+    def limits(self) -> global___NamespaceInfo.Limits:
+        """Namespace configured limits"""
     supports_schedules: builtins.bool
     """Whether scheduled workflows are supported on this namespace. This is only needed
     temporarily while the feature is experimental, so we can give it a high tag.
@@ -123,10 +208,14 @@ class NamespaceInfo(google.protobuf.message.Message):
         data: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         id: builtins.str = ...,
         capabilities: global___NamespaceInfo.Capabilities | None = ...,
+        limits: global___NamespaceInfo.Limits | None = ...,
         supports_schedules: builtins.bool = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["capabilities", b"capabilities"]
+        self,
+        field_name: typing_extensions.Literal[
+            "capabilities", b"capabilities", "limits", b"limits"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -139,6 +228,8 @@ class NamespaceInfo(google.protobuf.message.Message):
             b"description",
             "id",
             b"id",
+            "limits",
+            b"limits",
             "name",
             b"name",
             "owner_email",

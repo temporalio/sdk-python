@@ -1,6 +1,7 @@
 """Testing utilities for OpenAI agents."""
 
-from typing import AsyncIterator, Callable, Optional, Sequence, Union
+from collections.abc import AsyncIterator, Callable, Sequence
+from typing import Any
 
 from agents import (
     AgentOutputSchemaBase,
@@ -38,19 +39,11 @@ __all__ = [
 
 
 class ResponseBuilders:
-    """Builders for creating model responses for testing.
-
-    .. warning::
-        This API is experimental and may change in the future.
-    """
+    """Builders for creating model responses for testing."""
 
     @staticmethod
     def model_response(output: TResponseOutputItem) -> ModelResponse:
-        """Create a ModelResponse with the given output.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ModelResponse with the given output."""
         return ModelResponse(
             output=[output],
             usage=Usage(),
@@ -59,11 +52,7 @@ class ResponseBuilders:
 
     @staticmethod
     def response_output_message(text: str) -> ResponseOutputMessage:
-        """Create a ResponseOutputMessage with text content.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ResponseOutputMessage with text content."""
         return ResponseOutputMessage(
             id="",
             content=[
@@ -80,11 +69,7 @@ class ResponseBuilders:
 
     @staticmethod
     def tool_call(arguments: str, name: str) -> ModelResponse:
-        """Create a ModelResponse with a function tool call.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ModelResponse with a function tool call."""
         return ResponseBuilders.model_response(
             ResponseFunctionToolCall(
                 arguments=arguments,
@@ -98,94 +83,66 @@ class ResponseBuilders:
 
     @staticmethod
     def output_message(text: str) -> ModelResponse:
-        """Create a ModelResponse with an output message.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a ModelResponse with an output message."""
         return ResponseBuilders.model_response(
             ResponseBuilders.response_output_message(text)
         )
 
 
 class TestModelProvider(ModelProvider):
-    """Test model provider which simply returns the given module.
-
-    .. warning::
-        This API is experimental and may change in the future.
-    """
+    """Test model provider which simply returns the given model."""
 
     __test__ = False
 
     def __init__(self, model: Model):
-        """Initialize a test model provider with a model.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Initialize a test model provider with a model."""
         self._model = model
 
-    def get_model(self, model_name: Union[str, None]) -> Model:
-        """Get a model from the model provider.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+    def get_model(self, model_name: str | None) -> Model:
+        """Get a model from the model provider."""
         return self._model
 
 
 class TestModel(Model):
-    """Test model for use mocking model responses.
-
-    .. warning::
-        This API is experimental and may change in the future.
-    """
+    """Test model for use mocking model responses."""
 
     __test__ = False
 
     def __init__(self, fn: Callable[[], ModelResponse]) -> None:
-        """Initialize a test model with a callable.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Initialize a test model with a callable."""
         self.fn = fn
 
     async def get_response(
         self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs: Any,
     ) -> ModelResponse:
         """Get a response from the mocked model, by calling the callable passed to the constructor."""
         return self.fn()
 
     def stream_response(
         self,
-        system_instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Optional[AgentOutputSchemaBase],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs: Any,
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
 
     @staticmethod
     def returning_responses(responses: list[ModelResponse]) -> "TestModel":
-        """Create a mock model which sequentially returns responses from a list.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Create a mock model which sequentially returns responses from a list."""
         i = iter(responses)
         return TestModel(lambda: next(i))
 
@@ -195,9 +152,6 @@ class AgentEnvironment:
 
     This async context manager provides a convenient way to set up testing environments
     for OpenAI agents with mocked model calls and Temporal integration.
-
-    .. warning::
-        This API is experimental and may change in the future.
 
     Example:
         >>> from temporalio.contrib.openai_agents.testing import AgentEnvironment, TestModelProvider, ResponseBuilders
@@ -218,13 +172,15 @@ class AgentEnvironment:
 
     def __init__(
         self,
-        model_params: Optional[ModelActivityParameters] = None,
-        model_provider: Optional[ModelProvider] = None,
-        model: Optional[Model] = None,
+        model_params: ModelActivityParameters | None = None,
+        model_provider: ModelProvider | None = None,
+        model: Model | None = None,
         mcp_server_providers: Sequence[
-            Union[StatelessMCPServerProvider, StatefulMCPServerProvider]
+            StatelessMCPServerProvider | StatefulMCPServerProvider
         ] = (),
         register_activities: bool = True,
+        add_temporal_spans: bool = True,
+        use_otel_instrumentation: bool = False,
     ) -> None:
         """Initialize the AgentEnvironment.
 
@@ -241,9 +197,10 @@ class AgentEnvironment:
                 If both are provided, model_provider will be used.
             mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
             register_activities: Whether to register activities during worker execution.
-
-        .. warning::
-           This API is experimental and may change in the future.
+            add_temporal_spans: Whether to add temporal spans to traces
+            use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
+                Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
+                Use with caution in production environments.
         """
         self._model_params = model_params
         self._model_provider = None
@@ -253,7 +210,9 @@ class AgentEnvironment:
             self._model_provider = TestModelProvider(model)
         self._mcp_server_providers = mcp_server_providers
         self._register_activities = register_activities
-        self._plugin: Optional[OpenAIAgentsPlugin] = None
+        self._plugin: OpenAIAgentsPlugin | None = None
+        self._add_temporal_spans = add_temporal_spans
+        self._use_otel_instrumentation = use_otel_instrumentation
 
     async def __aenter__(self) -> "AgentEnvironment":
         """Enter the async context manager."""
@@ -263,11 +222,13 @@ class AgentEnvironment:
             model_provider=self._model_provider,
             mcp_server_providers=self._mcp_server_providers,
             register_activities=self._register_activities,
+            add_temporal_spans=self._add_temporal_spans,
+            use_otel_instrumentation=self._use_otel_instrumentation,
         )
 
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         """Exit the async context manager."""
         # No cleanup needed currently
         pass
@@ -280,9 +241,6 @@ class AgentEnvironment:
 
         Returns:
             A new Client instance with the OpenAI agents plugin applied.
-
-        .. warning::
-           This API is experimental and may change in the future.
         """
         if self._plugin is None:
             raise RuntimeError(
@@ -296,11 +254,7 @@ class AgentEnvironment:
 
     @property
     def openai_agents_plugin(self) -> OpenAIAgentsPlugin:
-        """Get the underlying OpenAI agents plugin.
-
-        .. warning::
-           This API is experimental and may change in the future.
-        """
+        """Get the underlying OpenAI agents plugin."""
         if self._plugin is None:
             raise RuntimeError(
                 "AgentEnvironment must be entered before accessing plugin"

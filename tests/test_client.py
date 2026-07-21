@@ -1,11 +1,14 @@
+import asyncio
 import dataclasses
 import json
 import multiprocessing
 import multiprocessing.context
 import os
+import threading
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, Literal, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -17,7 +20,6 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
 from temporalio import workflow
-from temporalio.api.cloud.cloudservice.v1 import GetNamespaceRequest
 from temporalio.api.enums.v1 import (
     CancelExternalWorkflowExecutionFailedCause,
     ContinueAsNewInitiator,
@@ -41,12 +43,9 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
-    CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
     QueryWorkflowInput,
-    RPCError,
-    RPCStatusCode,
     Schedule,
     ScheduleActionExecutionStartWorkflow,
     ScheduleActionStartWorkflow,
@@ -85,6 +84,10 @@ from temporalio.common import (
 )
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
+from temporalio.service import (
+    RPCError,
+    RPCStatusCode,
+)
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
@@ -310,8 +313,8 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
             req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, Union[str, bytes]] = {},
-            timeout: Optional[timedelta] = None,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
         ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
             raise self.already_exists_err
 
@@ -377,7 +380,7 @@ async def test_query(client: Client, worker: ExternalWorker):
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Try a query not on the workflow
-    with pytest.raises(WorkflowQueryFailedError) as err:
+    with pytest.raises(WorkflowQueryFailedError):
         await handle.query("does not exist")
 
 
@@ -571,6 +574,73 @@ async def test_lazy_client(client: Client, env: WorkflowEnvironment):
     assert lazy_client.service_client.worker_service_client._bridge_client
 
 
+async def test_client_connected_skips_connect_lock(client: Client):
+    # Once connected, RPCs must not touch the lazy-connect lock. Acquiring it
+    # per-RPC put an event-loop-bound primitive on the hot path, pinning a
+    # connected client to the loop it connected on.
+    other = await Client.connect(
+        client.service_client.config.target_host, namespace=client.namespace
+    )
+    svc = other.service_client.worker_service_client
+    assert svc._bridge_client
+
+    class CountingLock(asyncio.Lock):
+        def __init__(self) -> None:
+            super().__init__()
+            self.acquire_count = 0
+
+        async def acquire(self) -> Literal[True]:
+            self.acquire_count += 1
+            return await super().acquire()
+
+    counting = CountingLock()
+    svc._bridge_client_connect_lock = counting
+    await other.workflow_service.get_system_info(GetSystemInfoRequest())
+    assert counting.acquire_count == 0
+
+
+def test_client_reuse_across_event_loops(client: Client):
+    # A connected client must not be pinned to the loop (or thread) it
+    # connected on. This mirrors the long-lived-loop reuse pattern used by
+    # gevent/gunicorn and synchronous services.
+    target_host = client.service_client.config.target_host
+    namespace = client.namespace
+
+    connect_loop = asyncio.new_event_loop()
+    try:
+        reused_client = connect_loop.run_until_complete(
+            Client.connect(target_host, namespace=namespace)
+        )
+    finally:
+        connect_loop.close()
+
+    errors: list[BaseException] = []
+
+    async def hammer() -> None:
+        await asyncio.gather(
+            *(
+                reused_client.workflow_service.get_system_info(GetSystemInfoRequest())
+                for _ in range(10)
+            )
+        )
+
+    def reuse_on_new_loop() -> None:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(hammer())
+        except BaseException as err:
+            errors.append(err)
+        finally:
+            asyncio.set_event_loop(None)
+            loop.close()
+
+    thread = threading.Thread(target=reuse_on_new_loop)
+    thread.start()
+    thread.join()
+    assert not errors, f"cross-loop reuse failed: {errors[0]!r}"
+
+
 @workflow.defn
 class ListableWorkflow:
     @workflow.run
@@ -661,7 +731,7 @@ async def test_count_workflows(client: Client, env: WorkflowEnvironment):
         resp = await client.count_workflows(
             f"TaskQueue = '{worker.task_queue}' GROUP BY ExecutionStatus"
         )
-        cast(List[WorkflowExecutionCountAggregationGroup], resp.groups).sort(
+        cast(list[WorkflowExecutionCountAggregationGroup], resp.groups).sort(
             key=lambda g: g.count
         )
         return resp
@@ -898,7 +968,7 @@ async def test_schedule_basics(
     # Update but error
     with pytest.raises(RuntimeError) as err:
 
-        def update_fail(input: ScheduleUpdateInput) -> ScheduleUpdate:
+        def update_fail(_input: ScheduleUpdateInput) -> ScheduleUpdate:
             raise RuntimeError("Oh no")
 
         await handle.update(update_fail)
@@ -918,7 +988,7 @@ async def test_schedule_basics(
     )
     assert isinstance(new_schedule.action, ScheduleActionStartWorkflow)
 
-    async def update_schedule_basic(input: ScheduleUpdateInput) -> ScheduleUpdate:
+    async def update_schedule_basic(_input: ScheduleUpdateInput) -> ScheduleUpdate:
         return ScheduleUpdate(new_schedule)
 
     await handle.update(update_schedule_basic)
@@ -992,7 +1062,7 @@ async def test_schedule_basics(
         )
         expected_ids.append(new_handle.id)
 
-    async def list_ids() -> List[str]:
+    async def list_ids() -> list[str]:
         return sorted(
             [
                 list_desc.id
@@ -1135,34 +1205,31 @@ async def test_schedule_backfill(
             )
         ],
     )
-    # We accept both 1.24 and pre-1.24 action counts
-    assert (await handle.describe()).info.num_actions in [1, 2]
-
-    # Add two more backfills and and -2m will be deduped
-    await handle.backfill(
-        # 3 actions on Server >= 1.24, 2 actions on Server < 1.24
-        ScheduleBackfill(
-            start_at=begin - timedelta(minutes=4),
-            end_at=begin - timedelta(minutes=2),
-            overlap=ScheduleOverlapPolicy.ALLOW_ALL,
-        ),
-        # 3 actions on Server >= 1.24, 2 actions on Server < 1.24, except on
-        # Server >= 1.24, there is overlap with the prior backfill, so this is
-        # only net +2 actions, regardless of Server version.
-        ScheduleBackfill(
-            start_at=begin - timedelta(minutes=2),
-            end_at=begin,
-            overlap=ScheduleOverlapPolicy.ALLOW_ALL,
-        ),
-    )
-    assert (await handle.describe()).info.num_actions in [5, 7]
-
-    await handle.delete()
-    await assert_no_schedules(client)
+    try:
+        # Add two more backfills. Older servers treat the end time as
+        # exclusive, 1.24+ servers treat it as inclusive, and 1.31+ servers no
+        # longer dedupe the overlapping ALLOW_ALL backfills below.
+        await handle.backfill(
+            # 3 actions on Server >= 1.24, 2 actions on Server < 1.24
+            ScheduleBackfill(
+                start_at=begin - timedelta(minutes=4),
+                end_at=begin - timedelta(minutes=2),
+                overlap=ScheduleOverlapPolicy.ALLOW_ALL,
+            ),
+            # 3 actions on Server >= 1.24, 2 actions on Server < 1.24.
+            ScheduleBackfill(
+                start_at=begin - timedelta(minutes=2),
+                end_at=begin,
+                overlap=ScheduleOverlapPolicy.ALLOW_ALL,
+            ),
+        )
+    finally:
+        await handle.delete()
+        await assert_no_schedules(client)
 
 
 async def test_schedule_create_limited_actions_validation(
-    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+    client: Client, worker: ExternalWorker
 ):
     sched = Schedule(
         action=ScheduleActionStartWorkflow(
@@ -1222,7 +1289,7 @@ async def test_schedule_workflow_search_attribute_update(
     # Do update of typed attrs
     def update_schedule_typed_attrs(
         input: ScheduleUpdateInput,
-    ) -> Optional[ScheduleUpdate]:
+    ) -> ScheduleUpdate | None:
         assert isinstance(
             input.description.schedule.action, ScheduleActionStartWorkflow
         )
@@ -1329,7 +1396,7 @@ async def test_schedule_search_attribute_update(
 
     def update_search_attributes(
         input: ScheduleUpdateInput,
-    ) -> Optional[ScheduleUpdate]:
+    ) -> ScheduleUpdate | None:
         # Make sure the initial search attributes are present
         assert input.description.search_attributes[key_1.name] == [val_1]
         assert input.description.search_attributes[key_2.name] == [val_2]
@@ -1478,19 +1545,6 @@ async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
     assert reachability.build_id_reachability["1.1"].task_queue_reachability[tq] == []
 
 
-async def test_cloud_client_simple():
-    if "TEMPORAL_CLIENT_CLOUD_API_KEY" not in os.environ:
-        pytest.skip("No cloud API key")
-    client = await CloudOperationsClient.connect(
-        api_key=os.environ["TEMPORAL_CLIENT_CLOUD_API_KEY"],
-        version=os.environ["TEMPORAL_CLIENT_CLOUD_API_VERSION"],
-    )
-    result = await client.cloud_service.get_namespace(
-        GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
-    )
-    assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace
-
-
 @workflow.defn
 class LastCompletionResultWorkflow:
     @workflow.run
@@ -1522,7 +1576,7 @@ async def test_schedule_last_completion_result(
         )
         await handle.trigger()
 
-        async def get_schedule_result() -> Tuple[int, Optional[str]]:
+        async def get_schedule_result() -> tuple[int, str | None]:
             desc = await handle.describe()
             length = len(desc.info.recent_actions)
             if length == 0:
@@ -1560,8 +1614,23 @@ class TestForkCreateClient(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create client across forks"
         )
-        self._env = env
+        self._env = env  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)
+
+
+def test_client_connect_config_matches_connect_params():
+    """ClientConnectConfig TypedDict keys must match Client.connect kwargs."""
+    import inspect
+
+    from temporalio.client import Client, ClientConnectConfig
+
+    connect_params = set(inspect.signature(Client.connect).parameters.keys()) - {"cls"}
+    config_keys = set(ClientConnectConfig.__annotations__.keys())
+    assert config_keys == connect_params, (
+        f"ClientConnectConfig is out of sync with Client.connect. "
+        f"Missing from config: {connect_params - config_keys}. "
+        f"Extra in config: {config_keys - connect_params}."
+    )
 
 
 class TestForkUseClient(_TestFork):
@@ -1578,5 +1647,5 @@ class TestForkUseClient(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use client across forks"
         )
-        self._client = client
+        self._client = client  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)

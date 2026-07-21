@@ -258,7 +258,7 @@ def test_load_profiles_from_data_all():
     assert connect_config.get("target_host") == "custom-address"
 
 
-def test_load_profiles_no_env_override(tmp_path: Path, monkeypatch):
+def test_load_profiles_no_env_override(tmp_path: Path, monkeypatch):  # type: ignore[reportMissingParameterType]
     """Confirm that load_profiles does not apply env overrides."""
     config_file = tmp_path / "config.toml"
     config_file.write_text(TOML_CONFIG_BASE)

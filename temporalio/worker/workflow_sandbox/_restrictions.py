@@ -17,19 +17,12 @@ import random
 import sys
 import types
 import warnings
+from collections.abc import Callable, Mapping, Sequence
 from copy import copy, deepcopy
 from dataclasses import dataclass
 from typing import (
     Any,
-    Callable,
     ClassVar,
-    Dict,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
     cast,
 )
@@ -40,7 +33,7 @@ try:
 
     HAVE_PYDANTIC = True
 except ImportError:
-    HAVE_PYDANTIC = False
+    HAVE_PYDANTIC = False  # type: ignore[reportConstantRedefinition]
 
 import temporalio.exceptions
 import temporalio.workflow
@@ -63,7 +56,7 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
     """
 
     def __init__(
-        self, qualified_name: str, *, override_message: Optional[str] = None
+        self, qualified_name: str, *, override_message: str | None = None
     ) -> None:
         """Create restricted workflow access error."""
         super().__init__(
@@ -85,7 +78,7 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
 
 class UnintentionalPassthroughError(temporalio.exceptions.TemporalError):
     """Error that occurs when a workflow unintentionally passes an import to the sandbox when
-    the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_NON_PASSTHROUGH`.
+    the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH`.
 
     Attributes:
         qualified_name: Fully qualified name of what was passed through to the sandbox.
@@ -102,7 +95,7 @@ class UnintentionalPassthroughError(temporalio.exceptions.TemporalError):
 class SandboxRestrictions:
     """Set of restrictions that can be applied to a sandbox."""
 
-    passthrough_modules: Set[str]
+    passthrough_modules: set[str]
     """
     Modules which pass through because we know they are side-effect free (or the
     side-effecting pieces are restricted). These modules will not be reloaded,
@@ -153,19 +146,19 @@ class SandboxRestrictions:
     to have been explicitly imported.
     """
 
-    passthrough_modules_minimum: ClassVar[Set[str]]
+    passthrough_modules_minimum: ClassVar[set[str]]
     """Set of modules that must be passed through at the minimum."""
 
-    passthrough_modules_with_temporal: ClassVar[Set[str]]
+    passthrough_modules_with_temporal: ClassVar[set[str]]
     """Minimum modules that must be passed through and the Temporal modules."""
 
-    passthrough_modules_maximum: ClassVar[Set[str]]
+    passthrough_modules_maximum: ClassVar[set[str]]
     """
     All modules that can be passed through. This includes all standard library
     modules.
     """
 
-    passthrough_modules_default: ClassVar[Set[str]]
+    passthrough_modules_default: ClassVar[set[str]]
     """Same as :py:attr:`passthrough_modules_maximum`."""
 
     invalid_module_members_default: ClassVar[SandboxMatcher]
@@ -196,7 +189,7 @@ class SandboxRestrictions:
     def with_import_notification_policy(
         self, policy: temporalio.workflow.SandboxImportNotificationPolicy
     ) -> SandboxRestrictions:
-        """Create a new restriction set with the given import notification policy as the :py:attr:`import_policy`."""
+        """Create a new restriction set with the given import notification policy as the :py:attr:`import_notification_policy`."""
         return dataclasses.replace(self, import_notification_policy=policy)
 
 
@@ -227,7 +220,7 @@ class SandboxMatcher:
             ret = cls(children={key: ret})
         return ret
 
-    access: Set[str] = frozenset()  # type: ignore
+    access: set[str] = frozenset()  # type: ignore
     """Immutable set of names to match access.
 
     This is often only used for pass through checks and not member restrictions.
@@ -237,7 +230,7 @@ class SandboxMatcher:
     An string containing a single asterisk can be used to match all.
     """
 
-    use: Set[str] = frozenset()  # type: ignore
+    use: set[str] = frozenset()  # type: ignore
     """Immutable set of names to match use.
 
     This is best used for member restrictions on functions/classes because the
@@ -259,21 +252,21 @@ class SandboxMatcher:
     time.
     """
 
-    leaf_message: Optional[str] = None
+    leaf_message: str | None = None
     """
     Override message to use in error/warning. Defaults to a common message.
     This is only applicable to leafs, so this must only be set when
     ``match_self`` is ``True`` and this matcher is on ``children`` of a parent.
     """
 
-    leaf_warning: Optional[Type[Warning]] = None
+    leaf_warning: type[Warning] | None = None
     """
     If set, issues a warning instead of raising an error. This is only
     applicable to leafs, so this must only be set when ``match_self`` is
     ``True`` and this matcher is on ``children`` of a parent.
     """
 
-    exclude: Set[str] = frozenset()  # type: ignore
+    exclude: set[str] = frozenset()  # type: ignore
     """Immutable set of names to exclude.
 
     These override anything that may have been matched elsewhere.
@@ -303,7 +296,7 @@ class SandboxMatcher:
 
     def access_matcher(
         self, context: RestrictionContext, *child_path: str, include_use: bool = False
-    ) -> Optional[SandboxMatcher]:
+    ) -> SandboxMatcher | None:
         """Perform a match check and return matcher.
 
         Args:
@@ -360,7 +353,7 @@ class SandboxMatcher:
             is not None
         )
 
-    def child_matcher(self, *child_path: str) -> Optional[SandboxMatcher]:
+    def child_matcher(self, *child_path: str) -> SandboxMatcher | None:
         """Return a child matcher for the given path.
 
         Unlike :py:meth:`match_access`, this will match if in py:attr:`use` in
@@ -373,7 +366,7 @@ class SandboxMatcher:
             Matcher that can be used to check children.
         """
         # We prefer to avoid recursion
-        matcher: Optional[SandboxMatcher] = self
+        matcher: SandboxMatcher | None = self
         only_runtime = self.only_runtime
         for v in child_path:
             # Use all if it matches self, access, _or_ use. Use doesn't match
@@ -441,7 +434,7 @@ class SandboxMatcher:
         assert child_path
         # If there's only one item in path, make sure not in access, use, or
         # children. Otherwise, just remove from child.
-        to_replace: Dict[str, Any] = {}
+        to_replace: dict[str, Any] = {}
         if len(child_path) == 1:
             if child_path[0] in self.access:
                 to_replace["access"] = set(self.access)
@@ -520,10 +513,6 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # Due to how Pydantic is importing lazily inside of some classes, we choose
         # to always pass it through
         "pydantic",
-        # OpenAI and OpenAI agent modules in workflows we always want to pass
-        # through and reference the out-of-sandbox forms
-        "openai",
-        "agents",
     }
 )
 
@@ -545,8 +534,8 @@ SandboxRestrictions.passthrough_modules_default = (
 )
 
 
-def _public_callables(parent: Any, *, exclude: Set[str] = set()) -> Set[str]:
-    ret: Set[str] = set()
+def _public_callables(parent: Any, *, exclude: set[str] = set()) -> set[str]:
+    ret: set[str] = set()
     for name, member in inspect.getmembers(parent):
         # Name must be public and callable and not in exclude and not a class
         if (
@@ -562,11 +551,19 @@ def _public_callables(parent: Any, *, exclude: Set[str] = set()) -> Set[str]:
 SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
     children={
         "__builtins__": SandboxMatcher(
-            use={
-                "breakpoint",
-                "input",
-                "open",
+            children={
+                "breakpoint": SandboxMatcher(
+                    match_self=True,
+                    only_runtime=True,
+                    leaf_message=(
+                        "breakpoint() inside workflow code requires "
+                        "debug_mode=True on the Worker (or the "
+                        "TEMPORAL_DEBUG environment variable). Without it, "
+                        "the call cannot reach the debugger."
+                    ),
+                ),
             },
+            use={"input", "open"},
             # Too many things use open() at import time, e.g. pytest's assertion
             # rewriter
             only_runtime=True,
@@ -865,24 +862,28 @@ class _RestrictionState:
 class _RestrictedProxyLookup:
     def __init__(
         self,
-        access_func: Optional[Callable] = None,
+        access_func: Callable | None = None,
         *,
-        fallback_func: Optional[Callable] = None,
-        class_value: Optional[Any] = None,
+        fallback_func: Callable | None = None,
+        class_value: Any | None = None,
         is_attr: bool = False,
     ) -> None:
-        bind_func: Optional[Callable[[_RestrictedProxy, Any], Callable]]
+        bind_func: Callable[[_RestrictedProxy, Any], Callable] | None
         if hasattr(access_func, "__get__"):
             # A Python function, can be turned into a bound method.
 
-            def bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(_instance: _RestrictedProxy, obj: Any) -> Callable:
                 return access_func.__get__(obj, type(obj))  # type: ignore
+
+            bind_func = _bind_func
 
         elif access_func is not None:
             # A C function, use partial to bind the first argument.
 
-            def bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(_instance: _RestrictedProxy, obj: Any) -> Callable:
                 return functools.partial(access_func, obj)  # type: ignore
+
+            bind_func = _bind_func
 
         else:
             # Use getattr, which will produce a bound method.
@@ -894,12 +895,12 @@ class _RestrictedProxyLookup:
         self.is_attr = is_attr
 
     def __set_name__(self, owner: _RestrictedProxy, name: str) -> None:
-        self.name = name
+        self.name = name  # type: ignore[reportUninitializedInstanceVariable]
 
-    def __get__(self, instance: _RestrictedProxy, owner: Optional[Type] = None) -> Any:
-        if instance is None:
-            if self.class_value is not None:
-                return self.class_value
+    def __get__(self, instance: _RestrictedProxy, owner: type | None = None) -> Any:
+        if instance is None:  # type: ignore[reportUninitializedInstanceVariable]
+            if self.class_value is not None:  # type: ignore[reportUnreachable]
+                return self.class_value  # type: ignore[reportUnreachable]
 
             return self
 
@@ -942,9 +943,9 @@ class _RestrictedProxyIOp(_RestrictedProxyLookup):
 
     def __init__(
         self,
-        access_func: Optional[Callable] = None,
+        access_func: Callable | None = None,
         *,
-        fallback_func: Optional[Callable] = None,
+        fallback_func: Callable | None = None,
     ) -> None:
         super().__init__(access_func, fallback_func=fallback_func)
 
@@ -970,7 +971,7 @@ def _l_to_r_op(op: _OpF) -> _OpF:
     return cast(_OpF, r_op)
 
 
-_do_not_restrict: Tuple[Type, ...] = (bool, int, float, complex, str, bytes, bytearray)
+_do_not_restrict: tuple[type, ...] = (bool, int, float, complex, str, bytes, bytearray)
 if HAVE_PYDANTIC:
     # The datetime validator in pydantic_core
     # https://github.com/pydantic/pydantic-core/blob/741961c05847d9e9ee517cd783e24c2b58e5596b/src/input/input_python.rs#L548-L582
@@ -987,7 +988,7 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # When we instantiate this class, we have the signature of:
         #   __init__(
         #       self,
@@ -1035,7 +1036,7 @@ class _RestrictedProxy:
         state.assert_child_not_restricted(__name)
         setattr(state.obj, __name, __value)
 
-    def __call__(self, *args, **kwargs) -> _RestrictedProxy:
+    def __call__(self, *args: Any, **kwargs: Any) -> _RestrictedProxy:
         state = _RestrictionState.from_proxy(self)
         _trace("__call__ on %s", state.name)
         state.assert_child_not_restricted("__call__")

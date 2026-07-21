@@ -8,12 +8,16 @@ import collections.abc
 import sys
 
 import google.protobuf.descriptor
+import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.nexus_pb2
+import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -48,26 +52,45 @@ class Failure(google.protobuf.message.Message):
         ) -> None: ...
 
     MESSAGE_FIELD_NUMBER: builtins.int
+    STACK_TRACE_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     message: builtins.str
+    stack_trace: builtins.str
     @property
     def metadata(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     details: builtins.bytes
     """UTF-8 encoded JSON serializable details."""
+    @property
+    def cause(self) -> global___Failure: ...
     def __init__(
         self,
         *,
         message: builtins.str = ...,
+        stack_trace: builtins.str = ...,
         metadata: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         details: builtins.bytes = ...,
+        cause: global___Failure | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["cause", b"cause"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "details", b"details", "message", b"message", "metadata", b"metadata"
+            "cause",
+            b"cause",
+            "details",
+            b"details",
+            "message",
+            b"message",
+            "metadata",
+            b"metadata",
+            "stack_trace",
+            b"stack_trace",
         ],
     ) -> None: ...
 
@@ -297,6 +320,26 @@ class Request(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class Capabilities(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        TEMPORAL_FAILURE_RESPONSES_FIELD_NUMBER: builtins.int
+        temporal_failure_responses: builtins.bool
+        """If set, handlers may use temporalio.api.failure.v1.Failure instances to return failures to the server.
+        This also allows handler and operation errors to have their own messages and stack traces.
+        """
+        def __init__(
+            self,
+            *,
+            temporal_failure_responses: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "temporal_failure_responses", b"temporal_failure_responses"
+            ],
+        ) -> None: ...
+
     class HeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -317,8 +360,10 @@ class Request(google.protobuf.message.Message):
 
     HEADER_FIELD_NUMBER: builtins.int
     SCHEDULED_TIME_FIELD_NUMBER: builtins.int
+    CAPABILITIES_FIELD_NUMBER: builtins.int
     START_OPERATION_FIELD_NUMBER: builtins.int
     CANCEL_OPERATION_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
     @property
     def header(
         self,
@@ -333,22 +378,32 @@ class Request(google.protobuf.message.Message):
             aip.dev/not-precedent: Not following linter rules. --)
         """
     @property
+    def capabilities(self) -> global___Request.Capabilities: ...
+    @property
     def start_operation(self) -> global___StartOperationRequest: ...
     @property
     def cancel_operation(self) -> global___CancelOperationRequest: ...
+    endpoint: builtins.str
+    """The endpoint this request was addressed to before forwarding to the worker.
+    Supported from server version 1.30.0.
+    """
     def __init__(
         self,
         *,
         header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        capabilities: global___Request.Capabilities | None = ...,
         start_operation: global___StartOperationRequest | None = ...,
         cancel_operation: global___CancelOperationRequest | None = ...,
+        endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "cancel_operation",
             b"cancel_operation",
+            "capabilities",
+            b"capabilities",
             "scheduled_time",
             b"scheduled_time",
             "start_operation",
@@ -362,6 +417,10 @@ class Request(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancel_operation",
             b"cancel_operation",
+            "capabilities",
+            b"capabilities",
+            "endpoint",
+            b"endpoint",
             "header",
             b"header",
             "scheduled_time",
@@ -455,25 +514,36 @@ class StartOperationResponse(google.protobuf.message.Message):
     SYNC_SUCCESS_FIELD_NUMBER: builtins.int
     ASYNC_SUCCESS_FIELD_NUMBER: builtins.int
     OPERATION_ERROR_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
     @property
     def sync_success(self) -> global___StartOperationResponse.Sync: ...
     @property
     def async_success(self) -> global___StartOperationResponse.Async: ...
     @property
     def operation_error(self) -> global___UnsuccessfulOperationError:
-        """The operation completed unsuccessfully (failed or canceled)."""
+        """The operation completed unsuccessfully (failed or canceled).
+        Deprecated. Use the failure variant instead.
+        """
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The operation completed unsuccessfully (failed or canceled).
+        Failure object must contain an ApplicationFailureInfo or CanceledFailureInfo object.
+        """
     def __init__(
         self,
         *,
         sync_success: global___StartOperationResponse.Sync | None = ...,
         async_success: global___StartOperationResponse.Async | None = ...,
         operation_error: global___UnsuccessfulOperationError | None = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "async_success",
             b"async_success",
+            "failure",
+            b"failure",
             "operation_error",
             b"operation_error",
             "sync_success",
@@ -487,6 +557,8 @@ class StartOperationResponse(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "async_success",
             b"async_success",
+            "failure",
+            b"failure",
             "operation_error",
             b"operation_error",
             "sync_success",
@@ -498,7 +570,9 @@ class StartOperationResponse(google.protobuf.message.Message):
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
     ) -> (
-        typing_extensions.Literal["sync_success", "async_success", "operation_error"]
+        typing_extensions.Literal[
+            "sync_success", "async_success", "operation_error", "failure"
+        ]
         | None
     ): ...
 
@@ -758,3 +832,492 @@ class EndpointTarget(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["worker", "external"] | None: ...
 
 global___EndpointTarget = EndpointTarget
+
+class NexusOperationExecutionCancellationInfo(google.protobuf.message.Message):
+    """NexusOperationExecutionCancellationInfo contains the state of a Nexus operation cancellation."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REQUESTED_TIME_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
+    NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    BLOCKED_REASON_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    @property
+    def requested_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when cancellation was requested."""
+    state: temporalio.api.enums.v1.common_pb2.NexusOperationCancellationState.ValueType
+    attempt: builtins.int
+    """The number of attempts made to deliver the cancel operation request.
+    This number represents a minimum bound since the attempt is incremented after the request completes.
+    """
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+    blocked_reason: builtins.str
+    """If the state is BLOCKED, blocked reason provides additional information."""
+    reason: builtins.str
+    """A reason that may be specified in the CancelNexusOperationRequest."""
+    def __init__(
+        self,
+        *,
+        requested_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        state: temporalio.api.enums.v1.common_pb2.NexusOperationCancellationState.ValueType = ...,
+        attempt: builtins.int = ...,
+        last_attempt_complete_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        last_attempt_failure: temporalio.api.failure.v1.message_pb2.Failure
+        | None = ...,
+        next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        blocked_reason: builtins.str = ...,
+        reason: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "requested_time",
+            b"requested_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attempt",
+            b"attempt",
+            "blocked_reason",
+            b"blocked_reason",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "reason",
+            b"reason",
+            "requested_time",
+            b"requested_time",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
+
+global___NexusOperationExecutionCancellationInfo = (
+    NexusOperationExecutionCancellationInfo
+)
+
+class NexusOperationExecutionInfo(google.protobuf.message.Message):
+    """Full current state of a standalone Nexus operation, as of the time of the request."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class NexusHeaderEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
+    OPERATION_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    SCHEDULE_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
+    SCHEDULE_TO_START_TIMEOUT_FIELD_NUMBER: builtins.int
+    START_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    EXPIRATION_TIME_FIELD_NUMBER: builtins.int
+    CLOSE_TIME_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
+    NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    EXECUTION_DURATION_FIELD_NUMBER: builtins.int
+    CANCELLATION_INFO_FIELD_NUMBER: builtins.int
+    BLOCKED_REASON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    OPERATION_TOKEN_FIELD_NUMBER: builtins.int
+    STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    NEXUS_HEADER_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    operation_id: builtins.str
+    """Unique identifier of this Nexus operation within its namespace along with run ID (below)."""
+    run_id: builtins.str
+    endpoint: builtins.str
+    """Endpoint name, resolved to a URL via the cluster's endpoint registry."""
+    service: builtins.str
+    """Service name."""
+    operation: builtins.str
+    """Operation name."""
+    status: temporalio.api.enums.v1.nexus_pb2.NexusOperationExecutionStatus.ValueType
+    """A general status for this operation, indicates whether it is currently running or in one of the terminal statuses.
+    Updated once when the operation is originally scheduled, and again when it reaches a terminal status.
+    """
+    state: temporalio.api.enums.v1.common_pb2.PendingNexusOperationState.ValueType
+    """More detailed breakdown of NEXUS_OPERATION_EXECUTION_STATUS_RUNNING."""
+    @property
+    def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-close timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    @property
+    def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-start timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    @property
+    def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Start-to-close timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    attempt: builtins.int
+    """The number of attempts made to deliver the start operation request.
+    This number is approximate, it is incremented when a task is added to the history queue.
+    In practice, there could be more attempts if a task is executed but fails to commit, or less attempts if a task
+    was never executed.
+    """
+    @property
+    def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time the operation was originally scheduled via a StartNexusOperation request."""
+    @property
+    def expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Scheduled time + schedule to close timeout."""
+    @property
+    def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time when the operation transitioned to a closed state."""
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+    @property
+    def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Elapsed time from schedule_time to now for running operations or to close_time for closed
+        operations, including all attempts and backoff between attempts.
+        """
+    @property
+    def cancellation_info(self) -> global___NexusOperationExecutionCancellationInfo: ...
+    blocked_reason: builtins.str
+    """If the state is BLOCKED, blocked reason provides additional information."""
+    request_id: builtins.str
+    """Server-generated request ID used as an idempotency token when submitting start requests to
+    the handler. Distinct from the request_id in StartNexusOperationRequest, which is the
+    caller-side idempotency key for the StartNexusOperation RPC itself.
+    """
+    operation_token: builtins.str
+    """Operation token. Only set for asynchronous operations after a successful StartOperation call."""
+    state_transition_count: builtins.int
+    """Incremented each time the operation's state is mutated in persistence."""
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    @property
+    def nexus_header(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
+        """Header for context propagation and tracing purposes."""
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """Metadata for use by user interfaces to display the fixed as-of-start summary and details of the operation."""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links attached by the handler of this operation on start or completion."""
+    identity: builtins.str
+    """The identity of the client who started this operation."""
+    state_size_bytes: builtins.int
+    """Updated once on scheduled and once on terminal status."""
+    def __init__(
+        self,
+        *,
+        operation_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        endpoint: builtins.str = ...,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+        status: temporalio.api.enums.v1.nexus_pb2.NexusOperationExecutionStatus.ValueType = ...,
+        state: temporalio.api.enums.v1.common_pb2.PendingNexusOperationState.ValueType = ...,
+        schedule_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        schedule_to_start_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        start_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        attempt: builtins.int = ...,
+        schedule_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        expiration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        close_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        last_attempt_complete_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        last_attempt_failure: temporalio.api.failure.v1.message_pb2.Failure
+        | None = ...,
+        next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        execution_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        cancellation_info: global___NexusOperationExecutionCancellationInfo
+        | None = ...,
+        blocked_reason: builtins.str = ...,
+        request_id: builtins.str = ...,
+        operation_token: builtins.str = ...,
+        state_transition_count: builtins.int = ...,
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
+        | None = ...,
+        nexus_header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
+        identity: builtins.str = ...,
+        state_size_bytes: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancellation_info",
+            b"cancellation_info",
+            "close_time",
+            b"close_time",
+            "execution_duration",
+            b"execution_duration",
+            "expiration_time",
+            b"expiration_time",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "schedule_time",
+            b"schedule_time",
+            "schedule_to_close_timeout",
+            b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
+            "search_attributes",
+            b"search_attributes",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
+            "user_metadata",
+            b"user_metadata",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attempt",
+            b"attempt",
+            "blocked_reason",
+            b"blocked_reason",
+            "cancellation_info",
+            b"cancellation_info",
+            "close_time",
+            b"close_time",
+            "endpoint",
+            b"endpoint",
+            "execution_duration",
+            b"execution_duration",
+            "expiration_time",
+            b"expiration_time",
+            "identity",
+            b"identity",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_attempt_failure",
+            b"last_attempt_failure",
+            "links",
+            b"links",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "nexus_header",
+            b"nexus_header",
+            "operation",
+            b"operation",
+            "operation_id",
+            b"operation_id",
+            "operation_token",
+            b"operation_token",
+            "request_id",
+            b"request_id",
+            "run_id",
+            b"run_id",
+            "schedule_time",
+            b"schedule_time",
+            "schedule_to_close_timeout",
+            b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
+            "search_attributes",
+            b"search_attributes",
+            "service",
+            b"service",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
+            "state",
+            b"state",
+            "state_size_bytes",
+            b"state_size_bytes",
+            "state_transition_count",
+            b"state_transition_count",
+            "status",
+            b"status",
+            "user_metadata",
+            b"user_metadata",
+        ],
+    ) -> None: ...
+
+global___NexusOperationExecutionInfo = NexusOperationExecutionInfo
+
+class NexusOperationExecutionListInfo(google.protobuf.message.Message):
+    """Limited Nexus operation information returned in the list response.
+    When adding fields here, ensure that it is also present in NexusOperationExecutionInfo (note that it may already be present in
+    NexusOperationExecutionInfo but not at the top-level).
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    OPERATION_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    CLOSE_TIME_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
+    EXECUTION_DURATION_FIELD_NUMBER: builtins.int
+    STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    operation_id: builtins.str
+    """A unique identifier of this operation within its namespace along with run ID (below)."""
+    run_id: builtins.str
+    """The run ID of the standalone Nexus operation."""
+    endpoint: builtins.str
+    """Endpoint name."""
+    service: builtins.str
+    """Service name."""
+    operation: builtins.str
+    """Operation name."""
+    @property
+    def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time the operation was originally scheduled via a StartNexusOperation request."""
+    @property
+    def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """If the operation is in a terminal status, this field represents the time the operation transitioned to that status."""
+    status: temporalio.api.enums.v1.nexus_pb2.NexusOperationExecutionStatus.ValueType
+    """The status is updated once, when the operation is originally scheduled, and again when the operation reaches a terminal status."""
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
+        """Search attributes from the start request."""
+    state_transition_count: builtins.int
+    """Updated on terminal status."""
+    @property
+    def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """The difference between close time and scheduled time.
+        This field is only populated if the operation is closed.
+        """
+    state_size_bytes: builtins.int
+    """Updated once on scheduled and once on terminal status."""
+    def __init__(
+        self,
+        *,
+        operation_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        endpoint: builtins.str = ...,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+        schedule_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        close_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        status: temporalio.api.enums.v1.nexus_pb2.NexusOperationExecutionStatus.ValueType = ...,
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
+        | None = ...,
+        state_transition_count: builtins.int = ...,
+        execution_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        state_size_bytes: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "close_time",
+            b"close_time",
+            "execution_duration",
+            b"execution_duration",
+            "schedule_time",
+            b"schedule_time",
+            "search_attributes",
+            b"search_attributes",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "close_time",
+            b"close_time",
+            "endpoint",
+            b"endpoint",
+            "execution_duration",
+            b"execution_duration",
+            "operation",
+            b"operation",
+            "operation_id",
+            b"operation_id",
+            "run_id",
+            b"run_id",
+            "schedule_time",
+            b"schedule_time",
+            "search_attributes",
+            b"search_attributes",
+            "service",
+            b"service",
+            "state_size_bytes",
+            b"state_size_bytes",
+            "state_transition_count",
+            b"state_transition_count",
+            "status",
+            b"status",
+        ],
+    ) -> None: ...
+
+global___NexusOperationExecutionListInfo = NexusOperationExecutionListInfo

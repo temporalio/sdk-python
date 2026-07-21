@@ -6,7 +6,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import nexusrpc
 import nexusrpc.handler._decorators
@@ -23,9 +23,9 @@ from temporalio.client import (
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers import assert_event_subsequence, assert_eventually
+from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.nexus.test_workflow_caller_cancellation_types import (
-    assert_event_subsequence,
     get_event_time,
     has_event,
 )
@@ -48,6 +48,7 @@ class HandlerWorkflow:
     def __init__(self):
         self.cancel_handler_released = asyncio.Event()
         self.caller_op_future_resolved = asyncio.Event()
+        self.release_completion = asyncio.Event()
 
     @workflow.run
     async def run(self) -> None:
@@ -61,6 +62,11 @@ class HandlerWorkflow:
             # For WAIT_REQUESTED, we want to prove that the future can be unblocked before the
             # handler workflow completes.
             await self.caller_op_future_resolved.wait()
+        elif (
+            test_context.cancellation_type
+            == workflow.NexusOperationCancellationType.WAIT_COMPLETED
+        ):
+            await self.release_completion.wait()
 
     @workflow.signal
     def set_cancel_handler_released(self) -> None:
@@ -69,6 +75,14 @@ class HandlerWorkflow:
     @workflow.signal
     def set_caller_op_future_resolved(self) -> None:
         self.caller_op_future_resolved.set()
+
+    @workflow.signal
+    def set_release_completion(self) -> None:
+        self.release_completion.set()
+
+    @workflow.query
+    def has_cancel_handler_released(self) -> bool:
+        return self.cancel_handler_released.is_set()
 
 
 @nexusrpc.service
@@ -79,7 +93,7 @@ class Service:
 class WorkflowOpHandler(
     temporalio.nexus._operation_handlers.WorkflowRunOperationHandler
 ):
-    def __init__(self):
+    def __init__(self):  # type:ignore[reportMissingSuperCall]
         pass
 
     async def start(
@@ -120,15 +134,15 @@ class ServiceHandler:
 @dataclass
 class Input:
     endpoint: str
-    cancellation_type: Optional[workflow.NexusOperationCancellationType]
+    cancellation_type: workflow.NexusOperationCancellationType | None
 
 
 @dataclass
 class CancellationResult:
     operation_token: str
     caller_op_future_resolved: datetime
-    error_type: Optional[str] = None
-    error_cause_type: Optional[str] = None
+    error_type: str | None = None
+    error_cause_type: str | None = None
 
 
 @workflow.defn(sandboxed=False)
@@ -140,7 +154,7 @@ class CallerWorkflow:
             endpoint=input.endpoint,
         )
         self.released = False
-        self.operation_token: Optional[str] = None
+        self.operation_token: str | None = None
         self.caller_op_future_resolved: asyncio.Future[datetime] = asyncio.Future()
 
     @workflow.signal
@@ -152,6 +166,10 @@ class CallerWorkflow:
         await workflow.wait_condition(lambda: self.operation_token is not None)
         assert self.operation_token
         return self.operation_token
+
+    @workflow.query
+    def has_caller_op_future_resolved(self) -> bool:
+        return self.caller_op_future_resolved.done()
 
     @workflow.run
     async def run(self, input: Input) -> CancellationResult:
@@ -222,7 +240,9 @@ async def test_cancellation_type(
         workflows=[CallerWorkflow, HandlerWorkflow],
         nexus_service_handlers=[ServiceHandler()],
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(worker.task_queue), worker.task_queue
+        )
 
         # Start the caller workflow, wait for the nexus op to have started and retrieve the nexus op
         # token
@@ -296,6 +316,12 @@ async def check_behavior_for_try_cancel(
     handler_wf: WorkflowHandle[Any, None],
 ) -> None:
     await handler_wf.result()
+
+    cancel_request_failed = EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED
+    async for event in caller_wf.fetch_history_events(wait_new_event=True):
+        if event.event_type == cancel_request_failed:
+            break
+
     await caller_wf.signal(CallerWorkflow.release)
     result = await caller_wf.result()
     assert result.error_type == "NexusOperationError"
@@ -362,7 +388,23 @@ async def check_behavior_for_wait_cancellation_completed(
     caller_wf: WorkflowHandle[Any, CancellationResult],
     handler_wf: WorkflowHandle,
 ) -> None:
+    async def assert_cancel_handler_released() -> None:
+        assert await handler_wf.query(HandlerWorkflow.has_cancel_handler_released)
+
+    await assert_eventually(assert_cancel_handler_released)
+
+    handler_status = (await handler_wf.describe()).status
+    assert handler_status == WorkflowExecutionStatus.RUNNING
+    assert not await caller_wf.query(CallerWorkflow.has_caller_op_future_resolved)
+
+    await handler_wf.signal(HandlerWorkflow.set_release_completion)
     await handler_wf.result()
+
+    async def assert_caller_op_future_resolved() -> None:
+        assert await caller_wf.query(CallerWorkflow.has_caller_op_future_resolved)
+
+    await assert_eventually(assert_caller_op_future_resolved)
+
     await caller_wf.signal(CallerWorkflow.release)
     result = await caller_wf.result()
     assert not result.error_type
@@ -378,8 +420,3 @@ async def check_behavior_for_wait_cancellation_completed(
             EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
         ],
     )
-    handler_wf_completed = await get_event_time(
-        handler_wf,
-        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
-    )
-    assert handler_wf_completed <= result.caller_op_future_resolved

@@ -3,23 +3,114 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, Literal, Optional
+from enum import IntEnum
+from typing import TYPE_CHECKING, Any, Generic
 
 from nexusrpc import OutputT
+from typing_extensions import Self
 
-OperationTokenType = Literal[1]
-OPERATION_TOKEN_TYPE_WORKFLOW: OperationTokenType = 1
+
+class OperationTokenType(IntEnum):
+    """Type discriminator for Nexus operation tokens."""
+
+    WORKFLOW = 1
+
 
 if TYPE_CHECKING:
     import temporalio.client
 
 
+@dataclass(frozen=True, kw_only=True)
+class OperationToken:
+    """Serializable token identifying a Nexus operation target."""
+
+    version: int | None = None
+    type: OperationTokenType
+    namespace: str
+    workflow_id: str
+
+    def encode(self) -> str:
+        """Convert handle to a base64url-encoded token string."""
+        token_details: dict[str, Any] = {
+            "t": self.type,
+            "ns": self.namespace,
+            "wid": self.workflow_id,
+        }
+        if self.version is not None:
+            token_details["v"] = self.version
+        return _base64url_encode_no_padding(
+            json.dumps(
+                token_details,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+
+    @classmethod
+    def decode(cls, token: str) -> Self:
+        """Decodes and validates a token from its base64url-encoded string representation."""
+        if not token:
+            raise TypeError("invalid token: token is empty")
+        try:
+            decoded_bytes = _base64url_decode_no_padding(token)
+        except Exception as err:
+            raise TypeError("failed to decode token as base64url") from err
+        try:
+            token_details = json.loads(decoded_bytes.decode("utf-8"))
+        except Exception as err:
+            raise TypeError("failed to unmarshal operation token") from err
+
+        if not isinstance(token_details, dict):
+            raise TypeError(f"invalid token: expected dict, got {type(token_details)}")
+
+        raw_token_type = token_details.get("t")
+        if not isinstance(raw_token_type, int):
+            raise TypeError(
+                f"invalid token: expected token type to be an int, got {type(raw_token_type)}"
+            )
+
+        try:
+            token_type = OperationTokenType(raw_token_type)
+        except ValueError as err:
+            raise TypeError(
+                f"invalid token: unknown token type, got {raw_token_type}.",
+                f"Valid values: {', '.join([f'{t.value} ({t.name})' for t in OperationTokenType])}",
+            ) from err
+
+        version = token_details.get("v")
+        if version is not None and not isinstance(version, int):
+            raise TypeError(
+                f"invalid token: expected version to be an int or null, got {type(version)}"
+            )
+
+        workflow_id = token_details.get("wid")
+        if not isinstance(workflow_id, str):
+            raise TypeError(
+                f"invalid token: expected workflow id to be a string, got {type(workflow_id)}"
+            )
+
+        if token_type == OperationTokenType.WORKFLOW and not workflow_id:
+            raise TypeError(
+                "invalid token: expected non-empty workflow id for token type `WORKFLOW`"
+            )
+
+        namespace = token_details.get("ns")
+        if not isinstance(namespace, str):
+            # Allow empty string for ns, but it must be present and a string
+            raise TypeError(
+                f"invalid token: expected namespace to be a string, got {type(namespace)}"
+            )
+
+        return cls(
+            type=OperationTokenType(token_type),
+            namespace=namespace,
+            workflow_id=workflow_id,
+            version=version,
+        )
+
+
 @dataclass(frozen=True)
 class WorkflowHandle(Generic[OutputT]):
     """A handle to a workflow that is backing a Nexus operation.
-
-    .. warning::
-        This API is experimental and unstable.
 
     Do not instantiate this directly. Use
     :py:func:`temporalio.nexus.WorkflowRunOperationContext.start_workflow` to create a
@@ -30,12 +121,12 @@ class WorkflowHandle(Generic[OutputT]):
     workflow_id: str
     # Version of the token. Treated as v1 if missing. This field is not included in the
     # serialized token; it's only used to reject newer token versions on load.
-    version: Optional[int] = None
+    version: int | None = None
 
     def _to_client_workflow_handle(
         self,
         client: temporalio.client.Client,
-        result_type: Optional[type[OutputT]] = None,
+        result_type: type[OutputT] | None = None,
     ) -> temporalio.client.WorkflowHandle[Any, OutputT]:
         """Create a :py:class:`temporalio.client.WorkflowHandle` from the token."""
         if client.namespace != self.namespace:
@@ -45,8 +136,6 @@ class WorkflowHandle(Generic[OutputT]):
             )
         return client.get_workflow_handle(self.workflow_id, result_type=result_type)
 
-    # TODO(nexus-preview): The return type here should be dictated by the input workflow
-    # handle type.
     @classmethod
     def _unsafe_from_client_workflow_handle(
         cls, workflow_handle: temporalio.client.WorkflowHandle[Any, OutputT]
@@ -64,65 +153,30 @@ class WorkflowHandle(Generic[OutputT]):
 
     def to_token(self) -> str:
         """Convert handle to a base64url-encoded token string."""
-        return _base64url_encode_no_padding(
-            json.dumps(
-                {
-                    "t": OPERATION_TOKEN_TYPE_WORKFLOW,
-                    "ns": self.namespace,
-                    "wid": self.workflow_id,
-                },
-                separators=(",", ":"),
-            ).encode("utf-8")
-        )
+        return OperationToken(
+            type=OperationTokenType.WORKFLOW,
+            namespace=self.namespace,
+            workflow_id=self.workflow_id,
+        ).encode()
 
     @classmethod
     def from_token(cls, token: str) -> WorkflowHandle[OutputT]:
         """Decodes and validates a token from its base64url-encoded string representation."""
-        if not token:
-            raise TypeError("invalid workflow token: token is empty")
-        try:
-            decoded_bytes = _base64url_decode_no_padding(token)
-        except Exception as err:
-            raise TypeError("failed to decode token as base64url") from err
-        try:
-            workflow_operation_token = json.loads(decoded_bytes.decode("utf-8"))
-        except Exception as err:
-            raise TypeError("failed to unmarshal workflow operation token") from err
-
-        if not isinstance(workflow_operation_token, dict):
+        op_token = OperationToken.decode(token)
+        if op_token.type != OperationTokenType.WORKFLOW:
             raise TypeError(
-                f"invalid workflow token: expected dict, got {type(workflow_operation_token)}"
+                f"invalid workflow token type: {op_token.type}, expected: {OperationTokenType.WORKFLOW}"
             )
 
-        token_type = workflow_operation_token.get("t")
-        if token_type != OPERATION_TOKEN_TYPE_WORKFLOW:
-            raise TypeError(
-                f"invalid workflow token type: {token_type}, expected: {OPERATION_TOKEN_TYPE_WORKFLOW}"
-            )
-
-        version = workflow_operation_token.get("v")
-        if version is not None and version != 0:
+        if op_token.version is not None and op_token.version != 0:
             raise TypeError(
                 "invalid workflow token: 'v' field, if present, must be 0 or null/absent"
             )
 
-        workflow_id = workflow_operation_token.get("wid")
-        if not workflow_id or not isinstance(workflow_id, str):
-            raise TypeError(
-                "invalid workflow token: missing, empty, or non-string workflow ID (wid)"
-            )
-
-        namespace = workflow_operation_token.get("ns")
-        if namespace is None or not isinstance(namespace, str):
-            # Allow empty string for ns, but it must be present and a string
-            raise TypeError(
-                "invalid workflow token: missing or non-string namespace (ns)"
-            )
-
         return cls(
-            namespace=namespace,
-            workflow_id=workflow_id,
-            version=version,
+            namespace=op_token.namespace,
+            workflow_id=op_token.workflow_id,
+            version=op_token.version,
         )
 
 
