@@ -11,6 +11,8 @@ import pytest
 import pytest_asyncio
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
+from temporalio.exceptions import ApplicationError
 from temporalio.testing import TimeSkipper, TimeSkippingConfig, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import assert_duration_same, new_worker
@@ -373,3 +375,113 @@ async def test_fast_forward_returns_false_when_workflow_terminates_first(
                 task_queue=worker.task_queue,
             )
         assert (await env.fast_forward(handle, timedelta(hours=2))) is False
+
+
+@workflow.defn
+class FailOnceThenSleepWorkflow:
+    """Sleeps ``sleep_seconds``; fails on the first attempt, succeeds on later ones."""
+
+    @workflow.run
+    async def run(self, sleep_seconds: float) -> str:
+        await workflow.sleep(timedelta(seconds=sleep_seconds))
+        if workflow.info().attempt < 2:
+            raise ApplicationError("first attempt fails on purpose")
+        return "done"
+
+    @workflow.query
+    def attempt(self) -> int:
+        return workflow.info().attempt
+
+
+async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
+    """FF should cover retry_backoff + attempt 2. Currently fails: FF returns
+    False when it sees attempt 1's WORKFLOW_EXECUTION_FAILED event."""
+    async with new_worker(env.client, FailOnceThenSleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                FailOnceThenSleepWorkflow.run,
+                3600.0,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                retry_policy=RetryPolicy(
+                    initial_interval=timedelta(hours=1),
+                    backoff_coefficient=1.0,
+                    maximum_attempts=2,
+                ),
+            )
+        # 1h sleep, 1h retry backoff, 1h sleep. 2.5h fast forward should
+        # end solidly in the second run.
+        assert await env.fast_forward(handle, timedelta(hours=2, minutes=30))
+        assert (await handle.result()) == "done"
+        assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
+
+
+@workflow.defn
+class ContinueAsNewSleepWorkflow:
+    """Sleeps ``sleep_seconds``, then continues-as-new until ``runs_remaining`` is 1.
+
+    ``current_run`` counts up through the CAN chain (1, 2, 3, ...) and is
+    queryable so tests can verify how far the chain progressed.
+    """
+
+    def __init__(self) -> None:
+        self._current_run = 1
+
+    @workflow.run
+    async def run(
+        self, sleep_seconds: float, runs_remaining: int, current_run: int = 1
+    ) -> str:
+        self._current_run = current_run
+        await workflow.sleep(timedelta(seconds=sleep_seconds))
+        if runs_remaining > 1:
+            workflow.continue_as_new(
+                args=[sleep_seconds, runs_remaining - 1, current_run + 1]
+            )
+        return "done"
+
+    @workflow.query
+    def current_run(self) -> int:
+        return self._current_run
+
+
+async def test_fast_forward_spans_continue_as_new(env: WorkflowEnvironment) -> None:
+    """"Fast forward over 3 continue-as-new runs."""
+    async with new_worker(env.client, ContinueAsNewSleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                ContinueAsNewSleepWorkflow.run,
+                args=[3600.0, 3, 1],
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert await env.fast_forward(handle, timedelta(hours=2))
+        assert (await handle.result()) == "done"
+        assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
+
+
+async def test_fast_forward_spans_cron_restarts(
+    env: WorkflowEnvironment,
+) -> None:
+    """Fast forward over multiple cron firings."""
+    workflow_id = f"wf-{uuid.uuid4()}"
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                SleepWorkflow.run,
+                60.0,
+                id=workflow_id,
+                task_queue=worker.task_queue,
+                cron_schedule="@every 1h",
+            )
+        try:
+            assert await env.fast_forward(handle, timedelta(hours=3))
+            run_count = 0
+            async for _ in env.client.list_workflows(
+                query=f"WorkflowId = '{workflow_id}'"
+            ):
+                run_count += 1
+            assert run_count >= 3, (
+                f"expected >= 3 cron runs after 3h FF, got {run_count}"
+            )
+        finally:
+            await handle.cancel()
