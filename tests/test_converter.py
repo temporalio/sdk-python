@@ -44,12 +44,11 @@ from temporalio.converter import (
     JSONTypeConverter,
     JSONTypeConverterUnhandled,
     PayloadCodec,
-    PayloadConverter,
-    TemporalIntermediatePayloadConverter,
     decode_search_attributes,
     encode_search_attribute_values,
     value_to_type,
 )
+from temporalio.converter._payload_converter import _TemporalDataModelPayloadConverter
 from temporalio.exceptions import (
     ApplicationError,
     FailureError,
@@ -261,13 +260,13 @@ class TemporalIntermediateModel:
     value: str
 
     @classmethod
-    def _temporal_from_intermediate(
+    def _temporal_from_data_model(
         cls,
-        intermediate: temporalio.api.common.v1.WorkflowExecution,
+        data_model: temporalio.api.common.v1.WorkflowExecution,
     ) -> TemporalIntermediateModel:
-        return cls(value=intermediate.workflow_id)
+        return cls(value=data_model.workflow_id)
 
-    def _temporal_to_intermediate(self) -> temporalio.api.common.v1.WorkflowExecution:
+    def _temporal_to_data_model(self) -> temporalio.api.common.v1.WorkflowExecution:
         return temporalio.api.common.v1.WorkflowExecution(
             workflow_id=self.value,
             run_id="run-id",
@@ -278,12 +277,12 @@ class CustomDefaultPayloadConverter(DefaultPayloadConverter):
     pass
 
 
-def test_temporal_intermediate_payload_converter_wraps_user_converter():
+def test_temporal_data_model_payload_converter_wraps_user_converter():
     data_converter = DataConverter(
         payload_converter_class=CustomDefaultPayloadConverter
     )
     converter = data_converter.payload_converter
-    assert isinstance(converter, TemporalIntermediatePayloadConverter)
+    assert isinstance(converter, _TemporalDataModelPayloadConverter)
     value = TemporalIntermediateModel("workflow-id")
 
     payload = converter.to_payload(value)

@@ -514,40 +514,40 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
-class TemporalIntermediatePayloadConverter(PayloadConverter, WithSerializationContext):
-    """Payload converter wrapper for generated Temporal intermediate hooks.
+class _TemporalDataModelPayloadConverter(PayloadConverter, WithSerializationContext):
+    """Payload converter wrapper for generated Temporal data model hooks.
 
-    Values with a ``_temporal_to_intermediate`` method are first converted to
-    their intermediate value, then encoded by the wrapped payload converter. When
-    decoding to a type with ``_temporal_from_intermediate``, the wrapped
-    converter first decodes the payload to the intermediate value and this
+    Values with a ``_temporal_to_data_model`` method are first converted to
+    their data model value, then encoded by the wrapped payload converter. When
+    decoding to a type with ``_temporal_from_data_model``, the wrapped
+    converter first decodes the payload to the data model value and this
     wrapper constructs the requested user-facing type from it.
     """
 
     _inner_payload_converter: PayloadConverter
 
     def __init__(self, inner_payload_converter: PayloadConverter) -> None:
-        """Create a Temporal intermediate payload converter."""
+        """Create a Temporal data model payload converter."""
         self._inner_payload_converter = inner_payload_converter
 
     @staticmethod
     def wrap(payload_converter: PayloadConverter) -> PayloadConverter:
         """Wrap a payload converter unless it is already wrapped."""
-        if isinstance(payload_converter, TemporalIntermediatePayloadConverter):
+        if isinstance(payload_converter, _TemporalDataModelPayloadConverter):
             return payload_converter
-        return TemporalIntermediatePayloadConverter(payload_converter)
+        return _TemporalDataModelPayloadConverter(payload_converter)
 
     def to_payloads(
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
-        intermediate_values: list[Any] = []
+        data_model_values: list[Any] = []
         for value in values:
-            to_intermediate = getattr(value, "_temporal_to_intermediate", None)
-            if to_intermediate is not None:
-                value = to_intermediate()
-            intermediate_values.append(value)
-        return self._inner_payload_converter.to_payloads(intermediate_values)
+            to_data_model = getattr(value, "_temporal_to_data_model", None)
+            if to_data_model is not None:
+                value = to_data_model()
+            data_model_values.append(value)
+        return self._inner_payload_converter.to_payloads(data_model_values)
 
     def from_payloads(
         self,
@@ -562,7 +562,7 @@ class TemporalIntermediatePayloadConverter(PayloadConverter, WithSerializationCo
             normalized_type_hints.extend([None] * (len(payloads) - len(type_hints)))
         inner_type_hints = [
             None
-            if getattr(type_hint, "_temporal_from_intermediate", None) is not None
+            if getattr(type_hint, "_temporal_from_data_model", None) is not None
             else type_hint
             for type_hint in normalized_type_hints
         ]
@@ -570,11 +570,9 @@ class TemporalIntermediatePayloadConverter(PayloadConverter, WithSerializationCo
             payloads, typing.cast("list[type]", inner_type_hints)
         )
         return [
-            from_intermediate(value)
+            from_data_model(value)
             if (
-                from_intermediate := getattr(
-                    type_hint, "_temporal_from_intermediate", None
-                )
+                from_data_model := getattr(type_hint, "_temporal_from_data_model", None)
             )
             is not None
             else value

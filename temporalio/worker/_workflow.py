@@ -789,7 +789,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         # Create instance from details
         det = WorkflowInstanceDetails(
-            payload_converter_class=self._data_converter.payload_converter_class,
+            payload_converter_factory=self._data_converter._new_payload_converter,
             failure_converter_class=self._data_converter.failure_converter_class,
             interceptor_classes=self._interceptor_classes,
             defn=defn,

@@ -20,6 +20,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added SDK payload converter support for values and type hints that expose
+  `_temporal_to_data_model` and `_temporal_from_data_model` hooks. This lets
+  hook-aware types delegate their wire representation to the configured payload
+  converter, preserving SDK behavior such as serialization contexts for nested
+  payload fields.
+
 ### Changed
 
 ### Deprecated

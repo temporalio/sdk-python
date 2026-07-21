@@ -11,6 +11,7 @@ import temporalio.api.common.v1
 import temporalio.converter
 from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.converter import BinaryProtoPayloadConverter, CompositePayloadConverter
+from temporalio.converter._payload_converter import _TemporalDataModelPayloadConverter
 
 TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
 _user_payload_converter: contextvars.ContextVar[
@@ -52,13 +53,13 @@ class SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
     _user_payload_converter: temporalio.converter.PayloadConverter
     _outer_payload_converter: temporalio.converter.PayloadConverter
 
-    def __init__(self, user_payload_converter: temporalio.converter.PayloadConverter) -> None:
+    def __init__(
+        self, user_payload_converter: temporalio.converter.PayloadConverter
+    ) -> None:
         """Create a payload converter for system Nexus outer envelopes."""
         self._user_payload_converter = user_payload_converter
-        self._outer_payload_converter = (
-            temporalio.converter.TemporalIntermediatePayloadConverter.wrap(
-                _SystemNexusOuterPayloadConverter()
-            )
+        self._outer_payload_converter = _TemporalDataModelPayloadConverter.wrap(
+            _SystemNexusOuterPayloadConverter()
         )
 
     def to_payloads(
