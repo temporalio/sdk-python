@@ -43,11 +43,11 @@ class SleepWorkflow:
     """
 
     @workflow.run
-    async def run(self, sleep_seconds: float) -> dict[str, float]:
+    async def run(self, sleep_seconds: float) -> dict[str, Any]:
         t_start = workflow.now().timestamp()
         await workflow.sleep(timedelta(seconds=sleep_seconds))
         t_end = workflow.now().timestamp()
-        return {"start": t_start, "end": t_end}
+        return {"start": t_start, "end": t_end, "message": "all done"}
 
     @workflow.signal
     def tick(self) -> None:
@@ -70,14 +70,13 @@ async def test_workflow_env_time_skipping_basic():
             # Check that time is around now
             assert_timestamp_from_now(await env.get_current_time(), 0)
             # Run workflow
-            assert (
-                await env.client.execute_workflow(
-                    SleepWorkflow.run,
-                    100000.0,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
-            ) is not None
+            result = await env.client.execute_workflow(
+                SleepWorkflow.run,
+                100000.0,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert result["message"] == "all done"
             # Check that the time is around 100000 seconds after now
             assert_timestamp_from_now(await env.get_current_time(), 100000)
 
@@ -160,27 +159,25 @@ async def test_workflow_env_time_skipping_disabled():
         async with new_worker(env.client, SleepWorkflow) as worker:
             # Confirm when executing normally it does not sleep for a full 3s
             start = monotonic()
-            assert (
-                await env.client.execute_workflow(
-                    SleepWorkflow.run,
-                    3.0,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
-            ) is not None
+            result = await env.client.execute_workflow(
+                SleepWorkflow.run,
+                3.0,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert result["message"] == "all done"
             assert monotonic() - start < 2.5
 
             # Confirm when skipping is disabled, it does sleep for a full 3s
             with env.auto_time_skipping_disabled():
                 start = monotonic()
-                assert (
-                    await env.client.execute_workflow(
-                        SleepWorkflow.run,
-                        3.0,
-                        id=f"workflow-{uuid.uuid4()}",
-                        task_queue=worker.task_queue,
-                    )
-                ) is not None
+                result = await env.client.execute_workflow(
+                    SleepWorkflow.run,
+                    3.0,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                assert result["message"] == "all done"
                 assert monotonic() - start > 2.5
 
 

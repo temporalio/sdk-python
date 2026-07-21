@@ -5,6 +5,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import timedelta
 from time import monotonic
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -74,6 +75,7 @@ async def test_skip_full_run(env: WorkflowEnvironment) -> None:
         result = await handle.result()
         wall_elapsed = monotonic() - wall_start
 
+    assert result["message"] == "all done"
     # Virtual time advanced by ~1h even though wall time was just a few seconds.
     virtual_elapsed = result["end"] - result["start"]
     assert virtual_elapsed >= 3600, (
@@ -178,7 +180,8 @@ async def test_partial_fast_forward_then_unbounded(
         # has no target, so no disabled_after_fast_forward transition can fire;
         # the wait loop sees only the workflow's terminal event.
         assert not await env.fast_forward(handle, None)
-        assert (await handle.result()) is not None
+        result = await handle.result()
+        assert result["message"] == "all done"
 
         # Final virtual time on the closed workflow is ~+1h from start.
         t_end = await handle.query(SleepWorkflow.now)
@@ -194,12 +197,12 @@ class ParentTimeSkippingWorkflow:
     @workflow.run
     async def run(
         self, child_id: str, task_queue: str, child_sleep_seconds: float
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         parent_start = workflow.now().timestamp()
         await workflow.sleep(timedelta(hours=1))
         parent_after_wait_1 = workflow.now().timestamp()
 
-        child_times = await workflow.execute_child_workflow(
+        child_result = await workflow.execute_child_workflow(
             SleepWorkflow.run,
             child_sleep_seconds,
             id=child_id,
@@ -215,8 +218,10 @@ class ParentTimeSkippingWorkflow:
             "parent_after_wait_1": parent_after_wait_1,
             "parent_after_child_start": parent_after_child_start,
             "parent_end": parent_end,
-            "child_start": child_times["start"],
-            "child_end": child_times["end"],
+            "child_start": child_result["start"],
+            "child_end": child_result["end"],
+            "child_message": child_result["message"],
+            "message": "all done",
         }
 
 
@@ -240,6 +245,8 @@ async def test_child_workflow_propagates_time_skipping(
         result = await parent_handle.result()
         wall_elapsed = monotonic() - wall_start
 
+    assert result["message"] == "all done"
+    assert result["child_message"] == "all done"
     # Total 3h of virtual work should complete in a few seconds of wall time.
     assert wall_elapsed < 10, (
         f"parent+child took {wall_elapsed:.1f}s wall time; expected < 10s"
@@ -297,9 +304,11 @@ async def test_child_workflow_with_propagation_disabled() -> None:
                 id=parent_id,
                 task_queue=worker.task_queue,
             )
-            await parent_handle.result()
+            result = await parent_handle.result()
             wall_elapsed = monotonic() - wall_start
 
+        assert result["message"] == "all done"
+        assert result["child_message"] == "all done"
         # Child's 5s sleep runs in real time; parent's two 1h waits skip.
         # Total wall time is dominated by the child's real sleep.
         assert 4 < wall_elapsed < 15, (
@@ -338,6 +347,7 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
             result = await handle.result()
             wall_elapsed = monotonic() - wall_start
 
+        assert result["message"] == "all done"
         # Virtual clock advanced ~1h.
         assert_duration_same(3600, result["end"] - result["start"], tolerance=10)
         # But wall time was seconds, not an hour.

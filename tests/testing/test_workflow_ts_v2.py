@@ -35,7 +35,8 @@ async def test_workflow_env_time_skipping_basic_v2():
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            assert (await handle.result()) is not None
+            result = await handle.result()
+            assert result["message"] == "all done"
             assert_timestamp_from_now(
                 await handle.query(SleepWorkflow.now), 100000
             )
@@ -87,7 +88,8 @@ async def test_workflow_env_time_skipping_disabled_v2():
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            assert (await ts_on_handle.result()) is not None
+            ts_on_result = await ts_on_handle.result()
+            assert ts_on_result["message"] == "all done"
             assert monotonic() - start < 2.5
             await assert_time_was_skipped(ts_on_handle)
 
@@ -101,7 +103,8 @@ async def test_workflow_env_time_skipping_disabled_v2():
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
                 )
-            assert (await handle.result()) is not None
+            ts_off_result = await handle.result()
+            assert ts_off_result["message"] == "all done"
             assert monotonic() - start > 2.5
             await assert_time_was_not_skipped(handle)
 
@@ -126,7 +129,8 @@ async def test_workflow_env_time_skipping_basic_via_update_v2():
             # the workflow terminates before a ``disabled_after_fast_forward``
             # transition can fire (there's no target).
             assert not await env.fast_forward(handle, None)
-            assert (await handle.result()) is not None
+            result = await handle.result()
+            assert result["message"] == "all done"
             assert_timestamp_from_now(
                 await handle.query(SleepWorkflow.now), 100000
             )
