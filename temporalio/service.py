@@ -43,7 +43,9 @@ class TLSConfig:
     """Root CA to validate the server certificate against."""
 
     domain: str | None = None
-    """TLS domain."""
+    """SNI host and HTTP/2 authority override, and the default name the server
+    certificate is verified against (see
+    :py:attr:`verification_server_name`)."""
 
     client_cert: bytes | None = None
     """Client certificate for mTLS.
@@ -55,12 +57,26 @@ class TLSConfig:
 
     This must be combined with :py:attr:`client_cert`."""
 
+    verification_server_name: str | None = None
+    """Name to verify the server certificate against, instead of the
+    :py:attr:`domain` / connected host.
+
+    Unlike :py:attr:`domain`, this does not change the TLS SNI or HTTP/2
+    authority values, which continue to follow the connected host (or
+    :py:attr:`domain` if set). Use this when the server's certificate does not
+    carry the name being dialed, e.g. when the connection traverses an
+    SNI-inspecting proxy that must be able to resolve the SNI value.
+
+    Requires :py:attr:`server_root_ca_cert`; the system root store is not
+    consulted when this is set."""
+
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientTlsConfig:
         return temporalio.bridge.client.ClientTlsConfig(
             server_root_ca_cert=self.server_root_ca_cert,
             domain=self.domain,
             client_cert=self.client_cert,
             client_private_key=self.client_private_key,
+            verification_server_name=self.verification_server_name,
         )
 
 
