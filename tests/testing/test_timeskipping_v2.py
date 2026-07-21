@@ -559,6 +559,7 @@ async def test_update_time_reflects_workflow_virtual_clock(
         # Send a follow-up update. The response's update_time reflects the
         # workflow's virtual clock at the moment the update landed, which
         # should be ~+1h from workflow start, not ~real-now.
+        assert env._ts_skipper is not None
         resp = await env._ts_skipper._update_time_skipping_config(  # type: ignore[reportPrivateUsage]
             handle, TimeSkippingConfig(enabled=True, disable_propagation=True)
         )
