@@ -255,6 +255,7 @@ class Replayer:
                 workflow_failure_exception_types=self._config.get(
                     "workflow_failure_exception_types", []
                 ),
+                patch_activation_callback=None,
                 debug_mode=self._config.get("debug_mode", False),
                 metric_meter=runtime.metric_meter,
                 on_eviction_hook=on_eviction_hook,

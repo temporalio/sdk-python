@@ -89,6 +89,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 extern_functions={},
                 disable_eager_activity_execution=False,
                 worker_level_failure_exception_types=self._worker_level_failure_exception_types,
+                patch_activation_callback=None,
                 last_completion_result=Payloads(),
                 last_failure=Failure(),
             ),

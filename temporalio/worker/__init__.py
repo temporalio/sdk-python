@@ -58,6 +58,7 @@ from ._worker import (
     WorkerDeploymentConfig,
 )
 from ._workflow_instance import (
+    PatchActivationInput,
     UnsandboxedWorkflowRunner,
     WorkflowInstance,
     WorkflowInstanceDetails,
@@ -77,6 +78,7 @@ __all__ = [
     "PollerBehavior",
     "PollerBehaviorSimpleMaximum",
     "PollerBehaviorAutoscaling",
+    "PatchActivationInput",
     # Interceptor base classes
     "Interceptor",
     "ActivityInboundInterceptor",

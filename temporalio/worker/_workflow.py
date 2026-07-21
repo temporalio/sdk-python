@@ -42,6 +42,7 @@ from ._interceptor import (
     WorkflowInterceptorClassInput,
 )
 from ._workflow_instance import (
+    PatchActivationInput,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
@@ -78,6 +79,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         workflow_failure_exception_types: Sequence[type[BaseException]],
+        patch_activation_callback: Callable[[PatchActivationInput], bool] | None,
         debug_mode: bool,
         disable_eager_activity_execution: bool,
         metric_meter: temporalio.common.MetricMeter,
@@ -145,6 +147,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
 
         self._workflow_failure_exception_types = workflow_failure_exception_types
+        self._patch_activation_callback = patch_activation_callback
         self._running_workflows: dict[str, _RunningWorkflow] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
@@ -798,6 +801,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
+            patch_activation_callback=self._patch_activation_callback,
             last_completion_result=init.last_completion_result,
             last_failure=last_failure,
         )

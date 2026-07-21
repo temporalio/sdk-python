@@ -25,6 +25,9 @@ to include examples, links to docs, or any other relevant information.
   hook-aware types delegate their wire representation to the configured payload
   converter, preserving SDK behavior such as serialization contexts for nested
   payload fields.
+- Added the experimental `Worker` `patch_activation_callback` option, allowing workers
+  to decide whether a first non-replay `workflow.patched` call should activate a patch
+  during rolling deployments.
 
 ### Changed
 

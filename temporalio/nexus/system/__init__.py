@@ -20,7 +20,7 @@ _user_payload_converter: contextvars.ContextVar[
 
 
 @contextlib.contextmanager
-def user_payload_converter_context(
+def _user_payload_converter_context(
     payload_converter: temporalio.converter.PayloadConverter,
 ) -> Iterator[None]:
     """Set the user payload converter for system Nexus model conversion."""
@@ -31,7 +31,7 @@ def user_payload_converter_context(
         _user_payload_converter.reset(token)
 
 
-def current_user_payload_converter() -> temporalio.converter.PayloadConverter:
+def _current_user_payload_converter() -> temporalio.converter.PayloadConverter:
     """Return the active user payload converter for system Nexus model conversion."""
     payload_converter = _user_payload_converter.get()
     if payload_converter is None:
@@ -66,7 +66,7 @@ class SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
-        with user_payload_converter_context(self._user_payload_converter):
+        with _user_payload_converter_context(self._user_payload_converter):
             return self._outer_payload_converter.to_payloads(values)
 
     def from_payloads(
@@ -75,7 +75,7 @@ class SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
         type_hints: list[type] | None = None,
     ) -> list[Any]:
         """See base class."""
-        with user_payload_converter_context(self._user_payload_converter):
+        with _user_payload_converter_context(self._user_payload_converter):
             return self._outer_payload_converter.from_payloads(payloads, type_hints)
 
 
@@ -113,10 +113,8 @@ def get_payload_converter(
 
 __all__ = [
     "TEMPORAL_SYSTEM_ENDPOINT",
-    "current_user_payload_converter",
     "get_payload_converter",
     "is_system_endpoint",
     "maybe_visit_payload",
     "SystemNexusPayloadConverter",
-    "user_payload_converter_context",
 ]
