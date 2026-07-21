@@ -132,8 +132,21 @@ class PublicConnectivityRule(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    ENABLE_STABLE_IPS_FIELD_NUMBER: builtins.int
+    enable_stable_ips: builtins.bool
+    """Flag to determine namespace is connected via a predictable set of IPs on public internet
+    temporal:versioning:min_version=v0.15.0
+    """
     def __init__(
         self,
+        *,
+        enable_stable_ips: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "enable_stable_ips", b"enable_stable_ips"
+        ],
     ) -> None: ...
 
 global___PublicConnectivityRule = PublicConnectivityRule

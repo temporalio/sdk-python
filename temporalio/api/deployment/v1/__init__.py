@@ -1,7 +1,9 @@
 from .message_pb2 import (
+    ComputeStatus,
     Deployment,
     DeploymentInfo,
     DeploymentListInfo,
+    InheritedAutoUpgradeInfo,
     RoutingConfig,
     UpdateDeploymentMetadata,
     VersionDrainageInfo,
@@ -13,9 +15,11 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "ComputeStatus",
     "Deployment",
     "DeploymentInfo",
     "DeploymentListInfo",
+    "InheritedAutoUpgradeInfo",
     "RoutingConfig",
     "UpdateDeploymentMetadata",
     "VersionDrainageInfo",

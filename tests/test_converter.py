@@ -7,29 +7,21 @@ import logging
 import sys
 import traceback
 from collections import deque
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from typing import (
     Any,
-    Deque,
-    Dict,
-    Iterable,
-    List,
+    Dict,  # type:ignore[reportDeprecated]
     Literal,
-    Mapping,
-    MutableMapping,
     NewType,
-    Optional,
-    Sequence,
-    Set,
-    Text,
-    Tuple,
-    Type,
-    Union,
+    get_args,
+    get_type_hints,
 )
 from uuid import UUID, uuid4
 
+import nexusrpc
 import pydantic
 import pytest
 import typing_extensions
@@ -38,6 +30,7 @@ from typing_extensions import TypedDict
 import temporalio.api.common.v1
 import temporalio.common
 from temporalio.api.common.v1 import Payload, Payloads
+from temporalio.api.enums.v1 import NexusHandlerErrorRetryBehavior
 from temporalio.api.failure.v1 import Failure
 from temporalio.common import RawValue
 from temporalio.converter import (
@@ -49,17 +42,21 @@ from temporalio.converter import (
     DefaultPayloadConverter,
     JSONPlainPayloadConverter,
     JSONTypeConverter,
+    JSONTypeConverterUnhandled,
     PayloadCodec,
-    _JSONTypeConverterUnhandled,
     decode_search_attributes,
     encode_search_attribute_values,
     value_to_type,
 )
-from temporalio.exceptions import ApplicationError, FailureError
+from temporalio.exceptions import (
+    ApplicationError,
+    FailureError,
+    NexusOperationError,
+)
 
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
-    from enum import StrEnum
+    from enum import StrEnum  # type:ignore[reportUnreachable]
 
 
 class NonSerializableClass:
@@ -76,7 +73,7 @@ class SerializableEnum(IntEnum):
 
 if sys.version_info >= (3, 11):
 
-    class SerializableStrEnum(StrEnum):
+    class SerializableStrEnum(StrEnum):  # type:ignore[reportUnreachable]
         FOO = "foo"
 
 
@@ -102,12 +99,12 @@ class NewTypeMessage:
 
 async def test_converter_default():
     async def assert_payload(
-        input,
-        expected_encoding,
-        expected_data,
+        input,  # type:ignore[reportMissingParameterType]
+        expected_encoding,  # type:ignore[reportMissingParameterType]
+        expected_data,  # type:ignore[reportMissingParameterType]
         *,
-        expected_decoded_input=None,
-        type_hint=None,
+        expected_decoded_input=None,  # type:ignore[reportMissingParameterType]
+        type_hint=None,  # type:ignore[reportMissingParameterType]
     ):
         payloads = await DataConverter().encode([input])
         # Check encoding and data
@@ -119,7 +116,7 @@ async def test_converter_default():
             expected_data = expected_data.encode()
         assert payloads[0].data == expected_data
         # Decode and check
-        actual_inputs = await DataConverter().decode(payloads, [type_hint])
+        actual_inputs = await DataConverter().decode(payloads, [type_hint])  # type: ignore[reportArgumentType]
         assert len(actual_inputs) == 1
         if expected_decoded_input is None:
             expected_decoded_input = input
@@ -261,7 +258,7 @@ def test_encode_search_attribute_values():
     with pytest.raises(TypeError, match="of type tuple not one of"):
         encode_search_attribute_values([("bad type",)])  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="Timezone must be present"):
-        encode_search_attribute_values([datetime.utcnow()])
+        encode_search_attribute_values([datetime.utcnow()])  # type: ignore[reportDeprecated]
     with pytest.raises(TypeError, match="must have the same type"):
         encode_search_attribute_values(["foo", 123])  # type: ignore[arg-type]
 
@@ -269,7 +266,7 @@ def test_encode_search_attribute_values():
 def test_decode_search_attributes():
     """Tests decode from protobuf for python types"""
 
-    def payload(key, dtype, data, encoding=None):
+    def payload(key, dtype, data, encoding=None):  # type:ignore[reportMissingParameterType]
         if encoding is None:
             encoding = {"encoding": b"json/plain"}
         check = temporalio.api.common.v1.Payload(
@@ -308,9 +305,9 @@ MyDataClassAlias = MyDataClass
 @dataclass
 class NestedDataClass:
     foo: str
-    bar: List[NestedDataClass] = dataclasses.field(default_factory=list)
-    baz: Optional[NestedDataClass] = None
-    qux: Optional[UUID] = None
+    bar: list[NestedDataClass] = dataclasses.field(default_factory=list)
+    baz: NestedDataClass | None = None
+    qux: UUID | None = None
 
 
 class MyTypedDict(TypedDict):
@@ -326,10 +323,10 @@ class MyTypedDictNotTotal(TypedDict, total=False):
 # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
 if sys.version_info <= (3, 12, 3):
 
-    class MyPydanticClass(pydantic.BaseModel):
+    class MyPydanticClass(pydantic.BaseModel):  # type: ignore[reportUnreachable]
         foo: str
-        bar: List[MyPydanticClass]
-        baz: Optional[UUID] = None
+        bar: list[MyPydanticClass]
+        baz: UUID | None = None
 
 
 def test_json_type_hints():
@@ -359,7 +356,7 @@ def test_json_type_hints():
     ok(float, 5.5)
     ok(bool, True)
     ok(str, "foo")
-    ok(Text, "foo")
+    ok(str, "foo")
     ok(bytes, b"foo")
     fail(int, "1")
     fail(float, "1")
@@ -391,42 +388,41 @@ def test_json_type_hints():
     ok(NestedDataClass, {"foo": "bar", "unknownfield": "baz"}, NestedDataClass("bar"))
 
     # Optional/Union
-    ok(Optional[int], 5)
-    ok(Optional[int], None)
-    ok(Optional[MyDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
-    ok(Union[int, str], 5)
-    ok(Union[int, str], "foo")
-    ok(Union[MyDataClass, NestedDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
-    ok(Union[MyDataClass, NestedDataClass], NestedDataClass("foo"))
-    if sys.version_info >= (3, 10):
-        ok(int | None, None)
-        ok(int | None, 5)
-        fail(int | None, "1")
-        ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
-        ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
+    ok(int | None, 5)
+    ok(int | None, None)
+    ok(MyDataClass | None, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(int | str, 5)
+    ok(int | str, "foo")
+    ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
+    ok(int | None, None)
+    ok(int | None, 5)
+    fail(int | None, "1")
+    ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
 
     # NewType
     ok(NewIntType, 5)
 
     # List-like
-    ok(List, [5])
-    ok(List[int], [5])
-    ok(List[MyDataClass], [MyDataClass("foo", 5, SerializableEnum.FOO)])
+    ok(list, [5])
+    ok(list[int], [5])
+    ok(list[MyDataClass], [MyDataClass("foo", 5, SerializableEnum.FOO)])
     ok(Iterable[int], [5, 6])
-    ok(Tuple[int, str], (5, "6"))
-    ok(Tuple[int, ...], (5, 6, 7))
-    ok(Set[int], set([5, 6]))
-    ok(Set, set([5, 6]))
-    ok(List, ["foo"])
-    ok(Deque[int], deque([5, 6]))
+    ok(tuple[int, str], (5, "6"))
+    ok(tuple[int, ...], (5, 6, 7))
+    ok(set[int], {5, 6})
+    ok(set, {5, 6})
+    ok(list, ["foo"])
+    ok(deque[int], deque([5, 6]))
     ok(Sequence[int], [5, 6])
-    fail(List[int], [1, 2, "3"])
+    fail(list[int], [1, 2, "3"])
 
     # Dict-like
-    ok(Dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
-    ok(Dict, {"foo": 123})
-    ok(Dict[str, Any], {"foo": 123})
-    ok(Dict[Any, int], {"foo": 123})
+    ok(dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
+    ok(dict, {"foo": 123})
+    ok(dict[str, Any], {"foo": 123})
+    ok(dict[Any, int], {"foo": 123})
     ok(Mapping, {"foo": 123})
     ok(Mapping[str, int], {"foo": 123})
     ok(MutableMapping[str, int], {"foo": 123})
@@ -441,52 +437,51 @@ def test_json_type_hints():
     ok(MyTypedDict, {"foo": "bar", "blah": "meh"})
 
     # Non-string dict keys are supported
-    ok(Dict[int, str], {1: "1"})
-    ok(Dict[float, str], {1.0: "1"})
-    ok(Dict[bool, str], {True: "1"})
-    ok(Dict[None, str], {None: "1"})
+    ok(dict[int, str], {1: "1"})
+    ok(dict[float, str], {1.0: "1"})
+    ok(dict[bool, str], {True: "1"})
+
+    # On a 3.10+ dict type, None isn't returned from a key. This is potentially a bug
+    ok(dict[None, str], {"null": "1"})
+
+    # Dict has a different value for None keys
+    ok(Dict[None, str], {None: "1"})  # type:ignore[reportDeprecated]
 
     # Alias
     ok(MyDataClassAlias, MyDataClass("foo", 5, SerializableEnum.FOO))
 
     # IntEnum
     ok(SerializableEnum, SerializableEnum.FOO)
-    ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
+    ok(list[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
 
     # UUID
     ok(UUID, uuid4())
-    ok(List[UUID], [uuid4(), uuid4()])
+    ok(list[UUID], [uuid4(), uuid4()])
 
     # StrEnum is available in 3.11+
     if sys.version_info >= (3, 11):
         # StrEnum
-        ok(SerializableStrEnum, SerializableStrEnum.FOO)
+        ok(SerializableStrEnum, SerializableStrEnum.FOO)  # type:ignore[reportUnreachable]
         ok(
-            List[SerializableStrEnum],
+            list[SerializableStrEnum],
             [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
         )
-
-    # 3.10+ checks
-    if sys.version_info >= (3, 10):
-        ok(list[int], [1, 2])
-        ok(dict[str, int], {"1": 2})
-        ok(tuple[int, str], (1, "2"))
 
     # Pydantic
     # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
     if sys.version_info <= (3, 12, 3):
-        ok(
+        ok(  # type: ignore[reportUnreachable]
             MyPydanticClass,
             MyPydanticClass(
                 foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()
             ),
         )
-        ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
-        fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
+        ok(list[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
+        fail(list[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
 
 
 # This is an example of appending the stack to every Temporal failure error
-def append_temporal_stack(exc: Optional[BaseException]) -> None:
+def append_temporal_stack(exc: BaseException | None) -> None:
     while exc:
         # Only append if it doesn't appear already there
         if (
@@ -541,7 +536,7 @@ async def test_exception_format():
 
 # Just serializes in a "payloads" wrapper
 class SimpleCodec(PayloadCodec):
-    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
         wrapper = Payloads(payloads=payloads)
         return [
             Payload(
@@ -549,7 +544,7 @@ class SimpleCodec(PayloadCodec):
             )
         ]
 
-    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
         payloads = list(payloads)
         if len(payloads) != 1:
             raise RuntimeError("Expected only a single payload")
@@ -609,6 +604,248 @@ async def test_failure_encoded_attributes():
     assert failure == orig_failure
 
 
+@pytest.mark.parametrize(
+    "handler_type,retryable_override,expected_retryable",
+    [
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, None, None),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, True, True),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, False, False),
+        (nexusrpc.HandlerErrorType.INTERNAL, None, None),
+        (nexusrpc.HandlerErrorType.INTERNAL, True, True),
+        (nexusrpc.HandlerErrorType.NOT_FOUND, False, False),
+        (nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED, None, None),
+        (nexusrpc.HandlerErrorType.UNAVAILABLE, True, True),
+        (nexusrpc.HandlerErrorType.UPSTREAM_TIMEOUT, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHENTICATED, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHORIZED, None, None),
+    ],
+)
+async def test_nexus_handler_error_round_trip(
+    handler_type: nexusrpc.HandlerErrorType,
+    retryable_override: bool | None,
+    expected_retryable: bool | None,
+):
+    """Test round-trip conversion of nexusrpc.HandlerError through failure converter."""
+    message = f"test message for {handler_type.name}"
+    original_error = nexusrpc.HandlerError(
+        message,
+        type=handler_type,
+        retryable_override=retryable_override,
+    )
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify failure structure
+    assert failure.HasField("nexus_handler_failure_info")
+    assert failure.nexus_handler_failure_info.type == handler_type.name
+    assert failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+    # Convert back to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify result
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == handler_type
+    assert result_error.retryable_override == expected_retryable
+    assert result_error.message == message
+    assert result_error.original_failure
+    assert result_error.original_failure.details
+
+    # modify result_error.original_failure as a way of confirming that it is used
+    # when encoding the resulting failure
+    result_error.original_failure.details = {
+        "nexusHandlerFailureInfo": {
+            **result_error.original_failure.details["nexusHandlerFailureInfo"],
+            "type": "TEST TYPE",
+        }
+    }
+
+    result_failure = Failure()
+    await DataConverter.default.encode_failure(result_error, result_failure)
+    assert result_failure.HasField("nexus_handler_failure_info")
+    assert result_failure.nexus_handler_failure_info.type == "TEST TYPE"
+    assert result_failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+
+async def test_nexus_handler_error_with_cause():
+    """Test HandlerError with a cause chain is properly converted."""
+    # Create a cause chain
+    root_cause = ValueError("root cause")
+    middle_cause = RuntimeError("middle cause")
+    middle_cause.__cause__ = root_cause
+
+    handler_error = nexusrpc.HandlerError(
+        "handler error message",
+        type=nexusrpc.HandlerErrorType.INTERNAL,
+    )
+    handler_error.__cause__ = middle_cause
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(handler_error, failure)
+
+    # Verify message and cause chain in failure
+    assert failure.message == "handler error message"
+    assert failure.HasField("cause")
+    assert failure.cause.message == "middle cause"
+    assert failure.cause.application_failure_info.type == "RuntimeError"
+    assert failure.cause.HasField("cause")
+    assert failure.cause.cause.message == "root cause"
+    assert failure.cause.cause.application_failure_info.type == "ValueError"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify cause chain with messages (ApplicationError prepends type to message in str())
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert str(result_error) == "handler error message"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, ApplicationError)
+    assert str(result_error.__cause__) == "RuntimeError: middle cause"
+    assert result_error.__cause__.__cause__ is not None
+    assert str(result_error.__cause__.__cause__) == "ValueError: root cause"
+
+
+async def test_nexus_handler_error_unknown_type_fallback():
+    """Test that unknown HandlerErrorType falls back to INTERNAL during from_failure."""
+    # Create a failure with an unknown type
+    failure = Failure()
+    failure.message = "unknown type error"
+    failure.nexus_handler_failure_info.type = "UNKNOWN_TYPE_XYZ"
+
+    # Convert to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Should fall back to INTERNAL with message preserved
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == nexusrpc.HandlerErrorType.INTERNAL
+    assert str(result_error) == "unknown type error"
+
+
+async def test_nexus_operation_error_round_trip():
+    """Test round-trip conversion of NexusOperationError."""
+    test_cases = [
+        # (scheduled_event_id, endpoint, service, operation, operation_token)
+        (123, "my-endpoint", "MyService", "myOperation", "token-abc"),
+        (0, "", "", "", ""),  # Empty values
+        (999, "endpoint-2", "ServiceB", "op2", ""),  # Empty token
+        (1, "e", "s", "o", "very-long-token-" + "x" * 100),
+    ]
+
+    for scheduled_event_id, endpoint, service, operation, operation_token in test_cases:
+        message = "nexus operation failed"
+        original_error = NexusOperationError(
+            message,
+            scheduled_event_id=scheduled_event_id,
+            endpoint=endpoint,
+            service=service,
+            operation=operation,
+            operation_token=operation_token,
+        )
+
+        # Convert to failure
+        failure = Failure()
+        await DataConverter.default.encode_failure(original_error, failure)
+
+        # Verify failure structure and message
+        assert failure.message == message
+        assert failure.HasField("nexus_operation_execution_failure_info")
+        info = failure.nexus_operation_execution_failure_info
+        assert info.scheduled_event_id == scheduled_event_id
+        assert info.endpoint == endpoint
+        assert info.service == service
+        assert info.operation == operation
+        assert info.operation_token == operation_token
+
+        # Convert back
+        result_error = await DataConverter.default.decode_failure(failure)
+
+        # Verify result including message
+        assert isinstance(result_error, NexusOperationError)
+        assert result_error.message == message
+        assert result_error.scheduled_event_id == scheduled_event_id
+        assert result_error.endpoint == endpoint
+        assert result_error.service == service
+        assert result_error.operation == operation
+        assert result_error.operation_token == operation_token
+
+
+async def test_nexus_operation_error_with_cause():
+    """Test NexusOperationError with a HandlerError as cause."""
+    # Create NexusOperationError with HandlerError as cause
+    cause_error = nexusrpc.HandlerError(
+        "handler failed",
+        type=nexusrpc.HandlerErrorType.NOT_FOUND,
+    )
+
+    original_error = NexusOperationError(
+        "nexus operation failed",
+        scheduled_event_id=42,
+        endpoint="test-endpoint",
+        service="TestService",
+        operation="testOp",
+        operation_token="token123",
+    )
+    original_error.__cause__ = cause_error
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify message and cause is present
+    assert failure.message == "nexus operation failed"
+    assert failure.HasField("cause")
+    assert failure.cause.HasField("nexus_handler_failure_info")
+    assert failure.cause.message == "handler failed"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify messages preserved
+    assert isinstance(result_error, NexusOperationError)
+    assert result_error.message == "nexus operation failed"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, nexusrpc.HandlerError)
+    assert result_error.__cause__.type == nexusrpc.HandlerErrorType.NOT_FOUND
+    assert str(result_error.__cause__) == "handler failed"
+
+
 class IPv4AddressPayloadConverter(CompositePayloadConverter):
     def __init__(self) -> None:
         # Replace default JSON plain with our own that has our type converter
@@ -633,11 +870,21 @@ class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
 
 class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
-        self, hint: Type, value: Any
-    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+        self, hint: type, value: Any
+    ) -> Any | None | JSONTypeConverterUnhandled:
         if inspect.isclass(hint) and issubclass(hint, ipaddress.IPv4Address):
             return ipaddress.IPv4Address(value)
         return JSONTypeConverter.Unhandled
+
+
+def test_json_type_converter_unhandled_type_public():
+    return_type = get_type_hints(JSONTypeConverter.to_typed_value)["return"]
+
+    assert JSONTypeConverterUnhandled.__name__ == "JSONTypeConverterUnhandled"
+    assert JSONTypeConverterUnhandled in get_args(return_type)
+    assert JSONTypeConverterUnhandled(JSONTypeConverter.Unhandled) is (
+        JSONTypeConverter.Unhandled
+    )
 
 
 async def test_json_type_converter():
@@ -663,11 +910,37 @@ async def test_json_type_converter():
         await DataConverter.default.decode([payload], [ipaddress.IPv4Address])
     with pytest.raises(TypeError):
         await DataConverter.default.decode(
-            [list_payload], [List[ipaddress.IPv4Address]]
+            [list_payload], [list[ipaddress.IPv4Address]]
         )
 
     # But decodes with custom
     assert addr == (await custom_conv.decode([payload], [ipaddress.IPv4Address]))[0]
     assert [addr, addr] == (
-        await custom_conv.decode([list_payload], [List[ipaddress.IPv4Address]])
+        await custom_conv.decode([list_payload], [list[ipaddress.IPv4Address]])
     )[0]
+
+
+def test_value_to_type_literal_key():
+    # The type for the dictionary's *key*:
+    KeyHint = Literal[
+        "Key1",
+        "Key2",
+    ]
+
+    # The type for the dictionary's *value* (the inner dict):
+    InnerKeyHint = Literal[
+        "Inner1",
+        "Inner2",
+    ]
+    InnerValueHint = str | int | float | None
+    ValueHint = dict[InnerKeyHint, InnerValueHint]
+
+    # The full type hint for the mapping:
+    hint_with_bug = dict[KeyHint, ValueHint]
+
+    # A value that uses one of the literal keys:
+    value_to_convert = {"Key1": {"Inner1": 123.45, "Inner2": 10}}
+    custom_converters: Sequence[JSONTypeConverter] = []
+
+    # Function executes without error
+    value_to_type(hint_with_bug, value_to_convert, custom_converters)

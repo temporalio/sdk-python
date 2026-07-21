@@ -4,23 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    AsyncIterator,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Type,
-    Union,
     cast,
 )
 
 import google.protobuf.empty_pb2
+from typing_extensions import Self
 
+import temporalio.api.nexus.v1
+import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
 import temporalio.bridge.testing
 import temporalio.client
@@ -29,7 +25,6 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
-import temporalio.types
 import temporalio.worker
 
 logger = logging.getLogger(__name__)
@@ -54,8 +49,8 @@ class WorkflowEnvironment:
     to have ``assert`` failures fail the workflow with the assertion error.
     """
 
-    @staticmethod
-    def from_client(client: temporalio.client.Client) -> WorkflowEnvironment:
+    @classmethod
+    def from_client(cls, client: temporalio.client.Client) -> Self:
         """Create a workflow environment from the given client.
 
         :py:attr:`supports_time_skipping` will always return ``False`` for this
@@ -69,37 +64,36 @@ class WorkflowEnvironment:
             The workflow environment that runs against the given client.
         """
         # Add the assertion interceptor
-        return WorkflowEnvironment(
-            _client_with_interceptors(client, _AssertionErrorInterceptor())
-        )
+        return cls(_client_with_interceptors(client, _AssertionErrorInterceptor()))
 
-    @staticmethod
+    @classmethod
     async def start_local(
+        cls,
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
         plugins: Sequence[temporalio.client.Plugin] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
-        retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        identity: Optional[str] = None,
-        tls: bool | temporalio.client.TLSConfig = False,
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
+        retry_config: temporalio.service.RetryConfig | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
+        tls: bool | temporalio.service.TLSConfig = False,
         ip: str = "127.0.0.1",
-        port: Optional[int] = None,
-        download_dest_dir: Optional[str] = None,
+        port: int | None = None,
+        download_dest_dir: str | None = None,
         ui: bool = False,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
+        runtime: temporalio.runtime.Runtime | None = None,
         search_attributes: Sequence[temporalio.common.SearchAttributeKey] = (),
-        dev_server_existing_path: Optional[str] = None,
-        dev_server_database_filename: Optional[str] = None,
+        dev_server_existing_path: str | None = None,
+        dev_server_database_filename: str | None = None,
         dev_server_log_format: str = "pretty",
-        dev_server_log_level: Optional[str] = "warn",
+        dev_server_log_level: str | None = "warn",
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
-        dev_server_download_ttl: Optional[timedelta] = None,
+        dev_server_download_ttl: timedelta | None = None,
+        ui_port: int | None = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
@@ -158,6 +152,7 @@ class WorkflowEnvironment:
             dev_server_extra_args: Extra arguments for the CLI binary.
             dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
                 cached indefinitely.
+            ui_port: UI port to use if UI is enabled.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -182,6 +177,7 @@ class WorkflowEnvironment:
                 new_args.append(f"{attr.name}={attr._metadata_type}")
             new_args += dev_server_extra_args
             dev_server_extra_args = new_args
+
         # Start CLI dev server
         runtime = runtime or temporalio.runtime.Runtime.default()
         download_ttl_ms = None
@@ -200,12 +196,14 @@ class WorkflowEnvironment:
                 port=port,
                 database_filename=dev_server_database_filename,
                 ui=ui,
+                ui_port=ui_port,
                 log_format=dev_server_log_format,
                 log_level=dev_server_log_level,
                 extra_args=dev_server_extra_args,
                 download_ttl_ms=download_ttl_ms,
             ),
         )
+
         # If we can't connect to the server, we should shut it down
         try:
             return _EphemeralServerWorkflowEnvironment(
@@ -228,31 +226,31 @@ class WorkflowEnvironment:
             try:
                 await server.shutdown()
             except:
-                logger.warn(
+                logger.warning(
                     "Failed stopping local server on client connection failure",
                     exc_info=True,
                 )
             raise
 
-    @staticmethod
+    @classmethod
     async def start_time_skipping(
+        cls,
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
         plugins: Sequence[temporalio.client.Plugin] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
-        retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        identity: Optional[str] = None,
-        port: Optional[int] = None,
-        download_dest_dir: Optional[str] = None,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
-        test_server_existing_path: Optional[str] = None,
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
+        retry_config: temporalio.service.RetryConfig | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
+        port: int | None = None,
+        download_dest_dir: str | None = None,
+        runtime: temporalio.runtime.Runtime | None = None,
+        test_server_existing_path: str | None = None,
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
-        test_server_download_ttl: Optional[timedelta] = None,
+        test_server_download_ttl: timedelta | None = None,
     ) -> WorkflowEnvironment:
         """Start a time skipping workflow environment.
 
@@ -348,7 +346,7 @@ class WorkflowEnvironment:
             try:
                 await server.shutdown()
             except:
-                logger.warn(
+                logger.warning(
                     "Failed stopping test server on client connection failure",
                     exc_info=True,
                 )
@@ -357,7 +355,8 @@ class WorkflowEnvironment:
     def __init__(self, client: temporalio.client.Client) -> None:
         """Create a workflow environment from a client.
 
-        Most users would use a static method instead.
+        Most users would use a factory methods instead.
+
         """
         self._client = client
 
@@ -365,7 +364,7 @@ class WorkflowEnvironment:
         """Noop for ``async with`` support."""
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         """For ``async with`` support to just call :py:meth:`shutdown`."""
         await self.shutdown()
 
@@ -378,7 +377,7 @@ class WorkflowEnvironment:
         """Shut down this environment."""
         pass
 
-    async def sleep(self, duration: Union[timedelta, float]) -> None:
+    async def sleep(self, duration: timedelta | float) -> None:
         """Sleep in this environment.
 
         This awaits a regular :py:func:`asyncio.sleep` in regular environments,
@@ -403,6 +402,48 @@ class WorkflowEnvironment:
     def supports_time_skipping(self) -> bool:
         """Whether this environment supports time skipping."""
         return False
+
+    async def create_nexus_endpoint(
+        self, endpoint_name: str, task_queue: str
+    ) -> temporalio.api.nexus.v1.Endpoint:
+        """Create a Nexus endpoint with the given name and task queue.
+
+        Args:
+            endpoint_name: The name of the Nexus endpoint to create.
+            task_queue: The task queue to associate with the endpoint.
+
+        Returns:
+            The created Nexus endpoint.
+        """
+        response = await self._client.operator_service.create_nexus_endpoint(
+            temporalio.api.operatorservice.v1.CreateNexusEndpointRequest(
+                spec=temporalio.api.nexus.v1.EndpointSpec(
+                    name=endpoint_name,
+                    target=temporalio.api.nexus.v1.EndpointTarget(
+                        worker=temporalio.api.nexus.v1.EndpointTarget.Worker(
+                            namespace=self._client.namespace,
+                            task_queue=task_queue,
+                        )
+                    ),
+                )
+            )
+        )
+        return response.endpoint
+
+    async def delete_nexus_endpoint(
+        self, endpoint: temporalio.api.nexus.v1.Endpoint
+    ) -> None:
+        """Delete a Nexus endpoint.
+
+        Args:
+            endpoint: The Nexus endpoint to delete.
+        """
+        await self._client.operator_service.delete_nexus_endpoint(
+            temporalio.api.operatorservice.v1.DeleteNexusEndpointRequest(
+                id=endpoint.id,
+                version=endpoint.version,
+            )
+        )
 
     @contextmanager
     def auto_time_skipping_disabled(self) -> Iterator[None]:
@@ -430,7 +471,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         # Add assertion interceptor to client and if time skipping is supported,
         # add time skipping interceptor
         self._supports_time_skipping = server.has_test_service
-        interceptors: List[temporalio.client.Interceptor] = [
+        interceptors: list[temporalio.client.Interceptor] = [
             _AssertionErrorInterceptor()
         ]
         if self._supports_time_skipping:
@@ -442,7 +483,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def shutdown(self) -> None:
         await self._server.shutdown()
 
-    async def sleep(self, duration: Union[timedelta, float]) -> None:
+    async def sleep(self, duration: timedelta | float) -> None:
         # Use regular sleep if no time skipping
         if not self._supports_time_skipping:
             return await super().sleep(duration)
@@ -508,7 +549,7 @@ class _AssertionErrorInterceptor(
 ):
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
-    ) -> Optional[Type[temporalio.worker.WorkflowInboundInterceptor]]:
+    ) -> type[temporalio.worker.WorkflowInboundInterceptor] | None:
         return _AssertionErrorWorkflowInboundInterceptor
 
 
@@ -573,8 +614,8 @@ class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any:
         async with self.env.time_skipping_unlocked():
             return await super().result(

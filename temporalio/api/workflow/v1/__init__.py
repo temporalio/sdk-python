@@ -18,6 +18,7 @@ from .message_pb2 import (
     WorkflowExecutionExtendedInfo,
     WorkflowExecutionInfo,
     WorkflowExecutionOptions,
+    WorkflowExecutionPauseInfo,
     WorkflowExecutionVersioningInfo,
 )
 
@@ -41,5 +42,6 @@ __all__ = [
     "WorkflowExecutionExtendedInfo",
     "WorkflowExecutionInfo",
     "WorkflowExecutionOptions",
+    "WorkflowExecutionPauseInfo",
     "WorkflowExecutionVersioningInfo",
 ]

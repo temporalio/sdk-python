@@ -159,6 +159,7 @@ class Start(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     IS_LOCAL_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
     workflow_namespace: builtins.str
     """The namespace the workflow lives in"""
     workflow_type: builtins.str
@@ -224,6 +225,8 @@ class Start(google.protobuf.message.Message):
     """Set to true if this is a local activity. Note that heartbeating does not apply to local
     activities.
     """
+    run_id: builtins.str
+    """Run ID of this activity execution. Only set for standalone activities."""
     def __init__(
         self,
         *,
@@ -254,6 +257,7 @@ class Start(google.protobuf.message.Message):
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         is_local: builtins.bool = ...,
+        run_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -303,6 +307,8 @@ class Start(google.protobuf.message.Message):
             b"priority",
             "retry_policy",
             b"retry_policy",
+            "run_id",
+            b"run_id",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
             "scheduled_time",

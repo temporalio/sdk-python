@@ -12,9 +12,10 @@ import dataclasses
 import json
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, List, Literal, Optional, Sequence, Type
+from typing import Any, Literal
 
 import nexusrpc
 import pytest
@@ -50,7 +51,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 @dataclass
@@ -75,20 +76,20 @@ class SerializationContextPayloadConverter(
     EncodingPayloadConverter, WithSerializationContext
 ):
     def __init__(self):
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     @property
     def encoding(self) -> str:
         return "test-serialization-context"
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> SerializationContextPayloadConverter:
         converter = SerializationContextPayloadConverter()
         converter.context = context
         return converter
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         if not isinstance(value, TraceData):
             return None
         if isinstance(self.context, WorkflowSerializationContext):
@@ -115,7 +116,7 @@ class SerializationContextPayloadConverter(
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         value = JSONPlainPayloadConverter().from_payload(payload, TraceData)
         assert isinstance(value, TraceData)
@@ -179,6 +180,7 @@ class PayloadConversionWorkflow:
             data,
             start_to_close_timeout=timedelta(seconds=10),
             heartbeat_timeout=timedelta(seconds=2),
+            activity_id="activity-id",
         )
         data = await workflow.execute_child_workflow(
             EchoWorkflow.run, data, id=f"{workflow.info().workflow_id}_child"
@@ -231,6 +233,7 @@ async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
                 workflow_id=workflow_id,
                 workflow_type=PayloadConversionWorkflow.__name__,
                 activity_type=passthrough_activity.__name__,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -328,6 +331,7 @@ class HeartbeatDetailsSerializationContextTestWorkflow:
                 initial_interval=timedelta(milliseconds=100),
                 maximum_attempts=2,
             ),
+            activity_id="activity-id",
         )
 
 
@@ -370,6 +374,7 @@ async def test_heartbeat_details_payload_conversion(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=HeartbeatDetailsSerializationContextTestWorkflow.__name__,
                 activity_type=activity_with_heartbeat_details.__name__,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -419,6 +424,7 @@ class LocalActivityWorkflow:
             local_activity,
             data,
             start_to_close_timeout=timedelta(seconds=10),
+            activity_id="activity-id",
         )
 
 
@@ -459,6 +465,7 @@ async def test_local_activity_payload_conversion(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=LocalActivityWorkflow.__name__,
                 activity_type=local_activity.__name__,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=True,
             )
@@ -504,7 +511,7 @@ async def test_local_activity_payload_conversion(client: Client):
 
 
 @workflow.defn
-class EventWorkflow:
+class WaitForSignalWorkflow:
     # Like a global asyncio.Event()
 
     def __init__(self) -> None:
@@ -521,10 +528,11 @@ class EventWorkflow:
 
 @activity.defn
 async def async_activity() -> TraceData:
+    # Notify test that the activity has started and is ready to be completed manually
     await (
         activity.client()
         .get_workflow_handle("activity-started-wf-id")
-        .signal(EventWorkflow.signal)
+        .signal(WaitForSignalWorkflow.signal)
     )
     activity.raise_complete_async()
 
@@ -558,7 +566,7 @@ async def test_async_activity_completion_payload_conversion(
         task_queue=task_queue,
         workflows=[
             AsyncActivityCompletionSerializationContextTestWorkflow,
-            EventWorkflow,
+            WaitForSignalWorkflow,
         ],
         activities=[async_activity],
         workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
@@ -572,12 +580,13 @@ async def test_async_activity_completion_payload_conversion(
             workflow_id=workflow_id,
             workflow_type=AsyncActivityCompletionSerializationContextTestWorkflow.__name__,
             activity_type=async_activity.__name__,
+            activity_id="async-activity-id",
             activity_task_queue=task_queue,
             is_local=False,
         )
 
         act_started_wf_handle = await client.start_workflow(
-            EventWorkflow.run,
+            WaitForSignalWorkflow.run,
             id="activity-started-wf-id",
             task_queue=task_queue,
         )
@@ -644,6 +653,7 @@ def test_subclassed_async_activity_handle(client: Client):
         workflow_id="workflow-id",
         workflow_type="workflow-type",
         activity_type="activity-type",
+        activity_id="activity-id",
         activity_task_queue="activity-task-queue",
         is_local=False,
     )
@@ -685,7 +695,7 @@ def test_subclassed_async_activity_handle(client: Client):
 @workflow.defn(sandboxed=False)  # so that we can use isinstance
 class SignalSerializationContextTestWorkflow:
     def __init__(self) -> None:
-        self.signal_received: Optional[TraceData] = None
+        self.signal_received: TraceData | None = None
 
     @workflow.run
     async def run(self) -> TraceData:
@@ -833,23 +843,23 @@ class UpdateSerializationContextTestWorkflow:
     @workflow.init
     def __init__(self, pass_validation: bool) -> None:
         self.pass_validation = pass_validation
-        self.input: Optional[TraceData] = None
+        self.input: TraceData | None = None
 
     @workflow.run
-    async def run(self, pass_validation: bool) -> TraceData:
+    async def run(self, _pass_validation: bool) -> TraceData:
         await workflow.wait_condition(lambda: self.input is not None)
         assert self.input
         return self.input
 
     @workflow.update
     def my_update(self, input: TraceData) -> TraceData:
+        self.input = input
         return input
 
     @my_update.validator
     def my_update_validator(self, input: TraceData) -> None:
-        self.input = input  # for test purposes; update validators should not mutate workflow state
         if not self.pass_validation:
-            raise ValueError("Rejected")
+            raise ApplicationError("Rejected", input)
 
 
 @pytest.mark.parametrize("pass_validation", [True, False])
@@ -890,10 +900,12 @@ async def test_update_payload_conversion(
                     UpdateSerializationContextTestWorkflow.my_update, TraceData()
                 )
                 raise AssertionError("Expected WorkflowUpdateFailedError")
-            except WorkflowUpdateFailedError:
-                pass
-
-            result = await wf_handle.result()
+            except WorkflowUpdateFailedError as e:
+                assert isinstance(e.cause, ApplicationError)
+                assert len(e.cause.details) == 1
+                result = e.cause.details[0]
+                assert isinstance(result, TraceData)
+            await wf_handle.terminate()
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
@@ -912,11 +924,11 @@ async def test_update_payload_conversion(
             ),
             TraceItem(
                 method="to_payload",
-                context=workflow_context,  # Outbound update/workflow result
+                context=workflow_context,  # Outbound update result or error detail
             ),
             TraceItem(
                 method="from_payload",
-                context=workflow_context,  # Inbound update/workflow result
+                context=workflow_context,  # Inbound update result or error detail
             ),
         ]
 
@@ -927,7 +939,7 @@ async def test_update_payload_conversion(
 @workflow.defn
 class ExternalWorkflowTarget:
     def __init__(self) -> None:
-        self.signal_received: Optional[TraceData] = None
+        self.signal_received: TraceData | None = None
 
     @workflow.run
     async def run(self) -> TraceData:
@@ -1058,20 +1070,21 @@ class FailureConverterTestWorkflow:
             failing_activity,
             start_to_close_timeout=timedelta(seconds=10),
             retry_policy=RetryPolicy(maximum_attempts=1),
+            activity_id="activity-id",
         )
         raise Exception("Unreachable")
 
 
-test_traces: dict[str, list[TraceItem]] = defaultdict(list)
+test_traces: dict[str | None, list[TraceItem]] = defaultdict(list)
 
 
 class FailureConverterWithContext(DefaultFailureConverter, WithSerializationContext):
     def __init__(self):
         super().__init__(encode_common_attributes=False)
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> FailureConverterWithContext:
         converter = FailureConverterWithContext()
         converter.context = context
@@ -1154,6 +1167,7 @@ async def test_failure_converter_with_context(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=FailureConverterTestWorkflow.__name__,
                 activity_type=failing_activity.__name__,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -1198,12 +1212,12 @@ async def test_failure_converter_with_context(client: Client):
 
 class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
     def __init__(self):
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
         self.encode_called_with_context = False
         self.decode_called_with_context = False
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> PayloadCodecWithContext:
         codec = PayloadCodecWithContext()
         codec.context = context
@@ -1211,7 +1225,7 @@ class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         assert self.context
         if isinstance(self.context, ActivitySerializationContext):
             test_traces[self.context.workflow_id].append(
@@ -1232,7 +1246,7 @@ class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
 
     async def decode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         assert self.context
         if isinstance(self.context, ActivitySerializationContext):
             test_traces[self.context.workflow_id].append(
@@ -1322,6 +1336,7 @@ class LocalActivityCodecTestWorkflow:
             codec_test_local_activity,
             data,
             start_to_close_timeout=timedelta(seconds=10),
+            activity_id="activity-id",
         )
 
 
@@ -1360,6 +1375,7 @@ async def test_local_activity_codec_with_context(client: Client):
             workflow_id=workflow_id,
             workflow_type=LocalActivityCodecTestWorkflow.__name__,
             activity_type=codec_test_local_activity.__name__,
+            activity_id="activity-id",
             activity_task_queue=task_queue,
             is_local=True,
         )
@@ -1506,10 +1522,10 @@ class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
     """
 
     def __init__(self):
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> PayloadEncryptionCodec:
         codec = PayloadEncryptionCodec()
         codec.context = context
@@ -1517,7 +1533,7 @@ class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         return [
             temporalio.api.common.v1.Payload(
@@ -1528,7 +1544,7 @@ class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
 
     async def decode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         assert json.loads(payload.data.decode()) == self._get_encryption_key()
         metadata = dict(payload.metadata)
@@ -1582,9 +1598,9 @@ class PayloadEncryptionWorkflow:
         self.received_update = False
 
     @workflow.run
-    async def run(self, data: str) -> str:
+    async def run(self, _data: str) -> str:
         await workflow.wait_condition(
-            lambda: (self.received_signal and self.received_update)
+            lambda: self.received_signal and self.received_update
         )
         # Run them in parallel to check that data converter operations do not mix up contexts when
         # there are multiple concurrent payload types.
@@ -1593,6 +1609,7 @@ class PayloadEncryptionWorkflow:
                 payload_encryption_activity,
                 "outbound",
                 start_to_close_timeout=timedelta(seconds=10),
+                activity_id="activity-id",
             ),
             workflow.execute_child_workflow(
                 PayloadEncryptionChildWorkflow.run,
@@ -1684,7 +1701,7 @@ class AssertNexusLacksContextPayloadCodec(PayloadCodec, WithSerializationContext
 
     async def _assert_context_iff_not_nexus(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         assert bool(self.context) == (payload.data.decode() != '"nexus-data"')
         return list(payloads)
@@ -1704,7 +1721,7 @@ class NexusOperationTestServiceHandler:
 @workflow.defn
 class NexusOperationTestWorkflow:
     @workflow.run
-    async def run(self, data: str) -> None:
+    async def run(self, _data: str) -> None:
         nexus_client = workflow.create_nexus_client(
             service=NexusOperationTestServiceHandler,
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
@@ -1736,7 +1753,8 @@ async def test_nexus_payload_codec_operations_lack_context(
         workflows=[NexusOperationTestWorkflow],
         nexus_service_handlers=[NexusOperationTestServiceHandler()],
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
+        endpoint_name = make_nexus_endpoint_name(worker.task_queue)
+        await env.create_nexus_endpoint(endpoint_name, worker.task_queue)
         await client.execute_workflow(
             NexusOperationTestWorkflow.run,
             "workflow-data",
@@ -1750,7 +1768,7 @@ async def test_nexus_payload_codec_operations_lack_context(
 
 class PydanticData(BaseModel):
     value: str
-    trace: List[str] = []
+    trace: list[str] = []
 
 
 class PydanticJSONConverterWithContext(
@@ -1758,16 +1776,16 @@ class PydanticJSONConverterWithContext(
 ):
     def __init__(self):
         super().__init__()
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> PydanticJSONConverterWithContext:
         converter = PydanticJSONConverterWithContext()
         converter.context = context
         return converter
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         if isinstance(value, PydanticData) and self.context:
             if isinstance(self.context, WorkflowSerializationContext):
                 value.trace.append(f"wf_{self.context.workflow_id}")
@@ -1784,7 +1802,7 @@ class PydanticConverterWithContext(CompositePayloadConverter, WithSerializationC
                 for c in DefaultPayloadConverter.default_encoding_payload_converters
             )
         )
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
 
 @workflow.defn
@@ -1841,10 +1859,10 @@ class CustomEncodingPayloadConverter(
 
     def __init__(self):
         super().__init__()
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> CustomEncodingPayloadConverter:
         converter = CustomEncodingPayloadConverter()
         converter.context = context
@@ -1862,14 +1880,14 @@ class CustomPayloadConverter(CompositePayloadConverter):
 
     def to_payloads(
         self, values: Sequence[Any]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         raise UserMethodCalledError
 
     def from_payloads(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]] = None,
-    ) -> List[Any]:
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
         raise NotImplementedError
 
 

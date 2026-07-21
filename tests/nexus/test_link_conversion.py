@@ -1,6 +1,7 @@
 import urllib.parse
 from typing import Any
 
+import nexusrpc
 import pytest
 
 import temporalio.api.common.v1
@@ -39,8 +40,9 @@ import temporalio.nexus._link_conversion
 def test_query_params_to_event_reference(
     query_param_str: str, expected_event_ref: dict[str, Any]
 ):
+    query_params = urllib.parse.parse_qs(query_param_str)
     event_ref = temporalio.nexus._link_conversion._query_params_to_event_reference(
-        query_param_str
+        query_params
     )
     for k, v in expected_event_ref.items():
         assert getattr(event_ref, k) == v
@@ -70,6 +72,274 @@ def test_event_reference_to_query_params(
     query_params = urllib.parse.parse_qs(query_params_str)
     expected_query_params = urllib.parse.parse_qs(expected_query_param_str)
     assert query_params == expected_query_params
+
+
+@pytest.mark.parametrize(
+    ["query_param_str", "expected_event_ref"],
+    [
+        (
+            "eventType=NexusOperationScheduled&referenceType=RequestIdReference&requestID=req-123",
+            {
+                "event_type": temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                "request_id": "req-123",
+            },
+        ),
+        # event ID is optional in query params; we leave it unset in the ref if missing
+        (
+            "eventType=NexusOperationScheduled&referenceType=RequestIdReference",
+            {
+                "event_type": temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                "request_id": "",
+            },
+        ),
+        # Older server sends EVENT_TYPE_CONSTANT_CASE event type name
+        (
+            "eventType=EVENT_TYPE_NEXUS_OPERATION_SCHEDULED&referenceType=RequestIdReference&requestID=req-123",
+            {
+                "event_type": temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                "request_id": "req-123",
+            },
+        ),
+    ],
+)
+def test_query_params_to_request_id_reference(
+    query_param_str: str, expected_event_ref: dict[str, Any]
+):
+    query_params = urllib.parse.parse_qs(query_param_str)
+    event_ref = temporalio.nexus._link_conversion._query_params_to_request_id_reference(
+        query_params
+    )
+    for k, v in expected_event_ref.items():
+        assert getattr(event_ref, k) == v
+
+
+@pytest.mark.parametrize(
+    ["event_ref", "expected_query_param_str"],
+    [
+        # We always send PascalCase event type names (no EventType prefix)
+        (
+            {
+                "event_type": temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+                "request_id": "req-123",
+            },
+            "eventType=NexusOperationScheduled&referenceType=RequestIdReference&requestID=req-123",
+        ),
+    ],
+)
+def test_request_id_reference_to_query_params(
+    event_ref: dict[str, Any], expected_query_param_str: str
+):
+    query_params_str = (
+        temporalio.nexus._link_conversion._request_id_reference_to_query_params(
+            temporalio.api.common.v1.Link.WorkflowEvent.RequestIdReference(**event_ref)
+        )
+    )
+    query_params = urllib.parse.parse_qs(query_params_str)
+    expected_query_params = urllib.parse.parse_qs(expected_query_param_str)
+    assert query_params == expected_query_params
+
+
+@pytest.mark.parametrize(
+    ["wf_event_link", "expected_link"],
+    [
+        (
+            temporalio.api.common.v1.Link(
+                workflow_event=temporalio.api.common.v1.Link.WorkflowEvent(
+                    namespace="ns",
+                    workflow_id="wid",
+                    run_id="rid",
+                    request_id_ref=temporalio.api.common.v1.Link.WorkflowEvent.RequestIdReference(
+                        event_type=temporalio.api.enums.v1.event_type_pb2.EVENT_TYPE_WORKFLOW_TASK_COMPLETED,
+                        request_id="req-123",
+                    ),
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns/workflows/wid/rid/history?referenceType=RequestIdReference&requestID=req-123&eventType=WorkflowTaskCompleted",
+            ),
+        ),
+        (
+            temporalio.api.common.v1.Link(
+                workflow_event=temporalio.api.common.v1.Link.WorkflowEvent(
+                    namespace="ns2",
+                    workflow_id="wid2",
+                    run_id="rid2",
+                    event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
+                        event_id=42,
+                        event_type=temporalio.api.enums.v1.event_type_pb2.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
+                    ),
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns2/workflows/wid2/rid2/history?eventID=42&eventType=WorkflowExecutionCompleted&referenceType=EventReference",
+            ),
+        ),
+        (
+            temporalio.api.common.v1.Link(
+                workflow_event=temporalio.api.common.v1.Link.WorkflowEvent(
+                    namespace="ns2",
+                    workflow_id="wid/2",
+                    run_id="rid2",
+                    event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
+                        event_id=42,
+                        event_type=temporalio.api.enums.v1.event_type_pb2.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
+                    ),
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns2/workflows/wid%2F2/rid2/history?eventID=42&eventType=WorkflowExecutionCompleted&referenceType=EventReference",
+            ),
+        ),
+    ],
+)
+def test_link_conversion_workflow_event_to_link_and_back(
+    wf_event_link: temporalio.api.common.v1.Link, expected_link: nexusrpc.Link
+):
+    actual_link = temporalio.nexus._link_conversion.workflow_event_to_nexus_link(
+        wf_event_link.workflow_event
+    )
+    assert expected_link == actual_link
+
+    actual_event = temporalio.nexus._link_conversion.nexus_link_to_workflow_event_link(
+        actual_link
+    )
+    assert wf_event_link == actual_event
+
+
+@pytest.mark.parametrize(
+    ["workflow_link", "expected_link"],
+    [
+        (
+            temporalio.api.common.v1.Link(
+                workflow=temporalio.api.common.v1.Link.Workflow(
+                    namespace="ns",
+                    workflow_id="wid",
+                    run_id="rid",
+                    reason="query",
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns/workflows/wid/rid?reason=query",
+            ),
+        ),
+        (
+            temporalio.api.common.v1.Link(
+                workflow=temporalio.api.common.v1.Link.Workflow(
+                    namespace="ns2",
+                    workflow_id="wid/2",
+                    run_id="rid2",
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns2/workflows/wid%2F2/rid2",
+            ),
+        ),
+    ],
+)
+def test_link_conversion_workflow_to_link_and_back(
+    workflow_link: temporalio.api.common.v1.Link, expected_link: nexusrpc.Link
+):
+    actual_link = temporalio.nexus._link_conversion.workflow_to_nexus_link(
+        workflow_link.workflow
+    )
+    assert expected_link == actual_link
+
+    actual_workflow = temporalio.nexus._link_conversion.nexus_link_to_workflow_link(
+        actual_link
+    )
+    assert workflow_link == actual_workflow
+
+    assert (
+        expected_link
+        == temporalio.nexus._link_conversion.temporal_link_to_nexus_link(workflow_link)
+    )
+    assert (
+        workflow_link
+        == temporalio.nexus._link_conversion.nexus_link_to_temporal_link(expected_link)
+    )
+
+
+@pytest.mark.parametrize(
+    ["operation_link", "expected_link"],
+    [
+        (
+            temporalio.api.common.v1.Link(
+                nexus_operation=temporalio.api.common.v1.Link.NexusOperation(
+                    namespace="ns",
+                    operation_id="op-id",
+                    run_id="run-id",
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns/nexus-operations/op-id/run-id/details",
+            ),
+        ),
+        (
+            temporalio.api.common.v1.Link(
+                nexus_operation=temporalio.api.common.v1.Link.NexusOperation(
+                    namespace="ns",
+                    operation_id="op-id",
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns/nexus-operations/op-id//details",
+            ),
+        ),
+        (
+            temporalio.api.common.v1.Link(
+                nexus_operation=temporalio.api.common.v1.Link.NexusOperation(
+                    namespace="ns",
+                    operation_id="op/id",
+                )
+            ),
+            nexusrpc.Link(
+                type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
+                url="temporal:///namespaces/ns/nexus-operations/op%2Fid//details",
+            ),
+        ),
+    ],
+)
+def test_link_conversion_nexus_operation_to_link_and_back(
+    operation_link: temporalio.api.common.v1.Link,
+    expected_link: nexusrpc.Link,
+):
+    actual_link = temporalio.nexus._link_conversion.nexus_operation_to_nexus_link(
+        operation_link.nexus_operation
+    )
+    assert expected_link == actual_link
+
+    actual_operation = (
+        temporalio.nexus._link_conversion.nexus_link_to_nexus_operation_link(
+            actual_link
+        )
+    )
+    assert operation_link == actual_operation
+
+    assert (
+        expected_link
+        == temporalio.nexus._link_conversion.temporal_link_to_nexus_link(operation_link)
+    )
+    assert (
+        operation_link
+        == temporalio.nexus._link_conversion.nexus_link_to_temporal_link(expected_link)
+    )
+
+
+def test_nexus_operation_link_with_unparseable_url_is_ignored():
+    # The canonical path is /nexus-operations/{op_id}/{run_id}/details; a URL missing the
+    # run-id/details suffix (e.g. the legacy ?runID= form) does not parse.
+    link = nexusrpc.Link(
+        type=temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name,
+        url="temporal:///namespaces/ns/nexus-operations/op-id?runID=run-id",
+    )
+    assert temporalio.nexus._link_conversion.nexus_link_to_temporal_link(link) is None
 
 
 def test_link_conversion_utilities():

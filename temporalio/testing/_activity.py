@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import threading
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional, Set, TypeVar
+from typing import Any, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -21,29 +22,6 @@ from temporalio.client import Client
 _Params = ParamSpec("_Params")
 _Return = TypeVar("_Return")
 
-_utc_zero = datetime.fromtimestamp(0).replace(tzinfo=timezone.utc)
-_default_info = temporalio.activity.Info(
-    activity_id="test",
-    activity_type="unknown",
-    attempt=1,
-    current_attempt_scheduled_time=_utc_zero,
-    heartbeat_details=[],
-    heartbeat_timeout=None,
-    is_local=False,
-    schedule_to_close_timeout=timedelta(seconds=1),
-    scheduled_time=_utc_zero,
-    start_to_close_timeout=timedelta(seconds=1),
-    started_time=_utc_zero,
-    task_queue="test",
-    task_token=b"test",
-    workflow_id="test",
-    workflow_namespace="default",
-    workflow_run_id="test-run",
-    workflow_type="test",
-    priority=temporalio.common.Priority.default,
-    retry_policy=None,
-)
-
 
 class ActivityEnvironment:
     """Activity environment for testing activities.
@@ -54,7 +32,8 @@ class ActivityEnvironment:
 
     Attributes:
         info: The info that is returned from :py:func:`temporalio.activity.info`
-            function.
+            function. To customize, use :py:meth:`default_info` with
+            :py:func:`dataclasses.replace` to modify fields.
         on_heartbeat: Function called on each heartbeat invocation by the
             activity.
         payload_converter: Payload converter set on the activity context. This
@@ -65,9 +44,9 @@ class ActivityEnvironment:
             take effect. Default is noop.
     """
 
-    def __init__(self, client: Optional[Client] = None) -> None:
+    def __init__(self, client: Client | None = None) -> None:
         """Create an ActivityEnvironment for running activity code."""
-        self.info = _default_info
+        self.info = ActivityEnvironment.default_info()
         self.on_heartbeat: Callable[..., None] = lambda *args: None
         self.payload_converter = (
             temporalio.converter.DataConverter.default.payload_converter
@@ -75,10 +54,42 @@ class ActivityEnvironment:
         self.metric_meter = temporalio.common.MetricMeter.noop
         self._cancelled = False
         self._worker_shutdown = False
-        self._activities: Set[_Activity] = set()
+        self._activities: set[_Activity] = set()
         self._client = client
         self._cancellation_details = (
             temporalio.activity._ActivityCancellationDetailsHolder()
+        )
+
+    @staticmethod
+    def default_info() -> temporalio.activity.Info:
+        """Get the default activity info used for testing.
+
+        Returns a new default Info instance that can be modified using
+        :py:func:`dataclasses.replace` before assigning to the info attribute.
+        """
+        utc_zero = datetime.fromtimestamp(0).replace(tzinfo=timezone.utc)
+        return temporalio.activity.Info(
+            activity_id="test",
+            activity_type="unknown",
+            attempt=1,
+            current_attempt_scheduled_time=utc_zero,
+            heartbeat_details=[],
+            heartbeat_timeout=None,
+            is_local=False,
+            namespace="default",
+            schedule_to_close_timeout=timedelta(seconds=1),
+            scheduled_time=utc_zero,
+            start_to_close_timeout=timedelta(seconds=1),
+            started_time=utc_zero,
+            task_queue="test",
+            task_token=b"test",
+            workflow_id="test",
+            workflow_namespace="default",
+            workflow_run_id="test-run",
+            workflow_type="test",
+            priority=temporalio.common.Priority.default,
+            retry_policy=None,
+            activity_run_id=None,
         )
 
     def cancel(
@@ -139,16 +150,16 @@ class _Activity:
         self,
         env: ActivityEnvironment,
         fn: Callable,
-        client: Optional[Client],
+        client: Client | None,
     ) -> None:
         self.env = env
         self.fn = fn
         self.is_async = inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(
             fn.__call__  # type: ignore
         )
-        self.cancel_thread_raiser: Optional[
+        self.cancel_thread_raiser: None | (
             temporalio.worker._activity._ThreadExceptionRaiser
-        ] = None
+        ) = None
         if not self.is_async:
             # If there is a definition and they disable thread raising, don't
             # set
@@ -161,11 +172,11 @@ class _Activity:
         self.context = temporalio.activity._Context(
             info=lambda: env.info,
             heartbeat=lambda *args: env.on_heartbeat(*args),
-            cancelled_event=temporalio.activity._CompositeEvent(
+            cancelled_event=temporalio.common._CompositeEvent(
                 thread_event=threading.Event(),
                 async_event=asyncio.Event() if self.is_async else None,
             ),
-            worker_shutdown_event=temporalio.activity._CompositeEvent(
+            worker_shutdown_event=temporalio.common._CompositeEvent(
                 thread_event=threading.Event(),
                 async_event=asyncio.Event() if self.is_async else None,
             ),
@@ -179,9 +190,9 @@ class _Activity:
             client=client if self.is_async else None,
             cancellation_details=env._cancellation_details,
         )
-        self.task: Optional[asyncio.Task] = None
+        self.task: asyncio.Task | None = None
 
-    def run(self, *args, **kwargs) -> Any:
+    def run(self, *args: Any, **kwargs: Any) -> Any:
         if self.cancel_thread_raiser:
             thread_id = threading.current_thread().ident
             if thread_id is not None:

@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
 
 from typing_extensions import TypedDict
 
@@ -17,6 +17,7 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
 import temporalio.runtime
+import temporalio.worker
 import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
@@ -35,19 +36,19 @@ class Replayer:
     def __init__(
         self,
         *,
-        workflows: Sequence[Type],
-        workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        workflows: Sequence[type],
+        workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         plugins: Sequence[temporalio.worker.Plugin] = [],
-        build_id: Optional[str] = None,
-        identity: Optional[str] = None,
-        workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
+        build_id: str | None = None,
+        identity: str | None = None,
+        workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         debug_mode: bool = False,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
+        runtime: temporalio.runtime.Runtime | None = None,
         disable_safe_workflow_eviction: bool = False,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> None:
@@ -81,6 +82,7 @@ class Replayer:
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
         )
+        self._initial_config = self._config.copy()
 
         # Apply plugin configuration
         self.plugins = plugins
@@ -88,17 +90,21 @@ class Replayer:
             self._config = plugin.configure_replayer(self._config)
 
         # Validate workflows after plugin configuration
-        if not self._config["workflows"]:
+        if not self._config.get("workflows"):
             raise ValueError("At least one workflow must be specified")
 
-    def config(self) -> ReplayerConfig:
+    def config(self, *, active_config: bool = False) -> ReplayerConfig:
         """Config, as a dictionary, used to create this replayer.
+
+        Args:
+            active_config: If true, return the modified configuration in use rather than the initial one
+                provided to the client.
 
         Returns:
             Configuration, shallow-copied.
         """
-        config = self._config.copy()
-        config["workflows"] = list(config["workflows"])
+        config = self._config.copy() if active_config else self._initial_config.copy()
+        config["workflows"] = list(config.get("workflows", []))
         return config
 
     async def replay_workflow(
@@ -149,7 +155,7 @@ class Replayer:
             Aggregated results.
         """
         async with self.workflow_replay_iterator(histories) as replay_iterator:
-            replay_failures: Dict[str, Exception] = {}
+            replay_failures: dict[str, Exception] = {}
             async for result in replay_iterator:
                 if result.replay_failure:
                     if raise_on_replay_failure:
@@ -173,7 +179,7 @@ class Replayer:
             replayed.
         """
 
-        def make_lambda(plugin, next):
+        def make_lambda(plugin, next):  # type: ignore[reportMissingParameterType]
             return lambda r, hs: plugin.run_replayer(r, hs, next)
 
         next_function = lambda r, hs: r._workflow_replay_iterator(hs)
@@ -186,13 +192,18 @@ class Replayer:
     async def _workflow_replay_iterator(
         self, histories: AsyncIterator[temporalio.client.WorkflowHistory]
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+        # Initialize variables to avoid unbound variable errors
+        pusher = None
+        workflow_worker_task = None
+        bridge_worker_scope = None
+
         try:
-            last_replay_failure: Optional[Exception]
+            last_replay_failure: Exception | None
             last_replay_complete = asyncio.Event()
 
             # Create eviction hook
             def on_eviction_hook(
-                run_id: str,
+                _run_id: str,
                 remove_job: temporalio.bridge.proto.workflow_activation.RemoveFromCache,
             ) -> None:
                 nonlocal last_replay_failure
@@ -218,39 +229,62 @@ class Replayer:
 
             # Create worker referencing bridge worker
             bridge_worker: temporalio.bridge.worker.Worker
-            task_queue = f"replay-{self._config['build_id']}"
-            runtime = self._config["runtime"] or temporalio.runtime.Runtime.default()
+            task_queue = f"replay-{self._config.get('build_id')}"
+            runtime = (
+                self._config.get("runtime") or temporalio.runtime.Runtime.default()
+            )
+            data_converter = (
+                self._config.get("data_converter")
+                or temporalio.converter.DataConverter.default
+            )
             workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: bridge_worker,
-                namespace=self._config["namespace"],
+                namespace=self._config.get("namespace", "ReplayNamespace"),
                 task_queue=task_queue,
-                workflows=self._config["workflows"],
-                workflow_task_executor=self._config["workflow_task_executor"],
+                workflows=self._config.get("workflows", []),
+                workflow_task_executor=self._config.get("workflow_task_executor"),
                 max_concurrent_workflow_tasks=5,
-                workflow_runner=self._config["workflow_runner"],
-                unsandboxed_workflow_runner=self._config["unsandboxed_workflow_runner"],
-                data_converter=self._config["data_converter"],
-                interceptors=self._config["interceptors"],
-                workflow_failure_exception_types=self._config[
-                    "workflow_failure_exception_types"
-                ],
-                debug_mode=self._config["debug_mode"],
+                workflow_runner=self._config.get("workflow_runner")
+                or SandboxedWorkflowRunner(),
+                unsandboxed_workflow_runner=self._config.get(
+                    "unsandboxed_workflow_runner"
+                )
+                or UnsandboxedWorkflowRunner(),
+                data_converter=data_converter,
+                interceptors=self._config.get("interceptors", []),
+                workflow_failure_exception_types=self._config.get(
+                    "workflow_failure_exception_types", []
+                ),
+                patch_activation_callback=None,
+                debug_mode=self._config.get("debug_mode", False),
                 metric_meter=runtime.metric_meter,
                 on_eviction_hook=on_eviction_hook,
                 disable_eager_activity_execution=False,
-                disable_safe_eviction=self._config["disable_safe_workflow_eviction"],
+                disable_safe_eviction=self._config.get(
+                    "disable_safe_workflow_eviction", False
+                ),
                 should_enforce_versioning_behavior=False,
                 assert_local_activity_valid=lambda a: None,
-                encode_headers=self._config["header_codec_behavior"]
+                encode_headers=self._config.get(
+                    "header_codec_behavior", HeaderCodecBehavior.NO_CODEC
+                )
                 != HeaderCodecBehavior.NO_CODEC,
+                max_workflow_task_external_storage_concurrency=1,
             )
+            external_storage = data_converter.external_storage
+            storage_driver_types = (
+                {driver.type() for driver in external_storage.drivers}
+                if external_storage
+                else set()
+            )
+
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
                 runtime._core_runtime,
                 temporalio.bridge.worker.WorkerConfig(
-                    namespace=self._config["namespace"],
+                    namespace=self._config.get("namespace", "ReplayNamespace"),
                     task_queue=task_queue,
-                    identity_override=self._config["identity"],
+                    identity_override=self._config.get("identity"),
                     # Need to tell core whether we want to consider all
                     # non-determinism exceptions as workflow fail, and whether we do
                     # per workflow type
@@ -274,6 +308,12 @@ class Replayer:
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
                     no_remote_activities=True,
+                    task_types=temporalio.bridge.worker.WorkerTaskTypes(
+                        enable_workflows=True,
+                        enable_local_activities=False,
+                        enable_remote_activities=False,
+                        enable_nexus=False,
+                    ),
                     sticky_queue_schedule_to_start_timeout_millis=1000,
                     max_heartbeat_throttle_interval_millis=1000,
                     default_heartbeat_throttle_interval_millis=1000,
@@ -281,7 +321,7 @@ class Replayer:
                     max_task_queue_activities_per_second=None,
                     graceful_shutdown_period_millis=0,
                     versioning_strategy=temporalio.bridge.worker.WorkerVersioningStrategyNone(
-                        build_id_no_versioning=self._config["build_id"]
+                        build_id_no_versioning=self._config.get("build_id")
                         or load_default_build_id(),
                     ),
                     workflow_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
@@ -293,10 +333,14 @@ class Replayer:
                     nexus_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
                         1
                     ),
+                    plugins=[plugin.name() for plugin in self.plugins],
+                    storage_drivers=storage_driver_types,
                 ),
             )
+            bridge_worker_scope = bridge_worker
+
             # Start worker
-            workflow_worker_task = asyncio.create_task(workflow_worker.run())
+            workflow_worker_task = asyncio.create_task(workflow_worker.run(None))
 
             # Yield iterator
             async def replay_iterator() -> AsyncIterator[WorkflowReplayResult]:
@@ -335,18 +379,20 @@ class Replayer:
             yield replay_iterator()
         finally:
             # Close the pusher
-            pusher.close()
+            if pusher is not None:
+                pusher.close()
             # If the workflow worker task is not done, wait for it
             try:
-                if not workflow_worker_task.done():
+                if workflow_worker_task is not None and not workflow_worker_task.done():
                     await workflow_worker_task
             except Exception:
                 logger.warning("Failed to shutdown worker", exc_info=True)
             finally:
                 # We must shutdown here
                 try:
-                    bridge_worker.initiate_shutdown()
-                    await bridge_worker.finalize_shutdown()
+                    if bridge_worker_scope is not None:
+                        bridge_worker_scope.initiate_shutdown()
+                        await bridge_worker_scope.finalize_shutdown()
                 except Exception:
                     logger.warning("Failed to finalize shutdown", exc_info=True)
 
@@ -354,18 +400,18 @@ class Replayer:
 class ReplayerConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:class:`Replayer`."""
 
-    workflows: Sequence[Type]
-    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    workflows: Sequence[type]
+    workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     namespace: str
     data_converter: temporalio.converter.DataConverter
     interceptors: Sequence[Interceptor]
-    build_id: Optional[str]
-    identity: Optional[str]
-    workflow_failure_exception_types: Sequence[Type[BaseException]]
+    build_id: str | None
+    identity: str | None
+    workflow_failure_exception_types: Sequence[type[BaseException]]
     debug_mode: bool
-    runtime: Optional[temporalio.runtime.Runtime]
+    runtime: temporalio.runtime.Runtime | None
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior
 
@@ -377,7 +423,7 @@ class WorkflowReplayResult:
     history: temporalio.client.WorkflowHistory
     """History originally passed for this workflow replay."""
 
-    replay_failure: Optional[Exception]
+    replay_failure: Exception | None
     """Failure during replay if any.
 
     This does not mean your workflow exited by raising an error, but rather that

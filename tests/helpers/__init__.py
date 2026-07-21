@@ -1,11 +1,20 @@
 import asyncio
+import logging
+import logging.handlers
+import queue
 import socket
+import threading
 import time
 import uuid
-from contextlib import closing
+from collections.abc import Awaitable, Callable, Iterator, Sequence
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar, Union
+from typing import (
+    Any,
+    TypeVar,
+    cast,
+)
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType as EventType
@@ -35,13 +44,13 @@ from temporalio.workflow import (
 
 def new_worker(
     client: Client,
-    *workflows: Type,
+    *workflows: type,
     activities: Sequence[Callable] = [],
-    task_queue: Optional[str] = None,
+    task_queue: str | None = None,
     workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
     max_cached_workflows: int = 1000,
-    workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
-    **kwargs,
+    workflow_failure_exception_types: Sequence[type[BaseException]] = [],
+    **kwargs,  # type:ignore[reportMissingParameterType]
 ) -> Worker:
     return Worker(
         client,
@@ -63,6 +72,7 @@ async def assert_eventually(
     *,
     timeout: timedelta = timedelta(seconds=10),
     interval: timedelta = timedelta(milliseconds=200),
+    retry_on_rpc_cancelled: bool = True,
 ) -> T:
     start_sec = time.monotonic()
     while True:
@@ -71,6 +81,11 @@ async def assert_eventually(
             return res
         except AssertionError:
             if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
+                raise
+        except RPCError as e:
+            if retry_on_rpc_cancelled and e.status == RPCStatusCode.CANCELLED:
+                continue
+            else:
                 raise
         await asyncio.sleep(interval.total_seconds())
 
@@ -89,7 +104,7 @@ async def assert_eq_eventually(
 
 
 async def assert_task_fail_eventually(
-    handle: WorkflowHandle, *, message_contains: Optional[str] = None
+    handle: WorkflowHandle, *, message_contains: str | None = None
 ) -> None:
     async def check() -> None:
         async for evt in handle.fetch_history_events():
@@ -125,7 +140,7 @@ async def ensure_search_attributes_present(
     resp = await client.operator_service.list_search_attributes(
         ListSearchAttributesRequest(namespace=client.namespace)
     )
-    if not set(key.name for key in keys).issubset(resp.custom_attributes.keys()):
+    if not {key.name for key in keys}.issubset(resp.custom_attributes.keys()):
         await client.operator_service.add_search_attributes(
             AddSearchAttributesRequest(
                 namespace=client.namespace,
@@ -139,7 +154,7 @@ async def ensure_search_attributes_present(
         resp = await client.operator_service.list_search_attributes(
             ListSearchAttributesRequest(namespace=client.namespace)
         )
-        assert set(key.name for key in keys).issubset(resp.custom_attributes.keys())
+        assert {key.name for key in keys}.issubset(resp.custom_attributes.keys())
 
 
 def find_free_port() -> int:
@@ -175,7 +190,7 @@ async def admitted_update_task(
     handle: WorkflowHandle,
     update_method: UpdateMethodMultiParam,
     id: str,
-    **kwargs,
+    **kwargs,  # type:ignore[reportMissingParameterType]
 ) -> asyncio.Task:
     """
     Return an asyncio.Task for an update after waiting for it to be admitted.
@@ -239,10 +254,48 @@ async def assert_pending_activity_exists_eventually(
     return await assert_eventually(check, timeout=timeout)
 
 
+async def assert_event_subsequence(
+    wf_handle: WorkflowHandle,
+    expected_events: list[EventType.ValueType],
+    timeout: timedelta = timedelta(seconds=5),
+) -> None:
+    """
+    Given a workflow handle and a sequence of event types, assert that the workflow's history
+    contains that subsequence of events in the order specified.
+    """
+
+    async def check():
+        history = await wf_handle.fetch_history()
+
+        _all_events = iter(history.events)
+        _expected_events = iter(expected_events)
+
+        previous_expected_event_type_name = None
+        for expected_event_type in _expected_events:
+            expected_event_type_name = EventType.Name(expected_event_type).removeprefix(
+                "EVENT_TYPE_"
+            )
+            has_expected = next(
+                (e for e in _all_events if e.event_type == expected_event_type),
+                None,
+            )
+            if not has_expected:
+                if previous_expected_event_type_name is not None:
+                    prefix = f"After {previous_expected_event_type_name}, "
+                else:
+                    prefix = ""
+                raise AssertionError(
+                    f"{prefix}expected {expected_event_type_name} in workflow {wf_handle.id}"
+                )
+            previous_expected_event_type_name = expected_event_type_name
+
+    await assert_eventually(check, timeout=timeout)
+
+
 async def get_pending_activity_info(
     handle: WorkflowHandle,
     activity_id: str,
-) -> Optional[PendingActivityInfo]:
+) -> PendingActivityInfo | None:
     """Get pending activity info by ID, or None if not found."""
     desc = await handle.describe()
     for act in desc.raw_description.pending_activities:
@@ -251,8 +304,28 @@ async def get_pending_activity_info(
     return None
 
 
+_wait_for_pause_events: dict[str, threading.Event] = {}
+
+
+def wait_for_pause_event(activity_id: str) -> None:
+    event = _wait_for_pause_events.get(activity_id)
+    if event is not None:
+        event.wait()
+
+
+async def async_wait_for_pause_event(activity_id: str) -> None:
+    event = _wait_for_pause_events.get(activity_id)
+    if event is not None:
+        await asyncio.get_running_loop().run_in_executor(None, event.wait)
+
+
 async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
-    """Pause the given activity and assert it becomes paused."""
+    """Pause the given activity and assert it becomes paused.
+
+    Registers an event before calling the pause API so cooperating test
+    activities (those that catch the pause-induced cancel via
+    wait_for_pause_release) hang until we have observed paused=true.
+    """
     desc = await handle.describe()
     req = PauseActivityRequest(
         namespace=client.namespace,
@@ -262,14 +335,19 @@ async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: 
         ),
         id=activity_id,
     )
-    await client.workflow_service.pause_activity(req)
 
-    # Assert eventually paused
-    async def check_paused() -> bool:
-        info = await assert_pending_activity_exists_eventually(handle, activity_id)
-        return info.paused
+    _wait_for_pause_events[activity_id] = threading.Event()
+    try:
+        await client.workflow_service.pause_activity(req)
 
-    await assert_eventually(check_paused)
+        async def check_paused() -> None:
+            info = await assert_pending_activity_exists_eventually(handle, activity_id)
+            assert info.paused, f"Activity {activity_id} not yet paused"
+
+        await assert_eventually(check_paused)
+    finally:
+        _wait_for_pause_events[activity_id].set()
+        del _wait_for_pause_events[activity_id]
 
 
 async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
@@ -286,9 +364,9 @@ async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id
     await client.workflow_service.unpause_activity(req)
 
     # Assert eventually not paused
-    async def check_unpaused() -> bool:
+    async def check_unpaused() -> None:
         info = await assert_pending_activity_exists_eventually(handle, activity_id)
-        return not info.paused
+        assert not info.paused, f"Activity {activity_id} still paused"
 
     await assert_eventually(check_unpaused)
 
@@ -304,14 +382,14 @@ async def print_history(handle: WorkflowHandle):
 @dataclass
 class InterleavedHistoryEvent:
     handle: WorkflowHandle
-    event: Union[HistoryEvent, str]
-    number: Optional[int]
+    event: HistoryEvent | str
+    number: int | None
     time: datetime
 
 
 async def print_interleaved_histories(
     handles: list[WorkflowHandle],
-    extra_events: Optional[list[tuple[WorkflowHandle, str, datetime]]] = None,
+    extra_events: list[tuple[WorkflowHandle, str, datetime]] | None = None,
 ) -> None:
     """
     Print the interleaved history events from multiple workflow handles in columns.
@@ -401,3 +479,56 @@ async def print_interleaved_histories(
                 padding = len(f" *: {elapsed_ms:>4} ")
             summary_row[col_idx] = f"{' ' * padding}[{summary}]"[: col_width - 3]
             print(_format_row(summary_row))
+
+
+class LogCapturer:
+    def __init__(self) -> None:
+        self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
+
+    @contextmanager
+    def logs_captured(self, *loggers: logging.Logger, level: int = logging.INFO):
+        handler = logging.handlers.QueueHandler(self.log_queue)
+
+        prev_levels = [l.level for l in loggers]
+        for l in loggers:
+            l.setLevel(level)
+            l.addHandler(handler)
+        try:
+            yield self
+        finally:
+            for i, l in enumerate(loggers):
+                l.removeHandler(handler)
+                l.setLevel(prev_levels[i])
+
+    def find_log(self, starts_with: str) -> logging.LogRecord | None:
+        return self.find(lambda l: l.message.startswith(starts_with))
+
+    def find(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> logging.LogRecord | None:
+        for record in cast(list[logging.LogRecord], self.log_queue.queue):
+            if pred(record):
+                return record
+        return None
+
+    def find_all(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> list[logging.LogRecord]:
+        return [
+            record
+            for record in cast(list[logging.LogRecord], self.log_queue.queue)
+            if pred(record)
+        ]
+
+
+class LogHandler:
+    @staticmethod
+    @contextmanager
+    def apply(logger: logging.Logger, handler: logging.Handler) -> Iterator[None]:
+        level = logger.level
+        logger.addHandler(handler)
+        try:
+            yield
+        finally:
+            logger.removeHandler(handler)
+            logger.level = level

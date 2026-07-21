@@ -1,10 +1,12 @@
 import dataclasses
 import uuid
 import warnings
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from typing import AsyncIterator, Awaitable, Callable, Optional, cast
+from typing import cast
 
 import pytest
+import temporalio.bridge.temporal_sdk_bridge
 
 import temporalio.client
 import temporalio.converter
@@ -54,6 +56,7 @@ class MyClientPlugin(temporalio.client.Plugin):
         next: Callable[[ConnectConfig], Awaitable[ServiceClient]],
     ) -> ServiceClient:
         config.api_key = "replaced key"
+        config.tls = False
         return await next(config)
 
 
@@ -80,7 +83,7 @@ class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         return config
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        config["task_queue"] = "combined"
+        config["task_queue"] = "combined" + str(uuid.uuid4())
         return config
 
     async def connect_service_client(
@@ -112,7 +115,7 @@ class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
 class MyWorkerPlugin(temporalio.worker.Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        config["task_queue"] = "replaced_queue"
+        config["task_queue"] = "replaced_queue" + str(uuid.uuid4())
         runner = config.get("workflow_runner")
         if isinstance(runner, SandboxedWorkflowRunner):
             config["workflow_runner"] = dataclasses.replace(
@@ -144,27 +147,32 @@ class MyWorkerPlugin(temporalio.worker.Plugin):
 async def test_worker_plugin_basic_config(client: Client) -> None:
     worker = Worker(
         client,
-        task_queue="queue",
+        task_queue="queue" + str(uuid.uuid4()),
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    assert worker.config().get("task_queue") == "replaced_queue"
+    task_queue = worker.config(active_config=True).get("task_queue")
+    assert task_queue is not None and task_queue.startswith("replaced_queue")
 
     # Test client plugin propagation to worker plugins
     new_config = client.config()
     new_config["plugins"] = [MyCombinedPlugin()]
     client = Client(**new_config)
-    worker = Worker(client, task_queue="queue", activities=[never_run_activity])
-    assert worker.config().get("task_queue") == "combined"
+    worker = Worker(
+        client, task_queue="queue" + str(uuid.uuid4()), activities=[never_run_activity]
+    )
+    task_queue = worker.config(active_config=True).get("task_queue")
+    assert task_queue is not None and task_queue.startswith("combined")
 
     # Test both. Client propagated plugins are called first, so the worker plugin overrides in this case
     worker = Worker(
         client,
-        task_queue="queue",
+        task_queue="queue" + str(uuid.uuid4()),
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    assert worker.config().get("task_queue") == "replaced_queue"
+    task_queue = worker.config(active_config=True).get("task_queue")
+    assert task_queue is not None and task_queue.startswith("replaced_queue")
 
 
 async def test_worker_duplicated_plugin(client: Client) -> None:
@@ -173,9 +181,9 @@ async def test_worker_duplicated_plugin(client: Client) -> None:
     client = Client(**new_config)
 
     with warnings.catch_warnings(record=True) as warning_list:
-        worker = Worker(
+        Worker(
             client,
-            task_queue="queue",
+            task_queue="queue" + str(uuid.uuid4()),
             activities=[never_run_activity],
             plugins=[MyCombinedPlugin()],
         )
@@ -185,17 +193,18 @@ async def test_worker_duplicated_plugin(client: Client) -> None:
 
 
 async def test_worker_sandbox_restrictions(client: Client) -> None:
-    with warnings.catch_warnings(record=True) as warning_list:
+    with warnings.catch_warnings(record=True):
         worker = Worker(
             client,
-            task_queue="queue",
+            task_queue="queue" + str(uuid.uuid4()),
             activities=[never_run_activity],
             plugins=[MyWorkerPlugin()],
         )
     assert (
         "my_module"
         in cast(
-            SandboxedWorkflowRunner, worker.config().get("workflow_runner")
+            SandboxedWorkflowRunner,
+            worker.config(active_config=True).get("workflow_runner"),
         ).restrictions.passthrough_modules
     )
 
@@ -269,8 +278,11 @@ async def test_replay(client: Client) -> None:
         )
         await handle.result()
     replayer = Replayer(workflows=[], plugins=[plugin])
-    assert len(replayer.config().get("workflows") or []) == 1
-    assert replayer.config().get("data_converter") == pydantic_data_converter
+    assert len(replayer.config(active_config=True).get("workflows") or []) == 1
+    assert (
+        replayer.config(active_config=True).get("data_converter")
+        == pydantic_data_converter
+    )
 
     await replayer.replay_workflow(await handle.fetch_history())
 
@@ -290,29 +302,38 @@ async def test_simple_plugins(client: Client) -> None:
     # Test without plugin registered in client
     worker = Worker(
         client,
-        task_queue="queue",
+        task_queue="queue" + str(uuid.uuid4()),
         activities=[never_run_activity],
         workflows=[HelloWorkflow],
         plugins=[plugin],
     )
     # On a sequence, a value is appended
-    assert worker.config().get("workflows") == [HelloWorkflow, HelloWorkflow2]
+    assert worker.config(active_config=True).get("workflows") == [
+        HelloWorkflow,
+        HelloWorkflow2,
+    ]
 
     # Test with plugin registered in client
     worker = Worker(
         new_client,
-        task_queue="queue",
+        task_queue="queue" + str(uuid.uuid4()),
         activities=[never_run_activity],
     )
-    assert worker.config().get("workflows") == [HelloWorkflow2]
+    assert worker.config(active_config=True).get("workflows") == [HelloWorkflow2]
 
     replayer = Replayer(workflows=[HelloWorkflow], plugins=[plugin])
-    assert replayer.config().get("data_converter") == pydantic_data_converter
-    assert replayer.config().get("workflows") == [HelloWorkflow, HelloWorkflow2]
+    assert (
+        replayer.config(active_config=True).get("data_converter")
+        == pydantic_data_converter
+    )
+    assert replayer.config(active_config=True).get("workflows") == [
+        HelloWorkflow,
+        HelloWorkflow2,
+    ]
 
 
 async def test_simple_plugins_callables(client: Client) -> None:
-    def converter(old: Optional[DataConverter]):
+    def converter(old: DataConverter | None):
         if old != temporalio.converter.default():
             raise ValueError("Can't override non-default converter")
         return pydantic_data_converter
@@ -338,12 +359,12 @@ async def test_simple_plugins_callables(client: Client) -> None:
     )
     worker = Worker(
         client,
-        task_queue="queue",
+        task_queue="queue" + str(uuid.uuid4()) + str(uuid.uuid4()),
         workflows=[HelloWorkflow],
         activities=[never_run_activity],
         plugins=[plugin],
     )
-    assert worker.config().get("workflows") == []
+    assert worker.config(active_config=True).get("workflows") == []
 
 
 class MediumPlugin(SimplePlugin):
@@ -352,13 +373,245 @@ class MediumPlugin(SimplePlugin):
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config = super().configure_worker(config)
-        config["task_queue"] = "override"
+        config["task_queue"] = "override" + str(uuid.uuid4())
         return config
 
 
 async def test_medium_plugin(client: Client) -> None:
     plugin = MediumPlugin()
     worker = Worker(
-        client, task_queue="queue", plugins=[plugin], workflows=[HelloWorkflow]
+        client,
+        task_queue="queue" + str(uuid.uuid4()),
+        plugins=[plugin],
+        workflows=[HelloWorkflow],
     )
-    assert worker.config().get("task_queue") == "override"
+    task_queue = worker.config(active_config=True).get("task_queue")
+    assert task_queue is not None and task_queue.startswith("override")
+
+
+class CombinedClientWorkerInterceptor(
+    temporalio.client.Interceptor, temporalio.worker.Interceptor
+):
+    """Test interceptor that can be used as both client and worker interceptor with execution counting."""
+
+    def __init__(self):
+        super().__init__()
+        self.client_intercepted = False
+        self.worker_intercepted = False
+        self.call_count = {"execute_workflow": 0}
+
+    def intercept_client(
+        self, next: temporalio.client.OutboundInterceptor
+    ) -> temporalio.client.OutboundInterceptor:
+        self.client_intercepted = True
+        return super().intercept_client(next)
+
+    def intercept_activity(
+        self, next: temporalio.worker.ActivityInboundInterceptor
+    ) -> temporalio.worker.ActivityInboundInterceptor:
+        self.worker_intercepted = True
+        return super().intercept_activity(next)
+
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> type[temporalio.worker.WorkflowInboundInterceptor] | None:
+        # This method gets called when the worker is configured with workflows
+        # Mark that worker interceptor was used
+        self.worker_intercepted = True
+
+        # Return counting interceptor class
+        call_count = self.call_count
+
+        class CountingWorkflowInterceptor(temporalio.worker.WorkflowInboundInterceptor):
+            async def execute_workflow(
+                self, input: temporalio.worker.ExecuteWorkflowInput
+            ):
+                call_count["execute_workflow"] += 1
+                return await super().execute_workflow(input)
+
+        return CountingWorkflowInterceptor
+
+
+async def test_simple_plugin_worker_interceptor_only_used_on_worker(
+    client: Client,
+) -> None:
+    """Test that when a combined client/worker interceptor is provided by SimplePlugin
+    to interceptors, and the plugin is only used on a worker (not on the client
+    used to create that worker), the worker interceptor functionality is still provided."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the combined interceptor
+    plugin = SimplePlugin(
+        "TestCombinedPlugin",
+        interceptors=[interceptor],
+    )
+
+    # Create worker with the plugin (but don't add plugin to client)
+    worker = Worker(
+        client,
+        task_queue="queue" + str(uuid.uuid4()),
+        activities=[never_run_activity],
+        workflows=[
+            HelloWorkflow
+        ],  # Add workflows to trigger workflow_interceptor_class
+        plugins=[plugin],
+    )
+
+    # Worker creation triggers plugin configuration
+    assert worker is not None
+
+    # The interceptor should NOT have been used for client interception
+    # since the plugin was not added to the client
+    assert not interceptor.client_intercepted, (
+        "Client interceptor should not have been used"
+    )
+
+    # The interceptor SHOULD have been used for worker interception
+    # even though it was specified in interceptors
+    assert interceptor.worker_intercepted, "Worker interceptor should have been used"
+
+
+async def test_simple_plugin_interceptor_duplication_when_used_on_client_and_worker(
+    client: Client,
+) -> None:
+    """Test that when a combined client/worker interceptor is provided by SimplePlugin
+    to interceptors, and the plugin is used on both client and worker,
+    the interceptor is not duplicated in the worker."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the combined interceptor
+    plugin = SimplePlugin(
+        "TestCombinedPlugin",
+        interceptors=[interceptor],
+    )
+
+    # Add plugin to client first
+    config = client.config()
+    config["plugins"] = [plugin]
+    new_client = Client(**config)
+
+    # Verify client interceptor was used
+    assert interceptor.client_intercepted, "Client interceptor should have been used"
+
+    # Reset the worker intercepted flag to test worker behavior
+    interceptor.worker_intercepted = False
+
+    # Create worker with the same plugin-enabled client
+    worker = Worker(
+        new_client,
+        task_queue="queue" + str(uuid.uuid4()),
+        activities=[never_run_activity],
+        workflows=[HelloWorkflow],
+    )
+
+    # The worker interceptor functionality should still work
+    # (regardless of whether it comes from client propagation or worker config)
+    assert interceptor.worker_intercepted, "Worker interceptor should have been used"
+
+    # Test execution-level duplication by running a workflow
+    async with new_worker(
+        new_client,
+        HelloWorkflow,
+        max_cached_workflows=0,
+    ) as worker:
+        # Start and complete a workflow
+        handle = await new_client.start_workflow(
+            HelloWorkflow.run,
+            "test",
+            id=f"counting-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "Hello, test!"
+
+        # The workflow interceptor should only be called ONCE, not twice
+        assert interceptor.call_count["execute_workflow"] == 1, (
+            f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+        )
+
+
+async def test_simple_plugin_no_duplication_when_interceptor_in_both_client_and_worker_params(
+    client: Client,
+) -> None:
+    """Test that when the same interceptor is provided to the unified interceptors
+    parameter in a SimplePlugin, it doesn't get duplicated."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the interceptor once to the unified parameter
+    plugin = SimplePlugin(
+        "TestCombinedPlugin",
+        interceptors=[interceptor],  # Single unified parameter
+    )
+
+    # Create worker with plugin (not on client)
+    worker = Worker(
+        client,
+        task_queue="queue" + str(uuid.uuid4()),
+        activities=[never_run_activity],
+        workflows=[HelloWorkflow],
+        plugins=[plugin],
+    )
+
+    # The worker interceptor functionality should work
+    assert interceptor.worker_intercepted, "Worker interceptor should have been used"
+
+    # Test execution-level duplication by running a workflow
+    async with worker:
+        # Start and complete a workflow
+        handle = await client.start_workflow(
+            HelloWorkflow.run,
+            "test",
+            id=f"counting-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "Hello, test!"
+
+        # The workflow interceptor should only be called ONCE, not twice
+        assert interceptor.call_count["execute_workflow"] == 1, (
+            f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+        )
+
+
+async def test_simple_plugin_no_duplication_in_interceptor_chain(
+    client: Client,
+) -> None:
+    """Test that interceptors don't get duplicated in the actual interceptor chain execution.
+    This catches the specific OpenTelemetry issue where the same interceptor method gets called twice."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the combined interceptor
+    plugin = SimplePlugin(
+        "CountingPlugin",
+        interceptors=[interceptor],
+    )
+
+    # Add plugin to client (like OpenTelemetryPlugin does)
+    config = client.config()
+    config["plugins"] = [plugin]
+    new_client = Client(**config)
+
+    # Create worker with the plugin-enabled client (plugin propagates from client)
+    async with new_worker(
+        new_client,
+        HelloWorkflow,
+        max_cached_workflows=0,
+    ) as worker:
+        # Start and complete a workflow
+        handle = await new_client.start_workflow(
+            HelloWorkflow.run,
+            "test",
+            id=f"counting-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "Hello, test!"
+
+        # The workflow interceptor should only be called ONCE, not twice
+        assert interceptor.call_count["execute_workflow"] == 1, (
+            f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in the chain."
+        )

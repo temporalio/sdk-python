@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import abc
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, AsyncIterator, Awaitable, Callable
+from typing import TYPE_CHECKING
 
 from temporalio.client import WorkflowHistory
 

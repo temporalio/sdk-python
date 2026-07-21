@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, IntEnum
-from typing import Any, Mapping, Optional, Union
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -814,8 +815,8 @@ async def test_start_update_with_start_empty_details(client: Client):
             req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, Union[str, bytes]] = {},
-            timeout: Optional[timedelta] = None,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
         ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
             raise self.empty_details_err
 
@@ -1103,3 +1104,84 @@ async def test_update_with_start_does_not_attach_to_non_completed_update_in_clos
         elif id_reuse_policy == WorkflowIDReusePolicy.REJECT_DUPLICATE:
             with pytest.raises(WorkflowAlreadyStartedError):
                 await _do_update()
+
+
+class MetadataCapturingInterceptor(Interceptor):
+    """Interceptor that sets rpc_metadata on update-with-start calls."""
+
+    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
+        return MetadataCapturingOutboundInterceptor(super().intercept_client(next))
+
+
+class MetadataCapturingOutboundInterceptor(OutboundInterceptor):
+    def __init__(self, next: OutboundInterceptor) -> None:
+        super().__init__(next)
+
+    async def start_update_with_start_workflow(
+        self, input: StartWorkflowUpdateWithStartInput
+    ) -> WorkflowUpdateHandle[Any]:
+        input.rpc_metadata = {
+            **input.rpc_metadata,
+            "test-header-key": "test-header-value",
+        }
+        return await super().start_update_with_start_workflow(input)
+
+
+# Verify fix for https://github.com/temporalio/sdk-python/issues/1582
+async def test_update_with_start_rpc_metadata_and_timeout_forwarded(client: Client):
+    """Test that rpc_metadata and rpc_timeout on StartWorkflowUpdateWithStartInput
+    are forwarded to the execute_multi_operation gRPC call."""
+    captured_metadata: dict[str, str | bytes] = {}
+    captured_timeout: list[timedelta | None] = []
+
+    class execute_multi_operation:
+        err = RPCError("intentional", RPCStatusCode.INTERNAL, b"")
+        err._grpc_status = temporalio.api.common.v1.GrpcStatus(details=[])
+
+        def __init__(self) -> None:  # type: ignore[reportMissingSuperCall]
+            pass
+
+        async def __call__(
+            self,
+            req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
+            *,
+            retry: bool = False,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
+        ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
+            captured_metadata.update(metadata)
+            captured_timeout.append(timeout)
+            raise self.err
+
+    interceptor = MetadataCapturingInterceptor()
+    intercepted_client = Client(
+        **{**client.config(), "interceptors": [interceptor]}  # type: ignore
+    )
+
+    with patch.object(
+        intercepted_client.workflow_service,
+        "execute_multi_operation",
+        execute_multi_operation(),
+    ):
+        start_workflow_operation = WithStartWorkflowOperation(
+            UpdateWithStartInterceptorWorkflow.run,
+            "wf-arg",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue="tq",
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
+        with pytest.raises(RPCError):
+            await intercepted_client.start_update_with_start_workflow(
+                UpdateWithStartInterceptorWorkflow.my_update,
+                "update-arg",
+                start_workflow_operation=start_workflow_operation,
+                wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+                rpc_metadata={"original-key": "original-value"},
+                rpc_timeout=timedelta(seconds=42),
+            )
+
+    # The interceptor should have added its metadata on top of the caller's
+    assert captured_metadata.get("test-header-key") == "test-header-value"
+    assert captured_metadata.get("original-key") == "original-value"
+    # The caller's timeout should have been forwarded
+    assert captured_timeout == [timedelta(seconds=42)]

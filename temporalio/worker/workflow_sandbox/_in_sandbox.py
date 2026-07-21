@@ -6,13 +6,14 @@
 
 import dataclasses
 import logging
-from typing import Any, Optional, Type
+from typing import Any
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.converter
 import temporalio.worker._workflow_instance
 import temporalio.workflow
+from temporalio.converter._extstore import StorageDriverStoreContext
 from temporalio.worker import _command_aware_visitor
 
 logger = logging.getLogger(__name__)
@@ -32,8 +33,8 @@ class InSandbox:
     def __init__(
         self,
         instance_details: temporalio.worker._workflow_instance.WorkflowInstanceDetails,
-        runner_class: Type[temporalio.worker._workflow_instance.WorkflowRunner],
-        workflow_class: Type,
+        runner_class: type[temporalio.worker._workflow_instance.WorkflowRunner],
+        workflow_class: type,
     ) -> None:
         """Create in-sandbox instance."""
         _trace("Initializing workflow %s in sandbox", workflow_class)
@@ -84,7 +85,14 @@ class InSandbox:
 
     def get_serialization_context(
         self,
-        command_info: Optional[_command_aware_visitor.CommandInfo],
-    ) -> Optional[temporalio.converter.SerializationContext]:
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> temporalio.converter.SerializationContext | None:
         """Get serialization context."""
         return self.instance.get_serialization_context(command_info)
+
+    def get_external_store_context(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> StorageDriverStoreContext:
+        """Get store context for external storage."""
+        return self.instance.get_external_store_context(command_info)

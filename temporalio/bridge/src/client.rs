@@ -3,25 +3,24 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
-use temporal_client::{
-    ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
-    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryConfig,
-    TemporalServiceClientWithMetrics, TlsConfig,
+use temporalio_client::tonic::{
+    self,
+    metadata::{AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue},
 };
-use tonic::metadata::{
-    AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue,
+use temporalio_client::{
+    ClientKeepAliveOptions as CoreClientKeepAliveConfig, Connection, ConnectionOptions,
+    DnsLoadBalancingOptions, GrpcCompression, HttpConnectProxyOptions, RetryOptions,
 };
+use tracing::warn;
 use url::Url;
 
 use crate::runtime;
 
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
-
 #[pyclass]
 pub struct ClientRef {
-    pub(crate) retry_client: Client,
+    pub(crate) connection: Connection,
     pub(crate) runtime: runtime::Runtime,
 }
 
@@ -37,6 +36,8 @@ pub struct ClientConfig {
     retry_config: Option<ClientRetryConfig>,
     keep_alive_config: Option<ClientKeepAliveConfig>,
     http_connect_proxy_config: Option<ClientHttpConnectProxyConfig>,
+    dns_load_balancing_config: Option<ClientDnsLoadBalancingConfig>,
+    grpc_compression: String,
 }
 
 #[derive(FromPyObject)]
@@ -70,6 +71,11 @@ struct ClientHttpConnectProxyConfig {
 }
 
 #[derive(FromPyObject)]
+struct ClientDnsLoadBalancingConfig {
+    pub resolution_interval_millis: u64,
+}
+
+#[derive(FromPyObject)]
 pub(crate) struct RpcCall {
     pub(crate) rpc: String,
     req: Vec<u8>,
@@ -91,12 +97,17 @@ pub fn connect_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: ClientConfig,
 ) -> PyResult<Bound<'a, PyAny>> {
-    let opts: ClientOptions = config.try_into()?;
+    let metrics_meter = runtime_ref
+        .runtime
+        .core
+        .telemetry()
+        .get_temporal_metric_meter();
+    let opts = config.into_connection_options(metrics_meter)?;
+    runtime_ref.runtime.assert_same_process("create client")?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(ClientRef {
-            retry_client: opts
-                .connect_no_namespace(runtime.core.telemetry().get_temporal_metric_meter())
+            connection: Connection::connect(opts)
                 .await
                 .map_err(|err| PyRuntimeError::new_err(format!("Failed client connect: {err}")))?,
             runtime,
@@ -106,11 +117,16 @@ pub fn connect_client<'a>(
 
 #[macro_export]
 macro_rules! rpc_call {
-    ($retry_client:ident, $call:ident, $trait:tt, $call_name:ident) => {
+    ($connection:ident, $call:ident, $trait:tt, $service_method:ident, $call_name:ident) => {
         if $call.retry {
-            rpc_resp($trait::$call_name(&mut $retry_client, rpc_req($call)?).await)
+            rpc_resp($trait::$call_name(&mut $connection, rpc_req($call)?).await)
         } else {
-            rpc_resp($trait::$call_name(&mut $retry_client.into_inner(), rpc_req($call)?).await)
+            rpc_resp(
+                $connection
+                    .$service_method()
+                    .$call_name(rpc_req($call)?)
+                    .await,
+            )
         }
     };
 }
@@ -120,12 +136,10 @@ impl ClientRef {
     fn update_metadata(&self, headers: HashMap<String, RpcMetadataValue>) -> PyResult<()> {
         let (ascii_headers, binary_headers) = partition_headers(headers);
 
-        self.retry_client
-            .get_client()
+        self.connection
             .set_headers(ascii_headers)
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
-        self.retry_client
-            .get_client()
+        self.connection
             .set_binary_headers(binary_headers)
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
@@ -133,7 +147,7 @@ impl ClientRef {
     }
 
     fn update_api_key(&self, api_key: Option<String>) {
-        self.retry_client.get_client().set_api_key(api_key);
+        self.connection.set_api_key(api_key);
     }
 }
 
@@ -183,7 +197,7 @@ where
     match res {
         Ok(resp) => Ok(resp.get_ref().encode_to_vec()),
         Err(err) => {
-            Python::with_gil(move |py| {
+            Python::attach(move |py| {
                 // Create tuple of "status", "message", and optional "details"
                 let code = err.code() as u32;
                 let message = err.message().to_owned();
@@ -223,51 +237,71 @@ fn partition_headers(
     (ascii_headers, binary_headers)
 }
 
-impl TryFrom<ClientConfig> for ClientOptions {
-    type Error = PyErr;
-
-    fn try_from(opts: ClientConfig) -> PyResult<Self> {
-        let mut gateway_opts = ClientOptionsBuilder::default();
-        let (ascii_headers, binary_headers) = partition_headers(opts.metadata);
-        gateway_opts
-            .target_url(
-                Url::parse(&opts.target_url)
-                    .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
-            )
-            .client_name(opts.client_name)
-            .client_version(opts.client_version)
-            .identity(opts.identity)
-            .retry_config(
-                opts.retry_config
-                    .map_or(RetryConfig::default(), |c| c.into()),
-            )
-            .keep_alive(opts.keep_alive_config.map(Into::into))
-            .http_connect_proxy(opts.http_connect_proxy_config.map(Into::into))
-            .headers(Some(ascii_headers))
-            .binary_headers(Some(binary_headers))
-            .api_key(opts.api_key);
-        // Builder does not allow us to set option here, so we have to make
-        // a conditional to even call it
-        if let Some(tls_config) = opts.tls_config {
-            gateway_opts.tls_cfg(tls_config.try_into()?);
-        }
-        gateway_opts
-            .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {err}")))
+impl ClientConfig {
+    fn into_connection_options(
+        self,
+        metrics_meter: Option<temporalio_common::telemetry::metrics::TemporalMeter>,
+    ) -> PyResult<ConnectionOptions> {
+        let (ascii_headers, binary_headers) = partition_headers(self.metadata);
+        let has_proxy = self.http_connect_proxy_config.is_some();
+        // Core rejects DNS load balancing alongside an HTTP CONNECT proxy, so
+        // suppress DNS LB whenever a proxy is configured to keep the
+        // pre-existing behavior even if a caller leaves the default.
+        let dns_load_balancing = if has_proxy {
+            warn!("Disabling DNS load balancing because http_connect_proxy_config is set");
+            None
+        } else {
+            self.dns_load_balancing_config.map(Into::into)
+        };
+        let conn_opts = ConnectionOptions::new(
+            Url::parse(&self.target_url)
+                .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
+        )
+        .client_name(self.client_name)
+        .client_version(self.client_version)
+        .identity(self.identity)
+        .retry_options(
+            self.retry_config
+                .map_or(RetryOptions::default(), |c| c.into()),
+        )
+        .keep_alive(self.keep_alive_config.map(Into::into))
+        .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
+        .dns_load_balancing(dns_load_balancing)
+        .grpc_compression(grpc_compression_from_str(&self.grpc_compression)?)
+        .headers(ascii_headers)
+        .binary_headers(binary_headers)
+        .maybe_api_key(self.api_key)
+        .maybe_tls_options(if let Some(tls_config) = self.tls_config {
+            Some(tls_config.try_into()?)
+        } else {
+            None
+        })
+        .maybe_metrics_meter(metrics_meter);
+        Ok(conn_opts.build())
     }
 }
 
-impl TryFrom<ClientTlsConfig> for temporal_client::TlsConfig {
+fn grpc_compression_from_str(value: &str) -> PyResult<GrpcCompression> {
+    match value {
+        "none" => Ok(GrpcCompression::None),
+        "gzip" => Ok(GrpcCompression::Gzip),
+        _ => Err(PyValueError::new_err(format!(
+            "invalid grpc_compression: {value}"
+        ))),
+    }
+}
+
+impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
     type Error = PyErr;
 
     fn try_from(conf: ClientTlsConfig) -> PyResult<Self> {
-        Ok(TlsConfig {
+        Ok(temporalio_client::TlsOptions {
             server_root_ca_cert: conf.server_root_ca_cert,
             domain: conf.domain,
-            client_tls_config: match (conf.client_cert, conf.client_private_key) {
+            client_tls_options: match (conf.client_cert, conf.client_private_key) {
                 (None, None) => None,
                 (Some(client_cert), Some(client_private_key)) => {
-                    Some(temporal_client::ClientTlsConfig {
+                    Some(temporalio_client::ClientTlsOptions {
                         client_cert,
                         client_private_key,
                     })
@@ -278,13 +312,14 @@ impl TryFrom<ClientTlsConfig> for temporal_client::TlsConfig {
                     ))
                 }
             },
+            server_cert_verifier: None,
         })
     }
 }
 
-impl From<ClientRetryConfig> for RetryConfig {
+impl From<ClientRetryConfig> for RetryOptions {
     fn from(conf: ClientRetryConfig) -> Self {
-        RetryConfig {
+        RetryOptions {
             initial_interval: Duration::from_millis(conf.initial_interval_millis),
             randomization_factor: conf.randomization_factor,
             multiplier: conf.multiplier,
@@ -310,5 +345,13 @@ impl From<ClientHttpConnectProxyConfig> for HttpConnectProxyOptions {
             target_addr: conf.target_host,
             basic_auth: conf.basic_auth,
         }
+    }
+}
+
+impl From<ClientDnsLoadBalancingConfig> for DnsLoadBalancingOptions {
+    fn from(conf: ClientDnsLoadBalancingConfig) -> Self {
+        let mut opts = DnsLoadBalancingOptions::default();
+        opts.resolution_interval = Duration::from_millis(conf.resolution_interval_millis);
+        opts
     }
 }

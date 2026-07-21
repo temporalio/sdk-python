@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import pathlib
-import sys
 from dataclasses import dataclass
-from typing import ClassVar, Dict, Optional
+from typing import ClassVar
 
 import pytest
 
@@ -13,27 +12,7 @@ from temporalio.worker.workflow_sandbox._restrictions import (
     SandboxMatcher,
     SandboxRestrictions,
     _RestrictedProxy,
-    _stdlib_module_names,
 )
-
-
-def test_workflow_sandbox_stdlib_module_names():
-    if sys.version_info[1] != 11:
-        pytest.skip("Test only runs on 3.11")
-    actual_names = ",".join(sorted(sys.stdlib_module_names))
-    # Uncomment to print code for generating these
-    code_lines = [""]
-    for mod_name in sorted(sys.stdlib_module_names):
-        if code_lines[-1]:
-            code_lines[-1] += ","
-        if len(code_lines[-1]) > 80:
-            code_lines.append("")
-        code_lines[-1] += mod_name
-    code = '_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
-    # TODO(cretz): Point releases may add modules :-(
-    assert (
-        actual_names == _stdlib_module_names
-    ), f"Expecting names as {actual_names}. In code as:\n{code}"
 
 
 def test_workflow_sandbox_restrictions_add_passthrough_modules():
@@ -46,12 +25,12 @@ def test_workflow_sandbox_restrictions_add_passthrough_modules():
 
 @dataclass
 class RestrictableObject:
-    foo: Optional[RestrictableObject] = None
+    foo: RestrictableObject | None = None
     bar: int = 42
     baz: ClassVar[int] = 57
     qux: ClassVar[RestrictableObject]
 
-    some_dict: Optional[Dict] = None
+    some_dict: dict | None = None
 
 
 RestrictableObject.qux = RestrictableObject(foo=RestrictableObject(bar=70), bar=80)

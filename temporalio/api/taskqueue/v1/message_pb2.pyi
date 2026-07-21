@@ -86,8 +86,6 @@ class TaskQueueMetadata(google.protobuf.message.Message):
 global___TaskQueueMetadata = TaskQueueMetadata
 
 class TaskQueueVersioningInfo(google.protobuf.message.Message):
-    """Experimental. Worker Deployments are experimental and might significantly change in the future."""
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CURRENT_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
@@ -897,6 +895,25 @@ global___TimestampedCompatibleBuildIdRedirectRule = (
     TimestampedCompatibleBuildIdRedirectRule
 )
 
+class PollerGroupInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    WEIGHT_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    weight: builtins.float
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        weight: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["id", b"id", "weight", b"weight"]
+    ) -> None: ...
+
+global___PollerGroupInfo = PollerGroupInfo
+
 class PollerScalingDecision(google.protobuf.message.Message):
     """Attached to task responses to give hints to the SDK about how it may adjust its number of
     pollers.
@@ -1019,19 +1036,45 @@ global___RateLimitConfig = RateLimitConfig
 class TaskQueueConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class FairnessWeightOverridesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.float
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.float = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
     QUEUE_RATE_LIMIT_FIELD_NUMBER: builtins.int
     FAIRNESS_KEYS_RATE_LIMIT_DEFAULT_FIELD_NUMBER: builtins.int
+    FAIRNESS_WEIGHT_OVERRIDES_FIELD_NUMBER: builtins.int
     @property
     def queue_rate_limit(self) -> global___RateLimitConfig:
         """Unless modified, this is the system-defined rate limit."""
     @property
     def fairness_keys_rate_limit_default(self) -> global___RateLimitConfig:
         """If set, each individual fairness key will be limited to this rate, scaled by the weight of the fairness key."""
+    @property
+    def fairness_weight_overrides(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.float]:
+        """If set, overrides the fairness weights for the corresponding fairness keys."""
     def __init__(
         self,
         *,
         queue_rate_limit: global___RateLimitConfig | None = ...,
         fairness_keys_rate_limit_default: global___RateLimitConfig | None = ...,
+        fairness_weight_overrides: collections.abc.Mapping[builtins.str, builtins.float]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1047,6 +1090,8 @@ class TaskQueueConfig(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "fairness_keys_rate_limit_default",
             b"fairness_keys_rate_limit_default",
+            "fairness_weight_overrides",
+            b"fairness_weight_overrides",
             "queue_rate_limit",
             b"queue_rate_limit",
         ],

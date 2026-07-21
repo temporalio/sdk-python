@@ -42,10 +42,12 @@ class _WorkflowIdReusePolicyEnumTypeWrapper(
     could potentially change the policy, allowing re-use of the workflow id.
     """
     WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING: _WorkflowIdReusePolicy.ValueType  # 4
-    """This option belongs in WorkflowIdConflictPolicy but is here for backwards compatibility.
-    If specified, it acts like ALLOW_DUPLICATE, but also the WorkflowId*Conflict*Policy on
-    the request is treated as WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING.
-    If no running workflow, then the behavior is the same as ALLOW_DUPLICATE.
+    """Terminate the current Workflow if one is already running; otherwise allow reusing the
+    Workflow ID. When using this option, `WorkflowIdConflictPolicy` must be left unspecified.
+
+    Deprecated. Instead, set `WorkflowIdReusePolicy` to `ALLOW_DUPLICATE` and
+    `WorkflowIdConflictPolicy` to `TERMINATE_EXISTING`. Note that `WorkflowIdConflictPolicy`
+    requires Temporal Server v1.24.0 or later.
     """
 
 class WorkflowIdReusePolicy(
@@ -71,10 +73,12 @@ WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE: WorkflowIdReusePolicy.ValueType  # 3
 could potentially change the policy, allowing re-use of the workflow id.
 """
 WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING: WorkflowIdReusePolicy.ValueType  # 4
-"""This option belongs in WorkflowIdConflictPolicy but is here for backwards compatibility.
-If specified, it acts like ALLOW_DUPLICATE, but also the WorkflowId*Conflict*Policy on
-the request is treated as WORKFLOW_ID_CONFLICT_POLICY_TERMINATE_EXISTING.
-If no running workflow, then the behavior is the same as ALLOW_DUPLICATE.
+"""Terminate the current Workflow if one is already running; otherwise allow reusing the
+Workflow ID. When using this option, `WorkflowIdConflictPolicy` must be left unspecified.
+
+Deprecated. Instead, set `WorkflowIdReusePolicy` to `ALLOW_DUPLICATE` and
+`WorkflowIdConflictPolicy` to `TERMINATE_EXISTING`. Note that `WorkflowIdConflictPolicy`
+requires Temporal Server v1.24.0 or later.
 """
 global___WorkflowIdReusePolicy = WorkflowIdReusePolicy
 
@@ -202,6 +206,7 @@ class _WorkflowExecutionStatusEnumTypeWrapper(
     WORKFLOW_EXECUTION_STATUS_TERMINATED: _WorkflowExecutionStatus.ValueType  # 5
     WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW: _WorkflowExecutionStatus.ValueType  # 6
     WORKFLOW_EXECUTION_STATUS_TIMED_OUT: _WorkflowExecutionStatus.ValueType  # 7
+    WORKFLOW_EXECUTION_STATUS_PAUSED: _WorkflowExecutionStatus.ValueType  # 8
 
 class WorkflowExecutionStatus(
     _WorkflowExecutionStatus, metaclass=_WorkflowExecutionStatusEnumTypeWrapper
@@ -219,6 +224,7 @@ WORKFLOW_EXECUTION_STATUS_CANCELED: WorkflowExecutionStatus.ValueType  # 4
 WORKFLOW_EXECUTION_STATUS_TERMINATED: WorkflowExecutionStatus.ValueType  # 5
 WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW: WorkflowExecutionStatus.ValueType  # 6
 WORKFLOW_EXECUTION_STATUS_TIMED_OUT: WorkflowExecutionStatus.ValueType  # 7
+WORKFLOW_EXECUTION_STATUS_PAUSED: WorkflowExecutionStatus.ValueType  # 8
 global___WorkflowExecutionStatus = WorkflowExecutionStatus
 
 class _PendingActivityState:
@@ -376,9 +382,15 @@ class _VersioningBehaviorEnumTypeWrapper(
     with Unversioned workflows.
     """
     VERSIONING_BEHAVIOR_PINNED: _VersioningBehavior.ValueType  # 1
-    """Workflow will start on the Current Deployment Version of its Task Queue, and then
-    will be pinned to that same Deployment Version until completion (the Version that
-    this Workflow is pinned to is specified in `versioning_info.version`).
+    """Workflow will start on its Target Version and then will be pinned to that same Deployment
+    Version until completion (the Version that this Workflow is pinned to is specified in
+    `versioning_info.version` and is the Pinned Version of the Workflow).
+
+    The workflow's Target Version is the Current Version of its Task Queue, or, if the
+    Task Queue has a Ramping Version with non-zero Ramp Percentage `P`, the workflow's Target
+    Version has a P% chance of being the Ramping Version. Whether a workflow falls into the
+    Ramping group depends on its Workflow ID and and the Ramp Percentage.
+
     This behavior eliminates most of compatibility concerns users face when changing their code.
     Patching is not needed when pinned workflows code change.
     Can be overridden explicitly via `UpdateWorkflowExecutionOptions` API to move the
@@ -389,8 +401,13 @@ class _VersioningBehaviorEnumTypeWrapper(
     task queue.
     """
     VERSIONING_BEHAVIOR_AUTO_UPGRADE: _VersioningBehavior.ValueType  # 2
-    """Workflow will automatically move to the Current Deployment Version of its Task Queue when the
-    next workflow task is dispatched.
+    """Workflow will automatically move to its Target Version when the next workflow task is dispatched.
+
+    The workflow's Target Version is the Current Version of its Task Queue, or, if the
+    Task Queue has a Ramping Version with non-zero Ramp Percentage `P`, the workflow's Target
+    Version has a P% chance of being the Ramping Version. Whether a workflow falls into the
+    Ramping group depends on its Workflow ID and and the Ramp Percentage.
+
     AutoUpgrade behavior is suitable for long-running workflows as it allows them to move to the
     latest Deployment Version, but the user still needs to use Patching to keep the new code
     compatible with prior versions for changed workflow types.
@@ -398,11 +415,10 @@ class _VersioningBehaviorEnumTypeWrapper(
     execution (as specified in versioning_info.version based on the last completed
     workflow task). Exception to this would be when the activity Task Queue workers are not
     present in the workflow's Deployment Version, in which case, the activity will be sent to a
-    different Deployment Version according to the Current Deployment Version of its own task
-    queue.
-    Workflows stuck on a backlogged activity will still auto-upgrade if the Current Deployment
-    Version of their Task Queue changes, without having to wait for the backlogged activity to
-    complete on the old Version.
+    different Deployment Version according to the Current or Ramping Deployment Version of its own
+    Task Queue.
+    Workflows stuck on a backlogged activity will still auto-upgrade if their Target Version
+    changes, without having to wait for the backlogged activity to complete on the old Version.
     """
 
 class VersioningBehavior(
@@ -412,7 +428,6 @@ class VersioningBehavior(
     Versions. The Versioning Behavior of a workflow execution is typically specified by the worker
     who completes the first task of the execution, but is also overridable manually for new and
     existing workflows (see VersioningOverride).
-    Experimental. Worker Deployments are experimental and might significantly change in the future.
     """
 
 VERSIONING_BEHAVIOR_UNSPECIFIED: VersioningBehavior.ValueType  # 0
@@ -423,9 +438,15 @@ User needs to use Patching to keep the new code compatible with prior versions w
 with Unversioned workflows.
 """
 VERSIONING_BEHAVIOR_PINNED: VersioningBehavior.ValueType  # 1
-"""Workflow will start on the Current Deployment Version of its Task Queue, and then
-will be pinned to that same Deployment Version until completion (the Version that
-this Workflow is pinned to is specified in `versioning_info.version`).
+"""Workflow will start on its Target Version and then will be pinned to that same Deployment
+Version until completion (the Version that this Workflow is pinned to is specified in
+`versioning_info.version` and is the Pinned Version of the Workflow).
+
+The workflow's Target Version is the Current Version of its Task Queue, or, if the
+Task Queue has a Ramping Version with non-zero Ramp Percentage `P`, the workflow's Target
+Version has a P% chance of being the Ramping Version. Whether a workflow falls into the
+Ramping group depends on its Workflow ID and and the Ramp Percentage.
+
 This behavior eliminates most of compatibility concerns users face when changing their code.
 Patching is not needed when pinned workflows code change.
 Can be overridden explicitly via `UpdateWorkflowExecutionOptions` API to move the
@@ -436,8 +457,13 @@ Version, in which case the activity will be sent to the Current Deployment Versi
 task queue.
 """
 VERSIONING_BEHAVIOR_AUTO_UPGRADE: VersioningBehavior.ValueType  # 2
-"""Workflow will automatically move to the Current Deployment Version of its Task Queue when the
-next workflow task is dispatched.
+"""Workflow will automatically move to its Target Version when the next workflow task is dispatched.
+
+The workflow's Target Version is the Current Version of its Task Queue, or, if the
+Task Queue has a Ramping Version with non-zero Ramp Percentage `P`, the workflow's Target
+Version has a P% chance of being the Ramping Version. Whether a workflow falls into the
+Ramping group depends on its Workflow ID and and the Ramp Percentage.
+
 AutoUpgrade behavior is suitable for long-running workflows as it allows them to move to the
 latest Deployment Version, but the user still needs to use Patching to keep the new code
 compatible with prior versions for changed workflow types.
@@ -445,10 +471,142 @@ Activities of `AUTO_UPGRADE` workflows are sent to the Deployment Version of the
 execution (as specified in versioning_info.version based on the last completed
 workflow task). Exception to this would be when the activity Task Queue workers are not
 present in the workflow's Deployment Version, in which case, the activity will be sent to a
-different Deployment Version according to the Current Deployment Version of its own task
-queue.
-Workflows stuck on a backlogged activity will still auto-upgrade if the Current Deployment
-Version of their Task Queue changes, without having to wait for the backlogged activity to
-complete on the old Version.
+different Deployment Version according to the Current or Ramping Deployment Version of its own
+Task Queue.
+Workflows stuck on a backlogged activity will still auto-upgrade if their Target Version
+changes, without having to wait for the backlogged activity to complete on the old Version.
 """
 global___VersioningBehavior = VersioningBehavior
+
+class _ContinueAsNewVersioningBehavior:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ContinueAsNewVersioningBehaviorEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _ContinueAsNewVersioningBehavior.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED: (
+        _ContinueAsNewVersioningBehavior.ValueType
+    )  # 0
+    CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE: (
+        _ContinueAsNewVersioningBehavior.ValueType
+    )  # 1
+    """Experimental.
+    Start the new run with AutoUpgrade behavior. Use the Target Version of the workflow's task queue at
+    start-time, as AutoUpgrade workflows do. After the first workflow task completes, use whatever
+    Versioning Behavior the workflow is annotated with in the workflow code.
+
+    Note that if the workflow being continued has a Pinned override, that override will be inherited by the
+    new workflow run regardless of the ContinueAsNewVersioningBehavior specified in the continue-as-new
+    command. Versioning Override always takes precedence until it's removed manually via UpdateWorkflowExecutionOptions.
+    """
+    CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION: (
+        _ContinueAsNewVersioningBehavior.ValueType
+    )  # 2
+    """Experimental.
+    Use the Ramping Version of the workflow's task queue at start time, regardless of the workflow's
+    Target Version (according to f(workflow_id, ramp_percentage)). After the first workflow task completes,
+    the workflow will use whatever Versioning Behavior it is annotated with. If there is no Ramping
+    Version by the time that the first workflow task is dispatched, it will be sent to the Current Version.
+
+    It is highly discouraged to use this if the workflow is annotated with AutoUpgrade behavior, because
+    this setting ONLY applies to the first task of the workflow. If, after the first task, the workflow
+    is AutoUpgrade, it will behave like a normal AutoUpgrade workflow and go to the Target Version, which
+    may be the Current Version instead of the Ramping Version.
+
+    Note that if the workflow being continued has a Pinned override, that override will be inherited by the
+    new workflow run regardless of the ContinueAsNewVersioningBehavior specified in the continue-as-new
+    command. Versioning Override always takes precedence until it's removed manually via UpdateWorkflowExecutionOptions.
+    """
+
+class ContinueAsNewVersioningBehavior(
+    _ContinueAsNewVersioningBehavior,
+    metaclass=_ContinueAsNewVersioningBehaviorEnumTypeWrapper,
+):
+    """Experimental. Defines the versioning behavior to be used by the first task of a new workflow run in a continue-as-new chain."""
+
+CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED: (
+    ContinueAsNewVersioningBehavior.ValueType
+)  # 0
+CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE: (
+    ContinueAsNewVersioningBehavior.ValueType
+)  # 1
+"""Experimental.
+Start the new run with AutoUpgrade behavior. Use the Target Version of the workflow's task queue at
+start-time, as AutoUpgrade workflows do. After the first workflow task completes, use whatever
+Versioning Behavior the workflow is annotated with in the workflow code.
+
+Note that if the workflow being continued has a Pinned override, that override will be inherited by the
+new workflow run regardless of the ContinueAsNewVersioningBehavior specified in the continue-as-new
+command. Versioning Override always takes precedence until it's removed manually via UpdateWorkflowExecutionOptions.
+"""
+CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION: (
+    ContinueAsNewVersioningBehavior.ValueType
+)  # 2
+"""Experimental.
+Use the Ramping Version of the workflow's task queue at start time, regardless of the workflow's
+Target Version (according to f(workflow_id, ramp_percentage)). After the first workflow task completes,
+the workflow will use whatever Versioning Behavior it is annotated with. If there is no Ramping
+Version by the time that the first workflow task is dispatched, it will be sent to the Current Version.
+
+It is highly discouraged to use this if the workflow is annotated with AutoUpgrade behavior, because
+this setting ONLY applies to the first task of the workflow. If, after the first task, the workflow
+is AutoUpgrade, it will behave like a normal AutoUpgrade workflow and go to the Target Version, which
+may be the Current Version instead of the Ramping Version.
+
+Note that if the workflow being continued has a Pinned override, that override will be inherited by the
+new workflow run regardless of the ContinueAsNewVersioningBehavior specified in the continue-as-new
+command. Versioning Override always takes precedence until it's removed manually via UpdateWorkflowExecutionOptions.
+"""
+global___ContinueAsNewVersioningBehavior = ContinueAsNewVersioningBehavior
+
+class _SuggestContinueAsNewReason:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _SuggestContinueAsNewReasonEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _SuggestContinueAsNewReason.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED: (
+        _SuggestContinueAsNewReason.ValueType
+    )  # 0
+    SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE: (
+        _SuggestContinueAsNewReason.ValueType
+    )  # 1
+    """Workflow History size is getting too large."""
+    SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS: (
+        _SuggestContinueAsNewReason.ValueType
+    )  # 2
+    """Workflow History event count is getting too large."""
+    SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES: (
+        _SuggestContinueAsNewReason.ValueType
+    )  # 3
+    """Workflow's count of completed plus in-flight updates is too large."""
+
+class SuggestContinueAsNewReason(
+    _SuggestContinueAsNewReason, metaclass=_SuggestContinueAsNewReasonEnumTypeWrapper
+):
+    """SuggestContinueAsNewReason specifies why SuggestContinueAsNew is true."""
+
+SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED: SuggestContinueAsNewReason.ValueType  # 0
+SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE: (
+    SuggestContinueAsNewReason.ValueType
+)  # 1
+"""Workflow History size is getting too large."""
+SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS: (
+    SuggestContinueAsNewReason.ValueType
+)  # 2
+"""Workflow History event count is getting too large."""
+SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES: (
+    SuggestContinueAsNewReason.ValueType
+)  # 3
+"""Workflow's count of completed plus in-flight updates is too large."""
+global___SuggestContinueAsNewReason = SuggestContinueAsNewReason

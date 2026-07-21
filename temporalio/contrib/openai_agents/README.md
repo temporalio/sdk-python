@@ -1,8 +1,6 @@
 # OpenAI Agents SDK Integration for Temporal
 
-⚠️ **Public Preview** - The interface to this module is subject to change prior to General Availability.
 We welcome questions and feedback in the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
-
 
 ## Introduction
 
@@ -14,14 +12,15 @@ Temporal provides a crash-proof system foundation, taking care of the distribute
 OpenAI Agents SDK offers a lightweight yet powerful framework for defining those agents.
 
 This document is organized as follows:
- - **[Hello World Durable Agent](#hello-world-durable-agent).** Your first durable agent example.
- - **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
- - **[Full Example](#full-example)** Running the Hello World Durable Agent example.
- - **[Tool Calling](#tool-calling).** Calling agent Tools in Temporal.
- - **[Feature Support](#feature-support).** Compatibility matrix.
+
+- **[Hello World Durable Agent](#hello-world-durable-agent).** Your first durable agent example.
+- **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
+- **[Full Example](#full-example)** Running the Hello World Durable Agent example.
+- **[Tool Calling](#tool-calling).** Calling agent Tools in Temporal.
+- **[Sandbox Support](#sandbox-support).** Running sandbox agents in Temporal.
+- **[Feature Support](#feature-support).** Compatibility matrix.
 
 The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains examples including basic usage, common agent patterns, and more complete samples.
-
 
 ## Hello World Durable Agent
 
@@ -54,7 +53,6 @@ The `@workflow.defn` annotation on the `HelloWorldAgent` indicates that this cla
 We use the `Agent` class from OpenAI Agents SDK to define a simple agent, instructing it to always respond with haikus.
 We then run that agent, using the `Runner` class from OpenAI Agents SDK, passing through `prompt` as an argument.
 
-
 We will [complete this example below](#full-example).
 Before digging further into the code, we will review some background that will make it easier to understand.
 
@@ -70,13 +68,13 @@ In the OpenAI Agents SDK, an agent is an AI model configured with instructions, 
 
 We describe each of these briefly:
 
-- *AI model*. An LLM such as OpenAI's GPT, Google's Gemini, or one of many others.
-- *Instructions*. Also known as a system prompt, the instructions contain the initial input to the model, which configures it for the job it will do.
-- *Tools*. Typically, Python functions that the model may choose to invoke. Tools are functions with text-descriptions that explain their functionality to the model.
-- *MCP servers*. Best known for providing tools, MCP offers a pluggable standard for interoperability, including file-like resources, prompt templates, and human approvals. MCP servers may be accessed over the network or run in a local process.
-- *Guardrails*. Checks on the input or the output of an agent to ensure compliance or safety. Guardrails may be implemented as regular code or as AI agents.
-- *Handoffs*. A handoff occurs when an agent delegates a task to another agent. During a handoff the conversation history remains the same, and passes to a new agent with its own model, instructions, tools.
-- *Context*. This is an overloaded term. Here, context refers to a framework object that is shared across tools and other code, but is not passed to the model.
+- _AI model_. An LLM such as OpenAI's GPT, Google's Gemini, or one of many others.
+- _Instructions_. Also known as a system prompt, the instructions contain the initial input to the model, which configures it for the job it will do.
+- _Tools_. Typically, Python functions that the model may choose to invoke. Tools are functions with text-descriptions that explain their functionality to the model.
+- _MCP servers_. Best known for providing tools, MCP offers a pluggable standard for interoperability, including file-like resources, prompt templates, and human approvals. MCP servers may be accessed over the network or run in a local process.
+- _Guardrails_. Checks on the input or the output of an agent to ensure compliance or safety. Guardrails may be implemented as regular code or as AI agents.
+- _Handoffs_. A handoff occurs when an agent delegates a task to another agent. During a handoff the conversation history remains the same, and passes to a new agent with its own model, instructions, tools.
+- _Context_. This is an overloaded term. Here, context refers to a framework object that is shared across tools and other code, but is not passed to the model.
 
 Now, let's see how these components work together.
 In a common pattern, the model first receives user input and then reasons about which tool to invoke.
@@ -126,22 +124,21 @@ As the program makes progress, Temporal saves key inputs and decisions, allowing
 
 The key to making this work is to separate the applications repeatable (deterministic) and non-repeatable (non-deterministic) parts:
 
-1. Deterministic pieces, termed *workflows*, execute the same way when re-run with the same inputs.
-2. Non-deterministic pieces, termed *activities*, can run arbitrary code, performing I/O and any other operations.
+1. Deterministic pieces, termed _workflows_, execute the same way when re-run with the same inputs.
+2. Non-deterministic pieces, termed _activities_, can run arbitrary code, performing I/O and any other operations.
 
 Workflow code can run for extended periods and, if interrupted, resume exactly where it left off.
 Activity code faces no restrictions on I/O or external interactions, but if it fails part-way through it restarts from the beginning.
 
 In the AI-agent example above, model invocations and tool calls run inside activities, while the logic that coordinates them lives in the workflow.
 This pattern generalizes to more sophisticated agents.
-We refer to that coordinating logic as *agent orchestration*.
+We refer to that coordinating logic as _agent orchestration_.
 
 As a general rule, agent orchestration code executes within the Temporal workflow, whereas model calls and any I/O-bound tool invocations execute as Temporal activities.
 
 The diagram below shows the overall architecture of an agentic application in Temporal.
 The Temporal Server is responsible to tracking program execution and making sure associated state is preserved reliably (i.e., stored to a database, possibly replicated across cloud regions).
 Temporal Server manages data in encrypted form, so all data processing occurs on the Worker, which runs the workflow and activities.
-
 
 ```text
             +---------------------+
@@ -172,16 +169,13 @@ Temporal Server manages data in encrypted form, so all data processing occurs on
       [External APIs, services, databases, etc.]
 ```
 
-
 See the [Temporal documentation](https://docs.temporal.io/evaluate/understanding-temporal#temporal-application-the-building-blocks) for more information.
-
 
 ## Complete Example
 
 To make the [Hello World durable agent](#hello-world-durable-agent) shown earlier available in Temporal, we need to create a worker program.
 To see it run, we also need a client to launch it.
 We show these files below.
-
 
 ### File 2: Launch Worker (`run_worker.py`)
 
@@ -225,11 +219,11 @@ if __name__ == "__main__":
 
 We use the `OpenAIAgentsPlugin` to configure Temporal for use with OpenAI Agents SDK.
 The plugin automatically handles several important setup tasks:
+
 - Ensures proper serialization of Pydantic types
 - Propagates context for [OpenAI Agents tracing](https://openai.github.io/openai-agents-python/tracing/).
 - Registers an activity for invoking model calls with the Temporal worker.
 - Configures OpenAI Agents SDK to run model calls as Temporal activities.
-
 
 ### File 3: Client Execution (`run_hello_world_workflow.py`)
 
@@ -257,7 +251,8 @@ async def main():
         "Tell me about recursion in programming.",
         id="my-workflow-id",
         task_queue="my-task-queue",
-        id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+        id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
     )
     print(f"Result: {result}")
 
@@ -267,7 +262,6 @@ if __name__ == "__main__":
 
 This file is a standard Temporal launch script.
 We also configure the client with the `OpenAIAgentsPlugin` to ensure serialization is compatible with the worker.
-
 
 To run this example, see the detailed instructions in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
 
@@ -308,7 +302,7 @@ class WeatherAgent:
             instructions="You are a helpful weather agent.",
             tools=[
                 openai_agents.workflow.activity_as_tool(
-                    get_weather, 
+                    get_weather,
                     start_to_close_timeout=timedelta(seconds=10)
                 )
             ],
@@ -349,7 +343,6 @@ Note that any tools that run in the workflow must respect the workflow execution
 Of course, code running in the workflow can invoke a Temporal activity at any time.
 
 Tools that run in the workflow can also update OpenAI Agents context, which is read-only for tools run as Temporal activities.
-
 
 ## MCP Support
 
@@ -434,13 +427,13 @@ class FileSystemWorkflow:
     async def run(self, query: str) -> str:
         # Reference the MCP server by name (matches name in worker configuration)
         server = openai_agents.workflow.stateless_mcp_server("FileSystemServer")
-        
+
         agent = Agent(
             name="File Assistant",
             instructions="Use the filesystem tools to read files and answer questions.",
             mcp_servers=[server],
         )
-        
+
         result = await Runner.run(agent, input=query)
         return result.final_output
 ```
@@ -458,27 +451,222 @@ To recover from such failures, you need to implement your own application-level 
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
 
+## Sandbox Support
+
+⚠️ **Pre-release** - This functionality is subject to change prior to General Availability.
+
+The sandbox integration lets `SandboxAgent` from the OpenAI Agents SDK execute inside a remote or local sandbox (Daytona, Docker, E2B, local Unix, etc.) while keeping all coordination durable in Temporal.
+
+Every sandbox operation — creating a session, running commands, reading/writing files, PTY interactions — is dispatched as a Temporal activity. This means sandbox work is fully observable, retryable, and recoverable like any other activity, and sandbox session state is serialized with the workflow so it survives worker restarts.
+
+### Architecture
+
+```text
+Workflow Code
+  ↓
+temporal_sandbox_client("daytona")   [returns TemporalSandboxClient]
+  ↓
+SandboxAgent.run(run_config=RunConfig(sandbox=SandboxRunConfig(client=...)))
+  ↓
+sandbox agent calls session.exec / session.read / session.write / …
+  ↓
+TemporalSandboxSession routes each call as a Temporal activity
+("daytona-sandbox_session_exec", "daytona-sandbox_session_read", …)
+  ↓
+SandboxClientProvider activities on the worker call the real sandbox client
+  ↓
+Actual sandbox backend (Daytona, Docker, local, …)
+```
+
+### Worker Configuration
+
+Register one or more `SandboxClientProvider` instances with the plugin. Each provider pairs a unique name with a real `BaseSandboxClient` implementation. The plugin automatically registers all required activities on the worker.
+
+```python
+import asyncio
+import docker
+from temporalio.client import Client
+from temporalio.worker import Worker
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, SandboxClientProvider, ModelActivityParameters
+from agents.extensions.sandbox.daytona import DaytonaSandboxClient
+from agents.extensions.sandbox.unix_local import UnixLocalSandboxClient
+
+async def main():
+    client = await Client.connect(
+        "localhost:7233",
+        plugins=[
+            OpenAIAgentsPlugin(
+                model_params=ModelActivityParameters(
+                    start_to_close_timeout=timedelta(seconds=30)
+                ),
+                sandbox_clients=[
+                    SandboxClientProvider("daytona", DaytonaSandboxClient()),
+                    SandboxClientProvider("local", UnixLocalSandboxClient()),
+                ],
+            ),
+        ],
+    )
+
+    worker = Worker(
+        client,
+        task_queue="my-task-queue",
+        workflows=[MyWorkflow],
+    )
+    await worker.run()
+```
+
+Provider names must be unique. Each name becomes the prefix for that backend's activities, allowing multiple backends to coexist on a single worker.
+
+### Workflow Usage
+
+In the workflow, use `temporal_sandbox_client()` to create a reference to a registered backend by name. Pass it to `SandboxRunConfig` inside `RunConfig`:
+
+```python
+from temporalio import workflow
+from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
+from agents import Runner
+from agents.sandbox import SandboxAgent, SandboxRunConfig
+from agents.run import RunConfig
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        agent = SandboxAgent(
+            name="Coding Assistant",
+            instructions="You are a helpful coding assistant with access to a sandbox.",
+        )
+
+        result = await Runner.run(
+            agent,
+            prompt,
+            run_config=RunConfig(
+                sandbox=SandboxRunConfig(
+                    client=temporal_sandbox_client("daytona"),
+                    options=DaytonaSandboxClientOptions(pause_on_exit=False),
+                ),
+            ),
+        )
+        return result.final_output
+```
+
+The name passed to `temporal_sandbox_client()` must exactly match the name used in `SandboxClientProvider` on the worker.
+
+### Multiple Backends
+
+A single workflow can target different backends by name. Register all backends on the worker and reference each by name in the workflow:
+
+```python
+# Run a task on the "daytona" backend
+result = await Runner.run(
+    agent, prompt,
+    run_config=RunConfig(sandbox=SandboxRunConfig(
+        client=temporal_sandbox_client("daytona"),
+        options=DaytonaSandboxClientOptions(pause_on_exit=False),
+    )),
+)
+
+# Run a different task on the "local" backend
+result = await Runner.run(
+    agent, prompt,
+    run_config=RunConfig(sandbox=SandboxRunConfig(
+        client=temporal_sandbox_client("local"),
+        options=UnixLocalSandboxClientOptions(),
+    )),
+)
+```
+
+## Streaming
+
+⚠️ **Experimental** - This functionality is subject to change prior to General Availability.
+
+The integration supports streaming model responses via the SDK-native
+`Runner.run_streamed` API. Inside a workflow, model calls execute as a
+streaming activity (`invoke_model_activity_streaming`) that consumes
+`Model.stream_response` and returns the collected list of native OpenAI
+response events. The workflow surfaces those events to the caller
+through `RunResultStreaming.stream_events()`, which wraps them in the
+agents-SDK `StreamEvent` union (so raw model events arrive as
+`RawResponsesStreamEvent.data`).
+
+External consumers (UIs, tracing pipelines, etc.) observe events as
+they arrive by hosting a [`WorkflowStream`](../workflow_streams/README.md)
+in the workflow and subscribing with `WorkflowStreamClient`. The
+streaming activity publishes each event to the topic configured on
+`ModelActivityParameters.streaming_topic`. The topic is required
+when using `Runner.run_streamed`; calling it without a configured topic
+raises before any activity is scheduled.
+
+Example workflow consuming events via `stream_events()` while the
+streaming activity publishes to the `"events"` topic:
+
+```python
+from agents import Agent, Runner
+from agents.stream_events import RawResponsesStreamEvent
+
+from temporalio import workflow
+
+@workflow.defn
+class MyAgent:
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        agent = Agent(name="Assistant", instructions="...")
+        result = Runner.run_streamed(agent, prompt)
+        async for event in result.stream_events():
+            if isinstance(event, RawResponsesStreamEvent):
+                raw_event = event.data  # native OpenAI ResponseStreamEvent
+                ...
+        return result.final_output
+```
+
+To publish raw model events to external subscribers, host a
+`WorkflowStream` in the workflow and configure
+`OpenAIAgentsPlugin(model_params=ModelActivityParameters(streaming_topic="events"))`. See [`temporalio.contrib.workflow_streams`](../workflow_streams/README.md) for the
+publisher and subscriber API.
+
+`RunResultStreaming.stream_events()` yields the agents-SDK
+`StreamEvent` union (`RawResponsesStreamEvent`, `RunItemStreamEvent`,
+`AgentUpdatedStreamEvent`); native OpenAI response events arrive
+wrapped as `RawResponsesStreamEvent.data`. Workflow-stream subscribers,
+by contrast, receive the unwrapped native events directly because the
+streaming activity publishes them straight from `Model.stream_response`.
+
+Streaming is incompatible with `use_local_activity` because local
+activities support neither activity heartbeats nor the workflow stream
+signal channel.
+
+Activity retries surface to workflow-stream subscribers but not to
+`RunResultStreaming.stream_events()`. Events are published to the
+stream as `Model.stream_response` produces them, so a partial attempt
+that fails mid-response leaves its emitted events on the stream and the
+retry attempt publishes a second sequence. `stream_events()` only sees
+the final successful attempt's collected events because it consumes the
+activity's return value. Workflow-stream subscribers should treat
+retries the same way as any other workflow_streams publisher — see
+[Delivery semantics](../workflow_streams/README.md) for the trade and
+the conventional `RETRY` event pattern for surfacing the transition to
+consumers.
+
 ## Feature Support
 
 This integration is presently subject to certain limitations.
-Streaming and voice agents are not supported.
+Realtime agents are not supported. Streaming is supported via
+`Runner.run_streamed` — see [Streaming](#streaming) above.
 Certain tools are not suitable for a distributed computing environment, so these have been disabled as well.
 
 ### Model Providers
 
 | Model Provider | Supported |
-|:--------------|:---------:|
-| OpenAI        |    Yes    |
-| LiteLLM       |    Yes    |
+| :------------- | :-------: |
+| OpenAI         |    Yes    |
+| LiteLLM        |    Yes    |
 
 ### Model Response format
 
-This integration does not presently support streaming.
-
-| Model Response | Supported |
-|:--------------|:---------:|
-| Get Response  |    Yes    |
-| Streaming     |    No     |
+| Model Response | Supported            |
+| :------------- | :------------------: |
+| Get Response   |         Yes          |
+| Streaming      | Yes (experimental)   |
 
 ### Tools
 
@@ -487,7 +675,7 @@ This integration does not presently support streaming.
 `LocalShellTool` and `ComputerTool` are not suited to a distributed computing setting.
 
 | Tool Type           | Supported |
-|:-------------------|:---------:|
+| :------------------ | :-------: |
 | FunctionTool        |    Yes    |
 | LocalShellTool      |    No     |
 | WebSearchTool       |    Yes    |
@@ -501,12 +689,12 @@ This integration does not presently support streaming.
 
 As described in [Tool Calling](#tool-calling), context propagation is read-only when Temporal activities are used as tools.
 
-| Context Propagation                     | Supported |
-|:----------------------------------------|:---------:|
-| Activity Tool receives copy of context  |    Yes    |
-| Activity Tool can update context        |    No     |
-| Function Tool received context          |    Yes    |
-| Function Tool can update context        |    Yes    |
+| Context Propagation                    | Supported |
+| :------------------------------------- | :-------: |
+| Activity Tool receives copy of context |    Yes    |
+| Activity Tool can update context       |    No     |
+| Function Tool received context         |    Yes    |
+| Function Tool can update context       |    Yes    |
 
 ### MCP
 
@@ -516,16 +704,16 @@ These wrappers work with all transport varieties.
 
 Note that when using network-accessible MCP servers, you also can also use the tool `HostedMCPTool`, which is part of the OpenAI Responses API and uses an MCP client hosted by OpenAI.
 
-| MCP Class              | Supported |
-|:-----------------------|:---------:|
-| MCPServerStdio         |    Yes    |
-| MCPServerSse           |    Yes    |
-| MCPServerStreamableHttp|    Yes    |
+| MCP Class               | Supported |
+| :---------------------- | :-------: |
+| MCPServerStdio          |    Yes    |
+| MCPServerSse            |    Yes    |
+| MCPServerStreamableHttp |    Yes    |
 
 ### Guardrails
 
 | Guardrail Type | Supported |
-|:---------------|:---------:|
+| :------------- | :-------: |
 | Code           |    Yes    |
 | Agent          |    Yes    |
 
@@ -533,33 +721,273 @@ Note that when using network-accessible MCP servers, you also can also use the t
 
 SQLite storage is not suited to a distributed environment.
 
-| Feature        | Supported |
-|:---------------|:---------:|
-| SQLiteSession  |    No     |
+| Feature       | Supported |
+| :------------ | :-------: |
+| SQLiteSession |    No     |
 
 ### Tracing
 
 | Tracing Provider | Supported |
-|:-----------------|:---------:|
+| :--------------- | :-------: |
 | OpenAI platform  |    Yes    |
 
-### Voice 
+## OpenTelemetry Integration
 
-| Mode                    | Supported |
-|:------------------------|:---------:|
-| Voice agents (pipelines)|    No     |
-| Realtime agents         |    No     |
+⚠️ **Public Preview** - This functionality is subject to change prior to General Availability.
+
+This integration provides seamless export of OpenAI agent telemetry to OpenTelemetry (OTEL) endpoints for observability and monitoring. The integration automatically handles workflow replay semantics, ensuring spans are only exported when workflows actually complete.
+
+### Quick Start
+
+To enable OTEL telemetry export, you need to set up a global `ReplaySafeTracerProvider` and enable the integration in the `OpenAIAgentsPlugin`:
+
+```python
+from datetime import timedelta
+from temporalio.client import Client
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
+from temporalio.contrib.opentelemetry import create_tracer_provider
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+# Configure your OTEL exporters
+
+# Set up the global tracer provider
+tracer_provider = create_tracer_provider()
+tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint="http://localhost:4317")))
+trace.set_tracer_provider(tracer_provider)
+
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[
+        OpenAIAgentsPlugin(
+            use_otel_instrumentation=True,  # Enable OTEL integration
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            )
+        ),
+    ],
+)
+```
+
+### Features
+
+- **Multiple Exporters**: Send telemetry to multiple OTEL endpoints simultaneously via the global tracer provider
+- **Replay-Safe**: Spans are only exported when workflows actually complete, not during replays
+- **Deterministic IDs**: Consistent span IDs across workflow replays for reliable correlation
+- **Automatic Setup**: No manual instrumentation required - just enable the flag and set up the global tracer provider
+- **Graceful Degradation**: Works seamlessly whether OTEL dependencies are installed or not
+
+### Dependencies
+
+OTEL integration requires additional dependencies:
+
+```bash
+pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+Choose the appropriate OTEL exporter for your monitoring system:
+
+```bash
+# For OTLP (works with most OTEL collectors and monitoring systems)
+pip install opentelemetry-exporter-otlp
+
+# For Console output (development/debugging)
+pip install opentelemetry-exporter-console
+
+# Other exporters available for specific systems
+pip install opentelemetry-exporter-<your-system>
+```
+
+### Example: Multiple Exporters
+
+```python
+from temporalio.contrib.opentelemetry import create_tracer_provider
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.console import ConsoleSpanExporter
+from opentelemetry import trace
+
+exporters = [
+    # Production monitoring system
+    OTLPSpanExporter(
+        endpoint="https://your-monitoring-system:4317",
+        headers={"api-key": "your-api-key"}
+    ),
+    
+    # Secondary monitoring endpoint
+    OTLPSpanExporter(endpoint="https://backup-collector:4317"),
+    
+    # Development debugging
+    ConsoleSpanExporter(),
+]
+
+# Set up global tracer provider with multiple exporters
+tracer_provider = create_tracer_provider(exporters=exporters)
+trace.set_tracer_provider(tracer_provider)
+
+plugin = OpenAIAgentsPlugin(use_otel_instrumentation=True)
+```
+
+### Error Handling
+
+If you enable OTEL instrumentation but the required dependencies are not installed, you'll receive a clear error message:
+
+```
+ImportError: OTEL dependencies not available. Install with: pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+If you enable OTEL instrumentation but don't have a proper global tracer provider set up, you'll get:
+
+```
+ValueError: Global tracer provider must a ReplaySafeTracerProvider. Use temporalio.contrib.opentelemtry.create_trace_provider to create one.
+```
+
+### Direct OpenTelemetry API Calls in Workflows
+
+When using direct OpenTelemetry API calls within workflows (e.g., `opentelemetry.trace.get_tracer(__name__).start_as_current_span()`), you need to ensure proper context bridging and sandbox configuration.
+
+#### Sandbox Configuration
+
+Workflows run in a sandbox that restricts module access. To use direct OTEL API calls, you must explicitly allow OpenTelemetry passthrough:
+
+```python
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+# Configure worker with OpenTelemetry passthrough
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+#### Context Bridging Pattern
+
+Direct OTEL spans must be created within an active OpenAI Agents SDK span to ensure proper parenting:
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Start an SDK span first to establish OTEL context bridge
+        with custom_span("Workflow coordination"):
+            # Now direct OTEL spans will be properly parented
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            with tracer.start_as_current_span("Custom workflow span"):
+                # Your workflow logic here
+                result = await self.do_work()
+                return result
+```
+
+#### Why This Pattern is Required
+
+- **OpenInference instrumentation** bridges OpenAI Agents SDK spans to OpenTelemetry context
+- **Direct OTEL API calls** without an active SDK span become root spans with no parent
+- **SDK spans** (`custom_span()`) establish the context bridge that allows subsequent direct OTEL spans to inherit proper trace parenting
+
+#### Complete Example
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+@workflow.defn
+class TracedWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Establish OTEL context with SDK span
+        with custom_span("Main workflow"):
+            # Create direct OTEL spans for fine-grained tracing
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            
+            with tracer.start_as_current_span("Data processing"):
+                data = await self.process_data()
+                
+            with tracer.start_as_current_span("Business logic"):
+                result = await self.execute_business_logic(data)
+                
+            return result
+
+# Worker configuration
+worker = Worker(
+    client,
+    task_queue="traced-workflows",
+    workflows=[TracedWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+This ensures your direct OTEL spans are properly parented within the trace hierarchy initiated by your client SDK traces.
+
+### Client-Side Trace Initialization
+
+You can also start an Agents SDK trace on the client side before executing a workflow. This is useful when you want the entire workflow execution to be part of a larger trace context:
+
+```python
+from agents import trace, custom_span
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+
+# Set up the plugin with OTEL integration
+plugin = OpenAIAgentsPlugin(use_otel_instrumentation=True)
+
+# Client setup
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[plugin]
+)
+
+# Start a trace on the client side
+with plugin.tracing_context():
+    with trace("Customer support workflow"):
+        with custom_span("Workflow execution"):
+            # Execute workflow within the trace context
+            result = await client.execute_workflow(
+                CustomerSupportAgent.run,
+                "Help me with my order",
+                id="customer-support-123",
+                task_queue="my-task-queue",
+            )
+            print(f"Result: {result}")
+```
+
+The `plugin.tracing_context()` is required when starting traces outside of a worker context. This ensures proper instrumentation setup and trace propagation into the workflow execution.
+
+If OTEL instrumentation is not enabled, the integration works normally without any OTEL setup.
+
+### Voice
+
+| Mode                     | Supported     |
+| :----------------------- | :-----------: |
+| Voice agents (pipelines) | Yes [^voice]  |
+| Realtime agents          |      No       |
+
+[^voice]: `VoicePipeline` runs in your process and delegates the agent
+    step (`VoiceWorkflowBase.run`) to a Temporal workflow that uses
+    `Runner.run` or `Runner.run_streamed`. STT and TTS run outside
+    Temporal; the agent loop is durable.
 
 ### Utilities
 
 The REPL utility is not suitable for a distributed setting.
 
 | Utility | Supported |
-|:--------|:---------:|
+| :------ | :-------: |
 | REPL    |    No     |
-
 
 ## Additional Examples
 
 You can find additional examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
-

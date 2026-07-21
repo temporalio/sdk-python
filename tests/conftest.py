@@ -1,54 +1,59 @@
 import asyncio
+import multiprocessing.context
 import os
 import sys
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 
+import opentelemetry.trace
 import pytest
 import pytest_asyncio
+from opentelemetry.util._once import Once
+
+from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import SharedStateManager
+from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 from . import DEV_SERVER_DOWNLOAD_VERSION
 
 # If there is an integration test environment variable set, we must remove the
 # first path from the sys.path so we can import the wheel instead
 if os.getenv("TEMPORAL_INTEGRATION_TEST"):
-    assert (
-        sys.path[0] == os.getcwd()
-    ), "Expected first sys.path to be the current working dir"
+    assert sys.path[0] == os.getcwd(), (
+        "Expected first sys.path to be the current working dir"
+    )
     sys.path.pop(0)
     # Import temporalio and confirm it is prefixed with virtual env
     import temporalio
 
-    assert temporalio.__file__.startswith(
-        sys.prefix
-    ), f"Expected {temporalio.__file__} to be in {sys.prefix}"
+    assert temporalio.__file__.startswith(sys.prefix), (
+        f"Expected {temporalio.__file__} to be in {sys.prefix}"
+    )
 
-# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x lib
+# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x/6.x/7.x lib
 import google.protobuf
 
 protobuf_version = google.protobuf.__version__
 if os.getenv("TEMPORAL_TEST_PROTO3"):
-    assert protobuf_version.startswith(
-        "3."
-    ), f"Expected protobuf 3.x, got {protobuf_version}"
+    assert protobuf_version.startswith("3."), (
+        f"Expected protobuf 3.x, got {protobuf_version}"
+    )
 else:
     assert (
         protobuf_version.startswith("4.")
         or protobuf_version.startswith("5.")
         or protobuf_version.startswith("6.")
-    ), f"Expected protobuf 4.x/5.x/6.x, got {protobuf_version}"
-
-from temporalio.client import Client
-from temporalio.testing import WorkflowEnvironment
-from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
+        or protobuf_version.startswith("7.")
+    ), f"Expected protobuf 4.x/5.x/6.x/7.x, got {protobuf_version}"
 
 
-def pytest_runtest_setup(item):
+def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
     """Print a newline so that custom printed output starts on new line."""
     if item.config.getoption("-s"):
         print()
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
     parser.addoption(
         "-E",
         "--workflow-environment",
@@ -59,7 +64,7 @@ def pytest_addoption(parser):
 
 @pytest.fixture(scope="session")
 def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.get_event_loop_policy().new_event_loop()  # type: ignore[reportDeprecated]
     yield loop
     try:
         loop.close()
@@ -75,28 +80,27 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
     def get_event_loop(self):
         return self._underlying.get_event_loop()
 
-    def set_event_loop(self, loop):
+    def set_event_loop(self, loop):  # type: ignore[reportMissingParameterType]
         return self._underlying.set_event_loop(loop)
 
-    def new_event_loop(self):
+    def new_event_loop(self):  # type: ignore[reportIncompatibleMethodOverride]
         return None
 
     def get_child_watcher(self):
-        return self._underlying.get_child_watcher()
+        return self._underlying.get_child_watcher()  # type: ignore[reportDeprecated]
 
-    def set_child_watcher(self, watcher):
-        return self._underlying.set_child_watcher(watcher)
+    def set_child_watcher(self, watcher):  # type: ignore[reportMissingParameterType]
+        return self._underlying.set_child_watcher(watcher)  # type: ignore[reportDeprecated]
 
 
 @pytest.fixture(scope="session")
 def env_type(request: pytest.FixtureRequest) -> str:
-    return request.config.getoption("--workflow-environment")
+    return request.config.getoption("--workflow-environment")  # type: ignore[reportReturnType]
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
-        http_port = 7243
         env = await WorkflowEnvironment.start_local(
             dev_server_extra_args=[
                 "--dynamic-config-value",
@@ -116,14 +120,30 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "--dynamic-config-value",
                 "frontend.activityAPIsEnabled=true",
                 "--dynamic-config-value",
+                "frontend.enableCancelWorkerPollsOnShutdown=true",
+                "--dynamic-config-value",
                 "component.nexusoperations.recordCancelRequestCompletionEvents=true",
-                "--http-port",
-                str(http_port),
+                "--dynamic-config-value",
+                "activity.enableStandalone=true",
+                "--dynamic-config-value",
+                "activity.startDelayEnabled=true",
+                "--dynamic-config-value",
+                "history.enableChasm=true",
+                "--dynamic-config-value",
+                "history.enableTransitionHistory=true",
+                "--dynamic-config-value",
+                "history.enableChasmCallbacks=true",
+                "--dynamic-config-value",
+                "history.enableCHASMSignalBacklinks=true",
+                "--dynamic-config-value",
+                "nexusoperation.enableStandalone=true",
+                "--dynamic-config-value",
+                'system.system.refreshNexusEndpointsMinWait="0s"',
+                "--dynamic-config-value",
+                "history.enableSignalWithStartFromWorkflow=true",
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
-        # TODO(nexus-preview): expose this in a more principled way
-        env._http_port = http_port  # type: ignore
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
     else:
@@ -133,12 +153,40 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     await env.shutdown()
 
 
-@pytest_asyncio.fixture
+@pytest.fixture(scope="session")
+def shared_state_manager() -> Iterator[SharedStateManager]:
+    mp_mgr = multiprocessing.Manager()
+    mgr = SharedStateManager.create_from_multiprocessing(mp_mgr)
+
+    try:
+        yield mgr
+    finally:
+        mp_mgr.shutdown()
+
+
+@pytest.fixture(scope="session")
+def mp_fork_ctx() -> Iterator[multiprocessing.context.BaseContext | None]:
+    mp_ctx = None
+    try:
+        mp_ctx = multiprocessing.get_context("fork")
+    except ValueError:
+        pass
+
+    try:
+        yield mp_ctx
+    finally:
+        if mp_ctx:
+            for p in mp_ctx.active_children():
+                p.terminate()
+                p.join()
+
+
+@pytest_asyncio.fixture  # type: ignore[reportUntypedFunctionDecorator]
 async def client(env: WorkflowEnvironment) -> Client:
     return env.client
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def worker(
     env: WorkflowEnvironment,
 ) -> AsyncGenerator[ExternalWorker, None]:
@@ -152,11 +200,18 @@ async def worker(
 # hook forcefully kills the process as success when the exit code from pytest
 # is a success.
 @pytest.hookimpl(hookwrapper=True, trylast=True)
-def pytest_cmdline_main(config):
+def pytest_cmdline_main(config):  # type: ignore[reportMissingParameterType, reportUnusedParameter]
     result = yield
-    if result.get_result() == 0:
+    exit_code = result.get_result()
+    numprocesses = getattr(config.option, "numprocesses", None)
+    running_with_xdist = hasattr(config, "workerinput") or numprocesses not in (
+        None,
+        0,
+        "0",
+    )
+    if exit_code == 0 and not running_with_xdist:
         os._exit(0)
-    return result.get_result()
+    return exit_code
 
 
 CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
@@ -165,3 +220,13 @@ CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT = 50
 @pytest.fixture
 def continue_as_new_suggest_history_count() -> int:
     return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT
+
+
+@pytest.fixture
+def reset_otel_tracer_provider():
+    """Reset global OpenTelemetry tracer provider state around tests."""
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.trace._TRACER_PROVIDER = None
+    yield
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.trace._TRACER_PROVIDER = None

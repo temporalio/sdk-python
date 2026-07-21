@@ -92,6 +92,9 @@ class WorkflowActivation(google.protobuf.message.Message):
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     CONTINUE_AS_NEW_SUGGESTED_FIELD_NUMBER: builtins.int
     DEPLOYMENT_VERSION_FOR_CURRENT_TASK_FIELD_NUMBER: builtins.int
+    LAST_SDK_VERSION_FIELD_NUMBER: builtins.int
+    SUGGEST_CONTINUE_AS_NEW_REASONS_FIELD_NUMBER: builtins.int
+    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The id of the currently active run of the workflow. Also used as a cache key. There may
     only ever be one active workflow task (and hence activation) of a run at one time.
@@ -136,6 +139,23 @@ class WorkflowActivation(google.protobuf.message.Message):
         build id, if this worker was using the deprecated Build ID-only
         feature(s).
         """
+    last_sdk_version: builtins.str
+    """The last seen SDK version from the most recent WFT completed event"""
+    @property
+    def suggest_continue_as_new_reasons(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        temporalio.api.enums.v1.workflow_pb2.SuggestContinueAsNewReason.ValueType
+    ]:
+        """Experimental. Optionally decide the versioning behavior that the first task of the new run should use.
+        For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
+        of the previous run.
+        """
+    target_worker_deployment_version_changed: builtins.bool
+    """True if Workflow's Target Worker Deployment Version is different from its Pinned Version and
+    the workflow is Pinned.
+    Experimental.
+    """
     def __init__(
         self,
         *,
@@ -149,6 +169,12 @@ class WorkflowActivation(google.protobuf.message.Message):
         continue_as_new_suggested: builtins.bool = ...,
         deployment_version_for_current_task: temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion
         | None = ...,
+        last_sdk_version: builtins.str = ...,
+        suggest_continue_as_new_reasons: collections.abc.Iterable[
+            temporalio.api.enums.v1.workflow_pb2.SuggestContinueAsNewReason.ValueType
+        ]
+        | None = ...,
+        target_worker_deployment_version_changed: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -176,8 +202,14 @@ class WorkflowActivation(google.protobuf.message.Message):
             b"is_replaying",
             "jobs",
             b"jobs",
+            "last_sdk_version",
+            b"last_sdk_version",
             "run_id",
             b"run_id",
+            "suggest_continue_as_new_reasons",
+            b"suggest_continue_as_new_reasons",
+            "target_worker_deployment_version_changed",
+            b"target_worker_deployment_version_changed",
             "timestamp",
             b"timestamp",
         ],

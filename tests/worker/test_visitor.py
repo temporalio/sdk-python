@@ -1,8 +1,15 @@
-from typing import MutableSequence
+import asyncio
+import dataclasses
+import time
+from collections.abc import MutableSequence
 
+import pytest
 from google.protobuf.duration_pb2 import Duration
 
+import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice_pb2
 import temporalio.bridge.worker
+import temporalio.converter
+import temporalio.nexus.system as nexus_system
 from temporalio.api.common.v1.message_pb2 import (
     Payload,
     Payloads,
@@ -10,7 +17,8 @@ from temporalio.api.common.v1.message_pb2 import (
     SearchAttributes,
 )
 from temporalio.api.sdk.v1.user_metadata_pb2 import UserMetadata
-from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
+from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     InitializeWorkflow,
     WorkflowActivation,
@@ -20,6 +28,7 @@ from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
     ContinueAsNewWorkflowExecution,
     ScheduleActivity,
     ScheduleLocalActivity,
+    ScheduleNexusOperation,
     SignalExternalWorkflowExecution,
     StartChildWorkflowExecution,
     UpdateResponse,
@@ -98,14 +107,6 @@ async def test_workflow_activation():
             )
         ]
     )
-
-    async def visitor(payload: Payload) -> Payload:
-        # Mark visited by prefixing data
-        new_payload = Payload()
-        new_payload.metadata.update(payload.metadata)
-        new_payload.metadata["visited"] = b"True"
-        new_payload.data = payload.data
-        return new_payload
 
     act = original.__deepcopy__()
     await PayloadVisitor().visit(Visitor(), act)
@@ -211,6 +212,187 @@ async def test_visit_payloads_on_other_commands():
     assert ur.completed.metadata["visited"]
 
 
+async def test_concurrent_throughput():
+    """Demonstrate that concurrent visitation is faster than serialized for I/O-bound codecs."""
+    N_CMDS = 10
+    N_ARGS = 5
+    SLEEP = 0.02
+
+    class SlowVisitor(VisitorFunctions):
+        def __init__(self, *, blocking: bool = False):
+            self.visit_count = 0
+            self._active = 0
+            self.max_concurrent = 0
+            self._blocking = blocking
+
+        async def visit_payload(self, payload: Payload) -> None:
+            return await self._visit(1)
+
+        async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+            return await self._visit(len(payloads))
+
+        async def _visit(self, count: int) -> None:
+            self._active += 1
+            self.max_concurrent = max(self.max_concurrent, self._active)
+            try:
+                if self._blocking:
+                    time.sleep(SLEEP * count)
+                else:
+                    await asyncio.sleep(SLEEP * count)
+                self.visit_count += count
+            finally:
+                self._active -= 1
+
+    completion = WorkflowActivationCompletion(
+        run_id="1",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    schedule_activity=ScheduleActivity(
+                        seq=i,
+                        activity_id=str(i),
+                        activity_type="",
+                        task_queue="",
+                        arguments=[
+                            Payload(data=f"cmd_{i}_arg_{j}".encode())
+                            for j in range(N_ARGS)
+                        ],
+                        priority=Priority(),
+                    )
+                )
+                for i in range(N_CMDS)
+            ]
+        ),
+    )
+
+    visitor_default = SlowVisitor()
+    await PayloadVisitor().visit(visitor_default, completion)
+
+    assert visitor_default.visit_count == N_CMDS * N_ARGS
+    assert visitor_default.max_concurrent == 1
+
+    visitor_concurrent = SlowVisitor()
+    await PayloadVisitor(concurrency_limit=5).visit(visitor_concurrent, completion)
+
+    assert visitor_concurrent.visit_count == N_CMDS * N_ARGS
+    assert visitor_concurrent.max_concurrent == 5
+
+
+async def test_cancel_drains_background_tasks():
+    """Cancelling visit() cancels in-flight tasks and awaits their cleanup."""
+    tasks_started = 0
+    tasks_cleaned_up = 0
+    background_running = asyncio.Event()
+
+    class SlowVisitor(VisitorFunctions):
+        async def visit_payload(self, payload: Payload) -> None:
+            pass
+
+        async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+            nonlocal tasks_started, tasks_cleaned_up
+            tasks_started += 1
+            background_running.set()
+            try:
+                await asyncio.sleep(10)
+            finally:
+                tasks_cleaned_up += 1
+
+    completion = WorkflowActivationCompletion(
+        run_id="1",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    schedule_activity=ScheduleActivity(
+                        seq=i,
+                        activity_id=str(i),
+                        activity_type="",
+                        task_queue="",
+                        arguments=[Payload(data=f"arg_{i}".encode())],
+                        priority=Priority(),
+                    )
+                )
+                for i in range(5)
+            ]
+        ),
+    )
+
+    task = asyncio.create_task(
+        PayloadVisitor(concurrency_limit=5).visit(SlowVisitor(), completion)
+    )
+    await background_running.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    # All started tasks ran their finally blocks before drain() returned.
+    assert tasks_started > 0
+    assert tasks_cleaned_up == tasks_started
+
+
+async def test_system_nexus_envelope_visit_is_bounded():
+    active_visits = 0
+    max_active_visits = 0
+    two_visits_started = asyncio.Event()
+    release_visits = asyncio.Event()
+
+    class SlowVisitor(VisitorFunctions):
+        async def visit_payload(self, payload: Payload) -> None:
+            await self._visit()
+
+        async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+            await self._visit()
+
+        async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+            await self._visit()
+
+        async def _visit(self) -> None:
+            nonlocal active_visits, max_active_visits
+            active_visits += 1
+            max_active_visits = max(max_active_visits, active_visits)
+            if active_visits == 2:
+                two_visits_started.set()
+            try:
+                await release_visits.wait()
+            finally:
+                active_visits -= 1
+
+    payload_converter = nexus_system.get_payload_converter()
+    system_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest(
+        input=Payloads(payloads=[Payload(data=b"workflow-input")]),
+        signal_input=Payloads(payloads=[Payload(data=b"signal-input")]),
+    )
+    payload = payload_converter.to_payload(system_request)
+    assert payload is not None
+    completion = WorkflowActivationCompletion(
+        run_id="1",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    schedule_nexus_operation=ScheduleNexusOperation(
+                        seq=1,
+                        endpoint=nexus_system.TEMPORAL_SYSTEM_ENDPOINT,
+                        service="temporal.api.workflowservice.v1.WorkflowService",
+                        operation="SignalWithStartWorkflowExecution",
+                        input=payload,
+                    ),
+                )
+            ],
+        ),
+    )
+
+    task = asyncio.create_task(
+        PayloadVisitor(concurrency_limit=2).visit(SlowVisitor(), completion)
+    )
+    await two_visits_started.wait()
+    await asyncio.sleep(0)
+    assert max_active_visits == 2
+
+    release_visits.set()
+    await task
+    assert max_active_visits == 2
+
+
 async def test_bridge_encoding():
     comp = WorkflowActivationCompletion(
         run_id="1",
@@ -236,7 +418,14 @@ async def test_bridge_encoding():
         ),
     )
 
-    await temporalio.bridge.worker.encode_completion(comp, SimpleCodec(), True)
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=SimpleCodec(),
+    )
+
+    await temporalio.bridge.worker.encode_completion(
+        comp, data_converter, True, storage_concurrency_limit=1
+    )
 
     cmd = comp.successful.commands[0]
     sa = cmd.schedule_activity

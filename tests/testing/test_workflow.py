@@ -1,10 +1,9 @@
 import asyncio
 import platform
-import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from time import monotonic
-from typing import Any, Optional, Union
+from typing import Any
 
 import pytest
 
@@ -13,7 +12,6 @@ from temporalio.client import (
     Client,
     Interceptor,
     OutboundInterceptor,
-    RPCError,
     StartWorkflowInput,
     WorkflowFailureError,
     WorkflowHandle,
@@ -30,6 +28,7 @@ from temporalio.exceptions import (
     TimeoutError,
     TimeoutType,
 )
+from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
@@ -220,7 +219,7 @@ async def test_workflow_env_assert(client: Client):
     client_config["interceptors"] = [interceptor]
     client = Client(**client_config)
 
-    def assert_proper_error(err: Optional[BaseException]) -> None:
+    def assert_proper_error(err: BaseException | None) -> None:
         assert isinstance(err, ApplicationError)
         # In unsandboxed workflows, this message has extra diff info appended
         # due to pytest's custom loader that does special assert tricks. But in
@@ -318,8 +317,18 @@ async def test_search_attributes_on_dev_server(
         assert attrs == desc.typed_search_attributes
 
 
+async def test_ui_port():
+    """Test that ui_port parameter works correctly."""
+    async with await WorkflowEnvironment.start_local(
+        ui=True,
+        ui_port=18080,
+    ) as env:
+        # Just verify it starts without error
+        assert env.client is not None
+
+
 def assert_timestamp_from_now(
-    ts: Union[datetime, float], expected_from_now: float, max_delta: float = 30
+    ts: datetime | float, expected_from_now: float, max_delta: float = 30
 ) -> None:
     if isinstance(ts, datetime):
         ts = ts.timestamp()

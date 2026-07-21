@@ -12,6 +12,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.empty_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
+import google.protobuf.timestamp_pb2
 
 import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.event_type_pb2
@@ -95,8 +96,26 @@ class Payload(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    class ExternalPayloadDetails(google.protobuf.message.Message):
+        """Describes an externally stored object referenced by this payload."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        SIZE_BYTES_FIELD_NUMBER: builtins.int
+        size_bytes: builtins.int
+        """Size in bytes of the externally stored payload"""
+        def __init__(
+            self,
+            *,
+            size_bytes: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["size_bytes", b"size_bytes"]
+        ) -> None: ...
+
     METADATA_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
+    EXTERNAL_PAYLOADS_FIELD_NUMBER: builtins.int
     @property
     def metadata(
         self,
@@ -104,15 +123,33 @@ class Payload(google.protobuf.message.Message):
         builtins.str, builtins.bytes
     ]: ...
     data: builtins.bytes
+    @property
+    def external_payloads(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Payload.ExternalPayloadDetails
+    ]:
+        """Details about externally stored payloads associated with this payload."""
     def __init__(
         self,
         *,
         metadata: collections.abc.Mapping[builtins.str, builtins.bytes] | None = ...,
         data: builtins.bytes = ...,
+        external_payloads: collections.abc.Iterable[
+            global___Payload.ExternalPayloadDetails
+        ]
+        | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["data", b"data", "metadata", b"metadata"],
+        field_name: typing_extensions.Literal[
+            "data",
+            b"data",
+            "external_payloads",
+            b"external_payloads",
+            "metadata",
+            b"metadata",
+        ],
     ) -> None: ...
 
 global___Payload = Payload
@@ -847,25 +884,141 @@ class Link(google.protobuf.message.Message):
             self, field_name: typing_extensions.Literal["job_id", b"job_id"]
         ) -> None: ...
 
+    class Activity(google.protobuf.message.Message):
+        """A link to an activity."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        ACTIVITY_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        activity_id: builtins.str
+        run_id: builtins.str
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            activity_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "activity_id",
+                b"activity_id",
+                "namespace",
+                b"namespace",
+                "run_id",
+                b"run_id",
+            ],
+        ) -> None: ...
+
+    class NexusOperation(google.protobuf.message.Message):
+        """A link to a standalone Nexus operation."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        OPERATION_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        operation_id: builtins.str
+        run_id: builtins.str
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            operation_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "namespace",
+                b"namespace",
+                "operation_id",
+                b"operation_id",
+                "run_id",
+                b"run_id",
+            ],
+        ) -> None: ...
+
+    class Workflow(google.protobuf.message.Message):
+        """A link to a workflow execution. This is a more general version of WorkflowEvent that doesn't specify a
+        particular event within the workflow, useful when you want to link to a workflow but there is no particular event to link to,
+        such as a Query or a Rejected Update.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        WORKFLOW_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        REASON_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        workflow_id: builtins.str
+        run_id: builtins.str
+        reason: builtins.str
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            workflow_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+            reason: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "namespace",
+                b"namespace",
+                "reason",
+                b"reason",
+                "run_id",
+                b"run_id",
+                "workflow_id",
+                b"workflow_id",
+            ],
+        ) -> None: ...
+
     WORKFLOW_EVENT_FIELD_NUMBER: builtins.int
     BATCH_JOB_FIELD_NUMBER: builtins.int
+    ACTIVITY_FIELD_NUMBER: builtins.int
+    NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+    WORKFLOW_FIELD_NUMBER: builtins.int
     @property
     def workflow_event(self) -> global___Link.WorkflowEvent: ...
     @property
     def batch_job(self) -> global___Link.BatchJob: ...
+    @property
+    def activity(self) -> global___Link.Activity: ...
+    @property
+    def nexus_operation(self) -> global___Link.NexusOperation: ...
+    @property
+    def workflow(self) -> global___Link.Workflow: ...
     def __init__(
         self,
         *,
         workflow_event: global___Link.WorkflowEvent | None = ...,
         batch_job: global___Link.BatchJob | None = ...,
+        activity: global___Link.Activity | None = ...,
+        nexus_operation: global___Link.NexusOperation | None = ...,
+        workflow: global___Link.Workflow | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
             "batch_job",
             b"batch_job",
+            "nexus_operation",
+            b"nexus_operation",
             "variant",
             b"variant",
+            "workflow",
+            b"workflow",
             "workflow_event",
             b"workflow_event",
         ],
@@ -873,19 +1026,55 @@ class Link(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
             "batch_job",
             b"batch_job",
+            "nexus_operation",
+            b"nexus_operation",
             "variant",
             b"variant",
+            "workflow",
+            b"workflow",
             "workflow_event",
             b"workflow_event",
         ],
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["workflow_event", "batch_job"] | None: ...
+    ) -> (
+        typing_extensions.Literal[
+            "workflow_event", "batch_job", "activity", "nexus_operation", "workflow"
+        ]
+        | None
+    ): ...
 
 global___Link = Link
+
+class Principal(google.protobuf.message.Message):
+    """Principal is an authenticated caller identity computed by the server from trusted
+    authentication context.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TYPE_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    type: builtins.str
+    """Low-cardinality category of the principal (e.g., "jwt", "users")."""
+    name: builtins.str
+    """Identifier within that category (e.g., sub JWT claim, email address)."""
+    def __init__(
+        self,
+        *,
+        type: builtins.str = ...,
+        name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["name", b"name", "type", b"type"]
+    ) -> None: ...
+
+global___Principal = Principal
 
 class Priority(google.protobuf.message.Message):
     """Priority contains metadata that controls relative ordering of task processing
@@ -937,7 +1126,7 @@ class Priority(google.protobuf.message.Message):
     configuration, and defaults to 5.
 
     If priority is not present (or zero), then the effective priority will be
-    the default priority, which is is calculated by (min+max)/2. With the
+    the default priority, which is calculated by (min+max)/2. With the
     default max of 5, and min of 1, that comes out to 3.
     """
     fairness_key: builtins.str
@@ -1030,3 +1219,152 @@ class WorkerSelector(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["worker_instance_key"] | None: ...
 
 global___WorkerSelector = WorkerSelector
+
+class OnConflictOptions(google.protobuf.message.Message):
+    """When starting an execution with a conflict policy that uses an existing execution and there is already an existing
+    running execution, OnConflictOptions defines actions to be taken on the existing running execution.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ATTACH_REQUEST_ID_FIELD_NUMBER: builtins.int
+    ATTACH_COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    ATTACH_LINKS_FIELD_NUMBER: builtins.int
+    attach_request_id: builtins.bool
+    """Attaches the request ID to the running execution."""
+    attach_completion_callbacks: builtins.bool
+    """Attaches the completion callbacks to the running execution."""
+    attach_links: builtins.bool
+    """Attaches the links to the running execution."""
+    def __init__(
+        self,
+        *,
+        attach_request_id: builtins.bool = ...,
+        attach_completion_callbacks: builtins.bool = ...,
+        attach_links: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attach_completion_callbacks",
+            b"attach_completion_callbacks",
+            "attach_links",
+            b"attach_links",
+            "attach_request_id",
+            b"attach_request_id",
+        ],
+    ) -> None: ...
+
+global___OnConflictOptions = OnConflictOptions
+
+class TimeSkippingConfig(google.protobuf.message.Message):
+    """The configuration for time skipping of a workflow execution (a chain of runs including retries, cron, continue-as-new).
+    When time skipping is enabled, virtual time advances automatically whenever there is no in-flight work.
+    In-flight work includes activities, child workflows, Nexus operations, signal/cancel external workflow operations,
+    and possibly other features added in the future.
+    User timers are not classified as in-flight work and will be skipped over; the virtual clock may also skip to the
+    time point of the registered fast forward when there is no in-flight work.
+    When time is skipped, a WorkflowExecutionTimeSkippingTransitionedEvent will be
+    added to the workflow history to capture the state changes.
+
+    For child workflows, by default, if the parent execution is skipping time, the child execution will also skip time,
+    but a parent's fast_forward won't affect its child's execution. A flag is provided to disable propagation of the
+    "enabled" flag to child workflows; regardless of that flag, a child workflow inherits the virtual time from the
+    parent execution as its start time.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENABLED_FIELD_NUMBER: builtins.int
+    FAST_FORWARD_FIELD_NUMBER: builtins.int
+    DISABLE_CHILD_PROPAGATION_FIELD_NUMBER: builtins.int
+    enabled: builtins.bool
+    """Enables or disables time skipping for this workflow execution."""
+    @property
+    def fast_forward(self) -> google.protobuf.duration_pb2.Duration:
+        """Optionally fast-forward the current workflow execution by this duration ahead of current workflow execution time.
+        After the fast-forward completes, time skipping is disabled, and this
+        action is recorded in the WorkflowExecutionTimeSkippingTransitionedEvent. It can be re-enabled by
+        setting `enabled` to true or setting `fast_forward` again via UpdateWorkflowExecutionOptions.
+        The current workflow execution is a chain of runs (retries, cron, continue-as-new);
+        child workflows are separate executions, so this fast_forward won't affect them.
+
+        For a given workflow execution, only one active fast-forward is allowed at a time.
+        If a new fast-forward is set via UpdateWorkflowExecutionOptions before the previous
+        one completes, the new one will override the previous one.
+        If the fast-forward duration exceeds the remaining execution timeout, time will only
+        be fast-forwarded up to the end of the execution.
+        """
+    disable_child_propagation: builtins.bool
+    """By default, child workflows inherit the "enabled" flag when they are started.
+    This flag disables that inheritance.
+    """
+    def __init__(
+        self,
+        *,
+        enabled: builtins.bool = ...,
+        fast_forward: google.protobuf.duration_pb2.Duration | None = ...,
+        disable_child_propagation: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["fast_forward", b"fast_forward"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "disable_child_propagation",
+            b"disable_child_propagation",
+            "enabled",
+            b"enabled",
+            "fast_forward",
+            b"fast_forward",
+        ],
+    ) -> None: ...
+
+global___TimeSkippingConfig = TimeSkippingConfig
+
+class TimeSkippingStatePropagation(google.protobuf.message.Message):
+    """The time-skipping state that needs to be propagated from a parent workflow to a child workflow,
+    or through a chain of runs.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INITIAL_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
+    FAST_FORWARD_TARGET_TIME_FIELD_NUMBER: builtins.int
+    @property
+    def initial_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """The time skipped by the previous execution that started this workflow.
+        It can happen in child workflows and a chain of runs (CaN, cron, retry).
+        """
+    @property
+    def fast_forward_target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """If there is a fast-forward action set for the previous run in a chain of runs,
+        the target time should be propagated to the next run as well.
+        """
+    def __init__(
+        self,
+        *,
+        initial_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        fast_forward_target_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "fast_forward_target_time",
+            b"fast_forward_target_time",
+            "initial_skipped_duration",
+            b"initial_skipped_duration",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "fast_forward_target_time",
+            b"fast_forward_target_time",
+            "initial_skipped_duration",
+            b"initial_skipped_duration",
+        ],
+    ) -> None: ...
+
+global___TimeSkippingStatePropagation = TimeSkippingStatePropagation

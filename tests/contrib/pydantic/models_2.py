@@ -2,19 +2,12 @@ import collections
 import decimal
 import fractions
 import re
+from collections.abc import Hashable, Sequence
 from enum import Enum, IntEnum
+from re import Pattern
 from typing import (
     Any,
-    Dict,
-    Hashable,
-    List,
     NamedTuple,
-    Optional,
-    Pattern,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
     cast,
 )
 
@@ -214,12 +207,12 @@ class Point(NamedTuple):
 
 
 class ComplexTypesModel(BaseModel):
-    list_field: List[str]
-    dict_field: Dict[str, int]
-    set_field: Set[int]
-    tuple_field: Tuple[str, int]
-    union_field: Union[str, int]
-    optional_field: Optional[str]
+    list_field: list[str]
+    dict_field: dict[str, int]
+    set_field: set[int]
+    tuple_field: tuple[str, int]
+    union_field: str | int
+    optional_field: str | None
     named_tuple_field: Point
 
     def _check_instance(self) -> None:

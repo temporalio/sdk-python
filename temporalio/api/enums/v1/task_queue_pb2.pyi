@@ -29,6 +29,12 @@ class _TaskQueueKindEnumTypeWrapper(
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TASK_QUEUE_KIND_UNSPECIFIED: _TaskQueueKind.ValueType  # 0
+    """Tasks from any non workflow task may be unspecified.
+
+    Task queue kind is used to differentiate whether a workflow task queue is sticky or 
+    normal. If a task is not a workflow task, Task queue kind will sometimes be 
+    unspecified.
+    """
     TASK_QUEUE_KIND_NORMAL: _TaskQueueKind.ValueType  # 1
     """Tasks from a normal workflow task queue always include complete workflow history
 
@@ -46,10 +52,22 @@ class _TaskQueueKindEnumTypeWrapper(
 
     Sticky queues are only for workflow tasks. There are no sticky task queues for activities.
     """
+    TASK_QUEUE_KIND_WORKER_COMMANDS: _TaskQueueKind.ValueType  # 3
+    """A worker-commands task queue is used for server-to-worker communication (e.g. activity
+    cancellations). These queues are ephemeral and per-worker-process — they exist only for
+    the lifetime of the worker process. Used with TASK_QUEUE_TYPE_NEXUS and polled via
+    PollNexusTaskQueue.
+    """
 
 class TaskQueueKind(_TaskQueueKind, metaclass=_TaskQueueKindEnumTypeWrapper): ...
 
 TASK_QUEUE_KIND_UNSPECIFIED: TaskQueueKind.ValueType  # 0
+"""Tasks from any non workflow task may be unspecified.
+
+Task queue kind is used to differentiate whether a workflow task queue is sticky or 
+normal. If a task is not a workflow task, Task queue kind will sometimes be 
+unspecified.
+"""
 TASK_QUEUE_KIND_NORMAL: TaskQueueKind.ValueType  # 1
 """Tasks from a normal workflow task queue always include complete workflow history
 
@@ -66,6 +84,12 @@ for the lifetime of the worker process. Tasks in a sticky task queue are only av
 the worker that created the sticky queue.
 
 Sticky queues are only for workflow tasks. There are no sticky task queues for activities.
+"""
+TASK_QUEUE_KIND_WORKER_COMMANDS: TaskQueueKind.ValueType  # 3
+"""A worker-commands task queue is used for server-to-worker communication (e.g. activity
+cancellations). These queues are ephemeral and per-worker-process — they exist only for
+the lifetime of the worker process. Used with TASK_QUEUE_TYPE_NEXUS and polled via
+PollNexusTaskQueue.
 """
 global___TaskQueueKind = TaskQueueKind
 
@@ -269,3 +293,34 @@ RATE_LIMIT_SOURCE_WORKER: RateLimitSource.ValueType  # 2
 RATE_LIMIT_SOURCE_SYSTEM: RateLimitSource.ValueType  # 3
 """The value was set as the system default."""
 global___RateLimitSource = RateLimitSource
+
+class _RoutingConfigUpdateState:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _RoutingConfigUpdateStateEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _RoutingConfigUpdateState.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED: _RoutingConfigUpdateState.ValueType  # 0
+    ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS: _RoutingConfigUpdateState.ValueType  # 1
+    """Update to the RoutingConfig is currently in progress."""
+    ROUTING_CONFIG_UPDATE_STATE_COMPLETED: _RoutingConfigUpdateState.ValueType  # 2
+    """Update to the RoutingConfig has completed successfully."""
+
+class RoutingConfigUpdateState(
+    _RoutingConfigUpdateState, metaclass=_RoutingConfigUpdateStateEnumTypeWrapper
+):
+    """Indicates whether a change to the Routing Config has been
+    propagated to all relevant Task Queues and their partitions.
+    """
+
+ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED: RoutingConfigUpdateState.ValueType  # 0
+ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS: RoutingConfigUpdateState.ValueType  # 1
+"""Update to the RoutingConfig is currently in progress."""
+ROUTING_CONFIG_UPDATE_STATE_COMPLETED: RoutingConfigUpdateState.ValueType  # 2
+"""Update to the RoutingConfig has completed successfully."""
+global___RoutingConfigUpdateState = RoutingConfigUpdateState

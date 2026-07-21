@@ -1,12 +1,13 @@
 """Visitor that sets command context during payload traversal."""
 
 import contextvars
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Optional
 
 from temporalio.api.enums.v1.command_type_pb2 import CommandType
-from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
+from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     ResolveActivity,
     ResolveChildWorkflowExecution,
@@ -17,6 +18,7 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
     ResolveSignalExternalWorkflow,
 )
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
+    CompleteWorkflowExecution,
     ScheduleActivity,
     ScheduleLocalActivity,
     ScheduleNexusOperation,
@@ -33,7 +35,7 @@ class CommandInfo:
     command_seq: int
 
 
-current_command_info: contextvars.ContextVar[Optional[CommandInfo]] = (
+current_command_info: contextvars.ContextVar[CommandInfo | None] = (
     contextvars.ContextVar("current_command_info", default=None)
 )
 
@@ -45,7 +47,36 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
     activation jobs that have both a 'seq' field and payloads to visit.
     """
 
+    def __init__(
+        self,
+        *,
+        skip_search_attributes: bool = False,
+        skip_headers: bool = False,
+        concurrency_limit: int = 1,
+    ) -> None:
+        """Creates a new command-aware payload visitor.
+
+        Args:
+            skip_search_attributes: If True, search attributes are not visited.
+            skip_headers: If True, headers are not visited.
+            concurrency_limit: Maximum number of payload visits that may run
+                concurrently during a single call to visit(). Defaults to 1.
+        """
+        super().__init__(
+            skip_search_attributes=skip_search_attributes,
+            skip_headers=skip_headers,
+            concurrency_limit=concurrency_limit,
+        )
+
     # Workflow commands with payloads
+    async def _visit_coresdk_workflow_commands_CompleteWorkflowExecution(
+        self, fs: VisitorFunctions, o: CompleteWorkflowExecution
+    ) -> None:
+        with current_command(CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION, 0):
+            await super()._visit_coresdk_workflow_commands_CompleteWorkflowExecution(
+                fs, o
+            )
+
     async def _visit_coresdk_workflow_commands_ScheduleActivity(
         self, fs: VisitorFunctions, o: ScheduleActivity
     ) -> None:

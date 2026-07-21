@@ -21,7 +21,7 @@ from temporalio.api.cloud.resource.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n4temporal/api/cloud/connectivityrule/v1/message.proto\x12&temporal.api.cloud.connectivityrule.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\x96\x02\n\x10\x43onnectivityRule\x12\n\n\x02id\x18\x01 \x01(\t\x12J\n\x04spec\x18\x02 \x01(\x0b\x32<.temporal.api.cloud.connectivityrule.v1.ConnectivityRuleSpec\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12<\n\x05state\x18\x05 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x06 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampJ\x04\x08\x03\x10\x04"\xd9\x01\n\x14\x43onnectivityRuleSpec\x12U\n\x0bpublic_rule\x18\x01 \x01(\x0b\x32>.temporal.api.cloud.connectivityrule.v1.PublicConnectivityRuleH\x00\x12W\n\x0cprivate_rule\x18\x02 \x01(\x0b\x32?.temporal.api.cloud.connectivityrule.v1.PrivateConnectivityRuleH\x00\x42\x11\n\x0f\x63onnection_type"\x18\n\x16PublicConnectivityRule"^\n\x17PrivateConnectivityRule\x12\x15\n\rconnection_id\x18\x01 \x01(\t\x12\x16\n\x0egcp_project_id\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\tJ\x04\x08\x04\x10\x05\x42\xd4\x01\n)io.temporal.api.cloud.connectivityrule.v1B\x0cMessageProtoP\x01Z=go.temporal.io/api/cloud/connectivityrule/v1;connectivityrule\xaa\x02(Temporalio.Api.Cloud.ConnectivityRule.V1\xea\x02,Temporalio::Api::Cloud::ConnectivityRule::V1b\x06proto3'
+    b'\n4temporal/api/cloud/connectivityrule/v1/message.proto\x12&temporal.api.cloud.connectivityrule.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\x96\x02\n\x10\x43onnectivityRule\x12\n\n\x02id\x18\x01 \x01(\t\x12J\n\x04spec\x18\x02 \x01(\x0b\x32<.temporal.api.cloud.connectivityrule.v1.ConnectivityRuleSpec\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12<\n\x05state\x18\x05 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x06 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampJ\x04\x08\x03\x10\x04"\xd9\x01\n\x14\x43onnectivityRuleSpec\x12U\n\x0bpublic_rule\x18\x01 \x01(\x0b\x32>.temporal.api.cloud.connectivityrule.v1.PublicConnectivityRuleH\x00\x12W\n\x0cprivate_rule\x18\x02 \x01(\x0b\x32?.temporal.api.cloud.connectivityrule.v1.PrivateConnectivityRuleH\x00\x42\x11\n\x0f\x63onnection_type"3\n\x16PublicConnectivityRule\x12\x19\n\x11\x65nable_stable_ips\x18\x01 \x01(\x08"^\n\x17PrivateConnectivityRule\x12\x15\n\rconnection_id\x18\x01 \x01(\t\x12\x16\n\x0egcp_project_id\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\tJ\x04\x08\x04\x10\x05\x42\xd4\x01\n)io.temporal.api.cloud.connectivityrule.v1B\x0cMessageProtoP\x01Z=go.temporal.io/api/cloud/connectivityrule/v1;connectivityrule\xaa\x02(Temporalio.Api.Cloud.ConnectivityRule.V1\xea\x02,Temporalio::Api::Cloud::ConnectivityRule::V1b\x06proto3'
 )
 
 
@@ -81,7 +81,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _CONNECTIVITYRULESPEC._serialized_start = 457
     _CONNECTIVITYRULESPEC._serialized_end = 674
     _PUBLICCONNECTIVITYRULE._serialized_start = 676
-    _PUBLICCONNECTIVITYRULE._serialized_end = 700
-    _PRIVATECONNECTIVITYRULE._serialized_start = 702
-    _PRIVATECONNECTIVITYRULE._serialized_end = 796
+    _PUBLICCONNECTIVITYRULE._serialized_end = 727
+    _PRIVATECONNECTIVITYRULE._serialized_start = 729
+    _PRIVATECONNECTIVITYRULE._serialized_end = 823
 # @@protoc_insertion_point(module_scope)
