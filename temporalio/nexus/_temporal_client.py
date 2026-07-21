@@ -21,8 +21,8 @@ from typing_extensions import Self
 
 import temporalio.common
 from temporalio.nexus._operation_context import (
-    _start_nexus_backed_workflow_update,
     _start_nexus_backing_workflow,
+    _start_nexus_operation_workflow_update,
     _TemporalStartOperationContext,
 )
 from temporalio.types import (
@@ -361,7 +361,7 @@ class TemporalNexusClient(ABC):
         run_id: str | None = None,
         first_execution_run_id: str | None = None,
     ) -> TemporalOperationResult[Any]:
-        """Start a workflow update as the backing asynchronous Nexus operation.
+        """Start a Workflow Update-backed Nexus Operation.
 
         .. warning::
             This API is experimental and unstable.
@@ -481,14 +481,14 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
         run_id: str | None = None,
         first_execution_run_id: str | None = None,
     ) -> TemporalOperationResult[Any]:
-        """Start a workflow update as the backing asynchronous Nexus operation."""
+        """Start a Workflow Update-backed Nexus Operation."""
         if not self._temporal_context.nexus_context.callback_url:
             raise HandlerError(
                 "callback URL is required for a workflow update Nexus operation",
                 type=HandlerErrorType.BAD_REQUEST,
             )
         with self._reserve_async_start():
-            update_handle = await _start_nexus_backed_workflow_update(
+            update_handle = await _start_nexus_operation_workflow_update(
                 temporal_context=self._temporal_context,
                 workflow_id=workflow_id,
                 update=update,

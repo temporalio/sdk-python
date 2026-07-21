@@ -154,7 +154,7 @@ class CancelUpdateWorkflowOptions:
     update_id: str
     """The ID of the update to cancel."""
     run_id: str
-    """The workflow runID that accepted the update"""
+    """The workflow runID that accepted the update."""
 
 
 class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
@@ -239,8 +239,8 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
         ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
         options: CancelUpdateWorkflowOptions,  # pyright: ignore[reportUnusedParameter]
     ) -> None:
-        """Cancels the workflow update backing the Nexus operation. Cancellation is not natively supported for update-workflow Nexus operations.
-        Inherit a TemporalOperationHandler and override this method to run cancellable workflow updates.
+        """Cancels the Workflow Update triggered by the Nexus operation. There is no native way to cancel an accepted Update, so cancellation depends on the Update handler itself.
+        Override this method and coordinate with the specific Update handler to trigger a cancellation.
 
 
         .. warning::
@@ -248,8 +248,8 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
         """
         raise HandlerError(
             """
-                Cancellation is not natively supported for update-workflow Nexus operations.
-                Inherit a TemporalOperationHandler and override this method to run cancellable workflow updates.
+                There is no native way to cancel an accepted Update, so cancellation depends on the Update handler itself. 
+                Override this method and coordinate with the specific Update handler to trigger a cancellation.
             """,
             type=HandlerErrorType.NOT_IMPLEMENTED,
         )

@@ -107,7 +107,7 @@ class OperationToken:
         update_id = token_details.get("uid")
         if not isinstance(update_id, str | None):
             raise TypeError(
-                f"invalid token: expected update_id id to be a string or None, got {type(update_id)}"
+                f"invalid token: expected update_id to be a string or None, got {type(update_id)}"
             )
 
         if token_type == OperationTokenType.UPDATE_WORKFLOW and not update_id:

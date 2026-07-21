@@ -717,7 +717,7 @@ async def _start_nexus_backing_workflow(
     return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
 
 
-async def _start_nexus_backed_workflow_update(  # pyright: ignore[reportUnusedFunction]
+async def _start_nexus_operation_workflow_update(  # pyright: ignore[reportUnusedFunction]
     *,
     temporal_context: _TemporalStartOperationContext,
     workflow_id: str,

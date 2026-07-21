@@ -956,7 +956,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: type | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
-        # The following options are for Nexus Operation-backed updates. Experimental and unstable
+        # The following options are for Workflow Updates exposed as Nexus Operations. Experimental and unstable
         callbacks: Sequence[Callback] | None = None,
         links: Sequence[temporalio.api.common.v1.Link] | None = None,
         request_id: str | None = None,
