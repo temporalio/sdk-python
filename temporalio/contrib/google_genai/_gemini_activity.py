@@ -17,11 +17,11 @@ import google.auth.credentials
 from google.genai import Client as GeminiClient
 from google.genai import errors as genai_errors
 from google.genai import types
-from google.genai.interactions import Interaction
 from google.genai.types import HttpOptions
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio import activity
+from temporalio.contrib.google_genai._compat import Interaction
 from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,
