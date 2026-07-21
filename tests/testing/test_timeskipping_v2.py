@@ -579,7 +579,7 @@ async def test_update_time_reflects_workflow_virtual_clock(
 
 async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
     """The disabled-after-fast-forward transition event's payload is populated,
-    specifically `target_time` and `wall_clock_time`."""
+    specifically ``target_time`` and ``wall_clock_time``."""
     async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(

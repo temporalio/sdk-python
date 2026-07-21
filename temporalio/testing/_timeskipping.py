@@ -26,7 +26,7 @@ class TimeSkippingConfig:
 
     fast_forward: timedelta | None = None
     """One-shot advance of virtual time by this duration. Time skipping auto-disables at
-    the target time. `timedelta=None` means unbounded advance until completion."""
+    the target time. ``timedelta=None`` means unbounded advance until completion."""
 
     disable_propagation: bool = False
     """If true, child workflows do not inherit the ``enabled`` flag. Virtual
