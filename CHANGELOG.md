@@ -57,6 +57,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Marked system Nexus envelope payloads so nested payloads can be detected and
+  visited after the envelope is already stored as a payload.
+
 ### Security
 
 ## [1.30.0] - 2026-07-01
