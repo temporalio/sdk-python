@@ -7,7 +7,10 @@ from time import monotonic
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
-from tests.helpers.time_skipping import assert_time_was_skipped
+from tests.helpers.time_skipping import (
+    assert_time_was_not_skipped,
+    assert_time_was_skipped,
+)
 from tests.testing.test_workflow import (
     SleepWorkflow,
     assert_timestamp_from_now,
