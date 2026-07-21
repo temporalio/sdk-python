@@ -108,7 +108,7 @@ class WorkflowEnvironment:
         :py:class:`TimeSkipper` that stamps ``time_skipping_config`` on every
         workflow started via :py:attr:`client`, and exposes
         :py:meth:`fast_forward` and :py:meth:`set_disable_propagation` for
-        driving TS on running workflows. In contrast to :py:meth:`start_time_skipping`
+        driving time skipping on running workflows. In contrast to :py:meth:`start_time_skipping`
         (time-skipping v1, server-wide clock), each workflow has its own virtual clock.
 
         Internally, this uses the Temporal CLI dev server from
@@ -379,8 +379,8 @@ class WorkflowEnvironment:
         """Start a local Temporal server with per-workflow time skipping enabled.
 
         Equivalent to :py:meth:`start_local` with a non-``None`` ``ts_config``.
-        See :py:meth:`start_local` for available keyword arguments and TS
-        behavior details.
+        See :py:meth:`start_local` for available keyword arguments and
+        time-skipping behavior details.
         """
         return await cls.start_local(ts_config=ts_config, **kwargs)
 
@@ -526,7 +526,7 @@ class WorkflowEnvironment:
             workflow terminates first.
 
         Raises:
-            RuntimeError: If called on a v1 or non-TS environment.
+            RuntimeError: If called on a v1 or non-time-skipping environment.
         """
         if self._ts_skipper is None:
             raise RuntimeError(
@@ -551,7 +551,7 @@ class WorkflowEnvironment:
             disable_propagation: New value for the flag.
 
         Raises:
-            RuntimeError: If called on a v1 or non-TS environment.
+            RuntimeError: If called on a v1 or non-time-skipping environment.
         """
         if self._ts_skipper is None:
             raise RuntimeError(
@@ -562,7 +562,7 @@ class WorkflowEnvironment:
 
     @contextmanager
     def with_time_skipping_disabled(self) -> Iterator[None]:
-        """Suspend TS-config stamping on newly-started workflows within the block.
+        """Suspend time-skipping config stamping on newly-started workflows within the block.
 
         Workflows started via :py:attr:`client` during the block do not
         receive a ``time_skipping_config`` on their start request. Existing
@@ -600,7 +600,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def sleep(self, duration: timedelta | float) -> None:
         """Sleep in this environment.
 
-        Uses ``asyncio.sleep`` on non-TS envs or the v1 test server's
+        Uses ``asyncio.sleep`` on non-time-skipping envs or the v1 test server's
         virtual sleep on v1 envs. Unsupported on v2 envs — use
         :py:meth:`fast_forward` on a specific workflow handle instead.
 
@@ -627,7 +627,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def get_current_time(self) -> datetime:
         """Current time known to this environment.
 
-        System time on non-TS envs; the v1 test server's virtual clock on
+        System time on non-time-skipping envs; the v1 test server's virtual clock on
         v1 envs. Unsupported on v2 envs — read history events
         (``WorkflowExecutionTimeSkippingTransitioned``) or define a
         workflow-side query returning ``workflow.now()``.
@@ -663,7 +663,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         """Disable v1's SDK-driven auto-unlock-on-result-await for the block.
 
         Only meaningful on time-skipping v1 envs. Unsupported on v2 envs —
-        use :py:meth:`with_time_skipping_disabled` to suspend TS-config
+        use :py:meth:`with_time_skipping_disabled` to suspend time-skipping config
         stamping on newly-started workflows instead.
 
         Raises:
@@ -673,7 +673,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
             raise RuntimeError(
                 "env.auto_time_skipping_disabled is not supported in "
                 "time-skipping v2 environments; use "
-                "env.with_time_skipping_disabled() to suspend TS-config "
+                "env.with_time_skipping_disabled() to suspend time-skipping config "
                 "stamping on newly-started workflows."
             )
         already_disabled = not self._auto_time_skipping

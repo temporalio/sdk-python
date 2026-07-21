@@ -111,7 +111,7 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
     """Fast-forward 1h, signal, resume +1h, signal, workflow completes."""
     async with new_worker(env.client, InteractionWorkflow) as worker:
         wall_start = monotonic()
-        # Start the workflow with TS stamping suspended, then issue an
+        # Start the workflow with time-skipping stamping suspended, then issue an
         # explicit fast-forward. Keeps auto-skip from blowing through the
         # 10h wait_condition timeout before the test can interact.
         with env.with_time_skipping_disabled():
@@ -173,7 +173,7 @@ async def test_partial_fast_forward_then_unbounded(
 
         t0 = await wf_now()
 
-        # Fast-forward 30m; TS auto-disables at that point.
+        # Fast-forward 30m; time skipping auto-disables at that point.
         assert await env.fast_forward(handle, timedelta(minutes=30))
         t1 = await wf_now()
         assert_duration_same(30 * 60, t1 - t0, tolerance=10)
@@ -195,7 +195,7 @@ async def test_partial_fast_forward_then_unbounded(
 
 @workflow.defn
 class ParentTimeSkippingWorkflow:
-    """Parent 1h + child 1h + parent 1h all auto-skip; child inherits TS from parent."""
+    """Parent 1h + child 1h + parent 1h all auto-skip; child inherits time skipping from parent."""
 
     @workflow.run
     async def run(
@@ -231,7 +231,7 @@ class ParentTimeSkippingWorkflow:
 async def test_child_workflow_propagates_time_skipping(
     env: WorkflowEnvironment,
 ) -> None:
-    """Parent 1h + child 1h + parent 1h all auto-skip; child inherits TS from parent."""
+    """Parent 1h + child 1h + parent 1h all auto-skip; child inherits time skipping from parent."""
     async with new_worker(
         env.client, ParentTimeSkippingWorkflow, SleepWorkflow
     ) as worker:
@@ -276,14 +276,14 @@ async def test_child_workflow_propagates_time_skipping(
         0, result["parent_after_child_start"] - result["parent_after_wait_1"], tolerance=5
     )
 
-    # TS engaged on both workflows.
+    # Time skipping engaged on both workflows.
     await assert_time_was_skipped(parent_handle)
     child_handle = env.client.get_workflow_handle(child_id)
     await assert_time_was_skipped(child_handle)
 
 
 async def test_child_workflow_with_propagation_disabled() -> None:
-    """With ``disable_propagation=True`` on the env, child does NOT inherit TS
+    """With ``disable_propagation=True`` on the env, child does NOT inherit time skipping
     and runs in real time."""
 
     async with await WorkflowEnvironment.start_time_skipping_v2(
@@ -318,7 +318,7 @@ async def test_child_workflow_with_propagation_disabled() -> None:
             f"expected ~5s wall time (child didn't skip), got {wall_elapsed:.1f}s"
         )
 
-        # Parent had TS engaged (its own waits skipped); child did not.
+        # Parent had time skipping engaged (its own waits skipped); child did not.
         await assert_time_was_skipped(parent_handle)
         child_handle = env.client.get_workflow_handle(child_id)
         await assert_time_was_not_skipped(child_handle)
@@ -355,9 +355,9 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
         assert_duration_same(3600, result["end"] - result["start"], tolerance=10)
         # But wall time was seconds, not an hour.
         assert wall_elapsed < 10, (
-            f"expected fast wall finish under TS, got {wall_elapsed:.1f}s"
+            f"expected fast wall finish under time skipping, got {wall_elapsed:.1f}s"
         )
-        # And the workflow's history has the TS transition event.
+        # And the workflow's history has the time-skipping transition event.
         await assert_time_was_skipped(handle)
 
 
@@ -525,7 +525,7 @@ async def test_signal_with_start_stamps_time_skipping_config(
         result = await handle.result()
         wall_elapsed = monotonic() - wall_start
 
-    # 1h sleep was TS-skipped → wall time small; virtual clock advanced by ~1h.
+    # 1h sleep was time-skipped → wall time small; virtual clock advanced by ~1h.
     assert wall_elapsed < 10
     virtual_elapsed = result["end"] - result["after_signal"]
     assert 3550 <= virtual_elapsed <= 3650, (
@@ -553,7 +553,7 @@ async def test_update_time_reflects_workflow_virtual_clock(
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-        # FF 1h. Virtual clock advances to +1h and TS auto-disables.
+        # FF 1h. Virtual clock advances to +1h and time skipping auto-disables.
         wf_start_wall = datetime.now(tz=timezone.utc)
         assert await env.fast_forward(handle, timedelta(hours=1))
         # Send a follow-up update. The response's update_time reflects the
@@ -605,7 +605,7 @@ async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
         assert transition is not None, "no disabled_after_fast_forward transition found"
 
         # target_time: virtual time the FF advanced to. Should be ~+30m from
-        # the pre-FF wall clock (since the workflow started with TS off,
+        # the pre-FF wall clock (since the workflow started with time skipping off,
         # virtual clock at start ≈ wall clock).
         target = transition.target_time.ToDatetime().replace(tzinfo=timezone.utc)
         target_offset = (target - wall_before_ff).total_seconds()
@@ -627,7 +627,7 @@ async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
 async def test_child_workflow_started_event_has_state_propagation(
     env: WorkflowEnvironment,
 ) -> None:
-    """A child workflow spawned under TS carries TimeSkippingStatePropagation. """
+    """A child workflow spawned under time skipping carries TimeSkippingStatePropagation. """
     async with new_worker(
         env.client, ParentTimeSkippingWorkflow, SleepWorkflow
     ) as worker:

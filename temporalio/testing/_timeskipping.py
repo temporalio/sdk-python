@@ -25,7 +25,7 @@ class TimeSkippingConfig:
     """Whether time skipping is enabled for the workflow."""
 
     fast_forward: timedelta | None = None
-    """One-shot advance of virtual time by this duration. TS auto-disables at
+    """One-shot advance of virtual time by this duration. Time skipping auto-disables at
     the target time. `timedelta=None` means unbounded advance until completion."""
 
     disable_propagation: bool = False
@@ -251,7 +251,7 @@ class TimeSkipper:
 
     @contextmanager
     def with_time_skipping_disabled(self) -> Iterator[None]:
-        """Suspend TS-config stamping on newly-started workflows within the block.
+        """Suspend time-skipping config stamping on newly-started workflows within the block.
 
         Workflows started via :py:attr:`client` inside the block do not get
         their ``time_skipping_config`` set; existing workflows are unaffected.

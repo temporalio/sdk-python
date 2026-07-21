@@ -7,7 +7,7 @@ from temporalio.client import WorkflowHandle
 
 
 async def _has_time_skipping_transitioned_event(handle: WorkflowHandle) -> bool:
-    """Return True iff the workflow history contains the TS transition event 
+    """Return True iff the workflow history contains the time-skipping transition event
     ``EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED``."""
     async for e in handle.fetch_history_events():
         if (
