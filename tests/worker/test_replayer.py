@@ -82,6 +82,24 @@ class SayHelloWorkflow:
         return self._waiting
 
 
+_WorkflowLogicFlag = temporalio.worker._workflow_instance._WorkflowLogicFlag
+_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
+    _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
+)
+
+
+def _history_uses_workflow_logic_flag(
+    history: WorkflowHistory,
+    flag: _WorkflowLogicFlag,
+) -> bool:
+    return any(
+        event.HasField("workflow_task_completed_event_attributes")
+        and int(flag)
+        in event.workflow_task_completed_event_attributes.sdk_metadata.lang_used_flags
+        for event in history.events
+    )
+
+
 @pytest.mark.skipif(sys.version_info < (3, 12), reason="Skipping for < 3.12")
 async def test_replayer_workflow_complete(client: Client) -> None:
     # This test skips for versions < 3.12 because this is flaky due to CPython reimport issue:
@@ -428,15 +446,12 @@ class WorkflowResultInterceptor(WorkflowInboundInterceptor):
         return res
 
 
-async def test_replayer_async_ordering() -> None:
-    """
-    This test verifies that the order that asyncio tasks/coroutines are woken up matches the
-    order they were before changes to apply all jobs and then run the event loop, where previously
-    the event loop was ran after each "batch" of jobs.
-    """
-    histories_and_expecteds = [
-        (
+@pytest.mark.parametrize(
+    ("history_filename", "uses_single_batch", "expected"),
+    [
+        pytest.param(
             "test_replayer_event_tracing.json",
+            False,
             [
                 "sig-before-sync",
                 "sig-before-1",
@@ -454,9 +469,33 @@ async def test_replayer_async_ordering() -> None:
                 "timer-1",
                 "timer-2",
             ],
+            id="legacy-event-tracing",
         ),
-        (
+        pytest.param(
+            "test_replayer_event_tracing_single_batch.json",
+            True,
+            [
+                "sig-before-sync",
+                "sig-before-1",
+                "timer-sync",
+                "act-sync",
+                "sig-before-2",
+                "act-1",
+                "act-2",
+                "sig-1-sync",
+                "sig-1-1",
+                "sig-1-2",
+                "update-1-sync",
+                "update-1-1",
+                "update-1-2",
+                "timer-1",
+                "timer-2",
+            ],
+            id="single-batch-event-tracing",
+        ),
+        pytest.param(
             "test_replayer_event_tracing_double_sig_at_start.json",
+            False,
             [
                 "sig-before-sync",
                 "sig-before-1",
@@ -474,37 +513,72 @@ async def test_replayer_async_ordering() -> None:
                 "timer-1",
                 "timer-2",
             ],
+            id="legacy-double-signal-at-start",
         ),
-    ]
-    for history, expected in histories_and_expecteds:
-        with Path(__file__).with_name(history).open() as f:
-            history = f.read()
-        await Replayer(
-            workflows=[SignalsActivitiesTimersUpdatesTracingWorkflow],
-            interceptors=[WorkerWorkflowResultInterceptor()],
-        ).replay_workflow(WorkflowHistory.from_json("fake", history))
-        assert test_replayer_workflow_res == expected
-
-
-async def test_replayer_alternate_async_ordering(
-    monkeypatch: pytest.MonkeyPatch,
+        pytest.param(
+            "test_replayer_event_tracing_double_sig_at_start_single_batch.json",
+            True,
+            [
+                "sig-before-sync",
+                "sig-before-1",
+                "sig-1-sync",
+                "sig-1-1",
+                "timer-sync",
+                "act-sync",
+                "sig-before-2",
+                "sig-1-2",
+                "act-1",
+                "act-2",
+                "update-1-sync",
+                "update-1-1",
+                "update-1-2",
+                "timer-1",
+                "timer-2",
+            ],
+            id="single-batch-double-signal-at-start",
+        ),
+    ],
+)
+async def test_replayer_async_ordering(
+    history_filename: str,
+    uses_single_batch: bool,
+    expected: list[str],
 ) -> None:
-    flag = temporalio.worker._workflow_instance._WorkflowLogicFlag
-    monkeypatch.setattr(
-        temporalio.worker._workflow_instance,
-        "_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS",
-        frozenset({flag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH}),
+    """
+    Verify legacy and single-batch histories replay with the asyncio scheduling order that their
+    original executions observed.
+    """
+    with Path(__file__).with_name(history_filename).open() as f:
+        history = WorkflowHistory.from_json("fake", f.read())
+    assert (
+        _history_uses_workflow_logic_flag(history, _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG)
+        is uses_single_batch
     )
+    await Replayer(
+        workflows=[SignalsActivitiesTimersUpdatesTracingWorkflow],
+        interceptors=[WorkerWorkflowResultInterceptor()],
+    ).replay_workflow(history)
+    assert test_replayer_workflow_res == expected
+
+
+async def test_replayer_unflagged_history_uses_legacy_async_ordering() -> None:
     with (
         Path(__file__)
         .with_name("test_replayer_event_tracing_alternate.json")
         .open() as f
     ):
-        history = f.read()
-    await Replayer(
+        history = WorkflowHistory.from_json("fake", f.read())
+    assert not _history_uses_workflow_logic_flag(
+        history, _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG
+    )
+    replayer = Replayer(
         workflows=[ActivityAndSignalsWhileWorkflowDown],
         interceptors=[WorkerWorkflowResultInterceptor()],
-    ).replay_workflow(WorkflowHistory.from_json("fake", history))
+    )
+    replayer._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+    )
+    await replayer.replay_workflow(history)
     assert test_replayer_workflow_res == [
         "act-start",
         "sig-1",

@@ -1248,33 +1248,99 @@ class TrapCancelWorkflow:
             return "cancelled"
 
 
-def _enable_single_batch_workflow_activation_jobs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> temporalio.worker._workflow_instance._WorkflowLogicFlag:
-    flag = temporalio.worker._workflow_instance._WorkflowLogicFlag
-    single_batch_flag = flag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
-    monkeypatch.setattr(
-        temporalio.worker._workflow_instance,
-        "_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS",
-        frozenset({single_batch_flag}),
-    )
-    return single_batch_flag
+_WorkflowLogicFlag = temporalio.worker._workflow_instance._WorkflowLogicFlag
+_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
+    _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
+)
 
 
 def test_single_batch_workflow_activation_jobs_default_disabled() -> None:
-    flag = temporalio.worker._workflow_instance._WorkflowLogicFlag
     assert (
-        flag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG
         not in temporalio.worker._workflow_instance._DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
     )
 
 
+@workflow.defn
+class EnableWorkflowLogicFlagAfterReplayWorkflow:
+    def __init__(self) -> None:
+        self._ready = False
+        self._finish = False
+
+    @workflow.run
+    async def run(self) -> str:
+        self._ready = True
+        await workflow.wait_condition(lambda: self._finish)
+        return "done"
+
+    @workflow.signal
+    def finish(self) -> None:
+        self._finish = True
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+
+async def test_workflow_logic_flag_enabled_after_replay(client: Client) -> None:
+    task_queue = str(uuid.uuid4())
+    handle = await client.start_workflow(
+        EnableWorkflowLogicFlagAfterReplayWorkflow.run,
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+
+    async with new_worker(
+        client,
+        EnableWorkflowLogicFlagAfterReplayWorkflow,
+        task_queue=task_queue,
+    ):
+
+        async def ready() -> bool:
+            return await handle.query(EnableWorkflowLogicFlagAfterReplayWorkflow.ready)
+
+        await assert_eq_eventually(True, ready)
+
+    await handle.signal(EnableWorkflowLogicFlagAfterReplayWorkflow.finish)
+
+    runner = CustomWorkflowRunner()
+    worker = new_worker(
+        client,
+        EnableWorkflowLogicFlagAfterReplayWorkflow,
+        task_queue=task_queue,
+        workflow_runner=runner,
+    )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+    )
+    async with worker:
+        assert await handle.result() == "done"
+
+    assert any(activation.is_replaying for activation, _ in runner._pairs)
+    assert any(
+        not activation.is_replaying
+        and _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG
+        in completion.successful.used_internal_flags
+        for activation, completion in runner._pairs
+    )
+
+    history = await handle.fetch_history()
+    workflow_task_flags = [
+        event.workflow_task_completed_event_attributes.sdk_metadata.lang_used_flags
+        for event in history.events
+        if event.HasField("workflow_task_completed_event_attributes")
+    ]
+    assert _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG not in workflow_task_flags[0]
+    assert any(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG in flags for flags in workflow_task_flags[1:]
+    )
+    await Replayer(
+        workflows=[EnableWorkflowLogicFlagAfterReplayWorkflow]
+    ).replay_workflow(history)
+
+
 @pytest.mark.parametrize("single_batch", [False, True])
-async def test_workflow_cancel_before_run(
-    client: Client, monkeypatch: pytest.MonkeyPatch, single_batch: bool
-):
-    if single_batch:
-        _enable_single_batch_workflow_activation_jobs(monkeypatch)
+async def test_workflow_cancel_before_run(client: Client, single_batch: bool):
     # Start the workflow _and_ send cancel before even starting the workflow
     task_queue = str(uuid.uuid4())
     handle = await client.start_workflow(
@@ -1284,7 +1350,12 @@ async def test_workflow_cancel_before_run(
     )
     await handle.cancel()
     # Start worker and wait for result
-    async with new_worker(client, TrapCancelWorkflow, task_queue=task_queue):
+    worker = new_worker(client, TrapCancelWorkflow, task_queue=task_queue)
+    if single_batch:
+        worker._set_default_workflow_logic_flag(
+            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+        )
+    async with worker:
         assert "cancelled" == await handle.result()
 
 
@@ -1330,9 +1401,8 @@ class CancelAtWaitConditionWorkflow:
 
 @pytest.mark.parametrize("timeout", [False, True])
 async def test_workflow_cancel_and_condition_ready_in_same_activation(
-    client: Client, monkeypatch: pytest.MonkeyPatch, timeout: bool
+    client: Client, timeout: bool
 ):
-    single_batch_flag = _enable_single_batch_workflow_activation_jobs(monkeypatch)
     task_queue = str(uuid.uuid4())
     runner = CustomWorkflowRunner()
     handle = await client.start_workflow(
@@ -1342,12 +1412,16 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         task_queue=task_queue,
     )
 
-    async with new_worker(
+    worker = new_worker(
         client,
         CancelAtWaitConditionWorkflow,
         task_queue=task_queue,
         workflow_runner=runner,
-    ):
+    )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+    )
+    async with worker:
 
         async def ready() -> bool:
             return await handle.query(CancelAtWaitConditionWorkflow.ready)
@@ -1359,12 +1433,16 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
     await handle.signal(CancelAtWaitConditionWorkflow.proceed)
     await handle.cancel()
 
-    async with new_worker(
+    worker = new_worker(
         client,
         CancelAtWaitConditionWorkflow,
         task_queue=task_queue,
         workflow_runner=runner,
-    ):
+    )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+    )
+    async with worker:
 
         async def waiting_after_cancel() -> bool:
             return await handle.query(
@@ -1376,7 +1454,7 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         assert await handle.result() == "cancelled"
 
     assert any(
-        single_batch_flag in completion.successful.used_internal_flags
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG in completion.successful.used_internal_flags
         for _, completion in runner._pairs
     )
     assert any(
@@ -1426,32 +1504,39 @@ class CancelAtChildCompletionWorkflow:
 
 
 async def test_workflow_cancel_and_child_completion_in_same_activation(
-    client: Client, monkeypatch: pytest.MonkeyPatch
+    client: Client,
 ):
-    _enable_single_batch_workflow_activation_jobs(monkeypatch)
     parent_task_queue = str(uuid.uuid4())
     child_task_queue = str(uuid.uuid4())
     workflow_id = f"workflow-{uuid.uuid4()}"
     child_id = f"{workflow_id}-child"
     runner = CustomWorkflowRunner()
 
-    async with new_worker(
+    child_worker = new_worker(
         client,
         CompleteChildOnSignalWorkflow,
         task_queue=child_task_queue,
-    ):
+    )
+    child_worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+    )
+    async with child_worker:
         handle = await client.start_workflow(
             CancelAtChildCompletionWorkflow.run,
             child_task_queue,
             id=workflow_id,
             task_queue=parent_task_queue,
         )
-        async with new_worker(
+        parent_worker = new_worker(
             client,
             CancelAtChildCompletionWorkflow,
             task_queue=parent_task_queue,
             workflow_runner=runner,
-        ):
+        )
+        parent_worker._set_default_workflow_logic_flag(
+            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+        )
+        async with parent_worker:
 
             async def child_started() -> bool:
                 return await handle.query(CancelAtChildCompletionWorkflow.child_started)
@@ -1474,12 +1559,16 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
         await assert_eventually(child_completion_recorded)
         await handle.cancel()
 
-        async with new_worker(
+        parent_worker = new_worker(
             client,
             CancelAtChildCompletionWorkflow,
             task_queue=parent_task_queue,
             workflow_runner=runner,
-        ):
+        )
+        parent_worker._set_default_workflow_logic_flag(
+            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+        )
+        async with parent_worker:
             with pytest.raises(WorkflowFailureError) as err:
                 await handle.result()
             assert isinstance(err.value.cause, CancelledError)
@@ -4182,11 +4271,14 @@ class QueryAffectConditionWorkflow:
 
 @pytest.mark.parametrize("single_batch", [False, True])
 async def test_workflow_query_does_not_run_condition(
-    client: Client, monkeypatch: pytest.MonkeyPatch, single_batch: bool
+    client: Client, single_batch: bool
 ):
+    worker = new_worker(client, QueryAffectConditionWorkflow)
     if single_batch:
-        _enable_single_batch_workflow_activation_jobs(monkeypatch)
-    async with new_worker(client, QueryAffectConditionWorkflow) as worker:
+        worker._set_default_workflow_logic_flag(
+            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+        )
+    async with worker:
         handle = await client.start_workflow(
             QueryAffectConditionWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
@@ -7574,8 +7666,8 @@ class SignalsActivitiesTimersUpdatesTracingWorkflow:
 
 
 async def test_async_loop_ordering(client: Client, env: WorkflowEnvironment):
-    """This test mostly exists to generate histories for test_replayer_async_ordering.
-    See that test for more."""
+    """This test mostly exists to generate PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
+    histories for test_replayer_async_ordering. See that test for more."""
 
     if env.supports_time_skipping:
         pytest.skip("This test doesn't work right with time skipping for some reason")
@@ -7587,12 +7679,16 @@ async def test_async_loop_ordering(client: Client, env: WorkflowEnvironment):
     )
     await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "before")
 
-    async with new_worker(
+    worker = new_worker(
         client,
         SignalsActivitiesTimersUpdatesTracingWorkflow,
         activities=[say_hello],
         task_queue=task_queue,
-    ):
+    )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
+    )
+    async with worker:
         await asyncio.sleep(0.2)
         await handle.signal(SignalsActivitiesTimersUpdatesTracingWorkflow.dosig, "1")
         await handle.execute_update(

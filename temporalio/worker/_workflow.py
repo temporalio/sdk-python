@@ -40,11 +40,13 @@ from ._interceptor import (
     WorkflowInterceptorClassInput,
 )
 from ._workflow_instance import (
+    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
     PatchActivationInput,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
     _WorkflowExternFunctions,
+    _WorkflowLogicFlag,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,6 +92,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         assert_local_activity_valid: Callable[[str], None],
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
+        default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] | None = None,
     ) -> None:
         # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
         debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
@@ -97,6 +100,11 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._bridge_worker = bridge_worker
         self._namespace = namespace
         self._task_queue = task_queue
+        self._default_workflow_logic_flags = set(
+            _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+            if default_workflow_logic_flags is None
+            else default_workflow_logic_flags
+        )
         self._workflow_task_executor = (
             workflow_task_executor
             or concurrent.futures.ThreadPoolExecutor(
@@ -788,6 +796,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             patch_activation_callback=self._patch_activation_callback,
             last_completion_result=init.last_completion_result,
             last_failure=last_failure,
+            default_workflow_logic_flags=frozenset(self._default_workflow_logic_flags),
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)
@@ -799,6 +808,14 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             issubclass(temporalio.workflow.NondeterminismError, typ)
             for typ in self._workflow_failure_exception_types
         )
+
+    def _set_default_workflow_logic_flag(
+        self, flag: _WorkflowLogicFlag, *, enabled: bool
+    ) -> None:
+        if enabled:
+            self._default_workflow_logic_flags.add(flag)
+        else:
+            self._default_workflow_logic_flags.discard(flag)
 
     def nondeterminism_as_workflow_fail_for_types(self) -> set[str]:
         return {

@@ -27,7 +27,7 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum
 from typing import (
@@ -169,6 +169,9 @@ class WorkflowInstanceDetails:
     patch_activation_callback: Callable[[PatchActivationInput], bool] | None
     last_completion_result: temporalio.api.common.v1.Payloads
     last_failure: Failure | None
+    default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] = field(
+        default_factory=lambda: _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+    )
 
 
 class WorkflowInstance(ABC):
@@ -288,6 +291,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             det.worker_level_failure_exception_types
         )
         self._patch_activation_callback = det.patch_activation_callback
+        self._default_workflow_logic_flags = det.default_workflow_logic_flags
         self._primary_task: asyncio.Task[None] | None = None
         self._cancel_primary_task_pending = False
         self._time_ns = 0
@@ -2169,7 +2173,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def _workflow_logic_flag_enabled(self, flag: _WorkflowLogicFlag) -> bool:
         if flag in self._current_internal_flags:
             return True
-        if self._is_replaying or flag not in _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS:
+        if self._is_replaying or flag not in self._default_workflow_logic_flags:
             return False
         self._current_completion.successful.used_internal_flags.append(flag)
         return True
@@ -3942,5 +3946,7 @@ class _WorkflowLogicFlag(IntEnum):
 
 
 # TODO: Enable PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH by default after
-# two published SDK releases have recognized flag 2, then remove this reminder.
+# two published SDK releases have recognized flag 2. When enabling it, remove the
+# explicit overrides for this flag from tests/worker/test_workflow.py, then remove
+# this reminder.
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
