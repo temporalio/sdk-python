@@ -109,41 +109,47 @@ class TemporalMcpToolSetProvider:
             args: _GetToolsArguments,
         ) -> list[_ToolResult]:
             toolset = self._toolset_factory(args.factory_argument)
-            tools = await toolset.get_tools()
-            return [
-                _ToolResult(
-                    tool.name,
-                    tool.description,
-                    tool.is_long_running,
-                    tool.custom_metadata,
-                    tool._get_declaration(),
-                )
-                for tool in tools
-            ]
+            try:
+                tools = await toolset.get_tools()
+                return [
+                    _ToolResult(
+                        tool.name,
+                        tool.description,
+                        tool.is_long_running,
+                        tool.custom_metadata,
+                        tool._get_declaration(),
+                    )
+                    for tool in tools
+                ]
+            finally:
+                await toolset.close()
 
         @activity.defn(name=self._name + "-call-tool")
         async def call_tool(
             args: _CallToolArguments,
         ) -> _CallToolResult:
             toolset = self._toolset_factory(args.factory_argument)
-            tools = await toolset.get_tools()
-            tool_match = [tool for tool in tools if tool.name == args.name]
-            if len(tool_match) == 0:
-                raise ApplicationError(
-                    f"Unable to find matching mcp tool by name: {args.name}"
-                )
-            if len(tool_match) > 1:
-                raise ApplicationError(
-                    f"Unable too many matching mcp tools by name: {args.name}"
-                )
-            tool = tool_match[0]
+            try:
+                tools = await toolset.get_tools()
+                tool_match = [tool for tool in tools if tool.name == args.name]
+                if len(tool_match) == 0:
+                    raise ApplicationError(
+                        f"Unable to find matching mcp tool by name: {args.name}"
+                    )
+                if len(tool_match) > 1:
+                    raise ApplicationError(
+                        f"Unable too many matching mcp tools by name: {args.name}"
+                    )
+                tool = tool_match[0]
 
-            # We cannot provide a full-fledged ToolContext so we need to provide only what is needed by the tool
-            result = await tool.run_async(
-                args=args.arguments,
-                tool_context=args.tool_context,  #  type:ignore
-            )
-            return _CallToolResult(result=result, tool_context=args.tool_context)
+                # We cannot provide a full-fledged ToolContext so we need to provide only what is needed by the tool
+                result = await tool.run_async(
+                    args=args.arguments,
+                    tool_context=args.tool_context,  #  type:ignore
+                )
+                return _CallToolResult(result=result, tool_context=args.tool_context)
+            finally:
+                await toolset.close()
 
         return get_tools, call_tool
 

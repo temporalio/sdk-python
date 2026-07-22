@@ -45,6 +45,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Fixed Google ADK MCP toolset activities to close their factory-created toolsets after
+  listing or invoking tools, preventing leaked MCP sessions and stdio subprocesses.
+
 ### Security
 
 ## [1.30.0] - 2026-07-01

@@ -53,6 +53,11 @@ from temporalio.contrib.google_adk_agents import (
     TemporalMcpToolSetProvider,
     TemporalModel,
 )
+from temporalio.contrib.google_adk_agents._mcp import (
+    TemporalToolContext,
+    _CallToolArguments,
+    _GetToolsArguments,
+)
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.worker import Worker
 from temporalio.workflow import ActivityConfig
@@ -396,6 +401,62 @@ def example_toolset(_: Any | None) -> McpToolset:
             ),
         ),
     )
+
+
+class _TrackingMcpTool:
+    name = "tracking-tool"
+    description = "A test MCP tool"
+    is_long_running = False
+    custom_metadata = None
+
+    def _get_declaration(self) -> None:
+        return None
+
+    async def run_async(
+        self, *, args: dict[str, Any], tool_context: TemporalToolContext
+    ) -> dict[str, Any]:
+        return args
+
+
+class _TrackingMcpToolset:
+    def __init__(self) -> None:
+        self.close_calls = 0
+        self.tool = _TrackingMcpTool()
+
+    async def get_tools(self) -> list[_TrackingMcpTool]:
+        return [self.tool]
+
+    async def close(self) -> None:
+        self.close_calls += 1
+
+
+@pytest.mark.asyncio
+async def test_mcp_toolset_provider_closes_factory_toolsets() -> None:
+    created_toolsets: list[_TrackingMcpToolset] = []
+
+    def factory(_: Any | None) -> _TrackingMcpToolset:
+        toolset = _TrackingMcpToolset()
+        created_toolsets.append(toolset)
+        return toolset
+
+    get_tools, call_tool = TemporalMcpToolSetProvider(
+        "tracking",
+        factory,  # type: ignore[arg-type]
+    )._get_activities()
+
+    tool_results = await get_tools(_GetToolsArguments(None))
+    call_result = await call_tool(
+        _CallToolArguments(
+            None,
+            "tracking-tool",
+            {"value": "ok"},
+            tool_context=None,  # type: ignore[arg-type]
+        )
+    )
+
+    assert [tool.name for tool in tool_results] == ["tracking-tool"]
+    assert call_result.result == {"value": "ok"}
+    assert [toolset.close_calls for toolset in created_toolsets] == [1, 1]
 
 
 def mcp_agent(model_name: str) -> Agent:
