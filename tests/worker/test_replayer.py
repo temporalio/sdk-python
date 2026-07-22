@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+import temporalio.worker._workflow_instance
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
 from temporalio.exceptions import ApplicationError
@@ -485,7 +486,15 @@ async def test_replayer_async_ordering() -> None:
         assert test_replayer_workflow_res == expected
 
 
-async def test_replayer_alternate_async_ordering() -> None:
+async def test_replayer_alternate_async_ordering(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    flag = temporalio.worker._workflow_instance._WorkflowLogicFlag
+    monkeypatch.setattr(
+        temporalio.worker._workflow_instance,
+        "_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS",
+        frozenset({flag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH}),
+    )
     with (
         Path(__file__)
         .with_name("test_replayer_event_tracing_alternate.json")

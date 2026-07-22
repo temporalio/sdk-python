@@ -38,6 +38,14 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- Prepared replay-safe workflow activation scheduling that prevents cancellation
+  from being lost when another event becomes ready in the same workflow task. The
+  behavior is guarded by internal workflow logic flag 2 and remains disabled by
+  default during its compatibility rollout.
+  **Maintainer reminder:** keep flag 2 default-disabled for the first two published
+  SDK releases that recognize it; enable it in the third release and replace this
+  rollout note with a `Fixed` entry announcing the behavior change.
+
 ### Deprecated
 
 ### Breaking Changes

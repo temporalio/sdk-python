@@ -289,6 +289,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
         self._patch_activation_callback = det.patch_activation_callback
         self._primary_task: asyncio.Task[None] | None = None
+        self._cancel_primary_task_pending = False
         self._time_ns = 0
         self._cancel_reason: str | None = None
         self._deployment_version_for_current_task: None | (
@@ -459,6 +460,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._is_replaying = act.is_replaying
         self._current_thread_id = threading.get_ident()
         self._current_internal_flags = act.available_internal_flags
+        self._single_batch_activation = self._workflow_logic_flag_enabled(
+            _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
+        )
         activation_err: Exception | None = None
         try:
             # Split into job sets with patches, then signals + updates, then
@@ -479,21 +483,46 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 else:
                     job_sets[3].append(job)
 
+            # Core guarantees query-only activations. Fail fast in debug builds
+            # instead of silently accommodating a mixed activation.
+            assert not job_sets[3] or not any(job_sets[:3]), (
+                "Query jobs must not share an activation with non-query jobs. "
+                "This is an SDK Core bug."
+            )
+
             if start_job:
                 self._workflow_input = self._make_workflow_input(start_job)
 
-            # Apply every job set, running after each set
-            for index, job_set in enumerate(job_sets):
-                if not job_set:
-                    continue
-                for job in job_set:
-                    # Let errors bubble out of these to the caller to fail the task
-                    self._apply(job)
+            if self._single_batch_activation:
+                # Applying all non-query jobs before giving workflow tasks a
+                # chance to run prevents their order in the activation from
+                # hiding state that arrived in the same workflow task.
+                for job_set in job_sets[:3]:
+                    for job in job_set:
+                        # Let errors bubble out of these to the caller to fail the task
+                        self._apply(job)
+                if any(job_sets[:3]):
+                    self._run_once(check_conditions=bool(job_sets[1] or job_sets[2]))
 
-                # Run one iteration of the loop. We do not allow conditions to
-                # be checked in patch jobs (first index) or query jobs (last
-                # index).
-                self._run_once(check_conditions=index == 1 or index == 2)
+                # Query execution must not cause wait conditions to advance.
+                for job in job_sets[3]:
+                    self._apply(job)
+                if job_sets[3]:
+                    self._run_once(check_conditions=False)
+            else:
+                # Preserve the legacy scheduling order for histories which do
+                # not contain the single-batch workflow logic flag.
+                for index, job_set in enumerate(job_sets):
+                    if not job_set:
+                        continue
+                    for job in job_set:
+                        # Let errors bubble out of these to the caller to fail the task
+                        self._apply(job)
+
+                    # Run one iteration of the loop. We do not allow conditions to
+                    # be checked in patch jobs (first index) or query jobs (last
+                    # index).
+                    self._run_once(check_conditions=index == 1 or index == 2)
         except Exception as err:
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
@@ -628,6 +657,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # workflow the ability to receive the cancellation, so we must defer
             # this cancellation to the next iteration of the event loop.
             self.call_soon(self._primary_task.cancel)
+        elif self._single_batch_activation:
+            # Initialization is the only job that creates the primary task, so
+            # retain a same-activation cancellation until that task exists.
+            self._cancel_primary_task_pending = True
 
     def _apply_do_update(
         self, job: temporalio.bridge.proto.workflow_activation.DoUpdate
@@ -1121,6 +1154,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             self._run_top_level_workflow_function(run_workflow(self._workflow_input)),
             name="run",
         )
+        if self._cancel_primary_task_pending:
+            self._cancel_primary_task_pending = False
+            self.call_soon(self._primary_task.cancel)
 
     def _apply_update_random_seed(
         self, job: temporalio.bridge.proto.workflow_activation.UpdateRandomSeed
@@ -1832,6 +1868,19 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         timeout_summary: str | None = None,
     ) -> None:
         self._assert_not_read_only("wait condition")
+        cancellation_requested_before = self._cancel_reason is not None
+
+        # Some asyncio.wait_for implementations can prefer a ready condition
+        # result or timeout over task cancellation that becomes ready in the same
+        # event-loop turn. Only detect a new request so workflows can catch
+        # cancellation and keep going.
+        def cancellation_arrived() -> bool:
+            return (
+                self._single_batch_activation
+                and not cancellation_requested_before
+                and self._cancel_reason is not None
+            )
+
         fut = self.create_future()
         self._conditions.append((fn, fut))
         user_metadata = (
@@ -1849,7 +1898,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             _TimerOptionsCtxVar.set(_TimerOptions(user_metadata=user_metadata))
             await asyncio.wait_for(fut, timeout)
 
-        await ctxvars.run(in_context)
+        try:
+            await ctxvars.run(in_context)
+        except asyncio.TimeoutError:
+            if cancellation_arrived():
+                raise asyncio.CancelledError()
+            raise
+        if cancellation_arrived():
+            raise asyncio.CancelledError()
 
     def workflow_get_current_details(self) -> str:
         return self._current_details
@@ -1956,6 +2012,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     # If an activity future completes at the same time as a cancellation is being processed, the cancellation would be swallowed
                     # _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY will correctly reraise the exception
                     if handle._result_fut.done():
+                        if self._single_batch_activation:
+                            raise
                         if (
                             not self._is_replaying
                             or _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
@@ -2060,6 +2118,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     # spurious error log on Python 3.11+ (see issue #1600).
                     return await _shield_await(handle._result_fut)
                 except asyncio.CancelledError as err:
+                    if self._cancellation_wins_over_completed_future(
+                        handle._result_fut
+                    ):
+                        raise
                     apply_child_cancel_error(err)
                     # Clear the cancellation counter on Python 3.11+ so the
                     # next await does not immediately re-raise CancelledError
@@ -2085,6 +2147,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 await _shield_await(handle._start_fut)
                 return handle
             except asyncio.CancelledError as err:
+                if self._cancellation_wins_over_completed_future(handle._start_fut):
+                    raise
                 apply_child_cancel_error(err)
                 # Clear the cancellation counter on Python 3.11+ so the
                 # next await does not immediately re-raise CancelledError
@@ -2119,6 +2183,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 try:
                     return cast(OutputT, await _shield_await(handle._result_fut))
                 except asyncio.CancelledError:
+                    if self._cancellation_wins_over_completed_future(
+                        handle._result_fut
+                    ):
+                        raise
                     cancel_command = self._add_command()
                     handle._apply_cancel_command(cancel_command)
                     # Clear the cancellation counter on Python 3.11+ so the
@@ -2154,6 +2222,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 await _shield_await(handle._start_fut)
                 return handle
             except asyncio.CancelledError:
+                if self._cancellation_wins_over_completed_future(handle._start_fut):
+                    raise
                 cancel_command = self._add_command()
                 handle._apply_cancel_command(cancel_command)
                 # Clear the cancellation counter on Python 3.11+ so the
@@ -2172,6 +2242,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def _add_command(self) -> temporalio.bridge.proto.workflow_commands.WorkflowCommand:
         self._assert_not_read_only("add command")
         return self._current_completion.successful.commands.add()
+
+    def _workflow_logic_flag_enabled(self, flag: _WorkflowLogicFlag) -> bool:
+        if flag in self._current_internal_flags:
+            return True
+        if self._is_replaying or flag not in _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS:
+            return False
+        self._current_completion.successful.used_internal_flags.append(flag)
+        return True
 
     @contextmanager
     def _as_read_only(self, *, in_query_or_validator: bool) -> Iterator[None]:
@@ -2196,6 +2274,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise temporalio.workflow.ReadOnlyContextError(
                 f"While in read-only function, action attempted: {action_attempted}"
             )
+
+    def _cancellation_wins_over_completed_future(self, fut: asyncio.Future) -> bool:
+        # Retrying a shield after both it and its protected future become ready
+        # would return the result and erase the task cancellation.
+        return self._single_batch_activation and fut.done()
 
     async def _cancel_external_workflow(
         self,
@@ -2695,6 +2778,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # spurious error log on Python 3.11+ (see issue #1600).
                 return await _shield_await(done_fut)
             except asyncio.CancelledError:
+                if self._cancellation_wins_over_completed_future(done_fut):
+                    raise
                 cancel_command = self._add_command()
                 cancel_command.cancel_signal_workflow.seq = seq
                 # Clear the cancellation counter on Python 3.11+ so the
@@ -3896,3 +3981,9 @@ class _WorkflowLogicFlag(IntEnum):
     """Flags that may be set on task/activation completion to differentiate new from old workflow behavior."""
 
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
+    PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH = 2
+
+
+# TODO: Enable PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH by default after
+# two published SDK releases have recognized flag 2, then remove this reminder.
+_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()

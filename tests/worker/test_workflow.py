@@ -41,6 +41,7 @@ import temporalio.converter
 import temporalio.converter._extstore
 import temporalio.worker
 import temporalio.worker._command_aware_visitor
+import temporalio.worker._workflow_instance
 import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
@@ -114,6 +115,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ExecuteWorkflowInput,
     HandleSignalInput,
+    Replayer,
     UnsandboxedWorkflowRunner,
     Worker,
     WorkflowInstance,
@@ -1246,7 +1248,33 @@ class TrapCancelWorkflow:
             return "cancelled"
 
 
-async def test_workflow_cancel_before_run(client: Client):
+def _enable_single_batch_workflow_activation_jobs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> temporalio.worker._workflow_instance._WorkflowLogicFlag:
+    flag = temporalio.worker._workflow_instance._WorkflowLogicFlag
+    single_batch_flag = flag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
+    monkeypatch.setattr(
+        temporalio.worker._workflow_instance,
+        "_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS",
+        frozenset({single_batch_flag}),
+    )
+    return single_batch_flag
+
+
+def test_single_batch_workflow_activation_jobs_default_disabled() -> None:
+    flag = temporalio.worker._workflow_instance._WorkflowLogicFlag
+    assert (
+        flag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
+        not in temporalio.worker._workflow_instance._DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+    )
+
+
+@pytest.mark.parametrize("single_batch", [False, True])
+async def test_workflow_cancel_before_run(
+    client: Client, monkeypatch: pytest.MonkeyPatch, single_batch: bool
+):
+    if single_batch:
+        _enable_single_batch_workflow_activation_jobs(monkeypatch)
     # Start the workflow _and_ send cancel before even starting the workflow
     task_queue = str(uuid.uuid4())
     handle = await client.start_workflow(
@@ -1258,6 +1286,213 @@ async def test_workflow_cancel_before_run(client: Client):
     # Start worker and wait for result
     async with new_worker(client, TrapCancelWorkflow, task_queue=task_queue):
         assert "cancelled" == await handle.result()
+
+
+@workflow.defn
+class CancelAtWaitConditionWorkflow:
+    def __init__(self) -> None:
+        self._ready = False
+        self._proceed = False
+        self._waiting_after_cancel = False
+        self._finish_after_cancel = False
+
+    @workflow.run
+    async def run(self, timeout: bool) -> str:
+        self._ready = True
+        try:
+            await workflow.wait_condition(
+                lambda: self._proceed, timeout=1000 if timeout else None
+            )
+        except asyncio.CancelledError:
+            # A caught cancellation must not be raised again merely because a
+            # later wait sees the already-recorded workflow cancellation.
+            self._waiting_after_cancel = True
+            await workflow.wait_condition(lambda: self._finish_after_cancel)
+            return "cancelled"
+        return "condition"
+
+    @workflow.signal
+    def proceed(self) -> None:
+        self._proceed = True
+
+    @workflow.signal
+    def finish_after_cancel(self) -> None:
+        self._finish_after_cancel = True
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.query
+    def waiting_after_cancel(self) -> bool:
+        return self._waiting_after_cancel
+
+
+@pytest.mark.parametrize("timeout", [False, True])
+async def test_workflow_cancel_and_condition_ready_in_same_activation(
+    client: Client, monkeypatch: pytest.MonkeyPatch, timeout: bool
+):
+    single_batch_flag = _enable_single_batch_workflow_activation_jobs(monkeypatch)
+    task_queue = str(uuid.uuid4())
+    runner = CustomWorkflowRunner()
+    handle = await client.start_workflow(
+        CancelAtWaitConditionWorkflow.run,
+        timeout,
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+
+    async with new_worker(
+        client,
+        CancelAtWaitConditionWorkflow,
+        task_queue=task_queue,
+        workflow_runner=runner,
+    ):
+
+        async def ready() -> bool:
+            return await handle.query(CancelAtWaitConditionWorkflow.ready)
+
+        await assert_eq_eventually(True, ready)
+
+    # Keep the worker offline so the signal and cancellation are delivered in
+    # one activation when polling resumes.
+    await handle.signal(CancelAtWaitConditionWorkflow.proceed)
+    await handle.cancel()
+
+    async with new_worker(
+        client,
+        CancelAtWaitConditionWorkflow,
+        task_queue=task_queue,
+        workflow_runner=runner,
+    ):
+
+        async def waiting_after_cancel() -> bool:
+            return await handle.query(
+                CancelAtWaitConditionWorkflow.waiting_after_cancel
+            )
+
+        await assert_eq_eventually(True, waiting_after_cancel)
+        await handle.signal(CancelAtWaitConditionWorkflow.finish_after_cancel)
+        assert await handle.result() == "cancelled"
+
+    assert any(
+        single_batch_flag in completion.successful.used_internal_flags
+        for _, completion in runner._pairs
+    )
+    assert any(
+        {"signal_workflow", "cancel_workflow"}.issubset(
+            {job.WhichOneof("variant") for job in activation.jobs}
+        )
+        for activation, _ in runner._pairs
+    )
+    await Replayer(workflows=[CancelAtWaitConditionWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
+
+
+@workflow.defn
+class CompleteChildOnSignalWorkflow:
+    def __init__(self) -> None:
+        self._finish = False
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.wait_condition(lambda: self._finish)
+        return "child complete"
+
+    @workflow.signal
+    def finish(self) -> None:
+        self._finish = True
+
+
+@workflow.defn
+class CancelAtChildCompletionWorkflow:
+    def __init__(self) -> None:
+        self._child_started = False
+
+    @workflow.run
+    async def run(self, child_task_queue: str) -> str:
+        child = await workflow.start_child_workflow(
+            CompleteChildOnSignalWorkflow.run,
+            id=f"{workflow.info().workflow_id}-child",
+            task_queue=child_task_queue,
+        )
+        self._child_started = True
+        return await child
+
+    @workflow.query
+    def child_started(self) -> bool:
+        return self._child_started
+
+
+async def test_workflow_cancel_and_child_completion_in_same_activation(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+):
+    _enable_single_batch_workflow_activation_jobs(monkeypatch)
+    parent_task_queue = str(uuid.uuid4())
+    child_task_queue = str(uuid.uuid4())
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    child_id = f"{workflow_id}-child"
+    runner = CustomWorkflowRunner()
+
+    async with new_worker(
+        client,
+        CompleteChildOnSignalWorkflow,
+        task_queue=child_task_queue,
+    ):
+        handle = await client.start_workflow(
+            CancelAtChildCompletionWorkflow.run,
+            child_task_queue,
+            id=workflow_id,
+            task_queue=parent_task_queue,
+        )
+        async with new_worker(
+            client,
+            CancelAtChildCompletionWorkflow,
+            task_queue=parent_task_queue,
+            workflow_runner=runner,
+        ):
+
+            async def child_started() -> bool:
+                return await handle.query(CancelAtChildCompletionWorkflow.child_started)
+
+            await assert_eq_eventually(True, child_started)
+
+        child_handle = client.get_workflow_handle(child_id)
+        await child_handle.signal(CompleteChildOnSignalWorkflow.finish)
+        assert await child_handle.result() == "child complete"
+
+        async def child_completion_recorded() -> None:
+            async for event in handle.fetch_history_events():
+                if (
+                    event.event_type
+                    == EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED
+                ):
+                    return
+            raise AssertionError("Child completion is not in parent history")
+
+        await assert_eventually(child_completion_recorded)
+        await handle.cancel()
+
+        async with new_worker(
+            client,
+            CancelAtChildCompletionWorkflow,
+            task_queue=parent_task_queue,
+            workflow_runner=runner,
+        ):
+            with pytest.raises(WorkflowFailureError) as err:
+                await handle.result()
+            assert isinstance(err.value.cause, CancelledError)
+
+    assert any(
+        {"resolve_child_workflow_execution", "cancel_workflow"}.issubset(
+            {job.WhichOneof("variant") for job in activation.jobs}
+        )
+        for activation, _ in runner._pairs
+    )
+    await Replayer(workflows=[CancelAtChildCompletionWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
 
 
 @activity.defn
@@ -3945,7 +4180,12 @@ class QueryAffectConditionWorkflow:
         return True
 
 
-async def test_workflow_query_does_not_run_condition(client: Client):
+@pytest.mark.parametrize("single_batch", [False, True])
+async def test_workflow_query_does_not_run_condition(
+    client: Client, monkeypatch: pytest.MonkeyPatch, single_batch: bool
+):
+    if single_batch:
+        _enable_single_batch_workflow_activation_jobs(monkeypatch)
     async with new_worker(client, QueryAffectConditionWorkflow) as worker:
         handle = await client.start_workflow(
             QueryAffectConditionWorkflow.run,
