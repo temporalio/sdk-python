@@ -476,34 +476,43 @@ class TemporalStatefulMcpToolSetProvider:
         async def connect(
             args: _StatefulServerSessionArguments | None = None,
         ) -> None:
-            heartbeat_task = asyncio.create_task(heartbeat_every(30))
-
             server_id = self._name + "@" + (activity.info().workflow_run_id or "")
             if server_id in self._toolsets:
                 raise ApplicationError(
                     "Cannot connect to an already running toolset. Use a distinct "
                     "name if running multiple stateful toolsets in one workflow."
                 )
-            toolset = self._toolset_factory(args.factory_argument if args else None)
+
+            # Created only once the duplicate-connect check has passed, and
+            # cancelled in the outermost ``finally`` below so it is torn down
+            # on every exit path -- including a ``toolset.close()`` failure,
+            # which would otherwise leave it heartbeating forever after this
+            # activity has already exited.
+            heartbeat_task = asyncio.create_task(heartbeat_every(30))
             try:
-                self._toolsets[server_id] = toolset
+                toolset = self._toolset_factory(args.factory_argument if args else None)
                 try:
-                    worker = Worker(
-                        activity.client(),
-                        task_queue=server_id,
-                        activities=[get_tools, call_tool],
-                        activity_task_poller_behavior=PollerBehaviorSimpleMaximum(1),
-                    )
-                    await worker.run()
-                finally:
-                    await toolset.close()
-                    heartbeat_task.cancel()
+                    self._toolsets[server_id] = toolset
                     try:
-                        await heartbeat_task
-                    except asyncio.CancelledError:
-                        pass
+                        worker = Worker(
+                            activity.client(),
+                            task_queue=server_id,
+                            activities=[get_tools, call_tool],
+                            activity_task_poller_behavior=PollerBehaviorSimpleMaximum(
+                                1
+                            ),
+                        )
+                        await worker.run()
+                    finally:
+                        await toolset.close()
+                finally:
+                    del self._toolsets[server_id]
             finally:
-                del self._toolsets[server_id]
+                heartbeat_task.cancel()
+                try:
+                    await heartbeat_task
+                except asyncio.CancelledError:
+                    pass
 
         return (connect,)
 
