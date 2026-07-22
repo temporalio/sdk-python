@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
@@ -17,106 +16,6 @@ from google.genai.types import FunctionDeclaration
 from temporalio import activity, workflow
 from temporalio.exceptions import ApplicationError
 from temporalio.workflow import ActivityConfig
-
-# Default time an idle pooled McpToolset connection stays open before being
-# closed. The timer resets on every call that reuses the connection.
-# Overridable via ``TemporalMcpToolSetProvider(mcp_connection_idle_timeout=...)``,
-# matching the ``_MCP_CONNECTION_IDLE`` default used by the strands and
-# google_genai contribs' equivalent MCP connection pools.
-_MCP_CONNECTION_IDLE = timedelta(minutes=5)
-
-# Provider name -> live pooled connection held open in the activity worker
-# process. Activities run in the worker process, so this module state is
-# shared across activity invocations on the worker.
-_CONNECTIONS: dict[str, "_ConnectionRecord"] = {}
-
-
-class _ConnectionRecord:
-    """A single ``McpToolset`` instance held open and reused across calls.
-
-    ``McpToolset`` lazily opens its MCP session on first use and manages
-    reconnection internally via its own ``MCPSessionManager``, so -- unlike
-    the raw ``mcp.ClientSession`` pooled by the strands/google_genai contribs
-    -- no dedicated owner task is needed here: the toolset instance itself is
-    the thing kept alive and reused across activity invocations.
-    """
-
-    def __init__(self, name: str, toolset: McpToolset, idle_timeout: timedelta) -> None:
-        self._name = name
-        self._toolset = toolset
-        self._idle_timeout = idle_timeout
-        self._idle_handle: asyncio.TimerHandle | None = None
-        self._inflight = 0
-
-    @property
-    def toolset(self) -> McpToolset:
-        return self._toolset
-
-    def acquire(self) -> None:
-        """Mark a call in flight; pause idle eviction while calls are active."""
-        self._inflight += 1
-        if self._idle_handle is not None:
-            self._idle_handle.cancel()
-            self._idle_handle = None
-
-    def release(self) -> None:
-        """Mark a call done; arm idle eviction once no calls remain in flight."""
-        self._inflight -= 1
-        # Only the record still cached under this name arms a timer; a record
-        # already evicted or never cached must not schedule one, or it could
-        # later evict a different, healthy connection for the same name.
-        if self._inflight == 0 and _CONNECTIONS.get(self._name) is self:
-            loop = asyncio.get_running_loop()
-            self._idle_handle = loop.call_later(
-                self._idle_timeout.total_seconds(), self._on_idle
-            )
-
-    def _on_idle(self) -> None:
-        asyncio.ensure_future(self._maybe_evict())
-
-    async def _maybe_evict(self) -> None:
-        # A call may have acquired the connection between the timer firing and
-        # this task running; only evict if it is still idle.
-        if self._inflight == 0:
-            await _evict_connection(self._name)
-
-    async def aclose(self) -> None:
-        """Cancel any pending idle timer and close the underlying toolset."""
-        if self._idle_handle is not None:
-            self._idle_handle.cancel()
-            self._idle_handle = None
-        await self._toolset.close()
-
-
-async def get_connection(
-    name: str,
-    toolset_factory: Callable[[Any | None], McpToolset],
-    factory_argument: Any | None,
-    idle_timeout: timedelta,
-) -> "_ConnectionRecord":
-    """Return the cached connection for ``name``, opening one lazily if needed.
-
-    The returned record is acquired; the caller must ``release()`` it once the
-    call completes so idle eviction can resume. ``factory_argument`` is only
-    consulted the first time a connection is opened for ``name`` -- a warm
-    connection is reused as-is regardless of subsequent calls' ``factory_argument``
-    values, matching how the strands/google_genai contribs pool a single
-    connection per name.
-    """
-    record = _CONNECTIONS.get(name)
-    if record is None:
-        record = _ConnectionRecord(
-            name, toolset_factory(factory_argument), idle_timeout
-        )
-        _CONNECTIONS[name] = record
-    record.acquire()
-    return record
-
-
-async def _evict_connection(name: str) -> None:
-    record = _CONNECTIONS.pop(name, None)
-    if record is not None:
-        await record.aclose()
 
 
 @dataclass
@@ -189,76 +88,64 @@ class TemporalMcpToolSetProvider:
 
     Manages the creation of toolset activities and handles tool execution
     within Temporal workflows.
+
+    This provider is *stateless*: every ``list-tools``/``call-tool`` activity
+    invocation builds a fresh ``McpToolset`` via ``toolset_factory``, runs the
+    operation, and always closes the toolset in a ``finally`` block. This means
+    ``factory_argument`` is honored on every single call (no cross-workflow
+    connection sharing or silent mis-routing) and no MCP session or stdio
+    subprocess is leaked. State is not maintained across calls; if a persistent
+    connection is required, use :class:`TemporalStatefulMcpToolSetProvider`.
     """
 
     def __init__(
         self,
         name: str,
         toolset_factory: Callable[[Any | None], McpToolset],
-        mcp_connection_idle_timeout: timedelta | None = None,
     ) -> None:
         """Initializes the toolset provider.
 
         Args:
             name: Name prefix for the generated activities.
             toolset_factory: Factory function that creates McpToolset instances.
-            mcp_connection_idle_timeout: How long a pooled MCP connection may sit
-                idle (no in-flight calls) before it is closed and evicted.
-                Defaults to 5 minutes, matching the strands/google_genai contribs.
+                It should return a new toolset each time so that no state is
+                shared between workflow runs.
         """
         super().__init__()
         self._name = name
         self._toolset_factory = toolset_factory
-        self._idle_timeout = mcp_connection_idle_timeout or _MCP_CONNECTION_IDLE
 
     def _get_activities(self) -> Sequence[Callable]:
         @activity.defn(name=self._name + "-list-tools")
         async def get_tools(
             args: _GetToolsArguments,
         ) -> list[_ToolResult]:
-            record = await get_connection(
-                self._name,
-                self._toolset_factory,
-                args.factory_argument,
-                self._idle_timeout,
-            )
+            # Build a fresh toolset per call, honoring this call's
+            # ``factory_argument``, and always close it so no MCP session
+            # (or stdio subprocess) leaks. See issue #1663.
+            toolset = self._toolset_factory(args.factory_argument)
             try:
-                try:
-                    tools = await record.toolset.get_tools()
-                except Exception:
-                    # The underlying session may be broken; drop it so the
-                    # next call reconnects instead of reusing a dead session.
-                    await _evict_connection(self._name)
-                    raise
+                tools = await toolset.get_tools()
+                return [
+                    _ToolResult(
+                        tool.name,
+                        tool.description,
+                        tool.is_long_running,
+                        tool.custom_metadata,
+                        tool._get_declaration(),
+                    )
+                    for tool in tools
+                ]
             finally:
-                record.release()
-            return [
-                _ToolResult(
-                    tool.name,
-                    tool.description,
-                    tool.is_long_running,
-                    tool.custom_metadata,
-                    tool._get_declaration(),
-                )
-                for tool in tools
-            ]
+                await toolset.close()
 
         @activity.defn(name=self._name + "-call-tool")
         async def call_tool(
             args: _CallToolArguments,
         ) -> _CallToolResult:
-            record = await get_connection(
-                self._name,
-                self._toolset_factory,
-                args.factory_argument,
-                self._idle_timeout,
-            )
+            toolset = self._toolset_factory(args.factory_argument)
             try:
-                try:
-                    tools = await record.toolset.get_tools()
-                except Exception:
-                    await _evict_connection(self._name)
-                    raise
+                tools = await toolset.get_tools()
 
                 tool_match = [tool for tool in tools if tool.name == args.name]
                 if len(tool_match) == 0:
@@ -271,18 +158,14 @@ class TemporalMcpToolSetProvider:
                     )
                 tool = tool_match[0]
 
-                try:
-                    # We cannot provide a full-fledged ToolContext so we need to provide only what is needed by the tool
-                    result = await tool.run_async(
-                        args=args.arguments,
-                        tool_context=args.tool_context,  #  type:ignore
-                    )
-                except Exception:
-                    await _evict_connection(self._name)
-                    raise
+                # We cannot provide a full-fledged ToolContext so we need to provide only what is needed by the tool
+                result = await tool.run_async(
+                    args=args.arguments,
+                    tool_context=args.tool_context,  #  type:ignore
+                )
+                return _CallToolResult(result=result, tool_context=args.tool_context)
             finally:
-                record.release()
-            return _CallToolResult(result=result, tool_context=args.tool_context)
+                await toolset.close()
 
         return get_tools, call_tool
 
