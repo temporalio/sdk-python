@@ -497,21 +497,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 self._workflow_input = self._make_workflow_input(start_job)
 
             if self._single_batch_activation:
-                # Applying all non-query jobs before giving workflow tasks a
-                # chance to run prevents their order in the activation from
-                # hiding state that arrived in the same workflow task.
-                for job_set in job_sets[:3]:
+                # Applying every job before giving workflow tasks a chance to
+                # run prevents their order in the activation from hiding state
+                # that arrived in the same workflow task.
+                for job_set in job_sets:
                     for job in job_set:
                         # Let errors bubble out of these to the caller to fail the task
                         self._apply(job)
-                if any(job_sets[:3]):
+                if any(job_sets):
                     self._run_once(check_conditions=bool(job_sets[1] or job_sets[2]))
-
-                # Query execution must not cause wait conditions to advance.
-                for job in job_sets[3]:
-                    self._apply(job)
-                if job_sets[3]:
-                    self._run_once(check_conditions=False)
             else:
                 # Preserve the legacy scheduling order for histories which do
                 # not contain the single-batch workflow logic flag.
