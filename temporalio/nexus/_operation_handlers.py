@@ -138,6 +138,25 @@ class CancelWorkflowRunOptions:
     """The ID of the workflow to cancel."""
 
 
+@dataclass(frozen=True)
+class CancelUpdateWorkflowOptions:
+    """Options for cancelling the workflow update backing a Nexus operation.
+
+    These options are built by :py:class:`TemporalOperationHandler` and passed to
+    :py:meth:`TemporalOperationHandler.cancel_workflow_update`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    workflow_id: str
+    """The ID of the workflow where the update is running."""
+    update_id: str
+    """The ID of the update to cancel."""
+    run_id: str
+    """The workflow runID that accepted the update."""
+
+
 class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
     """Operation handler for Nexus operations that interact with Temporal.
     Implementations override the start_operation method.
@@ -190,6 +209,15 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
                     workflow_id=operation_token.workflow_id
                 )
                 await self.cancel_workflow_run(cancel_ctx, options)
+            case OperationTokenType.UPDATE_WORKFLOW:
+                assert operation_token.update_id is not None
+                assert operation_token.run_id is not None
+                cancel_options = CancelUpdateWorkflowOptions(
+                    workflow_id=operation_token.workflow_id,
+                    update_id=operation_token.update_id,
+                    run_id=operation_token.run_id,
+                )
+                await self.cancel_workflow_update(cancel_ctx, cancel_options)
 
     async def cancel_workflow_run(
         self,
@@ -205,3 +233,23 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
             options.workflow_id
         )
         await workflow_handle.cancel()
+
+    async def cancel_workflow_update(
+        self,
+        ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
+        options: CancelUpdateWorkflowOptions,  # pyright: ignore[reportUnusedParameter]
+    ) -> None:
+        """Cancels the Workflow Update triggered by the Nexus operation. There is no native way to cancel an accepted Update, so cancellation depends on the Update handler itself.
+        Override this method and coordinate with the specific Update handler to trigger a cancellation.
+
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        raise HandlerError(
+            """
+                There is no native way to cancel an accepted Update, so cancellation depends on the Update handler itself. 
+                Override this method and coordinate with the specific Update handler to trigger a cancellation.
+            """,
+            type=HandlerErrorType.NOT_IMPLEMENTED,
+        )

@@ -787,6 +787,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             ):
                 break
 
+        # Add response link if its a Nexus operation
+        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
+        if nexus_ctx is not None and resp.HasField("link"):
+            nexus_ctx._add_response_link(resp.link)
+
         # Build the handle. If the user's wait stage is COMPLETED, make sure we
         # poll for result.
         handle: WorkflowUpdateHandle[Any] = WorkflowUpdateHandle(
@@ -852,6 +857,23 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 )
             ),
         )
+        # Only set Nexus fields for StartWorkflowUpdateInput, skip for UpdateWithStartUpdateWorkflowInput
+        if isinstance(input, StartWorkflowUpdateInput):
+            if input.request_id:
+                req.request.request_id = input.request_id
+            if input.links:
+                req.request.links.extend(input.links)
+            if input.callbacks:
+                req.request.completion_callbacks.extend(
+                    temporalio.api.common.v1.Callback(
+                        nexus=temporalio.api.common.v1.Callback.Nexus(
+                            url=callback.url,
+                            header=callback.headers,
+                        ),
+                        links=input.links or [],
+                    )
+                    for callback in input.callbacks
+                )
         if input.args:
             req.request.input.args.payloads.extend(
                 await data_converter.encode(input.args)
