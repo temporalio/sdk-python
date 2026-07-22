@@ -38,19 +38,21 @@ from temporalio.converter import (
     BinaryProtoPayloadConverter,
     CompositePayloadConverter,
     DataConverter,
-    DataModelConverter,
     DefaultFailureConverterWithEncodedAttributes,
     DefaultPayloadConverter,
     JSONPlainPayloadConverter,
     JSONTypeConverter,
     JSONTypeConverterUnhandled,
     PayloadCodec,
-    data_model_convertible,
+    TransferTypeConverter,
     decode_search_attributes,
     encode_search_attribute_values,
+    transfer_type_convertible,
     value_to_type,
 )
-from temporalio.converter._payload_converter import _TemporalDataModelPayloadConverter
+from temporalio.converter._payload_converter import (
+    _TemporalTransferTypePayloadConverter,
+)
 from temporalio.exceptions import (
     ApplicationError,
     FailureError,
@@ -257,59 +259,59 @@ def test_binary_proto():
     assert decoded == proto
 
 
-class TemporalDataModelValueConverter(
-    DataModelConverter[
-        "TemporalDataModelValue",
+class TemporalTransferTypeValueConverter(
+    TransferTypeConverter[
+        "TemporalTransferTypeValue",
         temporalio.api.common.v1.WorkflowExecution,
     ]
 ):
-    data_model_type = temporalio.api.common.v1.WorkflowExecution
+    transfer_type = temporalio.api.common.v1.WorkflowExecution
 
-    def to_data_model(
-        self, value: TemporalDataModelValue
+    def to_transfer_type(
+        self, value: TemporalTransferTypeValue
     ) -> temporalio.api.common.v1.WorkflowExecution:
         return temporalio.api.common.v1.WorkflowExecution(
             workflow_id=value.value,
             run_id="run-id",
         )
 
-    def from_data_model(
+    def from_transfer_type(
         self,
         value: temporalio.api.common.v1.WorkflowExecution,
-    ) -> TemporalDataModelValue:
-        return TemporalDataModelValue(value=value.workflow_id)
+    ) -> TemporalTransferTypeValue:
+        return TemporalTransferTypeValue(value=value.workflow_id)
 
 
-@data_model_convertible(TemporalDataModelValueConverter)
+@transfer_type_convertible(TemporalTransferTypeValueConverter)
 @dataclass
-class TemporalDataModelValue:
+class TemporalTransferTypeValue:
     value: str
 
 
-class TemporalDataModelValueWithoutHintConverter(
-    DataModelConverter[
-        "TemporalDataModelValueWithoutHint",
+class TemporalTransferTypeValueWithoutHintConverter(
+    TransferTypeConverter[
+        "TemporalTransferTypeValueWithoutHint",
         temporalio.api.common.v1.WorkflowExecution,
     ]
 ):
-    def to_data_model(
-        self, value: TemporalDataModelValueWithoutHint
+    def to_transfer_type(
+        self, value: TemporalTransferTypeValueWithoutHint
     ) -> temporalio.api.common.v1.WorkflowExecution:
         return temporalio.api.common.v1.WorkflowExecution(
             workflow_id=value.value,
             run_id="run-id",
         )
 
-    def from_data_model(
+    def from_transfer_type(
         self,
         value: temporalio.api.common.v1.WorkflowExecution,
-    ) -> TemporalDataModelValueWithoutHint:
-        return TemporalDataModelValueWithoutHint(value=value.workflow_id)
+    ) -> TemporalTransferTypeValueWithoutHint:
+        return TemporalTransferTypeValueWithoutHint(value=value.workflow_id)
 
 
-@data_model_convertible(TemporalDataModelValueWithoutHintConverter)
+@transfer_type_convertible(TemporalTransferTypeValueWithoutHintConverter)
 @dataclass
-class TemporalDataModelValueWithoutHint:
+class TemporalTransferTypeValueWithoutHint:
     value: str
 
 
@@ -317,13 +319,13 @@ class CustomDefaultPayloadConverter(DefaultPayloadConverter):
     pass
 
 
-def test_temporal_data_model_payload_converter_wraps_user_converter():
+def test_temporal_transfer_type_payload_converter_wraps_user_converter():
     data_converter = DataConverter(
         payload_converter_class=CustomDefaultPayloadConverter
     )
     converter = data_converter.payload_converter
-    assert isinstance(converter, _TemporalDataModelPayloadConverter)
-    value = TemporalDataModelValue("workflow-id")
+    assert isinstance(converter, _TemporalTransferTypePayloadConverter)
+    value = TemporalTransferTypeValue("workflow-id")
 
     payload = converter.to_payload(value)
 
@@ -333,7 +335,7 @@ def test_temporal_data_model_payload_converter_wraps_user_converter():
     )
     assert all("temporal-wire" not in key for key in payload.metadata)
     assert all(b"temporal-wire" not in value for value in payload.metadata.values())
-    assert converter.from_payload(payload, TemporalDataModelValue) == value
+    assert converter.from_payload(payload, TemporalTransferTypeValue) == value
 
     plain_proto_payload = converter.to_payload(
         temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
@@ -341,9 +343,9 @@ def test_temporal_data_model_payload_converter_wraps_user_converter():
     assert plain_proto_payload.metadata["encoding"] == b"json/protobuf"
 
 
-def test_temporal_data_model_payload_converter_without_data_model_type():
+def test_temporal_transfer_type_payload_converter_without_transfer_type_hint():
     converter = DataConverter.default.payload_converter
-    value = TemporalDataModelValueWithoutHint("workflow-id")
+    value = TemporalTransferTypeValueWithoutHint("workflow-id")
 
     payload = converter.to_payload(value)
 
@@ -351,12 +353,16 @@ def test_temporal_data_model_payload_converter_without_data_model_type():
     assert (
         payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
     )
-    assert converter.from_payload(payload, TemporalDataModelValueWithoutHint) == value
+    assert (
+        converter.from_payload(payload, TemporalTransferTypeValueWithoutHint) == value
+    )
 
 
-def test_data_model_convertible_rejects_existing_converter():
-    with pytest.raises(TypeError, match="already has a data model converter"):
-        data_model_convertible(TemporalDataModelValueConverter)(TemporalDataModelValue)
+def test_transfer_type_convertible_rejects_existing_converter():
+    with pytest.raises(TypeError, match="already has a transfer type converter"):
+        transfer_type_convertible(TemporalTransferTypeValueConverter)(
+            TemporalTransferTypeValue
+        )
 
 
 def test_encode_search_attribute_values():

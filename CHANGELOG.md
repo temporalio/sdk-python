@@ -21,10 +21,10 @@ to include examples, links to docs, or any other relevant information.
 ### Added
 
 - Added experimental SDK payload converter support for values and type hints
-  decorated with `@data_model_convertible(...)` using a `DataModelConverter` class.
-  This lets data-model-aware types delegate their wire representation to the
+  decorated with `@transfer_type_convertible(...)` using a `TransferTypeConverter` class.
+  This lets types with transfer type converters delegate their wire representation to the
   configured payload converter, preserving SDK behavior such as serialization
-  contexts for nested payload fields.
+  contexts.
 - Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
   instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
   HTTP/2 authority values, which keep following the connected host, so it can be used when the

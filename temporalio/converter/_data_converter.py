@@ -28,7 +28,7 @@ from temporalio.converter._payload_codec import (
 )
 from temporalio.converter._payload_converter import (
     PayloadConverter,
-    _TemporalDataModelPayloadConverter,
+    _TemporalTransferTypePayloadConverter,
 )
 from temporalio.converter._serialization_context import (
     SerializationContext,
@@ -95,8 +95,10 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
 
     def _new_payload_converter(self) -> PayloadConverter:
-        """Create a payload converter instance with SDK data model hooks enabled."""
-        return _TemporalDataModelPayloadConverter.wrap(self.payload_converter_class())
+        """Create a payload converter instance with SDK transfer type hooks enabled."""
+        return _TemporalTransferTypePayloadConverter.wrap(
+            self.payload_converter_class()
+        )
 
     async def encode(
         self, values: Sequence[Any]

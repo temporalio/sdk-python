@@ -53,27 +53,27 @@ from temporalio.converter._serialization_context import (
 
 _sym_db = google.protobuf.symbol_database.Default()
 ValueT = TypeVar("ValueT")
-DataModelT = TypeVar("DataModelT")
-_DATA_MODEL_CONVERTER_ATTR = "__temporal_data_model_converter"
+TransferTypeT = TypeVar("TransferTypeT")
+_TRANSFER_TYPE_CONVERTER_ATTR = "__temporal_transfer_type_converter"
 
 
-class DataModelConverter(Generic[ValueT, DataModelT], ABC):
-    """Converter between a user-facing value and a data model value.
+class TransferTypeConverter(Generic[ValueT, TransferTypeT], ABC):
+    """Converter between a user-facing value and a transfer type value.
 
     .. warning::
         This API is experimental and subject to change.
     """
 
-    data_model_type: type[DataModelT] | None = None
-    """Optional data model type hint to use when decoding payloads.
+    transfer_type: type[TransferTypeT] | None = None
+    """Optional type hint for the transfer type to use when decoding payloads.
 
     .. warning::
         This API is experimental and subject to change.
     """
 
     @abstractmethod
-    def to_data_model(self, value: ValueT) -> DataModelT:
-        """Convert a user-facing value to its data model value.
+    def to_transfer_type(self, value: ValueT) -> TransferTypeT:
+        """Convert a user-facing value to its transfer type value.
 
         .. warning::
             This API is experimental and subject to change.
@@ -81,8 +81,8 @@ class DataModelConverter(Generic[ValueT, DataModelT], ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def from_data_model(self, value: DataModelT) -> ValueT:
-        """Convert a data model value to its user-facing value.
+    def from_transfer_type(self, value: TransferTypeT) -> ValueT:
+        """Convert a transfer type value to its user-facing value.
 
         .. warning::
             This API is experimental and subject to change.
@@ -90,35 +90,35 @@ class DataModelConverter(Generic[ValueT, DataModelT], ABC):
         raise NotImplementedError
 
 
-class _DataModelConvertibleDecorator(Generic[ValueT, DataModelT]):
+class _TransferTypeConvertibleDecorator(Generic[ValueT, TransferTypeT]):
     def __init__(
-        self, converter_type: type[DataModelConverter[ValueT, DataModelT]]
+        self, converter_type: type[TransferTypeConverter[ValueT, TransferTypeT]]
     ) -> None:
         self._converter_type = converter_type
 
     def __call__(self, cls: type[ValueT]) -> type[ValueT]:
-        if hasattr(cls, _DATA_MODEL_CONVERTER_ATTR):
-            raise TypeError("class already has a data model converter")
-        setattr(cls, _DATA_MODEL_CONVERTER_ATTR, self._converter_type())
+        if hasattr(cls, _TRANSFER_TYPE_CONVERTER_ATTR):
+            raise TypeError("class already has a transfer type converter")
+        setattr(cls, _TRANSFER_TYPE_CONVERTER_ATTR, self._converter_type())
         return cls
 
 
-def data_model_convertible(
-    converter_type: type[DataModelConverter[ValueT, DataModelT]],
-) -> _DataModelConvertibleDecorator[ValueT, DataModelT]:
-    """Decorate a class with a data model converter class.
+def transfer_type_convertible(
+    converter_type: type[TransferTypeConverter[ValueT, TransferTypeT]],
+) -> _TransferTypeConvertibleDecorator[ValueT, TransferTypeT]:
+    """Decorate a class with a transfer type converter class.
 
     .. warning::
         This API is experimental and subject to change.
     """
-    return _DataModelConvertibleDecorator(converter_type)
+    return _TransferTypeConvertibleDecorator(converter_type)
 
 
-def _get_data_model_converter(
+def _get_transfer_type_converter(
     value_type: object,
-) -> DataModelConverter[Any, Any] | None:
-    converter = getattr(value_type, _DATA_MODEL_CONVERTER_ATTR, None)
-    if isinstance(converter, DataModelConverter):
+) -> TransferTypeConverter[Any, Any] | None:
+    converter = getattr(value_type, _TRANSFER_TYPE_CONVERTER_ATTR, None)
+    if isinstance(converter, TransferTypeConverter):
         return converter
     return None
 
@@ -584,40 +584,40 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
-class _TemporalDataModelPayloadConverter(PayloadConverter, WithSerializationContext):
-    """Payload converter wrapper for registered Temporal data model converters.
+class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationContext):
+    """Payload converter wrapper for registered Temporal transfer type converters.
 
-    Values with a registered data model converter are first converted to their
-    data model value, then encoded by the wrapped payload converter. When
-    decoding to a type with a registered data model converter, the wrapped
-    converter first decodes the payload to the data model value and this wrapper
+    Values with a registered transfer type converter are first converted to their
+    transfer type value, then encoded by the wrapped payload converter. When
+    decoding to a type with a registered transfer type converter, the wrapped
+    converter first decodes the payload to the transfer type value and this wrapper
     constructs the requested user-facing type from it.
     """
 
     _inner_payload_converter: PayloadConverter
 
     def __init__(self, inner_payload_converter: PayloadConverter) -> None:
-        """Create a Temporal data model payload converter."""
+        """Create a Temporal transfer type payload converter."""
         self._inner_payload_converter = inner_payload_converter
 
     @staticmethod
     def wrap(payload_converter: PayloadConverter) -> PayloadConverter:
         """Wrap a payload converter unless it is already wrapped."""
-        if isinstance(payload_converter, _TemporalDataModelPayloadConverter):
+        if isinstance(payload_converter, _TemporalTransferTypePayloadConverter):
             return payload_converter
-        return _TemporalDataModelPayloadConverter(payload_converter)
+        return _TemporalTransferTypePayloadConverter(payload_converter)
 
     def to_payloads(
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
-        data_model_values: list[Any] = []
+        transfer_type_values: list[Any] = []
         for value in values:
-            converter = _get_data_model_converter(type(value))
+            converter = _get_transfer_type_converter(type(value))
             if converter is not None:
-                value = converter.to_data_model(value)
-            data_model_values.append(value)
-        return self._inner_payload_converter.to_payloads(data_model_values)
+                value = converter.to_transfer_type(value)
+            transfer_type_values.append(value)
+        return self._inner_payload_converter.to_payloads(transfer_type_values)
 
     def from_payloads(
         self,
@@ -627,16 +627,18 @@ class _TemporalDataModelPayloadConverter(PayloadConverter, WithSerializationCont
         """See base class."""
         if type_hints is None:
             return self._inner_payload_converter.from_payloads(payloads, None)
-        converters = [_get_data_model_converter(type_hint) for type_hint in type_hints]
+        converters = [
+            _get_transfer_type_converter(type_hint) for type_hint in type_hints
+        ]
         inner_type_hints = [
-            converter.data_model_type if converter is not None else type_hint
+            converter.transfer_type if converter is not None else type_hint
             for converter, type_hint in zip(converters, type_hints)
         ]
         values = self._inner_payload_converter.from_payloads(
             payloads, typing.cast("list[type]", inner_type_hints)
         )
         return [
-            converter.from_data_model(value) if converter is not None else value
+            converter.from_transfer_type(value) if converter is not None else value
             for value, converter in zip(values, converters)
         ]
 
