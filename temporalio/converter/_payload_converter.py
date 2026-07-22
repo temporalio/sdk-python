@@ -90,22 +90,28 @@ class DataModelConverter(Generic[ValueT, DataModelT], ABC):
         raise NotImplementedError
 
 
+class _DataModelConvertibleDecorator(Generic[ValueT, DataModelT]):
+    def __init__(
+        self, converter_type: type[DataModelConverter[ValueT, DataModelT]]
+    ) -> None:
+        self._converter_type = converter_type
+
+    def __call__(self, cls: type[ValueT]) -> type[ValueT]:
+        if hasattr(cls, _DATA_MODEL_CONVERTER_ATTR):
+            raise TypeError("class already has a data model converter")
+        setattr(cls, _DATA_MODEL_CONVERTER_ATTR, self._converter_type())
+        return cls
+
+
 def data_model_convertible(
-    converter: DataModelConverter[ValueT, DataModelT],
-) -> Callable[[type[ValueT]], type[ValueT]]:
-    """Decorate a class with a data model converter.
+    converter_type: type[DataModelConverter[ValueT, DataModelT]],
+) -> _DataModelConvertibleDecorator[ValueT, DataModelT]:
+    """Decorate a class with a data model converter class.
 
     .. warning::
         This API is experimental and subject to change.
     """
-
-    def decorator(cls: type[ValueT]) -> type[ValueT]:
-        if hasattr(cls, _DATA_MODEL_CONVERTER_ATTR):
-            raise TypeError("class already has a data model converter")
-        setattr(cls, _DATA_MODEL_CONVERTER_ATTR, converter)
-        return cls
-
-    return decorator
+    return _DataModelConvertibleDecorator(converter_type)
 
 
 def _get_data_model_converter(

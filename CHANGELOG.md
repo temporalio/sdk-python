@@ -21,7 +21,7 @@ to include examples, links to docs, or any other relevant information.
 ### Added
 
 - Added experimental SDK payload converter support for values and type hints
-  decorated with `@data_model_convertible(...)` using a `DataModelConverter`.
+  decorated with `@data_model_convertible(...)` using a `DataModelConverter` class.
   This lets data-model-aware types delegate their wire representation to the
   configured payload converter, preserving SDK behavior such as serialization
   contexts for nested payload fields.

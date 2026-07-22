@@ -257,14 +257,9 @@ def test_binary_proto():
     assert decoded == proto
 
 
-@dataclass
-class TemporalDataModelValue:
-    value: str
-
-
 class TemporalDataModelValueConverter(
     DataModelConverter[
-        TemporalDataModelValue,
+        "TemporalDataModelValue",
         temporalio.api.common.v1.WorkflowExecution,
     ]
 ):
@@ -285,17 +280,15 @@ class TemporalDataModelValueConverter(
         return TemporalDataModelValue(value=value.workflow_id)
 
 
+@data_model_convertible(TemporalDataModelValueConverter)
 @dataclass
-class TemporalDataModelValueWithoutHint:
+class TemporalDataModelValue:
     value: str
-
-
-data_model_convertible(TemporalDataModelValueConverter())(TemporalDataModelValue)
 
 
 class TemporalDataModelValueWithoutHintConverter(
     DataModelConverter[
-        TemporalDataModelValueWithoutHint,
+        "TemporalDataModelValueWithoutHint",
         temporalio.api.common.v1.WorkflowExecution,
     ]
 ):
@@ -314,9 +307,10 @@ class TemporalDataModelValueWithoutHintConverter(
         return TemporalDataModelValueWithoutHint(value=value.workflow_id)
 
 
-data_model_convertible(TemporalDataModelValueWithoutHintConverter())(
-    TemporalDataModelValueWithoutHint
-)
+@data_model_convertible(TemporalDataModelValueWithoutHintConverter)
+@dataclass
+class TemporalDataModelValueWithoutHint:
+    value: str
 
 
 class CustomDefaultPayloadConverter(DefaultPayloadConverter):
@@ -362,9 +356,7 @@ def test_temporal_data_model_payload_converter_without_data_model_type():
 
 def test_data_model_convertible_rejects_existing_converter():
     with pytest.raises(TypeError, match="already has a data model converter"):
-        data_model_convertible(TemporalDataModelValueConverter())(
-            TemporalDataModelValue
-        )
+        data_model_convertible(TemporalDataModelValueConverter)(TemporalDataModelValue)
 
 
 def test_encode_search_attribute_values():
