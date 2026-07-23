@@ -455,7 +455,7 @@ class TemporalStatefulMcpToolSetProvider:
                 )
             if len(tool_match) > 1:
                 raise ApplicationError(
-                    f"Unable too many matching mcp tools by name: {args.name}"
+                    f"Found multiple MCP tools with the same name: {args.name}"
                 )
             tool = tool_match[0]
 
