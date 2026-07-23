@@ -23,6 +23,7 @@ import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
 import temporalio.converter._extstore
+import temporalio.converter._payload_handle
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.bridge.worker import PollShutdownError
@@ -307,6 +308,34 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         loop.call_soon(run_inline)
         return await future
 
+    def _deferred_run_arg_payloads(
+        self,
+        init_job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow | None,
+    ) -> set[bytes] | None:
+        """Deterministic serializations of run args annotated as PayloadHandle.
+
+        These defer external-storage retrieval so the workflow can forward them
+        without downloading. This is the prototype's run-args-only plumbing;
+        other activation positions (activity/child results, signal args) still
+        retrieve eagerly. A production version would thread this decision
+        through the payload visitor for every position.
+        """
+        if not init_job:
+            return None
+        defn = self._workflows.get(init_job.workflow_type)
+        if not defn or not defn.arg_types:
+            return None
+        arg_types = defn.arg_types
+        payloads = {
+            payload.SerializeToString(deterministic=True)
+            for i, payload in enumerate(init_job.arguments)
+            if i < len(arg_types)
+            and temporalio.converter._payload_handle._is_payload_handle_hint(
+                arg_types[i]
+            )
+        }
+        return payloads or None
+
     async def _handle_activation(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> None:
@@ -387,6 +416,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 data_converter,
                 decode_headers=self._encode_headers,
                 storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
+                defer_retrieval_payloads=self._deferred_run_arg_payloads(init_job),
             )
             if not workflow:
                 assert init_job
