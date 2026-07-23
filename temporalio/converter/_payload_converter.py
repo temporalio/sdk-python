@@ -21,6 +21,7 @@ from types import UnionType
 from typing import (
     Any,
     ClassVar,
+    Generic,
     Literal,
     NewType,
     TypeVar,
@@ -51,6 +52,75 @@ from temporalio.converter._serialization_context import (
 )
 
 _sym_db = google.protobuf.symbol_database.Default()
+ValueT = TypeVar("ValueT")
+TransferTypeT = TypeVar("TransferTypeT")
+_TRANSFER_TYPE_CONVERTER_ATTR = "__temporal_transfer_type_converter"
+
+
+class TransferTypeConverter(Generic[ValueT, TransferTypeT], ABC):
+    """Converter between a user-facing value and a transfer type value.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    transfer_type: type[TransferTypeT] | None = None
+    """Optional type hint for the transfer type to use when decoding payloads.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    @abstractmethod
+    def to_transfer_type(self, value: ValueT) -> TransferTypeT:
+        """Convert a user-facing value to its transfer type value.
+
+        .. warning::
+            This API is experimental and subject to change.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def from_transfer_type(self, value: TransferTypeT) -> ValueT:
+        """Convert a transfer type value to its user-facing value.
+
+        .. warning::
+            This API is experimental and subject to change.
+        """
+        raise NotImplementedError
+
+
+class _TransferTypeConvertibleDecorator(Generic[ValueT, TransferTypeT]):
+    def __init__(
+        self, converter_type: type[TransferTypeConverter[ValueT, TransferTypeT]]
+    ) -> None:
+        self._converter_type = converter_type
+
+    def __call__(self, cls: type[ValueT]) -> type[ValueT]:
+        if hasattr(cls, _TRANSFER_TYPE_CONVERTER_ATTR):
+            raise TypeError("class already has a transfer type converter")
+        setattr(cls, _TRANSFER_TYPE_CONVERTER_ATTR, self._converter_type())
+        return cls
+
+
+def transfer_type_convertible(
+    converter_type: type[TransferTypeConverter[ValueT, TransferTypeT]],
+) -> _TransferTypeConvertibleDecorator[ValueT, TransferTypeT]:
+    """Decorate a class with a transfer type converter class.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+    return _TransferTypeConvertibleDecorator(converter_type)
+
+
+def _get_transfer_type_converter(
+    value_type: object,
+) -> TransferTypeConverter[Any, Any] | None:
+    converter = getattr(value_type, _TRANSFER_TYPE_CONVERTER_ATTR, None)
+    if isinstance(converter, TransferTypeConverter):
+        return converter
+    return None
 
 
 class PayloadConverter(ABC):
@@ -512,6 +582,74 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError(f"Unknown Protobuf type {message_type}") from err
         except google.protobuf.message.DecodeError as err:
             raise RuntimeError("Failed parsing") from err
+
+
+class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationContext):
+    """Payload converter wrapper for registered Temporal transfer type converters.
+
+    Values with a registered transfer type converter are first converted to their
+    transfer type value, then encoded by the wrapped payload converter. When
+    decoding to a type with a registered transfer type converter, the wrapped
+    converter first decodes the payload to the transfer type value and this wrapper
+    constructs the requested user-facing type from it.
+    """
+
+    _inner_payload_converter: PayloadConverter
+
+    def __init__(self, inner_payload_converter: PayloadConverter) -> None:
+        """Create a Temporal transfer type payload converter."""
+        self._inner_payload_converter = inner_payload_converter
+
+    @staticmethod
+    def wrap(payload_converter: PayloadConverter) -> PayloadConverter:
+        """Wrap a payload converter unless it is already wrapped."""
+        if isinstance(payload_converter, _TemporalTransferTypePayloadConverter):
+            return payload_converter
+        return _TemporalTransferTypePayloadConverter(payload_converter)
+
+    def to_payloads(
+        self, values: Sequence[Any]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """See base class."""
+        transfer_type_values: list[Any] = []
+        for value in values:
+            converter = _get_transfer_type_converter(type(value))
+            if converter is not None:
+                value = converter.to_transfer_type(value)
+            transfer_type_values.append(value)
+        return self._inner_payload_converter.to_payloads(transfer_type_values)
+
+    def from_payloads(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
+        """See base class."""
+        if type_hints is None:
+            return self._inner_payload_converter.from_payloads(payloads, None)
+        converters = [
+            _get_transfer_type_converter(type_hint) for type_hint in type_hints
+        ]
+        inner_type_hints = [
+            converter.transfer_type if converter is not None else type_hint
+            for converter, type_hint in zip(converters, type_hints)
+        ]
+        values = self._inner_payload_converter.from_payloads(
+            payloads, typing.cast("list[type]", inner_type_hints)
+        )
+        return [
+            converter.from_transfer_type(value) if converter is not None else value
+            for value, converter in zip(values, converters)
+        ]
+
+    def with_context(self, context: SerializationContext) -> Self:
+        """Return a new instance with context set on the inner converter."""
+        if not isinstance(self._inner_payload_converter, WithSerializationContext):
+            return self
+        inner_payload_converter = self._inner_payload_converter.with_context(context)
+        if inner_payload_converter is self._inner_payload_converter:
+            return self
+        return type(self)(inner_payload_converter)
 
 
 class AdvancedJSONEncoder(json.JSONEncoder):
