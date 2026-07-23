@@ -29,6 +29,10 @@ from temporalio.converter._payload_codec import (
 from temporalio.converter._payload_converter import (
     PayloadConverter,
 )
+from temporalio.converter._payload_handle import (
+    _bind_data_converter,
+    _is_payload_handle_hint,
+)
 from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
@@ -128,6 +132,31 @@ class DataConverter(WithSerializationContext):
         Returns:
             Decoded and converted values.
         """
+        # Positions annotated as PayloadHandle defer acquisition: keep their
+        # opaque payload and skip eager external-storage retrieval + codec
+        # decode so the produced handle can materialize on demand. The handle
+        # binds to this (context-applied) converter so materialize() uses the
+        # correct serialization context and codec.
+        if type_hints is not None and any(
+            _is_payload_handle_hint(h) for h in type_hints
+        ):
+            payloads = list(payloads)
+            transform_indexes = [
+                i
+                for i in range(len(payloads))
+                if i >= len(type_hints) or not _is_payload_handle_hint(type_hints[i])
+            ]
+            to_transform = [payloads[i] for i in transform_indexes]
+            if to_transform:
+                transformed = await self._external_retrieve_payload_sequence(
+                    to_transform
+                )
+                transformed = await self._decode_payload_sequence(transformed)
+                for i, payload in zip(transform_indexes, transformed):
+                    payloads[i] = payload
+            with _bind_data_converter(self):
+                return self.payload_converter.from_payloads(payloads, type_hints)
+
         payloads = await self._external_retrieve_payload_sequence(payloads)
         payloads = await self._decode_payload_sequence(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)

@@ -45,6 +45,12 @@ if sys.version_info < (3, 11):
 if sys.version_info >= (3, 11):
     from enum import StrEnum  # type: ignore[reportUnreachable]
 
+from temporalio.converter._payload_handle import (
+    PayloadHandle,
+    _create_handle,
+    _is_payload_handle_hint,
+    _payload_handle_inner_type,
+)
 from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
@@ -261,6 +267,11 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             # RawValue should just pass through
             if isinstance(value, temporalio.common.RawValue):
                 payload = value.payload
+            # A PayloadHandle re-emits its opaque payload unchanged, so
+            # forwarding it (e.g. workflow -> activity) neither downloads nor
+            # re-stores the underlying data.
+            elif isinstance(value, PayloadHandle):
+                payload = value._payload
             else:
                 for converter in self.converters.values():
                     payload = converter.to_payload(value)
@@ -292,6 +303,15 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             # Raw value should just wrap
             if type_hint == temporalio.common.RawValue:
                 values.append(temporalio.common.RawValue(payload))
+                continue
+            # A PayloadHandle[T] hint defers acquisition: wrap the opaque payload
+            # regardless of its encoding rather than materializing it now. The
+            # handle binds to the current boundary converter (via contextvar) if
+            # one is set, else it is forward-only.
+            if type_hint is not None and _is_payload_handle_hint(type_hint):
+                values.append(
+                    _create_handle(payload, _payload_handle_inner_type(type_hint))
+                )
                 continue
             encoding = payload.metadata.get("encoding", b"<unknown>")
             converter = self.converters.get(encoding)
