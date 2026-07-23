@@ -2344,8 +2344,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             ]._serialization_context
             if serialization_context is not None:
                 return serialization_context
-            # Nexus operations normally have no context because the caller workflow context is
-            # unavailable on the handler side for decryption.
+            # A handle has a context only when a generated Temporal system-Nexus operation
+            # provides one for its target. Other Nexus operations have no context because the
+            # caller workflow context is unavailable on the handler side for decryption.
             return None
 
         else:
