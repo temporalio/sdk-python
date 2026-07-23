@@ -188,22 +188,9 @@ class PayloadVisitor:
     async def _visit_nexus_operation_input_payload(
         self,
         fs: VisitorFunctions,
-        endpoint: str,
         payload: Payload,
     ) -> None:
-        new_payload = await temporalio.nexus.system._maybe_visit_payload(
-            endpoint,
-            payload,
-            fs,
-            self.skip_search_attributes,
-        )
-        if new_payload is None:
-            await self._visit_temporal_api_common_v1_Payload(fs, payload)
-            return
-
-        if new_payload is not payload:
-            payload.CopyFrom(new_payload)
-        await fs.visit_system_nexus_envelope(payload)
+        await self._visit_temporal_api_common_v1_Payload(fs, payload)
 
 """
 
@@ -219,7 +206,18 @@ class PayloadVisitor:
         self.methods: list[str] = [
             """\
     async def _visit_temporal_api_common_v1_Payload(self, fs: VisitorFunctions, o: Payload):
-        await fs.visit_payload(o)
+        new_payload = await temporalio.nexus.system.maybe_visit_payload(
+            o,
+            fs,
+            self.skip_search_attributes,
+        )
+        if new_payload is None:
+            await fs.visit_payload(o)
+            return
+
+        if new_payload is not o:
+            o.CopyFrom(new_payload)
+        await fs.visit_system_nexus_envelope(o)
     """,
             """\
     async def _visit_temporal_api_common_v1_Payloads(self, fs: VisitorFunctions, o: Any):
@@ -403,11 +401,11 @@ class PayloadVisitor:
                         )
                     )
                 elif item[0] == "system_nexus":
-                    _, field_name, endpoint_expr, payload_expr = item
+                    _, field_name, _endpoint_expr, payload_expr = item
                     lines.append(
                         f'        if o.HasField("{field_name}"):\n'
                         "            await self._visit_nexus_operation_input_payload(\n"
-                        f"                fs, {endpoint_expr}, {payload_expr}\n"
+                        f"                fs, {payload_expr}\n"
                         "            )"
                     )
                 else:  # oneof_group

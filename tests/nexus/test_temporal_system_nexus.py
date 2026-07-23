@@ -34,6 +34,7 @@ from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
 from tests.test_extstore import InMemoryTestDriver
 
 interceptor_traces: list[tuple[str, object]] = []
+SYSTEM_NEXUS_PAYLOAD_METADATA_KEY = "__temporal_system_payload"
 
 
 @workflow.defn
@@ -193,9 +194,15 @@ def _new_system_nexus_request_payload() -> temporalio.api.common.v1.Payload:
     return payload
 
 
-async def test_schedule_system_nexus_endpoint_ignores_operation_registry() -> None:
+def _new_unmarked_system_nexus_request_payload() -> temporalio.api.common.v1.Payload:
+    payload = _new_system_nexus_request_payload()
+    del payload.metadata[SYSTEM_NEXUS_PAYLOAD_METADATA_KEY]
+    return payload
+
+
+async def test_schedule_marked_system_nexus_payload_ignores_endpoint() -> None:
     completion = _new_schedule_nexus_completion(
-        nexus_system.TEMPORAL_SYSTEM_ENDPOINT,
+        "not-the-system-endpoint",
         _new_system_nexus_request_payload(),
     )
     visitor = _MarkingPayloadVisitor()
@@ -215,10 +222,12 @@ async def test_schedule_system_nexus_endpoint_ignores_operation_registry() -> No
     assert visitor.system_envelope_count == 1
 
 
-async def test_schedule_non_system_nexus_visits_input_as_regular_payload() -> None:
+async def test_schedule_unmarked_system_nexus_payload_visits_input_as_regular_payload() -> (
+    None
+):
     completion = _new_schedule_nexus_completion(
-        "not-the-system-endpoint",
-        _new_system_nexus_request_payload(),
+        nexus_system.TEMPORAL_SYSTEM_ENDPOINT,
+        _new_unmarked_system_nexus_request_payload(),
     )
     visitor = _MarkingPayloadVisitor()
 
@@ -226,6 +235,13 @@ async def test_schedule_non_system_nexus_visits_input_as_regular_payload() -> No
 
     schedule = completion.successful.commands[0].schedule_nexus_operation
     assert schedule.input.metadata["visited"] == b"true"
+    decoded = nexus_system._get_payload_converter(
+        temporalio.converter.default().payload_converter
+    ).from_payload(schedule.input)
+    assert isinstance(
+        decoded, workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
+    )
+    assert "visited" not in decoded.input.payloads[0].metadata
     assert visitor.visited_payload_count == 1
     assert visitor.system_envelope_count == 0
 
@@ -351,6 +367,7 @@ def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
     assert payload is not None
     assert payload.metadata["encoding"] == b"binary/protobuf"
     assert payload.metadata["messageType"] == message_type.DESCRIPTOR.full_name.encode()
+    assert payload.metadata[SYSTEM_NEXUS_PAYLOAD_METADATA_KEY] == b"true"
     roundtripped = payload_converter.from_payload(payload, message_type)
     assert isinstance(roundtripped, message_type)
     assert roundtripped == proto_value

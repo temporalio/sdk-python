@@ -212,6 +212,58 @@ async def test_visit_payloads_on_other_commands():
     assert ur.completed.metadata["visited"]
 
 
+async def test_system_nexus_envelope_is_detected_in_generic_payload_field():
+    class SystemNexusVisitor(Visitor):
+        def __init__(self) -> None:
+            self.visited_payload_count = 0
+            self.system_envelope_count = 0
+
+        async def visit_payload(self, payload: Payload) -> None:
+            self.visited_payload_count += 1
+            await super().visit_payload(payload)
+
+        async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+            self.visited_payload_count += len(payloads)
+            await super().visit_payloads(payloads)
+
+        async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+            _ = payload
+            self.system_envelope_count += 1
+
+    system_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest(
+        input=Payloads(payloads=[Payload(data=b"workflow-input")]),
+    )
+    payload_converter = nexus_system._get_payload_converter(
+        temporalio.converter.default().payload_converter
+    )
+    system_payload = payload_converter.to_payload(system_request)
+    assert system_payload is not None
+    comp = WorkflowActivationCompletion(
+        run_id="3",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    update_response=UpdateResponse(completed=system_payload),
+                )
+            ]
+        ),
+    )
+    visitor = SystemNexusVisitor()
+
+    await PayloadVisitor().visit(visitor, comp)
+
+    completed = comp.successful.commands[0].update_response.completed
+    assert completed.metadata["__temporal_system_payload"] == b"true"
+    assert "visited" not in completed.metadata
+    decoded = payload_converter.from_payload(completed)
+    assert isinstance(
+        decoded, workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
+    )
+    assert decoded.input.payloads[0].metadata["visited"] == b"True"
+    assert visitor.visited_payload_count == 1
+    assert visitor.system_envelope_count == 1
+
+
 async def test_concurrent_throughput():
     """Demonstrate that concurrent visitation is faster than serialized for I/O-bound codecs."""
     N_CMDS = 10
