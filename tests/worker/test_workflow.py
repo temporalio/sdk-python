@@ -1294,6 +1294,10 @@ async def test_workflow_logic_flag_enabled_after_replay(client: Client) -> None:
         client,
         EnableWorkflowLogicFlagAfterReplayWorkflow,
         task_queue=task_queue,
+        # The Java test server does not reliably reschedule an abandoned sticky
+        # task after its timeout, so keep events sent after this worker stops on
+        # the normal queue.
+        max_cached_workflows=0,
     ):
 
         async def ready() -> bool:
@@ -1417,6 +1421,10 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         CancelAtWaitConditionWorkflow,
         task_queue=task_queue,
         workflow_runner=runner,
+        # The Java test server does not reliably reschedule an abandoned sticky
+        # task after its timeout, so keep events sent after this worker stops on
+        # the normal queue.
+        max_cached_workflows=0,
     )
     worker._set_default_workflow_logic_flag(
         _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
@@ -1532,6 +1540,10 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
             CancelAtChildCompletionWorkflow,
             task_queue=parent_task_queue,
             workflow_runner=runner,
+            # The Java test server does not reliably reschedule an abandoned
+            # sticky task after its timeout, so keep events sent after this
+            # worker stops on the normal queue.
+            max_cached_workflows=0,
         )
         parent_worker._set_default_workflow_logic_flag(
             _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
