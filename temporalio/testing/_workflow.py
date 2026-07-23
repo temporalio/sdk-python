@@ -107,8 +107,8 @@ class WorkflowEnvironment:
         to enable it — the returned environment wraps :py:attr:`client` with a
         :py:class:`TimeSkipper` that stamps ``time_skipping_config`` on every
         workflow started via :py:attr:`client`, and exposes
-        :py:meth:`fast_forward` and :py:meth:`set_disable_propagation` for
-        driving time skipping on running workflows. In contrast to :py:meth:`start_time_skipping`
+        :py:meth:`fast_forward` for driving time skipping on running workflows.
+        In contrast to :py:meth:`start_time_skipping`
         (time-skipping v1, server-wide clock), each workflow has its own virtual clock.
 
         Internally, this uses the Temporal CLI dev server from
@@ -534,31 +534,6 @@ class WorkflowEnvironment:
                 "WorkflowEnvironment.start_time_skipping_v2()."
             )
         return await self._ts_skipper.fast_forward(handle, duration)
-
-    async def set_disable_propagation(
-        self,
-        handle: temporalio.client.WorkflowHandle[Any, Any],
-        disable_propagation: bool,
-        /,
-    ) -> None:
-        """Set the ``disable_propagation`` flag on a running workflow.
-
-        Only supported on time-skipping v2 environments (created via
-        :py:meth:`start_time_skipping_v2`).
-
-        Args:
-            handle: Target workflow execution.
-            disable_propagation: New value for the flag.
-
-        Raises:
-            RuntimeError: If called on a v1 or non-time-skipping environment.
-        """
-        if self._ts_skipper is None:
-            raise RuntimeError(
-                "set_disable_propagation requires a time-skipping environment; "
-                "use WorkflowEnvironment.start_time_skipping_v2()."
-            )
-        await self._ts_skipper.set_disable_propagation(handle, disable_propagation)
 
     @contextmanager
     def with_time_skipping_disabled(self) -> Iterator[None]:

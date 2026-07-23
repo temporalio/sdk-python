@@ -537,14 +537,8 @@ async def test_signal_with_start_stamps_time_skipping_config(
 async def test_update_time_reflects_workflow_virtual_clock(
     env: WorkflowEnvironment,
 ) -> None:
-    """``UpdateWorkflowExecutionOptionsResponse.update_time`` is the workflow's virtual clock.
-
-    Proto: "The Workflow Execution time when the options were updated. When
-    time skipping is enabled, this is the workflow's virtual time rather
-    than wall-clock time." Sequence: FF 1h → workflow's virtual clock now
-    ~+1h → send another update (set_disable_propagation) → its response's
-    update_time should be ~+1h, not ~real-now.
-    """
+    """Use ``UpdateWorkflowExecutionOptionsResponse.update_time``
+    to get the virtual clock time. Fast forward 1h, then check the time."""
     async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
@@ -556,9 +550,7 @@ async def test_update_time_reflects_workflow_virtual_clock(
         # FF 1h. Virtual clock advances to +1h and time skipping auto-disables.
         wf_start_wall = datetime.now(tz=timezone.utc)
         assert await env.fast_forward(handle, timedelta(hours=1))
-        # Send a follow-up update. The response's update_time reflects the
-        # workflow's virtual clock at the moment the update landed, which
-        # should be ~+1h from workflow start, not ~real-now.
+        # Have to call update_workflow_execution_options to update the virtual clock.
         assert env._ts_skipper is not None
         resp = await env._ts_skipper._update_time_skipping_config(  # type: ignore[reportPrivateUsage]
             handle, TimeSkippingConfig(enabled=True, disable_propagation=True)

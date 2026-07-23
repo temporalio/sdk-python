@@ -61,8 +61,7 @@ class TimeSkipper:
     on every workflow started through :py:attr:`client`. Use
     :py:meth:`fast_forward` to advance a running workflow's virtual clock
     (awaited call waits for the fast-forward to complete and the transition
-    event to fire), and :py:meth:`set_disable_propagation` to toggle the
-    propagation flag on a running workflow.
+    event to fire).
 
     In tests, the same functionality is available via
     :py:class:`WorkflowEnvironment.start_time_skipping_v2`. Use
@@ -148,26 +147,6 @@ class TimeSkipper:
             handle, latest_transition_event_id
         )
 
-    async def set_disable_propagation(
-        self,
-        handle: temporalio.client.WorkflowHandle[Any, Any],
-        disable_propagation: bool,
-        /,
-    ) -> None:
-        """Set the ``disable_propagation`` flag on a running workflow.
-
-        Args:
-            handle: Target workflow execution.
-            disable_propagation: New value for the flag.
-        """
-        await self._update_time_skipping_config(
-            handle,
-            TimeSkippingConfig(
-                enabled=True,
-                disable_propagation=disable_propagation,
-            ),
-        )
-
     async def _latest_transition_event_id(
         self,
         handle: temporalio.client.WorkflowHandle[Any, Any],
@@ -227,9 +206,8 @@ class TimeSkipper:
         """Replace the stored time-skipping config for a running workflow.
 
         The server accepts the whole ``TimeSkippingConfig`` field only, so
-        callers must send a complete config. Public callers should prefer
-        the per-field updaters (:py:meth:`fast_forward`,
-        :py:meth:`set_disable_propagation`).
+        callers must send a complete config. Public callers should use
+        :py:meth:`fast_forward`.
         """
         return await self._client.workflow_service.update_workflow_execution_options(
             temporalio.api.workflowservice.v1.UpdateWorkflowExecutionOptionsRequest(
