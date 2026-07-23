@@ -7,29 +7,195 @@ import dataclasses
 import datetime
 import typing
 
+import typing_extensions
+
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.common
+import temporalio.converter
 
 from ._support import (
+    SignalWithStartWorkflowRequest,
+    duration_from_proto,
     duration_to_proto,
+    memo_from_proto,
     memo_to_proto,
     payload_from_proto,
     payload_to_proto,
     payloads_to_proto,
+    priority_from_proto,
     priority_to_proto,
+    retry_policy_from_proto,
     retry_policy_to_proto,
     search_attributes_to_proto,
     signal_function_to_proto,
+    task_queue_from_proto,
     task_queue_to_proto,
     versioning_override_to_proto,
+    workflow_id_conflict_policy_from_proto,
     workflow_id_conflict_policy_to_proto,
+    workflow_id_reuse_policy_from_proto,
     workflow_id_reuse_policy_to_proto,
     workflow_namespace,
     workflow_type_to_proto,
 )
 
 
+class _SignalWithStartWorkflowRequestTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        "SignalWithStartWorkflowRequest",
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
+    ]
+):
+    transfer_type: (
+        type[
+            temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest
+        ]
+        | None
+    ) = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
+    ) -> "SignalWithStartWorkflowRequest":
+        proto = value
+        if not proto.HasField("workflow_type"):
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowRequest.workflow"
+            )
+        workflow = workflow_type_from_proto(proto.workflow_type)
+        if not proto.workflow_id:
+            raise ValueError("missing required field SignalWithStartWorkflowRequest.id")
+        id = proto.workflow_id
+        if not proto.HasField("task_queue"):
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowRequest.task_queue"
+            )
+        task_queue = task_queue_from_proto(proto.task_queue)
+        if not proto.signal_name:
+            raise ValueError(
+                "missing required field SignalWithStartWorkflowRequest.signal"
+            )
+        signal = proto.signal_name
+        return SignalWithStartWorkflowRequest(
+            workflow=workflow,
+            args=payloads_from_proto(proto.input) if proto.HasField("input") else None,
+            id=id,
+            task_queue=task_queue,
+            signal=signal,
+            signal_args=payloads_from_proto(proto.signal_input)
+            if proto.HasField("signal_input")
+            else None,
+            execution_timeout=duration_from_proto(proto.workflow_execution_timeout)
+            if proto.HasField("workflow_execution_timeout")
+            else None,
+            run_timeout=duration_from_proto(proto.workflow_run_timeout)
+            if proto.HasField("workflow_run_timeout")
+            else None,
+            task_timeout=duration_from_proto(proto.workflow_task_timeout)
+            if proto.HasField("workflow_task_timeout")
+            else None,
+            request_id=proto.request_id if bool(proto.request_id) else None,
+            id_reuse_policy=workflow_id_reuse_policy_from_proto(
+                proto.workflow_id_reuse_policy
+            ),
+            id_conflict_policy=workflow_id_conflict_policy_from_proto(
+                proto.workflow_id_conflict_policy
+            )
+            if proto.workflow_id_conflict_policy != 0
+            else None,
+            retry_policy=retry_policy_from_proto(proto.retry_policy)
+            if proto.HasField("retry_policy")
+            else None,
+            cron_schedule=proto.cron_schedule if bool(proto.cron_schedule) else None,
+            memo=memo_from_proto(proto.memo) if proto.HasField("memo") else None,
+            search_attributes=search_attributes_from_proto(proto.search_attributes)
+            if proto.HasField("search_attributes")
+            else None,
+            priority=priority_from_proto(proto.priority)
+            if proto.HasField("priority")
+            else None,
+            versioning_override=versioning_override_from_proto(
+                proto.versioning_override
+            )
+            if proto.HasField("versioning_override")
+            else None,
+            start_delay=duration_from_proto(proto.workflow_start_delay)
+            if proto.HasField("workflow_start_delay")
+            else None,
+            user_metadata=_UserMetadataTransferTypeConverter().from_transfer_type(
+                proto.user_metadata
+            )
+            if proto.HasField("user_metadata")
+            else None,
+            namespace=proto.namespace,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: "SignalWithStartWorkflowRequest",
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest:
+        message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest()
+        message.workflow_type.CopyFrom(workflow_type_to_proto(value.workflow))
+        if value.args is not None:
+            message.input.CopyFrom(payloads_to_proto(value.args))
+        message.workflow_id = value.id
+        message.task_queue.CopyFrom(task_queue_to_proto(value.task_queue))
+        message.signal_name = signal_function_to_proto(value.signal)
+        if value.signal_args is not None:
+            message.signal_input.CopyFrom(payloads_to_proto(value.signal_args))
+        if value.execution_timeout is not None:
+            message.workflow_execution_timeout.CopyFrom(
+                duration_to_proto(value.execution_timeout)
+            )
+        if value.run_timeout is not None:
+            message.workflow_run_timeout.CopyFrom(duration_to_proto(value.run_timeout))
+        if value.task_timeout is not None:
+            message.workflow_task_timeout.CopyFrom(
+                duration_to_proto(value.task_timeout)
+            )
+        if value.request_id is not None:
+            message.request_id = value.request_id
+        message.workflow_id_reuse_policy = workflow_id_reuse_policy_to_proto(
+            value.id_reuse_policy
+        )
+        if value.id_conflict_policy is not None:
+            message.workflow_id_conflict_policy = workflow_id_conflict_policy_to_proto(
+                value.id_conflict_policy
+            )
+        if value.retry_policy is not None:
+            message.retry_policy.CopyFrom(retry_policy_to_proto(value.retry_policy))
+        if value.cron_schedule is not None:
+            message.cron_schedule = value.cron_schedule
+        if value.memo is not None:
+            message.memo.CopyFrom(memo_to_proto(value.memo))
+        if value.search_attributes is not None:
+            message.search_attributes.CopyFrom(
+                search_attributes_to_proto(value.search_attributes)
+            )
+        if value.priority is not None:
+            message.priority.CopyFrom(priority_to_proto(value.priority))
+        if value.versioning_override is not None:
+            message.versioning_override.CopyFrom(
+                versioning_override_to_proto(value.versioning_override)
+            )
+        if value.start_delay is not None:
+            message.workflow_start_delay.CopyFrom(duration_to_proto(value.start_delay))
+        if value.user_metadata is not None:
+            message.user_metadata.CopyFrom(
+                _UserMetadataTransferTypeConverter().to_transfer_type(
+                    value.user_metadata
+                )
+            )
+        message.namespace = value.namespace
+        return message
+
+
+@temporalio.converter.transfer_type_convertible(
+    _SignalWithStartWorkflowRequestTransferTypeConverter
+)
 @dataclasses.dataclass(slots=True, kw_only=True)
 class SignalWithStartWorkflowRequest:
     """
@@ -59,71 +225,25 @@ class SignalWithStartWorkflowRequest:
     versioning_override: temporalio.common.VersioningOverride | None = None
     start_delay: datetime.timedelta | None = None
     user_metadata: UserMetadata | None = None
+    namespace: str = dataclasses.field(default_factory=workflow_namespace)
 
-    def to_proto(
+
+class _UserMetadataTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        "UserMetadata", temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+    ]
+):
+    transfer_type: type[temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata] | None = (
+        temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+    )
+
+    @typing_extensions.override
+    def from_transfer_type(
         self,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest:
-        message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest()
-        message.workflow_type.CopyFrom(workflow_type_to_proto(self.workflow))
-        if self.args is not None:
-            message.input.CopyFrom(payloads_to_proto(self.args))
-        message.workflow_id = self.id
-        message.task_queue.CopyFrom(task_queue_to_proto(self.task_queue))
-        message.signal_name = signal_function_to_proto(self.signal)
-        if self.signal_args is not None:
-            message.signal_input.CopyFrom(payloads_to_proto(self.signal_args))
-        if self.execution_timeout is not None:
-            message.workflow_execution_timeout.CopyFrom(
-                duration_to_proto(self.execution_timeout)
-            )
-        if self.run_timeout is not None:
-            message.workflow_run_timeout.CopyFrom(duration_to_proto(self.run_timeout))
-        if self.task_timeout is not None:
-            message.workflow_task_timeout.CopyFrom(duration_to_proto(self.task_timeout))
-        if self.request_id is not None:
-            message.request_id = self.request_id
-        message.workflow_id_reuse_policy = workflow_id_reuse_policy_to_proto(
-            self.id_reuse_policy
-        )
-        if self.id_conflict_policy is not None:
-            message.workflow_id_conflict_policy = workflow_id_conflict_policy_to_proto(
-                self.id_conflict_policy
-            )
-        if self.retry_policy is not None:
-            message.retry_policy.CopyFrom(retry_policy_to_proto(self.retry_policy))
-        if self.cron_schedule is not None:
-            message.cron_schedule = self.cron_schedule
-        if self.memo is not None:
-            message.memo.CopyFrom(memo_to_proto(self.memo))
-        if self.search_attributes is not None:
-            message.search_attributes.CopyFrom(
-                search_attributes_to_proto(self.search_attributes)
-            )
-        if self.priority is not None:
-            message.priority.CopyFrom(priority_to_proto(self.priority))
-        if self.versioning_override is not None:
-            message.versioning_override.CopyFrom(
-                versioning_override_to_proto(self.versioning_override)
-            )
-        if self.start_delay is not None:
-            message.workflow_start_delay.CopyFrom(duration_to_proto(self.start_delay))
-        if self.user_metadata is not None:
-            message.user_metadata.CopyFrom(self.user_metadata.to_proto())
-        message.namespace = workflow_namespace()
-        return message
-
-
-@dataclasses.dataclass(slots=True)
-class UserMetadata:
-    static_summary: typing.Any | None = None
-    static_details: typing.Any | None = None
-
-    @classmethod
-    def from_proto(
-        cls,
-        proto: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata,
-    ) -> UserMetadata:
-        return cls(
+        value: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata,
+    ) -> "UserMetadata":
+        proto = value
+        return UserMetadata(
             static_summary=payload_from_proto(proto.summary)
             if proto.HasField("summary")
             else None,
@@ -132,10 +252,72 @@ class UserMetadata:
             else None,
         )
 
-    def to_proto(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: "UserMetadata",
+    ) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         message = temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata()
-        if self.static_summary is not None:
-            message.summary.CopyFrom(payload_to_proto(self.static_summary))
-        if self.static_details is not None:
-            message.details.CopyFrom(payload_to_proto(self.static_details))
+        if value.static_summary is not None:
+            message.summary.CopyFrom(payload_to_proto(value.static_summary))
+        if value.static_details is not None:
+            message.details.CopyFrom(payload_to_proto(value.static_details))
         return message
+
+
+@temporalio.converter.transfer_type_convertible(_UserMetadataTransferTypeConverter)
+@dataclasses.dataclass(slots=True)
+class UserMetadata:
+    static_summary: typing.Any | None = None
+    static_details: typing.Any | None = None
+
+
+class _SignalWithStartWorkflowResponseTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        "SignalWithStartWorkflowResponse",
+        temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+    ]
+):
+    transfer_type: (
+        type[
+            temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse
+        ]
+        | None
+    ) = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+    ) -> "SignalWithStartWorkflowResponse":
+        proto = value
+        return SignalWithStartWorkflowResponse(
+            run_id=proto.run_id if bool(proto.run_id) else None,
+            started=proto.started if bool(proto.started) else None,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: "SignalWithStartWorkflowResponse",
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse:
+        message = temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse()
+        if value.run_id is not None:
+            message.run_id = value.run_id
+        if value.started is not None:
+            message.started = value.started
+        return message
+
+
+@temporalio.converter.transfer_type_convertible(
+    _SignalWithStartWorkflowResponseTransferTypeConverter
+)
+@dataclasses.dataclass(slots=True)
+class SignalWithStartWorkflowResponse:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    run_id: str | None = None
+    started: bool | None = None
