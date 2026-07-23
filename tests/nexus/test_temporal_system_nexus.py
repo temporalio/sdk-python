@@ -20,7 +20,13 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
     WorkflowActivationCompletion,
 )
 from temporalio.client import Client
-from temporalio.converter import ExternalStorage, PayloadCodec
+from temporalio.converter import (
+    ExternalStorage,
+    PayloadCodec,
+    SerializationContext,
+    WithSerializationContext,
+    WorkflowSerializationContext,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
@@ -97,6 +103,34 @@ class RejectOuterSystemNexusCodec(PayloadCodec):
         return decoded
 
 
+class CaptureSystemNexusPayloadContextCodec(PayloadCodec, WithSerializationContext):
+    def __init__(
+        self,
+        captured_contexts: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ) -> None:
+        self._captured_contexts = captured_contexts
+        self._context = context
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> CaptureSystemNexusPayloadContextCodec:
+        return CaptureSystemNexusPayloadContextCodec(self._captured_contexts, context)
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        for payload in payloads:
+            if payload.data in {b'"workflow-input"', b'"signal-input"'}:
+                self._captured_contexts.append(self._context)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+
 class TracingWorkflowInterceptor(Interceptor):
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
@@ -134,13 +168,10 @@ def _assert_start_nexus_operation_interceptor_trace() -> None:
     trace_name, trace_value = interceptor_traces.pop()
     assert trace_name == "workflow.start_nexus_operation"
     trace_input = cast(StartNexusOperationInput[Any, Any], trace_value)
-    request = cast(
-        workflowservice_pb2.SignalWithStartWorkflowExecutionRequest,
-        trace_input.input,
-    )
-    assert request.workflow_id == "system-nexus-workflow-id"
-    assert request.signal_name == "test-signal"
-    assert request.workflow_type.name == "test-workflow"
+    request = trace_input.input
+    assert request.id == "system-nexus-workflow-id"
+    assert request.signal == "test-signal"
+    assert request.workflow == "test-workflow"
 
 
 class _MarkingPayloadVisitor:
@@ -408,3 +439,42 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
         },
     )
     _assert_start_nexus_operation_interceptor_trace()
+
+
+async def test_signal_with_start_uses_target_workflow_serialization_context(
+    env: WorkflowEnvironment,
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    captured_contexts: list[SerializationContext | None] = []
+    caller_config = env.client.config()
+    caller_config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=CaptureSystemNexusPayloadContextCodec(captured_contexts),
+    )
+    caller_client = Client(**caller_config)
+    caller_task_queue = str(uuid.uuid4())
+    target_workflow_id = "system-nexus-workflow-id"
+
+    async with Worker(
+        caller_client,
+        task_queue=caller_task_queue,
+        workflows=[ExternalHandleSignalWithStartWorkflowCaller],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        result = await caller_client.execute_workflow(
+            ExternalHandleSignalWithStartWorkflowCaller.run,
+            args=[str(uuid.uuid4())],
+            id=str(uuid.uuid4()),
+            task_queue=caller_task_queue,
+            execution_timeout=timedelta(seconds=5),
+        )
+
+    assert result == target_workflow_id
+    assert len(captured_contexts) >= 2
+    assert all(
+        isinstance(context, WorkflowSerializationContext)
+        and context.workflow_id == target_workflow_id
+        for context in captured_contexts
+    )

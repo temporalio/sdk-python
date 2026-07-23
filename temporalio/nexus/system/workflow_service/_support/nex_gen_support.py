@@ -12,6 +12,11 @@ import temporalio.common
 import temporalio.converter
 
 
+class SignalWithStartWorkflowRequest(typing.Protocol):
+    namespace: str
+    id: str
+
+
 def retry_policy_from_proto(
     proto: common_pb2.RetryPolicy,
 ) -> temporalio.common.RetryPolicy:
@@ -68,6 +73,15 @@ def workflow_namespace() -> str:
     from temporalio.workflow import info
 
     return info().namespace
+
+
+def signal_with_start_workflow_serialization_context(
+    request: SignalWithStartWorkflowRequest,
+) -> temporalio.converter.WorkflowSerializationContext:
+    return temporalio.converter.WorkflowSerializationContext(
+        namespace=request.namespace,
+        workflow_id=request.id,
+    )
 
 
 def payloads_to_proto(

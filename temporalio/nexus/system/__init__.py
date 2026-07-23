@@ -121,6 +121,20 @@ def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
     return _SystemNexusPayloadConverter(user_payload_converter)
 
 
+def _get_serialization_context(  # pyright: ignore[reportUnusedFunction]
+    service: str,
+    operation: str,
+    request: Any,
+) -> temporalio.converter.SerializationContext | None:
+    """Return the target serialization context for a system Nexus operation."""
+    from .workflow_service import __nexus_operation_registry__
+
+    operation_info = __nexus_operation_registry__.get((service, operation))
+    if operation_info is None or operation_info.serialization_context is None:
+        return None
+    return operation_info.serialization_context(request)
+
+
 __all__ = [
     "TEMPORAL_SYSTEM_ENDPOINT",
     "is_system_endpoint",
