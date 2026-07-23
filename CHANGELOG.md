@@ -20,6 +20,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
+  instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
+  HTTP/2 authority values, which keep following the connected host, so it can be used when the
+  server's certificate does not carry the dialed name but on-path infrastructure (e.g. an
+  SNI-inspecting egress proxy) needs the SNI to remain resolvable. Requires
+  `server_root_ca_cert`.
+
 - Added the experimental `Worker` `patch_activation_callback` option, allowing workers
   to decide whether a first non-replay `workflow.patched` call should activate a patch
   during rolling deployments.
@@ -29,6 +36,12 @@ to include examples, links to docs, or any other relevant information.
 ### Deprecated
 
 ### Breaking Changes
+
+- Payload size limits have moved from `DataConverter` to `Client.connect`. Pass
+  `payload_limits=PayloadLimitsConfig(...)` (now exported from
+  `temporalio.client`) instead of setting `payload_limits` on `DataConverter`.
+  Config fields were renamed to `payloads_warn_size` and `memo_warn_size`, and
+  the deprecated `PayloadSizeWarning` was removed.
 
 ### Fixed
 

@@ -2242,8 +2242,27 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-async def test_workflow_logging(client: Client):
-    workflow.logger.full_workflow_info_on_extra = True
+@pytest.mark.parametrize(
+    "with_workflow_info",
+    [True, False],
+)
+async def test_workflow_logging(client: Client, with_workflow_info: bool):
+    orig_on_message = workflow.logger.workflow_info_on_message
+    orig_on_extra = workflow.logger.workflow_info_on_extra
+    orig_full_on_extra = workflow.logger.full_workflow_info_on_extra
+
+    try:
+        workflow.logger.workflow_info_on_message = with_workflow_info
+        workflow.logger.workflow_info_on_extra = with_workflow_info
+        workflow.logger.full_workflow_info_on_extra = with_workflow_info
+        await _do_workflow_logging_test(client, with_workflow_info)
+    finally:
+        workflow.logger.workflow_info_on_message = orig_on_message
+        workflow.logger.workflow_info_on_extra = orig_on_extra
+        workflow.logger.full_workflow_info_on_extra = orig_full_on_extra
+
+
+async def _do_workflow_logging_test(client: Client, with_workflow_info: bool):
     with LogCapturer().logs_captured(
         workflow.logger.base_logger, activity.logger.base_logger
     ) as capturer:
@@ -2270,31 +2289,43 @@ async def test_workflow_logging(client: Client):
             assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
 
         # Confirm logs were produced
-        assert capturer.find_log("Signal: signal 1 ({'attempt':")
+        assert capturer.find_log("Signal: signal 1")
         assert capturer.find_log("Signal: signal 2")
         assert capturer.find_log("Update: update 1")
         assert capturer.find_log("Update: update 2")
         assert capturer.find_log("Query called")
         assert not capturer.find_log("Signal: signal 3")
-        # Also make sure it has some workflow info and correct funcName
-        record = capturer.find_log("Signal: signal 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["workflow_type"]
-            == "LoggingWorkflow"
-            and record.funcName == "my_signal"
-        )
-        # Since we enabled full info, make sure it's there
-        assert isinstance(record.__dict__["workflow_info"], workflow.Info)
-        # Check the log emitted by the update execution.
-        record = capturer.find_log("Update: update 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
-            and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
-            and "'update_id': 'update-1'" in record.message
-            and "'update_name': 'my_update'" in record.message
-        )
+
+        if with_workflow_info:
+            record = capturer.find_log("Signal: signal 1 ({'attempt':")
+            assert (
+                record
+                and record.__dict__["temporal_workflow"]["workflow_type"]
+                == "LoggingWorkflow"
+                and record.funcName == "my_signal"
+            )
+            # Since we enabled full info, make sure it's there
+            assert isinstance(record.__dict__["workflow_info"], workflow.Info)
+
+            # Check the log emitted by the update execution.
+            record = capturer.find_log("Update: update 1")
+            assert (
+                record
+                and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
+                and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
+                and "'update_id': 'update-1'" in record.message
+                and "'update_name': 'my_update'" in record.message
+            )
+        else:
+            record = capturer.find_log("Signal: signal 1")
+            assert record and "temporal_workflow" not in record.__dict__
+            assert record and "workflow_info" not in record.__dict__
+
+            record = capturer.find_log("Update: update 1")
+            assert record and "temporal_workflow" not in record.__dict__
+            assert record and "workflow_info" not in record.__dict__
+            assert "'update_id': 'update-1'" not in record.message
+            assert "'update_name': 'my_update'" not in record.message
 
         # Clear queue and start a new one with more signals
         capturer.log_queue.queue.clear()
@@ -9487,4 +9518,66 @@ async def test_workflow_uncancel_shield_signal_external(client: Client):
     shielded_err = log_capturer.find_log("exception in shielded future")
     assert shielded_err is None, (
         f"Unexpected 'exception in shielded future' log: {shielded_err}"
+    )
+
+
+class _SlowActivity:
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    @activity.defn(name="slow_activity")
+    async def slow_activity(self) -> None:
+        self.started.set()
+        await asyncio.sleep(60)
+
+
+@workflow.defn
+class _CancelInFlightActivityWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await asyncio.gather(
+            *(
+                workflow.execute_activity(
+                    "slow_activity",
+                    start_to_close_timeout=timedelta(minutes=2),
+                )
+                for _ in range(4)
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_workflow_cancel_no_shielded_future_log(
+    client: Client, caplog: pytest.LogCaptureFixture
+):
+    activity_inst = _SlowActivity()
+
+    with caplog.at_level(logging.ERROR):
+        async with new_worker(
+            client,
+            _CancelInFlightActivityWorkflow,
+            activities=[activity_inst.slow_activity],
+        ) as worker:
+            handle = await client.start_workflow(
+                _CancelInFlightActivityWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(minutes=5),
+            )
+
+            # Wait for activities to start
+            await asyncio.wait_for(activity_inst.started.wait(), timeout=10)
+
+            # Ignore worker startup logs
+            caplog.clear()
+
+            await handle.cancel()
+
+            try:
+                await handle.result()
+            except WorkflowFailureError as err:
+                assert isinstance(err.cause, CancelledError)
+
+    assert not any(
+        "exception in shielded future" in record.message for record in caplog.records
     )
