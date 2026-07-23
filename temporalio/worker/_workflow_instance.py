@@ -2133,21 +2133,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             payload_converter = temporalio.nexus.system._get_payload_converter(
                 self._workflow_context_payload_converter
             )
-            serialization_context = temporalio.nexus.system._get_serialization_context(
-                input.service,
-                input.operation_name,
-                input.input,
-            )
         else:
             payload_converter = self._context_free_payload_converter
-            serialization_context = None
         handle = _NexusOperationHandle(
             self,
             self._next_seq("nexus_operation"),
             input,
             operation_handle_fn(),
             payload_converter,
-            serialization_context,
         )
         handle._apply_schedule_command()
         self._pending_nexus_operations[handle._seq] = handle
@@ -2339,14 +2332,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
             and command_info.command_seq in self._pending_nexus_operations
         ):
-            serialization_context = self._pending_nexus_operations[
-                command_info.command_seq
-            ]._serialization_context
-            if serialization_context is not None:
-                return serialization_context
-            # A handle has a context only when a generated Temporal system-Nexus operation
-            # provides one for its target. Other Nexus operations have no context because the
-            # caller workflow context is unavailable on the handler side for decryption.
+            nexus_operation = self._pending_nexus_operations[command_info.command_seq]
+            if temporalio.nexus.system.is_system_endpoint(
+                nexus_operation._input.endpoint
+            ):
+                return temporalio.nexus.system._get_serialization_context(
+                    nexus_operation._input.service,
+                    nexus_operation._input.operation_name,
+                    nexus_operation._input.input,
+                )
+            # Other Nexus operations have no context because the caller workflow context is
+            # unavailable on the handler side for decryption.
             return None
 
         else:
@@ -3524,7 +3520,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         input: StartNexusOperationInput[Any, OutputT],
         fn: Coroutine[Any, Any, OutputT],
         payload_converter: temporalio.converter.PayloadConverter,
-        serialization_context: temporalio.converter.SerializationContext | None,
     ):
         self._instance = instance
         self._seq = seq
@@ -3533,7 +3528,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
         self._payload_converter = payload_converter
-        self._serialization_context = serialization_context
         self._failure_converter = self._instance._context_free_failure_converter
 
     @property
