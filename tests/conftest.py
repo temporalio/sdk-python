@@ -16,6 +16,23 @@ from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 from . import DEV_SERVER_DOWNLOAD_VERSION
 
+# Hack: if TEMPORAL_DEV_SERVER_EXISTING_PATH is set, monkeypatch
+# WorkflowEnvironment.start_local to inject dev_server_existing_path=<that path>.
+# Covers every env-spawn site (start_local + start_time_skipping_v2, since the
+# latter delegates to start_local) without touching each call.
+# Delete this block once we ship against a stable CLI release with the TS
+# server features (see revert-hack.md's Hack #6 territory).
+_dev_server_existing_path = os.environ.get("TEMPORAL_DEV_SERVER_EXISTING_PATH")
+if _dev_server_existing_path:
+    _orig_start_local = WorkflowEnvironment.start_local
+
+    @classmethod  # type: ignore[reportArgumentType]
+    async def _start_local_with_path(cls, **kwargs):  # type: ignore[reportMissingParameterType]
+        kwargs["dev_server_existing_path"] = _dev_server_existing_path
+        return await _orig_start_local.__func__(cls, **kwargs)  # type: ignore[reportFunctionMemberAccess]
+
+    WorkflowEnvironment.start_local = _start_local_with_path  # type: ignore[reportAttributeAccessIssue]
+
 # If there is an integration test environment variable set, we must remove the
 # first path from the sys.path so we can import the wheel instead
 if os.getenv("TEMPORAL_INTEGRATION_TEST"):
@@ -138,7 +155,7 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
         "--dynamic-config-value",
         'system.system.refreshNexusEndpointsMinWait="0s"',
         "--dynamic-config-value",
-        "frontend.TimeSkippingEnabled=true",
+        "frontend.WorkflowTimeSkippingEnabled=true",
         "--dynamic-config-value",
         "history.enableSignalWithStartFromWorkflow=true",
     ]

@@ -18,7 +18,7 @@ from tests.testing.test_workflow import (
 
 _TS_EXTRA_ARGS = [
     "--dynamic-config-value",
-    "frontend.TimeSkippingEnabled=true",
+    "frontend.WorkflowTimeSkippingEnabled=true",
 ]
 
 

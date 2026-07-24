@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -35,10 +36,15 @@ class TimeSkippingConfig:
     def _to_proto(self) -> temporalio.api.common.v1.TimeSkippingConfig:
         proto = temporalio.api.common.v1.TimeSkippingConfig(
             enabled=self.enabled,
-            disable_child_propagation=self.disable_propagation,
+            disable_propagation=self.disable_propagation,
         )
         if self.fast_forward is not None:
             proto.fast_forward.FromTimedelta(self.fast_forward)
+            # Server requires fast_forward_id whenever fast_forward is set;
+            # it's used for the PollWorkflowExecutionTimeSkipping API. We
+            # don't currently expose polling, so a fresh unique ID per
+            # call suffices.
+            proto.fast_forward_id = str(uuid.uuid4())
         return proto
 
 

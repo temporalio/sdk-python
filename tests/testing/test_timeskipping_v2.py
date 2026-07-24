@@ -31,7 +31,7 @@ async def env() -> AsyncGenerator[WorkflowEnvironment, None]:
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
             "--dynamic-config-value",
-            "frontend.TimeSkippingEnabled=true",
+            "frontend.WorkflowTimeSkippingEnabled=true",
         ],
     ) as workflow_env:
         yield workflow_env
@@ -290,7 +290,7 @@ async def test_child_workflow_with_propagation_disabled() -> None:
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
             "--dynamic-config-value",
-            "frontend.TimeSkippingEnabled=true",
+            "frontend.WorkflowTimeSkippingEnabled=true",
         ],
         ts_config=TimeSkippingConfig(disable_propagation=True),
     ) as env:
@@ -333,7 +333,7 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
             "--dynamic-config-value",
-            "frontend.TimeSkippingEnabled=true",
+            "frontend.WorkflowTimeSkippingEnabled=true",
         ],
     ) as env:
         assert not env.supports_time_skipping
