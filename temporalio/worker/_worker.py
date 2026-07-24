@@ -270,8 +270,9 @@ class Worker:
                 winning.
             max_eager_activity_reservations_per_workflow_task: Maximum number of
                 activity slots that may be reserved for eager execution when
-                completing a workflow task. The default is 3. Setting this to
-                zero disables eager activity execution.
+                completing a workflow task. The default is 3 and the value must
+                be positive. To disable eager activity execution, set
+                ``disable_eager_activity_execution`` to ``True``.
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
@@ -450,6 +451,11 @@ class Worker:
         if max_workflow_task_external_storage_concurrency < 1:
             raise ValueError(
                 "max_workflow_task_external_storage_concurrency must be positive"
+            )
+        if config.get("max_eager_activity_reservations_per_workflow_task", 3) < 1:
+            raise ValueError(
+                "max_eager_activity_reservations_per_workflow_task must be positive; "
+                "use disable_eager_activity_execution=True to disable eager activity execution"
             )
 
         # Prepend applicable client interceptors to the given ones
