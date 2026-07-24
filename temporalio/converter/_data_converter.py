@@ -28,6 +28,7 @@ from temporalio.converter._payload_codec import (
 )
 from temporalio.converter._payload_converter import (
     PayloadConverter,
+    _TemporalTransferTypePayloadConverter,
 )
 from temporalio.converter._serialization_context import (
     SerializationContext,
@@ -90,8 +91,14 @@ class DataConverter(WithSerializationContext):
     """Singleton default data converter."""
 
     def __post_init__(self) -> None:  # noqa: D105
-        object.__setattr__(self, "payload_converter", self.payload_converter_class())
+        object.__setattr__(self, "payload_converter", self._new_payload_converter())
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
+
+    def _new_payload_converter(self) -> PayloadConverter:
+        """Create a payload converter instance with SDK transfer type hooks enabled."""
+        return _TemporalTransferTypePayloadConverter.wrap(
+            self.payload_converter_class()
+        )
 
     async def encode(
         self, values: Sequence[Any]

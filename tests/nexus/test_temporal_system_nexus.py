@@ -186,7 +186,9 @@ def _new_system_nexus_request_payload() -> temporalio.api.common.v1.Payload:
     assert nested_payload is not None
     request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest()
     request.input.payloads.add().CopyFrom(nested_payload)
-    payload = nexus_system.get_payload_converter().to_payload(request)
+    payload = nexus_system._get_payload_converter(
+        temporalio.converter.PayloadConverter.default
+    ).to_payload(request)
     assert payload is not None
     return payload
 
@@ -201,7 +203,9 @@ async def test_schedule_system_nexus_endpoint_ignores_operation_registry() -> No
     await PayloadVisitor().visit(visitor, completion)
 
     schedule = completion.successful.commands[0].schedule_nexus_operation
-    decoded = nexus_system.get_payload_converter().from_payload(schedule.input)
+    decoded = nexus_system._get_payload_converter(
+        temporalio.converter.PayloadConverter.default
+    ).from_payload(schedule.input)
     assert isinstance(
         decoded, workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
     )
@@ -339,7 +343,9 @@ def _field_is_repeated(field: FieldDescriptor) -> bool:
     ],
 )
 def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
-    payload_converter = nexus_system.get_payload_converter()
+    payload_converter = nexus_system._get_payload_converter(
+        temporalio.converter.PayloadConverter.default
+    )
     proto_value = _build_proto_sample(message_type)
     payload = payload_converter.to_payload(proto_value)
     assert payload is not None
