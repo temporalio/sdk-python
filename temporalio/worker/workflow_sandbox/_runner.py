@@ -229,3 +229,20 @@ class _Instance(WorkflowInstance):
             )  # type: ignore
         finally:
             self.importer.restriction_context.is_runtime = False
+
+    def is_result_deferred(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> bool:
+        # Forward call to the sandboxed instance
+        self.importer.restriction_context.is_runtime = True
+        try:
+            self._run_code(
+                "with __temporal_importer.applied():\n"
+                "  __temporal_deferred = __temporal_in_sandbox.is_result_deferred(__temporal_command_info)\n",
+                __temporal_importer=self.importer,
+                __temporal_command_info=command_info,
+            )
+            return bool(self.globals_and_locals.pop("__temporal_deferred", False))
+        finally:
+            self.importer.restriction_context.is_runtime = False

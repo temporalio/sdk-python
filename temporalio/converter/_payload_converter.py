@@ -297,7 +297,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             KeyError: Unknown payload encoding
             RuntimeError: Error during decode
         """
-        values = []
+        values: list[Any] = []
         type_hints = type_hints or []
         for index, (payload, type_hint) in enumerate(zip_longest(payloads, type_hints)):
             # Raw value should just wrap

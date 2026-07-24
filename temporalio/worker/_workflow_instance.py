@@ -56,6 +56,7 @@ import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._payload_handle
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
@@ -81,6 +82,33 @@ from ._interceptor import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _result_ret_type(
+    result_type: type | None, declared_ret_type: type | None
+) -> type | None:
+    """Resolve the decode type for a callable activity/child result.
+
+    Normally the callable's declared return type. If the caller opted to consume
+    the result as a handle (``result_type`` is a ``PayloadHandle`` hint, e.g. via
+    ``execute_activity_as_handle``), keep an explicit inner type if one was given,
+    else wrap the declared return type as ``PayloadHandle[declared]``. This lets a
+    workflow upgrade an unchanged activity's result to a handle.
+    """
+    if (
+        result_type is not None
+        and temporalio.converter._payload_handle._is_payload_handle_hint(result_type)
+    ):
+        if (
+            temporalio.converter._payload_handle._payload_handle_inner_type(result_type)
+            is not None
+        ):
+            return result_type
+        return temporalio.converter._payload_handle._payload_handle_hint(
+            declared_ret_type
+        )
+    return declared_ret_type
+
 
 # Set to true to log all cases where we're ignoring things during delete
 LOG_IGNORE_DURING_DELETE = False
@@ -221,6 +249,19 @@ class WorkflowInstance(ABC):
             The store context associated with the command.
         """
         raise NotImplementedError
+
+    def is_result_deferred(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> bool:
+        """Whether the resolved result for this command should stay a handle.
+
+        Not abstract: defaults to False (eager retrieval, the prior behavior).
+        Overridden to return True when the pending activity/child-workflow
+        requested its result as a ``PayloadHandle``, so the worker can skip
+        downloading an offloaded result the workflow only forwards.
+        """
+        return False
 
     @abstractmethod
     def get_info(self) -> temporalio.workflow.Info:
@@ -1517,7 +1558,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise ValueError("Cannot invoke dynamic activity explicitly")
             name = defn.name
             arg_types = defn.arg_types
-            ret_type = defn.ret_type
+            ret_type = _result_ret_type(result_type, defn.ret_type)
         else:
             raise TypeError("Activity must be a string or callable")
 
@@ -1581,7 +1622,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise TypeError("Cannot invoke dynamic workflow explicitly")
             name = defn.name
             arg_types = defn.arg_types
-            ret_type = defn.ret_type
+            ret_type = _result_ret_type(result_type, defn.ret_type)
         else:
             raise TypeError("Workflow must be a string or callable")
 
@@ -1637,7 +1678,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise ValueError("Cannot invoke dynamic activity explicitly")
             name = defn.name
             arg_types = defn.arg_types
-            ret_type = defn.ret_type
+            ret_type = _result_ret_type(result_type, defn.ret_type)
         else:
             raise TypeError("Activity must be a string or callable")
 
@@ -2265,6 +2306,33 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if isinstance(failure_converter, temporalio.converter.WithSerializationContext):
             failure_converter = failure_converter.with_context(context)
         return failure_converter
+
+    def is_result_deferred(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> bool:
+        if command_info is None:
+            return False
+        command_type = temporalio.api.enums.v1.command_type_pb2.CommandType
+        seq = command_info.command_seq
+        handle: Any = None
+        if (
+            command_info.command_type
+            == command_type.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK
+        ):
+            handle = self._pending_activities.get(seq)
+        elif (
+            command_info.command_type
+            == command_type.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION
+        ):
+            handle = self._pending_child_workflows.get(seq)
+        if handle is None:
+            return False
+        ret_type = handle._input.ret_type
+        return (
+            ret_type is not None
+            and temporalio.converter._payload_handle._is_payload_handle_hint(ret_type)
+        )
 
     def get_serialization_context(
         self,

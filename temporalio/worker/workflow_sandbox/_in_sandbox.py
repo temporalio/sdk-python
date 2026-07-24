@@ -96,3 +96,10 @@ class InSandbox:
     ) -> StorageDriverStoreContext:
         """Get store context for external storage."""
         return self.instance.get_external_store_context(command_info)
+
+    def is_result_deferred(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> bool:
+        """Whether the command's resolved result should stay a handle."""
+        return self.instance.is_result_deferred(command_info)
