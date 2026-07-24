@@ -25,7 +25,9 @@ toolset is torn down when the workflow completes.
 
 import uuid
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
+
+from google.adk.tools.mcp_tool import McpToolset
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -73,10 +75,10 @@ class _FakeToolset:
         self.closed = True
 
 
-def _factory(arg: Any) -> _FakeToolset:
+def _factory(arg: Any) -> McpToolset:
     toolset = _FakeToolset(arg)
     CREATED.append(toolset)
-    return toolset  # type: ignore[return-value]
+    return cast(McpToolset, cast(object, toolset))
 
 
 @workflow.defn

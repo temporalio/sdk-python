@@ -22,10 +22,11 @@ for the connection-leak fix (issue #1663): every call builds its own toolset,
 honors that call's ``factory_argument``, and always closes the toolset.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from google.adk.events import EventActions
+from google.adk.tools.mcp_tool import McpToolset
 
 from temporalio.contrib.google_adk_agents._mcp import (
     TemporalMcpToolSetProvider,
@@ -103,10 +104,10 @@ async def test_call_tool_creates_and_closes_fresh_toolset_each_call():
     """Each call_tool builds its own toolset and closes it, every time."""
     created: list[_FakeToolset] = []
 
-    def factory(arg: Any) -> _FakeToolset:
+    def factory(arg: Any) -> McpToolset:
         toolset = _FakeToolset(arg)
         created.append(toolset)
-        return toolset
+        return cast(McpToolset, cast(object, toolset))
 
     provider = TemporalMcpToolSetProvider("stateless_reuse", factory)
     _, call_tool = provider._get_activities()
@@ -123,10 +124,10 @@ async def test_call_tool_creates_and_closes_fresh_toolset_each_call():
 async def test_get_tools_creates_and_closes_fresh_toolset():
     created: list[_FakeToolset] = []
 
-    def factory(arg: Any) -> _FakeToolset:
+    def factory(arg: Any) -> McpToolset:
         toolset = _FakeToolset(arg)
         created.append(toolset)
-        return toolset
+        return cast(McpToolset, cast(object, toolset))
 
     provider = TemporalMcpToolSetProvider("stateless_list", factory)
     get_tools, _ = provider._get_activities()
@@ -145,10 +146,10 @@ async def test_factory_argument_honored_on_every_call():
     """
     created: list[_FakeToolset] = []
 
-    def factory(arg: Any) -> _FakeToolset:
+    def factory(arg: Any) -> McpToolset:
         toolset = _FakeToolset(arg)
         created.append(toolset)
-        return toolset
+        return cast(McpToolset, cast(object, toolset))
 
     provider = TemporalMcpToolSetProvider("stateless_routing", factory)
     _, call_tool = provider._get_activities()
@@ -164,10 +165,10 @@ async def test_call_tool_closes_toolset_on_error():
     """A failure mid-call still closes the toolset (no leak on the error path)."""
     created: list[_FakeToolset] = []
 
-    def factory(arg: Any) -> _FakeToolset:
+    def factory(arg: Any) -> McpToolset:
         toolset = _FakeToolset(arg, fail_run=True)
         created.append(toolset)
-        return toolset
+        return cast(McpToolset, cast(object, toolset))
 
     provider = TemporalMcpToolSetProvider("stateless_run_error", factory)
     _, call_tool = provider._get_activities()
@@ -182,10 +183,10 @@ async def test_call_tool_closes_toolset_on_error():
 async def test_get_tools_closes_toolset_on_error():
     created: list[_FakeToolset] = []
 
-    def factory(arg: Any) -> _FakeToolset:
+    def factory(arg: Any) -> McpToolset:
         toolset = _FakeToolset(arg, fail_get_tools=True)
         created.append(toolset)
-        return toolset
+        return cast(McpToolset, cast(object, toolset))
 
     provider = TemporalMcpToolSetProvider("stateless_list_error", factory)
     get_tools, _ = provider._get_activities()
@@ -201,10 +202,10 @@ async def test_call_tool_no_matching_tool_still_closes():
     """A business-logic ApplicationError still closes the fresh toolset."""
     created: list[_FakeToolset] = []
 
-    def factory(arg: Any) -> _FakeToolset:
+    def factory(arg: Any) -> McpToolset:
         toolset = _FakeToolset(arg)
         created.append(toolset)
-        return toolset
+        return cast(McpToolset, cast(object, toolset))
 
     provider = TemporalMcpToolSetProvider("stateless_no_match", factory)
     _, call_tool = provider._get_activities()
