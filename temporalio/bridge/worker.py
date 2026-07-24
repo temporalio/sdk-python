@@ -374,8 +374,12 @@ async def decode_activation(
     Returns:
         Metrics from any external storage retrieval operations that occurred.
     """
-    retrieve = data_converter._external_retrieve_payload_sequence
-    decode = data_converter._decode_payload_sequence
+    retrieve: Callable[[Sequence[Payload]], Awaitable[list[Payload]]] = (
+        data_converter._external_retrieve_payload_sequence
+    )
+    decode: Callable[[Sequence[Payload]], Awaitable[list[Payload]]] = (
+        data_converter._decode_payload_sequence
+    )
     if defer_retrieval_payloads:
         retrieve = _skip_payloads(retrieve, defer_retrieval_payloads)
         decode = _skip_reference_payloads(decode)

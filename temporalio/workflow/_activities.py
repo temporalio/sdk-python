@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Concatenate, Generic, TypedDict, overload
 
 import temporalio.bridge.proto.workflow_commands
 import temporalio.common
+import temporalio.converter
 
 from ..types import (
     AnyType,
@@ -485,6 +486,180 @@ async def execute_activity(
         *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
         result_type=result_type,
+        schedule_to_close_timeout=schedule_to_close_timeout,
+        schedule_to_start_timeout=schedule_to_start_timeout,
+        start_to_close_timeout=start_to_close_timeout,
+        heartbeat_timeout=heartbeat_timeout,
+        retry_policy=retry_policy,
+        cancellation_type=cancellation_type,
+        activity_id=activity_id,
+        versioning_intent=versioning_intent,
+        summary=summary,
+        priority=priority,
+    )
+
+
+# Overload for async no-param activity
+@overload
+async def execute_activity_as_handle(
+    activity: CallableAsyncNoParam[ReturnType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for sync no-param activity
+@overload
+async def execute_activity_as_handle(
+    activity: CallableSyncNoParam[ReturnType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for async single-param activity
+@overload
+async def execute_activity_as_handle(
+    activity: CallableAsyncSingleParam[ParamType, ReturnType],
+    arg: ParamType,
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for sync single-param activity
+@overload
+async def execute_activity_as_handle(
+    activity: CallableSyncSingleParam[ParamType, ReturnType],
+    arg: ParamType,
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for multi-param activity
+@overload
+async def execute_activity_as_handle(
+    activity: Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType],
+    *,
+    args: Sequence[Any],
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for string-name activity
+@overload
+async def execute_activity_as_handle(
+    activity: str,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Sequence[Any] = [],
+    task_queue: str | None = None,
+    result_type: type | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[Any]: ...
+
+
+async def execute_activity_as_handle(
+    activity: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Sequence[Any] = [],
+    task_queue: str | None = None,
+    result_type: type | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> Any:
+    """Execute an activity and receive its result as a lazy PayloadHandle.
+
+    Identical to :py:func:`execute_activity` except the activity is left
+    unchanged and its result is delivered as a
+    :py:class:`temporalio.converter.PayloadHandle` of the declared return type.
+    If the result was offloaded to external storage, it is not downloaded into
+    the workflow; forward the handle to an activity (or materialize it there) to
+    avoid paying for data the workflow only routes.
+
+    For a string activity name, pass ``result_type=PayloadHandle[T]`` to keep the
+    materialized type; otherwise the declared return type is used.
+    """
+    handle_result_type = (
+        result_type
+        if result_type is not None
+        and result_type is not temporalio.converter.PayloadHandle
+        else temporalio.converter.PayloadHandle
+    )
+    return await _Runtime.current().workflow_start_activity(
+        activity,
+        *temporalio.common._arg_or_args(arg, args),
+        task_queue=task_queue,
+        result_type=handle_result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,
@@ -1467,6 +1642,150 @@ async def execute_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
         result_type=result_type,
+        schedule_to_close_timeout=schedule_to_close_timeout,
+        schedule_to_start_timeout=schedule_to_start_timeout,
+        start_to_close_timeout=start_to_close_timeout,
+        retry_policy=retry_policy,
+        local_retry_threshold=local_retry_threshold,
+        cancellation_type=cancellation_type,
+        activity_id=activity_id,
+        summary=summary,
+    )
+
+
+# Overload for async no-param local activity
+@overload
+async def execute_local_activity_as_handle(
+    activity: CallableAsyncNoParam[ReturnType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for sync no-param local activity
+@overload
+async def execute_local_activity_as_handle(
+    activity: CallableSyncNoParam[ReturnType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for async single-param local activity
+@overload
+async def execute_local_activity_as_handle(
+    activity: CallableAsyncSingleParam[ParamType, ReturnType],
+    arg: ParamType,
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for sync single-param local activity
+@overload
+async def execute_local_activity_as_handle(
+    activity: CallableSyncSingleParam[ParamType, ReturnType],
+    arg: ParamType,
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for multi-param local activity
+@overload
+async def execute_local_activity_as_handle(
+    activity: Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType],
+    *,
+    args: Sequence[Any],
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for string-name local activity
+@overload
+async def execute_local_activity_as_handle(
+    activity: str,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Sequence[Any] = [],
+    result_type: type | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> temporalio.converter.PayloadHandle[Any]: ...
+
+
+async def execute_local_activity_as_handle(
+    activity: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Sequence[Any] = [],
+    result_type: type | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> Any:
+    """Execute a local activity and receive its result as a lazy PayloadHandle.
+
+    Like :py:func:`execute_local_activity` but the (unchanged) activity's result
+    is delivered as a :py:class:`temporalio.converter.PayloadHandle` of the
+    declared return type, avoiding an eager download of an offloaded result.
+    """
+    handle_result_type = (
+        result_type
+        if result_type is not None
+        and result_type is not temporalio.converter.PayloadHandle
+        else temporalio.converter.PayloadHandle
+    )
+    return await _Runtime.current().workflow_start_local_activity(
+        activity,
+        *temporalio.common._arg_or_args(arg, args),
+        result_type=handle_result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
         schedule_to_start_timeout=schedule_to_start_timeout,
         start_to_close_timeout=start_to_close_timeout,

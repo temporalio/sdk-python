@@ -144,6 +144,19 @@ def _payload_handle_inner_type(hint: Any) -> Optional[type]:
     return args[0] if args else None
 
 
+def _payload_handle_hint(inner_type: Optional[type]) -> Any:
+    """Build a ``PayloadHandle[inner_type]`` hint (bare if ``inner_type`` is None).
+
+    Used to upgrade a call's result type so an unchanged activity/child result
+    is consumed as a handle: the declared return type becomes the handle's ``T``.
+    """
+    return (
+        PayloadHandle[inner_type]  # type: ignore[valid-type]
+        if inner_type is not None
+        else PayloadHandle
+    )
+
+
 def _create_handle(
     payload: temporalio.api.common.v1.Payload, inner_type: Optional[type]
 ) -> PayloadHandle[Any]:

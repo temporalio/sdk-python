@@ -7,6 +7,7 @@ from typing import Any, Concatenate, Generic, NoReturn, TypedDict, overload
 
 import temporalio.bridge.proto.child_workflow
 import temporalio.common
+import temporalio.converter
 
 from ..types import (
     MethodAsyncNoParam,
@@ -530,6 +531,182 @@ async def execute_child_workflow(
         id=id or str(uuid4()),
         task_queue=task_queue,
         result_type=result_type,
+        cancellation_type=cancellation_type,
+        parent_close_policy=parent_close_policy,
+        execution_timeout=execution_timeout,
+        run_timeout=run_timeout,
+        task_timeout=task_timeout,
+        id_reuse_policy=id_reuse_policy,
+        retry_policy=retry_policy,
+        cron_schedule=cron_schedule,
+        memo=memo,
+        search_attributes=search_attributes,
+        versioning_intent=versioning_intent,
+        static_summary=static_summary,
+        static_details=static_details,
+        priority=priority,
+    )
+    return await handle
+
+
+# Overload for no-param child workflow
+@overload
+async def execute_child_workflow_as_handle(
+    workflow: MethodAsyncNoParam[SelfType, ReturnType],
+    *,
+    id: str | None = None,
+    task_queue: str | None = None,
+    cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+    parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for single-param child workflow
+@overload
+async def execute_child_workflow_as_handle(
+    workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
+    arg: ParamType,
+    *,
+    id: str | None = None,
+    task_queue: str | None = None,
+    cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+    parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for multi-param child workflow
+@overload
+async def execute_child_workflow_as_handle(
+    workflow: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]],
+    *,
+    args: Sequence[Any],
+    id: str | None = None,
+    task_queue: str | None = None,
+    cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+    parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[ReturnType]: ...
+
+
+# Overload for string-name child workflow
+@overload
+async def execute_child_workflow_as_handle(
+    workflow: str,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Sequence[Any] = [],
+    id: str | None = None,
+    task_queue: str | None = None,
+    result_type: type | None = None,
+    cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+    parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> temporalio.converter.PayloadHandle[Any]: ...
+
+
+async def execute_child_workflow_as_handle(
+    workflow: Any,
+    arg: Any = temporalio.common._arg_unset,
+    *,
+    args: Sequence[Any] = [],
+    id: str | None = None,
+    task_queue: str | None = None,
+    result_type: type | None = None,
+    cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+    parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> Any:
+    """Execute a child workflow and receive its result as a lazy PayloadHandle.
+
+    Like :py:func:`execute_child_workflow` but the (unchanged) child's result is
+    delivered as a :py:class:`temporalio.converter.PayloadHandle` of the declared
+    return type, avoiding an eager download of an offloaded result.
+    """
+    temporalio.common._warn_on_deprecated_search_attributes(search_attributes)
+    handle_result_type = (
+        result_type
+        if result_type is not None
+        and result_type is not temporalio.converter.PayloadHandle
+        else temporalio.converter.PayloadHandle
+    )
+    handle = await _Runtime.current().workflow_start_child_workflow(
+        workflow,
+        *temporalio.common._arg_or_args(arg, args),
+        id=id or str(uuid4()),
+        task_queue=task_queue,
+        result_type=handle_result_type,
         cancellation_type=cancellation_type,
         parent_close_policy=parent_close_policy,
         execution_timeout=execution_timeout,

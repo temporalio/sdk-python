@@ -59,6 +59,60 @@ class ForwardToIgnoreWorkflow:
         )
 
 
+@activity.defn
+async def produce_big() -> str:
+    # An ordinary activity returning a large value; it is unchanged / unaware of
+    # handles. The value is offloaded to external storage on completion.
+    return _BIG
+
+
+@workflow.defn
+class ResultAsHandleConsumeWorkflow:
+    @workflow.run
+    async def run(self) -> int:
+        # Upgrade an unchanged activity's result to a handle, then forward it to
+        # an activity that materializes it.
+        handle = await workflow.execute_activity_as_handle(
+            produce_big, start_to_close_timeout=timedelta(seconds=30)
+        )
+        return await workflow.execute_activity(
+            consume_handle, handle, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+@workflow.defn
+class ResultAsHandlePassThroughWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        handle = await workflow.execute_activity_as_handle(
+            produce_big, start_to_close_timeout=timedelta(seconds=30)
+        )
+        return await workflow.execute_activity(
+            ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+@workflow.defn
+class ChildProducerWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return _BIG
+
+
+@workflow.defn
+class ParentChildResultAsHandleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Upgrade an unchanged child workflow's result to a handle and forward it
+        # without materializing it in this (parent) workflow.
+        handle = await workflow.execute_child_workflow_as_handle(
+            ChildProducerWorkflow.run
+        )
+        return await workflow.execute_activity(
+            ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
 def _data_converter(driver: InMemoryTestDriver) -> temporalio.converter.DataConverter:
     return dataclasses.replace(
         temporalio.converter.default(),
@@ -119,4 +173,68 @@ async def test_workflow_pass_through_no_download(env: WorkflowEnvironment) -> No
         data_converter=_data_converter(driver),
     ).replay_workflow(history, raise_on_replay_failure=True)
     assert replay_result is not None
+    assert driver._retrieve_calls == 0
+
+
+async def test_activity_result_as_handle_materializes_once(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = InMemoryTestDriver()
+    client = await _client(env, driver)
+    async with new_worker(
+        client,
+        ResultAsHandleConsumeWorkflow,
+        activities=[produce_big, consume_handle],
+    ) as worker:
+        result = await client.execute_workflow(
+            ResultAsHandleConsumeWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == len(_BIG)
+    # The producing activity's result was offloaded, upgraded to a handle in the
+    # workflow (not downloaded there), and materialized exactly once downstream.
+    assert driver._retrieve_calls == 1
+
+
+async def test_activity_result_as_handle_pass_through_no_download(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = InMemoryTestDriver()
+    client = await _client(env, driver)
+    async with new_worker(
+        client,
+        ResultAsHandlePassThroughWorkflow,
+        activities=[produce_big, ignore_handle],
+    ) as worker:
+        result = await client.execute_workflow(
+            ResultAsHandlePassThroughWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == "ignored"
+    # The unchanged activity's offloaded result was never downloaded: the
+    # workflow received it as a handle and forwarded it without materializing.
+    assert driver._retrieve_calls == 0
+
+
+async def test_child_workflow_result_as_handle_pass_through(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = InMemoryTestDriver()
+    client = await _client(env, driver)
+    async with new_worker(
+        client,
+        ParentChildResultAsHandleWorkflow,
+        ChildProducerWorkflow,
+        activities=[ignore_handle],
+    ) as worker:
+        result = await client.execute_workflow(
+            ParentChildResultAsHandleWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == "ignored"
+    # The child workflow's offloaded result was upgraded to a handle in the
+    # parent and forwarded without ever being downloaded.
     assert driver._retrieve_calls == 0
