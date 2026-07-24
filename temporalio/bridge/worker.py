@@ -52,6 +52,7 @@ class WorkerConfig:
     default_heartbeat_throttle_interval_millis: int
     max_activities_per_second: float | None
     max_task_queue_activities_per_second: float | None
+    max_eager_activity_reservations_per_workflow_task: int
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: set[str]

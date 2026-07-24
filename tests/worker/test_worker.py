@@ -1744,6 +1744,18 @@ def test_worker_config_matches_init_params():
     )
 
 
+async def test_worker_max_eager_activity_reservations_per_workflow_task_config(
+    client: Client,
+):
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        max_eager_activity_reservations_per_workflow_task=7,
+    )
+    assert worker.config()["max_eager_activity_reservations_per_workflow_task"] == 7
+
+
 async def test_worker_debug_mode(client: Client):
     worker = Worker(
         client,

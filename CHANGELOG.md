@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `Worker` `max_eager_activity_reservations_per_workflow_task` option for configuring
+  the number of activity slots reserved for eager execution per workflow task.
 - Added experimental SDK payload converter support for values and type hints
   decorated with `@transfer_type_convertible(...)` using a `TransferTypeConverter` class.
   This lets types with transfer type converters delegate their wire representation to the

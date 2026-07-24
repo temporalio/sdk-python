@@ -57,6 +57,7 @@ pub struct WorkerConfig {
     default_heartbeat_throttle_interval_millis: u64,
     max_activities_per_second: Option<f64>,
     max_task_queue_activities_per_second: Option<f64>,
+    max_eager_activity_reservations_per_workflow_task: usize,
     graceful_shutdown_period_millis: u64,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
@@ -739,6 +740,9 @@ fn convert_worker_config(
         ))
         .maybe_max_worker_activities_per_second(conf.max_activities_per_second)
         .maybe_max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
+        .max_eager_activity_reservations_per_workflow_task(
+            conf.max_eager_activity_reservations_per_workflow_task,
+        )
         // Even though grace period is optional, if it is not set then the
         // auto-cancel-activity behavior of shutdown will not occur, so we
         // always set it even if 0.
