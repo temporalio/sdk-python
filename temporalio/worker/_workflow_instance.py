@@ -84,32 +84,6 @@ from ._interceptor import (
 logger = logging.getLogger(__name__)
 
 
-def _result_ret_type(
-    result_type: type | None, declared_ret_type: type | None
-) -> type | None:
-    """Resolve the decode type for a callable activity/child result.
-
-    Normally the callable's declared return type. If the caller opted to consume
-    the result as a handle (``result_type`` is a ``PayloadHandle`` hint, e.g. via
-    ``execute_activity_as_handle``), keep an explicit inner type if one was given,
-    else wrap the declared return type as ``PayloadHandle[declared]``. This lets a
-    workflow upgrade an unchanged activity's result to a handle.
-    """
-    if (
-        result_type is not None
-        and temporalio.converter._payload_handle._is_payload_handle_hint(result_type)
-    ):
-        if (
-            temporalio.converter._payload_handle._payload_handle_inner_type(result_type)
-            is not None
-        ):
-            return result_type
-        return temporalio.converter._payload_handle._payload_handle_hint(
-            declared_ret_type
-        )
-    return declared_ret_type
-
-
 # Set to true to log all cases where we're ignoring things during delete
 LOG_IGNORE_DURING_DELETE = False
 
@@ -1558,7 +1532,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise ValueError("Cannot invoke dynamic activity explicitly")
             name = defn.name
             arg_types = defn.arg_types
-            ret_type = _result_ret_type(result_type, defn.ret_type)
+            ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
 
@@ -1622,7 +1596,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise TypeError("Cannot invoke dynamic workflow explicitly")
             name = defn.name
             arg_types = defn.arg_types
-            ret_type = _result_ret_type(result_type, defn.ret_type)
+            ret_type = defn.ret_type
         else:
             raise TypeError("Workflow must be a string or callable")
 
@@ -1678,7 +1652,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise ValueError("Cannot invoke dynamic activity explicitly")
             name = defn.name
             arg_types = defn.arg_types
-            ret_type = _result_ret_type(result_type, defn.ret_type)
+            ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
 
@@ -3247,6 +3221,12 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             )
         )
 
+    def as_payload_handle(self) -> temporalio.workflow.ActivityHandle[Any]:
+        ph = temporalio.converter._payload_handle
+        if not ph._is_payload_handle_hint(self._input.ret_type):
+            self._input.ret_type = ph._payload_handle_hint(self._input.ret_type)
+        return self
+
     def cancel(self, msg: Any | None = None) -> bool:
         # Allow the cancel to go through for the task even if we're deleting,
         # just don't do any commands
@@ -3399,6 +3379,12 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._failure_converter = self._instance._failure_converter_with_context(
             workflow_context
         )
+
+    def as_payload_handle(self) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
+        ph = temporalio.converter._payload_handle
+        if not ph._is_payload_handle_hint(self._input.ret_type):
+            self._input.ret_type = ph._payload_handle_hint(self._input.ret_type)
+        return self
 
     @property
     def id(self) -> str:
