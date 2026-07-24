@@ -43,6 +43,7 @@ from ._workflow_instance import (
     PatchActivationInput,
     UnsandboxedWorkflowRunner,
     WorkflowRunner,
+    _WorkflowLogicFlag,
 )
 from .workflow_sandbox import SandboxedWorkflowRunner
 
@@ -734,6 +735,17 @@ class Worker:
         # Update the nexus worker's client reference if nexus services are configured
         if self._nexus_worker:
             self._nexus_worker._client = value
+
+    def _set_default_workflow_logic_flag(
+        self, flag: _WorkflowLogicFlag, *, enabled: bool
+    ) -> None:
+        if self._started:
+            raise RuntimeError(
+                "Cannot set default workflow logic flags after the worker has started"
+            )
+        if not self._workflow_worker:
+            raise RuntimeError("Cannot set workflow logic flags without workflows")
+        self._workflow_worker._set_default_workflow_logic_flag(flag, enabled=enabled)
 
     @property
     def is_running(self) -> bool:
