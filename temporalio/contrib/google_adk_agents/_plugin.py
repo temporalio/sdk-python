@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import random
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -56,6 +57,24 @@ def setup_deterministic_runtime():
         pass
     except Exception as e:
         print(f"Warning: Failed to set deterministic runtime providers: {e}")
+
+    try:
+        # Available on ADK versions that route retry jitter through the
+        # platform random seam; a no-op ImportError on older versions.
+        from google.adk.platform import set_random_provider
+
+        _local_random = random.Random()
+
+        def _deterministic_random_provider() -> random.Random:
+            if workflow.in_workflow():
+                return workflow.random()
+            return _local_random
+
+        set_random_provider(_deterministic_random_provider)
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"Warning: Failed to set deterministic random provider: {e}")
 
 
 class GoogleAdkPlugin(SimplePlugin):
