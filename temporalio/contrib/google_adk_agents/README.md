@@ -323,6 +323,13 @@ requesting confirmation via `tool_context.request_confirmation(...)` flow
 through the same loop. Partial responses are fine: unanswered requests stay
 pending across `run_async` turns.
 
+> **Replay-safety note:** HITL resume matches recorded human responses against
+> generated interrupt/function-call ids, so those ids must regenerate
+> identically on replay. The plugin installs ADK's platform time/uuid/random
+> providers as process-wide defaults to guarantee this. On google-adk versions
+> where `RequestInput` ids bypass the platform seam, pass an explicit
+> `interrupt_id` to `RequestInput(...)` (as the examples here do).
+
 ## Determinism Notes
 
 - The plugin patches ADK's `google.adk.platform` time, uuid, and (on ADK
