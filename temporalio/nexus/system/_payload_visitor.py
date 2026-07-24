@@ -63,20 +63,20 @@ class PayloadVisitor:
         await self._visit_temporal_api_common_v1_Payload(fs, payload)
 
     async def _visit_temporal_api_common_v1_Payload(
-        self, fs: VisitorFunctions, o: Payload
-    ):
+        self, fs: VisitorFunctions, payload: Payload
+    ) -> None:
         new_payload = await temporalio.nexus.system.maybe_visit_payload(
-            o,
+            payload,
             fs,
             self.skip_search_attributes,
         )
         if new_payload is None:
-            await fs.visit_payload(o)
+            await fs.visit_payload(payload)
             return
 
-        if new_payload is not o:
-            o.CopyFrom(new_payload)
-        await fs.visit_system_nexus_envelope(o)
+        if new_payload is not payload:
+            payload.CopyFrom(new_payload)
+        await fs.visit_system_nexus_envelope(payload)
 
     async def _visit_temporal_api_common_v1_Payloads(
         self, fs: VisitorFunctions, o: Any

@@ -250,7 +250,7 @@ async def test_system_nexus_envelope_is_detected_in_generic_payload_field():
     )
     visitor = SystemNexusVisitor()
 
-    await PayloadVisitor().visit(visitor, comp)
+    await PayloadVisitor(concurrency_limit=3).visit(visitor, comp)
 
     completed = comp.successful.commands[0].update_response.completed
     assert completed.metadata["__temporal_system_payload"] == b"true"

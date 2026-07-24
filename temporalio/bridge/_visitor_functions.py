@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
@@ -24,6 +24,19 @@ class VisitorFunctions(Protocol):
     async def visit_system_nexus_envelope(self, payload: Payload) -> None:
         """Visit a recognized system Nexus envelope payload."""
         return None
+
+
+@runtime_checkable
+class CheckpointingVisitorFunctions(VisitorFunctions, Protocol):
+    """Visitor functions that can await a scoped set of deferred visits."""
+
+    def checkpoint(self) -> int:
+        """Return a marker for visits scheduled after this point."""
+        ...
+
+    async def drain_since(self, checkpoint: int) -> None:
+        """Wait for visits scheduled after ``checkpoint`` to finish."""
+        ...
 
 
 class BoundedVisitorFunctions(VisitorFunctions):
@@ -74,16 +87,33 @@ class BoundedVisitorFunctions(VisitorFunctions):
 
         self._tasks.append(asyncio.create_task(_run()))
 
+    def checkpoint(self) -> int:
+        """Return a marker for tasks scheduled after this point."""
+        return len(self._tasks)
+
+    async def drain_since(self, checkpoint: int) -> None:
+        """Wait for tasks scheduled after ``checkpoint`` to finish.
+
+        This lets system-envelope traversal finish mutating its decoded value
+        before that value is serialized again, without waiting for unrelated
+        visits that were already in progress.
+        """
+        await self._drain_tasks(self._tasks[checkpoint:])
+
     async def drain(self) -> None:
         """Wait for all in-flight background tasks to complete.
 
         On cancellation or error, cancels all remaining tasks and awaits
         them so their finally blocks run before this coroutine returns.
         """
-        if not self._tasks:
+        await self._drain_tasks(self._tasks)
+
+    async def _drain_tasks(self, tasks: list[asyncio.Task[None]]) -> None:
+        """Wait for the given tasks, cancelling all tasks if one fails."""
+        if not tasks:
             return
         try:
-            await asyncio.gather(*self._tasks)
+            await asyncio.gather(*tasks)
         except BaseException:
             for task in self._tasks:
                 task.cancel()
