@@ -38,7 +38,7 @@ from temporalio.api.workflow.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n#temporal/api/batch/v1/message.proto\x12\x15temporal.api.batch.v1\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&temporal/api/activity/v1/message.proto\x1a$temporal/api/common/v1/message.proto\x1a+temporal/api/enums/v1/batch_operation.proto\x1a!temporal/api/enums/v1/reset.proto\x1a#temporal/api/rules/v1/message.proto\x1a&temporal/api/workflow/v1/message.proto"\xbf\x01\n\x12\x42\x61tchOperationInfo\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x39\n\x05state\x18\x02 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"`\n\x19\x42\x61tchOperationTermination\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x02 \x01(\t"\x99\x01\n\x14\x42\x61tchOperationSignal\x12\x0e\n\x06signal\x18\x01 \x01(\t\x12/\n\x05input\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x10\n\x08identity\x18\x04 \x01(\t".\n\x1a\x42\x61tchOperationCancellation\x12\x10\n\x08identity\x18\x01 \x01(\t"*\n\x16\x42\x61tchOperationDeletion\x12\x10\n\x08identity\x18\x01 \x01(\t"\xae\x02\n\x13\x42\x61tchOperationReset\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x35\n\x07options\x18\x04 \x01(\x0b\x32$.temporal.api.common.v1.ResetOptions\x12\x38\n\nreset_type\x18\x01 \x01(\x0e\x32 .temporal.api.enums.v1.ResetTypeB\x02\x18\x01\x12G\n\x12reset_reapply_type\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyTypeB\x02\x18\x01\x12K\n\x15post_reset_operations\x18\x05 \x03(\x0b\x32,.temporal.api.workflow.v1.PostResetOperation"\xc9\x01\n,BatchOperationUpdateWorkflowExecutionOptions\x12\x10\n\x08identity\x18\x01 \x01(\t\x12V\n\x1aworkflow_execution_options\x18\x02 \x01(\x0b\x32\x32.temporal.api.workflow.v1.WorkflowExecutionOptions\x12/\n\x0bupdate_mask\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.FieldMask"\xc0\x01\n\x1f\x42\x61tchOperationUnpauseActivities\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x04type\x18\x02 \x01(\tH\x00\x12\x13\n\tmatch_all\x18\x03 \x01(\x08H\x00\x12\x16\n\x0ereset_attempts\x18\x04 \x01(\x08\x12\x17\n\x0freset_heartbeat\x18\x05 \x01(\x08\x12)\n\x06jitter\x18\x06 \x01(\x0b\x32\x19.google.protobuf.DurationB\n\n\x08\x61\x63tivity"\x84\x01\n!BatchOperationTriggerWorkflowRule\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0c\n\x02id\x18\x02 \x01(\tH\x00\x12\x37\n\x04spec\x18\x03 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpecH\x00\x42\x06\n\x04rule"\xf5\x01\n\x1d\x42\x61tchOperationResetActivities\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x04type\x18\x02 \x01(\tH\x00\x12\x13\n\tmatch_all\x18\x03 \x01(\x08H\x00\x12\x16\n\x0ereset_attempts\x18\x04 \x01(\x08\x12\x17\n\x0freset_heartbeat\x18\x05 \x01(\x08\x12\x13\n\x0bkeep_paused\x18\x06 \x01(\x08\x12)\n\x06jitter\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12 \n\x18restore_original_options\x18\x08 \x01(\x08\x42\n\n\x08\x61\x63tivity"\xf8\x01\n#BatchOperationUpdateActivityOptions\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x04type\x18\x02 \x01(\tH\x00\x12\x13\n\tmatch_all\x18\x03 \x01(\x08H\x00\x12\x43\n\x10\x61\x63tivity_options\x18\x04 \x01(\x0b\x32).temporal.api.activity.v1.ActivityOptions\x12/\n\x0bupdate_mask\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12\x18\n\x10restore_original\x18\x06 \x01(\x08\x42\n\n\x08\x61\x63tivityB\x84\x01\n\x18io.temporal.api.batch.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/batch/v1;batch\xaa\x02\x17Temporalio.Api.Batch.V1\xea\x02\x1aTemporalio::Api::Batch::V1b\x06proto3'
+    b'\n#temporal/api/batch/v1/message.proto\x12\x15temporal.api.batch.v1\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&temporal/api/activity/v1/message.proto\x1a$temporal/api/common/v1/message.proto\x1a+temporal/api/enums/v1/batch_operation.proto\x1a!temporal/api/enums/v1/reset.proto\x1a#temporal/api/rules/v1/message.proto\x1a&temporal/api/workflow/v1/message.proto"\x82\x02\n\x12\x42\x61tchOperationInfo\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x39\n\x05state\x18\x02 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x41\n\x0eoperation_type\x18\x05 \x01(\x0e\x32).temporal.api.enums.v1.BatchOperationType"`\n\x19\x42\x61tchOperationTermination\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x02 \x01(\t"E\n!BatchOperationTerminateActivities\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t"\x99\x01\n\x14\x42\x61tchOperationSignal\x12\x0e\n\x06signal\x18\x01 \x01(\t\x12/\n\x05input\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x10\n\x08identity\x18\x04 \x01(\t".\n\x1a\x42\x61tchOperationCancellation\x12\x10\n\x08identity\x18\x01 \x01(\t"B\n\x1e\x42\x61tchOperationCancelActivities\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t"*\n\x16\x42\x61tchOperationDeletion\x12\x10\n\x08identity\x18\x01 \x01(\t" \n\x1e\x42\x61tchOperationDeleteActivities"\xae\x02\n\x13\x42\x61tchOperationReset\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x35\n\x07options\x18\x04 \x01(\x0b\x32$.temporal.api.common.v1.ResetOptions\x12\x38\n\nreset_type\x18\x01 \x01(\x0e\x32 .temporal.api.enums.v1.ResetTypeB\x02\x18\x01\x12G\n\x12reset_reapply_type\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyTypeB\x02\x18\x01\x12K\n\x15post_reset_operations\x18\x05 \x03(\x0b\x32,.temporal.api.workflow.v1.PostResetOperation"\xc9\x01\n,BatchOperationUpdateWorkflowExecutionOptions\x12\x10\n\x08identity\x18\x01 \x01(\t\x12V\n\x1aworkflow_execution_options\x18\x02 \x01(\x0b\x32\x32.temporal.api.workflow.v1.WorkflowExecutionOptions\x12/\n\x0bupdate_mask\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.FieldMask"\xc0\x01\n\x1f\x42\x61tchOperationUnpauseActivities\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x04type\x18\x02 \x01(\tH\x00\x12\x13\n\tmatch_all\x18\x03 \x01(\x08H\x00\x12\x16\n\x0ereset_attempts\x18\x04 \x01(\x08\x12\x17\n\x0freset_heartbeat\x18\x05 \x01(\x08\x12)\n\x06jitter\x18\x06 \x01(\x0b\x32\x19.google.protobuf.DurationB\n\n\x08\x61\x63tivity"\x84\x01\n!BatchOperationTriggerWorkflowRule\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0c\n\x02id\x18\x02 \x01(\tH\x00\x12\x37\n\x04spec\x18\x03 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpecH\x00\x42\x06\n\x04rule"\xf5\x01\n\x1d\x42\x61tchOperationResetActivities\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x04type\x18\x02 \x01(\tH\x00\x12\x13\n\tmatch_all\x18\x03 \x01(\x08H\x00\x12\x16\n\x0ereset_attempts\x18\x04 \x01(\x08\x12\x17\n\x0freset_heartbeat\x18\x05 \x01(\x08\x12\x13\n\x0bkeep_paused\x18\x06 \x01(\x08\x12)\n\x06jitter\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12 \n\x18restore_original_options\x18\x08 \x01(\x08\x42\n\n\x08\x61\x63tivity"\xf8\x01\n#BatchOperationUpdateActivityOptions\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x04type\x18\x02 \x01(\tH\x00\x12\x13\n\tmatch_all\x18\x03 \x01(\x08H\x00\x12\x43\n\x10\x61\x63tivity_options\x18\x04 \x01(\x0b\x32).temporal.api.activity.v1.ActivityOptions\x12/\n\x0bupdate_mask\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12\x18\n\x10restore_original\x18\x06 \x01(\x08\x42\n\n\x08\x61\x63tivityB\x84\x01\n\x18io.temporal.api.batch.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/batch/v1;batch\xaa\x02\x17Temporalio.Api.Batch.V1\xea\x02\x1aTemporalio::Api::Batch::V1b\x06proto3'
 )
 
 
@@ -46,11 +46,20 @@ _BATCHOPERATIONINFO = DESCRIPTOR.message_types_by_name["BatchOperationInfo"]
 _BATCHOPERATIONTERMINATION = DESCRIPTOR.message_types_by_name[
     "BatchOperationTermination"
 ]
+_BATCHOPERATIONTERMINATEACTIVITIES = DESCRIPTOR.message_types_by_name[
+    "BatchOperationTerminateActivities"
+]
 _BATCHOPERATIONSIGNAL = DESCRIPTOR.message_types_by_name["BatchOperationSignal"]
 _BATCHOPERATIONCANCELLATION = DESCRIPTOR.message_types_by_name[
     "BatchOperationCancellation"
 ]
+_BATCHOPERATIONCANCELACTIVITIES = DESCRIPTOR.message_types_by_name[
+    "BatchOperationCancelActivities"
+]
 _BATCHOPERATIONDELETION = DESCRIPTOR.message_types_by_name["BatchOperationDeletion"]
+_BATCHOPERATIONDELETEACTIVITIES = DESCRIPTOR.message_types_by_name[
+    "BatchOperationDeleteActivities"
+]
 _BATCHOPERATIONRESET = DESCRIPTOR.message_types_by_name["BatchOperationReset"]
 _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS = DESCRIPTOR.message_types_by_name[
     "BatchOperationUpdateWorkflowExecutionOptions"
@@ -89,6 +98,17 @@ BatchOperationTermination = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(BatchOperationTermination)
 
+BatchOperationTerminateActivities = _reflection.GeneratedProtocolMessageType(
+    "BatchOperationTerminateActivities",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _BATCHOPERATIONTERMINATEACTIVITIES,
+        "__module__": "temporalio.api.batch.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationTerminateActivities)
+    },
+)
+_sym_db.RegisterMessage(BatchOperationTerminateActivities)
+
 BatchOperationSignal = _reflection.GeneratedProtocolMessageType(
     "BatchOperationSignal",
     (_message.Message,),
@@ -111,6 +131,17 @@ BatchOperationCancellation = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(BatchOperationCancellation)
 
+BatchOperationCancelActivities = _reflection.GeneratedProtocolMessageType(
+    "BatchOperationCancelActivities",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _BATCHOPERATIONCANCELACTIVITIES,
+        "__module__": "temporalio.api.batch.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationCancelActivities)
+    },
+)
+_sym_db.RegisterMessage(BatchOperationCancelActivities)
+
 BatchOperationDeletion = _reflection.GeneratedProtocolMessageType(
     "BatchOperationDeletion",
     (_message.Message,),
@@ -121,6 +152,17 @@ BatchOperationDeletion = _reflection.GeneratedProtocolMessageType(
     },
 )
 _sym_db.RegisterMessage(BatchOperationDeletion)
+
+BatchOperationDeleteActivities = _reflection.GeneratedProtocolMessageType(
+    "BatchOperationDeleteActivities",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _BATCHOPERATIONDELETEACTIVITIES,
+        "__module__": "temporalio.api.batch.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.batch.v1.BatchOperationDeleteActivities)
+    },
+)
+_sym_db.RegisterMessage(BatchOperationDeleteActivities)
 
 BatchOperationReset = _reflection.GeneratedProtocolMessageType(
     "BatchOperationReset",
@@ -198,25 +240,31 @@ if _descriptor._USE_C_DESCRIPTORS == False:
         "reset_reapply_type"
     ]._serialized_options = b"\030\001"
     _BATCHOPERATIONINFO._serialized_start = 397
-    _BATCHOPERATIONINFO._serialized_end = 588
-    _BATCHOPERATIONTERMINATION._serialized_start = 590
-    _BATCHOPERATIONTERMINATION._serialized_end = 686
-    _BATCHOPERATIONSIGNAL._serialized_start = 689
-    _BATCHOPERATIONSIGNAL._serialized_end = 842
-    _BATCHOPERATIONCANCELLATION._serialized_start = 844
-    _BATCHOPERATIONCANCELLATION._serialized_end = 890
-    _BATCHOPERATIONDELETION._serialized_start = 892
-    _BATCHOPERATIONDELETION._serialized_end = 934
-    _BATCHOPERATIONRESET._serialized_start = 937
-    _BATCHOPERATIONRESET._serialized_end = 1239
-    _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS._serialized_start = 1242
-    _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS._serialized_end = 1443
-    _BATCHOPERATIONUNPAUSEACTIVITIES._serialized_start = 1446
-    _BATCHOPERATIONUNPAUSEACTIVITIES._serialized_end = 1638
-    _BATCHOPERATIONTRIGGERWORKFLOWRULE._serialized_start = 1641
-    _BATCHOPERATIONTRIGGERWORKFLOWRULE._serialized_end = 1773
-    _BATCHOPERATIONRESETACTIVITIES._serialized_start = 1776
-    _BATCHOPERATIONRESETACTIVITIES._serialized_end = 2021
-    _BATCHOPERATIONUPDATEACTIVITYOPTIONS._serialized_start = 2024
-    _BATCHOPERATIONUPDATEACTIVITYOPTIONS._serialized_end = 2272
+    _BATCHOPERATIONINFO._serialized_end = 655
+    _BATCHOPERATIONTERMINATION._serialized_start = 657
+    _BATCHOPERATIONTERMINATION._serialized_end = 753
+    _BATCHOPERATIONTERMINATEACTIVITIES._serialized_start = 755
+    _BATCHOPERATIONTERMINATEACTIVITIES._serialized_end = 824
+    _BATCHOPERATIONSIGNAL._serialized_start = 827
+    _BATCHOPERATIONSIGNAL._serialized_end = 980
+    _BATCHOPERATIONCANCELLATION._serialized_start = 982
+    _BATCHOPERATIONCANCELLATION._serialized_end = 1028
+    _BATCHOPERATIONCANCELACTIVITIES._serialized_start = 1030
+    _BATCHOPERATIONCANCELACTIVITIES._serialized_end = 1096
+    _BATCHOPERATIONDELETION._serialized_start = 1098
+    _BATCHOPERATIONDELETION._serialized_end = 1140
+    _BATCHOPERATIONDELETEACTIVITIES._serialized_start = 1142
+    _BATCHOPERATIONDELETEACTIVITIES._serialized_end = 1174
+    _BATCHOPERATIONRESET._serialized_start = 1177
+    _BATCHOPERATIONRESET._serialized_end = 1479
+    _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS._serialized_start = 1482
+    _BATCHOPERATIONUPDATEWORKFLOWEXECUTIONOPTIONS._serialized_end = 1683
+    _BATCHOPERATIONUNPAUSEACTIVITIES._serialized_start = 1686
+    _BATCHOPERATIONUNPAUSEACTIVITIES._serialized_end = 1878
+    _BATCHOPERATIONTRIGGERWORKFLOWRULE._serialized_start = 1881
+    _BATCHOPERATIONTRIGGERWORKFLOWRULE._serialized_end = 2013
+    _BATCHOPERATIONRESETACTIVITIES._serialized_start = 2016
+    _BATCHOPERATIONRESETACTIVITIES._serialized_end = 2261
+    _BATCHOPERATIONUPDATEACTIVITYOPTIONS._serialized_start = 2264
+    _BATCHOPERATIONUPDATEACTIVITYOPTIONS._serialized_end = 2512
 # @@protoc_insertion_point(module_scope)

@@ -62,13 +62,17 @@ class _ActivityExecutionStatusEnumTypeWrapper(
       reached when retry is blocked (RetryPolicy.maximum_attempts exhausted,
       SCHEDULE_TO_CLOSE would be exceeded, or cancellation has been requested).
     """
+    ACTIVITY_EXECUTION_STATUS_PAUSED: _ActivityExecutionStatus.ValueType  # 7
+    """The activity is paused. Paused state is only reachable after calling
+    PauseActivityExecution on a standalone activity.
+    """
 
 class ActivityExecutionStatus(
     _ActivityExecutionStatus, metaclass=_ActivityExecutionStatusEnumTypeWrapper
 ):
     """Status of a standalone activity.
-    The status is updated once, when the activity is originally scheduled, and again when the activity reaches a terminal
-    status.
+    The status is updated when the activity is originally scheduled, paused, unpaused, and when the
+    activity reaches a terminal state.
     (-- api-linter: core::0216::synonyms=disabled
         aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
     """
@@ -106,6 +110,10 @@ ACTIVITY_EXECUTION_STATUS_TIMED_OUT: ActivityExecutionStatus.ValueType  # 6
 - START_TO_CLOSE and HEARTBEAT may retry if RetryPolicy permits; TIMED_OUT is
   reached when retry is blocked (RetryPolicy.maximum_attempts exhausted,
   SCHEDULE_TO_CLOSE would be exceeded, or cancellation has been requested).
+"""
+ACTIVITY_EXECUTION_STATUS_PAUSED: ActivityExecutionStatus.ValueType  # 7
+"""The activity is paused. Paused state is only reachable after calling
+PauseActivityExecution on a standalone activity.
 """
 global___ActivityExecutionStatus = ActivityExecutionStatus
 

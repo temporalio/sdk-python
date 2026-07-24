@@ -316,6 +316,7 @@ class TaskQueueStats(google.protobuf.message.Message):
     APPROXIMATE_BACKLOG_AGE_FIELD_NUMBER: builtins.int
     TASKS_ADD_RATE_FIELD_NUMBER: builtins.int
     TASKS_DISPATCH_RATE_FIELD_NUMBER: builtins.int
+    RATE_LIMITING_ACTIVE_FIELD_NUMBER: builtins.int
     approximate_backlog_count: builtins.int
     """The approximate number of tasks backlogged in this task queue. May count expired tasks but eventually
     converges to the right value. Can be relied upon for scaling decisions.
@@ -365,6 +366,12 @@ class TaskQueueStats(google.protobuf.message.Message):
       workflow goes to a normal queue, and the rest workflow tasks go to the Sticky queue associated with a specific
       worker instance.
     """
+    rate_limiting_active: builtins.bool
+    """Whether rate limiting blocked any dispatches within the recent observation window (approximately
+    30 seconds). When true, adding more workers will not increase throughput — the bottleneck is the
+    rate limit, not worker count. This field is useful for auto-scaling systems to avoid unnecessary
+    scale-up.
+    """
     def __init__(
         self,
         *,
@@ -372,6 +379,7 @@ class TaskQueueStats(google.protobuf.message.Message):
         approximate_backlog_age: google.protobuf.duration_pb2.Duration | None = ...,
         tasks_add_rate: builtins.float = ...,
         tasks_dispatch_rate: builtins.float = ...,
+        rate_limiting_active: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -386,6 +394,8 @@ class TaskQueueStats(google.protobuf.message.Message):
             b"approximate_backlog_age",
             "approximate_backlog_count",
             b"approximate_backlog_count",
+            "rate_limiting_active",
+            b"rate_limiting_active",
             "tasks_add_rate",
             b"tasks_add_rate",
             "tasks_dispatch_rate",
@@ -913,6 +923,42 @@ class PollerGroupInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___PollerGroupInfo = PollerGroupInfo
+
+class PollerGroupsInfo(google.protobuf.message.Message):
+    """A versioned snapshot of the poller groups the client should use for future polls to a task
+    queue. The version is monotonically increasing so that a client can ignore a snapshot that is
+    older than the one it has already applied.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    VERSION_FIELD_NUMBER: builtins.int
+    POLLER_GROUPS_FIELD_NUMBER: builtins.int
+    version: builtins.int
+    """Monotonically increasing version of this snapshot. A client should ignore any snapshot whose
+    version is not greater than the one it last applied.
+    """
+    @property
+    def poller_groups(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___PollerGroupInfo
+    ]:
+        """The weighted list of poller groups the client should use for future polls to this task queue."""
+    def __init__(
+        self,
+        *,
+        version: builtins.int = ...,
+        poller_groups: collections.abc.Iterable[global___PollerGroupInfo] | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "poller_groups", b"poller_groups", "version", b"version"
+        ],
+    ) -> None: ...
+
+global___PollerGroupsInfo = PollerGroupsInfo
 
 class PollerScalingDecision(google.protobuf.message.Message):
     """Attached to task responses to give hints to the SDK about how it may adjust its number of

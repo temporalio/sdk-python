@@ -18,6 +18,7 @@ from .message_pb2 import (
     SystemWorkflowFailure,
     WorkflowExecutionAlreadyStartedFailure,
     WorkflowNotReadyFailure,
+    WorkflowTaskCompletionBufferLostFailure,
 )
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "SystemWorkflowFailure",
     "WorkflowExecutionAlreadyStartedFailure",
     "WorkflowNotReadyFailure",
+    "WorkflowTaskCompletionBufferLostFailure",
 ]
