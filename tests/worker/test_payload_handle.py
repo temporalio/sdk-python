@@ -72,9 +72,9 @@ class ResultAsHandleConsumeWorkflow:
     async def run(self) -> int:
         # Upgrade an unchanged activity's result to a handle, then forward it to
         # an activity that materializes it.
-        handle = await workflow.execute_activity_as_handle(
+        handle = await workflow.start_activity(
             produce_big, start_to_close_timeout=timedelta(seconds=30)
-        )
+        ).as_payload_handle()
         return await workflow.execute_activity(
             consume_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -84,9 +84,9 @@ class ResultAsHandleConsumeWorkflow:
 class ResultAsHandlePassThroughWorkflow:
     @workflow.run
     async def run(self) -> str:
-        handle = await workflow.execute_activity_as_handle(
+        handle = await workflow.start_activity(
             produce_big, start_to_close_timeout=timedelta(seconds=30)
-        )
+        ).as_payload_handle()
         return await workflow.execute_activity(
             ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -105,9 +105,8 @@ class ParentChildResultAsHandleWorkflow:
     async def run(self) -> str:
         # Upgrade an unchanged child workflow's result to a handle and forward it
         # without materializing it in this (parent) workflow.
-        handle = await workflow.execute_child_workflow_as_handle(
-            ChildProducerWorkflow.run
-        )
+        child = await workflow.start_child_workflow(ChildProducerWorkflow.run)
+        handle = await child.as_payload_handle()
         return await workflow.execute_activity(
             ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
