@@ -17,7 +17,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from temporalio.api.enums.v1 import namespace_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_namespace__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'temporal/api/namespace/v1/message.proto\x12\x19temporal.api.namespace.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%temporal/api/enums/v1/namespace.proto\"\x94\x08\n\rNamespaceInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x13\n\x0bowner_email\x18\x04 \x01(\t\x12@\n\x04\x64\x61ta\x18\x05 \x03(\x0b\x32\x32.temporal.api.namespace.v1.NamespaceInfo.DataEntry\x12\n\n\x02id\x18\x06 \x01(\t\x12K\n\x0c\x63\x61pabilities\x18\x07 \x01(\x0b\x32\x35.temporal.api.namespace.v1.NamespaceInfo.Capabilities\x12?\n\x06limits\x18\x08 \x01(\x0b\x32/.temporal.api.namespace.v1.NamespaceInfo.Limits\x12\x1a\n\x12supports_schedules\x18\x64 \x01(\x08\x1a+\n\tDataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\xa7\x04\n\x0c\x43\x61pabilities\x12\x1c\n\x14\x65\x61ger_workflow_start\x18\x01 \x01(\x08\x12\x13\n\x0bsync_update\x18\x02 \x01(\x08\x12\x14\n\x0c\x61sync_update\x18\x03 \x01(\x08\x12\x19\n\x11worker_heartbeats\x18\x04 \x01(\x08\x12*\n\"reported_problems_search_attribute\x18\x05 \x01(\x08\x12\x16\n\x0eworkflow_pause\x18\x06 \x01(\x08\x12\x1d\n\x15standalone_activities\x18\x07 \x01(\x08\x12(\n worker_poll_complete_on_shutdown\x18\x08 \x01(\x08\x12\x1a\n\x12poller_autoscaling\x18\t \x01(\x08\x12\x17\n\x0fworker_commands\x18\n \x01(\x08\x12\"\n\x1astandalone_nexus_operation\x18\x0b \x01(\x08\x12!\n\x19workflow_update_callbacks\x18\x0c \x01(\x08\x12&\n\x1epoller_autoscaling_auto_enroll\x18\r \x01(\x08\x12+\n#workflow_task_completion_pagination\x18\x0e \x01(\x08\x12\'\n\x1fstandalone_activity_start_delay\x18\x0f \x01(\x08\x12,\n$standalone_activity_batch_operations\x18\x10 \x01(\x08\x1a\x46\n\x06Limits\x12\x1d\n\x15\x62lob_size_limit_error\x18\x01 \x01(\x03\x12\x1d\n\x15memo_size_limit_error\x18\x02 \x01(\x03\"\x9e\x04\n\x0fNamespaceConfig\x12\x43\n workflow_execution_retention_ttl\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x0c\x62\x61\x64_binaries\x18\x02 \x01(\x0b\x32&.temporal.api.namespace.v1.BadBinaries\x12\x44\n\x16history_archival_state\x18\x03 \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1c\n\x14history_archival_uri\x18\x04 \x01(\t\x12G\n\x19visibility_archival_state\x18\x05 \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1f\n\x17visibility_archival_uri\x18\x06 \x01(\t\x12u\n\x1f\x63ustom_search_attribute_aliases\x18\x07 \x03(\x0b\x32L.temporal.api.namespace.v1.NamespaceConfig.CustomSearchAttributeAliasesEntry\x1a\x43\n!CustomSearchAttributeAliasesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xb0\x01\n\x0b\x42\x61\x64\x42inaries\x12\x46\n\x08\x62inaries\x18\x01 \x03(\x0b\x32\x34.temporal.api.namespace.v1.BadBinaries.BinariesEntry\x1aY\n\rBinariesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x37\n\x05value\x18\x02 \x01(\x0b\x32(.temporal.api.namespace.v1.BadBinaryInfo:\x02\x38\x01\"b\n\rBadBinaryInfo\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x10\n\x08operator\x18\x02 \x01(\t\x12/\n\x0b\x63reate_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xea\x01\n\x13UpdateNamespaceInfo\x12\x13\n\x0b\x64\x65scription\x18\x01 \x01(\t\x12\x13\n\x0bowner_email\x18\x02 \x01(\t\x12\x46\n\x04\x64\x61ta\x18\x03 \x03(\x0b\x32\x38.temporal.api.namespace.v1.UpdateNamespaceInfo.DataEntry\x12\x34\n\x05state\x18\x04 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x1a+\n\tDataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"*\n\x0fNamespaceFilter\x12\x17\n\x0finclude_deleted\x18\x01 \x01(\x08\x42\x98\x01\n\x1cio.temporal.api.namespace.v1B\x0cMessageProtoP\x01Z)go.temporal.io/api/namespace/v1;namespace\xaa\x02\x1bTemporalio.Api.Namespace.V1\xea\x02\x1eTemporalio::Api::Namespace::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'temporal/api/namespace/v1/message.proto\x12\x19temporal.api.namespace.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%temporal/api/enums/v1/namespace.proto\"\xc3\x08\n\rNamespaceInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x13\n\x0bowner_email\x18\x04 \x01(\t\x12@\n\x04\x64\x61ta\x18\x05 \x03(\x0b\x32\x32.temporal.api.namespace.v1.NamespaceInfo.DataEntry\x12\n\n\x02id\x18\x06 \x01(\t\x12K\n\x0c\x63\x61pabilities\x18\x07 \x01(\x0b\x32\x35.temporal.api.namespace.v1.NamespaceInfo.Capabilities\x12?\n\x06limits\x18\x08 \x01(\x0b\x32/.temporal.api.namespace.v1.NamespaceInfo.Limits\x12\x1a\n\x12supports_schedules\x18\x64 \x01(\x08\x1a+\n\tDataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\xd6\x04\n\x0c\x43\x61pabilities\x12\x1c\n\x14\x65\x61ger_workflow_start\x18\x01 \x01(\x08\x12\x13\n\x0bsync_update\x18\x02 \x01(\x08\x12\x14\n\x0c\x61sync_update\x18\x03 \x01(\x08\x12\x19\n\x11worker_heartbeats\x18\x04 \x01(\x08\x12*\n\"reported_problems_search_attribute\x18\x05 \x01(\x08\x12\x16\n\x0eworkflow_pause\x18\x06 \x01(\x08\x12\x1d\n\x15standalone_activities\x18\x07 \x01(\x08\x12(\n worker_poll_complete_on_shutdown\x18\x08 \x01(\x08\x12\x1a\n\x12poller_autoscaling\x18\t \x01(\x08\x12\x17\n\x0fworker_commands\x18\n \x01(\x08\x12\"\n\x1astandalone_nexus_operation\x18\x0b \x01(\x08\x12!\n\x19workflow_update_callbacks\x18\x0c \x01(\x08\x12&\n\x1epoller_autoscaling_auto_enroll\x18\r \x01(\x08\x12+\n#workflow_task_completion_pagination\x18\x0e \x01(\x08\x12\'\n\x1fstandalone_activity_start_delay\x18\x0f \x01(\x08\x12,\n$standalone_activity_batch_operations\x18\x10 \x01(\x08\x12-\n%standalone_activity_operator_commands\x18\x11 \x01(\x08\x1a\x46\n\x06Limits\x12\x1d\n\x15\x62lob_size_limit_error\x18\x01 \x01(\x03\x12\x1d\n\x15memo_size_limit_error\x18\x02 \x01(\x03\"\x9e\x04\n\x0fNamespaceConfig\x12\x43\n workflow_execution_retention_ttl\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x0c\x62\x61\x64_binaries\x18\x02 \x01(\x0b\x32&.temporal.api.namespace.v1.BadBinaries\x12\x44\n\x16history_archival_state\x18\x03 \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1c\n\x14history_archival_uri\x18\x04 \x01(\t\x12G\n\x19visibility_archival_state\x18\x05 \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1f\n\x17visibility_archival_uri\x18\x06 \x01(\t\x12u\n\x1f\x63ustom_search_attribute_aliases\x18\x07 \x03(\x0b\x32L.temporal.api.namespace.v1.NamespaceConfig.CustomSearchAttributeAliasesEntry\x1a\x43\n!CustomSearchAttributeAliasesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xb0\x01\n\x0b\x42\x61\x64\x42inaries\x12\x46\n\x08\x62inaries\x18\x01 \x03(\x0b\x32\x34.temporal.api.namespace.v1.BadBinaries.BinariesEntry\x1aY\n\rBinariesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x37\n\x05value\x18\x02 \x01(\x0b\x32(.temporal.api.namespace.v1.BadBinaryInfo:\x02\x38\x01\"b\n\rBadBinaryInfo\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x10\n\x08operator\x18\x02 \x01(\t\x12/\n\x0b\x63reate_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xea\x01\n\x13UpdateNamespaceInfo\x12\x13\n\x0b\x64\x65scription\x18\x01 \x01(\t\x12\x13\n\x0bowner_email\x18\x02 \x01(\t\x12\x46\n\x04\x64\x61ta\x18\x03 \x03(\x0b\x32\x38.temporal.api.namespace.v1.UpdateNamespaceInfo.DataEntry\x12\x34\n\x05state\x18\x04 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x1a+\n\tDataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"*\n\x0fNamespaceFilter\x12\x17\n\x0finclude_deleted\x18\x01 \x01(\x08\x42\x98\x01\n\x1cio.temporal.api.namespace.v1B\x0cMessageProtoP\x01Z)go.temporal.io/api/namespace/v1;namespace\xaa\x02\x1bTemporalio.Api.Namespace.V1\xea\x02\x1eTemporalio::Api::Namespace::V1b\x06proto3')
 
 
 
@@ -136,27 +136,27 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _UPDATENAMESPACEINFO_DATAENTRY._options = None
   _UPDATENAMESPACEINFO_DATAENTRY._serialized_options = b'8\001'
   _NAMESPACEINFO._serialized_start=175
-  _NAMESPACEINFO._serialized_end=1219
+  _NAMESPACEINFO._serialized_end=1266
   _NAMESPACEINFO_DATAENTRY._serialized_start=550
   _NAMESPACEINFO_DATAENTRY._serialized_end=593
   _NAMESPACEINFO_CAPABILITIES._serialized_start=596
-  _NAMESPACEINFO_CAPABILITIES._serialized_end=1147
-  _NAMESPACEINFO_LIMITS._serialized_start=1149
-  _NAMESPACEINFO_LIMITS._serialized_end=1219
-  _NAMESPACECONFIG._serialized_start=1222
-  _NAMESPACECONFIG._serialized_end=1764
-  _NAMESPACECONFIG_CUSTOMSEARCHATTRIBUTEALIASESENTRY._serialized_start=1697
-  _NAMESPACECONFIG_CUSTOMSEARCHATTRIBUTEALIASESENTRY._serialized_end=1764
-  _BADBINARIES._serialized_start=1767
-  _BADBINARIES._serialized_end=1943
-  _BADBINARIES_BINARIESENTRY._serialized_start=1854
-  _BADBINARIES_BINARIESENTRY._serialized_end=1943
-  _BADBINARYINFO._serialized_start=1945
-  _BADBINARYINFO._serialized_end=2043
-  _UPDATENAMESPACEINFO._serialized_start=2046
-  _UPDATENAMESPACEINFO._serialized_end=2280
+  _NAMESPACEINFO_CAPABILITIES._serialized_end=1194
+  _NAMESPACEINFO_LIMITS._serialized_start=1196
+  _NAMESPACEINFO_LIMITS._serialized_end=1266
+  _NAMESPACECONFIG._serialized_start=1269
+  _NAMESPACECONFIG._serialized_end=1811
+  _NAMESPACECONFIG_CUSTOMSEARCHATTRIBUTEALIASESENTRY._serialized_start=1744
+  _NAMESPACECONFIG_CUSTOMSEARCHATTRIBUTEALIASESENTRY._serialized_end=1811
+  _BADBINARIES._serialized_start=1814
+  _BADBINARIES._serialized_end=1990
+  _BADBINARIES_BINARIESENTRY._serialized_start=1901
+  _BADBINARIES_BINARIESENTRY._serialized_end=1990
+  _BADBINARYINFO._serialized_start=1992
+  _BADBINARYINFO._serialized_end=2090
+  _UPDATENAMESPACEINFO._serialized_start=2093
+  _UPDATENAMESPACEINFO._serialized_end=2327
   _UPDATENAMESPACEINFO_DATAENTRY._serialized_start=550
   _UPDATENAMESPACEINFO_DATAENTRY._serialized_end=593
-  _NAMESPACEFILTER._serialized_start=2282
-  _NAMESPACEFILTER._serialized_end=2324
+  _NAMESPACEFILTER._serialized_start=2329
+  _NAMESPACEFILTER._serialized_end=2371
 # @@protoc_insertion_point(module_scope)

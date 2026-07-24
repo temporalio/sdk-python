@@ -231,7 +231,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """Time the activity was originally scheduled via a StartActivityExecution request."""
     @property
     def expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Scheduled time + schedule to close timeout."""
+        """The time at which the activity's Schedule-to-Close timeout expires.
+        Calculated as `schedule_time` + `start_delay` + `schedule_to_close_timeout`.
+        """
     @property
     def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time when the activity transitioned to a closed state."""

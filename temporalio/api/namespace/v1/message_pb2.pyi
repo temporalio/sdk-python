@@ -58,6 +58,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         WORKFLOW_TASK_COMPLETION_PAGINATION_FIELD_NUMBER: builtins.int
         STANDALONE_ACTIVITY_START_DELAY_FIELD_NUMBER: builtins.int
         STANDALONE_ACTIVITY_BATCH_OPERATIONS_FIELD_NUMBER: builtins.int
+        STANDALONE_ACTIVITY_OPERATOR_COMMANDS_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -95,6 +96,8 @@ class NamespaceInfo(google.protobuf.message.Message):
         """True if the namespace supports start delay for standalone activities."""
         standalone_activity_batch_operations: builtins.bool
         """True if the namespace supports batch operations for standalone activities."""
+        standalone_activity_operator_commands: builtins.bool
+        """True if the namespace supports standalone activity operator commands."""
         def __init__(
             self,
             *,
@@ -114,8 +117,9 @@ class NamespaceInfo(google.protobuf.message.Message):
             workflow_task_completion_pagination: builtins.bool = ...,
             standalone_activity_start_delay: builtins.bool = ...,
             standalone_activity_batch_operations: builtins.bool = ...,
+            standalone_activity_operator_commands: builtins.bool = ...,
         ) -> None: ...
-        def ClearField(self, field_name: typing_extensions.Literal["async_update", b"async_update", "eager_workflow_start", b"eager_workflow_start", "poller_autoscaling", b"poller_autoscaling", "poller_autoscaling_auto_enroll", b"poller_autoscaling_auto_enroll", "reported_problems_search_attribute", b"reported_problems_search_attribute", "standalone_activities", b"standalone_activities", "standalone_activity_batch_operations", b"standalone_activity_batch_operations", "standalone_activity_start_delay", b"standalone_activity_start_delay", "standalone_nexus_operation", b"standalone_nexus_operation", "sync_update", b"sync_update", "worker_commands", b"worker_commands", "worker_heartbeats", b"worker_heartbeats", "worker_poll_complete_on_shutdown", b"worker_poll_complete_on_shutdown", "workflow_pause", b"workflow_pause", "workflow_task_completion_pagination", b"workflow_task_completion_pagination", "workflow_update_callbacks", b"workflow_update_callbacks"]) -> None: ...
+        def ClearField(self, field_name: typing_extensions.Literal["async_update", b"async_update", "eager_workflow_start", b"eager_workflow_start", "poller_autoscaling", b"poller_autoscaling", "poller_autoscaling_auto_enroll", b"poller_autoscaling_auto_enroll", "reported_problems_search_attribute", b"reported_problems_search_attribute", "standalone_activities", b"standalone_activities", "standalone_activity_batch_operations", b"standalone_activity_batch_operations", "standalone_activity_operator_commands", b"standalone_activity_operator_commands", "standalone_activity_start_delay", b"standalone_activity_start_delay", "standalone_nexus_operation", b"standalone_nexus_operation", "sync_update", b"sync_update", "worker_commands", b"worker_commands", "worker_heartbeats", b"worker_heartbeats", "worker_poll_complete_on_shutdown", b"worker_poll_complete_on_shutdown", "workflow_pause", b"workflow_pause", "workflow_task_completion_pagination", b"workflow_task_completion_pagination", "workflow_update_callbacks", b"workflow_update_callbacks"]) -> None: ...
 
     class Limits(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
