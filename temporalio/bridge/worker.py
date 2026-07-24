@@ -20,7 +20,6 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
-import temporalio.converter._data_converter
 import temporalio.converter._extstore
 from temporalio.api.common.v1.message_pb2 import Payload
 from temporalio.bridge._visitor_functions import PayloadSequence, VisitorFunctions
@@ -305,53 +304,23 @@ class _Visitor(VisitorFunctions):
         payloads.extend(new_payloads)
 
 
-def _skip_payloads(
+def _skip_deferred(
     f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
-    skip: set[bytes],
+    defer: Callable[[], bool],
 ) -> Callable[[Sequence[Payload]], Awaitable[list[Payload]]]:
-    """Wrap a transform so matching payloads pass through untransformed.
+    """Wrap a transform so payloads at a deferred position pass through.
 
-    Payloads are matched by deterministic serialization rather than object
-    identity: the payload visitor may hand out fresh wrapper objects for the
-    same underlying proto (e.g. under the upb implementation), so id() is not
-    stable, and deterministic serialization also neutralizes metadata-map
-    ordering.
-    """
-
-    def key(payload: Payload) -> bytes:
-        return payload.SerializeToString(deterministic=True)
-
-    async def wrapped(payloads: Sequence[Payload]) -> list[Payload]:
-        to_transform = [p for p in payloads if key(p) not in skip]
-        if len(to_transform) == len(payloads):
-            return await f(payloads)
-        if not to_transform:
-            return list(payloads)
-        transformed = iter(await f(to_transform))
-        return [p if key(p) in skip else next(transformed) for p in payloads]
-
-    return wrapped
-
-
-def _skip_reference_payloads(
-    f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
-) -> Callable[[Sequence[Payload]], Awaitable[list[Payload]]]:
-    """Wrap a transform so external-storage reference payloads pass through.
-
-    References are never codec-encoded (they are created after codec-encode +
-    store on the way out), so codec-decoding one would be wrong. A reference
-    only survives to this point when its retrieval was deferred for a handle.
+    ``defer`` is a content-neutral predicate that reads the visitor's current
+    command / run-argument context (set during traversal) and returns True when
+    the payload(s) being visited should keep their opaque form -- i.e. skip
+    external-storage retrieval and codec decode so they surface as forward-only
+    handles. The decision never inspects the payload proto itself.
     """
 
     async def wrapped(payloads: Sequence[Payload]) -> list[Payload]:
-        is_ref = temporalio.converter._data_converter._is_reference_payload
-        to_transform = [p for p in payloads if not is_ref(p)]
-        if len(to_transform) == len(payloads):
-            return await f(payloads)
-        if not to_transform:
+        if defer():
             return list(payloads)
-        transformed = iter(await f(to_transform))
-        return [p if is_ref(p) else next(transformed) for p in payloads]
+        return await f(payloads)
 
     return wrapped
 
@@ -361,15 +330,18 @@ async def decode_activation(
     data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
     storage_concurrency_limit: int,
-    defer_retrieval_payloads: set[bytes] | None = None,
+    defer: Callable[[], bool] | None = None,
+    index_run_args: bool = False,
 ) -> temporalio.converter._extstore.StorageOperationMetrics:
     """Decode all payloads in the activation.
 
     Args:
-        defer_retrieval_payloads: deterministic serializations of payloads
-            (workflow run args annotated as PayloadHandle) whose external-storage
-            retrieval and codec decode should be skipped so they surface as
-            forward-only handles inside the workflow.
+        defer: content-neutral predicate (reads the visitor's current command /
+            run-argument context) returning True when the payload(s) being
+            visited should be left un-retrieved and un-codec-decoded so they
+            surface as forward-only PayloadHandles.
+        index_run_args: visit run arguments one at a time so ``defer`` can decide
+            per argument position (only needed when a run arg is a PayloadHandle).
 
     Returns:
         Metrics from any external storage retrieval operations that occurred.
@@ -380,9 +352,9 @@ async def decode_activation(
     decode: Callable[[Sequence[Payload]], Awaitable[list[Payload]]] = (
         data_converter._decode_payload_sequence
     )
-    if defer_retrieval_payloads:
-        retrieve = _skip_payloads(retrieve, defer_retrieval_payloads)
-        decode = _skip_reference_payloads(decode)
+    if defer is not None:
+        retrieve = _skip_deferred(retrieve, defer)
+        decode = _skip_deferred(decode, defer)
 
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
@@ -390,11 +362,13 @@ async def decode_activation(
             skip_search_attributes=True,
             skip_headers=not decode_headers,
             concurrency_limit=storage_concurrency_limit,
+            index_run_args=index_run_args,
         ).visit(_Visitor(retrieve), activation)
 
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True,
         skip_headers=not decode_headers,
+        index_run_args=index_run_args,
     ).visit(_Visitor(decode), activation)
 
     return metrics

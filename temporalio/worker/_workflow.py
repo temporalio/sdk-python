@@ -13,7 +13,6 @@ from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
-from typing import Any
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1.command_type_pb2
@@ -310,69 +309,52 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         loop.call_soon(run_inline)
         return await future
 
-    def _deferred_payloads(
+    def _defer_retrieval(
         self,
-        act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
         init_job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow | None,
         workflow: _RunningWorkflow | None,
-    ) -> set[bytes] | None:
-        """Deterministic serializations of payloads whose external-storage
-        retrieval should be deferred, so the workflow receives forward-only
-        PayloadHandles it can forward without downloading.
+    ) -> tuple[Callable[[], bool] | None, bool]:
+        """Build a content-neutral deferral predicate for ``decode_activation``.
 
-        One unified skip set from two sources:
-        - Run args annotated ``PayloadHandle`` (from the workflow definition).
-        - Activity / local-activity / child-workflow results whose call requested
-          a ``PayloadHandle`` result type (looked up per seq on the running
-          instance via ``is_result_deferred``).
+        The predicate reads the payload visitor's current context (run-argument
+        index, or command seq for a resolved activity/child result) and returns
+        True when that position's payload should stay a forward-only PayloadHandle
+        -- so retrieval and codec decode are skipped. It decides purely from
+        API-declared types by position, never by inspecting the payload proto.
 
-        Matched by deterministic serialization (see ``_skip_payloads``); this can
-        over-defer if two positions carry byte-identical offloaded payloads,
-        which is acceptable for the prototype.
+        Returns the predicate (or None if nothing is deferrable) and whether run
+        arguments must be visited per-index (only when a run arg is a handle).
         """
         is_handle = temporalio.converter._payload_handle._is_payload_handle_hint
-        deferred: set[bytes] = set()
-
-        # Run args: present on the first activation and again on replay.
+        run_arg_indices: set[int] = set()
         if init_job:
             defn = self._workflows.get(init_job.workflow_type)
             if defn and defn.arg_types:
-                for i, payload in enumerate(init_job.arguments):
-                    if i < len(defn.arg_types) and is_handle(defn.arg_types[i]):
-                        deferred.add(payload.SerializeToString(deterministic=True))
+                run_arg_indices = {
+                    i for i, t in enumerate(defn.arg_types) if is_handle(t)
+                }
 
-        # Results resolved this activation. The instance exists whenever a
-        # resolve is present (the schedule happened on a prior task).
-        if workflow is not None:
-            instance = workflow.instance
-            command_type = temporalio.api.enums.v1.command_type_pb2.CommandType
-            result: Any
-            info: _command_aware_visitor.CommandInfo
-            for job in act.jobs:
-                if job.HasField("resolve_activity"):
-                    result = job.resolve_activity.result
-                    info = _command_aware_visitor.CommandInfo(
-                        command_type=command_type.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK,
-                        command_seq=job.resolve_activity.seq,
-                    )
-                elif job.HasField("resolve_child_workflow_execution"):
-                    result = job.resolve_child_workflow_execution.result
-                    info = _command_aware_visitor.CommandInfo(
-                        command_type=command_type.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION,
-                        command_seq=job.resolve_child_workflow_execution.seq,
-                    )
-                else:
-                    continue
-                if (
-                    result.HasField("completed")
-                    and result.completed.HasField("result")
-                    and instance.is_result_deferred(info)
-                ):
-                    deferred.add(
-                        result.completed.result.SerializeToString(deterministic=True)
-                    )
+        if not run_arg_indices and workflow is None:
+            return None, False
 
-        return deferred or None
+        instance = workflow.instance if workflow is not None else None
+        command_type = temporalio.api.enums.v1.command_type_pb2.CommandType
+        result_command_types = {
+            command_type.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK,
+            command_type.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION,
+        }
+
+        def defer() -> bool:
+            arg_index = _command_aware_visitor.current_run_arg_index.get()
+            if arg_index is not None:
+                return arg_index in run_arg_indices
+            if instance is not None:
+                info = _command_aware_visitor.current_command_info.get()
+                if info is not None and info.command_type in result_command_types:
+                    return instance.is_result_deferred(info)
+            return False
+
+        return defer, bool(run_arg_indices)
 
     async def _handle_activation(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
@@ -449,14 +431,14 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     workflow_context_dc=data_converter,
                     workflow_context=workflow_context,
                 )
+            defer_predicate, index_run_args = self._defer_retrieval(init_job, workflow)
             download_metrics = await temporalio.bridge.worker.decode_activation(
                 act,
                 data_converter,
                 decode_headers=self._encode_headers,
                 storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
-                defer_retrieval_payloads=self._deferred_payloads(
-                    act, init_job, workflow
-                ),
+                defer=defer_predicate,
+                index_run_args=index_run_args,
             )
             if not workflow:
                 assert init_job
