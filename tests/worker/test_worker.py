@@ -1744,6 +1744,18 @@ def test_worker_config_matches_init_params():
     )
 
 
+async def test_worker_max_concurrent_eager_activity_execution_size_config(
+    client: Client,
+):
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        max_concurrent_eager_activity_execution_size=7,
+    )
+    assert worker.config()["max_concurrent_eager_activity_execution_size"] == 7
+
+
 async def test_worker_debug_mode(client: Client):
     worker = Worker(
         client,

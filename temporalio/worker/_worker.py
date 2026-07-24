@@ -129,6 +129,7 @@ class Worker:
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
         max_activities_per_second: float | None = None,
         max_task_queue_activities_per_second: float | None = None,
+        max_concurrent_eager_activity_execution_size: int = 0,
         graceful_shutdown_timeout: timedelta = timedelta(),
         workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         shared_state_manager: SharedStateManager | None = None,
@@ -267,6 +268,12 @@ class Worker:
                 poll request. If multiple workers on the same queue have
                 different values set, they will thrash with the last poller
                 winning.
+            max_concurrent_eager_activity_execution_size: Maximum number of
+                eager activities that may be running concurrently. When
+                nonzero, eager activity execution will not be requested if it
+                would cause the number of running eager activities to exceed
+                this value. Zero means unlimited and therefore only bound by
+                the activity slot supplier.
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
@@ -369,6 +376,7 @@ class Worker:
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
             max_activities_per_second=max_activities_per_second,
             max_task_queue_activities_per_second=max_task_queue_activities_per_second,
+            max_concurrent_eager_activity_execution_size=max_concurrent_eager_activity_execution_size,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             workflow_failure_exception_types=workflow_failure_exception_types,
             shared_state_manager=shared_state_manager,
@@ -656,6 +664,9 @@ class Worker:
                 max_activities_per_second=config.get("max_activities_per_second"),
                 max_task_queue_activities_per_second=config[
                     "max_task_queue_activities_per_second"
+                ],  # type: ignore[reportTypedDictNotRequiredAccess]
+                max_concurrent_eager_activity_execution_size=config[
+                    "max_concurrent_eager_activity_execution_size"
                 ],  # type: ignore[reportTypedDictNotRequiredAccess]
                 graceful_shutdown_period_millis=int(
                     1000 * config["graceful_shutdown_timeout"].total_seconds()  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -977,6 +988,7 @@ class WorkerConfig(TypedDict, total=False):
     default_heartbeat_throttle_interval: timedelta
     max_activities_per_second: float | None
     max_task_queue_activities_per_second: float | None
+    max_concurrent_eager_activity_execution_size: int
     graceful_shutdown_timeout: timedelta
     workflow_failure_exception_types: Sequence[type[BaseException]]
     shared_state_manager: SharedStateManager | None

@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `Worker` `max_concurrent_eager_activity_execution_size` option for limiting the
+  number of eager activities that may run concurrently.
 - Added experimental SDK payload converter support for values and type hints
   decorated with `@transfer_type_convertible(...)` using a `TransferTypeConverter` class.
   This lets types with transfer type converters delegate their wire representation to the
