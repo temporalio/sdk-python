@@ -27,6 +27,7 @@ from temporalio.converter._payload_converter import (
 _T = TypeVar("_T")
 
 _REFERENCE_ENCODING = b"json/external-storage-reference"
+_REFERENCE_MESSAGE_TYPE = ExternalStorageReference.DESCRIPTOR.full_name.encode()
 
 
 @dataclass
@@ -455,8 +456,6 @@ class ExternalStorage:
 
     def _decode_reference(self, payload: Payload) -> ExternalStorageReference | None:
         """Decode an external storage reference from a payload."""
-        if len(payload.external_payloads) == 0:
-            return None
         encoding = payload.metadata.get("encoding", b"")
         if encoding == _REFERENCE_ENCODING:
             legacy = self._legacy_claim_converter.from_payload(
@@ -468,6 +467,11 @@ class ExternalStorage:
                 driver_name=legacy.driver_name,
                 claim_data=legacy.driver_claim.claim_data,
             )
+        if not (
+            encoding == b"json/protobuf"
+            and payload.metadata.get("messageType") == _REFERENCE_MESSAGE_TYPE
+        ):
+            return None
         ref = self._claim_converter.from_payload(payload, ExternalStorageReference)
         return ref if isinstance(ref, ExternalStorageReference) else None
 
