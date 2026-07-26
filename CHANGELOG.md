@@ -57,6 +57,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Fixed JSON conversion of `dict[None, T]` type hints to restore `None` keys.
+
 ### Security
 
 ## [1.30.0] - 2026-07-01
