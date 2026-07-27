@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+from google.protobuf.message import Message
 
 import temporalio.api.common.v1
 import temporalio.common
@@ -132,13 +134,23 @@ def is_system_endpoint(endpoint: str) -> bool:
     return endpoint == TEMPORAL_SYSTEM_ENDPOINT
 
 
+def _apply_headers_to_request(
+    request: Message,
+    headers: Mapping[str, temporalio.api.common.v1.Payload],
+) -> None:
+    """Apply headers to a system request when it supports Temporal headers."""
+    if not headers or "header" not in request.DESCRIPTOR.fields_by_name:
+        return
+    request_header = getattr(request, "header")
+    for key, payload in headers.items():
+        request_header.fields[key].CopyFrom(payload)
+
+
 def _is_system_payload(payload: temporalio.api.common.v1.Payload) -> bool:
     return (
         payload.metadata.get(_SYSTEM_PAYLOAD_METADATA_KEY)
         == _SYSTEM_PAYLOAD_METADATA_VALUE
     )
-
-
 async def maybe_visit_payload(
     payload: temporalio.api.common.v1.Payload,
     visitor_functions: VisitorFunctions,
