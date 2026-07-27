@@ -395,8 +395,7 @@ class FailOnceThenSleepWorkflow:
 
 
 async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
-    """FF should cover retry_backoff + attempt 2. Currently fails: FF returns
-    False when it sees attempt 1's WORKFLOW_EXECUTION_FAILED event."""
+    """FF spans across retry: attempt 1 fails, backoff elapses, attempt 2 runs."""
     async with new_worker(env.client, FailOnceThenSleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
@@ -413,8 +412,15 @@ async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
         # 1h sleep, 1h retry backoff, 1h sleep. 2.5h fast forward should
         # end solidly in the second run.
         assert await env.fast_forward(handle, timedelta(hours=2, minutes=30))
+        # FF auto-disables TS at target. Re-enable so the remaining ~30m
+        # of attempt-2 sleep is skipped rather than waited out.
+        assert env._ts_skipper is not None
+        await env._ts_skipper._update_time_skipping_config(  # type: ignore[reportPrivateUsage]
+            handle, TimeSkippingConfig(enabled=True)
+        )
         assert (await handle.result()) == "done"
         assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
+        await assert_time_was_skipped(handle)
 
 
 @workflow.defn
@@ -446,7 +452,7 @@ class ContinueAsNewSleepWorkflow:
 
 
 async def test_fast_forward_spans_continue_as_new(env: WorkflowEnvironment) -> None:
-    """"Fast forward over 3 continue-as-new runs."""
+    """Fast forward spans multiple continue-as-new runs."""
     async with new_worker(env.client, ContinueAsNewSleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
@@ -456,8 +462,15 @@ async def test_fast_forward_spans_continue_as_new(env: WorkflowEnvironment) -> N
                 task_queue=worker.task_queue,
             )
         assert await env.fast_forward(handle, timedelta(hours=2))
+        # FF auto-disables TS at target. Re-enable so the remaining sleeps
+        # of runs 2 and 3 are skipped rather than waited out.
+        assert env._ts_skipper is not None
+        await env._ts_skipper._update_time_skipping_config(  # type: ignore[reportPrivateUsage]
+            handle, TimeSkippingConfig(enabled=True)
+        )
         assert (await handle.result()) == "done"
         assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
+        await assert_time_was_skipped(handle)
 
 
 async def test_fast_forward_spans_cron_restarts(
@@ -534,11 +547,12 @@ async def test_signal_with_start_stamps_time_skipping_config(
     await assert_time_was_skipped(handle)
 
 
-async def test_update_time_reflects_workflow_virtual_clock(
+async def test_time_skipping_virtual_clock(
     env: WorkflowEnvironment,
 ) -> None:
-    """Use ``UpdateWorkflowExecutionOptionsResponse.update_time``
-    to get the virtual clock time. Fast forward 1h, then check the time."""
+    """Query the workflow's virtual clock via
+    ``DescribeWorkflowExecution → WorkflowExecutionExtendedInfo.time_skipping_info.current_time``.
+    Fast forward 1h, then verify current_time is ~+1h from wall-clock start."""
     async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
@@ -547,26 +561,23 @@ async def test_update_time_reflects_workflow_virtual_clock(
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-        # FF 1h. Virtual clock advances to +1h and time skipping auto-disables.
         wf_start_wall = datetime.now(tz=timezone.utc)
+        # FF 1h. Virtual clock advances to +1h and time skipping auto-disables.
         assert await env.fast_forward(handle, timedelta(hours=1))
-        # Have to call update_workflow_execution_options to update the virtual clock.
-        assert env._ts_skipper is not None
-        resp = await env._ts_skipper._update_time_skipping_config(  # type: ignore[reportPrivateUsage]
-            handle, TimeSkippingConfig(enabled=True, disable_propagation=True)
+        desc = await handle.describe()
+        tsi = desc.raw_description.workflow_extended_info.time_skipping_info
+        assert tsi.HasField("current_time"), (
+            "WorkflowExecutionExtendedInfo.time_skipping_info.current_time is not populated"
         )
-        assert resp.HasField("update_time"), (
-            "UpdateWorkflowExecutionOptionsResponse.update_time is not populated"
-        )
-        update_time = resp.update_time.ToDatetime().replace(tzinfo=timezone.utc)
-        # Update time should be at least ~+1h from workflow start wall clock
-        # (virtual clock was advanced 1h before this update).
-        offset_seconds = (update_time - wf_start_wall).total_seconds()
+        current_time = tsi.current_time.ToDatetime().replace(tzinfo=timezone.utc)
+        # Virtual clock should be ~+1h from workflow start wall clock.
+        offset_seconds = (current_time - wf_start_wall).total_seconds()
         assert 3550 <= offset_seconds <= 3700, (
-            f"update_time is {offset_seconds}s past wf_start_wall; expected "
-            f"~3600s (virtual clock advanced 1h before the update)"
+            f"time_skipping_info.current_time is {offset_seconds}s past "
+            f"wf_start_wall; expected ~3600s (1h FF)"
         )
         await handle.cancel()
+        await assert_time_was_skipped(handle)
 
 
 async def test_transition_event_payload(env: WorkflowEnvironment) -> None:

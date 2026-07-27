@@ -16,6 +16,24 @@ import temporalio.api.enums.v1.event_type_pb2 as _event_type
 import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.client
+from temporalio.api.workflowservice.v1 import PollWorkflowExecutionTimeSkippingResponse
+
+
+@dataclass(frozen=True)
+class FastForwardConfig:
+    """One-shot fast-forward within a :py:class:`TimeSkippingConfig`."""
+
+    id: str
+    """Identifies this fast-forward for ``PollWorkflowExecutionTimeSkipping``."""
+
+    duration: timedelta
+    """Advance the workflow's virtual time by this amount. Time skipping
+    auto-disables when the target time is reached."""
+
+    def _to_proto(self) -> temporalio.api.common.v1.FastForwardConfig:
+        proto = temporalio.api.common.v1.FastForwardConfig(id=self.id)
+        proto.duration.FromTimedelta(self.duration)
+        return proto
 
 
 @dataclass(frozen=True)
@@ -25,22 +43,28 @@ class TimeSkippingConfig:
     enabled: bool = True
     """Whether time skipping is enabled for the workflow."""
 
-    fast_forward: timedelta | None = None
-    """One-shot advance of virtual time by this duration. Time skipping auto-disables at
-    the target time. ``timedelta=None`` means unbounded advance until completion."""
+    fast_forward_config: FastForwardConfig | None = None
+    """One-shot fast-forward. ``None`` means skip unbounded until completion
+    (when :py:attr:`enabled` is true) or no skipping at all (when it is false)."""
 
     disable_propagation: bool = False
     """If true, child workflows do not inherit the ``enabled`` flag. Virtual
     start time inherits regardless."""
+
+    def __post_init__(self) -> None:
+        """Validates that a fast-forward isn't configured with skipping off."""
+        if not self.enabled and self.fast_forward_config is not None:
+            raise ValueError(
+                "fast_forward_config cannot be set when enabled is False"
+            )
 
     def _to_proto(self) -> temporalio.api.common.v1.TimeSkippingConfig:
         proto = temporalio.api.common.v1.TimeSkippingConfig(
             enabled=self.enabled,
             disable_propagation=self.disable_propagation,
         )
-        if self.fast_forward is not None:
-            proto.fast_forward_config.id = str(uuid.uuid4())
-            proto.fast_forward_config.duration.FromTimedelta(self.fast_forward)
+        if self.fast_forward_config is not None:
+            proto.fast_forward_config.CopyFrom(self.fast_forward_config._to_proto())
         return proto
 
 
@@ -116,89 +140,87 @@ class TimeSkipper:
         """Issue a fast-forward on a workflow and wait for it to complete.
 
         Sends an ``UpdateWorkflowExecutionOptions`` with the new
-        ``TimeSkippingConfig``, then waits for the resulting
-        ``disabled_after_fast_forward`` transition event (or the workflow's
-        terminal event).
+        ``TimeSkippingConfig``. For a bounded ``duration``, long-polls
+        ``PollWorkflowExecutionTimeSkipping`` for completion, which
+        follows the workflow across multiple runs.
 
         Args:
             handle: Target workflow execution.
             duration: One-shot advance by this amount (``timedelta`` or
-                seconds as a ``float``). If ``None``, resume unbounded
-                skipping until completion.
+                seconds as a ``float``). If ``None``, enable unbounded
+                skipping and wait for the workflow to terminate.
 
         Returns:
-            True if the fast-forward transition is observed; False if the
-            workflow terminates first.
+            For a bounded ``duration``: True if the fast-forward completes,
+            False if the workflow chain terminates first or the fast-forward
+            id is superseded. For ``duration=None``: always False (there is
+            no fast-forward completion to observe; the wait ends on the
+            workflow's terminal event).
         """
         if duration is not None and not isinstance(duration, timedelta):
             duration = timedelta(seconds=duration)
-        # Capture the most recent transition event's id before we issue this
-        # FF. The wait loop will only consider transition events with a
-        # higher event_id, ensuring we don't spuriously return True from a
-        # transition left in history by a previous FF on the same workflow.
-        latest_transition_event_id = await self._latest_transition_event_id(handle)
+        if duration is None:
+            # Unbounded: enable skipping, then wait for the workflow chain
+            # to terminate. There's no fast-forward id to poll on, so we
+            # watch history events for a terminal event on the current run.
+            await self._update_time_skipping_config(
+                handle,
+                TimeSkippingConfig(
+                    enabled=True,
+                    disable_propagation=self._config.disable_propagation,
+                ),
+            )
+            async for event in handle.fetch_history_events(wait_new_event=True):
+                if event.event_type in _TERMINAL_EVENT_TYPES:
+                    return False
+            return False
+        fast_forward_id = str(uuid.uuid4())
         await self._update_time_skipping_config(
             handle,
             TimeSkippingConfig(
                 enabled=True,
-                fast_forward=duration,
+                fast_forward_config=FastForwardConfig(
+                    id=fast_forward_id, duration=duration
+                ),
                 disable_propagation=self._config.disable_propagation,
             ),
         )
-        return await self._wait_for_fast_forward_completed(
-            handle, latest_transition_event_id
-        )
+        return await self._poll_fast_forward_completion(handle, fast_forward_id)
 
-    async def _latest_transition_event_id(
+    async def _poll_fast_forward_completion(
         self,
         handle: temporalio.client.WorkflowHandle[Any, Any],
-    ) -> int:
-        """Return the event_id of the most recent time-skipping transition event.
-
-        Returns 0 if the workflow has no such events yet.
-        """
-        latest = 0
-        async for event in handle.fetch_history_events():
-            if (
-                event.event_type
-                == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED
-            ):
-                latest = event.event_id
-        return latest
-
-    async def _wait_for_fast_forward_completed(
-        self,
-        handle: temporalio.client.WorkflowHandle[Any, Any],
-        last_transition_event_id: int = 0,
+        fast_forward_id: str,
     ) -> bool:
-        """Wait for a ``disabled_after_fast_forward`` transition event.
+        """Long-poll for a bounded fast-forward to complete.
 
-        Args:
-            handle: Target workflow execution.
-            last_transition_event_id: Ignore transition events with an
-                ``event_id`` at or below this value — they belong to earlier
-                FFs on this workflow and shouldn't be treated as this FF's
-                completion.
-
-        Returns:
-            True on a fresh ``disabled_after_fast_forward`` transition;
-            False if the workflow terminates first.
+        Passes ``run_id=""`` so the server resolves to the current run in
+        the chain (retry / CAN / cron) and follows the FF across the chain
+        boundary. Retries on server-side long-poll timeout until a
+        terminal poll result arrives.
         """
-        async for event in handle.fetch_history_events(wait_new_event=True):
-            if (
-                event.event_type
-                == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED
+        req = (
+            temporalio.api.workflowservice.v1.PollWorkflowExecutionTimeSkippingRequest(
+                namespace=self._client.namespace,
+                workflow_execution=temporalio.api.common.v1.WorkflowExecution(
+                    workflow_id=handle.id,
+                    run_id="",
+                ),
+                fast_forward_id=fast_forward_id,
+            )
+        )
+        while True:
+            resp = await self._client.workflow_service.poll_workflow_execution_time_skipping(
+                req, retry=True
+            )
+            if resp.result == PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_COMPLETED:
+                return True
+            if resp.result in (
+                PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_ID_MISMATCH,
+                PollWorkflowExecutionTimeSkippingResponse.RESULT_WORKFLOW_ENDED_BEFORE_FAST_FORWARD_COMPLETION,
             ):
-                if event.event_id <= last_transition_event_id:
-                    continue
-                attrs = (
-                    event.workflow_execution_time_skipping_transitioned_event_attributes
-                )
-                if attrs.disabled_after_fast_forward:
-                    return True
-            elif event.event_type in _TERMINAL_EVENT_TYPES:
                 return False
-        return False
+            # RESULT_POLL_TIMEOUT (server-side long-poll expiry): re-poll.
 
     async def _update_time_skipping_config(
         self,
