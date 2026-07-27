@@ -14,6 +14,7 @@ import dataclasses
 import uuid
 from collections.abc import Sequence
 from datetime import timedelta
+from typing import Any
 
 import nexusrpc
 import pytest
@@ -35,6 +36,7 @@ from temporalio.converter import (
 )
 from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
+from temporalio.types import MethodAsyncSingleParam
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.test_extstore import InMemoryTestDriver
@@ -147,7 +149,7 @@ def _client_with_extstore(
 async def _run_caller(
     env: WorkflowEnvironment,
     driver: InMemoryTestDriver,
-    caller: type,
+    workflow_run: MethodAsyncSingleParam[Any, str, int],
 ) -> int:
     client = _client_with_extstore(env, driver)
     task_queue = str(uuid.uuid4())
@@ -162,7 +164,7 @@ async def _run_caller(
             make_nexus_endpoint_name(task_queue), task_queue
         )
         return await client.execute_workflow(
-            caller.run,
+            workflow_run,
             task_queue,
             id=str(uuid.uuid4()),
             task_queue=task_queue,
@@ -185,7 +187,7 @@ async def test_nexus_operation_input_offloaded_and_retrieved(env: WorkflowEnviro
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = InMemoryTestDriver()
-    result = await _run_caller(env, driver, SizeOpCallerWorkflow)
+    result = await _run_caller(env, driver, SizeOpCallerWorkflow.run)
 
     assert result == PAYLOAD_SIZE
     assert driver._store_calls >= 1
@@ -200,7 +202,7 @@ async def test_nexus_operation_sync_result_offloaded_and_retrieved(
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = InMemoryTestDriver()
-    result = await _run_caller(env, driver, BigResultOpCallerWorkflow)
+    result = await _run_caller(env, driver, BigResultOpCallerWorkflow.run)
 
     assert result == PAYLOAD_SIZE
     assert driver._store_calls >= 1
@@ -215,7 +217,7 @@ async def test_nexus_operation_transient_retrieve_failure_recovers(
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = TransientFailureDriver(fail_first_retrieve=True)
-    result = await _run_caller(env, driver, SizeOpCallerWorkflow)
+    result = await _run_caller(env, driver, SizeOpCallerWorkflow.run)
 
     assert result == PAYLOAD_SIZE
     assert driver.retrieve_attempts >= 2
@@ -229,7 +231,7 @@ async def test_nexus_operation_transient_store_failure_recovers(
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = TransientFailureDriver(fail_first_store=True)
-    result = await _run_caller(env, driver, BigResultOpCallerWorkflow)
+    result = await _run_caller(env, driver, BigResultOpCallerWorkflow.run)
 
     assert result == PAYLOAD_SIZE
     assert driver.store_attempts >= 2
@@ -256,7 +258,7 @@ async def test_nexus_operation_store_failure_fails_operation(
 
     driver = PermanentFailStoreDriver()
     with pytest.raises(WorkflowFailureError) as exc_info:
-        await _run_caller(env, driver, BigResultOpCallerWorkflow)
+        await _run_caller(env, driver, BigResultOpCallerWorkflow.run)
 
     causes = _cause_chain(exc_info.value)
     assert [type(c) for c in causes] == [
