@@ -14,9 +14,7 @@ from typing import Any
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.converter
-from temporalio.bridge._visitor_functions import (
-    VisitorFunctions,
-)
+from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.converter import BinaryProtoPayloadConverter, CompositePayloadConverter
 from temporalio.converter._payload_converter import (
     _TemporalTransferTypePayloadConverter,
