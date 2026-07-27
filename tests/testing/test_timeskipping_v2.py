@@ -679,3 +679,59 @@ async def test_fast_forward_clamped_to_execution_timeout(
                 timed_out = True
                 break
         assert timed_out, "expected WORKFLOW_EXECUTION_TIMED_OUT in history"
+
+
+async def test_overriding_fast_forward_raises_on_original(
+    env: WorkflowEnvironment,
+) -> None:
+    """Override a fast-forward with another one. Awaiting the first raises
+    ``RuntimeError``, but the second completes properly. The test starts
+    with no worker to prevent fast-forwards from completing immediately.
+    """
+    task_queue = f"tq-{uuid.uuid4()}"
+    with env.with_time_skipping_disabled():
+        handle = await env.client.start_workflow(
+            SleepWorkflow.run,
+            100000.0,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+    # No worker yet.
+
+    original = asyncio.create_task(env.fast_forward(handle, timedelta(hours=2)))
+
+    async def _wait_for_ff_id(
+        expect_change_from: str | None,
+    ) -> str:
+        """Poll describe until fast_forward_info.fast_forward_id is set and,
+        if given, differs from the previous id."""
+        deadline = monotonic() + 10
+        while monotonic() < deadline:
+            if original.done() and expect_change_from is None:
+                val = original.result()  # re-raise if it already errored
+                raise AssertionError(
+                    f"first completed before second ran (returned {val!r})"
+                )
+            desc = await handle.describe()
+            ffi = (
+                desc.raw_description.workflow_extended_info.time_skipping_info.fast_forward_info
+            )
+            if ffi.fast_forward_id and ffi.fast_forward_id != expect_change_from:
+                return ffi.fast_forward_id
+            await asyncio.sleep(0.05)
+        raise AssertionError("timed out waiting for expected fast_forward_id")
+
+    first_ff = await _wait_for_ff_id(expect_change_from=None)
+
+    second_ff = asyncio.create_task(env.fast_forward(handle, timedelta(minutes=30)))
+    await _wait_for_ff_id(expect_change_from=first_ff)
+
+    with pytest.raises(RuntimeError, match=r"RESULT_FAST_FORWARD_ID_MISMATCH"):
+        await original
+
+    # Attach a worker so the workflow can complete and the second fast-forward can happen.
+    async with new_worker(env.client, SleepWorkflow, task_queue=task_queue):
+        assert await second_ff
+        await env.fast_forward(handle)
+        await handle.result()
+        await assert_time_was_skipped(handle)

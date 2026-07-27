@@ -153,7 +153,7 @@ class TimeSkipper:
         Returns:
             For a bounded ``duration``: True if the fast-forward completes,
             False if the workflow chain terminates first or the fast-forward
-            id is superseded. For ``duration=None``: always False (there is
+            id is overridden. For ``duration=None``: always False (there is
             no fast-forward completion to observe; the wait ends on the
             workflow's terminal event).
         """
@@ -224,14 +224,12 @@ class TimeSkipper:
                 resp.result
                 == PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_ID_MISMATCH
             ):
-                # Our fast_forward_id doesn't match the workflow's current one.
-                # Under this SDK's API a single fast_forward() call is the sole
-                # owner of the id it just wrote, so this indicates either a
-                # concurrent UpdateWorkflowExecutionOptions from another caller
-                # or an SDK bug — surface it loudly.
                 raise RuntimeError(
                     f"PollWorkflowExecutionTimeSkipping returned "
-                    f"RESULT_FAST_FORWARD_ID_MISMATCH for id {fast_forward_id!r}"
+                    f"RESULT_FAST_FORWARD_ID_MISMATCH for id {fast_forward_id!r}: "
+                    "the workflow's active fast-forward id no longer matches. "
+                    "This is the expected result when another fast_forward() call "
+                    overrode this one; if the caller did not do that, it's an internal bug."
                 )
             # RESULT_POLL_TIMEOUT (server-side long-poll expiry): re-poll.
 
