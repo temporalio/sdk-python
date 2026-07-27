@@ -160,20 +160,7 @@ class TimeSkipper:
         if duration is not None and not isinstance(duration, timedelta):
             duration = timedelta(seconds=duration)
         if duration is None:
-            # Unbounded: enable skipping, then wait for the workflow chain
-            # to terminate. There's no fast-forward id to poll on, so we
-            # watch history events for a terminal event on the current run.
-            await self._update_time_skipping_config(
-                handle,
-                TimeSkippingConfig(
-                    enabled=True,
-                    disable_propagation=self._config.disable_propagation,
-                ),
-            )
-            async for event in handle.fetch_history_events(wait_new_event=True):
-                if event.event_type in _TERMINAL_EVENT_TYPES:
-                    return False
-            return False
+            return await self._wait_for_unbounded_fast_forward_completion(handle)
         fast_forward_id = str(uuid.uuid4())
         await self._update_time_skipping_config(
             handle,
@@ -186,6 +173,29 @@ class TimeSkipper:
             ),
         )
         return await self._poll_fast_forward_completion(handle, fast_forward_id)
+
+    async def _wait_for_unbounded_fast_forward_completion(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any],
+    ) -> bool:
+        """Enable unbounded time skipping and wait for the workflow to terminate.
+
+        There is no fast-forward id to poll on, so we watch history events
+        for a terminal event on the current run. Always returns False —
+        unbounded skipping has no completion event of its own; the wait
+        ends on the workflow's terminal event.
+        """
+        await self._update_time_skipping_config(
+            handle,
+            TimeSkippingConfig(
+                enabled=True,
+                disable_propagation=self._config.disable_propagation,
+            ),
+        )
+        async for event in handle.fetch_history_events(wait_new_event=True):
+            if event.event_type in _TERMINAL_EVENT_TYPES:
+                return False
+        return False
 
     async def _poll_fast_forward_completion(
         self,
@@ -229,7 +239,7 @@ class TimeSkipper:
                     f"RESULT_FAST_FORWARD_ID_MISMATCH for id {fast_forward_id!r}: "
                     "the workflow's active fast-forward id no longer matches. "
                     "This is the expected result when another fast_forward() call "
-                    overrode this one; if the caller did not do that, it's an internal bug."
+                    "overrode this one; if the caller did not do that, it's an internal bug."
                 )
             # RESULT_POLL_TIMEOUT (server-side long-poll expiry): re-poll.
 
