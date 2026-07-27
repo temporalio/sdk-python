@@ -321,6 +321,35 @@ class WorkflowExecution(google.protobuf.message.Message):
 
 global___WorkflowExecution = WorkflowExecution
 
+class Execution(google.protobuf.message.Message):
+    """Identifies a specific execution within a namespace. This is used for standalone activities
+    executions in batch jobs currently.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TYPE_FIELD_NUMBER: builtins.int
+    BUSINESS_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    type: temporalio.api.enums.v1.common_pb2.ExecutionType.ValueType
+    business_id: builtins.str
+    run_id: builtins.str
+    def __init__(
+        self,
+        *,
+        type: temporalio.api.enums.v1.common_pb2.ExecutionType.ValueType = ...,
+        business_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "business_id", b"business_id", "run_id", b"run_id", "type", b"type"
+        ],
+    ) -> None: ...
+
+global___Execution = Execution
+
 class WorkflowType(google.protobuf.message.Message):
     """Represents the identifier used by a workflow author to define the workflow. Typically, the
     name of a function. This is sometimes referred to as the workflow's "name"
@@ -1277,7 +1306,7 @@ class TimeSkippingConfig(google.protobuf.message.Message):
 
     ENABLED_FIELD_NUMBER: builtins.int
     FAST_FORWARD_FIELD_NUMBER: builtins.int
-    DISABLE_CHILD_PROPAGATION_FIELD_NUMBER: builtins.int
+    DISABLE_PROPAGATION_FIELD_NUMBER: builtins.int
     enabled: builtins.bool
     """Enables or disables time skipping for this workflow execution."""
     @property
@@ -1295,8 +1324,9 @@ class TimeSkippingConfig(google.protobuf.message.Message):
         If the fast-forward duration exceeds the remaining execution timeout, time will only
         be fast-forwarded up to the end of the execution.
         """
-    disable_child_propagation: builtins.bool
-    """By default, child workflows inherit the "enabled" flag when they are started.
+    disable_propagation: builtins.bool
+    """By default, executions started by another execution (e.g. a child workflow of a parent workflow or
+    a schedule with the timeskipping policy enabled), inherit the "enabled" flag and skip time when possible.
     This flag disables that inheritance.
     """
     def __init__(
@@ -1304,7 +1334,7 @@ class TimeSkippingConfig(google.protobuf.message.Message):
         *,
         enabled: builtins.bool = ...,
         fast_forward: google.protobuf.duration_pb2.Duration | None = ...,
-        disable_child_propagation: builtins.bool = ...,
+        disable_propagation: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["fast_forward", b"fast_forward"]
@@ -1312,8 +1342,8 @@ class TimeSkippingConfig(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "disable_child_propagation",
-            b"disable_child_propagation",
+            "disable_propagation",
+            b"disable_propagation",
             "enabled",
             b"enabled",
             "fast_forward",

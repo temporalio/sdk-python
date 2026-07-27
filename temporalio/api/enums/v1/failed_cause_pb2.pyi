@@ -174,6 +174,16 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
         _WorkflowTaskFailedCause.ValueType
     )  # 37
     """A workflow task failed because payloads were too large."""
+    WORKFLOW_TASK_FAILED_CAUSE_EXTERNAL_STORAGE_FAILURE: (
+        _WorkflowTaskFailedCause.ValueType
+    )  # 38
+    """A workflow task failed because an external storage operation failed.
+    Check the workflow task failure message for more information.
+    """
+    WORKFLOW_TASK_FAILED_CAUSE_WORKFLOW_PAUSE_REQUESTED_BEFORE_TASK_STARTED: (
+        _WorkflowTaskFailedCause.ValueType
+    )  # 39
+    """A workflow task is failed because the workflow is paused before the task is started."""
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -320,6 +330,16 @@ WORKFLOW_TASK_FAILED_CAUSE_GRPC_MESSAGE_TOO_LARGE: (
 """A workflow task failed because a grpc message was too large."""
 WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: WorkflowTaskFailedCause.ValueType  # 37
 """A workflow task failed because payloads were too large."""
+WORKFLOW_TASK_FAILED_CAUSE_EXTERNAL_STORAGE_FAILURE: (
+    WorkflowTaskFailedCause.ValueType
+)  # 38
+"""A workflow task failed because an external storage operation failed.
+Check the workflow task failure message for more information.
+"""
+WORKFLOW_TASK_FAILED_CAUSE_WORKFLOW_PAUSE_REQUESTED_BEFORE_TASK_STARTED: (
+    WorkflowTaskFailedCause.ValueType
+)  # 39
+"""A workflow task is failed because the workflow is paused before the task is started."""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:
@@ -342,6 +362,9 @@ class _StartChildWorkflowExecutionFailedCauseEnumTypeWrapper(
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: (
         _StartChildWorkflowExecutionFailedCause.ValueType
     )  # 2
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE: (
+        _StartChildWorkflowExecutionFailedCause.ValueType
+    )  # 3
 
 class StartChildWorkflowExecutionFailedCause(
     _StartChildWorkflowExecutionFailedCause,
@@ -357,6 +380,9 @@ START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: (
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: (
     StartChildWorkflowExecutionFailedCause.ValueType
 )  # 2
+START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE: (
+    StartChildWorkflowExecutionFailedCause.ValueType
+)  # 3
 global___StartChildWorkflowExecutionFailedCause = StartChildWorkflowExecutionFailedCause
 
 class _CancelExternalWorkflowExecutionFailedCause:

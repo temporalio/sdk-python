@@ -2648,6 +2648,7 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     PRIORITY_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_STATE_PROPAGATION_FIELD_NUMBER: builtins.int
+    VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the child workflow.
     SDKs and UI tools should use `namespace` field but server must use `namespace_id` only.
@@ -2713,6 +2714,13 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
         """The time-skipping state propagated from the parent workflow. This can be nil if no time skipping
         has occurred or there is no previous run.
         """
+    @property
+    def versioning_override(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.VersioningOverride:
+        """Versioning override requested for the child workflow. If present, this explicit override
+        takes precedence over versioning behavior inherited from the parent workflow.
+        """
     def __init__(
         self,
         *,
@@ -2741,6 +2749,8 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
         | None = ...,
         time_skipping_state_propagation: temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation
         | None = ...,
+        versioning_override: temporalio.api.workflow.v1.message_pb2.VersioningOverride
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2763,6 +2773,8 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
             b"time_skipping_config",
             "time_skipping_state_propagation",
             b"time_skipping_state_propagation",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -2806,6 +2818,8 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
             b"time_skipping_config",
             "time_skipping_state_propagation",
             b"time_skipping_state_propagation",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",

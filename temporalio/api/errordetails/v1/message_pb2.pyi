@@ -53,18 +53,26 @@ class WorkflowExecutionAlreadyStartedFailure(google.protobuf.message.Message):
 
     START_REQUEST_ID_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
+    FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
     start_request_id: builtins.str
     run_id: builtins.str
+    first_execution_run_id: builtins.str
     def __init__(
         self,
         *,
         start_request_id: builtins.str = ...,
         run_id: builtins.str = ...,
+        first_execution_run_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "run_id", b"run_id", "start_request_id", b"start_request_id"
+            "first_execution_run_id",
+            b"first_execution_run_id",
+            "run_id",
+            b"run_id",
+            "start_request_id",
+            b"start_request_id",
         ],
     ) -> None: ...
 
@@ -495,4 +503,20 @@ class NexusOperationExecutionAlreadyStartedFailure(google.protobuf.message.Messa
 
 global___NexusOperationExecutionAlreadyStartedFailure = (
     NexusOperationExecutionAlreadyStartedFailure
+)
+
+class WorkflowTaskCompletionBufferLostFailure(google.protobuf.message.Message):
+    """An error indicating that the server lost the buffered pages of a paginated workflow task
+    completion. This is a transient error: the workflow task is still valid, and the client
+    should resend all pages from page 0 using the same task token.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___WorkflowTaskCompletionBufferLostFailure = (
+    WorkflowTaskCompletionBufferLostFailure
 )

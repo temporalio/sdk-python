@@ -128,7 +128,7 @@ async def maybe_visit_payload(
 
     payload_converter = _SystemNexusOuterPayloadConverter()
     value = payload_converter.from_payload(payload)
-    from ._payload_visitor import PayloadVisitor
+    from temporalio.bridge._visitor import PayloadVisitor
 
     payload_visitor = PayloadVisitor(skip_search_attributes=skip_search_attributes)
     checkpoint = visitor_functions.checkpoint()

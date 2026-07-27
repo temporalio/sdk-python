@@ -76,6 +76,7 @@ class ActivityOptions(google.protobuf.message.Message):
     HEARTBEAT_TIMEOUT_FIELD_NUMBER: builtins.int
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    START_DELAY_FIELD_NUMBER: builtins.int
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     @property
@@ -116,6 +117,12 @@ class ActivityOptions(google.protobuf.message.Message):
         """Priority metadata. If this message is not present, or any fields are not
         present, they inherit the values from the workflow.
         """
+    @property
+    def start_delay(self) -> google.protobuf.duration_pb2.Duration:
+        """Time to wait before making the first activity task available for dispatch. This delay is not applied to retry attempts.
+        When updated, the time is added to the original `schedule_time`, not to the current time.
+        If the resulting time is in the past, the task is made available for dispatch immediately.
+        """
     def __init__(
         self,
         *,
@@ -126,6 +133,7 @@ class ActivityOptions(google.protobuf.message.Message):
         heartbeat_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        start_delay: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -140,6 +148,8 @@ class ActivityOptions(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -159,6 +169,8 @@ class ActivityOptions(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "start_delay",
+            b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -210,6 +222,7 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     SDK_NAME_FIELD_NUMBER: builtins.int
     SDK_VERSION_FIELD_NUMBER: builtins.int
     START_DELAY_FIELD_NUMBER: builtins.int
+    EXECUTION_TIME_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """Unique identifier of this activity within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -273,7 +286,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """Time the activity was originally scheduled via a StartActivityExecution request."""
     @property
     def expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Scheduled time + schedule to close timeout."""
+        """The time at which the activity's Schedule-to-Close timeout expires.
+        Calculated as `schedule_time` + `start_delay` + `schedule_to_close_timeout`.
+        """
     @property
     def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time when the activity transitioned to a closed state."""
@@ -344,7 +359,12 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     """
     @property
     def start_delay(self) -> google.protobuf.duration_pb2.Duration:
-        """Time to wait before dispatching the first activity task. This delay is not applied to retry attempts."""
+        """Time to wait before making the first activity task available for dispatch. This delay is not applied to retry attempts."""
+    @property
+    def execution_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time at which the first activity task is made available for dispatch, computed as
+        `schedule_time + start_delay`. Same as `schedule_time` if `start_delay` is not set.
+        """
     def __init__(
         self,
         *,
@@ -391,6 +411,7 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         sdk_name: builtins.str = ...,
         sdk_version: builtins.str = ...,
         start_delay: google.protobuf.duration_pb2.Duration | None = ...,
+        execution_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -403,6 +424,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"current_retry_interval",
             "execution_duration",
             b"execution_duration",
+            "execution_time",
+            b"execution_time",
             "expiration_time",
             b"expiration_time",
             "header",
@@ -460,6 +483,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"current_retry_interval",
             "execution_duration",
             b"execution_duration",
+            "execution_time",
+            b"execution_time",
             "expiration_time",
             b"expiration_time",
             "header",
@@ -544,6 +569,7 @@ class ActivityExecutionListInfo(google.protobuf.message.Message):
     STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
     STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
     EXECUTION_DURATION_FIELD_NUMBER: builtins.int
+    EXECUTION_TIME_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """A unique identifier of this activity within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -577,6 +603,11 @@ class ActivityExecutionListInfo(google.protobuf.message.Message):
         """The difference between close time and scheduled time.
         This field is only populated if the activity is closed.
         """
+    @property
+    def execution_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time at which the first activity task is made available for dispatch, computed as
+        `schedule_time + start_delay`. Same as `schedule_time` if `start_delay` is not set.
+        """
     def __init__(
         self,
         *,
@@ -592,6 +623,7 @@ class ActivityExecutionListInfo(google.protobuf.message.Message):
         state_transition_count: builtins.int = ...,
         state_size_bytes: builtins.int = ...,
         execution_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        execution_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -602,6 +634,8 @@ class ActivityExecutionListInfo(google.protobuf.message.Message):
             b"close_time",
             "execution_duration",
             b"execution_duration",
+            "execution_time",
+            b"execution_time",
             "schedule_time",
             b"schedule_time",
             "search_attributes",
@@ -619,6 +653,8 @@ class ActivityExecutionListInfo(google.protobuf.message.Message):
             b"close_time",
             "execution_duration",
             b"execution_duration",
+            "execution_time",
+            b"execution_time",
             "run_id",
             b"run_id",
             "schedule_time",

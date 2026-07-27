@@ -30,14 +30,31 @@ class _BatchOperationTypeEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     BATCH_OPERATION_TYPE_UNSPECIFIED: _BatchOperationType.ValueType  # 0
     BATCH_OPERATION_TYPE_TERMINATE: _BatchOperationType.ValueType  # 1
+    """DEPRECATED: Use BATCH_OPERATION_TYPE_TERMINATE_WORKFLOW instead."""
+    BATCH_OPERATION_TYPE_TERMINATE_WORKFLOW: _BatchOperationType.ValueType  # 13
     BATCH_OPERATION_TYPE_CANCEL: _BatchOperationType.ValueType  # 2
+    """DEPRECATED: Use BATCH_OPERATION_TYPE_CANCEL_WORKFLOW instead."""
+    BATCH_OPERATION_TYPE_CANCEL_WORKFLOW: _BatchOperationType.ValueType  # 14
     BATCH_OPERATION_TYPE_SIGNAL: _BatchOperationType.ValueType  # 3
+    """DEPRECATED: Use BATCH_OPERATION_TYPE_SIGNAL_WORKFLOW instead."""
+    BATCH_OPERATION_TYPE_SIGNAL_WORKFLOW: _BatchOperationType.ValueType  # 15
     BATCH_OPERATION_TYPE_DELETE: _BatchOperationType.ValueType  # 4
+    """DEPRECATED: Use BATCH_OPERATION_TYPE_DELETE_WORKFLOW instead."""
+    BATCH_OPERATION_TYPE_DELETE_WORKFLOW: _BatchOperationType.ValueType  # 16
     BATCH_OPERATION_TYPE_RESET: _BatchOperationType.ValueType  # 5
+    """DEPRECATED: Use BATCH_OPERATION_TYPE_RESET_WORKFLOW instead."""
+    BATCH_OPERATION_TYPE_RESET_WORKFLOW: _BatchOperationType.ValueType  # 17
     BATCH_OPERATION_TYPE_UPDATE_EXECUTION_OPTIONS: _BatchOperationType.ValueType  # 6
+    """DEPRECATED: Use BATCH_OPERATION_TYPE_UPDATE_WORKFLOW_EXECUTION_OPTIONS instead."""
+    BATCH_OPERATION_TYPE_UPDATE_WORKFLOW_EXECUTION_OPTIONS: (
+        _BatchOperationType.ValueType
+    )  # 18
     BATCH_OPERATION_TYPE_UNPAUSE_ACTIVITY: _BatchOperationType.ValueType  # 7
     BATCH_OPERATION_TYPE_UPDATE_ACTIVITY_OPTIONS: _BatchOperationType.ValueType  # 8
     BATCH_OPERATION_TYPE_RESET_ACTIVITY: _BatchOperationType.ValueType  # 9
+    BATCH_OPERATION_TYPE_TERMINATE_ACTIVITY: _BatchOperationType.ValueType  # 10
+    BATCH_OPERATION_TYPE_CANCEL_ACTIVITY: _BatchOperationType.ValueType  # 11
+    BATCH_OPERATION_TYPE_DELETE_ACTIVITY: _BatchOperationType.ValueType  # 12
 
 class BatchOperationType(
     _BatchOperationType, metaclass=_BatchOperationTypeEnumTypeWrapper
@@ -45,14 +62,31 @@ class BatchOperationType(
 
 BATCH_OPERATION_TYPE_UNSPECIFIED: BatchOperationType.ValueType  # 0
 BATCH_OPERATION_TYPE_TERMINATE: BatchOperationType.ValueType  # 1
+"""DEPRECATED: Use BATCH_OPERATION_TYPE_TERMINATE_WORKFLOW instead."""
+BATCH_OPERATION_TYPE_TERMINATE_WORKFLOW: BatchOperationType.ValueType  # 13
 BATCH_OPERATION_TYPE_CANCEL: BatchOperationType.ValueType  # 2
+"""DEPRECATED: Use BATCH_OPERATION_TYPE_CANCEL_WORKFLOW instead."""
+BATCH_OPERATION_TYPE_CANCEL_WORKFLOW: BatchOperationType.ValueType  # 14
 BATCH_OPERATION_TYPE_SIGNAL: BatchOperationType.ValueType  # 3
+"""DEPRECATED: Use BATCH_OPERATION_TYPE_SIGNAL_WORKFLOW instead."""
+BATCH_OPERATION_TYPE_SIGNAL_WORKFLOW: BatchOperationType.ValueType  # 15
 BATCH_OPERATION_TYPE_DELETE: BatchOperationType.ValueType  # 4
+"""DEPRECATED: Use BATCH_OPERATION_TYPE_DELETE_WORKFLOW instead."""
+BATCH_OPERATION_TYPE_DELETE_WORKFLOW: BatchOperationType.ValueType  # 16
 BATCH_OPERATION_TYPE_RESET: BatchOperationType.ValueType  # 5
+"""DEPRECATED: Use BATCH_OPERATION_TYPE_RESET_WORKFLOW instead."""
+BATCH_OPERATION_TYPE_RESET_WORKFLOW: BatchOperationType.ValueType  # 17
 BATCH_OPERATION_TYPE_UPDATE_EXECUTION_OPTIONS: BatchOperationType.ValueType  # 6
+"""DEPRECATED: Use BATCH_OPERATION_TYPE_UPDATE_WORKFLOW_EXECUTION_OPTIONS instead."""
+BATCH_OPERATION_TYPE_UPDATE_WORKFLOW_EXECUTION_OPTIONS: (
+    BatchOperationType.ValueType
+)  # 18
 BATCH_OPERATION_TYPE_UNPAUSE_ACTIVITY: BatchOperationType.ValueType  # 7
 BATCH_OPERATION_TYPE_UPDATE_ACTIVITY_OPTIONS: BatchOperationType.ValueType  # 8
 BATCH_OPERATION_TYPE_RESET_ACTIVITY: BatchOperationType.ValueType  # 9
+BATCH_OPERATION_TYPE_TERMINATE_ACTIVITY: BatchOperationType.ValueType  # 10
+BATCH_OPERATION_TYPE_CANCEL_ACTIVITY: BatchOperationType.ValueType  # 11
+BATCH_OPERATION_TYPE_DELETE_ACTIVITY: BatchOperationType.ValueType  # 12
 global___BatchOperationType = BatchOperationType
 
 class _BatchOperationState:
