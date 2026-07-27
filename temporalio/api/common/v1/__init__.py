@@ -20,6 +20,7 @@ from .message_pb2 import Priority
 from .message_pb2 import WorkerSelector
 from .message_pb2 import OnConflictOptions
 from .message_pb2 import TimeSkippingConfig
+from .message_pb2 import FastForwardConfig
 from .message_pb2 import TimeSkippingStatePropagation
 from .message_pb2 import TimeSkippingInfo
 from .message_pb2 import TimeSkippingFastForwardInfo
@@ -30,6 +31,7 @@ __all__ = [
     "Callback",
     "DataBlob",
     "Execution",
+    "FastForwardConfig",
     "GrpcStatus",
     "Header",
     "Link",
