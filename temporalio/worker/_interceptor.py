@@ -363,21 +363,6 @@ class StartSystemNexusOperationInput(Generic[InputT, OutputT]):
     summary: str | None
     output_type: type[OutputT] | None = None
 
-    def __post_init__(self) -> None:
-        """Initialize operation-specific attributes after dataclass creation."""
-        if isinstance(self.operation, nexusrpc.Operation):
-            self.output_type = self.operation.output_type
-        elif callable(self.operation):
-            _, op = temporalio.nexus._util.get_operation_factory(self.operation)
-            if isinstance(op, nexusrpc.Operation):
-                self.output_type = op.output_type
-            else:
-                raise ValueError(
-                    f"Operation callable is not a Nexus operation: {self.operation}"
-                )
-        elif not isinstance(self.operation, str):
-            raise ValueError(f"Operation is not a Nexus operation: {self.operation}")
-
     @property
     def operation_name(self) -> str:
         """Get the name of the Nexus operation."""
