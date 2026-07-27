@@ -16,6 +16,8 @@ import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus.system as nexus_system
+import temporalio.nexus.system.workflow_service as workflow_service
+import temporalio.nexus.system.workflow_service.models as workflow_service_models
 from temporalio import workflow
 from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge._visitor_functions import VisitorFunctions
@@ -133,6 +135,32 @@ class ExternalHandleSignalWithStartWorkflowCaller:
             static_details="details-value",
         )
         return started_handle.id
+
+
+def test_signal_with_start_serialization_context() -> None:
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="test-workflow",
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+    )
+    operation_info = workflow_service.__nexus_operation_registry__[
+        (
+            "temporal.api.workflowservice.v1.WorkflowService",
+            "SignalWithStartWorkflowExecution",
+        )
+    ]
+
+    assert operation_info.serialization_context is not None
+    context = nexus_system._get_serialization_context(
+        "temporal.api.workflowservice.v1.WorkflowService",
+        "SignalWithStartWorkflowExecution",
+        request,
+    )
+    assert isinstance(context, WorkflowSerializationContext)
+    assert context.namespace == "target-namespace"
+    assert context.workflow_id == "target-workflow-id"
 
 
 class RejectOuterSystemNexusCodec(PayloadCodec):
@@ -601,11 +629,25 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
 
 async def test_signal_with_start_uses_target_workflow_serialization_context(
     env: WorkflowEnvironment,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     captured_contexts: list[SerializationContext | None] = []
+    system_payload_converter_wrap_count = 0
+    original_get_payload_converter = nexus_system._get_payload_converter
+
+    def capture_get_payload_converter(
+        user_payload_converter: temporalio.converter.PayloadConverter,
+    ) -> temporalio.converter.PayloadConverter:
+        nonlocal system_payload_converter_wrap_count
+        system_payload_converter_wrap_count += 1
+        return original_get_payload_converter(user_payload_converter)
+
+    monkeypatch.setattr(
+        nexus_system, "_get_payload_converter", capture_get_payload_converter
+    )
     caller_config = env.client.config()
     caller_config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
@@ -630,6 +672,7 @@ async def test_signal_with_start_uses_target_workflow_serialization_context(
         )
 
     assert result == target_workflow_id
+    assert system_payload_converter_wrap_count >= 2
     assert len(captured_contexts) >= 2
     assert all(
         isinstance(context, WorkflowSerializationContext)

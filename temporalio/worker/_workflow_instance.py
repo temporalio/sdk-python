@@ -1032,10 +1032,23 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Handle the four oneof variants of NexusOperationResult
         result = job.result
         if result.HasField("completed"):
+            payload_converter = handle._payload_converter
+            if temporalio.nexus.system.is_system_endpoint(handle._input.endpoint):
+                serialization_context = (
+                    temporalio.nexus.system._get_serialization_context(
+                        handle._input.service,
+                        handle._input.operation_name,
+                        handle._input.input,
+                    )
+                )
+                if serialization_context is not None:
+                    payload_converter = temporalio.nexus.system._get_payload_converter(
+                        self._payload_converter_with_context(serialization_context)
+                    )
             [output] = self._convert_payloads(
                 [result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
-                handle._payload_converter,
+                payload_converter,
             )
             handle._resolve_success(output)
         elif result.HasField("failed"):
