@@ -916,8 +916,10 @@ def value_to_type(
             origin, "__optional_keys__", None
         ):
             per_key_types = get_type_hints(origin)
-        key_type = (
-            type_args[0]
+        key_type: Any = (
+            type(None)
+            if len(type_args) > 0 and type_args[0] is None
+            else type_args[0]
             if len(type_args) > 0
             and type_args[0] is not Any
             and not isinstance(type_args[0], TypeVar)
