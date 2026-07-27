@@ -96,7 +96,7 @@ def is_system_endpoint(endpoint: str) -> bool:
     return endpoint == TEMPORAL_SYSTEM_ENDPOINT
 
 
-def _apply_headers_to_request(
+def _apply_headers_to_request(  # pyright: ignore[reportUnusedFunction]
     request: Message,
     headers: Mapping[str, temporalio.api.common.v1.Payload],
 ) -> None:
