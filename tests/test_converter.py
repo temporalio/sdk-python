@@ -6,6 +6,7 @@ import ipaddress
 import logging
 import sys
 import traceback
+import typing
 from collections import deque
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
@@ -22,7 +23,6 @@ from typing import (
     get_args,
     get_type_hints,
 )
-import typing
 from uuid import UUID, uuid4
 
 import nexusrpc
