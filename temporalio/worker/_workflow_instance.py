@@ -76,6 +76,7 @@ from ._interceptor import (
     StartChildWorkflowInput,
     StartLocalActivityInput,
     StartNexusOperationInput,
+    StartSystemNexusOperationInput,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
@@ -1724,7 +1725,21 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         headers: Mapping[str, str] | None,
         summary: str | None,
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        # start_nexus_operation
+        if temporalio.nexus.system.is_system_endpoint(endpoint):
+            return await self._outbound.start_system_nexus_operation(
+                StartSystemNexusOperationInput(
+                    service=service,
+                    operation=operation,
+                    input=input,
+                    output_type=output_type,
+                    schedule_to_close_timeout=schedule_to_close_timeout,
+                    schedule_to_start_timeout=schedule_to_start_timeout,
+                    start_to_close_timeout=start_to_close_timeout,
+                    cancellation_type=cancellation_type,
+                    headers={},
+                    summary=summary,
+                )
+            )
         return await self._outbound.start_nexus_operation(
             StartNexusOperationInput(
                 endpoint=endpoint,
@@ -2170,6 +2185,26 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             reraise_on_workflow_cancellation=True,
         )
         return handle
+
+    async def _outbound_start_system_nexus_operation(
+        self, input: StartSystemNexusOperationInput[Any, OutputT]
+    ) -> _NexusOperationHandle[OutputT]:
+        temporalio.nexus.system._apply_headers_to_request(input.input, input.headers)
+        return await self._outbound_start_nexus_operation(
+            StartNexusOperationInput(
+                endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+                service=input.service,
+                operation=input.operation,
+                input=input.input,
+                output_type=input.output_type,
+                schedule_to_close_timeout=input.schedule_to_close_timeout,
+                schedule_to_start_timeout=input.schedule_to_start_timeout,
+                start_to_close_timeout=input.start_to_close_timeout,
+                cancellation_type=input.cancellation_type,
+                headers=None,
+                summary=input.summary,
+            )
+        )
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
@@ -3156,6 +3191,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> _NexusOperationHandle[OutputT]:
         return await self._instance._outbound_start_nexus_operation(input)
+
+    async def start_system_nexus_operation(
+        self, input: StartSystemNexusOperationInput[Any, OutputT]
+    ) -> _NexusOperationHandle[OutputT]:
+        return await self._instance._outbound_start_system_nexus_operation(input)
 
     def start_local_activity(
         self, input: StartLocalActivityInput

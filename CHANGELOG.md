@@ -153,11 +153,18 @@ to include examples, links to docs, or any other relevant information.
   `temporalio.client`) instead of setting `payload_limits` on `DataConverter`.
   Config fields were renamed to `payloads_warn_size` and `memo_warn_size`, and
   the deprecated `PayloadSizeWarning` was removed.
+- `WorkflowOutboundInterceptor.start_nexus_operation` no longer receives Temporal System Nexus
+  operations. Custom interceptors that need to observe or modify these operations must implement
+  `start_system_nexus_operation` instead.
 
 ### Fixed
 
 - Marked system Nexus envelope payloads so nested payloads can be detected and
   visited after the envelope is already stored as a payload.
+- Fixed OpenTelemetry context propagation when a workflow uses signal-with-start. Trace context is
+  now added to the called workflow's headers instead of the System Nexus transport headers.
+
+### Security
 
 ## [1.30.0] - 2026-07-01
 
