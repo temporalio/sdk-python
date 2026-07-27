@@ -425,28 +425,18 @@ class PayloadVisitor:
 def write_bridge_visitors() -> None:
     out_path = base_dir / "temporalio" / "bridge" / "_visitor.py"
 
-    # Build root descriptors: WorkflowActivation, WorkflowActivationCompletion,
-    # and all messages from selected API modules
     roots: list[Descriptor] = [
         WorkflowActivation.DESCRIPTOR,
         WorkflowActivationCompletion.DESCRIPTOR,
-    ]
+    ] + discover_system_nexus_roots()
 
     code = VisitorGenerator().generate(roots)
-    out_path.write_text(code)
-
-
-def write_system_nexus_payload_visitors() -> None:
-    out_path = base_dir / "temporalio" / "nexus" / "system" / "_payload_visitor.py"
-    code = VisitorGenerator().generate(discover_system_nexus_roots())
     out_path.write_text(code)
 
 
 if __name__ == "__main__":
     print("Generating temporalio/bridge/_visitor.py...", file=sys.stderr)
     write_bridge_visitors()
-    print("Generating temporalio/nexus/system/_payload_visitor.py...", file=sys.stderr)
-    write_system_nexus_payload_visitors()
     subprocess.run(
         [
             "uv",
@@ -457,7 +447,6 @@ if __name__ == "__main__":
             "I",
             "--fix",
             "temporalio/bridge/_visitor.py",
-            "temporalio/nexus/system/_payload_visitor.py",
         ],
         cwd=base_dir,
         check=True,
@@ -469,7 +458,6 @@ if __name__ == "__main__":
             "ruff",
             "format",
             "temporalio/bridge/_visitor.py",
-            "temporalio/nexus/system/_payload_visitor.py",
         ],
         cwd=base_dir,
         check=True,

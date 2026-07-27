@@ -549,3 +549,25 @@ class PayloadVisitor:
             await self._visit_coresdk_workflow_completion_Success(fs, o.successful)
         elif o.HasField("failed"):
             await self._visit_coresdk_workflow_completion_Failure(fs, o.failed)
+
+    async def _visit_temporal_api_common_v1_Header(self, fs: VisitorFunctions, o: Any):
+        for v in o.fields.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_temporal_api_workflowservice_v1_SignalWithStartWorkflowExecutionRequest(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("input"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.input)
+        if o.HasField("signal_input"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.signal_input)
+        if o.HasField("memo"):
+            await self._visit_temporal_api_common_v1_Memo(fs, o.memo)
+        if o.HasField("search_attributes"):
+            await self._visit_temporal_api_common_v1_SearchAttributes(
+                fs, o.search_attributes
+            )
+        if o.HasField("header"):
+            await self._visit_temporal_api_common_v1_Header(fs, o.header)
+        if o.HasField("user_metadata"):
+            await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
