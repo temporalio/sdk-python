@@ -215,11 +215,24 @@ class TimeSkipper:
             )
             if resp.result == PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_COMPLETED:
                 return True
-            if resp.result in (
-                PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_ID_MISMATCH,
-                PollWorkflowExecutionTimeSkippingResponse.RESULT_WORKFLOW_ENDED_BEFORE_FAST_FORWARD_COMPLETION,
+            if (
+                resp.result
+                == PollWorkflowExecutionTimeSkippingResponse.RESULT_WORKFLOW_ENDED_BEFORE_FAST_FORWARD_COMPLETION
             ):
                 return False
+            if (
+                resp.result
+                == PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_ID_MISMATCH
+            ):
+                # Our fast_forward_id doesn't match the workflow's current one.
+                # Under this SDK's API a single fast_forward() call is the sole
+                # owner of the id it just wrote, so this indicates either a
+                # concurrent UpdateWorkflowExecutionOptions from another caller
+                # or an SDK bug — surface it loudly.
+                raise RuntimeError(
+                    f"PollWorkflowExecutionTimeSkipping returned "
+                    f"RESULT_FAST_FORWARD_ID_MISMATCH for id {fast_forward_id!r}"
+                )
             # RESULT_POLL_TIMEOUT (server-side long-poll expiry): re-poll.
 
     async def _update_time_skipping_config(
