@@ -3,7 +3,7 @@
 import functools
 import inspect
 import typing
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 import temporalio.workflow
 from temporalio import workflow
@@ -64,7 +64,7 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
 def activity_node(
     activity_def: Callable,
     *,
-    name: Optional[str] = None,
+    name: str | None = None,
     rerun_on_resume: bool = False,
     **kwargs: Any,
 ) -> "FunctionNode":

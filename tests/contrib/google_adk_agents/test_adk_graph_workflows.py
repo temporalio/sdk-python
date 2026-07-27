@@ -123,10 +123,10 @@ class RoutingGraphWorkflow:
             text = str(node_input)
             return Event(route="bug" if "bug" in text else "other", output=text)  # type: ignore
 
-        def handle_bug(node_input: str) -> str:
+        def handle_bug(node_input: str) -> str:  # pyright: ignore[reportUnusedParameter]
             return "routed-to-bug"
 
-        def handle_other(node_input: str) -> str:
+        def handle_other(node_input: str) -> str:  # pyright: ignore[reportUnusedParameter]
             return "routed-to-other"
 
         graph = Workflow(
@@ -145,10 +145,10 @@ class ParallelJoinGraphWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> dict[str, Any]:
-        def make_a(node_input: Any) -> str:
+        def make_a(node_input: Any) -> str:  # pyright: ignore[reportUnusedParameter]
             return "alpha"
 
-        def make_b(node_input: Any) -> str:
+        def make_b(node_input: Any) -> str:  # pyright: ignore[reportUnusedParameter]
             return "beta"
 
         enrich_a = activity_node(
@@ -177,7 +177,7 @@ class MultiParamActivityNodeWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        def prepare(node_input: Any) -> dict[str, str]:
+        def prepare(node_input: Any) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
             return {"left": "L", "right": "R"}
 
         combine = activity_node(
@@ -216,7 +216,7 @@ class TimeoutGraphWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
-        async def slow(node_input: Any) -> str:
+        async def slow(node_input: Any) -> str:  # pyright: ignore[reportUnusedParameter]
             await asyncio.sleep(5)
             return "never"
 
@@ -237,7 +237,7 @@ class RetryGraphWorkflow:
     async def run(self, prompt: str) -> str:
         attempts: list[int] = []
 
-        def flaky(node_input: Any) -> str:
+        def flaky(node_input: Any) -> str:  # pyright: ignore[reportUnusedParameter]
             attempts.append(1)
             if len(attempts) < 2:
                 raise RuntimeError("transient failure")
@@ -264,7 +264,7 @@ class JitteredRetryGraphWorkflow:
     async def run(self, prompt: str) -> str:
         attempts: list[int] = []
 
-        def flaky(node_input: Any) -> str:
+        def flaky(node_input: Any) -> str:  # pyright: ignore[reportUnusedParameter]
             attempts.append(1)
             if len(attempts) < 2:
                 raise RuntimeError("transient failure")

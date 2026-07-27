@@ -18,7 +18,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from google.adk.agents import LlmAgent
@@ -327,7 +327,7 @@ async def _wait_for_pending(
     handle: WorkflowHandle,
     query: Any,
     count: int = 1,
-    expected_ids: Optional[set[str]] = None,
+    expected_ids: set[str] | None = None,
 ) -> list[HitlRequest]:
     async def _poll() -> list[HitlRequest]:
         while True:
@@ -422,7 +422,7 @@ async def test_hitl_multiple_pending_partial_response(client: Client):
             task_queue=TASK_QUEUE,
             execution_timeout=timedelta(seconds=60),
         )
-        pending = await _wait_for_pending(
+        await _wait_for_pending(
             handle, MultiPendingGraphWorkflow.pending_requests, expected_ids={"a", "b"}
         )
 
@@ -430,7 +430,7 @@ async def test_hitl_multiple_pending_partial_response(client: Client):
         await handle.execute_update(
             MultiPendingGraphWorkflow.respond, args=["a", "yes-a"]
         )
-        pending = await _wait_for_pending(
+        await _wait_for_pending(
             handle, MultiPendingGraphWorkflow.pending_requests, expected_ids={"b"}
         )
 

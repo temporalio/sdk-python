@@ -15,8 +15,9 @@ Temporal workflow code.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Literal, Mapping, Optional
+from typing import Any, Literal
 
 from google.adk.events import Event
 from google.adk.tools.tool_confirmation import ToolConfirmation
@@ -64,12 +65,12 @@ class HitlRequest:
 
     kind: Literal["input", "tool_confirmation", "credential"]
     interrupt_id: str
-    invocation_id: Optional[str] = None
-    author: Optional[str] = None
-    message: Optional[str] = None
-    payload: Optional[Any] = None
-    response_schema: Optional[dict[str, Any]] = None
-    original_function_call: Optional[dict[str, Any]] = None
+    invocation_id: str | None = None
+    author: str | None = None
+    message: str | None = None
+    payload: Any | None = None
+    response_schema: dict[str, Any] | None = None
+    original_function_call: dict[str, Any] | None = None
 
 
 def pending_hitl_requests(event: Event) -> list[HitlRequest]:
@@ -104,10 +105,10 @@ def pending_hitl_requests(event: Event) -> list[HitlRequest]:
         if kind is None:
             continue
         args = function_call.args or {}
-        message: Optional[str] = None
-        payload: Optional[Any] = None
-        response_schema: Optional[dict[str, Any]] = None
-        original_function_call: Optional[dict[str, Any]] = None
+        message: str | None = None
+        payload: Any | None = None
+        response_schema: dict[str, Any] | None = None
+        original_function_call: dict[str, Any] | None = None
         if kind == "input":
             message = args.get("message")
             payload = args.get("payload")
@@ -164,7 +165,7 @@ def hitl_input_response(interrupt_id: str, response: Any) -> types.Part:
 
 
 def hitl_confirmation_response(
-    interrupt_id: str, *, confirmed: bool, payload: Optional[Any] = None
+    interrupt_id: str, *, confirmed: bool, payload: Any | None = None
 ) -> types.Part:
     """Builds the message part answering a tool-confirmation request.
 

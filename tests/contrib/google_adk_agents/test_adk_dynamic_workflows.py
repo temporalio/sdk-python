@@ -18,7 +18,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from google.adk.agents import LlmAgent
@@ -158,7 +158,7 @@ class WorkflowToolModel(BaseLlm):
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
-        tool_response: Optional[types.FunctionResponse] = None
+        tool_response: types.FunctionResponse | None = None
         for content in llm_request.contents:
             for part in content.parts or []:
                 if part.function_response is not None:
