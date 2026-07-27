@@ -166,6 +166,40 @@ worker = Worker(
 )
 ```
 
+### Reading Session State in Activity Tools
+
+ADK's live `ToolContext` holds non-serializable objects, so it cannot be an
+activity argument. To read the serializable subset from an activity-backed
+tool, declare a parameter named `tool_context` annotated with
+`ToolContextSnapshot`:
+
+```python
+from temporalio import activity
+from temporalio.contrib.google_adk_agents.workflow import (
+    ToolContextSnapshot,
+    activity_tool,
+)
+
+
+@activity.defn
+async def get_weather(query: str, tool_context: ToolContextSnapshot) -> dict:
+    db_url = tool_context.state.get("url", "")
+    ...
+
+
+weather_tool = activity_tool(get_weather, start_to_close_timeout=timedelta(seconds=30))
+```
+
+Exactly like a native ADK function tool's `tool_context` parameter, it is
+excluded from the LLM-facing tool schema; at invocation the wrapper snapshots
+the live `ToolContext` (session state as a plain dict, plus the function-call
+id) and passes it to the activity.
+
+The snapshot is one-way: mutations inside the activity do not propagate back
+to the session, because the activity may run on a different worker. To modify
+session state, return the needed information from the activity and apply it in
+workflow-side code (for example an ADK callback or a plain tool function).
+
 ### Local ADK Runs
 
 The same agent definitions can also be exercised outside Temporal with
