@@ -15,7 +15,6 @@ import temporalio.api.common.v1
 import temporalio.common
 import temporalio.converter
 from temporalio.bridge._visitor_functions import (
-    CheckpointingVisitorFunctions,
     VisitorFunctions,
 )
 from temporalio.converter import BinaryProtoPayloadConverter, CompositePayloadConverter
@@ -134,12 +133,10 @@ async def maybe_visit_payload(
     from ._payload_visitor import PayloadVisitor
 
     payload_visitor = PayloadVisitor(skip_search_attributes=skip_search_attributes)
-    if isinstance(visitor_functions, CheckpointingVisitorFunctions):
-        checkpoint = visitor_functions.checkpoint()
-        await payload_visitor.visit(visitor_functions, value)
+    checkpoint = visitor_functions.checkpoint()
+    await payload_visitor.visit(visitor_functions, value)
+    if checkpoint is not None:
         await visitor_functions.drain_since(checkpoint)
-    else:
-        await payload_visitor.visit(visitor_functions, value)
     return payload_converter.to_payload(value)
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Protocol, runtime_checkable
+from abc import ABC, abstractmethod
 
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
@@ -10,33 +10,30 @@ from temporalio.api.common.v1.message_pb2 import Payload
 PayloadSequence = list[Payload] | RepeatedCompositeFieldContainer[Payload]
 
 
-class VisitorFunctions(Protocol):
+class VisitorFunctions(ABC):
     """Functions invoked by generated payload visitors."""
 
+    @abstractmethod
     async def visit_payload(self, payload: Payload) -> None:
         """Visit a single payload."""
         ...
 
+    @abstractmethod
     async def visit_payloads(self, payloads: PayloadSequence) -> None:
         """Visit a sequence of payloads together."""
         ...
 
-    async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+    async def visit_system_nexus_envelope(self, _payload: Payload) -> None:
         """Visit a recognized system Nexus envelope payload."""
         return None
 
+    def checkpoint(self) -> int | None:
+        """Return a marker for visits scheduled after this point, if supported."""
+        return None
 
-@runtime_checkable
-class CheckpointingVisitorFunctions(VisitorFunctions, Protocol):
-    """Visitor functions that can await a scoped set of deferred visits."""
-
-    def checkpoint(self) -> int:
-        """Return a marker for visits scheduled after this point."""
-        ...
-
-    async def drain_since(self, checkpoint: int) -> None:
+    async def drain_since(self, _checkpoint: int) -> None:
         """Wait for visits scheduled after ``checkpoint`` to finish."""
-        ...
+        return None
 
 
 class BoundedVisitorFunctions(VisitorFunctions):
