@@ -106,7 +106,7 @@ async def _maybe_visit_payload(  # pyright: ignore[reportUnusedFunction]
 
     payload_converter = _SystemNexusOuterPayloadConverter()
     value = payload_converter.from_payload(payload)
-    from ._payload_visitor import PayloadVisitor
+    from temporalio.bridge._visitor import PayloadVisitor
 
     await PayloadVisitor(skip_search_attributes=skip_search_attributes).visit(
         visitor_functions, value
