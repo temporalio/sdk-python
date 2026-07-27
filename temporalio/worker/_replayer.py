@@ -320,6 +320,7 @@ class Replayer:
                     default_heartbeat_throttle_interval_millis=1000,
                     max_activities_per_second=None,
                     max_task_queue_activities_per_second=None,
+                    max_eager_activity_reservations_per_workflow_task=3,
                     graceful_shutdown_period_millis=0,
                     versioning_strategy=temporalio.bridge.worker.WorkerVersioningStrategyNone(
                         build_id_no_versioning=self._config.get("build_id")

@@ -35,6 +35,7 @@ class BatchOperationInfo(google.protobuf.message.Message):
     STATE_FIELD_NUMBER: builtins.int
     START_TIME_FIELD_NUMBER: builtins.int
     CLOSE_TIME_FIELD_NUMBER: builtins.int
+    OPERATION_TYPE_FIELD_NUMBER: builtins.int
     job_id: builtins.str
     """Batch job ID"""
     state: temporalio.api.enums.v1.batch_operation_pb2.BatchOperationState.ValueType
@@ -45,6 +46,10 @@ class BatchOperationInfo(google.protobuf.message.Message):
     @property
     def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Batch operation close time"""
+    operation_type: (
+        temporalio.api.enums.v1.batch_operation_pb2.BatchOperationType.ValueType
+    )
+    """Operation type"""
     def __init__(
         self,
         *,
@@ -52,6 +57,7 @@ class BatchOperationInfo(google.protobuf.message.Message):
         state: temporalio.api.enums.v1.batch_operation_pb2.BatchOperationState.ValueType = ...,
         start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         close_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        operation_type: temporalio.api.enums.v1.batch_operation_pb2.BatchOperationType.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -66,6 +72,8 @@ class BatchOperationInfo(google.protobuf.message.Message):
             b"close_time",
             "job_id",
             b"job_id",
+            "operation_type",
+            b"operation_type",
             "start_time",
             b"start_time",
             "state",
@@ -107,6 +115,36 @@ class BatchOperationTermination(google.protobuf.message.Message):
     ) -> None: ...
 
 global___BatchOperationTermination = BatchOperationTermination
+
+class BatchOperationTerminateActivities(google.protobuf.message.Message):
+    """BatchOperationTerminateActivities sends terminate requests to a batch of activities.
+    Keep the parameter in sync with temporalio.api.workflowservice.v1.TerminateActivityExecutionRequest.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client"""
+    reason: builtins.str
+    """Reason for requesting the termination, recorded and available via the PollActivityExecution API.
+    Not propagated to a worker if an activity attempt is currently running.
+    """
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity", b"identity", "reason", b"reason"
+        ],
+    ) -> None: ...
+
+global___BatchOperationTerminateActivities = BatchOperationTerminateActivities
 
 class BatchOperationSignal(google.protobuf.message.Message):
     """BatchOperationSignal sends signals to batch workflows.
@@ -181,6 +219,36 @@ class BatchOperationCancellation(google.protobuf.message.Message):
 
 global___BatchOperationCancellation = BatchOperationCancellation
 
+class BatchOperationCancelActivities(google.protobuf.message.Message):
+    """BatchOperationCancelActivities sends cancel requests to a batch of activities.
+    Keep the parameter in sync with temporalio.api.workflowservice.v1.RequestCancelActivityExecutionRequest.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client"""
+    reason: builtins.str
+    """Reason for requesting the cancellation, recorded and available via the PollActivityExecution API.
+    Not propagated to a worker if an activity attempt is currently running.
+    """
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity", b"identity", "reason", b"reason"
+        ],
+    ) -> None: ...
+
+global___BatchOperationCancelActivities = BatchOperationCancelActivities
+
 class BatchOperationDeletion(google.protobuf.message.Message):
     """BatchOperationDeletion sends deletion requests to batch workflows.
     Keep the parameter in sync with temporalio.api.workflowservice.v1.DeleteWorkflowExecutionRequest.
@@ -201,6 +269,19 @@ class BatchOperationDeletion(google.protobuf.message.Message):
     ) -> None: ...
 
 global___BatchOperationDeletion = BatchOperationDeletion
+
+class BatchOperationDeleteActivities(google.protobuf.message.Message):
+    """BatchOperationDeleteActivities sends deletion requests to a batch of activities.
+    Keep the parameter in sync with temporalio.api.workflowservice.v1.DeleteActivityExecutionRequest.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___BatchOperationDeleteActivities = BatchOperationDeleteActivities
 
 class BatchOperationReset(google.protobuf.message.Message):
     """BatchOperationReset sends reset requests to batch workflows.
