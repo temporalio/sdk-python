@@ -14,11 +14,15 @@ from enum import Enum, IntEnum
 from typing import (
     Any,
     Dict,  # type:ignore[reportDeprecated]
+    Generic,
     Literal,
     NewType,
+    TypeVar,
+    cast,
     get_args,
     get_type_hints,
 )
+import typing
 from uuid import UUID, uuid4
 
 import nexusrpc
@@ -278,6 +282,7 @@ class TemporalTransferTypeValueConverter(
     def from_transfer_type(
         self,
         value: temporalio.api.common.v1.WorkflowExecution,
+        type_hint: type[TemporalTransferTypeValue],
     ) -> TemporalTransferTypeValue:
         return TemporalTransferTypeValue(value=value.workflow_id)
 
@@ -305,6 +310,7 @@ class TemporalTransferTypeValueWithoutHintConverter(
     def from_transfer_type(
         self,
         value: temporalio.api.common.v1.WorkflowExecution,
+        type_hint: type[TemporalTransferTypeValueWithoutHint],
     ) -> TemporalTransferTypeValueWithoutHint:
         return TemporalTransferTypeValueWithoutHint(value=value.workflow_id)
 
@@ -313,6 +319,47 @@ class TemporalTransferTypeValueWithoutHintConverter(
 @dataclass
 class TemporalTransferTypeValueWithoutHint:
     value: str
+
+
+T = TypeVar("T")
+
+
+@dataclass
+class TemporalTransferTypeGenericValue(Generic[T]):
+    value: T
+
+
+class TemporalTransferTypeGenericValueConverter(
+    TransferTypeConverter[
+        TemporalTransferTypeGenericValue[T],
+        temporalio.api.common.v1.WorkflowExecution,
+    ]
+):
+    transfer_type = temporalio.api.common.v1.WorkflowExecution
+
+    def to_transfer_type(
+        self, value: TemporalTransferTypeGenericValue[T]
+    ) -> temporalio.api.common.v1.WorkflowExecution:
+        return temporalio.api.common.v1.WorkflowExecution(
+            workflow_id=str(value.value),
+            run_id="run-id",
+        )
+
+    def from_transfer_type(
+        self,
+        value: temporalio.api.common.v1.WorkflowExecution,
+        type_hint: type[TemporalTransferTypeGenericValue[T]],
+    ) -> TemporalTransferTypeGenericValue[T]:
+        converted_value: str | int = value.workflow_id
+        if typing.get_args(type_hint)[0] is int:
+            converted_value = int(converted_value)
+        return TemporalTransferTypeGenericValue(value=cast(T, converted_value))
+
+
+# Register after both classes are defined so the generic type can be resolved.
+transfer_type_convertible(TemporalTransferTypeGenericValueConverter)(
+    TemporalTransferTypeGenericValue
+)
 
 
 class CustomDefaultPayloadConverter(DefaultPayloadConverter):
@@ -356,6 +403,30 @@ def test_temporal_transfer_type_payload_converter_without_transfer_type_hint():
     assert (
         converter.from_payload(payload, TemporalTransferTypeValueWithoutHint) == value
     )
+
+
+@pytest.mark.parametrize(
+    ("value", "type_hint"),
+    [
+        (
+            TemporalTransferTypeGenericValue("workflow-id"),
+            TemporalTransferTypeGenericValue[str],
+        ),
+        (
+            TemporalTransferTypeGenericValue(123),
+            TemporalTransferTypeGenericValue[int],
+        ),
+    ],
+)
+def test_temporal_transfer_type_payload_converter_with_generic_value(
+    value: TemporalTransferTypeGenericValue[T],
+    type_hint: type[TemporalTransferTypeGenericValue[T]],
+):
+    converter = DataConverter.default.payload_converter
+
+    payload = converter.to_payload(value)
+
+    assert converter.from_payload(payload, type_hint) == value
 
 
 def test_transfer_type_convertible_rejects_existing_converter():
