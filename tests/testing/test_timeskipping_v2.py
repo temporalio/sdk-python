@@ -412,12 +412,9 @@ async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
         # 1h sleep, 1h retry backoff, 1h sleep. 2.5h fast forward should
         # end solidly in the second run.
         assert await env.fast_forward(handle, timedelta(hours=2, minutes=30))
-        # FF auto-disables TS at target. Re-enable so the remaining ~30m
-        # of attempt-2 sleep is skipped rather than waited out.
-        assert env._ts_skipper is not None
-        await env._ts_skipper._update_time_skipping_config(  # type: ignore[reportPrivateUsage]
-            handle, TimeSkippingConfig(enabled=True)
-        )
+        # FF auto-disables TS at target. Re-enable (unbounded) so the
+        # remaining ~30m of attempt-2 sleep is skipped rather than waited out.
+        await env.fast_forward(handle)
         assert (await handle.result()) == "done"
         assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
         await assert_time_was_skipped(handle)
@@ -462,12 +459,9 @@ async def test_fast_forward_spans_continue_as_new(env: WorkflowEnvironment) -> N
                 task_queue=worker.task_queue,
             )
         assert await env.fast_forward(handle, timedelta(hours=2))
-        # FF auto-disables TS at target. Re-enable so the remaining sleeps
-        # of runs 2 and 3 are skipped rather than waited out.
-        assert env._ts_skipper is not None
-        await env._ts_skipper._update_time_skipping_config(  # type: ignore[reportPrivateUsage]
-            handle, TimeSkippingConfig(enabled=True)
-        )
+        # FF auto-disables TS at target. Re-enable (unbounded) so the
+        # remaining sleeps of runs 2 and 3 are skipped rather than waited out.
+        await env.fast_forward(handle)
         assert (await handle.result()) == "done"
         assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
         await assert_time_was_skipped(handle)
