@@ -16,6 +16,7 @@ import temporalio.converter
 import temporalio.nexus.system as nexus_system
 from temporalio import workflow
 from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import (
     WorkflowActivationCompletion,
 )
@@ -144,7 +145,7 @@ def _assert_start_nexus_operation_interceptor_trace() -> None:
     assert request.workflow_type.name == "test-workflow"
 
 
-class _MarkingPayloadVisitor:
+class _MarkingPayloadVisitor(VisitorFunctions):
     def __init__(self) -> None:
         self.visited_payload_count = 0
         self.system_envelope_count = 0
