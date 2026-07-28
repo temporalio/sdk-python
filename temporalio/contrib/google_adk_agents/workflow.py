@@ -2,6 +2,7 @@
 
 import functools
 import inspect
+import types
 import typing
 from dataclasses import dataclass, field
 from typing import Any, Callable, cast
@@ -25,8 +26,9 @@ class ToolContextSnapshot:
     may run on a different worker than the workflow. This snapshot carries the
     serializable subset instead.
 
-    Declare a parameter named ``tool_context`` annotated with this type on an
-    activity wrapped by :func:`activity_tool`:
+    Declare a parameter named ``tool_context`` annotated with this type (or
+    ``ToolContextSnapshot | None``) on an activity wrapped by
+    :func:`activity_tool`:
 
     .. code-block:: python
 
@@ -40,8 +42,17 @@ class ToolContextSnapshot:
     time — here with a snapshot taken from the live ``ToolContext`` before the
     activity is scheduled.
 
-    The snapshot is one-way: mutating it inside the activity does not
-    propagate back to the session. To modify session state, return the needed
+    When running under Temporal, the entire session state crosses the
+    activity boundary: every value in it must be serializable by the
+    configured data converter and the total size must fit within payload
+    limits, even for keys the tool never reads. A non-serializable value
+    fails the workflow task when the activity is scheduled. Local ADK runs
+    pass the snapshot in memory and have no such constraint.
+
+    The snapshot is one-way and should be treated as read-only: mutating it
+    inside the activity does not propagate back to the session (and in local
+    runs nested values may alias the live session state, so mutating them can
+    corrupt the session). To modify session state, return the needed
     information from the activity and apply it in workflow-side code (for
     example an ADK callback or a plain tool function).
 
@@ -55,39 +66,59 @@ class ToolContextSnapshot:
     function_call_id: str | None = None
 
 
-def _tool_context_parameter(activity_def: Callable) -> inspect.Parameter | None:
-    """Returns the activity's ``tool_context`` parameter after validating it.
+def _annotation_members(annotation: Any) -> tuple[Any, ...]:
+    """Returns a union annotation's members, or the annotation itself."""
+    origin = typing.get_origin(annotation)
+    if origin is typing.Union or origin is types.UnionType:  # pyright: ignore[reportDeprecated]
+        return typing.get_args(annotation)
+    return (annotation,)
 
-    ADK reserves the parameter name ``tool_context`` for context injection and
-    never includes it in the LLM-facing tool schema, so a parameter with that
-    name can only ever be filled by the integration. It must be annotated with
-    :class:`ToolContextSnapshot` (or left unannotated).
+
+def _annotation_display(members: tuple[Any, ...]) -> str:
+    """Renders annotation members for error messages."""
+    return " | ".join(
+        "None" if member is type(None) else getattr(member, "__name__", str(member))
+        for member in members
+    )
+
+
+def _adk_context_error(
+    activity_def: Callable, name: str, annotation_name: str
+) -> ValueError:
+    """Builds the error for a parameter annotated with a live ADK context."""
+    return ValueError(
+        f"Activity '{activity_def.__name__}' declares '{name}:"
+        f" {annotation_name}', but ADK context objects are not serializable"
+        " and cannot be activity arguments. Declare a parameter named"
+        " 'tool_context' annotated with ToolContextSnapshot instead to receive"
+        " the serializable subset (session state and function-call id)."
+    )
+
+
+def _validated_tool_context_parameter(
+    activity_def: Callable, parameter: inspect.Parameter, members: tuple[Any, ...]
+) -> inspect.Parameter:
+    """Returns the ``tool_context`` parameter after validating its annotation.
+
+    The parameter must be annotated with :class:`ToolContextSnapshot` or
+    ``ToolContextSnapshot | None``.
     """
-    parameter = inspect.signature(activity_def).parameters.get(_TOOL_CONTEXT_PARAM)
-    if parameter is None:
-        return None
     if parameter.annotation is inspect.Parameter.empty:
-        return parameter
-    try:
-        resolved = typing.get_type_hints(activity_def).get(
-            _TOOL_CONTEXT_PARAM, parameter.annotation
-        )
-    except Exception:
-        resolved = parameter.annotation
-    if resolved is ToolContextSnapshot:
-        return parameter
-    # Accept an optional annotation too (ToolContextSnapshot | None).
-    if set(typing.get_args(resolved)) == {ToolContextSnapshot, type(None)}:
-        return parameter
-    annotation_name = getattr(resolved, "__name__", str(resolved))
-    if getattr(resolved, "__module__", "").startswith("google.adk"):
         raise ValueError(
-            f"Activity '{activity_def.__name__}' declares 'tool_context:"
-            f" {annotation_name}', but ADK context objects are not serializable"
-            " and cannot be activity arguments. Annotate the parameter with"
-            " ToolContextSnapshot instead to receive the serializable subset"
+            f"Activity '{activity_def.__name__}' has an unannotated"
+            " 'tool_context' parameter. Annotate it with ToolContextSnapshot"
+            " to receive the serializable subset of the ADK tool context"
             " (session state and function-call id)."
         )
+    non_none = [member for member in members if member is not type(None)]
+    if non_none == [ToolContextSnapshot]:
+        return parameter
+    annotation_name = _annotation_display(members)
+    if any(
+        getattr(member, "__module__", "").startswith("google.adk")
+        for member in non_none
+    ):
+        raise _adk_context_error(activity_def, _TOOL_CONTEXT_PARAM, annotation_name)
     raise ValueError(
         f"Activity '{activity_def.__name__}' has a 'tool_context' parameter"
         f" annotated with {annotation_name}. The name 'tool_context' is"
@@ -95,6 +126,52 @@ def _tool_context_parameter(activity_def: Callable) -> inspect.Parameter | None:
         " ToolContextSnapshot to receive the serializable subset of the tool"
         " context."
     )
+
+
+def _tool_context_parameter(activity_def: Callable) -> inspect.Parameter | None:
+    """Validates context-related parameters and returns the ``tool_context`` one.
+
+    ADK injects the live context into the first parameter annotated with an
+    ADK context type (regardless of name), or failing that into one named
+    ``tool_context``, and excludes that parameter from the LLM-facing tool
+    schema. Live context objects cannot cross the activity boundary, so the
+    only supported declaration is a parameter named ``tool_context`` annotated
+    with :class:`ToolContextSnapshot` (or ``ToolContextSnapshot | None``);
+    anything else ADK would treat as a context parameter is rejected at wrap
+    time, as is a misplaced ToolContextSnapshot annotation that would leak
+    into the tool schema.
+    """
+    try:
+        hints = typing.get_type_hints(activity_def)
+    except Exception:
+        hints = {}
+    adk_context: type[Any] | None
+    try:
+        from google.adk.tools.tool_context import ToolContext
+
+        adk_context = ToolContext
+    except ImportError:
+        adk_context = None
+    tool_context_parameter: inspect.Parameter | None = None
+    for name, parameter in inspect.signature(activity_def).parameters.items():
+        members = _annotation_members(hints.get(name, parameter.annotation))
+        if name == _TOOL_CONTEXT_PARAM:
+            tool_context_parameter = _validated_tool_context_parameter(
+                activity_def, parameter, members
+            )
+        elif adk_context is not None and any(
+            member is adk_context for member in members
+        ):
+            raise _adk_context_error(activity_def, name, _annotation_display(members))
+        elif any(member is ToolContextSnapshot for member in members):
+            raise ValueError(
+                f"Activity '{activity_def.__name__}' annotates parameter"
+                f" '{name}' with ToolContextSnapshot, but ADK only injects the"
+                " tool context into a parameter named 'tool_context'; under"
+                " any other name it would appear in the LLM-facing tool"
+                " schema. Rename the parameter to 'tool_context'."
+            )
+    return tool_context_parameter
 
 
 def _snapshot_tool_context(tool_context: Any) -> ToolContextSnapshot:
@@ -121,10 +198,13 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
     while marking it as a tool that executes via 'workflow.execute_activity'.
 
     If the activity declares a parameter named ``tool_context``, it must be
-    annotated with :class:`ToolContextSnapshot`. ADK excludes the parameter
-    from the tool schema and injects the live ``ToolContext`` into the
-    wrapper, which passes the activity a serializable snapshot of it (session
-    state and function-call id) in that parameter's position.
+    annotated with :class:`ToolContextSnapshot` (or ``ToolContextSnapshot |
+    None``). ADK excludes the parameter from the tool schema and injects the
+    live ``ToolContext`` into the wrapper, which passes the activity a
+    serializable snapshot of it (session state and function-call id) in that
+    parameter's position. Annotating any parameter with a live ADK context
+    type raises ``ValueError`` at wrap time, since ADK would inject the
+    non-serializable context into it regardless of its name.
     """
     tool_context_param = _tool_context_parameter(activity_def)
 

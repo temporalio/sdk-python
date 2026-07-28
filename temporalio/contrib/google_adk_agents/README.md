@@ -174,6 +174,8 @@ tool, declare a parameter named `tool_context` annotated with
 `ToolContextSnapshot`:
 
 ```python
+from datetime import timedelta
+
 from temporalio import activity
 from temporalio.contrib.google_adk_agents.workflow import (
     ToolContextSnapshot,
@@ -193,12 +195,21 @@ weather_tool = activity_tool(get_weather, start_to_close_timeout=timedelta(secon
 Exactly like a native ADK function tool's `tool_context` parameter, it is
 excluded from the LLM-facing tool schema; at invocation the wrapper snapshots
 the live `ToolContext` (session state as a plain dict, plus the function-call
-id) and passes it to the activity.
+id) and passes it to the activity. Annotating any parameter with a live ADK
+context type raises `ValueError` at wrap time, since ADK would inject the
+non-serializable context into it regardless of its name.
 
-The snapshot is one-way: mutations inside the activity do not propagate back
-to the session, because the activity may run on a different worker. To modify
-session state, return the needed information from the activity and apply it in
-workflow-side code (for example an ADK callback or a plain tool function).
+When running under Temporal, the entire session state crosses the activity
+boundary: every value in it must be serializable by the configured data
+converter and the total size must fit within payload limits, even for keys
+the tool never reads. Local ADK runs pass the snapshot in memory and have no
+such constraint.
+
+The snapshot is one-way and should be treated as read-only: mutations inside
+the activity do not propagate back to the session, because the activity may
+run on a different worker. To modify session state, return the needed
+information from the activity and apply it in workflow-side code (for example
+an ADK callback or a plain tool function).
 
 ### Local ADK Runs
 

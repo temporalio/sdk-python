@@ -1,17 +1,3 @@
-# Copyright 2026 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Tests for ToolContextSnapshot injection into activity-backed tools.
 
 Covers https://github.com/temporalio/sdk-python/issues/1470: activities
@@ -24,10 +10,11 @@ without the parameter leaking into the LLM-facing tool schema.
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any
+from typing import Any, Optional  # pyright: ignore[reportDeprecated]
 
 import pytest
 from google.adk import Agent
+from google.adk.features import FeatureName, override_feature_enabled
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
@@ -49,6 +36,12 @@ from temporalio.worker import Worker
 
 TASK_QUEUE = "adk-tool-context-task-queue"
 
+SESSION_STATE: dict[str, Any] = {
+    "db_url": "postgres://config",
+    "retries": 3,
+    "regions": {"primary": "us-east1", "replicas": ["eu-west1"]},
+}
+
 
 @activity.defn
 async def lookup_weather(
@@ -57,11 +50,16 @@ async def lookup_weather(
     """Activity that reads tool configuration from session state.
 
     Mirrors the shape reported in issue #1470, with tool_context deliberately
-    in the middle of the parameter list to prove positional slotting.
+    in the middle of the parameter list to prove positional slotting. The
+    returned string also records whether the code ran inside a real activity,
+    so tests can tell the activity boundary was actually crossed (or not).
     """
     db_url = tool_context.state.get("db_url", "<missing>")
+    retries = tool_context.state.get("retries", -1)
+    region = tool_context.state.get("regions", {}).get("primary", "<missing>")
     has_function_call_id = "yes" if tool_context.function_call_id else "no"
-    return f"{city}|{units}|{db_url}|fc={has_function_call_id}"
+    in_act = "yes" if activity.in_activity() else "no"
+    return f"{city}|{units}|{db_url}|{retries}|{region}|fc={has_function_call_id}|act={in_act}"
 
 
 def weather_agent(model_name: str) -> Agent:
@@ -120,7 +118,7 @@ async def run_state_agent(model_name: str) -> str:
     session = await runner.session_service.create_session(
         app_name="test_app",
         user_id="test",
-        state={"db_url": "postgres://config"},
+        state=SESSION_STATE,
     )
     final_text = ""
     async with Aclosing(
@@ -166,9 +164,11 @@ async def test_activity_tool_receives_tool_context_snapshot(client: Client):
             task_queue=TASK_QUEUE,
             execution_timeout=timedelta(seconds=30),
         )
-    # The activity saw the session state, the default parameter value, and a
-    # populated function-call id — none of which came from the LLM.
-    assert "NYC|celsius|postgres://config|fc=yes" in result
+    # The activity saw mixed-type session state (string, int, nested dict),
+    # the default parameter value, and a populated function-call id — none of
+    # which came from the LLM — and act=yes proves the snapshot crossed a
+    # real activity boundary rather than running inline in the workflow.
+    assert "NYC|celsius|postgres://config|3|us-east1|fc=yes|act=yes" in result
 
 
 @pytest.mark.asyncio
@@ -176,7 +176,7 @@ async def test_activity_tool_snapshot_outside_workflow():
     """Local ADK runs (no Temporal) receive the same snapshot."""
     LLMRegistry.register(StateToolModel)
     result = await run_state_agent("state_tool_model")
-    assert "NYC|celsius|postgres://config|fc=yes" in result
+    assert "NYC|celsius|postgres://config|3|us-east1|fc=yes|act=no" in result
 
 
 def _declared_properties(tool: FunctionTool) -> dict[str, Any]:
@@ -200,6 +200,66 @@ def test_tool_schema_excludes_tool_context():
     assert "tool_context" not in properties
 
 
+def test_tool_schema_excludes_tool_context_legacy_declaration():
+    """Exclusion also holds on the legacy (non-JSON-schema) declaration path."""
+    override_feature_enabled(FeatureName.JSON_SCHEMA_FOR_FUNC_DECL, False)
+    try:
+        tool = FunctionTool(
+            func=activity_tool(
+                lookup_weather, start_to_close_timeout=timedelta(seconds=30)
+            )
+        )
+        declaration = tool._get_declaration()
+        assert declaration is not None
+        assert declaration.parameters is not None
+        properties = declaration.parameters.properties or {}
+        assert "city" in properties
+        assert "units" in properties
+        assert "tool_context" not in properties
+    finally:
+        # The flag is default-on across the supported google-adk range.
+        override_feature_enabled(FeatureName.JSON_SCHEMA_FOR_FUNC_DECL, True)
+
+
+def test_tool_schema_context_only_parameter():
+    """A tool whose only parameter is tool_context exposes no LLM arguments."""
+
+    @activity.defn
+    async def ctx_only_tool(tool_context: ToolContextSnapshot) -> str:
+        return str(tool_context.state)
+
+    tool = FunctionTool(
+        func=activity_tool(ctx_only_tool, start_to_close_timeout=timedelta(seconds=30))
+    )
+    declaration = tool._get_declaration()
+    if declaration is not None:
+        json_properties = (declaration.parameters_json_schema or {}).get(
+            "properties", {}
+        )
+        legacy_properties = (
+            (declaration.parameters.properties or {}) if declaration.parameters else {}
+        )
+        assert not json_properties
+        assert not legacy_properties
+
+
+def test_activity_tool_accepts_optional_snapshot_annotation():
+    """ToolContextSnapshot | None is accepted and still excluded from the schema."""
+
+    @activity.defn
+    async def optional_tool(
+        query: str,
+        tool_context: ToolContextSnapshot | None = None,  # pyright: ignore[reportUnusedParameter]
+    ) -> str:
+        return query
+
+    tool = FunctionTool(
+        func=activity_tool(optional_tool, start_to_close_timeout=timedelta(seconds=30))
+    )
+    properties = _declared_properties(tool)
+    assert set(properties) == {"query"}
+
+
 def test_activity_tool_rejects_adk_tool_context_annotation():
     """Annotating with the live ADK ToolContext gives an actionable error."""
 
@@ -209,6 +269,53 @@ def test_activity_tool_rejects_adk_tool_context_annotation():
 
     with pytest.raises(ValueError, match="ToolContextSnapshot"):
         activity_tool(bad_tool, start_to_close_timeout=timedelta(seconds=30))
+
+
+def test_activity_tool_rejects_optional_adk_tool_context_annotation():
+    """Optional[ToolContext] is rejected with the ADK-specific message."""
+
+    @activity.defn
+    async def optional_bad_tool(
+        query: str,
+        tool_context: Optional[ToolContext] = None,  # pyright: ignore[reportUnusedParameter, reportDeprecated]
+    ) -> str:
+        return query
+
+    with pytest.raises(ValueError, match="not serializable"):
+        activity_tool(optional_bad_tool, start_to_close_timeout=timedelta(seconds=30))
+
+
+def test_activity_tool_rejects_adk_context_under_any_name():
+    """ADK injects into any param annotated with a context type, so all are rejected."""
+
+    @activity.defn
+    async def sneaky_tool(query: str, ctx: ToolContext) -> str:  # pyright: ignore[reportUnusedParameter]
+        return query
+
+    with pytest.raises(ValueError, match="not serializable"):
+        activity_tool(sneaky_tool, start_to_close_timeout=timedelta(seconds=30))
+
+
+def test_activity_tool_rejects_snapshot_under_other_name():
+    """ToolContextSnapshot on a differently-named param would leak into the schema."""
+
+    @activity.defn
+    async def misnamed_tool(query: str, snap: ToolContextSnapshot) -> str:  # pyright: ignore[reportUnusedParameter]
+        return query
+
+    with pytest.raises(ValueError, match="named 'tool_context'"):
+        activity_tool(misnamed_tool, start_to_close_timeout=timedelta(seconds=30))
+
+
+def test_activity_tool_rejects_unannotated_tool_context():
+    """The reserved name without an annotation gives an actionable error."""
+
+    @activity.defn
+    async def untyped_tool(query: str, tool_context) -> str:  # type: ignore[no-untyped-def] # pyright: ignore[reportUnusedParameter, reportMissingParameterType]
+        return query
+
+    with pytest.raises(ValueError, match="unannotated 'tool_context'"):
+        activity_tool(untyped_tool, start_to_close_timeout=timedelta(seconds=30))
 
 
 def test_activity_tool_rejects_other_tool_context_annotation():
