@@ -541,12 +541,41 @@ async def test_signal_with_start_stamps_time_skipping_config(
     await assert_time_was_skipped(handle)
 
 
+async def test_get_time_skipping_info_during_workflow(
+    env: WorkflowEnvironment,
+) -> None:
+    """``env.get_time_skipping_info`` on a running (not fast-forwarded)
+    workflow returns a populated ``TimeSkippingInfo`` with a current
+    virtual clock and no fast-forward info set."""
+    async with new_worker(env.client, InteractionWorkflow) as worker:
+        # InteractionWorkflow waits on a signal, so it stays running while
+        # we read.
+        handle = await env.client.start_workflow(
+            InteractionWorkflow.run,
+            1,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        try:
+            tsi = await env.get_time_skipping_info(handle)
+            assert tsi is not None
+            assert tsi.is_running, "expected time skipping to be running (env-stamped enabled)"
+            assert tsi.HasField("current_time"), (
+                "TimeSkippingInfo.current_time is not populated"
+            )
+            assert not tsi.HasField("fast_forward_info"), (
+                "no fast-forward was issued; expected fast_forward_info unset"
+            )
+        finally:
+            await handle.signal(InteractionWorkflow.proceed)
+            await handle.result()
+
+
 async def test_time_skipping_virtual_clock(
     env: WorkflowEnvironment,
 ) -> None:
-    """Query the workflow's virtual clock via
-    ``DescribeWorkflowExecution → WorkflowExecutionExtendedInfo.time_skipping_info.current_time``.
-    Fast forward 1h, then verify current_time is ~+1h from wall-clock start."""
+    """Read the workflow's virtual clock after a 1h fast-forward;
+    verify current_time is ~+1h from wall start."""
     async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
@@ -558,13 +587,11 @@ async def test_time_skipping_virtual_clock(
         wf_start_wall = datetime.now(tz=timezone.utc)
         # FF 1h. Virtual clock advances to +1h and time skipping auto-disables.
         assert await env.fast_forward(handle, timedelta(hours=1))
-        desc = await handle.describe()
-        tsi = desc.raw_description.workflow_extended_info.time_skipping_info
-        assert tsi.HasField("current_time"), (
-            "WorkflowExecutionExtendedInfo.time_skipping_info.current_time is not populated"
+        tsi = await env.get_time_skipping_info(handle)
+        assert tsi is not None and tsi.HasField("current_time"), (
+            "TimeSkippingInfo.current_time is not populated"
         )
         current_time = tsi.current_time.ToDatetime().replace(tzinfo=timezone.utc)
-        # Virtual clock should be ~+1h from workflow start wall clock.
         offset_seconds = (current_time - wf_start_wall).total_seconds()
         assert 3550 <= offset_seconds <= 3700, (
             f"time_skipping_info.current_time is {offset_seconds}s past "

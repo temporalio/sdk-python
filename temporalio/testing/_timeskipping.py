@@ -243,6 +243,21 @@ class TimeSkipper:
                 )
             # RESULT_POLL_TIMEOUT (server-side long-poll expiry): re-poll.
 
+    async def get_time_skipping_info(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any],
+    ) -> temporalio.api.common.v1.TimeSkippingInfo | None:
+        """Fetch a workflow's ``TimeSkippingInfo`` via ``DescribeWorkflowExecution``.
+
+        Returns ``None`` if time skipping has never been enabled on the
+        workflow.
+        """
+        desc = await handle.describe()
+        ext = desc.raw_description.workflow_extended_info
+        if not ext.HasField("time_skipping_info"):
+            return None
+        return ext.time_skipping_info
+
     async def _update_time_skipping_config(
         self,
         handle: temporalio.client.WorkflowHandle[Any, Any],

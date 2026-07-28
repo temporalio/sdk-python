@@ -15,6 +15,7 @@ from typing import (
 import google.protobuf.empty_pb2
 from typing_extensions import Self
 
+import temporalio.api.common.v1
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
@@ -549,6 +550,28 @@ class WorkflowEnvironment:
             return
         with self._ts_skipper.with_time_skipping_disabled():
             yield None
+
+    async def get_time_skipping_info(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any],
+    ) -> temporalio.api.common.v1.TimeSkippingInfo | None:
+        """Fetch a workflow's ``TimeSkippingInfo`` via ``DescribeWorkflowExecution``.
+
+        Returns ``None`` if time skipping has never been enabled on the
+        workflow.
+
+        Only supported on time-skipping v2 environments (created via
+        :py:meth:`start_time_skipping_v2`).
+
+        Raises:
+            RuntimeError: If called on a v1 or non-time-skipping environment.
+        """
+        if self._ts_skipper is None:
+            raise RuntimeError(
+                "get_time_skipping_info requires a V2 time-skipping environment; "
+                "use WorkflowEnvironment.start_time_skipping_v2()."
+            )
+        return await self._ts_skipper.get_time_skipping_info(handle)
 
 
 class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
