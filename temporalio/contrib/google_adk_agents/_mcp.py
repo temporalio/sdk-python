@@ -221,10 +221,19 @@ class TemporalMcpToolSet(BaseToolset):
     ):
         """Initializes the Temporal MCP toolset.
 
+        .. warning::
+            Do not pass secrets, credentials, or API keys through ``factory_argument``. It
+            is serialized as an activity argument, so it is recorded in workflow history,
+            which is durable, replayed on every workflow replay, and visible in the Web UI.
+            Resolve credentials worker-side inside the toolset factory instead (environment
+            variable, secret manager, etc.), passing only non-secret identifiers through
+            ``factory_argument``.
+
         Args:
             name: Name of the toolset (used for activity naming).
             config: Optional activity configuration.
-            factory_argument: Optional argument passed to toolset factory.
+            factory_argument: Optional argument passed to toolset factory. Must not
+                contain secrets; see the warning above.
             not_in_workflow_toolset: Optional factory that returns the
                 underlying ``McpToolset`` to use when this wrapper executes
                 outside ``workflow.in_workflow()``, such as local ADK runs.
