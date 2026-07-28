@@ -47,7 +47,12 @@ class _FakeTool:
     def _get_declaration(self) -> None:
         return None
 
-    async def run_async(self, *, args: dict[str, Any], tool_context: Any) -> Any:
+    async def run_async(
+        self,
+        *,
+        args: dict[str, Any],
+        tool_context: Any,  # pyright: ignore[reportUnusedParameter]
+    ) -> Any:
         if self._fail_run:
             raise RuntimeError("tool call failed")
         return {"echo": args}

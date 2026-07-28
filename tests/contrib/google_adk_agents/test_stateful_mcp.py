@@ -55,7 +55,12 @@ class _FakeTool:
     def _get_declaration(self) -> None:
         return None
 
-    async def run_async(self, *, args: dict[str, Any], tool_context: Any) -> Any:
+    async def run_async(
+        self,
+        *,
+        args: dict[str, Any],
+        tool_context: Any,  # pyright: ignore[reportUnusedParameter]
+    ) -> Any:
         return {"echo": args}
 
 
