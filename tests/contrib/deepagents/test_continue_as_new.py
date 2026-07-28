@@ -131,9 +131,13 @@ class SuggestedCanWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_can_defaults_to_server_suggestion(env: WorkflowEnvironment) -> None:
+async def test_can_defaults_to_server_suggestion(
+    env: WorkflowEnvironment, env_type: str
+) -> None:
     """With ``continue_as_new_after`` unset, the driver continues-as-new when
     the SERVER suggests it (history count/size), not on a fixed threshold."""
+    if env_type != "local":
+        pytest.skip("needs the local dev server's low suggestContinueAsNew threshold")
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,

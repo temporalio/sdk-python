@@ -310,4 +310,7 @@ def create_temporal_deep_agent(
         args = (model, *args[1:])
     else:
         kwargs["model"] = model
-    return deepagents.create_deep_agent(*args, **kwargs)
+    # Any-typed local: on interpreters where deepagents is not installed,
+    # type checkers resolve the module attribute as an uncallable object.
+    factory: Any = deepagents.create_deep_agent
+    return factory(*args, **kwargs)
