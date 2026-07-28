@@ -71,6 +71,9 @@ from tests.helpers.nexus import (
 # ---------------------------------------------------------------------------
 
 
+pytestmark = pytest.mark.requires_local_server
+
+
 @dataclass
 class EchoInput:
     value: str

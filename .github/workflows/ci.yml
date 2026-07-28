@@ -231,10 +231,9 @@ jobs:
       - run: uv sync --all-extras
       - run: poe build-develop
       - run: mkdir junit-xml
-      - run: poe test -s --junit-xml=junit-xml/cloud.xml
+      - run: poe test -s --workflow-environment envconfig --junit-xml=junit-xml/cloud.xml
         timeout-minutes: 15
         env:
-          TEMPORAL_TEST_ENV_CONFIG_SERVER: true
           TEMPORAL_ADDRESS: sdk-ci.a2dd6.tmprl.cloud:7233
           TEMPORAL_NAMESPACE: sdk-ci.a2dd6
           TEMPORAL_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}

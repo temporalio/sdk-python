@@ -202,6 +202,7 @@ class ActivityTracingOutboundInterceptor(OutboundInterceptor):
         return await super().count_activities(input)
 
 
+@pytest.mark.requires_local_server
 async def test_start_activity_calls_interceptor(
     client: Client, env: WorkflowEnvironment
 ):
@@ -461,6 +462,7 @@ async def test_get_result(client: Client, env: WorkflowEnvironment):
         assert await result_via_execute_activity == 2
 
 
+@pytest.mark.requires_local_server
 async def test_start_activity_start_delay(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(

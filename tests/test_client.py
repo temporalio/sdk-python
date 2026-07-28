@@ -657,21 +657,24 @@ async def test_list_workflows_and_fetch_history(
             )
             expected_id_and_input.append((workflow_id, f'"user{i}"'))
 
-    # List them and get their history
-    actual_id_and_input = sorted(
-        [
-            (
-                hist.workflow_id,
-                hist.events[0]
-                .workflow_execution_started_event_attributes.input.payloads[0]
-                .data.decode(),
-            )
-            async for hist in client.list_workflows(
-                f"WorkflowId = '{workflow_id}'"
-            ).map_histories()
-        ]
-    )
-    assert actual_id_and_input == expected_id_and_input
+    # Visibility is eventually consistent, so wait for all runs before fetching
+    # their histories.
+    async def list_id_and_input() -> list[tuple[str, str]]:
+        return sorted(
+            [
+                (
+                    hist.workflow_id,
+                    hist.events[0]
+                    .workflow_execution_started_event_attributes.input.payloads[0]
+                    .data.decode(),
+                )
+                async for hist in client.list_workflows(
+                    f"WorkflowId = '{workflow_id}'"
+                ).map_histories()
+            ]
+        )
+
+    await assert_eq_eventually(expected_id_and_input, list_id_and_input)
 
     # Verify listing can limit results
     limited = [
@@ -833,8 +836,6 @@ async def test_schedule_basics(
         pytest.skip("Java test server doesn't support schedules")
     elif os.getenv("TEMPORAL_TEST_PROTO3"):
         pytest.skip("Older proto library cannot compare repeated fields")
-    await assert_no_schedules(client)
-
     # Create a schedule with a lot of stuff
     schedule = Schedule(
         action=ScheduleActionStartWorkflow(
@@ -1072,10 +1073,9 @@ async def test_schedule_basics(
     assert list_descs[0].id in [f"{handle.id}-3", f"{handle.id}-4"]
     assert list_descs[1].id in [f"{handle.id}-3", f"{handle.id}-4"]
 
-    # Delete all of the schedules
-    for id in await list_ids():
+    # Delete the schedules created by this test.
+    for id in expected_ids:
         await client.get_schedule_handle(id).delete()
-    await assert_no_schedules(client)
 
 
 async def test_schedule_calendar_spec_defaults(
@@ -1083,8 +1083,6 @@ async def test_schedule_calendar_spec_defaults(
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     handle = await client.create_schedule(
         f"schedule-{uuid.uuid4()}",
         Schedule(
@@ -1113,7 +1111,6 @@ async def test_schedule_calendar_spec_defaults(
             assert time == desc.info.next_action_times[i - 1] + timedelta(days=1)
 
     await handle.delete()
-    await assert_no_schedules(client)
 
 
 async def test_schedule_trigger_immediately(
@@ -1121,8 +1118,6 @@ async def test_schedule_trigger_immediately(
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     # Create paused schedule that triggers immediately
     handle = await client.create_schedule(
         f"schedule-{uuid.uuid4()}",
@@ -1154,7 +1149,6 @@ async def test_schedule_trigger_immediately(
     )
 
     await handle.delete()
-    await assert_no_schedules(client)
 
 
 async def test_schedule_backfill(
@@ -1162,8 +1156,6 @@ async def test_schedule_backfill(
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     begin = datetime(year=2020, month=1, day=20, hour=5)
 
     # Create paused schedule that runs every minute and has two backfills
@@ -1214,7 +1206,6 @@ async def test_schedule_backfill(
         )
     finally:
         await handle.delete()
-        await assert_no_schedules(client)
 
 
 async def test_schedule_create_limited_actions_validation(
@@ -1245,8 +1236,6 @@ async def test_schedule_workflow_search_attribute_update(
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     # Put search attribute on server
     text_attr_key = SearchAttributeKey.for_text("python-test-schedule-text")
     untyped_keyword_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
@@ -1339,7 +1328,6 @@ async def test_schedule_workflow_search_attribute_update(
     assert desc.typed_search_attributes[text_attr_key] == "some-schedule-attr1"
 
     await handle.delete()
-    await assert_no_schedules(client)
 
 
 @pytest.mark.parametrize(
@@ -1356,8 +1344,6 @@ async def test_schedule_search_attribute_update(
 ):
     if env.supports_time_skipping:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     # Put search attributes on server
     key_1 = SearchAttributeKey.for_text("python-test-schedule-sa-update-key-1")
     key_2 = SearchAttributeKey.for_keyword("python-test-schedule-sa-update-key-2")
@@ -1475,15 +1461,6 @@ async def test_schedule_search_attribute_update(
         raise ValueError(f"Invalid test case: {test_case}")
 
     await handle.delete()
-    await assert_no_schedules(client)
-
-
-async def assert_no_schedules(client: Client) -> None:
-    # Listing appears eventually consistent
-    async def schedule_count() -> int:
-        return len([d async for d in await client.list_schedules()])
-
-    await assert_eq_eventually(0, schedule_count)
 
 
 async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):

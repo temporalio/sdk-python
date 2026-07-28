@@ -311,6 +311,14 @@ async def test_replayer_multiple_from_client(
             )
             await handle.result()
 
+    async def visible_run_ids() -> set[str]:
+        return {
+            workflow.run_id
+            async for workflow in client.list_workflows(f"WorkflowId = '{workflow_id}'")
+        }
+
+    await assert_eq_eventually(set(expected_runs_and_non_det), visible_run_ids)
+
     # Run replayer with list iterator mapped to histories and collect results
     async with Replayer(workflows=[SayHelloWorkflow]).workflow_replay_iterator(
         client.list_workflows(f"WorkflowId = '{workflow_id}'").map_histories()

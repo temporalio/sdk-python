@@ -399,6 +399,7 @@ class CustomSlotSupplierWorkflow:
         workflow.logger.info(f"Signal: {value}")
 
 
+@pytest.mark.requires_local_server
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work under Java test server")

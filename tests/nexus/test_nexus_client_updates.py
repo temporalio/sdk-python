@@ -3,6 +3,7 @@
 import uuid
 
 import nexusrpc
+import pytest
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 import temporalio.nexus
@@ -10,6 +11,8 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+
+pytestmark = pytest.mark.requires_local_server
 
 
 @nexusrpc.service

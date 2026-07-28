@@ -64,11 +64,7 @@ def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
 
 
 def _uses_envconfig_server(env_type: str) -> bool:
-    if env_type == "envconfig":
-        return True
-    return env_type == "local" and os.getenv(
-        "TEMPORAL_TEST_ENV_CONFIG_SERVER", ""
-    ).lower() not in ("", "0", "false", "no", "off")
+    return env_type == "envconfig"
 
 
 def pytest_configure(config: pytest.Config) -> None:

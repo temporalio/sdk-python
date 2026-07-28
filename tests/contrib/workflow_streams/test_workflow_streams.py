@@ -2699,6 +2699,7 @@ async def test_subscribe_iterates_through_more_ready(client: Client) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.requires_local_server
 async def test_cross_namespace_nexus_stream(
     client: Client, env: WorkflowEnvironment
 ) -> None:

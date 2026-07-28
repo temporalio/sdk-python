@@ -13,6 +13,8 @@ from temporalio.service import TLSConfig
 from temporalio.testing import WorkflowEnvironment
 from tests import conftest
 
+pytestmark = pytest.mark.requires_local_server
+
 # A base TOML config with a default and a custom profile
 TOML_CONFIG_BASE = textwrap.dedent(
     """
@@ -153,22 +155,17 @@ def test_load_profile_from_data_env_overrides():
 
 
 @pytest.mark.parametrize(
-    ("env_type", "flag", "expected"),
+    ("env_type", "expected"),
     [
-        ("envconfig", None, True),
-        ("local", "true", True),
-        ("local", "false", False),
-        ("time-skipping", "true", False),
+        ("envconfig", True),
+        ("local", False),
+        ("time-skipping", False),
     ],
 )
 def test_envconfig_server_selection(
-    monkeypatch: pytest.MonkeyPatch,
     env_type: str,
-    flag: str | None,
     expected: bool,
 ):
-    if flag is not None:
-        monkeypatch.setenv("TEMPORAL_TEST_ENV_CONFIG_SERVER", flag)
     assert conftest._uses_envconfig_server(env_type) is expected
 
 

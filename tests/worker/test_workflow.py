@@ -306,6 +306,7 @@ class HistoryInfoWorkflow:
         )
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_history_info(
     client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
 ):
@@ -2016,6 +2017,7 @@ class SearchAttributeWorkflow:
         )
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_search_attributes(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
@@ -2201,6 +2203,7 @@ class NoSearchAttributesWorkflow:
         # All we need to do is complete
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_no_initial_search_attributes(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
@@ -5861,6 +5864,7 @@ class TickingWorkflow:
             await asyncio.sleep(0.1)
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Only testing against two real servers")
@@ -9050,6 +9054,7 @@ class SearchAttributeCodecChildWorkflow:
         return f"Hello from child, {name}"
 
 
+@pytest.mark.requires_local_server
 async def test_search_attribute_codec(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")

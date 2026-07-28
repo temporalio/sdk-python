@@ -90,6 +90,9 @@ class OpDefinitionType(IntEnum):
     LONGHAND = 1
 
 
+pytestmark = pytest.mark.requires_local_server
+
+
 @dataclass
 class SyncResponse:
     op_definition_type: OpDefinitionType

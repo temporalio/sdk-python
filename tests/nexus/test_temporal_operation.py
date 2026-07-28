@@ -20,6 +20,8 @@ from temporalio.worker import Worker
 from tests.helpers import EventType, assert_event_subsequence, assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
+pytestmark = pytest.mark.requires_local_server
+
 
 @dataclass
 class Input:
