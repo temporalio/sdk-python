@@ -96,3 +96,68 @@ def test_state_snapshot_roundtrip() -> None:
     _serde.set_result_cache(dict(snapshot))
     hit, value = _serde.cache_lookup(key)
     assert hit and value == {"dumped": "message"}
+
+
+class SlowFakeAgent:
+    """Like ``FakeAgent`` but each turn burns timers so a single run's history
+    grows past the dev server's continue-as-new suggestion threshold (the test
+    env pins ``limit.historyCount.suggestContinueAsNew`` low)."""
+
+    async def ainvoke(self, input: Any) -> dict:
+        for _ in range(20):
+            await workflow.sleep(0.001)
+        messages = list(input.get("messages", [])) if isinstance(input, dict) else []
+        messages = [*messages, "step"]
+        done = len(messages) >= 3
+        return {
+            "messages": messages,
+            "todos": [
+                {"content": "work", "status": "completed" if done else "pending"}
+            ],
+        }
+
+
+@workflow.defn
+class SuggestedCanWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> dict:
+        # No continue_as_new_after: the default follows the server's own
+        # is_continue_as_new_suggested() signal.
+        return await run_deep_agent(
+            SlowFakeAgent(),
+            input,
+            state_snapshot=state_snapshot,
+        )
+
+
+@pytest.mark.asyncio
+async def test_can_defaults_to_server_suggestion(env: WorkflowEnvironment) -> None:
+    """With ``continue_as_new_after`` unset, the driver continues-as-new when
+    the SERVER suggests it (history count/size), not on a fixed threshold."""
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-can-suggested",
+        workflows=[SuggestedCanWorkflow],
+        plugins=[plugin],
+    ):
+        handle = await env.client.start_workflow(
+            SuggestedCanWorkflow.run,
+            {"messages": ["start"]},
+            id=f"da-can-suggested-{uuid.uuid4()}",
+            task_queue="da-can-suggested",
+        )
+        result = await handle.result()
+
+    # Carry across the suggested continue-as-new: the conversation only reaches
+    # 3 messages if snapshots crossed run boundaries.
+    assert len(result["messages"]) >= 3, result
+    assert result["todos"][0]["status"] == "completed"
+    # The first run really did continue-as-new (not complete).
+    first = env.client.get_workflow_handle(
+        handle.id, run_id=handle.first_execution_run_id
+    )
+    desc = await first.describe()
+    assert desc.status is not None and desc.status.name == "CONTINUED_AS_NEW", (
+        desc.status
+    )

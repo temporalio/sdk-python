@@ -183,13 +183,19 @@ async def run_deep_agent(
     continue_as_new_after: int | None = None,
     state_snapshot: Mapping[str, Any] | None = None,
 ) -> Any:
-    """Drive ``agent.ainvoke(input)`` with optional continue-as-new state carry.
+    """Drive ``agent.ainvoke(input)`` with continue-as-new state carry.
 
-    Without ``continue_as_new_after`` this is a thin wrapper over
-    ``agent.ainvoke``. With it, once the workflow history passes the threshold the
-    completed turn's state (messages + the model/tool result cache) is snapshotted
-    and carried into a fresh run via ``workflow.continue_as_new``, so long
-    conversations do not accumulate unbounded history.
+    Once the completed turn leaves pending todos AND history has grown past the
+    limit, the turn's state (messages + the model/tool result cache) is
+    snapshotted and carried into a fresh run via ``workflow.continue_as_new``,
+    so long conversations do not accumulate unbounded history.
+
+    By default (``continue_as_new_after=None``) the limit is the server's own
+    recommendation — ``workflow.info().is_continue_as_new_suggested()`` — which
+    accounts for both history length and size; this is the recommended mode.
+    Pass an explicit ``continue_as_new_after=N`` to trigger on a fixed history
+    event count instead. To run an agent with NO continue-as-new behavior, call
+    ``agent.ainvoke(...)`` directly rather than using this driver.
 
     The enclosing ``@workflow.run`` method must accept the continued call — i.e.
     its signature is ``(input, state_snapshot=None)`` — because that is how the
@@ -214,11 +220,15 @@ async def run_deep_agent(
             raise DeepAgentsWorkflowError(f"Deep Agents run failed: {exc}") from cause
         raise
 
-    if (
-        continue_as_new_after is not None
-        and workflow.info().get_current_history_length() >= continue_as_new_after
-        and _has_pending_work(result)
-    ):
+    if continue_as_new_after is None:
+        # Default: follow the server's judgement. The suggestion accounts for
+        # history count AND size limits, which a fixed event threshold cannot.
+        should_continue = workflow.info().is_continue_as_new_suggested()
+    else:
+        should_continue = (
+            workflow.info().get_current_history_length() >= continue_as_new_after
+        )
+    if should_continue and _has_pending_work(result):
         snapshot = {
             "messages": _extract_messages(result),
             _CACHE_KEY: _serde.result_cache_snapshot() or {},
@@ -251,3 +261,53 @@ def _has_pending_work(result: Any) -> bool:
             for t in todos
         )
     return False
+
+
+def create_temporal_deep_agent(
+    *args: Any,
+    activity_options: Mapping[str, Any] | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Build a Deep Agent whose model calls run as durable activities.
+
+    A thin wrapper over ``deepagents.create_deep_agent`` that makes the
+    Temporal wiring explicit: a ``model=`` name string is wrapped in
+    :class:`~temporalio.contrib.deepagents.TemporalModel` carrying this
+    agent's ``activity_options`` (``execute_activity`` overrides — timeouts,
+    retry policy — for its model calls). Every other argument — tools,
+    backend, sub-agents, ``interrupt_on`` — is forwarded unchanged.
+
+    Unmodified ``create_deep_agent(...)`` also works inside a workflow (the
+    plugin substitutes the durable model automatically, using the plugin's
+    ``model_activity_options``); use this wrapper to scope activity options
+    to one agent instead of configuring them plugin-wide.
+    """
+    with workflow.unsafe.imports_passed_through():
+        from deepagents import create_deep_agent
+
+    from temporalio.contrib.deepagents._model import TemporalModel
+
+    model = args[0] if args else kwargs.pop("model", None)
+    if isinstance(model, str):
+        model = TemporalModel(
+            model=model,
+            activity_options=(
+                dict(activity_options) if activity_options is not None else None
+            ),
+        )
+    elif activity_options is not None:
+        if isinstance(model, TemporalModel):
+            model = TemporalModel(
+                model=model.model, activity_options=dict(activity_options)
+            )
+        else:
+            raise ValueError(
+                "activity_options requires model= to be a model-name string "
+                "or a TemporalModel; got "
+                f"{type(model).__name__ if model is not None else 'no model'}."
+            )
+    if args:
+        args = (model, *args[1:])
+    else:
+        kwargs["model"] = model
+    return create_deep_agent(*args, **kwargs)

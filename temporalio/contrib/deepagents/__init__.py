@@ -25,6 +25,7 @@ __all__ = [
     "activity_as_tool",
     "tool_as_activity",
     "run_deep_agent",
+    "create_temporal_deep_agent",
     "DeepAgentsWorkflowError",
 ]
 
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     )
     from temporalio.contrib.deepagents.workflow import (
         DeepAgentsWorkflowError,
+        create_temporal_deep_agent,
         run_deep_agent,
     )
 
@@ -55,7 +57,11 @@ def __getattr__(name: str) -> object:
         from temporalio.contrib.deepagents import _tools
 
         return getattr(_tools, name)
-    if name in ("DeepAgentsWorkflowError", "run_deep_agent"):
+    if name in (
+        "DeepAgentsWorkflowError",
+        "run_deep_agent",
+        "create_temporal_deep_agent",
+    ):
         from temporalio.contrib.deepagents import workflow
 
         return getattr(workflow, name)
