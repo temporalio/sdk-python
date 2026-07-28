@@ -283,6 +283,7 @@ async def test_replayer_workflow_not_registered(client: Client) -> None:
     assert "SayHelloWorkflow is not registered" in str(err.value)
 
 
+@pytest.mark.requires_local_server
 async def test_replayer_multiple_from_client(
     client: Client, env: WorkflowEnvironment
 ) -> None:
