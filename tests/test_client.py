@@ -829,6 +829,7 @@ def test_history_from_json():
     )
 
 
+@pytest.mark.requires_local_server
 async def test_schedule_basics(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
@@ -1231,6 +1232,7 @@ async def test_schedule_create_limited_actions_validation(
     assert "are remaining actions set" in str(err.value)
 
 
+@pytest.mark.requires_local_server
 async def test_schedule_workflow_search_attribute_update(
     client: Client, env: WorkflowEnvironment
 ):
@@ -1339,6 +1341,7 @@ async def test_schedule_workflow_search_attribute_update(
         "partial-new-values-overwrites-and-drops",
     ],
 )
+@pytest.mark.requires_local_server
 async def test_schedule_search_attribute_update(
     client: Client, env: WorkflowEnvironment, test_case: str
 ):
@@ -1556,12 +1559,14 @@ async def test_schedule_last_completion_result(
                 result = await workflow_handle.result()
                 return length, result
 
-        assert await get_schedule_result() == (1, "My First Result")
+        expected_first_result: tuple[int, str | None] = (1, "My First Result")
+        await assert_eq_eventually(expected_first_result, get_schedule_result)
         await handle.trigger()
-        assert await get_schedule_result() == (
+        expected_second_result: tuple[int, str | None] = (
             2,
             "From last completion: My First Result",
         )
+        await assert_eq_eventually(expected_second_result, get_schedule_result)
 
         await handle.delete()
 

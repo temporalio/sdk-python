@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+import temporalio.runtime
 import temporalio.service
 from temporalio.client import Client
 from temporalio.envconfig import ClientConfig, ClientConfigProfile, ClientConfigTLS
@@ -200,6 +201,7 @@ async def test_envconfig_workflow_environment_uses_client_connect_config(
 async def test_workflow_environment_connect_client_inherits_connection_options(
     monkeypatch: pytest.MonkeyPatch,
 ):
+    runtime = temporalio.runtime.Runtime.default()
     source_client = SimpleNamespace(
         namespace="env-namespace",
         service_client=SimpleNamespace(
@@ -208,6 +210,7 @@ async def test_workflow_environment_connect_client_inherits_connection_options(
                 api_key="env-api-key",
                 tls=False,
                 rpc_metadata={"test-header": "env-value"},
+                runtime=runtime,
             )
         ),
     )
@@ -223,6 +226,7 @@ async def test_workflow_environment_connect_client_inherits_connection_options(
         api_key="env-api-key",
         tls=False,
         rpc_metadata={"test-header": "env-value"},
+        runtime=runtime,
         lazy=True,
     )
 

@@ -387,6 +387,7 @@ class WorkflowEnvironment:
             "api_key": config.api_key,
             "tls": config.tls,
             "rpc_metadata": config.rpc_metadata,
+            "runtime": config.runtime or temporalio.runtime.Runtime.default(),
         }
         connect_kwargs.update(kwargs)
         return await temporalio.client.Client.connect(

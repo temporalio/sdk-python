@@ -1476,7 +1476,6 @@ async def test_activity_client_updates_when_worker_client_changes(
     # Must use the same runtime
     client2 = await env.connect_client(
         data_converter=client.data_converter,
-        runtime=client.service_client.config.runtime,
     )
 
     captured_clients: list[Client] = []
