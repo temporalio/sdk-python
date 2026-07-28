@@ -283,7 +283,7 @@ def create_temporal_deep_agent(
     to one agent instead of configuring them plugin-wide.
     """
     with workflow.unsafe.imports_passed_through():
-        from deepagents import create_deep_agent
+        import deepagents
 
     from temporalio.contrib.deepagents._model import TemporalModel
 
@@ -310,4 +310,4 @@ def create_temporal_deep_agent(
         args = (model, *args[1:])
     else:
         kwargs["model"] = model
-    return create_deep_agent(*args, **kwargs)
+    return deepagents.create_deep_agent(*args, **kwargs)
