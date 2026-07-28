@@ -4613,7 +4613,7 @@ class CustomMetricsWorkflow:
         )
 
 
-async def test_workflow_custom_metrics(client: Client):
+async def test_workflow_custom_metrics(client: Client, env: WorkflowEnvironment):
     # Run worker with default runtime which is noop meter just to confirm it
     # doesn't fail
     async with new_worker(
@@ -4639,9 +4639,7 @@ async def test_workflow_custom_metrics(client: Client):
     assert str(err.value).startswith("Invalid value type for key")
 
     # New client with the runtime
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
 
@@ -4718,7 +4716,7 @@ async def test_workflow_custom_metrics(client: Client):
         )
 
 
-async def test_workflow_buffered_metrics(client: Client):
+async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironment):
     # Create runtime with metric buffer
     buffer = MetricBuffer(10000)
     runtime = Runtime(
@@ -4779,9 +4777,7 @@ async def test_workflow_buffered_metrics(client: Client):
     assert runtime_updates2[1].value == 400
 
     # Create a new client on the runtime and execute the custom metric workflow
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
     async with new_worker(
@@ -4842,12 +4838,10 @@ async def test_workflow_buffered_metrics(client: Client):
     )
 
 
-async def test_workflow_metrics_other_types(client: Client):
+async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
     async def do_stuff(buffer: MetricBuffer) -> None:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
-        new_client = await Client.connect(
-            client.service_client.config.target_host,
-            namespace=client.namespace,
+        new_client = await env.connect_client(
             runtime=runtime,
         )
         async with new_worker(new_client, HelloWorkflow) as worker:
@@ -5922,11 +5916,11 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             await handle2.terminate()
 
 
-async def test_workflow_replace_worker_client_diff_runtimes_fail(client: Client):
+async def test_workflow_replace_worker_client_diff_runtimes_fail(
+    client: Client, env: WorkflowEnvironment
+):
     other_runtime = Runtime(telemetry=TelemetryConfig())
-    other_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    other_client = await env.connect_client(
         runtime=other_runtime,
     )
     async with new_worker(client, HelloWorkflow) as worker:

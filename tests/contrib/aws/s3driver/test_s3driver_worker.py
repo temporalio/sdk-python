@@ -62,9 +62,7 @@ async def tmprl_client(
 ) -> AsyncIterator[Client]:
     """Temporal client wired with ExternalStorage backed by the moto S3 server."""
     driver = S3StorageDriver(client=new_aioboto3_client(aioboto3_client), bucket=BUCKET)
-    yield await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    yield await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -469,9 +467,7 @@ async def test_s3_store_failure_surfaces_in_workflow_history(
         aws_secret_access_key="testing",
     ) as client:
         driver = S3StorageDriver(client=new_aioboto3_client(client), bucket=bad_bucket)
-        bad_client = await Client.connect(
-            env.client.service_client.config.target_host,
-            namespace=env.client.namespace,
+        bad_client = await env.connect_client(
             data_converter=dataclasses.replace(
                 temporalio.converter.default(),
                 external_storage=ExternalStorage(

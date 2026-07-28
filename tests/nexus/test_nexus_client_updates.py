@@ -48,9 +48,7 @@ async def test_nexus_client_updates_when_worker_client_changes(
     """Test that Nexus operations get the updated client when worker.client is changed."""
     # Create a second client (simulating a new client after cert rotation)
     # Must use the same runtime
-    client2 = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client2 = await env.connect_client(
         data_converter=env.client.data_converter,
         runtime=env.client.service_client.config.runtime,
     )

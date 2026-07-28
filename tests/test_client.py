@@ -556,7 +556,7 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
     assert interceptor.traces[4][1].id == handle.id
 
 
-async def test_lazy_client(client: Client, env: WorkflowEnvironment):
+async def test_lazy_client(env: WorkflowEnvironment):
     # TODO(cretz): Fix
     if env.supports_time_skipping:
         pytest.skip(
@@ -564,23 +564,17 @@ async def test_lazy_client(client: Client, env: WorkflowEnvironment):
         )
     # Create another client that is lazy. This test just makes sure the
     # functionality continues to work.
-    lazy_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
-        lazy=True,
-    )
+    lazy_client = await env.connect_client(lazy=True)
     assert not lazy_client.service_client.worker_service_client._bridge_client
     await lazy_client.workflow_service.get_system_info(GetSystemInfoRequest())
     assert lazy_client.service_client.worker_service_client._bridge_client
 
 
-async def test_client_connected_skips_connect_lock(client: Client):
+async def test_client_connected_skips_connect_lock(env: WorkflowEnvironment):
     # Once connected, RPCs must not touch the lazy-connect lock. Acquiring it
     # per-RPC put an event-loop-bound primitive on the hot path, pinning a
     # connected client to the loop it connected on.
-    other = await Client.connect(
-        client.service_client.config.target_host, namespace=client.namespace
-    )
+    other = await env.connect_client()
     svc = other.service_client.worker_service_client
     assert svc._bridge_client
 
@@ -599,18 +593,13 @@ async def test_client_connected_skips_connect_lock(client: Client):
     assert counting.acquire_count == 0
 
 
-def test_client_reuse_across_event_loops(client: Client):
+def test_client_reuse_across_event_loops(env: WorkflowEnvironment):
     # A connected client must not be pinned to the loop (or thread) it
     # connected on. This mirrors the long-lived-loop reuse pattern used by
     # gevent/gunicorn and synchronous services.
-    target_host = client.service_client.config.target_host
-    namespace = client.namespace
-
     connect_loop = asyncio.new_event_loop()
     try:
-        reused_client = connect_loop.run_until_complete(
-            Client.connect(target_host, namespace=namespace)
-        )
+        reused_client = connect_loop.run_until_complete(env.connect_client())
     finally:
         connect_loop.close()
 

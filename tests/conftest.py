@@ -10,6 +10,7 @@ import pytest_asyncio
 from opentelemetry.util._once import Once
 
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfigProfile
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import SharedStateManager
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
@@ -58,8 +59,45 @@ def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
         "-E",
         "--workflow-environment",
         default="local",
-        help="Which workflow environment to use ('local', 'time-skipping', or ip:port for existing server)",
+        help="Which workflow environment to use ('local', 'time-skipping', 'envconfig', or ip:port for existing server)",
     )
+
+
+def _uses_envconfig_server(env_type: str) -> bool:
+    if env_type == "envconfig":
+        return True
+    return env_type == "local" and os.getenv(
+        "TEMPORAL_TEST_ENV_CONFIG_SERVER", ""
+    ).lower() not in ("", "0", "false", "no", "off")
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "requires_local_server: test requires local-server-only behavior and cannot run against an envconfig server",
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    if not _uses_envconfig_server(config.getoption("--workflow-environment")):
+        return
+    skip_local_only = pytest.mark.skip(
+        reason="requires a local Temporal server, not the configured envconfig server"
+    )
+    for item in items:
+        if item.get_closest_marker("requires_local_server"):
+            item.add_marker(skip_local_only)
+
+
+async def _create_env_from_envconfig() -> WorkflowEnvironment:
+    config = ClientConfigProfile.load().to_client_connect_config()
+    if not config.get("target_host"):
+        raise ValueError(
+            "An envconfig workflow environment requires TEMPORAL_ADDRESS or an envconfig profile with an address"
+        )
+    return WorkflowEnvironment.from_client(await Client.connect(**config))
 
 
 @pytest.fixture(scope="session")
@@ -100,7 +138,9 @@ def env_type(request: pytest.FixtureRequest) -> str:
 
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
-    if env_type == "local":
+    if _uses_envconfig_server(env_type):
+        env = await _create_env_from_envconfig()
+    elif env_type == "local":
         env = await WorkflowEnvironment.start_local(
             dev_server_extra_args=[
                 "--dynamic-config-value",

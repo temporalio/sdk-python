@@ -1,12 +1,17 @@
 import os
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
+import temporalio.service
 from temporalio.client import Client
 from temporalio.envconfig import ClientConfig, ClientConfigProfile, ClientConfigTLS
 from temporalio.service import TLSConfig
+from temporalio.testing import WorkflowEnvironment
+from tests import conftest
 
 # A base TOML config with a default and a custom profile
 TOML_CONFIG_BASE = textwrap.dedent(
@@ -145,6 +150,84 @@ def test_load_profile_from_data_env_overrides():
 
     config = profile.to_client_connect_config()
     assert config.get("target_host") == "env-address"
+
+
+@pytest.mark.parametrize(
+    ("env_type", "flag", "expected"),
+    [
+        ("envconfig", None, True),
+        ("local", "true", True),
+        ("local", "false", False),
+        ("time-skipping", "true", False),
+    ],
+)
+def test_envconfig_server_selection(
+    monkeypatch: pytest.MonkeyPatch,
+    env_type: str,
+    flag: str | None,
+    expected: bool,
+):
+    if flag is not None:
+        monkeypatch.setenv("TEMPORAL_TEST_ENV_CONFIG_SERVER", flag)
+    assert conftest._uses_envconfig_server(env_type) is expected
+
+
+async def test_envconfig_workflow_environment_uses_client_connect_config(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("TEMPORAL_ADDRESS", "env-address")
+    monkeypatch.setenv("TEMPORAL_NAMESPACE", "env-namespace")
+    monkeypatch.setenv("TEMPORAL_API_KEY", "env-api-key")
+    monkeypatch.setenv("TEMPORAL_TLS", "false")
+    monkeypatch.setenv("TEMPORAL_GRPC_META_TEST_HEADER", "env-value")
+    client = object()
+    environment = object()
+    connect = AsyncMock(return_value=client)
+    monkeypatch.setattr(Client, "connect", connect)
+    monkeypatch.setattr(
+        WorkflowEnvironment,
+        "from_client",
+        lambda actual_client: environment,
+    )
+
+    assert await conftest._create_env_from_envconfig() is environment
+    connect.assert_awaited_once_with(
+        target_host="env-address",
+        namespace="env-namespace",
+        api_key="env-api-key",
+        tls=False,
+        rpc_metadata={"test-header": "env-value"},
+    )
+
+
+async def test_workflow_environment_connect_client_inherits_connection_options(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source_client = SimpleNamespace(
+        namespace="env-namespace",
+        service_client=SimpleNamespace(
+            config=temporalio.service.ConnectConfig(
+                target_host="env-address",
+                api_key="env-api-key",
+                tls=False,
+                rpc_metadata={"test-header": "env-value"},
+            )
+        ),
+    )
+    environment = WorkflowEnvironment(source_client)  # type: ignore[arg-type]
+    connect = AsyncMock(return_value=object())
+    monkeypatch.setattr(Client, "connect", connect)
+
+    await environment.connect_client(lazy=True)
+
+    connect.assert_awaited_once_with(
+        "env-address",
+        namespace="env-namespace",
+        api_key="env-api-key",
+        tls=False,
+        rpc_metadata={"test-header": "env-value"},
+        lazy=True,
+    )
 
 
 def test_load_profile_env_overrides(base_config_file: Path):

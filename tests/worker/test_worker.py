@@ -1206,7 +1206,9 @@ async def test_workflows_can_use_versioning_override(
         )
 
 
-async def test_can_run_autoscaling_polling_worker(client: Client):
+async def test_can_run_autoscaling_polling_worker(
+    client: Client, env: WorkflowEnvironment
+):
     # Create new runtime with Prom server
     prom_addr = f"127.0.0.1:{find_free_port()}"
     runtime = Runtime(
@@ -1214,9 +1216,7 @@ async def test_can_run_autoscaling_polling_worker(client: Client):
             metrics=PrometheusConfig(bind_address=prom_addr),
         )
     )
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
 
@@ -1467,13 +1467,13 @@ class TestForkUseWorker(_TestFork):
         self.run(mp_fork_ctx)
 
 
-async def test_activity_client_updates_when_worker_client_changes(client: Client):
+async def test_activity_client_updates_when_worker_client_changes(
+    client: Client, env: WorkflowEnvironment
+):
     """Test that activities get the updated client when worker.client is changed."""
     # Create a second client (simulating a new client after cert rotation)
     # Must use the same runtime
-    client2 = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client2 = await env.connect_client(
         data_converter=client.data_converter,
         runtime=client.service_client.config.runtime,
     )

@@ -181,9 +181,7 @@ async def test_extstore_activity_input_no_retrieve(
     WorkflowFailureError wrapping an ActivityError."""
     driver = BadTestDriver(no_retrieve=True)
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -225,9 +223,7 @@ async def test_extstore_activity_result_no_store(
     terminates with a WorkflowFailureError wrapping an ActivityError."""
     driver = BadTestDriver(no_store=True)
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -274,9 +270,7 @@ async def test_extstore_worker_missing_driver(
     """
     driver = InMemoryTestDriver()
 
-    far_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    far_client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -286,10 +280,7 @@ async def test_extstore_worker_missing_driver(
         ),
     )
 
-    worker_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
-    )
+    worker_client = await env.connect_client()
 
     async with new_worker(
         worker_client, ExtStoreWorkflow, activities=[ext_store_activity]
@@ -315,9 +306,7 @@ async def test_extstore_payload_not_found_fails_workflow(
     """When a non-retryable ApplicationError is raised while retrieving workflow input,
     the workflow must fail terminally (not retry as a task failure).
     """
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -363,9 +352,7 @@ async def _run_extstore_workflow_and_fetch_history(
     activity_output_size: int = 10,
 ) -> WorkflowHandle:
     """Helper: run ExtStoreWorkflow with the given driver and return its history handle."""
-    extstore_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    extstore_client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -515,9 +502,7 @@ async def test_extstore_chained_activities(
     """
     driver = InMemoryTestDriver()
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -567,9 +552,7 @@ async def test_worker_storage_drivers_populated_from_client(
     driver2 = InMemoryTestDriver(driver_name="driver2")
     driver3 = DifferentTestDriver(driver_name="driver3")
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -685,9 +668,7 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
             payload_size_threshold=512,
         ),
     )
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=data_converter,
     )
 
@@ -737,9 +718,7 @@ async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
             payload_size_threshold=512,
         ),
     )
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=data_converter,
     )
 
@@ -791,9 +770,7 @@ async def test_tmprl1104_with_extstore_download_and_upload(
             payload_size_threshold=512,
         ),
     )
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=data_converter,
     )
 
@@ -914,9 +891,7 @@ async def _make_tracking_client(
     env: WorkflowEnvironment,
 ) -> tuple[Client, ContextTrackingStorageDriver]:
     driver = ContextTrackingStorageDriver()
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(

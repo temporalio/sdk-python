@@ -2722,8 +2722,7 @@ async def test_cross_namespace_nexus_stream(
         )
     )
 
-    handler_client = await Client.connect(
-        client.service_client.config.target_host,
+    handler_client = await env.connect_client(
         namespace=handler_ns,
     )
 
