@@ -110,7 +110,7 @@ class WorkflowEnvironment:
         workflow started via :py:attr:`client`, and exposes
         :py:meth:`fast_forward` for driving time skipping on running workflows.
         In contrast to :py:meth:`start_time_skipping`
-        (time-skipping v1, server-wide clock), each workflow has its own virtual clock.
+        (time-skipping V1, server-wide clock), each workflow has its own virtual clock.
 
         Internally, this uses the Temporal CLI dev server from
         https://github.com/temporalio/cli. This is a self-contained binary for
@@ -165,7 +165,7 @@ class WorkflowEnvironment:
             ts_config: Per-workflow time-skipping config stamped on every
                 workflow started via :py:attr:`client`. Off by default (no
                 time skipping). If set, the returned environment supports
-                :py:meth:`fast_forward` and related time-skipping v2 methods.
+                :py:meth:`fast_forward` and related time-skipping V2 methods.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -235,7 +235,7 @@ class WorkflowEnvironment:
                 ),
                 server,
             )
-            # Wrap the client, if time-skipping v2 is being used.
+            # Wrap the client, if time-skipping V2 is being used.
             if ts_config is not None:
                 env._ts_skipper = TimeSkipper(env._client, config=ts_config)
                 env._client = env._ts_skipper.client
@@ -444,7 +444,7 @@ class WorkflowEnvironment:
 
     @property
     def supports_time_skipping(self) -> bool:
-        """Whether this environment supports either v1 or v2 time skipping."""
+        """Whether this environment supports either V1 or V2 time skipping."""
         return self.supports_time_skipping_v1 or self.supports_time_skipping_v2
 
     async def create_nexus_endpoint(
@@ -513,7 +513,7 @@ class WorkflowEnvironment:
     ) -> bool:
         """Fast-forward this workflow's virtual clock by ``duration``, and wait for it to complete.
 
-        Only supported on time-skipping v2 environments (created via
+        Only supported on time-skipping V2 environments (created via
         :py:meth:`start_time_skipping_v2`).
 
         Args:
@@ -527,7 +527,7 @@ class WorkflowEnvironment:
             workflow terminates first.
 
         Raises:
-            RuntimeError: If called on a v1 or non-time-skipping environment.
+            RuntimeError: If called on a V1 or non-time-skipping environment.
         """
         if self._ts_skipper is None:
             raise RuntimeError(
@@ -542,7 +542,7 @@ class WorkflowEnvironment:
 
         Workflows started via :py:attr:`client` during the block do not
         receive a ``time_skipping_config`` on their start request. Existing
-        workflows and v1 auto-behavior are unaffected. No-op on non-v2
+        workflows and V1 auto-behavior are unaffected. No-op on non-V2
         environments.
         """
         if self._ts_skipper is None:
@@ -560,11 +560,11 @@ class WorkflowEnvironment:
         Returns ``None`` if time skipping has never been enabled on the
         workflow.
 
-        Only supported on time-skipping v2 environments (created via
+        Only supported on time-skipping V2 environments (created via
         :py:meth:`start_time_skipping_v2`).
 
         Raises:
-            RuntimeError: If called on a v1 or non-time-skipping environment.
+            RuntimeError: If called on a V1 or non-time-skipping environment.
         """
         if self._ts_skipper is None:
             raise RuntimeError(
@@ -598,19 +598,19 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def sleep(self, duration: timedelta | float) -> None:
         """Sleep in this environment.
 
-        Uses ``asyncio.sleep`` on non-time-skipping envs or the v1 test server's
-        virtual sleep on v1 envs. Unsupported on v2 envs — use
+        Uses ``asyncio.sleep`` on non-time-skipping envs or the V1 test server's
+        virtual sleep on V1 envs. Unsupported on V2 envs — use
         :py:meth:`fast_forward` on a specific workflow handle instead.
 
         Args:
             duration: Amount of time to sleep.
 
         Raises:
-            RuntimeError: If called on a time-skipping v2 environment.
+            RuntimeError: If called on a time-skipping V2 environment.
         """
         if self._ts_skipper is not None:
             raise RuntimeError(
-                "env.sleep is not supported in time-skipping v2 environments; use "
+                "env.sleep is not supported in time-skipping V2 environments; use "
                 "env.fast_forward(handle, duration) on a specific workflow."
             )
         # Use regular sleep if no time skipping
@@ -628,23 +628,23 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     ) -> datetime:
         """Current time known to this environment.
 
-        System time on non-time-skipping envs; the v1 test server's virtual
-        clock on v1 envs. On v2 envs a ``handle`` is required — each
+        System time on non-time-skipping envs; the V1 test server's virtual
+        clock on V1 envs. On V2 envs a ``handle`` is required — each
         workflow has its own virtual clock, read via
         ``TimeSkippingInfo.current_time``.
 
         Args:
-            handle: On v2 envs, the workflow whose virtual clock to read.
-                Ignored on non-v2 envs.
+            handle: On V2 envs, the workflow whose virtual clock to read.
+                Ignored on non-V2 envs.
 
         Raises:
-            RuntimeError: If called on a v2 env without a ``handle``.
+            RuntimeError: If called on a V2 env without a ``handle``.
         """
         if self._ts_skipper is not None:
             if handle is None:
                 raise RuntimeError(
                     "env.get_current_time requires a workflow handle in "
-                    "time-skipping v2 environments; each workflow has its "
+                    "time-skipping V2 environments; each workflow has its "
                     "own virtual clock."
                 )
             return await self._ts_skipper.get_current_time(handle)
@@ -666,19 +666,19 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
 
     @contextmanager
     def auto_time_skipping_disabled(self) -> Iterator[None]:
-        """Disable v1's SDK-driven auto-unlock-on-result-await for the block.
+        """Disable V1's SDK-driven auto-unlock-on-result-await for the block.
 
-        Only meaningful on time-skipping v1 envs. Unsupported on v2 envs —
+        Only meaningful on time-skipping V1 envs. Unsupported on V2 envs —
         use :py:meth:`with_time_skipping_disabled` to suspend time-skipping config
         stamping on newly-started workflows instead.
 
         Raises:
-            RuntimeError: If called on a time-skipping v2 environment.
+            RuntimeError: If called on a time-skipping V2 environment.
         """
         if self._ts_skipper is not None:
             raise RuntimeError(
                 "env.auto_time_skipping_disabled is not supported in "
-                "time-skipping v2 environments; use "
+                "time-skipping V2 environments; use "
                 "env.with_time_skipping_disabled() to suspend time-skipping config "
                 "stamping on newly-started workflows."
             )

@@ -335,7 +335,7 @@ async def test_ui_port():
 
 
 async def test_get_time_skipping_info_raises_on_non_ts_env(client: Client):
-    """``get_time_skipping_info`` on a non-v2 environment raises ``RuntimeError``.
+    """``get_time_skipping_info`` on a non-V2 environment raises ``RuntimeError``.
     The check fails env-side before any RPC, so no workflow needs to exist."""
     async with WorkflowEnvironment.from_client(client) as env:
         handle = client.get_workflow_handle(f"wf-{uuid.uuid4()}")

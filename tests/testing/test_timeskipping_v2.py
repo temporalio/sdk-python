@@ -1,4 +1,4 @@
-"""Tests for per-workflow time skipping via the v2 test env."""
+"""Tests for per-workflow time skipping via the V2 test env."""
 
 import asyncio
 import uuid
@@ -26,7 +26,7 @@ from tests.testing.test_workflow import SleepWorkflow
 
 @pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
 async def env() -> AsyncGenerator[WorkflowEnvironment, None]:
-    """Spawn a module-scoped time-skipping v2 dev server for the tests in this file."""
+    """Spawn a module-scoped time-skipping V2 dev server for the tests in this file."""
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
@@ -316,7 +316,7 @@ async def test_child_workflow_with_propagation_disabled() -> None:
 
 async def test_timeskipper_wrapping_local_env_client() -> None:
     """Test timeskipping through direct use of a TimeSkipper, instead of
-    indirectly through the time skipping v2 test env.
+    indirectly through the time skipping V2 test env.
     """
 
     async with await WorkflowEnvironment.start_local(
