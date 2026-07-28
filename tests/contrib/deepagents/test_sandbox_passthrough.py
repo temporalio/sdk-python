@@ -27,7 +27,7 @@ pytestmark = pytest.mark.skipif(
 pytest.importorskip("deepagents")
 pytest.importorskip("langchain_core")
 
-import deepagents  # noqa: F401  # pyright: ignore[reportUnusedImport]
+import deepagents  # noqa: F401  # pyright: ignore[reportUnusedImport, reportImplicitRelativeImport]
 
 from temporalio import workflow
 from temporalio.contrib.deepagents import (

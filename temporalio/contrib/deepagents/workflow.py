@@ -13,6 +13,7 @@ still works without it.
 
 from __future__ import annotations
 
+import importlib
 import warnings
 from collections.abc import Mapping
 from typing import Any
@@ -272,7 +273,7 @@ def create_temporal_deep_agent(
 
     A thin wrapper over ``deepagents.create_deep_agent`` that makes the
     Temporal wiring explicit: a ``model=`` name string is wrapped in
-    :class:`~temporalio.contrib.deepagents.TemporalModel` carrying this
+    ``TemporalModel`` carrying this
     agent's ``activity_options`` (``execute_activity`` overrides — timeouts,
     retry policy — for its model calls). Every other argument — tools,
     backend, sub-agents, ``interrupt_on`` — is forwarded unchanged.
@@ -283,7 +284,10 @@ def create_temporal_deep_agent(
     to one agent instead of configuring them plugin-wide.
     """
     with workflow.unsafe.imports_passed_through():
-        import deepagents
+        # importlib keeps this resolution absolute: a static
+        # `import deepagents` from inside this same-named package directory
+        # is flagged (and on 3.10, mis-resolved) as implicitly relative.
+        deepagents_mod: Any = importlib.import_module("deepagents")
 
     from temporalio.contrib.deepagents._model import TemporalModel
 
@@ -310,7 +314,4 @@ def create_temporal_deep_agent(
         args = (model, *args[1:])
     else:
         kwargs["model"] = model
-    # Any-typed local: on interpreters where deepagents is not installed,
-    # type checkers resolve the module attribute as an uncallable object.
-    factory: Any = deepagents.create_deep_agent
-    return factory(*args, **kwargs)
+    return deepagents_mod.create_deep_agent(*args, **kwargs)
