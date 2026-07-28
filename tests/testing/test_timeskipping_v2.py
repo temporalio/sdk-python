@@ -16,7 +16,7 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import TimeSkipper, TimeSkippingConfig, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
-from tests.helpers import assert_duration_same, new_worker
+from tests.helpers import assert_duration_same, assert_eventually, new_worker
 from tests.helpers.time_skipping import (
     assert_time_was_not_skipped,
     assert_time_was_skipped,
@@ -473,14 +473,21 @@ async def test_fast_forward_spans_cron_restarts(
             )
         try:
             assert await env.fast_forward(handle, timedelta(hours=3))
-            run_count = 0
-            async for _ in env.client.list_workflows(
-                query=f"WorkflowId = '{workflow_id}'"
-            ):
-                run_count += 1
-            assert run_count >= 3, (
-                f"expected >= 3 cron runs after 3h FF, got {run_count}"
-            )
+
+            # list_workflows is eventually consistent — the FF has already
+            # completed on the history side, but the visibility index may
+            # not yet reflect all 3 cron-produced runs. Poll until it does.
+            async def _at_least_three_cron_runs() -> None:
+                run_count = 0
+                async for _ in env.client.list_workflows(
+                    query=f"WorkflowId = '{workflow_id}'"
+                ):
+                    run_count += 1
+                assert run_count >= 3, (
+                    f"expected >= 3 cron runs after 3h FF, got {run_count}"
+                )
+
+            await assert_eventually(_at_least_three_cron_runs)
         finally:
             await handle.cancel()
 
