@@ -147,7 +147,7 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
         "--dynamic-config-value",
         "history.enableTransitionHistory=true",
         "--dynamic-config-value",
-        "history.enableChasmCallbacks=true",
+        "history.enableCHASMCallbacks=true",
         "--dynamic-config-value",
         "history.enableCHASMSignalBacklinks=true",
         "--dynamic-config-value",
@@ -158,6 +158,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
         "frontend.WorkflowTimeSkippingEnabled=true",
         "--dynamic-config-value",
         "history.enableSignalWithStartFromWorkflow=true",
+        "--dynamic-config-value",
+        "history.enableUpdateCallbacks=true",
     ]
     if env_type == "local":
         env = await WorkflowEnvironment.start_local(

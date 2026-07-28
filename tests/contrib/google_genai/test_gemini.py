@@ -32,7 +32,6 @@ from google.genai import Client as GeminiClient
 from google.genai import types
 from google.genai.interactions import (
     Agent,  # pyright: ignore[reportPrivateImportUsage]
-    Interaction,
     InteractionSSEEvent,
 )
 from google.genai.types import HttpResponse as SdkHttpResponse
@@ -45,6 +44,7 @@ from temporalio.contrib.google_genai import (
     GoogleGenAIPlugin,
     activity_as_tool,
 )
+from temporalio.contrib.google_genai._compat import Interaction
 from temporalio.contrib.google_genai._models import (
     _GeminiApiRequest,
     _GeminiApiResponse,

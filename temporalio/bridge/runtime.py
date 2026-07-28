@@ -71,6 +71,7 @@ class OpenTelemetryConfig:
     metric_temporality_delta: bool
     durations_as_seconds: bool
     http: bool
+    histogram_bucket_overrides: Mapping[str, Sequence[float]] | None = None
 
 
 @dataclass(frozen=True)

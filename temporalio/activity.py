@@ -29,6 +29,9 @@ import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
 import temporalio.common
 import temporalio.converter
+from temporalio.converter._payload_converter import (
+    _TemporalTransferTypePayloadConverter,
+)
 
 from .types import CallableType
 
@@ -238,9 +241,13 @@ class _Context:
                 self.payload_converter_class_or_instance,
                 temporalio.converter.PayloadConverter,
             ):
-                self._payload_converter = self.payload_converter_class_or_instance
+                self._payload_converter = _TemporalTransferTypePayloadConverter.wrap(
+                    self.payload_converter_class_or_instance
+                )
             else:
-                self._payload_converter = self.payload_converter_class_or_instance()
+                self._payload_converter = _TemporalTransferTypePayloadConverter.wrap(
+                    self.payload_converter_class_or_instance()
+                )
         return self._payload_converter
 
     @property

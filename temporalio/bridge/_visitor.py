@@ -58,27 +58,25 @@ class PayloadVisitor:
     async def _visit_nexus_operation_input_payload(
         self,
         fs: VisitorFunctions,
-        endpoint: str,
         payload: Payload,
     ) -> None:
+        await self._visit_temporal_api_common_v1_Payload(fs, payload)
+
+    async def _visit_temporal_api_common_v1_Payload(
+        self, fs: VisitorFunctions, payload: Payload
+    ) -> None:
         new_payload = await temporalio.nexus.system.maybe_visit_payload(
-            endpoint,
             payload,
             fs,
             self.skip_search_attributes,
         )
         if new_payload is None:
-            await self._visit_temporal_api_common_v1_Payload(fs, payload)
+            await fs.visit_payload(payload)
             return
 
         if new_payload is not payload:
             payload.CopyFrom(new_payload)
         await fs.visit_system_nexus_envelope(payload)
-
-    async def _visit_temporal_api_common_v1_Payload(
-        self, fs: VisitorFunctions, o: Payload
-    ):
-        await fs.visit_payload(o)
 
     async def _visit_temporal_api_common_v1_Payloads(
         self, fs: VisitorFunctions, o: Any
@@ -474,7 +472,7 @@ class PayloadVisitor:
         self, fs: VisitorFunctions, o: Any
     ):
         if o.HasField("input"):
-            await self._visit_nexus_operation_input_payload(fs, o.endpoint, o.input)
+            await self._visit_nexus_operation_input_payload(fs, o.input)
 
     async def _visit_coresdk_workflow_commands_WorkflowCommand(
         self, fs: VisitorFunctions, o: Any
@@ -549,3 +547,25 @@ class PayloadVisitor:
             await self._visit_coresdk_workflow_completion_Success(fs, o.successful)
         elif o.HasField("failed"):
             await self._visit_coresdk_workflow_completion_Failure(fs, o.failed)
+
+    async def _visit_temporal_api_common_v1_Header(self, fs: VisitorFunctions, o: Any):
+        for v in o.fields.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_temporal_api_workflowservice_v1_SignalWithStartWorkflowExecutionRequest(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("input"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.input)
+        if o.HasField("signal_input"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.signal_input)
+        if o.HasField("memo"):
+            await self._visit_temporal_api_common_v1_Memo(fs, o.memo)
+        if o.HasField("search_attributes"):
+            await self._visit_temporal_api_common_v1_SearchAttributes(
+                fs, o.search_attributes
+            )
+        if o.HasField("header"):
+            await self._visit_temporal_api_common_v1_Header(fs, o.header)
+        if o.HasField("user_metadata"):
+            await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
