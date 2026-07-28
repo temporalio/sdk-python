@@ -57,12 +57,14 @@ pub struct WorkerConfig {
     default_heartbeat_throttle_interval_millis: u64,
     max_activities_per_second: Option<f64>,
     max_task_queue_activities_per_second: Option<f64>,
+    max_eager_activity_reservations_per_workflow_task: usize,
     graceful_shutdown_period_millis: u64,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
     plugins: Vec<String>,
     storage_drivers: HashSet<String>,
+    disable_payload_error_limit: bool,
 }
 
 #[derive(FromPyObject)]
@@ -658,10 +660,14 @@ impl WorkerRef {
         enter_sync!(self.runtime);
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
-        self.worker
-            .as_ref()
-            .unwrap()
-            .record_activity_heartbeat(heartbeat);
+        let worker = self.worker.as_ref().unwrap().clone();
+        // Detach from the GIL during the core call. Core may block on internal
+        // locks whose holders can call back into Python (e.g. a custom slot
+        // supplier's mark_slot_used runs while core's outstanding-activity
+        // lock is held); holding the GIL here would deadlock the worker.
+        proto
+            .py()
+            .detach(move || worker.record_activity_heartbeat(heartbeat));
         Ok(())
     }
 
@@ -734,6 +740,9 @@ fn convert_worker_config(
         ))
         .maybe_max_worker_activities_per_second(conf.max_activities_per_second)
         .maybe_max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
+        .max_eager_activity_reservations_per_workflow_task(
+            conf.max_eager_activity_reservations_per_workflow_task,
+        )
         // Even though grace period is optional, if it is not set then the
         // auto-cancel-activity behavior of shutdown will not occur, so we
         // always set it even if 0.
@@ -770,6 +779,7 @@ fn convert_worker_config(
                 .map(|r#type| StorageDriverInfo { r#type })
                 .collect::<HashSet<_>>(),
         )
+        .disable_payload_error_limit(conf.disable_payload_error_limit)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }
@@ -823,11 +833,13 @@ fn convert_tuner_holder(
     }
 
     Ok(temporalio_sdk_core::TunerHolderOptions::builder()
-        .maybe_resource_based_options(first.map(|first| {
-            temporalio_sdk_core::ResourceBasedSlotsOptions::builder()
-                .target_mem_usage(first.target_memory_usage)
-                .target_cpu_usage(first.target_cpu_usage)
-                .build()
+        .maybe_resource_based_config(first.map(|first| {
+            temporalio_sdk_core::ResourceBasedTunerConfig::Options(
+                temporalio_sdk_core::ResourceBasedSlotsOptions::builder()
+                    .target_mem_usage(first.target_memory_usage)
+                    .target_cpu_usage(first.target_cpu_usage)
+                    .build(),
+            )
         }))
         .workflow_slot_options(convert_slot_supplier(
             holder.workflow_slot_supplier,
@@ -895,10 +907,11 @@ fn convert_versioning_strategy(
                     use_worker_versioning: options.use_worker_versioning,
                     default_versioning_behavior: if options.use_worker_versioning {
                         Some(
-                            options
-                                .default_versioning_behavior
-                                .try_into()
-                                .unwrap_or_default(),
+                            temporalio_common::protos::temporal::api::enums::v1::VersioningBehavior::try_from(
+                                options.default_versioning_behavior,
+                            )
+                            .unwrap_or_default()
+                            .into(),
                         )
                     } else {
                         None

@@ -36,6 +36,9 @@ temporalio-sdk-core = { version = "0.5", path = "./sdk-core/crates/sdk-core", fe
     "ephemeral-server",
 ] }
 tokio = "1.26"
+# Matches the sdk-core client crate's rustls stack; used to build the custom
+# server certificate verifier for ClientTlsConfig.verification_server_name.
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 tokio-stream = "0.1"
 tonic = "0.14"
 tracing = "0.1"

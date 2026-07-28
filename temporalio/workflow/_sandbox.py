@@ -268,9 +268,9 @@ class LoggerAdapter(logging.LoggerAdapter):
                 else None,
             )
 
-        kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
-        if msg_extra:
-            msg = f"{msg} ({msg_extra})"
+            kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
+            if msg_extra:
+                msg = f"{msg} ({msg_extra})"
         return msg, kwargs
 
     def log(

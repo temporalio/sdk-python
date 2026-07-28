@@ -75,6 +75,7 @@ pub struct OpenTelemetryConfig {
     metric_temporality_delta: bool,
     durations_as_seconds: bool,
     http: bool,
+    histogram_bucket_overrides: Option<HashMap<String, Vec<f64>>>,
 }
 
 #[derive(FromPyObject)]
@@ -357,6 +358,11 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
                 } else {
                     None
                 })
+                .maybe_histogram_bucket_overrides(otel_conf.histogram_bucket_overrides.map(
+                    |overrides| temporalio_common::telemetry::HistogramBucketOverrides {
+                        overrides,
+                    },
+                ))
                 .build();
             Ok(Arc::new(build_otlp_metric_exporter(otel_options).map_err(
                 |err| PyValueError::new_err(format!("Failed building OTel exporter: {err}")),

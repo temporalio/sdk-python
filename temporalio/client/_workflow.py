@@ -59,6 +59,7 @@ from ..types import (
     ReturnType,
     SelfType,
 )
+from ._callback import Callback
 from ._exceptions import (
     WorkflowContinuedAsNewError,
     WorkflowFailureError,
@@ -955,6 +956,10 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: type | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
+        # The following options are for Workflow Updates exposed as Nexus Operations. Experimental and unstable
+        callbacks: Sequence[Callback] | None = None,
+        links: Sequence[temporalio.api.common.v1.Link] | None = None,
+        request_id: str | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
@@ -967,7 +972,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             StartWorkflowUpdateInput(
                 id=self._id,
                 run_id=self._run_id,
-                first_execution_run_id=self.first_execution_run_id,
+                first_execution_run_id=self._first_execution_run_id,
                 update_id=id,
                 update=update_name,
                 args=temporalio.common._arg_or_args(arg, args),
@@ -976,6 +981,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 wait_for_stage=wait_for_stage,
+                callbacks=callbacks,
+                links=links,
+                request_id=request_id,
             )
         )
 

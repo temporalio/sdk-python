@@ -90,7 +90,7 @@ class ResponseBuilders:
 
 
 class TestModelProvider(ModelProvider):
-    """Test model provider which simply returns the given module."""
+    """Test model provider which simply returns the given model."""
 
     __test__ = False
 

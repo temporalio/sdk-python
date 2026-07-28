@@ -414,7 +414,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):  # ty
 class StatefulMCPServerProvider:
     """A stateful MCP server implementation for Temporal workflows.
 
-    This class wraps an function to create MCP servers to maintain a persistent connection throughout
+    This class wraps a function to create MCP servers to maintain a persistent connection throughout
     the workflow execution. It creates a dedicated worker that stays connected to
     the MCP server and processes operations on a dedicated task queue.
 

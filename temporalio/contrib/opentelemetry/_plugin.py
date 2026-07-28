@@ -18,7 +18,7 @@ class OpenTelemetryPlugin(SimplePlugin):
     It uses the new OpenTelemetryInterceptor implementation.
 
     Unlike the prior TracingInterceptor, this allows for accurate duration spans and parenting inside a workflow
-    with temporalio.contrib.opentelemetry.workflow.tracer()
+    using opentelemetry.trace.get_tracer() directly.
 
     Your tracer provider should be created with `create_tracer_provider` for it to be used within a Temporal worker.
     """
@@ -34,7 +34,9 @@ class OpenTelemetryPlugin(SimplePlugin):
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
-                raise ValueError("No WorkflowRunner provided to the OpenAI plugin.")
+                raise ValueError(
+                    "No WorkflowRunner provided to the OpenTelemetry plugin."
+                )
 
             # If in sandbox, add additional passthrough
             if isinstance(runner, SandboxedWorkflowRunner):

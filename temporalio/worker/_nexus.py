@@ -29,7 +29,6 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
 import temporalio.converter
-import temporalio.converter._payload_limits
 import temporalio.nexus
 from temporalio.bridge.worker import PollShutdownError
 from temporalio.exceptions import (
@@ -96,15 +95,8 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         self._worker_shutdown_event: temporalio.common._CompositeEvent | None = None
 
-    async def run(
-        self,
-        payload_error_limits: temporalio.converter._payload_limits._ServerPayloadErrorLimits
-        | None,
-    ) -> None:
+    async def run(self) -> None:
         """Continually poll for Nexus tasks and dispatch to handlers."""
-        self._data_converter = self._data_converter._with_payload_error_limits(
-            payload_error_limits
-        )
 
         async def raise_from_exception_queue() -> NoReturn:
             raise await self._fail_worker_exception_queue.get()

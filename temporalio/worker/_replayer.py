@@ -24,7 +24,12 @@ from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
 from ._worker import load_default_build_id
 from ._workflow import _WorkflowWorker
-from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from ._workflow_instance import (
+    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
+    UnsandboxedWorkflowRunner,
+    WorkflowRunner,
+    _WorkflowLogicFlag,
+)
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -83,6 +88,7 @@ class Replayer:
             header_codec_behavior=header_codec_behavior,
         )
         self._initial_config = self._config.copy()
+        self._default_workflow_logic_flags = set(_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS)
 
         # Apply plugin configuration
         self.plugins = plugins
@@ -92,6 +98,14 @@ class Replayer:
         # Validate workflows after plugin configuration
         if not self._config.get("workflows"):
             raise ValueError("At least one workflow must be specified")
+
+    def _set_default_workflow_logic_flag(
+        self, flag: _WorkflowLogicFlag, *, enabled: bool
+    ) -> None:
+        if enabled:
+            self._default_workflow_logic_flags.add(flag)
+        else:
+            self._default_workflow_logic_flags.discard(flag)
 
     def config(self, *, active_config: bool = False) -> ReplayerConfig:
         """Config, as a dictionary, used to create this replayer.
@@ -255,6 +269,7 @@ class Replayer:
                 workflow_failure_exception_types=self._config.get(
                     "workflow_failure_exception_types", []
                 ),
+                patch_activation_callback=None,
                 debug_mode=self._config.get("debug_mode", False),
                 metric_meter=runtime.metric_meter,
                 on_eviction_hook=on_eviction_hook,
@@ -269,6 +284,9 @@ class Replayer:
                 )
                 != HeaderCodecBehavior.NO_CODEC,
                 max_workflow_task_external_storage_concurrency=1,
+                default_workflow_logic_flags=frozenset(
+                    self._default_workflow_logic_flags
+                ),
             )
             external_storage = data_converter.external_storage
             storage_driver_types = (
@@ -307,6 +325,7 @@ class Replayer:
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
                     no_remote_activities=True,
+                    disable_payload_error_limit=True,
                     task_types=temporalio.bridge.worker.WorkerTaskTypes(
                         enable_workflows=True,
                         enable_local_activities=False,
@@ -318,6 +337,7 @@ class Replayer:
                     default_heartbeat_throttle_interval_millis=1000,
                     max_activities_per_second=None,
                     max_task_queue_activities_per_second=None,
+                    max_eager_activity_reservations_per_workflow_task=3,
                     graceful_shutdown_period_millis=0,
                     versioning_strategy=temporalio.bridge.worker.WorkerVersioningStrategyNone(
                         build_id_no_versioning=self._config.get("build_id")
@@ -339,7 +359,7 @@ class Replayer:
             bridge_worker_scope = bridge_worker
 
             # Start worker
-            workflow_worker_task = asyncio.create_task(workflow_worker.run(None))
+            workflow_worker_task = asyncio.create_task(workflow_worker.run())
 
             # Yield iterator
             async def replay_iterator() -> AsyncIterator[WorkflowReplayResult]:

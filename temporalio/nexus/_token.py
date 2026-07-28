@@ -14,6 +14,7 @@ class OperationTokenType(IntEnum):
     """Type discriminator for Nexus operation tokens."""
 
     WORKFLOW = 1
+    UPDATE_WORKFLOW = 3
 
 
 if TYPE_CHECKING:
@@ -28,6 +29,8 @@ class OperationToken:
     type: OperationTokenType
     namespace: str
     workflow_id: str
+    run_id: str | None = None
+    update_id: str | None = None
 
     def encode(self) -> str:
         """Convert handle to a base64url-encoded token string."""
@@ -38,6 +41,10 @@ class OperationToken:
         }
         if self.version is not None:
             token_details["v"] = self.version
+        if self.run_id is not None:
+            token_details["rid"] = self.run_id
+        if self.update_id is not None:
+            token_details["uid"] = self.update_id
         return _base64url_encode_no_padding(
             json.dumps(
                 token_details,
@@ -88,9 +95,24 @@ class OperationToken:
                 f"invalid token: expected workflow id to be a string, got {type(workflow_id)}"
             )
 
-        if token_type == OperationTokenType.WORKFLOW and not workflow_id:
+        if (
+            token_type == OperationTokenType.WORKFLOW
+            or token_type == OperationTokenType.UPDATE_WORKFLOW
+        ):
+            if not workflow_id:
+                raise TypeError(
+                    f"invalid token: expected non-empty workflow id for token type `{token_type.name}`"
+                )
+
+        update_id = token_details.get("uid")
+        if not isinstance(update_id, str | None):
             raise TypeError(
-                "invalid token: expected non-empty workflow id for token type `WORKFLOW`"
+                f"invalid token: expected update_id to be a string or None, got {type(update_id)}"
+            )
+
+        if token_type == OperationTokenType.UPDATE_WORKFLOW and not update_id:
+            raise TypeError(
+                "invalid token: expected non-empty update id for token type `UPDATE_WORKFLOW`"
             )
 
         namespace = token_details.get("ns")
@@ -100,11 +122,20 @@ class OperationToken:
                 f"invalid token: expected namespace to be a string, got {type(namespace)}"
             )
 
+        run_id = token_details.get("rid")
+
+        if not isinstance(run_id, str | None):
+            raise TypeError(
+                f"invalid token: expected run_id to be a string or None, got {type(run_id)}"
+            )
+
         return cls(
             type=OperationTokenType(token_type),
             namespace=namespace,
             workflow_id=workflow_id,
+            run_id=run_id,
             version=version,
+            update_id=update_id,
         )
 
 

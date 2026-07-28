@@ -23,10 +23,8 @@ import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
 import temporalio.converter._extstore
-import temporalio.converter._payload_limits
 import temporalio.exceptions
 import temporalio.workflow
-from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
@@ -42,10 +40,13 @@ from ._interceptor import (
     WorkflowInterceptorClassInput,
 )
 from ._workflow_instance import (
+    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
+    PatchActivationInput,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
     _WorkflowExternFunctions,
+    _WorkflowLogicFlag,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         workflow_failure_exception_types: Sequence[type[BaseException]],
+        patch_activation_callback: Callable[[PatchActivationInput], bool] | None,
         debug_mode: bool,
         disable_eager_activity_execution: bool,
         metric_meter: temporalio.common.MetricMeter,
@@ -90,6 +92,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         assert_local_activity_valid: Callable[[str], None],
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
+        default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] | None = None,
     ) -> None:
         # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
         debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
@@ -97,6 +100,11 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._bridge_worker = bridge_worker
         self._namespace = namespace
         self._task_queue = task_queue
+        self._default_workflow_logic_flags = set(
+            _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+            if default_workflow_logic_flags is None
+            else default_workflow_logic_flags
+        )
         self._workflow_task_executor = (
             workflow_task_executor
             or concurrent.futures.ThreadPoolExecutor(
@@ -145,6 +153,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
 
         self._workflow_failure_exception_types = workflow_failure_exception_types
+        self._patch_activation_callback = patch_activation_callback
         self._running_workflows: dict[str, _RunningWorkflow] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
@@ -206,15 +215,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             else:
                 self._dynamic_workflow = defn
 
-    async def run(
-        self,
-        payload_error_limits: temporalio.converter._payload_limits._ServerPayloadErrorLimits
-        | None,
-    ) -> None:
-        self._data_converter = self._data_converter._with_payload_error_limits(
-            payload_error_limits
-        )
-
+    async def run(self) -> None:
         # Continually poll for workflow work
         task_tag = object()
         try:
@@ -486,18 +487,12 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         upload_metrics = temporalio.converter._extstore.StorageOperationMetrics()
         try:
-            try:
-                upload_metrics = await temporalio.bridge.worker.encode_completion(
-                    completion,
-                    data_converter,
-                    encode_headers=self._encode_headers,
-                    storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
-                )
-            except temporalio.converter._payload_limits._PayloadSizeError as err:
-                logger.warning(err.message)
-                completion.failed.Clear()
-                await data_converter.encode_failure(err, completion.failed.failure)
-                completion.failed.force_cause = WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE
+            upload_metrics = await temporalio.bridge.worker.encode_completion(
+                completion,
+                data_converter,
+                encode_headers=self._encode_headers,
+                storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
+            )
         except Exception as err:
             logger.exception(
                 "Failed encoding completion on workflow with run ID %s", act.run_id
@@ -789,7 +784,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         # Create instance from details
         det = WorkflowInstanceDetails(
-            payload_converter_class=self._data_converter.payload_converter_class,
+            payload_converter_factory=self._data_converter._new_payload_converter,
             failure_converter_class=self._data_converter.failure_converter_class,
             interceptor_classes=self._interceptor_classes,
             defn=defn,
@@ -798,8 +793,10 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
+            patch_activation_callback=self._patch_activation_callback,
             last_completion_result=init.last_completion_result,
             last_failure=last_failure,
+            default_workflow_logic_flags=frozenset(self._default_workflow_logic_flags),
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)
@@ -811,6 +808,14 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             issubclass(temporalio.workflow.NondeterminismError, typ)
             for typ in self._workflow_failure_exception_types
         )
+
+    def _set_default_workflow_logic_flag(
+        self, flag: _WorkflowLogicFlag, *, enabled: bool
+    ) -> None:
+        if enabled:
+            self._default_workflow_logic_flags.add(flag)
+        else:
+            self._default_workflow_logic_flags.discard(flag)
 
     def nondeterminism_as_workflow_fail_for_types(self) -> set[str]:
         return {
@@ -977,7 +982,6 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
             payload_converter_class=workflow_context_dc.payload_converter_class,
             payload_codec=workflow_context_dc.payload_codec,
             failure_converter_class=workflow_context_dc.failure_converter_class,
-            payload_limits=workflow_context_dc.payload_limits,
             external_storage=workflow_context_dc.external_storage,
             _ca_instance=instance,
             _ca_context_free_dc=context_free_dc,
@@ -1019,12 +1023,6 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         return await self._get_current_dc()._decode_payload_sequence(payloads)
-
-    def _validate_payload_limits(
-        self,
-        payloads: Sequence[temporalio.api.common.v1.Payload],
-    ) -> None:
-        self._get_current_dc()._validate_payload_limits(payloads)
 
 
 class _InterruptDeadlockError(BaseException):

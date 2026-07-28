@@ -29,7 +29,6 @@ from temporalio.common import (
     VersioningBehavior,
     WorkerDeploymentVersion,
 )
-from temporalio.converter._payload_limits import _ServerPayloadErrorLimits
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -40,7 +39,12 @@ from ._workflow import (
     _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
     _WorkflowWorker,
 )
-from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
+from ._workflow_instance import (
+    PatchActivationInput,
+    UnsandboxedWorkflowRunner,
+    WorkflowRunner,
+    _WorkflowLogicFlag,
+)
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -126,6 +130,7 @@ class Worker:
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
         max_activities_per_second: float | None = None,
         max_task_queue_activities_per_second: float | None = None,
+        max_eager_activity_reservations_per_workflow_task: int = 3,
         graceful_shutdown_timeout: timedelta = timedelta(),
         workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         shared_state_manager: SharedStateManager | None = None,
@@ -135,6 +140,7 @@ class Worker:
         use_worker_versioning: bool = False,
         disable_safe_workflow_eviction: bool = False,
         deployment_config: WorkerDeploymentConfig | None = None,
+        patch_activation_callback: Callable[[PatchActivationInput], bool] | None = None,
         workflow_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
@@ -263,6 +269,11 @@ class Worker:
                 poll request. If multiple workers on the same queue have
                 different values set, they will thrash with the last poller
                 winning.
+            max_eager_activity_reservations_per_workflow_task: Maximum number of
+                activity slots that may be reserved for eager execution when
+                completing a workflow task. The default is 3 and the value must
+                be positive. To disable eager activity execution, set
+                ``disable_eager_activity_execution`` to ``True``.
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
@@ -306,6 +317,12 @@ class Worker:
                 wrong workflow environment.
             deployment_config: Deployment config for the worker. Exclusive with ``build_id`` and
                 ``use_worker_versioning``.
+                WARNING: This is an experimental feature and may change in the future.
+            patch_activation_callback: Callback to decide whether the first non-replay
+                call to :py:func:`workflow.patched<temporalio.workflow.patched>` for a
+                patch ID should activate that patch. The callback receives a
+                :py:class:`PatchActivationInput` and must return ``True`` to activate the
+                patch or ``False`` to leave it inactive.
                 WARNING: This is an experimental feature and may change in the future.
             workflow_task_poller_behavior: Specify the behavior of workflow task polling.
                 Defaults to a 5-poller maximum.
@@ -359,6 +376,7 @@ class Worker:
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
             max_activities_per_second=max_activities_per_second,
             max_task_queue_activities_per_second=max_task_queue_activities_per_second,
+            max_eager_activity_reservations_per_workflow_task=max_eager_activity_reservations_per_workflow_task,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
             workflow_failure_exception_types=workflow_failure_exception_types,
             shared_state_manager=shared_state_manager,
@@ -368,6 +386,7 @@ class Worker:
             use_worker_versioning=use_worker_versioning,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             deployment_config=deployment_config,
+            patch_activation_callback=patch_activation_callback,
             workflow_task_poller_behavior=workflow_task_poller_behavior,
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
@@ -433,6 +452,11 @@ class Worker:
         if max_workflow_task_external_storage_concurrency < 1:
             raise ValueError(
                 "max_workflow_task_external_storage_concurrency must be positive"
+            )
+        if config.get("max_eager_activity_reservations_per_workflow_task", 3) < 1:
+            raise ValueError(
+                "max_eager_activity_reservations_per_workflow_task must be positive; "
+                "use disable_eager_activity_execution=True to disable eager activity execution"
             )
 
         # Prepend applicable client interceptors to the given ones
@@ -528,6 +552,7 @@ class Worker:
                 workflow_failure_exception_types=config[
                     "workflow_failure_exception_types"
                 ],  # type: ignore[reportTypedDictNotRequiredAccess]
+                patch_activation_callback=config.get("patch_activation_callback"),
                 debug_mode=config["debug_mode"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 disable_eager_activity_execution=config[
                     "disable_eager_activity_execution"
@@ -645,6 +670,9 @@ class Worker:
                 max_task_queue_activities_per_second=config[
                     "max_task_queue_activities_per_second"
                 ],  # type: ignore[reportTypedDictNotRequiredAccess]
+                max_eager_activity_reservations_per_workflow_task=config[
+                    "max_eager_activity_reservations_per_workflow_task"
+                ],  # type: ignore[reportTypedDictNotRequiredAccess]
                 graceful_shutdown_period_millis=int(
                     1000 * config["graceful_shutdown_timeout"].total_seconds()  # type: ignore[reportTypedDictNotRequiredAccess]
                 ),
@@ -666,6 +694,9 @@ class Worker:
                 ]._to_bridge(),  # type: ignore[reportTypedDictNotRequiredAccess,reportOptionalMemberAccess]
                 plugins=deduped_plugin_names,
                 storage_drivers=deduped_storage_driver_types,
+                disable_payload_error_limit=config.get(
+                    "disable_payload_error_limit", False
+                ),
             ),
         )
 
@@ -720,6 +751,17 @@ class Worker:
         if self._nexus_worker:
             self._nexus_worker._client = value
 
+    def _set_default_workflow_logic_flag(
+        self, flag: _WorkflowLogicFlag, *, enabled: bool
+    ) -> None:
+        if self._started:
+            raise RuntimeError(
+                "Cannot set default workflow logic flags after the worker has started"
+            )
+        if not self._workflow_worker:
+            raise RuntimeError("Cannot set workflow logic flags without workflows")
+        self._workflow_worker._set_default_workflow_logic_flag(flag, enabled=enabled)
+
     @property
     def is_running(self) -> bool:
         """Whether the worker is running.
@@ -767,17 +809,8 @@ class Worker:
         await next_function(self)
 
     async def _run(self):
-        # Eagerly validate which will do a namespace check in Core
-        namespace_info = await self._bridge_worker.validate()
-        payload_error_limits = (
-            _ServerPayloadErrorLimits(
-                memo_size_error=namespace_info.limits.memo_size_limit_error,
-                payload_size_error=namespace_info.limits.blob_size_limit_error,
-            )
-            if namespace_info.HasField("limits")
-            and not self._config.get("disable_payload_error_limit", False)
-            else None
-        )
+        # Eagerly validate which will do a namespace check in Core.
+        await self._bridge_worker.validate()
 
         if self._started:
             raise RuntimeError("Already started")
@@ -797,16 +830,14 @@ class Worker:
         # Create tasks for workers
         if self._activity_worker:
             tasks[self._activity_worker] = asyncio.create_task(
-                self._activity_worker.run(payload_error_limits)
+                self._activity_worker.run()
             )
         if self._workflow_worker:
             tasks[self._workflow_worker] = asyncio.create_task(
-                self._workflow_worker.run(payload_error_limits)
+                self._workflow_worker.run()
             )
         if self._nexus_worker:
-            tasks[self._nexus_worker] = asyncio.create_task(
-                self._nexus_worker.run(payload_error_limits)
-            )
+            tasks[self._nexus_worker] = asyncio.create_task(self._nexus_worker.run())
 
         # Wait for either worker or shutdown requested
         wait_task = asyncio.wait(tasks.values(), return_when=asyncio.FIRST_EXCEPTION)
@@ -973,6 +1004,7 @@ class WorkerConfig(TypedDict, total=False):
     default_heartbeat_throttle_interval: timedelta
     max_activities_per_second: float | None
     max_task_queue_activities_per_second: float | None
+    max_eager_activity_reservations_per_workflow_task: int
     graceful_shutdown_timeout: timedelta
     workflow_failure_exception_types: Sequence[type[BaseException]]
     shared_state_manager: SharedStateManager | None
@@ -982,6 +1014,7 @@ class WorkerConfig(TypedDict, total=False):
     use_worker_versioning: bool
     disable_safe_workflow_eviction: bool
     deployment_config: WorkerDeploymentConfig | None
+    patch_activation_callback: Callable[[PatchActivationInput], bool] | None
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior

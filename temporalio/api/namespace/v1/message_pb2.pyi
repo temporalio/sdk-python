@@ -61,6 +61,10 @@ class NamespaceInfo(google.protobuf.message.Message):
         STANDALONE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
         WORKFLOW_UPDATE_CALLBACKS_FIELD_NUMBER: builtins.int
         POLLER_AUTOSCALING_AUTO_ENROLL_FIELD_NUMBER: builtins.int
+        WORKFLOW_TASK_COMPLETION_PAGINATION_FIELD_NUMBER: builtins.int
+        STANDALONE_ACTIVITY_START_DELAY_FIELD_NUMBER: builtins.int
+        STANDALONE_ACTIVITY_BATCH_OPERATIONS_FIELD_NUMBER: builtins.int
+        STANDALONE_ACTIVITY_OPERATOR_COMMANDS_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -92,6 +96,14 @@ class NamespaceInfo(google.protobuf.message.Message):
         """True if the namespace supports attaching callbacks on workflow updates"""
         poller_autoscaling_auto_enroll: builtins.bool
         """When true, workers should use poller autoscaling by default unless explicitly configured otherwise."""
+        workflow_task_completion_pagination: builtins.bool
+        """True if the namespace supports pagination of `RespondWorkflowTaskCompleted` request."""
+        standalone_activity_start_delay: builtins.bool
+        """True if the namespace supports start delay for standalone activities."""
+        standalone_activity_batch_operations: builtins.bool
+        """True if the namespace supports batch operations for standalone activities."""
+        standalone_activity_operator_commands: builtins.bool
+        """True if the namespace supports standalone activity operator commands."""
         def __init__(
             self,
             *,
@@ -108,6 +120,10 @@ class NamespaceInfo(google.protobuf.message.Message):
             standalone_nexus_operation: builtins.bool = ...,
             workflow_update_callbacks: builtins.bool = ...,
             poller_autoscaling_auto_enroll: builtins.bool = ...,
+            workflow_task_completion_pagination: builtins.bool = ...,
+            standalone_activity_start_delay: builtins.bool = ...,
+            standalone_activity_batch_operations: builtins.bool = ...,
+            standalone_activity_operator_commands: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -124,6 +140,12 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"reported_problems_search_attribute",
                 "standalone_activities",
                 b"standalone_activities",
+                "standalone_activity_batch_operations",
+                b"standalone_activity_batch_operations",
+                "standalone_activity_operator_commands",
+                b"standalone_activity_operator_commands",
+                "standalone_activity_start_delay",
+                b"standalone_activity_start_delay",
                 "standalone_nexus_operation",
                 b"standalone_nexus_operation",
                 "sync_update",
@@ -136,6 +158,8 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"worker_poll_complete_on_shutdown",
                 "workflow_pause",
                 b"workflow_pause",
+                "workflow_task_completion_pagination",
+                b"workflow_task_completion_pagination",
                 "workflow_update_callbacks",
                 b"workflow_update_callbacks",
             ],

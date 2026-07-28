@@ -305,6 +305,7 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
     IS_GLOBAL_NAMESPACE_FIELD_NUMBER: builtins.int
     FAILOVER_HISTORY_FIELD_NUMBER: builtins.int
     POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
+    POLLER_GROUPS_INFO_FIELD_NUMBER: builtins.int
     @property
     def namespace_info(
         self,
@@ -332,9 +333,19 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
     ]:
-        """The initial info that client should use for poller group assignment. This information is
+        """Deprecated. Use `poller_groups_info` instead, which carries a version so the client can
+        ignore stale updates.
+        The initial info that client should use for poller group assignment. This information is
         updated through poll response. Client is supposed to use the info received in the latest
         poll response.
+        """
+    @property
+    def poller_groups_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo:
+        """The initial, versioned info that client should use for poller group assignment. This
+        information is updated through poll responses. Client is supposed to use the info with the
+        highest version it has received.
         """
     def __init__(
         self,
@@ -354,6 +365,8 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
             temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
         ]
         | None = ...,
+        poller_groups_info: temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -362,6 +375,8 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
             b"config",
             "namespace_info",
             b"namespace_info",
+            "poller_groups_info",
+            b"poller_groups_info",
             "replication_config",
             b"replication_config",
         ],
@@ -381,6 +396,8 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
             b"namespace_info",
             "poller_group_infos",
             b"poller_group_infos",
+            "poller_groups_info",
+            b"poller_groups_info",
             "replication_config",
             b"replication_config",
         ],
@@ -656,8 +673,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     ) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     @property
     def workflow_start_delay(self) -> google.protobuf.duration_pb2.Duration:
-        """Time to wait before dispatching the first workflow task. Cannot be used with `cron_schedule`.
-        If the workflow gets a signal before the delay, a workflow task will be dispatched and the rest
+        """Time to wait before making the first workflow task available for dispatch. Cannot be used with `cron_schedule`.
+        If the workflow gets a signal before the delay, a workflow task will be made available for dispatch and the rest
         of the delay will be ignored.
         """
     @property
@@ -869,12 +886,15 @@ class StartWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
     STARTED_FIELD_NUMBER: builtins.int
     STATUS_FIELD_NUMBER: builtins.int
     EAGER_WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     LINK_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run id of the workflow that was started - or used (via WorkflowIdConflictPolicy USE_EXISTING)."""
+    first_execution_run_id: builtins.str
+    """If the workflow was started as a result of a de-dupe, this field will contain the run id of the first execution in the chain."""
     started: builtins.bool
     """If true, a new workflow was started."""
     status: temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType
@@ -894,6 +914,7 @@ class StartWorkflowExecutionResponse(google.protobuf.message.Message):
         self,
         *,
         run_id: builtins.str = ...,
+        first_execution_run_id: builtins.str = ...,
         started: builtins.bool = ...,
         status: temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType = ...,
         eager_workflow_task: global___PollWorkflowTaskQueueResponse | None = ...,
@@ -910,6 +931,8 @@ class StartWorkflowExecutionResponse(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "eager_workflow_task",
             b"eager_workflow_task",
+            "first_execution_run_id",
+            b"first_execution_run_id",
             "link",
             b"link",
             "run_id",
@@ -1253,6 +1276,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     POLLER_SCALING_DECISION_FIELD_NUMBER: builtins.int
     POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
+    POLLER_GROUPS_INFO_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     @property
@@ -1346,8 +1370,22 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
     ]:
-        """The weighted list of poller groups IDs that client should use for future polls to this task
+        """Deprecated. Use `poller_groups_info` instead, which carries a version so the client can
+        ignore stale updates.
+        The weighted list of poller groups IDs that client should use for future polls to this task
         queue. Client is expected to:
+          1. Maintain minimum number of pollers no less than the number of groups.
+          2. Try to assign the next poll to a group without any pending polls,
+          3. If every group has some pending polls, assign the next poll to a group randomly
+            according to the weights.
+        """
+    @property
+    def poller_groups_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo:
+        """The weighted, versioned list of poller groups IDs that client should use for future polls to
+        this task queue. Client should ignore this if it has already applied a snapshot with a
+        version greater than or equal to `poller_groups_info.version`. Client is expected to:
           1. Maintain minimum number of pollers no less than the number of groups.
           2. Try to assign the next poll to a group without any pending polls,
           3. If every group has some pending polls, assign the next poll to a group randomly
@@ -1386,12 +1424,16 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
             temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
         ]
         | None = ...,
+        poller_groups_info: temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "history",
             b"history",
+            "poller_groups_info",
+            b"poller_groups_info",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "query",
@@ -1425,6 +1467,8 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
             b"poller_group_id",
             "poller_group_infos",
             b"poller_group_infos",
+            "poller_groups_info",
+            b"poller_groups_info",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "previous_started_event_id",
@@ -1524,6 +1568,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     WORKER_INSTANCE_KEY_FIELD_NUMBER: builtins.int
     WORKER_CONTROL_TASK_QUEUE_FIELD_NUMBER: builtins.int
+    PAGE_NUMBER_FIELD_NUMBER: builtins.int
+    INTERMEDIATE_PAGE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollWorkflowTaskQueueResponse`"""
     @property
@@ -1622,6 +1668,16 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     """A dedicated per-worker Nexus task queue on which the server sends control
     tasks (e.g. activity cancellation) to this specific worker instance.
     """
+    page_number: builtins.int
+    """0-indexed page number when the workflow task completion is split across multiple
+    requests ("pages"). 0 for single-page requests. May only be set to non-zero value
+    when the namespace capability workflow_task_completion_pagination is true.
+    """
+    intermediate_page: builtins.bool
+    """True for non-final pages of a paginated workflow task completion. The final page's
+    `page_number` tells the server how many intermediate pages (0..page_number-1) preceded it.
+    May only be used when the namespace capability workflow_task_completion_pagination is true.
+    """
     def __init__(
         self,
         *,
@@ -1660,6 +1716,8 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         | None = ...,
         worker_instance_key: builtins.str = ...,
         worker_control_task_queue: builtins.str = ...,
+        page_number: builtins.int = ...,
+        intermediate_page: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1697,12 +1755,16 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             b"force_create_new_workflow_task",
             "identity",
             b"identity",
+            "intermediate_page",
+            b"intermediate_page",
             "messages",
             b"messages",
             "metering_metadata",
             b"metering_metadata",
             "namespace",
             b"namespace",
+            "page_number",
+            b"page_number",
             "query_results",
             b"query_results",
             "resource_id",
@@ -2030,6 +2092,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
     PRIORITY_FIELD_NUMBER: builtins.int
     ACTIVITY_RUN_ID_FIELD_NUMBER: builtins.int
     POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
+    POLLER_GROUPS_INFO_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     workflow_namespace: builtins.str
@@ -2123,6 +2186,18 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
           3. If every group has some pending polls, assign the next poll to a group randomly
             according to the weights.
         """
+    @property
+    def poller_groups_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo:
+        """The weighted, versioned list of poller groups IDs that client should use for future polls to
+        this task queue. Client should ignore this if it has already applied a snapshot with a
+        version greater than or equal to `poller_groups_info.version`. Client is expected to:
+          1. Maintain minimum number of pollers no less than the number of groups.
+          2. Try to assign the next poll to a group without any pending polls,
+          3. If every group has some pending polls, assign the next poll to a group randomly
+            according to the weights.
+        """
     def __init__(
         self,
         *,
@@ -2153,6 +2228,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
             temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
         ]
         | None = ...,
+        poller_groups_info: temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2169,6 +2246,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "input",
             b"input",
+            "poller_groups_info",
+            b"poller_groups_info",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "priority",
@@ -2212,6 +2291,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
             b"input",
             "poller_group_infos",
             b"poller_group_infos",
+            "poller_groups_info",
+            b"poller_groups_info",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "priority",
@@ -3310,9 +3391,9 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
     @property
     def workflow_start_delay(self) -> google.protobuf.duration_pb2.Duration:
-        """Time to wait before dispatching the first workflow task. Cannot be used with `cron_schedule`.
+        """Time to wait before making the first workflow task available for dispatch. Cannot be used with `cron_schedule`.
         Note that the signal will be delivered with the first workflow task. If the workflow gets
-        another SignalWithStartWorkflow before the delay a workflow task will be dispatched immediately
+        another SignalWithStartWorkflow before the delay a workflow task will be made available for dispatch immediately
         and the rest of the delay period will be ignored, even if that request also had a delay.
         Signal via SignalWorkflowExecution will not unblock the workflow.
         """
@@ -3482,10 +3563,13 @@ class SignalWithStartWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    FIRST_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
     STARTED_FIELD_NUMBER: builtins.int
     SIGNAL_LINK_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run id of the workflow that was started - or just signaled, if it was already running."""
+    first_execution_run_id: builtins.str
+    """If the workflow was started as a result of a de-dupe, this field will contain the run id of the first execution in the chain."""
     started: builtins.bool
     """If true, a new workflow was started."""
     @property
@@ -3498,6 +3582,7 @@ class SignalWithStartWorkflowExecutionResponse(google.protobuf.message.Message):
         self,
         *,
         run_id: builtins.str = ...,
+        first_execution_run_id: builtins.str = ...,
         started: builtins.bool = ...,
         signal_link: temporalio.api.common.v1.message_pb2.Link | None = ...,
     ) -> None: ...
@@ -3507,7 +3592,14 @@ class SignalWithStartWorkflowExecutionResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "run_id", b"run_id", "signal_link", b"signal_link", "started", b"started"
+            "first_execution_run_id",
+            b"first_execution_run_id",
+            "run_id",
+            b"run_id",
+            "signal_link",
+            b"signal_link",
+            "started",
+            b"started",
         ],
     ) -> None: ...
 
@@ -5229,6 +5321,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         COUNT_GROUP_BY_EXECUTION_STATUS_FIELD_NUMBER: builtins.int
         NEXUS_FIELD_NUMBER: builtins.int
         SERVER_SCALED_DEPLOYMENTS_FIELD_NUMBER: builtins.int
+        SERVER_SCALED_PROVIDER_CLOUD_RUN_FIELD_NUMBER: builtins.int
         signal_and_query_header: builtins.bool
         """True if signal and query headers are supported."""
         internal_error_differentiation: builtins.bool
@@ -5270,6 +5363,11 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         This flag is dependent both on server version and for server-scaled deployments
         to be enabled via server configuration.
         """
+        server_scaled_provider_cloud_run: builtins.bool
+        """True if the server supports the Cloud Run compute provider for
+        server-scaled deployments. Dependent on server version and the
+        provider being enabled via server configuration.
+        """
         def __init__(
             self,
             *,
@@ -5285,6 +5383,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
             count_group_by_execution_status: builtins.bool = ...,
             nexus: builtins.bool = ...,
             server_scaled_deployments: builtins.bool = ...,
+            server_scaled_provider_cloud_run: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -5307,6 +5406,8 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
                 b"sdk_metadata",
                 "server_scaled_deployments",
                 b"server_scaled_deployments",
+                "server_scaled_provider_cloud_run",
+                b"server_scaled_provider_cloud_run",
                 "signal_and_query_header",
                 b"signal_and_query_header",
                 "supports_schedules",
@@ -7032,6 +7133,7 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     JOB_ID_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
     EXECUTIONS_FIELD_NUMBER: builtins.int
+    TARGET_EXECUTIONS_FIELD_NUMBER: builtins.int
     MAX_OPERATIONS_PER_SECOND_FIELD_NUMBER: builtins.int
     TERMINATION_OPERATION_FIELD_NUMBER: builtins.int
     SIGNAL_OPERATION_FIELD_NUMBER: builtins.int
@@ -7042,6 +7144,9 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     UNPAUSE_ACTIVITIES_OPERATION_FIELD_NUMBER: builtins.int
     RESET_ACTIVITIES_OPERATION_FIELD_NUMBER: builtins.int
     UPDATE_ACTIVITY_OPTIONS_OPERATION_FIELD_NUMBER: builtins.int
+    CANCEL_ACTIVITIES_OPERATION_FIELD_NUMBER: builtins.int
+    TERMINATE_ACTIVITIES_OPERATION_FIELD_NUMBER: builtins.int
+    DELETE_ACTIVITIES_OPERATION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace that contains the batch operation"""
     visibility_query: builtins.str
@@ -7060,6 +7165,16 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     ]:
         """Executions to apply the batch operation
         This field and `visibility_query` are mutually exclusive
+        DEPRECATED: Use `target_executions` instead.
+        """
+    @property
+    def target_executions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Execution
+    ]:
+        """Target executions to apply the batch operation. This field and `visibility_query`
+        are mutually exclusive.
         """
     max_operations_per_second: builtins.float
     """Limit for the number of operations processed per second within this batch.
@@ -7107,6 +7222,18 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     def update_activity_options_operation(
         self,
     ) -> temporalio.api.batch.v1.message_pb2.BatchOperationUpdateActivityOptions: ...
+    @property
+    def cancel_activities_operation(
+        self,
+    ) -> temporalio.api.batch.v1.message_pb2.BatchOperationCancelActivities: ...
+    @property
+    def terminate_activities_operation(
+        self,
+    ) -> temporalio.api.batch.v1.message_pb2.BatchOperationTerminateActivities: ...
+    @property
+    def delete_activities_operation(
+        self,
+    ) -> temporalio.api.batch.v1.message_pb2.BatchOperationDeleteActivities: ...
     def __init__(
         self,
         *,
@@ -7116,6 +7243,10 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         reason: builtins.str = ...,
         executions: collections.abc.Iterable[
             temporalio.api.common.v1.message_pb2.WorkflowExecution
+        ]
+        | None = ...,
+        target_executions: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Execution
         ]
         | None = ...,
         max_operations_per_second: builtins.float = ...,
@@ -7137,12 +7268,22 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         | None = ...,
         update_activity_options_operation: temporalio.api.batch.v1.message_pb2.BatchOperationUpdateActivityOptions
         | None = ...,
+        cancel_activities_operation: temporalio.api.batch.v1.message_pb2.BatchOperationCancelActivities
+        | None = ...,
+        terminate_activities_operation: temporalio.api.batch.v1.message_pb2.BatchOperationTerminateActivities
+        | None = ...,
+        delete_activities_operation: temporalio.api.batch.v1.message_pb2.BatchOperationDeleteActivities
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "cancel_activities_operation",
+            b"cancel_activities_operation",
             "cancellation_operation",
             b"cancellation_operation",
+            "delete_activities_operation",
+            b"delete_activities_operation",
             "deletion_operation",
             b"deletion_operation",
             "operation",
@@ -7153,6 +7294,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"reset_operation",
             "signal_operation",
             b"signal_operation",
+            "terminate_activities_operation",
+            b"terminate_activities_operation",
             "termination_operation",
             b"termination_operation",
             "unpause_activities_operation",
@@ -7166,8 +7309,12 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "cancel_activities_operation",
+            b"cancel_activities_operation",
             "cancellation_operation",
             b"cancellation_operation",
+            "delete_activities_operation",
+            b"delete_activities_operation",
             "deletion_operation",
             b"deletion_operation",
             "executions",
@@ -7188,6 +7335,10 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"reset_operation",
             "signal_operation",
             b"signal_operation",
+            "target_executions",
+            b"target_executions",
+            "terminate_activities_operation",
+            b"terminate_activities_operation",
             "termination_operation",
             b"termination_operation",
             "unpause_activities_operation",
@@ -7213,6 +7364,9 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             "unpause_activities_operation",
             "reset_activities_operation",
             "update_activity_options_operation",
+            "cancel_activities_operation",
+            "terminate_activities_operation",
+            "delete_activities_operation",
         ]
         | None
     ): ...
@@ -7313,6 +7467,8 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
     FAILURE_OPERATION_COUNT_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
+    QUERY_FIELD_NUMBER: builtins.int
+    EXECUTIONS_FIELD_NUMBER: builtins.int
     operation_type: (
         temporalio.api.enums.v1.batch_operation_pb2.BatchOperationType.ValueType
     )
@@ -7337,6 +7493,15 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
     """Identity indicates the operator identity"""
     reason: builtins.str
     """Reason indicates the reason to stop a operation"""
+    query: builtins.str
+    """Query is the visibility query that defines the group of workflow to apply the batch operation"""
+    @property
+    def executions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Execution
+    ]:
+        """Executions is the list of workflow OR standalone activity executions to apply the batch operation"""
     def __init__(
         self,
         *,
@@ -7350,6 +7515,11 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
         failure_operation_count: builtins.int = ...,
         identity: builtins.str = ...,
         reason: builtins.str = ...,
+        query: builtins.str = ...,
+        executions: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Execution
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -7364,6 +7534,8 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
             b"close_time",
             "complete_operation_count",
             b"complete_operation_count",
+            "executions",
+            b"executions",
             "failure_operation_count",
             b"failure_operation_count",
             "identity",
@@ -7372,6 +7544,8 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
             b"job_id",
             "operation_type",
             b"operation_type",
+            "query",
+            b"query",
             "reason",
             b"reason",
             "start_time",
@@ -7657,6 +7831,7 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
     POLLER_SCALING_DECISION_FIELD_NUMBER: builtins.int
     POLLER_GROUP_ID_FIELD_NUMBER: builtins.int
     POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
+    POLLER_GROUPS_INFO_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """An opaque unique identifier for this task for correlating a completion request the embedded request."""
     @property
@@ -7686,6 +7861,18 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
           3. If every group has some pending polls, assign the next poll to a group randomly
             according to the weights.
         """
+    @property
+    def poller_groups_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo:
+        """The weighted, versioned list of poller groups IDs that client should use for future polls to
+        this task queue. Client should ignore this if it has already applied a snapshot with a
+        version greater than or equal to `poller_groups_info.version`. Client is expected to:
+          1. Maintain minimum number of pollers no less than the number of groups.
+          2. Try to assign the next poll to a group without any pending polls,
+          3. If every group has some pending polls, assign the next poll to a group randomly
+            according to the weights.
+        """
     def __init__(
         self,
         *,
@@ -7698,11 +7885,18 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
             temporalio.api.taskqueue.v1.message_pb2.PollerGroupInfo
         ]
         | None = ...,
+        poller_groups_info: temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "poller_scaling_decision", b"poller_scaling_decision", "request", b"request"
+            "poller_groups_info",
+            b"poller_groups_info",
+            "poller_scaling_decision",
+            b"poller_scaling_decision",
+            "request",
+            b"request",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -7712,6 +7906,8 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
             b"poller_group_id",
             "poller_group_infos",
             b"poller_group_infos",
+            "poller_groups_info",
+            b"poller_groups_info",
             "poller_scaling_decision",
             b"poller_scaling_decision",
             "request",
@@ -8748,7 +8944,6 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
-    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
     KEEP_PAUSED_FIELD_NUMBER: builtins.int
     JITTER_FIELD_NUMBER: builtins.int
     RESTORE_ORIGINAL_OPTIONS_FIELD_NUMBER: builtins.int
@@ -8765,10 +8960,6 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     """Run ID of the workflow or standalone activity."""
     identity: builtins.str
     """The identity of the client who initiated this request."""
-    reset_heartbeat: builtins.bool
-    """Indicates that activity should reset heartbeat details.
-    This flag will be applied only to the new instance of the activity.
-    """
     keep_paused: builtins.bool
     """If activity is paused, it will remain paused after reset"""
     @property
@@ -8791,7 +8982,6 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
         activity_id: builtins.str = ...,
         run_id: builtins.str = ...,
         identity: builtins.str = ...,
-        reset_heartbeat: builtins.bool = ...,
         keep_paused: builtins.bool = ...,
         jitter: google.protobuf.duration_pb2.Duration | None = ...,
         restore_original_options: builtins.bool = ...,
@@ -8813,8 +9003,6 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
             b"keep_paused",
             "namespace",
             b"namespace",
-            "reset_heartbeat",
-            b"reset_heartbeat",
             "resource_id",
             b"resource_id",
             "restore_original_options",
@@ -11864,7 +12052,7 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
         """Options for handling conflicts when using ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING."""
     @property
     def start_delay(self) -> google.protobuf.duration_pb2.Duration:
-        """Time to wait before dispatching the first activity task. This delay is not applied to retry attempts."""
+        """Time to wait before making the first activity task available for dispatch. This delay is not applied to retry attempts."""
     def __init__(
         self,
         *,

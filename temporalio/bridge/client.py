@@ -27,6 +27,7 @@ class ClientTlsConfig:
     domain: str | None
     client_cert: bytes | None
     client_private_key: bytes | None
+    verification_server_name: str | None
 
 
 @dataclass
@@ -82,6 +83,8 @@ class ClientConfig:
     http_connect_proxy_config: ClientHttpConnectProxyConfig | None
     dns_load_balancing_config: ClientDnsLoadBalancingConfig | None
     grpc_compression: str
+    payloads_warn_size: int
+    memo_warn_size: int
 
 
 @dataclass

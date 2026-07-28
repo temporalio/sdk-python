@@ -715,3 +715,47 @@ async def _start_nexus_backing_workflow(
         )
 
     return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
+
+
+async def _start_nexus_operation_workflow_update(  # pyright: ignore[reportUnusedFunction]
+    *,
+    temporal_context: _TemporalStartOperationContext,
+    workflow_id: str,
+    update: str | Callable,
+    arg: Any = temporalio.common._arg_unset,
+    args: Sequence[Any] = [],
+    update_id: str | None = None,
+    result_type: type | None = None,
+    rpc_metadata: Mapping[str, str | bytes] = {},
+    rpc_timeout: timedelta | None = None,
+    run_id: str | None = None,
+    first_execution_run_id: str | None = None,
+) -> temporalio.client.WorkflowUpdateHandle[Any]:
+    # Default update ID to the Nexus request ID for retry-safety (matches sdk-go).
+    update_id = update_id or temporal_context.nexus_context.request_id
+    # This token is different from the actual token returned to the caller
+    # because return token will have the run_id that is unknowable before
+    # making the call. If run_id is passed, then it will be the same
+    token = OperationToken(
+        type=OperationTokenType.UPDATE_WORKFLOW,
+        namespace=temporal_context.client.namespace,
+        workflow_id=workflow_id,
+        update_id=update_id,
+        run_id=run_id,
+    ).encode()
+    workflow_handle = temporal_context.client.get_workflow_handle(
+        workflow_id, run_id=run_id, first_execution_run_id=first_execution_run_id
+    )
+    return await workflow_handle._start_update(
+        update,
+        arg,
+        args=args,
+        wait_for_stage=temporalio.client.WorkflowUpdateStage.ACCEPTED,  # hardcoded as nexus only supports async updates
+        id=update_id,
+        result_type=result_type,
+        rpc_metadata=rpc_metadata,
+        rpc_timeout=rpc_timeout,
+        callbacks=temporal_context._get_callbacks(token),
+        links=temporal_context._get_request_links(),
+        request_id=temporal_context.nexus_context.request_id,
+    )
