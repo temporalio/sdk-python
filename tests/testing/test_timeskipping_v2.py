@@ -561,6 +561,24 @@ async def test_get_time_skipping_info_during_workflow(
             await handle.result()
 
 
+async def test_get_time_skipping_info_returns_none_when_ts_never_enabled(
+    env: WorkflowEnvironment,
+) -> None:
+    async with new_worker(env.client, InteractionWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                InteractionWorkflow.run,
+                1,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        try:
+            assert await env.get_time_skipping_info(handle) is None
+        finally:
+            await handle.signal(InteractionWorkflow.proceed)
+            await handle.result()
+
+
 async def test_time_skipping_virtual_clock(
     env: WorkflowEnvironment,
 ) -> None:

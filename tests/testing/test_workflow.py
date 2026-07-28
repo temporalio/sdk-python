@@ -334,6 +334,15 @@ async def test_ui_port():
         assert env.client is not None
 
 
+async def test_get_time_skipping_info_raises_on_non_ts_env(client: Client):
+    """``get_time_skipping_info`` on a non-v2 environment raises ``RuntimeError``.
+    The check fails env-side before any RPC, so no workflow needs to exist."""
+    async with WorkflowEnvironment.from_client(client) as env:
+        handle = client.get_workflow_handle(f"wf-{uuid.uuid4()}")
+        with pytest.raises(RuntimeError, match=r"V2 time-skipping"):
+            await env.get_time_skipping_info(handle)
+
+
 def assert_timestamp_from_now(
     ts: datetime | float, expected_from_now: float, max_delta: float = 30
 ) -> None:
