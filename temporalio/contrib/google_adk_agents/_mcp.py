@@ -97,9 +97,7 @@ class TemporalMcpToolSetProvider:
 
         Args:
             name: Name prefix for the generated activities.
-            toolset_factory: Factory function that creates McpToolset instances. It
-                receives the ``factory_argument`` from the workflow, or ``None`` if the
-                workflow did not provide one.
+            toolset_factory: Factory function that creates McpToolset instances.
         """
         super().__init__()
         self._name = name
@@ -232,9 +230,8 @@ class TemporalMcpToolSet(BaseToolset):
         Args:
             name: Name of the toolset (used for activity naming).
             config: Optional activity configuration.
-            factory_argument: Optional argument passed to the ``toolset_factory``
-                registered on ``TemporalMcpToolSetProvider``. ``not_in_workflow_toolset``
-                always receives ``None``. Must not contain secrets.
+            factory_argument: Optional argument passed to ``toolset_factory``.
+                Must not contain secrets.
             not_in_workflow_toolset: Optional factory that returns the
                 underlying ``McpToolset`` to use when this wrapper executes
                 outside ``workflow.in_workflow()``, such as local ADK runs.

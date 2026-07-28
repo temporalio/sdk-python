@@ -153,8 +153,7 @@ class StatelessMCPServerProvider:
             name: The name of the MCP server.
             server_factory: A function which will produce MCPServer instances. It should return a new server each time
                 so that state is not shared between workflow runs. It may accept a single positional parameter, which
-                receives the ``factory_argument`` from the workflow; if it declares no parameters, that argument is
-                discarded.
+                receives a ``factory_argument`` from the workflow.
         """
         self._server_factory = server_factory
 
@@ -439,8 +438,8 @@ class StatefulMCPServerProvider:
         Args:
             name: The name of the MCP server.
             server_factory: A function which will produce MCPServer instances. It should return a new server each time
-                so that state is not shared between workflow runs. It receives the ``factory_argument`` from the
-                workflow, or ``None`` if the workflow did not provide one.
+                so that state is not shared between workflow runs. It receives an optional ``factory_argument`` from the
+                workflow.
         """
         self._server_factory = server_factory
         self._name = name + "-stateful"
