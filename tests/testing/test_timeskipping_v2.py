@@ -716,8 +716,8 @@ async def test_overriding_fast_forward_raises_on_original(
     async def _wait_for_ff_id(
         expect_change_from: str | None,
     ) -> str:
-        """Poll describe until fast_forward_info.fast_forward_id is set and,
-        if given, differs from the previous id."""
+        """Poll the workflow's TimeSkippingInfo until fast_forward_info.
+        fast_forward_id is set and, if given, differs from the previous id."""
         deadline = monotonic() + 10
         while monotonic() < deadline:
             if original.done() and expect_change_from is None:
@@ -725,11 +725,9 @@ async def test_overriding_fast_forward_raises_on_original(
                 raise AssertionError(
                     f"first completed before second ran (returned {val!r})"
                 )
-            desc = await handle.describe()
-            ffi = (
-                desc.raw_description.workflow_extended_info.time_skipping_info.fast_forward_info
-            )
-            if ffi.fast_forward_id and ffi.fast_forward_id != expect_change_from:
+            tsi = await env.get_time_skipping_info(handle)
+            ffi = tsi.fast_forward_info if tsi is not None else None
+            if ffi and ffi.fast_forward_id and ffi.fast_forward_id != expect_change_from:
                 return ffi.fast_forward_id
             await asyncio.sleep(0.05)
         raise AssertionError("timed out waiting for expected fast_forward_id")
