@@ -622,24 +622,32 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         )
         await self._client.test_service.unlock_time_skipping_with_sleep(req)
 
-    async def get_current_time(self) -> datetime:
+    async def get_current_time(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any] | None = None,
+    ) -> datetime:
         """Current time known to this environment.
 
-        System time on non-time-skipping envs; the v1 test server's virtual clock on
-        v1 envs. Unsupported on v2 envs — read history events
-        (``WorkflowExecutionTimeSkippingTransitioned``) or define a
-        workflow-side query returning ``workflow.now()``.
+        System time on non-time-skipping envs; the v1 test server's virtual
+        clock on v1 envs. On v2 envs a ``handle`` is required — each
+        workflow has its own virtual clock, read via
+        ``TimeSkippingInfo.current_time``.
+
+        Args:
+            handle: On v2 envs, the workflow whose virtual clock to read.
+                Ignored on non-v2 envs.
 
         Raises:
-            RuntimeError: If called on a time-skipping v2 environment.
+            RuntimeError: If called on a v2 env without a ``handle``.
         """
         if self._ts_skipper is not None:
-            raise RuntimeError(
-                "env.get_current_time is not supported in time-skipping v2 "
-                "environments; read history events "
-                "(WorkflowExecutionTimeSkippingTransitioned) or define a "
-                "workflow.query returning workflow.now()."
-            )
+            if handle is None:
+                raise RuntimeError(
+                    "env.get_current_time requires a workflow handle in "
+                    "time-skipping v2 environments; each workflow has its "
+                    "own virtual clock."
+                )
+            return await self._ts_skipper.get_current_time(handle)
         # Use regular time if no time skipping
         if not self._supports_time_skipping_v1:
             return await super().get_current_time()

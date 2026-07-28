@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import google.protobuf.field_mask_pb2
@@ -257,6 +257,22 @@ class TimeSkipper:
         if not ext.HasField("time_skipping_info"):
             return None
         return ext.time_skipping_info
+
+    async def get_current_time(
+        self,
+        handle: temporalio.client.WorkflowHandle[Any, Any],
+    ) -> datetime:
+        """Get a workflow's current virtual time.
+
+        Reads ``TimeSkippingInfo.current_time`` via
+        :py:meth:`get_time_skipping_info`. If time skipping has never been
+        enabled on the workflow, falls back to wall-clock time (the two
+        coincide when no skipping has ever happened).
+        """
+        tsi = await self.get_time_skipping_info(handle)
+        if tsi is None:
+            return datetime.now(timezone.utc)
+        return tsi.current_time.ToDatetime().replace(tzinfo=timezone.utc)
 
     async def _update_time_skipping_config(
         self,

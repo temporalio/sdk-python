@@ -37,9 +37,7 @@ async def test_workflow_env_time_skipping_basic_v2():
             )
             result = await handle.result()
             assert result["message"] == "all done"
-            assert_timestamp_from_now(
-                await handle.query(SleepWorkflow.now), 100000
-            )
+            assert_timestamp_from_now(await env.get_current_time(handle), 100000)
             await assert_time_was_skipped(handle)
 
 
@@ -58,16 +56,12 @@ async def test_workflow_env_time_skipping_manual_v2():
                     task_queue=worker.task_queue,
                 )
 
-            async def workflow_current_time() -> float:
-                # Signal first so the next query timestamp is from a
-                # non-query-only workflow task.
-                await handle.signal(SleepWorkflow.tick)
-                return await handle.query(SleepWorkflow.now)
-
-            assert_timestamp_from_now(await workflow_current_time(), 0, max_delta=1)
+            assert_timestamp_from_now(
+                await env.get_current_time(handle), 0, max_delta=1
+            )
 
             assert await env.fast_forward(handle, timedelta(seconds=1000))
-            assert_timestamp_from_now(await workflow_current_time(), 1000)
+            assert_timestamp_from_now(await env.get_current_time(handle), 1000)
             await assert_time_was_skipped(handle)
 
             await handle.cancel()
@@ -131,7 +125,5 @@ async def test_workflow_env_time_skipping_basic_via_update_v2():
             assert not await env.fast_forward(handle, None)
             result = await handle.result()
             assert result["message"] == "all done"
-            assert_timestamp_from_now(
-                await handle.query(SleepWorkflow.now), 100000
-            )
+            assert_timestamp_from_now(await env.get_current_time(handle), 100000)
             await assert_time_was_skipped(handle)

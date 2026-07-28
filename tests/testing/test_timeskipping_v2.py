@@ -60,10 +60,6 @@ class InteractionWorkflow:
     def get_signal_count(self) -> int:
         return self.signals_received
 
-    @workflow.query
-    def current_time(self) -> float:
-        return workflow.now().timestamp()
-
 
 async def test_skip_full_run(env: WorkflowEnvironment) -> None:
     """Enable time skipping, let workflow run to completion."""
@@ -123,7 +119,7 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
             )
 
         # Baseline: workflow's virtual clock before any fast-forward.
-        t0 = await handle.query(InteractionWorkflow.current_time)
+        t0 = await env.get_current_time(handle)
 
         # Fast-forward 1h; skipping pauses so we can interact.
         assert await env.fast_forward(handle, timedelta(hours=1)), (
@@ -131,16 +127,16 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
         )
         await handle.signal(InteractionWorkflow.proceed)
         assert await handle.query(InteractionWorkflow.get_signal_count) == 1
-        t1 = await handle.query(InteractionWorkflow.current_time)
-        assert_duration_same(3600, t1 - t0, tolerance=10)
+        t1 = await env.get_current_time(handle)
+        assert_duration_same(3600, (t1 - t0).total_seconds(), tolerance=10)
 
         # Fast-forward another 1h, then send the second signal to release.
         assert await env.fast_forward(handle, timedelta(hours=1)), (
             "expected second fast-forward to complete at 2h total"
         )
         await handle.signal(InteractionWorkflow.proceed)
-        t2 = await handle.query(InteractionWorkflow.current_time)
-        assert_duration_same(7200, t2 - t0, tolerance=10)
+        t2 = await env.get_current_time(handle)
+        assert_duration_same(7200, (t2 - t0).total_seconds(), tolerance=10)
 
         result = await handle.result()
         wall_elapsed = monotonic() - wall_start
@@ -165,18 +161,12 @@ async def test_partial_fast_forward_then_unbounded(
                 task_queue=worker.task_queue,
             )
 
-        async def wf_now() -> float:
-            # Signal first so the query reads workflow.now() as of a fresh
-            # non-query workflow task, not the workflow's initial one.
-            await handle.signal(SleepWorkflow.tick)
-            return await handle.query(SleepWorkflow.now)
-
-        t0 = await wf_now()
+        t0 = await env.get_current_time(handle)
 
         # Fast-forward 30m; time skipping auto-disables at that point.
         assert await env.fast_forward(handle, timedelta(minutes=30))
-        t1 = await wf_now()
-        assert_duration_same(30 * 60, t1 - t0, tolerance=10)
+        t1 = await env.get_current_time(handle)
+        assert_duration_same(30 * 60, (t1 - t0).total_seconds(), tolerance=10)
 
         # Unbounded resume — the workflow's remaining 30m timer fires and it
         # completes. fast_forward returns False because unbounded (duration=None)
@@ -187,8 +177,8 @@ async def test_partial_fast_forward_then_unbounded(
         assert result["message"] == "all done"
 
         # Final virtual time on the closed workflow is ~+1h from start.
-        t_end = await handle.query(SleepWorkflow.now)
-        assert_duration_same(3600, t_end - t0, tolerance=10)
+        t_end = await env.get_current_time(handle)
+        assert_duration_same(3600, (t_end - t0).total_seconds(), tolerance=10)
 
         await assert_time_was_skipped(handle)
 
@@ -587,14 +577,10 @@ async def test_time_skipping_virtual_clock(
         wf_start_wall = datetime.now(tz=timezone.utc)
         # FF 1h. Virtual clock advances to +1h and time skipping auto-disables.
         assert await env.fast_forward(handle, timedelta(hours=1))
-        tsi = await env.get_time_skipping_info(handle)
-        assert tsi is not None and tsi.HasField("current_time"), (
-            "TimeSkippingInfo.current_time is not populated"
-        )
-        current_time = tsi.current_time.ToDatetime().replace(tzinfo=timezone.utc)
+        current_time = await env.get_current_time(handle)
         offset_seconds = (current_time - wf_start_wall).total_seconds()
         assert 3550 <= offset_seconds <= 3700, (
-            f"time_skipping_info.current_time is {offset_seconds}s past "
+            f"virtual current_time is {offset_seconds}s past "
             f"wf_start_wall; expected ~3600s (1h FF)"
         )
         await handle.cancel()
