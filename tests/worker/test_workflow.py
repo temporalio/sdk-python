@@ -6275,6 +6275,9 @@ class _UnfinishedHandlersWarningsTest:
 class UnfinishedHandlersOnWorkflowTerminationWorkflow:
     def __init__(self) -> None:
         self.handlers_may_finish = False
+        self.handler_started = False
+        self.ready_for_termination = False
+        self.termination_requested = False
 
     @workflow.run
     async def run(
@@ -6291,18 +6294,23 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
             "-wait-all-handlers-finish-", "-no-wait-all-handlers-finish-"
         ],
     ) -> NoReturn:
+        if workflow_termination_type == "-fail-post-continue-as-new-run-":
+            raise ApplicationError("Deliberately failing post-ContinueAsNew run")
+
         if handler_registration == "-late-registered-":
             if handler_dynamism == "-dynamic-":
 
                 async def my_late_registered_dynamic_update(
                     _name: str, _args: Sequence[RawValue]
                 ) -> str:
+                    self.handler_started = True
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-dynamic-update-result"
 
                 async def my_late_registered_dynamic_signal(
                     _name: str, _args: Sequence[RawValue]
                 ) -> None:
+                    self.handler_started = True
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
                 workflow.set_dynamic_update_handler(my_late_registered_dynamic_update)
@@ -6310,10 +6318,12 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
             else:
 
                 async def my_late_registered_update() -> str:
+                    self.handler_started = True
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-update-result"
 
                 async def my_late_registered_signal() -> None:
+                    self.handler_started = True
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
                 workflow.set_update_handler(
@@ -6323,16 +6333,17 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
                     "my_late_registered_signal", my_late_registered_signal
                 )
 
+        await workflow.wait_condition(lambda: self.handler_started)
         if handler_waiting == "-wait-all-handlers-finish-":
             self.handlers_may_finish = True
             await workflow.wait_condition(workflow.all_handlers_finished)
+        self.ready_for_termination = True
+        await workflow.wait_condition(lambda: self.termination_requested)
         if workflow_termination_type == "-failure-":
             raise ApplicationError(
                 "Deliberately failing workflow with an unfinished handler"
             )
-        elif workflow_termination_type == "-fail-post-continue-as-new-run-":
-            raise ApplicationError("Deliberately failing post-ContinueAsNew run")
-        elif workflow_termination_type == "-continue-as-new-":
+        if workflow_termination_type == "-continue-as-new-":
             # Fail next run so that test terminates
             workflow.continue_as_new(
                 args=[
@@ -6348,21 +6359,33 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
 
     @workflow.update
     async def my_update(self) -> str:
+        self.handler_started = True
         await workflow.wait_condition(lambda: self.handlers_may_finish)
         return "update-result"
 
     @workflow.signal
     async def my_signal(self) -> None:
+        self.handler_started = True
         await workflow.wait_condition(lambda: self.handlers_may_finish)
 
     @workflow.update(dynamic=True)
     async def my_dynamic_update(self, _name: str, _args: Sequence[RawValue]) -> str:
+        self.handler_started = True
         await workflow.wait_condition(lambda: self.handlers_may_finish)
         return "my-dynamic-update-result"
 
     @workflow.signal(dynamic=True)
     async def my_dynamic_signal(self, _name: str, _args: Sequence[RawValue]) -> None:
+        self.handler_started = True
         await workflow.wait_condition(lambda: self.handlers_may_finish)
+
+    @workflow.signal
+    def request_termination(self) -> None:
+        self.termination_requested = True
+
+    @workflow.query
+    def is_ready_for_termination(self) -> bool:
+        return self.ready_for_termination
 
 
 @pytest.mark.parametrize("handler_type", ["-signal-", "-update-"])
@@ -6430,9 +6453,6 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
         update_id = "update-id"
         task_queue = "tq"
 
-        # We require a startWorkflow, an update, and maybe a cancellation request, to be delivered
-        # in the same WFT. To do this we start the worker after they've all been accepted by the
-        # server.
         handle = await self.client.start_workflow(
             UnfinishedHandlersOnWorkflowTerminationWorkflow.run,
             args=[
@@ -6444,36 +6464,6 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             id=workflow_id,
             task_queue=task_queue,
         )
-        if self.workflow_termination_type == "-cancellation-":
-            await handle.cancel()
-
-        if self.handler_type == "-update-":
-            update_method = (
-                "__does_not_exist__"
-                if self.handler_dynamism == "-dynamic-"
-                else "my_late_registered_update"
-                if self.handler_registration == "-late-registered-"
-                else UnfinishedHandlersOnWorkflowTerminationWorkflow.my_update
-            )
-            update_task = asyncio.create_task(
-                handle.execute_update(
-                    update_method,  # type: ignore
-                    id=update_id,
-                )
-            )
-            await assert_eq_eventually(
-                True,
-                lambda: workflow_update_exists(self.client, workflow_id, update_id),
-            )
-        else:
-            signal_method = (
-                "__does_not_exist__"
-                if self.handler_dynamism == "-dynamic-"
-                else "my_late_registered_signal"
-                if self.handler_registration == "-late-registered-"
-                else UnfinishedHandlersOnWorkflowTerminationWorkflow.my_signal
-            )
-            await handle.signal(signal_method)  # type: ignore
 
         async with new_worker(
             self.client,
@@ -6481,6 +6471,43 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             task_queue=task_queue,
         ):
             with pytest.WarningsRecorder() as warnings:
+                if self.handler_type == "-update-":
+                    update_method = (
+                        "__does_not_exist__"
+                        if self.handler_dynamism == "-dynamic-"
+                        else "my_late_registered_update"
+                        if self.handler_registration == "-late-registered-"
+                        else UnfinishedHandlersOnWorkflowTerminationWorkflow.my_update
+                    )
+                    update_task = asyncio.create_task(
+                        handle.execute_update(
+                            update_method,  # type: ignore
+                            id=update_id,
+                        )
+                    )
+                else:
+                    signal_method = (
+                        "__does_not_exist__"
+                        if self.handler_dynamism == "-dynamic-"
+                        else "my_late_registered_signal"
+                        if self.handler_registration == "-late-registered-"
+                        else UnfinishedHandlersOnWorkflowTerminationWorkflow.my_signal
+                    )
+                    await handle.signal(signal_method)  # type: ignore
+
+                async def is_ready_for_termination() -> bool:
+                    return await handle.query(
+                        UnfinishedHandlersOnWorkflowTerminationWorkflow.is_ready_for_termination
+                    )
+
+                await assert_eq_eventually(True, is_ready_for_termination)
+                if self.workflow_termination_type == "-cancellation-":
+                    await handle.cancel()
+                else:
+                    await handle.signal(
+                        UnfinishedHandlersOnWorkflowTerminationWorkflow.request_termination
+                    )
+
                 if self.handler_type == "-update-":
                     assert update_task  # type: ignore[reportUnboundVariable]
                     if self.handler_waiting == "-wait-all-handlers-finish-":
