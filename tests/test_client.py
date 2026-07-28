@@ -1561,6 +1561,11 @@ async def test_schedule_last_completion_result(
 
         expected_first_result: tuple[int, str | None] = (1, "My First Result")
         await assert_eq_eventually(expected_first_result, get_schedule_result)
+
+        async def no_running_actions() -> bool:
+            return not (await handle.describe()).info.running_actions
+
+        await assert_eq_eventually(True, no_running_actions)
         await handle.trigger()
         expected_second_result: tuple[int, str | None] = (
             2,
