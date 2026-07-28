@@ -20,6 +20,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added experimental SDK payload converter support for values and type hints
+  decorated with `@transfer_type_convertible(...)` using a `TransferTypeConverter` class.
+  This lets types with transfer type converters delegate their wire representation to the
+  configured payload converter, preserving SDK behavior such as serialization
+  contexts.
 - Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
   instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
   HTTP/2 authority values, which keep following the connected host, so it can be used when the
@@ -37,6 +42,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Breaking Changes
 
+- Custom workflow runners that construct `WorkflowInstanceDetails` must now pass
+  `payload_converter_factory` instead of `payload_converter_class`. The factory
+  returns the already wrapped payload converter that workflow instances should
+  use.
+- System Nexus payload converter helpers added for generated bindings are now
+  private implementation details, and the remaining public `temporalio.nexus.system`
+  APIs are marked experimental and subject to change.
 - Payload size limits have moved from `DataConverter` to `Client.connect`. Pass
   `payload_limits=PayloadLimitsConfig(...)` (now exported from
   `temporalio.client`) instead of setting `payload_limits` on `DataConverter`.

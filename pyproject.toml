@@ -261,7 +261,7 @@ manifest-path = "temporalio/bridge/Cargo.toml"
 module-name = "temporalio.bridge.temporal_sdk_bridge"
 python-packages = ["temporalio"]
 include = ["LICENSE"]
-exclude = ["temporalio/bridge/target/**/*"]
+exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 
 [tool.uv]
 # Prevent uv commands from building the package by default

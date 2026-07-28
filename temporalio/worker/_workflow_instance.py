@@ -157,7 +157,7 @@ class PatchActivationInput:
 class WorkflowInstanceDetails:
     """Immutable details for creating a workflow instance."""
 
-    payload_converter_class: type[temporalio.converter.PayloadConverter]
+    payload_converter_factory: Callable[[], temporalio.converter.PayloadConverter]
     failure_converter_class: type[temporalio.converter.FailureConverter]
     interceptor_classes: Sequence[type[WorkflowInboundInterceptor]]
     defn: temporalio.workflow._Definition
@@ -269,7 +269,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._defn = det.defn
         self._workflow_input: ExecuteWorkflowInput | None = None
         self._info = det.info
-        self._context_free_payload_converter = det.payload_converter_class()
+        self._context_free_payload_converter = det.payload_converter_factory()
         self._context_free_failure_converter = det.failure_converter_class()
         workflow_context = temporalio.converter.WorkflowSerializationContext(
             namespace=det.info.namespace,
@@ -2130,7 +2130,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         t.uncancel()  # type: ignore[union-attr]
 
         payload_converter = (
-            temporalio.nexus.system.get_payload_converter()
+            temporalio.nexus.system._get_payload_converter(
+                self._workflow_context_payload_converter
+            )
             if temporalio.nexus.system.is_system_endpoint(input.endpoint)
             else self._context_free_payload_converter
         )

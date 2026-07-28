@@ -61,7 +61,7 @@ class PayloadVisitor:
         endpoint: str,
         payload: Payload,
     ) -> None:
-        new_payload = await temporalio.nexus.system.maybe_visit_payload(
+        new_payload = await temporalio.nexus.system._maybe_visit_payload(
             endpoint,
             payload,
             fs,
