@@ -449,9 +449,11 @@ To recover from such failures, you need to implement your own application-level 
 
 ### Factory Arguments
 
-Both `stateless_mcp_server()` and `stateful_mcp_server()` accept an optional `factory_argument`. It is sent to the MCP activities and passed to the registered server factory when the MCP server is created.
+Both `stateless_mcp_server()` and `stateful_mcp_server()` accept an optional `factory_argument`, which is passed to the registered server factory when the MCP server is created.
 
-⚠️ **Do not pass secrets, credentials, or API keys through `factory_argument`.** It is serialized as an activity argument, so it is recorded in workflow history, which is durable, replayed on every workflow replay, and visible in the Web UI. Resolve credentials worker-side inside the server factory instead (environment variable, secret manager, etc.), passing only non-secret identifiers through `factory_argument`.
+A stateless factory that declares no parameters — like the `lambda: MCPServerStdio(...)` example above — ignores the value, but it is still recorded in history.
+
+**Do not pass secrets, credentials, or API keys through `factory_argument`.** It is an activity argument, so it is recorded in workflow history and, without a payload codec, visible in the web UI. Resolve credentials worker-side inside the server factory instead.
 
 ### Hosted MCP Tool
 

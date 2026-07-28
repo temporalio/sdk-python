@@ -97,7 +97,9 @@ class TemporalMcpToolSetProvider:
 
         Args:
             name: Name prefix for the generated activities.
-            toolset_factory: Factory function that creates McpToolset instances.
+            toolset_factory: Factory function that creates McpToolset instances. It
+                receives the ``factory_argument`` from the workflow, or ``None`` if the
+                workflow did not provide one.
         """
         super().__init__()
         self._name = name
@@ -223,17 +225,16 @@ class TemporalMcpToolSet(BaseToolset):
 
         .. warning::
             Do not pass secrets, credentials, or API keys through ``factory_argument``. It
-            is serialized as an activity argument, so it is recorded in workflow history,
-            which is durable, replayed on every workflow replay, and visible in the Web UI.
-            Resolve credentials worker-side inside the toolset factory instead (environment
-            variable, secret manager, etc.), passing only non-secret identifiers through
-            ``factory_argument``.
+            is an activity argument, so it is recorded in workflow history and, without a
+            payload codec, visible in the web UI. Resolve credentials worker-side inside the
+            toolset factory instead.
 
         Args:
             name: Name of the toolset (used for activity naming).
             config: Optional activity configuration.
-            factory_argument: Optional argument passed to toolset factory. Must not
-                contain secrets; see the warning above.
+            factory_argument: Optional argument passed to the ``toolset_factory``
+                registered on ``TemporalMcpToolSetProvider``. ``not_in_workflow_toolset``
+                always receives ``None``. Must not contain secrets.
             not_in_workflow_toolset: Optional factory that returns the
                 underlying ``McpToolset`` to use when this wrapper executes
                 outside ``workflow.in_workflow()``, such as local ADK runs.
