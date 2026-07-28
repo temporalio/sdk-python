@@ -19,6 +19,7 @@ import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
+import temporalio.api.workflow.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -759,6 +760,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     INHERIT_BUILD_ID_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Deprecated. Cross-namespace operations are disabled by default as of server 1.30.1."""
     workflow_id: builtins.str
@@ -808,6 +810,13 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
         """Priority metadata. If this message is not present, or any fields are not
         present, they inherit the values from the workflow.
         """
+    @property
+    def versioning_override(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.VersioningOverride:
+        """Versioning override for the child workflow. If present, this explicit override takes
+        precedence over versioning behavior inherited from the parent workflow.
+        """
     def __init__(
         self,
         *,
@@ -830,6 +839,8 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
         | None = ...,
         inherit_build_id: builtins.bool = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        versioning_override: temporalio.api.workflow.v1.message_pb2.VersioningOverride
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -848,6 +859,8 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -885,6 +898,8 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",
