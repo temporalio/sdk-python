@@ -17,7 +17,7 @@ CHANGELOG_HEADERS = (
     "Added",
     "Changed",
     "Deprecated",
-    "Breaking Changes",
+    ":boom: Breaking Changes",
     "Fixed",
     "Security",
 )
