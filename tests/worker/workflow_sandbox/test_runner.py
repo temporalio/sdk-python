@@ -533,9 +533,9 @@ async def test_workflow_sandbox_initial_workflow_import_does_not_warn() -> None:
 
     with warnings.catch_warnings(record=True) as recorder:
         warnings.simplefilter("always")
-        SandboxedWorkflowRunner(restrictions).prepare_workflow(
-            workflow._Definition.from_class(LazyImportWorkflow)
-        )
+        definition = workflow._Definition.from_class(LazyImportWorkflow)
+        assert definition is not None
+        SandboxedWorkflowRunner(restrictions).prepare_workflow(definition)
 
     assert (
         "Module tests.worker.workflow_sandbox.test_runner was not intentionally "
