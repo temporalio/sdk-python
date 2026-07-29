@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import random
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -25,6 +26,23 @@ from temporalio.worker import (
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
+def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -> None:
+    """Installs a provider as the process-wide default for an ADK platform seam.
+
+    ADK's platform providers are held in ``ContextVar``s. Setting them with the
+    public ``set_*_provider`` helpers only affects the calling context, and
+    Temporal executes workflow code on executor threads whose contexts never
+    see that call — so the provider must be installed at the ContextVar
+    *default* level to be visible inside workflows. Rebinding the module's
+    ContextVar with a new default preserves the public setters' semantics
+    (a context-local ``set_*_provider`` still overrides the default).
+    """
+    from contextvars import ContextVar
+
+    context_var = getattr(module, var_name)
+    setattr(module, var_name, ContextVar(context_var.name, default=provider))
+
+
 def setup_deterministic_runtime():
     """Configures ADK runtime for Temporal determinism.
 
@@ -32,8 +50,11 @@ def setup_deterministic_runtime():
         This function is experimental and may change in future versions.
         Use with caution in production environments.
 
-    This should be called at the start of a Temporal Workflow before any ADK components
-    (like SessionService) are used, if they rely on runtime.get_time() or runtime.new_uuid().
+    Installs Temporal-aware time, uuid, and (when the seam exists) random
+    providers as the process-wide defaults for ADK's ``google.adk.platform``
+    seams. Inside a workflow they derive from ``workflow.now()`` /
+    ``workflow.uuid4()`` / ``workflow.random()`` so replays are
+    deterministic; outside a workflow they fall back to the real primitives.
     """
     try:
         import google.adk.platform.time
@@ -50,12 +71,42 @@ def setup_deterministic_runtime():
                 return str(workflow.uuid4())
             return str(uuid.uuid4())
 
-        google.adk.platform.time.set_time_provider(_deterministic_time_provider)
-        google.adk.platform.uuid.set_id_provider(_deterministic_id_provider)
+        _install_provider(
+            google.adk.platform.time,
+            "_time_provider_context_var",
+            _deterministic_time_provider,
+        )
+        _install_provider(
+            google.adk.platform.uuid,
+            "_id_provider_context_var",
+            _deterministic_id_provider,
+        )
     except ImportError:
         pass
     except Exception as e:
         print(f"Warning: Failed to set deterministic runtime providers: {e}")
+
+    try:
+        # Available on ADK versions that route retry jitter through the
+        # platform random seam; a no-op ImportError on older versions.
+        import google.adk.platform._random  # type: ignore
+
+        _local_random = random.Random()
+
+        def _deterministic_random_provider() -> random.Random:
+            if workflow.in_workflow():
+                return workflow.random()
+            return _local_random
+
+        _install_provider(
+            google.adk.platform._random,
+            "_random_provider_context_var",
+            _deterministic_random_provider,
+        )
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"Warning: Failed to set deterministic random provider: {e}")
 
 
 class GoogleAdkPlugin(SimplePlugin):
