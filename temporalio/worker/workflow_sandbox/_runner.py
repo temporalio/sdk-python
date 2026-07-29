@@ -135,14 +135,10 @@ class _Instance(WorkflowInstance):
         if module_name == "__main__":
             module_name = "__temporal_main__"
         try:
-            # Import user code
-            # Initial workflow loading necessarily imports the workflow module
-            # into the sandbox. It and its import-time dependencies are not
-            # accidental passthroughs, so defer notification policy until the
-            # workflow has finished loading.
-            with temporalio.workflow.unsafe.sandbox_import_notification_policy(
-                temporalio.workflow.SandboxImportNotificationPolicy.SILENT
-            ):
+            # Import user code. The workflow module is intentionally loaded
+            # into every sandbox instance, while its import-time dependencies
+            # must retain the configured warning/error policy.
+            with self.importer.initial_workflow_module_import(module_name):
                 self._run_code(
                     "with __temporal_importer.applied():\n"
                     # Import the workflow code
