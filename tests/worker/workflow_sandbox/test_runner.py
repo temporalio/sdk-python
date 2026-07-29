@@ -525,6 +525,25 @@ class LazyImportWorkflow:
             ) from err
 
 
+async def test_workflow_sandbox_initial_workflow_import_does_not_warn() -> None:
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH,
+    )
+
+    with warnings.catch_warnings(record=True) as recorder:
+        warnings.simplefilter("always")
+        SandboxedWorkflowRunner(restrictions).prepare_workflow(
+            workflow._Definition.from_class(LazyImportWorkflow)
+        )
+
+    assert (
+        "Module tests.worker.workflow_sandbox.test_runner was not intentionally "
+        "passed through to the sandbox."
+        not in {str(warning.message) for warning in recorder}
+    )
+
+
 async def test_workflow_sandbox_import_default_warnings(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,

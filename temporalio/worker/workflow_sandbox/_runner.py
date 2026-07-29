@@ -136,13 +136,20 @@ class _Instance(WorkflowInstance):
             module_name = "__temporal_main__"
         try:
             # Import user code
-            self._run_code(
-                "with __temporal_importer.applied():\n"
-                # Import the workflow code
-                f"  from {module_name} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
-                f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n",
-                __temporal_importer=self.importer,
-            )
+            # Initial workflow loading necessarily imports the workflow module
+            # into the sandbox. It and its import-time dependencies are not
+            # accidental passthroughs, so defer notification policy until the
+            # workflow has finished loading.
+            with temporalio.workflow.unsafe.sandbox_import_notification_policy(
+                temporalio.workflow.SandboxImportNotificationPolicy.SILENT
+            ):
+                self._run_code(
+                    "with __temporal_importer.applied():\n"
+                    # Import the workflow code
+                    f"  from {module_name} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
+                    f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n",
+                    __temporal_importer=self.importer,
+                )
 
             # Set context as in runtime
             self.importer.restriction_context.is_runtime = True
