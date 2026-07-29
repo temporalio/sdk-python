@@ -586,6 +586,44 @@ async def test_get_time_skipping_info_returns_none_when_ts_never_enabled(
             await handle.result()
 
 
+async def test_max_session_skip_count_stamped_by_env() -> None:
+    """Set ``max_session_skip_count`` and confirm it in the
+    WorkflowExecutionStarted event."""
+    async with await WorkflowEnvironment.start_time_skipping_v2(
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+        dev_server_extra_args=[
+            "--dynamic-config-value",
+            "frontend.WorkflowTimeSkippingEnabled=true",
+        ],
+        ts_config=TimeSkippingConfig(enabled=True, max_session_skip_count=5),
+    ) as env:
+        async with new_worker(env.client, InteractionWorkflow) as worker:
+            handle = await env.client.start_workflow(
+                InteractionWorkflow.run,
+                1,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            try:
+                started_tsc = None
+                async for event in handle.fetch_history_events():
+                    if (
+                        event.event_type
+                        == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+                    ):
+                        started_tsc = (
+                            event.workflow_execution_started_event_attributes.time_skipping_config
+                        )
+                        break
+                assert started_tsc is not None
+                assert started_tsc.max_session_skip_count == 5, (
+                    f"expected max_session_skip_count=5, got {started_tsc.max_session_skip_count}"
+                )
+            finally:
+                await handle.signal(InteractionWorkflow.proceed)
+                await handle.result()
+
+
 async def test_time_skipping_virtual_clock(
     env: WorkflowEnvironment,
 ) -> None:

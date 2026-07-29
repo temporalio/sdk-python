@@ -51,6 +51,11 @@ class TimeSkippingConfig:
     """If true, child workflows do not inherit the ``enabled`` flag. Virtual
     start time inherits regardless."""
 
+    max_session_skip_count: int = 0
+    """Max skips permitted within one time-skipping session (from when
+    skipping is enabled until it is disabled). Once reached, the server
+    auto-disables time skipping. Use ``0`` for server default."""
+
     def __post_init__(self) -> None:
         """Validates that a fast-forward isn't configured with skipping off."""
         if not self.enabled and self.fast_forward_config is not None:
@@ -62,6 +67,7 @@ class TimeSkippingConfig:
         proto = temporalio.api.common.v1.TimeSkippingConfig(
             enabled=self.enabled,
             disable_propagation=self.disable_propagation,
+            max_session_skip_count=self.max_session_skip_count,
         )
         if self.fast_forward_config is not None:
             proto.fast_forward_config.CopyFrom(self.fast_forward_config._to_proto())
