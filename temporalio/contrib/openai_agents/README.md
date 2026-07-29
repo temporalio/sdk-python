@@ -447,6 +447,14 @@ For implementation details and examples, see the [samples repository](https://gi
 When using stateful servers, the dedicated worker maintaining the connection may fail due to network issues or server problems. When this happens, Temporal raises an `ApplicationError` and cannot automatically recover because it cannot restore the lost server state.
 To recover from such failures, you need to implement your own application-level retry logic.
 
+### Factory Arguments
+
+Both `stateless_mcp_server()` and `stateful_mcp_server()` accept an optional `factory_argument`, which is passed to the registered server factory when the MCP server is created.
+
+A stateless factory that declares no parameters — like the `lambda: MCPServerStdio(...)` example above — ignores the value, but it is still recorded in history.
+
+**Do not pass secrets, credentials, or API keys through `factory_argument`.** It is an activity argument, so it is recorded in workflow history and, without a payload codec, visible in the web UI. Resolve credentials worker-side inside the server factory instead.
+
 ### Hosted MCP Tool
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
