@@ -1516,22 +1516,18 @@ async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
 
 @workflow.defn
 class LastCompletionResultWorkflow:
-    def __init__(self) -> None:
-        self.complete = False
-
     @workflow.run
     async def run(self) -> str:
         last_result = workflow.get_last_completion_result(type_hint=str)
         if last_result is not None:
             return "From last completion: " + last_result
-        await workflow.wait_condition(lambda: self.complete)
-        return "My First Result"
-
-    @workflow.signal
-    def allow_completion(self) -> None:
-        self.complete = True
+        else:
+            return "My First Result"
 
 
+# Cloud does not reliably provide a prior completion result to manually
+# triggered schedule actions.
+@pytest.mark.requires_local_server
 async def test_schedule_last_completion_result(
     client: Client, env: WorkflowEnvironment
 ):
@@ -1548,26 +1544,9 @@ async def test_schedule_last_completion_result(
                     task_queue=worker.task_queue,
                 ),
                 spec=ScheduleSpec(),
-                policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.BUFFER_ONE),
             ),
         )
         await handle.trigger()
-
-        async def has_running_action() -> bool:
-            return bool((await handle.describe()).info.running_actions)
-
-        await assert_eq_eventually(True, has_running_action)
-        first_action = cast(
-            ScheduleActionExecutionStartWorkflow,
-            (await handle.describe()).info.running_actions[0],
-        )
-        # Buffer the second action so the scheduler starts it only after recording
-        # the first run's completion result.
-        await handle.trigger()
-        await client.get_workflow_handle(
-            first_action.workflow_id,
-            run_id=first_action.first_execution_run_id,
-        ).signal(LastCompletionResultWorkflow.allow_completion)
 
         async def get_schedule_result() -> tuple[int, str | None]:
             desc = await handle.describe()
@@ -1583,6 +1562,9 @@ async def test_schedule_last_completion_result(
                 result = await workflow_handle.result()
                 return length, result
 
+        expected_first_result: tuple[int, str | None] = (1, "My First Result")
+        await assert_eq_eventually(expected_first_result, get_schedule_result)
+        await handle.trigger()
         expected_second_result: tuple[int, str | None] = (
             2,
             "From last completion: My First Result",
