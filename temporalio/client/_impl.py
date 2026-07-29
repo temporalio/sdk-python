@@ -32,6 +32,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.nexus._operation_context
+import temporalio.nexus._token
 from temporalio.activity import ActivityCancellationDetails
 from temporalio.converter import (
     ActivitySerializationContext,
@@ -246,7 +247,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             # inside a Nexus operation handler must forward the inbound Nexus task links
             # explicitly so the started callee's WorkflowExecutionStarted event links back to
             # the caller.
-            if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+            if not temporalio.nexus._operation_context._in_nexus_backing_start_context():
                 req.links.extend(nexus_ctx._get_request_links())
 
         return req
@@ -277,7 +278,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # If this signal-with-start is issued from inside a Nexus operation handler (but not the
         # nexus-backing workflow), forward the inbound Nexus task links so both the callee's
         # WorkflowExecutionStarted and WorkflowExecutionSignaled events link back to the caller.
-        if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+        if not temporalio.nexus._operation_context._in_nexus_backing_start_context():
             nexus_ctx = (
                 temporalio.nexus._operation_context._try_start_operation_context()
             )
@@ -587,6 +588,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                         input.id, input.activity_type, run_id=details.run_id
                     )
             raise
+
+        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
+        if nexus_ctx is not None:
+            nexus_ctx._add_response_link(resp.link)
+
         return ActivityHandle(
             self._client,
             input.id,
@@ -670,6 +676,44 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Set priority
         req.priority.CopyFrom(input.priority._to_proto())
 
+        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
+
+        request_links: list[temporalio.api.common.v1.Link] = []
+        if nexus_ctx is not None:
+            req.on_conflict_options.attach_request_id = True
+            req.on_conflict_options.attach_completion_callbacks = True
+            req.on_conflict_options.attach_links = True
+
+            # Add all Nexus links if we're in a Nexus context, backing or otherwise
+            request_links = nexus_ctx._get_request_links()
+
+        # Add request ID and callbacks only if we're in a backing Nexus context
+        if (
+            nexus_ctx is not None
+            and temporalio.nexus._operation_context._in_nexus_backing_start_context()
+        ):
+            req.request_id = nexus_ctx.nexus_context.request_id
+            callbacks = nexus_ctx._get_callbacks(
+                temporalio.nexus._token.OperationToken(
+                    type=temporalio.nexus._token.OperationTokenType.ACTIVITY,
+                    namespace=self._client.namespace,
+                    activity_id=input.id,
+                ).encode()
+            )
+            req.completion_callbacks.extend(
+                temporalio.api.common.v1.Callback(
+                    nexus=temporalio.api.common.v1.Callback.Nexus(
+                        url=callback.url,
+                        header=callback.headers,
+                    ),
+                    links=request_links,
+                )
+                for callback in callbacks
+            )
+
+        # Links are duplicated on request for compatibility with older server versions.
+        req.links.extend(request_links)
+
         return req
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
@@ -733,6 +777,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     is_local=False,
                 )
             ),
+            callbacks=resp.callbacks,
         )
 
     def list_activities(

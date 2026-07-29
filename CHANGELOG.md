@@ -20,6 +20,20 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.31.0] - 2026-07-29
+
+### Added
+
 - Added the `Worker` `max_eager_activity_reservations_per_workflow_task` option for configuring
   the number of activity slots reserved for eager execution per workflow task. Configured values
   must be positive; use `disable_eager_activity_execution` to disable eager activity execution.
@@ -50,8 +64,6 @@ to include examples, links to docs, or any other relevant information.
   overrides for this flag from `tests/worker/test_workflow.py`, and replace this rollout
   note with a `Fixed` entry announcing the behavior change.
 
-### Deprecated
-
 ### Breaking Changes
 
 - Custom workflow runners that construct `WorkflowInstanceDetails` must now pass
@@ -71,8 +83,6 @@ to include examples, links to docs, or any other relevant information.
 
 - Marked system Nexus envelope payloads so nested payloads can be detected and
   visited after the envelope is already stored as a payload.
-
-### Security
 
 ## [1.30.0] - 2026-07-01
 

@@ -14,6 +14,7 @@ class OperationTokenType(IntEnum):
     """Type discriminator for Nexus operation tokens."""
 
     WORKFLOW = 1
+    ACTIVITY = 2
     UPDATE_WORKFLOW = 3
 
 
@@ -28,7 +29,8 @@ class OperationToken:
     version: int | None = None
     type: OperationTokenType
     namespace: str
-    workflow_id: str
+    workflow_id: str | None = None
+    activity_id: str | None = None
     run_id: str | None = None
     update_id: str | None = None
 
@@ -37,8 +39,11 @@ class OperationToken:
         token_details: dict[str, Any] = {
             "t": self.type,
             "ns": self.namespace,
-            "wid": self.workflow_id,
         }
+        if self.workflow_id is not None:
+            token_details["wid"] = self.workflow_id
+        if self.activity_id is not None:
+            token_details["aid"] = self.activity_id
         if self.version is not None:
             token_details["v"] = self.version
         if self.run_id is not None:
@@ -90,7 +95,7 @@ class OperationToken:
             )
 
         workflow_id = token_details.get("wid")
-        if not isinstance(workflow_id, str):
+        if workflow_id is not None and not isinstance(workflow_id, str):
             raise TypeError(
                 f"invalid token: expected workflow id to be a string, got {type(workflow_id)}"
             )
@@ -103,6 +108,17 @@ class OperationToken:
                 raise TypeError(
                     f"invalid token: expected non-empty workflow id for token type `{token_type.name}`"
                 )
+
+        activity_id = token_details.get("aid")
+        if activity_id is not None and not isinstance(activity_id, str):
+            raise TypeError(
+                f"invalid token: expected activity id to be a string, got {type(activity_id)}"
+            )
+
+        if token_type == OperationTokenType.ACTIVITY and not activity_id:
+            raise TypeError(
+                f"invalid token: expected non-empty activity id for token type `{token_type.name}`"
+            )
 
         update_id = token_details.get("uid")
         if not isinstance(update_id, str | None):
@@ -123,7 +139,6 @@ class OperationToken:
             )
 
         run_id = token_details.get("rid")
-
         if not isinstance(run_id, str | None):
             raise TypeError(
                 f"invalid token: expected run_id to be a string or None, got {type(run_id)}"
@@ -133,6 +148,7 @@ class OperationToken:
             type=OperationTokenType(token_type),
             namespace=namespace,
             workflow_id=workflow_id,
+            activity_id=activity_id,
             run_id=run_id,
             version=version,
             update_id=update_id,
@@ -198,6 +214,9 @@ class WorkflowHandle(Generic[OutputT]):
             raise TypeError(
                 f"invalid workflow token type: {op_token.type}, expected: {OperationTokenType.WORKFLOW}"
             )
+
+        if not op_token.workflow_id:
+            raise TypeError("invalid workflow token: missing workflow id")
 
         if op_token.version is not None and op_token.version != 0:
             raise TypeError(

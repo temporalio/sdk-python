@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import nexusrpc
 
 import temporalio.nexus
-from temporalio import workflow
+from temporalio import activity, workflow
 from temporalio.client import Client, NexusOperationHandle
 from temporalio.nexus import TemporalOperationStartHandlerFunc
 from temporalio.service import ServiceClient
@@ -71,6 +71,40 @@ class MyFiveArgProcWorkflow:
         pass
 
 
+@activity.defn
+async def my_no_arg_activity() -> None:
+    pass
+
+
+@activity.defn
+async def my_one_arg_activity(_input: MyInput) -> None:
+    pass
+
+
+@activity.defn
+async def my_two_arg_activity(_input: MyInput, _arg2: int) -> None:
+    pass
+
+
+@activity.defn
+async def my_three_arg_activity(_input: MyInput, _arg2: int, _arg3: int) -> None:
+    pass
+
+
+@activity.defn
+async def my_four_arg_activity(
+    _input: MyInput, _arg2: int, _arg3: int, _arg4: int
+) -> None:
+    pass
+
+
+@activity.defn
+async def my_five_arg_activity(
+    _input: MyInput, _arg2: int, _arg3: int, _arg4: int, _arg5: int
+) -> None:
+    pass
+
+
 @nexusrpc.service
 class MyService:
     my_sync_operation: nexusrpc.Operation[MyInput, MyOutput]
@@ -105,8 +139,9 @@ class MyServiceHandler:
         input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
         """
-        Typed proc workflow starts from a generic Temporal Nexus operation handler
-        infer TemporalOperationResult[None] for 0 to 5 workflow parameters.
+        Typed proc workflow and activity starts from a generic Temporal Nexus
+        operation handler infer TemporalOperationResult[None] for 0 to 5
+        workflow or activity parameters.
         """
         if input == 0:
             result_0: temporalio.nexus.TemporalOperationResult[
@@ -154,6 +189,78 @@ class MyServiceHandler:
                 id="proc-5",
             )
             return result_5
+
+        # Typed activity starts infer TemporalOperationResult[None] for 0 to 5
+        # activity parameters. Activities require a start_to_close_timeout.
+        if input == 6:
+            activity_result_0: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_no_arg_activity,
+                id="activity-0",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return activity_result_0
+        if input == 7:
+            activity_result_1: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_one_arg_activity,
+                MyInput(),
+                id="activity-1",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return activity_result_1
+        if input == 8:
+            activity_result_2: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_two_arg_activity,
+                args=[MyInput(), 2],
+                id="activity-2",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return activity_result_2
+        if input == 9:
+            activity_result_3: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_three_arg_activity,
+                args=[MyInput(), 2, 3],
+                id="activity-3",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return activity_result_3
+        if input == 10:
+            activity_result_4: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_four_arg_activity,
+                args=[MyInput(), 2, 3, 4],
+                id="activity-4",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return activity_result_4
+        if input == 11:
+            activity_result_5: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_five_arg_activity,
+                args=[MyInput(), 2, 3, 4, 5],
+                id="activity-5",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return activity_result_5
+        if input == 12:
+            # assert-type-error-pyright: 'No overloads for "start_activity" match'
+            return await client.start_activity(  # type: ignore
+                my_one_arg_activity,
+                # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter'
+                "wrong-input-type",  # type: ignore
+                id="activity-wrong-input",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+
         # assert-type-error-pyright: 'No overloads for "start_workflow" match'
         return await client.start_workflow(  # type: ignore
             MyOneArgProcWorkflow.run,
