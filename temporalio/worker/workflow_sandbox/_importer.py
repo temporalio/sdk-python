@@ -321,8 +321,7 @@ class Importer:
         # The workflow module itself must be loaded into every sandbox instance.
         # That import is intentional, but its import-time dependencies still need
         # to follow the configured notification policy.
-        if name == self._initial_workflow_module_import:
-            return None
+        is_initial_workflow_module = name == self._initial_workflow_module_import
 
         # If imports not passed through and all modules are not passed through
         # and name not in passthrough modules, check parents
@@ -330,13 +329,19 @@ class Importer:
             not temporalio.workflow.unsafe.is_imports_passed_through()
             and not self.module_configured_passthrough(name)
         ):
-            if self._is_import_notification_policy_applied(
-                temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH
+            if (
+                not is_initial_workflow_module
+                and self._is_import_notification_policy_applied(
+                    temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH
+                )
             ):
                 raise UnintentionalPassthroughError(name)
 
-            if self._is_import_notification_policy_applied(
-                temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
+            if (
+                not is_initial_workflow_module
+                and self._is_import_notification_policy_applied(
+                    temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
+                )
             ):
                 warnings.warn(
                     f"Module {name} was not intentionally passed through to the sandbox."
