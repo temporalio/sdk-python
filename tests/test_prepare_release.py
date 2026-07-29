@@ -20,6 +20,8 @@ def test_finalize_changelog_release_seeds_unreleased_and_versions_notes() -> Non
 
 - Changed a thing.
 
+### :boom: Breaking Changes
+
 ### Fixed
 
 ## [1.29.0] - 2026-06-17
@@ -46,7 +48,7 @@ def test_finalize_changelog_release_seeds_unreleased_and_versions_notes() -> Non
 
 ### Deprecated
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 ### Fixed
 

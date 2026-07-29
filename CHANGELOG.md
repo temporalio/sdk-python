@@ -9,7 +9,7 @@ to include examples, links to docs, or any other relevant information.
 ### Added            — new features
 ### Changed          — changes in existing functionality
 ### Deprecated       — soon-to-be-removed features
-### Breaking Changes — removed or backwards-incompatible features
+### :boom: Breaking Changes — removed or backwards-incompatible features
 ### Fixed            — notable bug fixes
 ### Security         — notable security fixes
 -->
@@ -24,7 +24,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Deprecated
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 ### Fixed
 
@@ -64,7 +64,7 @@ to include examples, links to docs, or any other relevant information.
   overrides for this flag from `tests/worker/test_workflow.py`, and replace this rollout
   note with a `Fixed` entry announcing the behavior change.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - Custom workflow runners that construct `WorkflowInstanceDetails` must now pass
   `payload_converter_factory` instead of `payload_converter_class`. The factory
@@ -104,7 +104,7 @@ to include examples, links to docs, or any other relevant information.
   with the selected optional dependencies.
 - Standalone Nexus operation links are now forwarded on start workflow and signal requests.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - AWS Lambda worker `configure` parameter has been changed to be invoked
   per-invocation of the worker instead of only at startup. It is advised that
@@ -127,7 +127,7 @@ to include examples, links to docs, or any other relevant information.
   Pass `grpc_compression=GrpcCompression.NONE` to `Client.connect` or
   `CloudOperationsClient.connect` to disable it.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - `StartWorkflowUpdateWithStartInput` now owns the authoritative
   `rpc_metadata` and `rpc_timeout` fields for
