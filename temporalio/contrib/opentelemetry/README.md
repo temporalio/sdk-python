@@ -1,6 +1,29 @@
 # OpenTelemetry Integration for Temporal Python SDK
 
-This package provides OpenTelemetry tracing integration for Temporal workflows, activities, and other operations. It includes automatic span creation and propagation for distributed tracing across your Temporal applications.
+This package provides OpenTelemetry tracing and metrics integration for Temporal workflows, activities, and other operations. It includes automatic span creation and propagation for distributed tracing, and a `MetricsExporter` for exporting Temporal SDK/Core metrics through the standard OpenTelemetry metrics API, across your Temporal applications.
+
+## Metrics
+
+`MetricsExporter` drains a `temporalio.runtime.MetricBuffer` into an OpenTelemetry `MeterProvider`, so Temporal's own SDK/Core metrics (and any custom metrics recorded via `activity.metric_meter()`/`workflow.metric_meter()`) can be exported through the standard OpenTelemetry metrics pipeline (views, resources, any OTel-compatible backend) instead of only through `PrometheusConfig`/`OpenTelemetryConfig`.
+
+```python
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
+from temporalio.contrib.opentelemetry import MetricsExporter
+from temporalio.runtime import MetricBuffer, Runtime, TelemetryConfig
+
+buffer = MetricBuffer(10_000)
+runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
+meter_provider = MeterProvider(
+    metric_readers=[PeriodicExportingMetricReader(ConsoleMetricExporter())]
+)
+
+async with MetricsExporter(buffer, meter_provider):
+    client = await Client.connect("localhost:7233", runtime=runtime)
+    ...
+```
+
+**Note:** the `Runtime` must be constructed with the buffer attached *before* `MetricsExporter` is started, and the exporter must keep running (it polls on a fixed interval) for as long as metrics should be exported.
 
 ## Overview
 
