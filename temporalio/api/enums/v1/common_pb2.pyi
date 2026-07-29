@@ -339,3 +339,29 @@ WORKER_STATUS_RUNNING: WorkerStatus.ValueType  # 1
 WORKER_STATUS_SHUTTING_DOWN: WorkerStatus.ValueType  # 2
 WORKER_STATUS_SHUTDOWN: WorkerStatus.ValueType  # 3
 global___WorkerStatus = WorkerStatus
+
+class _ExecutionType:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ExecutionTypeEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _ExecutionType.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    EXECUTION_TYPE_UNSPECIFIED: _ExecutionType.ValueType  # 0
+    EXECUTION_TYPE_WORKFLOW: _ExecutionType.ValueType  # 1
+    """A workflow execution archetype."""
+    EXECUTION_TYPE_ACTIVITY: _ExecutionType.ValueType  # 2
+    """An activity execution archetype. This is reserved for standalone activities."""
+
+class ExecutionType(_ExecutionType, metaclass=_ExecutionTypeEnumTypeWrapper): ...
+
+EXECUTION_TYPE_UNSPECIFIED: ExecutionType.ValueType  # 0
+EXECUTION_TYPE_WORKFLOW: ExecutionType.ValueType  # 1
+"""A workflow execution archetype."""
+EXECUTION_TYPE_ACTIVITY: ExecutionType.ValueType  # 2
+"""An activity execution archetype. This is reserved for standalone activities."""
+global___ExecutionType = ExecutionType

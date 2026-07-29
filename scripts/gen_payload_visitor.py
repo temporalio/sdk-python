@@ -189,22 +189,9 @@ class PayloadVisitor:
     async def _visit_nexus_operation_input_payload(
         self,
         fs: VisitorFunctions,
-        endpoint: str,
         payload: Payload,
     ) -> None:
-        new_payload = await temporalio.nexus.system._maybe_visit_payload(
-            endpoint,
-            payload,
-            fs,
-            self.skip_search_attributes,
-        )
-        if new_payload is None:
-            await self._visit_temporal_api_common_v1_Payload(fs, payload)
-            return
-
-        if new_payload is not payload:
-            payload.CopyFrom(new_payload)
-        await fs.visit_system_nexus_envelope(payload)
+        await self._visit_temporal_api_common_v1_Payload(fs, payload)
 
 """
 
@@ -219,8 +206,21 @@ class PayloadVisitor:
         self.in_progress: set[str] = set()
         self.methods: list[str] = [
             """\
-    async def _visit_temporal_api_common_v1_Payload(self, fs: VisitorFunctions, o: Payload):
-        await fs.visit_payload(o)
+    async def _visit_temporal_api_common_v1_Payload(
+        self, fs: VisitorFunctions, payload: Payload
+    ) -> None:
+        new_payload = await temporalio.nexus.system.maybe_visit_payload(
+            payload,
+            fs,
+            self.skip_search_attributes,
+        )
+        if new_payload is None:
+            await fs.visit_payload(payload)
+            return
+
+        if new_payload is not payload:
+            payload.CopyFrom(new_payload)
+        await fs.visit_system_nexus_envelope(payload)
     """,
             """\
     async def _visit_temporal_api_common_v1_Payloads(self, fs: VisitorFunctions, o: Any):
@@ -404,11 +404,11 @@ class PayloadVisitor:
                         )
                     )
                 elif item[0] == "system_nexus":
-                    _, field_name, endpoint_expr, payload_expr = item
+                    _, field_name, _endpoint_expr, payload_expr = item
                     lines.append(
                         f'        if o.HasField("{field_name}"):\n'
                         "            await self._visit_nexus_operation_input_payload(\n"
-                        f"                fs, {endpoint_expr}, {payload_expr}\n"
+                        f"                fs, {payload_expr}\n"
                         "            )"
                     )
                 else:  # oneof_group
@@ -427,28 +427,20 @@ def write_bridge_visitors() -> None:
     out_path = base_dir / "temporalio" / "bridge" / "_visitor.py"
 
     # Build root descriptors: WorkflowActivation, WorkflowActivationCompletion,
-    # NexusTaskCompletion, and all messages from selected API modules
+    # NexusTaskCompletion, and the system Nexus operation roots.
     roots: list[Descriptor] = [
         WorkflowActivation.DESCRIPTOR,
         WorkflowActivationCompletion.DESCRIPTOR,
         NexusTaskCompletion.DESCRIPTOR,
-    ]
+    ] + discover_system_nexus_roots()
 
     code = VisitorGenerator().generate(roots)
-    out_path.write_text(code)
-
-
-def write_system_nexus_payload_visitors() -> None:
-    out_path = base_dir / "temporalio" / "nexus" / "system" / "_payload_visitor.py"
-    code = VisitorGenerator().generate(discover_system_nexus_roots())
     out_path.write_text(code)
 
 
 if __name__ == "__main__":
     print("Generating temporalio/bridge/_visitor.py...", file=sys.stderr)
     write_bridge_visitors()
-    print("Generating temporalio/nexus/system/_payload_visitor.py...", file=sys.stderr)
-    write_system_nexus_payload_visitors()
     subprocess.run(
         [
             "uv",
@@ -459,7 +451,6 @@ if __name__ == "__main__":
             "I",
             "--fix",
             "temporalio/bridge/_visitor.py",
-            "temporalio/nexus/system/_payload_visitor.py",
         ],
         cwd=base_dir,
         check=True,
@@ -471,7 +462,6 @@ if __name__ == "__main__":
             "ruff",
             "format",
             "temporalio/bridge/_visitor.py",
-            "temporalio/nexus/system/_payload_visitor.py",
         ],
         cwd=base_dir,
         check=True,

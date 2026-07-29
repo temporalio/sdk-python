@@ -81,8 +81,13 @@ class TransferTypeConverter(Generic[ValueT, TransferTypeT], ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def from_transfer_type(self, value: TransferTypeT) -> ValueT:
+    def from_transfer_type(
+        self, value: TransferTypeT, type_hint: type[ValueT]
+    ) -> ValueT:
         """Convert a transfer type value to its user-facing value.
+
+        ``type_hint`` is the requested user-facing type, including concrete
+        generic arguments.
 
         .. warning::
             This API is experimental and subject to change.
@@ -638,8 +643,10 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
             payloads, typing.cast("list[type]", inner_type_hints)
         )
         return [
-            converter.from_transfer_type(value) if converter is not None else value
-            for value, converter in zip(values, converters)
+            converter.from_transfer_type(value, type_hint)
+            if converter is not None
+            else value
+            for value, converter, type_hint in zip(values, converters, type_hints)
         ]
 
     def with_context(self, context: SerializationContext) -> Self:

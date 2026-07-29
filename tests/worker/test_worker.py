@@ -1744,6 +1744,37 @@ def test_worker_config_matches_init_params():
     )
 
 
+async def test_worker_max_eager_activity_reservations_per_workflow_task_config(
+    client: Client,
+):
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        max_eager_activity_reservations_per_workflow_task=7,
+    )
+    assert worker.config().get("max_eager_activity_reservations_per_workflow_task") == 7
+
+
+@pytest.mark.parametrize("value", [0, -1])
+async def test_worker_rejects_non_positive_max_eager_activity_reservations(
+    client: Client, value: int
+):
+    with pytest.raises(
+        ValueError,
+        match=(
+            "max_eager_activity_reservations_per_workflow_task must be positive; "
+            "use disable_eager_activity_execution=True to disable eager activity execution"
+        ),
+    ):
+        Worker(
+            client,
+            workflows=[SimpleWorkflow],
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            max_eager_activity_reservations_per_workflow_task=value,
+        )
+
+
 async def test_worker_debug_mode(client: Client):
     worker = Worker(
         client,
