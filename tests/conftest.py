@@ -143,6 +143,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "history.enableSignalWithStartFromWorkflow=true",
                 "--dynamic-config-value",
                 "history.enableUpdateCallbacks=true",
+                "--dynamic-config-value",
+                "activity.enableCallbacks=true",
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
