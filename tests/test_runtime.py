@@ -21,6 +21,7 @@ from temporalio.runtime import (
     TelemetryFilter,
     _RuntimeRef,
 )
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import (
     LogHandler,
@@ -37,22 +38,18 @@ class HelloWorkflow:
         return f"Hello, {name}!"
 
 
-async def test_different_runtimes(client: Client):
+async def test_different_runtimes(env: WorkflowEnvironment):
     # Create two workers in separate runtimes and run workflows on them.
     # Confirm they each have different Prometheus addresses.
     prom_addr1 = f"127.0.0.1:{find_free_port()}"
-    client1 = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client1 = await env.connect_client(
         runtime=Runtime(
             telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr1))
         ),
     )
 
     prom_addr2 = f"127.0.0.1:{find_free_port()}"
-    client2 = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client2 = await env.connect_client(
         runtime=Runtime(
             telemetry=TelemetryConfig(metrics=PrometheusConfig(bind_address=prom_addr2))
         ),
@@ -151,16 +148,14 @@ class TaskFailWorkflow:
         raise RuntimeError("Intentional error")
 
 
-async def test_runtime_task_fail_log_forwarding(client: Client):
+async def test_runtime_task_fail_log_forwarding(env: WorkflowEnvironment):
     # Client with lo capturing runtime
     log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
     log_queue_list = cast(list[logging.LogRecord], log_queue.queue)
     handler = logging.handlers.QueueHandler(log_queue)
     logger = logging.getLogger(f"log-{uuid.uuid4()}")
     logger.setLevel(logging.WARN)
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=Runtime(
             telemetry=TelemetryConfig(
                 logging=LoggingConfig(
@@ -199,7 +194,7 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
         assert record.temporal_log.fields["run_id"] == handle.result_run_id  # type: ignore
 
 
-async def test_prometheus_histogram_bucket_overrides(client: Client):
+async def test_prometheus_histogram_bucket_overrides(env: WorkflowEnvironment):
     # Set up a Prometheus configuration with custom histogram bucket overrides
     prom_addr = f"127.0.0.1:{find_free_port()}"
     special_value = float(1234.5678)
@@ -229,9 +224,7 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     custom_histogram.record(600)
 
     # Create client with overrides
-    client_with_overrides = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client_with_overrides = await env.connect_client(
         runtime=runtime,
     )
 
@@ -270,7 +263,7 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
     await assert_eventually(check_metrics)
 
 
-async def test_opentelemetry_histogram_bucket_overrides(client: Client):
+async def test_opentelemetry_histogram_bucket_overrides(env: WorkflowEnvironment):
     # Set up an OpenTelemetry configuration with custom histogram bucket overrides
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -336,9 +329,7 @@ async def test_opentelemetry_histogram_bucket_overrides(client: Client):
 
         # Run a workflow so built-in histograms (e.g. temporal_long_request_latency)
         # are recorded and exported.
-        client_with_overrides = await Client.connect(
-            client.service_client.config.target_host,
-            namespace=client.namespace,
+        client_with_overrides = await env.connect_client(
             runtime=runtime,
         )
         task_queue = f"task-queue-{uuid.uuid4()}"

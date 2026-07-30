@@ -233,6 +233,7 @@ class ComprehensiveWorkflow:
             raise ValueError("Status cannot be empty")
 
 
+@pytest.mark.requires_local_server
 async def test_opentelemetry_comprehensive_tracing(
     client: Client,
     env: WorkflowEnvironment,

@@ -60,6 +60,7 @@ class MyClientPlugin(temporalio.client.Plugin):
         return await next(config)
 
 
+@pytest.mark.requires_local_server
 async def test_client_plugin(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Client connect is only designed for local")

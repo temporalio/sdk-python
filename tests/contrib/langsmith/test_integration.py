@@ -572,6 +572,7 @@ class TestErrorTracing:
 
 
 class TestComprehensiveTracing:
+    @pytest.mark.requires_local_server
     async def test_comprehensive_with_temporal_runs(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
@@ -765,6 +766,7 @@ class TestComprehensiveTracing:
             "  HandleUpdate:my_unvalidated_update",
         ]
 
+    @pytest.mark.requires_local_server
     async def test_comprehensive_without_temporal_runs(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
@@ -1138,6 +1140,7 @@ class NexusDirectTraceableWorkflow:
 class TestNexusInboundTracing:
     """Verifies nexus handlers receive tracing_context for @traceable collection."""
 
+    @pytest.mark.requires_local_server
     async def test_nexus_direct_traceable_without_temporal_runs(
         self,
         client: Client,
