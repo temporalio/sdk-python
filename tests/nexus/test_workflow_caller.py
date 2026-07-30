@@ -90,6 +90,9 @@ class OpDefinitionType(IntEnum):
     LONGHAND = 1
 
 
+pytestmark = pytest.mark.requires_local_server
+
+
 @dataclass
 class SyncResponse:
     op_definition_type: OpDefinitionType
@@ -1979,9 +1982,7 @@ async def test_workflow_caller_custom_metrics(client: Client, env: WorkflowEnvir
     )
 
     # New client with the runtime
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
 
@@ -2052,9 +2053,7 @@ async def test_workflow_caller_buffered_metrics(
     assert not buffer.retrieve_updates()
 
     # Create a new client on the runtime and execute the custom metric workflow
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
     task_queue = str(uuid.uuid4())

@@ -166,6 +166,10 @@ worker = Worker(
 )
 ```
 
+`TemporalMcpToolSet` also accepts an optional `factory_argument`. It is sent to the toolset activities and passed to the registered `toolset_factory` when the `McpToolset` is created.
+
+**Do not pass secrets, credentials, or API keys through `factory_argument`.** It is an activity argument, so it is recorded in workflow history and, without a payload codec, visible in the web UI. Resolve credentials worker-side inside the toolset factory instead.
+
 ### Local ADK Runs
 
 The same agent definitions can also be exercised outside Temporal with

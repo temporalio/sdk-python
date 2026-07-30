@@ -269,6 +269,7 @@ class InterceptedWorkflow:
             raise ApplicationError("Invalid update")
 
 
+@pytest.mark.requires_local_server
 async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
     if env.supports_time_skipping:

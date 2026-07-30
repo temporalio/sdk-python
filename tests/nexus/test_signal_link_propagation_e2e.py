@@ -56,6 +56,8 @@ from tests.helpers.nexus import (
     workflow_event_link_event_type,
 )
 
+pytestmark = pytest.mark.requires_local_server
+
 EventType = temporalio.api.enums.v1.EventType
 
 

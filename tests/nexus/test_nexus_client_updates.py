@@ -3,6 +3,7 @@
 import uuid
 
 import nexusrpc
+import pytest
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 import temporalio.nexus
@@ -10,6 +11,8 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+
+pytestmark = pytest.mark.requires_local_server
 
 
 @nexusrpc.service
@@ -48,9 +51,7 @@ async def test_nexus_client_updates_when_worker_client_changes(
     """Test that Nexus operations get the updated client when worker.client is changed."""
     # Create a second client (simulating a new client after cert rotation)
     # Must use the same runtime
-    client2 = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client2 = await env.connect_client(
         data_converter=env.client.data_converter,
         runtime=env.client.service_client.config.runtime,
     )

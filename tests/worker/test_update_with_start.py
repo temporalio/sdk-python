@@ -192,6 +192,7 @@ class TestUpdateWithStart:
         id_conflict_policy: WorkflowIDConflictPolicy,
         expect_error_when_workflow_exists: ExpectErrorWhenWorkflowExists,
     ):
+        workflow_id = f"{workflow_id}-{uuid.uuid4()}"
         await self._do_execute_update_test(
             client,
             workflow_id + "-execute-update",
@@ -336,6 +337,7 @@ async def test_update_with_start_sets_first_execution_run_id(
         WorkflowForUpdateWithStartTest,
         activities=[activity_called_by_update],
     ) as worker:
+        workflow_id_prefix = f"wid-{uuid.uuid4()}"
 
         def make_start_op(workflow_id: str):
             return WithStartWorkflowOperation(
@@ -348,7 +350,7 @@ async def test_update_with_start_sets_first_execution_run_id(
 
         # conflict policy is FAIL
         # First UWS succeeds and sets the first execution run ID
-        start_op_1 = make_start_op("wid-1")
+        start_op_1 = make_start_op(f"{workflow_id_prefix}-1")
         update_handle_1 = await client.start_update_with_start_workflow(
             WorkflowForUpdateWithStartTest.my_non_blocking_update,
             "1",
@@ -360,7 +362,7 @@ async def test_update_with_start_sets_first_execution_run_id(
 
         # Second UWS start fails because the workflow already exists
         # first execution run ID is not set on the second UWS handle
-        start_op_2 = make_start_op("wid-1")
+        start_op_2 = make_start_op(f"{workflow_id_prefix}-1")
 
         for aw in [
             client.start_update_with_start_workflow(
@@ -375,7 +377,7 @@ async def test_update_with_start_sets_first_execution_run_id(
                 await aw
 
         # Third UWS start succeeds, but the update fails after acceptance
-        start_op_3 = make_start_op("wid-2")
+        start_op_3 = make_start_op(f"{workflow_id_prefix}-2")
         update_handle_3 = await client.start_update_with_start_workflow(
             WorkflowForUpdateWithStartTest.my_non_blocking_update,
             "fail-after-acceptance",
@@ -394,7 +396,7 @@ async def test_update_with_start_sets_first_execution_run_id(
         assert await wf_handle_3.result() == "workflow-result-0"
 
         # Fourth UWS is same as third, but we use execute_update instead of start_update.
-        start_op_4 = make_start_op("wid-3")
+        start_op_4 = make_start_op(f"{workflow_id_prefix}-3")
         with pytest.raises(WorkflowUpdateFailedError):
             await client.execute_update_with_start_workflow(
                 WorkflowForUpdateWithStartTest.my_non_blocking_update,

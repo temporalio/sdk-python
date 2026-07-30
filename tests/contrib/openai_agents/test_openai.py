@@ -471,6 +471,7 @@ async def test_tool_failure_workflow(client: Client):
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
+@pytest.mark.requires_local_server
 async def test_nexus_tool_workflow(
     client: Client, env: WorkflowEnvironment, use_local_model: bool
 ):

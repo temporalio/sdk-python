@@ -159,7 +159,7 @@ jobs:
       - run: poe gen-protos
       - name: Check generation unchanged
         run: |
-          [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
+          [[ -z $(git status --porcelain temporalio tests) ]] || (git diff temporalio tests; echo "Protos changed"; exit 1)
       - name: Test with protobuf 3.x
         run: poe test -s --ignore=tests/contrib/google_adk_agents/
         env:
@@ -204,10 +204,10 @@ jobs:
           path: junit-xml
           retention-days: 14
 
-  # Run tests against Temporal Cloud (skipped on forks)
+  # Run the test suite against Temporal Cloud (skipped on forks)
   cloud-test:
     if: ${{ github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python' }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -230,16 +230,19 @@ jobs:
       - run: uv tool install poethepoet
       - run: uv sync --all-extras
       - run: poe build-develop
-      - run: poe test -s tests/test_cloud.py --junit-xml=junit-xml/cloud.xml
-        timeout-minutes: 10
+      - run: mkdir junit-xml
+      - run: poe test -s --workflow-environment envconfig --junit-xml=junit-xml/cloud.xml
+        timeout-minutes: 15
         env:
+          TEMPORAL_ADDRESS: sdk-ci.a2dd6.tmprl.cloud:7233
+          TEMPORAL_NAMESPACE: sdk-ci.a2dd6
+          TEMPORAL_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
+          TEMPORAL_TLS_CLIENT_CERT_DATA: ${{ secrets.TEMPORAL_CLIENT_CERT }}
+          TEMPORAL_TLS_CLIENT_KEY_DATA: ${{ secrets.TEMPORAL_CLIENT_KEY }}
           TEMPORAL_IS_CLOUD_TESTS: true
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
           TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
-          TEMPORAL_CLIENT_CLOUD_TARGET: sdk-ci.a2dd6.tmprl.cloud:7233
-          TEMPORAL_CLIENT_CERT: ${{ secrets.TEMPORAL_CLIENT_CERT }}
-          TEMPORAL_CLIENT_KEY: ${{ secrets.TEMPORAL_CLIENT_KEY }}
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

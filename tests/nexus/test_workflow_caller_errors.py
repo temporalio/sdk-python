@@ -42,6 +42,8 @@ from temporalio.worker import Worker
 from tests.helpers import LogCapturer, assert_eq_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
+pytestmark = pytest.mark.requires_local_server
+
 operation_invocation_counts = Counter[str]()
 
 logger = getLogger(__name__)

@@ -308,6 +308,7 @@ class HistoryInfoWorkflow:
         )
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_history_info(
     client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
 ):
@@ -2352,6 +2353,7 @@ class SearchAttributeWorkflow:
         )
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_search_attributes(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
@@ -2537,6 +2539,7 @@ class NoSearchAttributesWorkflow:
         # All we need to do is complete
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_no_initial_search_attributes(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
@@ -4957,7 +4960,7 @@ class CustomMetricsWorkflow:
         )
 
 
-async def test_workflow_custom_metrics(client: Client):
+async def test_workflow_custom_metrics(client: Client, env: WorkflowEnvironment):
     # Run worker with default runtime which is noop meter just to confirm it
     # doesn't fail
     async with new_worker(
@@ -4983,9 +4986,7 @@ async def test_workflow_custom_metrics(client: Client):
     assert str(err.value).startswith("Invalid value type for key")
 
     # New client with the runtime
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
 
@@ -5062,7 +5063,7 @@ async def test_workflow_custom_metrics(client: Client):
         )
 
 
-async def test_workflow_buffered_metrics(client: Client):
+async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironment):
     # Create runtime with metric buffer
     buffer = MetricBuffer(10000)
     runtime = Runtime(
@@ -5123,9 +5124,7 @@ async def test_workflow_buffered_metrics(client: Client):
     assert runtime_updates2[1].value == 400
 
     # Create a new client on the runtime and execute the custom metric workflow
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
     async with new_worker(
@@ -5186,12 +5185,10 @@ async def test_workflow_buffered_metrics(client: Client):
     )
 
 
-async def test_workflow_metrics_other_types(client: Client):
+async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
     async def do_stuff(buffer: MetricBuffer) -> None:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
-        new_client = await Client.connect(
-            client.service_client.config.target_host,
-            namespace=client.namespace,
+        new_client = await env.connect_client(
             runtime=runtime,
         )
         async with new_worker(new_client, HelloWorkflow) as worker:
@@ -6211,6 +6208,7 @@ class TickingWorkflow:
             await asyncio.sleep(0.1)
 
 
+@pytest.mark.requires_local_server
 async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Only testing against two real servers")
@@ -6266,11 +6264,11 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             await handle2.terminate()
 
 
-async def test_workflow_replace_worker_client_diff_runtimes_fail(client: Client):
+async def test_workflow_replace_worker_client_diff_runtimes_fail(
+    client: Client, env: WorkflowEnvironment
+):
     other_runtime = Runtime(telemetry=TelemetryConfig())
-    other_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    other_client = await env.connect_client(
         runtime=other_runtime,
     )
     async with new_worker(client, HelloWorkflow) as worker:
@@ -6711,6 +6709,9 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
         await workflow.wait_condition(lambda: self.handlers_may_finish)
 
 
+# Cloud cancels in-flight dynamic handlers before SDK teardown can emit the
+# unfinished-handler warning this test asserts.
+@pytest.mark.requires_local_server
 @pytest.mark.parametrize("handler_type", ["-signal-", "-update-"])
 @pytest.mark.parametrize(
     "handler_registration", ["-late-registered-", "-not-late-registered-"]
@@ -6725,7 +6726,6 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
 )
 async def test_unfinished_handler_on_workflow_termination(
     client: Client,
-    env: WorkflowEnvironment,
     handler_type: Literal["-signal-", "-update-"],
     handler_registration: Literal["-late-registered-", "-not-late-registered-"],
     handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
@@ -6736,10 +6736,6 @@ async def test_unfinished_handler_on_workflow_termination(
         "-cancellation-", "-failure-", "-continue-as-new-"
     ],
 ):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Issues with update: https://github.com/temporalio/sdk-python/issues/826"
-        )
     skip_unfinished_handler_tests_in_older_python()
     await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
@@ -6832,13 +6828,24 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                     if self.handler_waiting == "-wait-all-handlers-finish-":
                         await update_task
                     else:
-                        with pytest.raises(WorkflowUpdateFailedError) as err_info:
+                        with pytest.raises(
+                            (WorkflowUpdateFailedError, RPCError)
+                        ) as err_info:
                             await update_task
                         update_err = err_info.value
-                        assert isinstance(update_err.cause, ApplicationError)
-                        assert (
-                            update_err.cause.type == "AcceptedUpdateCompletedWorkflow"
-                        )
+                        if isinstance(update_err, WorkflowUpdateFailedError):
+                            assert isinstance(update_err.cause, ApplicationError)
+                            assert (
+                                update_err.cause.type
+                                == "AcceptedUpdateCompletedWorkflow"
+                            )
+                        else:
+                            assert isinstance(update_err, RPCError)
+                            assert update_err.status == RPCStatusCode.NOT_FOUND
+                            assert (
+                                str(update_err)
+                                == "workflow execution already completed"
+                            )
 
                 with pytest.raises(WorkflowFailureError) as err:
                     await handle.result()
@@ -9404,6 +9411,7 @@ class SearchAttributeCodecChildWorkflow:
         return f"Hello from child, {name}"
 
 
+@pytest.mark.requires_local_server
 async def test_search_attribute_codec(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
