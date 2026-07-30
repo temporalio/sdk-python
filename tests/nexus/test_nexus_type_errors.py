@@ -105,6 +105,40 @@ async def my_five_arg_activity(
     pass
 
 
+@activity.defn
+def my_sync_no_arg_activity() -> None:
+    pass
+
+
+@activity.defn
+def my_sync_one_arg_activity(_input: MyInput) -> None:
+    pass
+
+
+@activity.defn
+def my_sync_two_arg_activity(_input: MyInput, _arg2: int) -> None:
+    pass
+
+
+@activity.defn
+def my_sync_three_arg_activity(_input: MyInput, _arg2: int, _arg3: int) -> None:
+    pass
+
+
+@activity.defn
+def my_sync_four_arg_activity(
+    _input: MyInput, _arg2: int, _arg3: int, _arg4: int
+) -> None:
+    pass
+
+
+@activity.defn
+def my_sync_five_arg_activity(
+    _input: MyInput, _arg2: int, _arg3: int, _arg4: int, _arg5: int
+) -> None:
+    pass
+
+
 @nexusrpc.service
 class MyService:
     my_sync_operation: nexusrpc.Operation[MyInput, MyOutput]
@@ -252,6 +286,75 @@ class MyServiceHandler:
             )
             return activity_result_5
         if input == 12:
+            sync_activity_result_0: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_sync_no_arg_activity,
+                id="sync-activity-0",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return sync_activity_result_0
+        if input == 13:
+            sync_activity_result_1: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_sync_one_arg_activity,
+                MyInput(),
+                id="sync-activity-1",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return sync_activity_result_1
+        if input == 14:
+            sync_activity_result_2: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_sync_two_arg_activity,
+                args=[MyInput(), 2],
+                id="sync-activity-2",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return sync_activity_result_2
+        if input == 15:
+            sync_activity_result_3: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_sync_three_arg_activity,
+                args=[MyInput(), 2, 3],
+                id="sync-activity-3",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return sync_activity_result_3
+        if input == 16:
+            sync_activity_result_4: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_sync_four_arg_activity,
+                args=[MyInput(), 2, 3, 4],
+                id="sync-activity-4",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return sync_activity_result_4
+        if input == 17:
+            sync_activity_result_5: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                my_sync_five_arg_activity,
+                args=[MyInput(), 2, 3, 4, 5],
+                id="sync-activity-5",
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return sync_activity_result_5
+        if input == 18:
+            string_activity_result: temporalio.nexus.TemporalOperationResult[
+                None
+            ] = await client.start_activity(
+                "string-activity",
+                id="string-activity",
+                result_type=type(None),
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+            return string_activity_result
+        if input == 19:
             # assert-type-error-pyright: 'No overloads for "start_activity" match'
             return await client.start_activity(  # type: ignore
                 my_one_arg_activity,
