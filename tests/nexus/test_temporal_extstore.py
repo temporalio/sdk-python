@@ -41,6 +41,8 @@ from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.test_extstore import InMemoryTestDriver
 
+pytestmark = pytest.mark.requires_local_server
+
 PAYLOAD_SIZE = 4096
 PAYLOAD_SIZE_THRESHOLD = 1024
 _STORE_FAILURE_MESSAGE = "external storage store failed"
