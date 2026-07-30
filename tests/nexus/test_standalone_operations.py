@@ -308,8 +308,10 @@ async def test_started_workflow_has_link_to_standalone_nexus_operation(
         workflow_history = await _assert_workflow_started_with_nexus_operation_link(
             client, workflow_id, handle
         )
-        await _assert_nexus_operation_has_link_to_started_workflow(
-            client, workflow_history, handle
+        await assert_eventually(
+            lambda: _assert_nexus_operation_has_link_to_started_workflow(
+                client, workflow_history, handle
+            )
         )
 
         workflow_handle = client.get_workflow_handle(workflow_id)
