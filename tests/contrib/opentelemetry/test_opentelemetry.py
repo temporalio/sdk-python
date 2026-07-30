@@ -457,6 +457,7 @@ async def test_opentelemetry_tracing_update_with_start(
     ]
 
 
+@pytest.mark.requires_local_server
 async def test_opentelemetry_tracing_nexus(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(

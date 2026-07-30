@@ -23,6 +23,8 @@ from tests.helpers.nexus import (
     make_nexus_endpoint_name,
 )
 
+pytestmark = pytest.mark.requires_local_server
+
 
 @nexusrpc.service
 class ShutdownTestService:

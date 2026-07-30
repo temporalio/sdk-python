@@ -30,6 +30,8 @@ from tests.nexus.test_workflow_caller_cancellation_types import (
     has_event,
 )
 
+pytestmark = pytest.mark.requires_local_server
+
 
 @dataclass
 class TestContext:

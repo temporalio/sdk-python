@@ -302,6 +302,7 @@ async def test_replayer_workflow_not_registered(client: Client) -> None:
     assert "SayHelloWorkflow is not registered" in str(err.value)
 
 
+@pytest.mark.requires_local_server
 async def test_replayer_multiple_from_client(
     client: Client, env: WorkflowEnvironment
 ) -> None:
@@ -329,6 +330,14 @@ async def test_replayer_multiple_from_client(
                 should_cause_nondeterminism
             )
             await handle.result()
+
+    async def visible_run_ids() -> set[str]:
+        return {
+            workflow.run_id
+            async for workflow in client.list_workflows(f"WorkflowId = '{workflow_id}'")
+        }
+
+    await assert_eq_eventually(set(expected_runs_and_non_det), visible_run_ids)
 
     # Run replayer with list iterator mapped to histories and collect results
     async with Replayer(workflows=[SayHelloWorkflow]).workflow_replay_iterator(
