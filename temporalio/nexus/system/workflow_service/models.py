@@ -15,28 +15,31 @@ import temporalio.common
 import temporalio.converter
 
 from ._support import (
-    SignalWithStartWorkflowRequest,
     duration_from_proto,
     duration_to_proto,
     memo_from_proto,
     memo_to_proto,
     payload_from_proto,
     payload_to_proto,
+    payloads_from_proto,
     payloads_to_proto,
     priority_from_proto,
     priority_to_proto,
     retry_policy_from_proto,
     retry_policy_to_proto,
+    search_attributes_from_proto,
     search_attributes_to_proto,
     signal_function_to_proto,
     task_queue_from_proto,
     task_queue_to_proto,
+    versioning_override_from_proto,
     versioning_override_to_proto,
     workflow_id_conflict_policy_from_proto,
     workflow_id_conflict_policy_to_proto,
     workflow_id_reuse_policy_from_proto,
     workflow_id_reuse_policy_to_proto,
     workflow_namespace,
+    workflow_type_from_proto,
     workflow_type_to_proto,
 )
 
@@ -58,6 +61,7 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
     def from_transfer_type(
         self,
         value: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionRequest,
+        type_hint: type["SignalWithStartWorkflowRequest"],
     ) -> "SignalWithStartWorkflowRequest":
         proto = value
         if not proto.HasField("workflow_type"):
@@ -96,7 +100,6 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
             task_timeout=duration_from_proto(proto.workflow_task_timeout)
             if proto.HasField("workflow_task_timeout")
             else None,
-            request_id=proto.request_id if bool(proto.request_id) else None,
             id_reuse_policy=workflow_id_reuse_policy_from_proto(
                 proto.workflow_id_reuse_policy
             ),
@@ -125,7 +128,7 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
             if proto.HasField("workflow_start_delay")
             else None,
             user_metadata=_UserMetadataTransferTypeConverter().from_transfer_type(
-                proto.user_metadata
+                proto.user_metadata, UserMetadata
             )
             if proto.HasField("user_metadata")
             else None,
@@ -156,8 +159,6 @@ class _SignalWithStartWorkflowRequestTransferTypeConverter(
             message.workflow_task_timeout.CopyFrom(
                 duration_to_proto(value.task_timeout)
             )
-        if value.request_id is not None:
-            message.request_id = value.request_id
         message.workflow_id_reuse_policy = workflow_id_reuse_policy_to_proto(
             value.id_reuse_policy
         )
@@ -212,7 +213,6 @@ class SignalWithStartWorkflowRequest:
     execution_timeout: datetime.timedelta | None = None
     run_timeout: datetime.timedelta | None = None
     task_timeout: datetime.timedelta | None = None
-    request_id: str | None = None
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = (
         temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE
     )
@@ -241,6 +241,7 @@ class _UserMetadataTransferTypeConverter(
     def from_transfer_type(
         self,
         value: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata,
+        type_hint: type["UserMetadata"],
     ) -> "UserMetadata":
         proto = value
         return UserMetadata(
@@ -289,6 +290,7 @@ class _SignalWithStartWorkflowResponseTransferTypeConverter(
     def from_transfer_type(
         self,
         value: temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+        type_hint: type["SignalWithStartWorkflowResponse"],
     ) -> "SignalWithStartWorkflowResponse":
         proto = value
         return SignalWithStartWorkflowResponse(
