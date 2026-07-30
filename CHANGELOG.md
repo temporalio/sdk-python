@@ -52,6 +52,7 @@ to include examples, links to docs, or any other relevant information.
 - Added the experimental `Worker` `patch_activation_callback` option, allowing workers
   to decide whether a first non-replay `workflow.patched` call should activate a patch
   during rolling deployments.
+- Added external storage support to Nexus task handling.
 
 ### Changed
 
