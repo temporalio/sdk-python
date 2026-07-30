@@ -6726,7 +6726,6 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
 )
 async def test_unfinished_handler_on_workflow_termination(
     client: Client,
-    env: WorkflowEnvironment,
     handler_type: Literal["-signal-", "-update-"],
     handler_registration: Literal["-late-registered-", "-not-late-registered-"],
     handler_dynamism: Literal["-dynamic-", "-not-dynamic-"],
@@ -6737,10 +6736,6 @@ async def test_unfinished_handler_on_workflow_termination(
         "-cancellation-", "-failure-", "-continue-as-new-"
     ],
 ):
-    if env.supports_time_skipping:
-        pytest.skip(
-            "Issues with update: https://github.com/temporalio/sdk-python/issues/826"
-        )
     skip_unfinished_handler_tests_in_older_python()
     await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
@@ -6833,13 +6828,24 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                     if self.handler_waiting == "-wait-all-handlers-finish-":
                         await update_task
                     else:
-                        with pytest.raises(WorkflowUpdateFailedError) as err_info:
+                        with pytest.raises(
+                            (WorkflowUpdateFailedError, RPCError)
+                        ) as err_info:
                             await update_task
                         update_err = err_info.value
-                        assert isinstance(update_err.cause, ApplicationError)
-                        assert (
-                            update_err.cause.type == "AcceptedUpdateCompletedWorkflow"
-                        )
+                        if isinstance(update_err, WorkflowUpdateFailedError):
+                            assert isinstance(update_err.cause, ApplicationError)
+                            assert (
+                                update_err.cause.type
+                                == "AcceptedUpdateCompletedWorkflow"
+                            )
+                        else:
+                            assert isinstance(update_err, RPCError)
+                            assert update_err.status == RPCStatusCode.NOT_FOUND
+                            assert (
+                                str(update_err)
+                                == "workflow execution already completed"
+                            )
 
                 with pytest.raises(WorkflowFailureError) as err:
                     await handle.result()
