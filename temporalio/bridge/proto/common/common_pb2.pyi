@@ -4,10 +4,13 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import sys
 import typing
 
 import google.protobuf.descriptor
+import google.protobuf.duration_pb2
+import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 
@@ -121,3 +124,53 @@ class WorkerDeploymentVersion(google.protobuf.message.Message):
     ) -> None: ...
 
 global___WorkerDeploymentVersion = WorkerDeploymentVersion
+
+class ExternalStorageMetrics(google.protobuf.message.Message):
+    """Metrics for a set of external payload storage operations (all uploads and downloads)
+    performed while processing a task, so core can emit unified logging and metrics.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAYLOAD_COUNT_FIELD_NUMBER: builtins.int
+    TOTAL_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    TOTAL_DURATION_FIELD_NUMBER: builtins.int
+    DRIVER_NAMES_FIELD_NUMBER: builtins.int
+    payload_count: builtins.int
+    """Number of payloads stored or retrieved externally."""
+    total_size_bytes: builtins.int
+    """Total size in bytes of the externally stored or retrieved payloads."""
+    @property
+    def total_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Wall-clock time spent on the external storage operations."""
+    @property
+    def driver_names(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Names of the drivers that participated in the operations."""
+    def __init__(
+        self,
+        *,
+        payload_count: builtins.int = ...,
+        total_size_bytes: builtins.int = ...,
+        total_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        driver_names: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["total_duration", b"total_duration"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "driver_names",
+            b"driver_names",
+            "payload_count",
+            b"payload_count",
+            "total_duration",
+            b"total_duration",
+            "total_size_bytes",
+            b"total_size_bytes",
+        ],
+    ) -> None: ...
+
+global___ExternalStorageMetrics = ExternalStorageMetrics
