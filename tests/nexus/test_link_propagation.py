@@ -500,6 +500,28 @@ async def test_activity_start_forwards_inbound_links() -> None:
     assert len(req.completion_callbacks) == 0
 
 
+async def test_activity_start_without_server_link_synthesizes_backlink(
+    nexus_ctx: _TemporalStartOperationContext,
+) -> None:
+    workflow_service = mock.MagicMock()
+    workflow_service.start_activity_execution = mock.AsyncMock(
+        return_value=temporalio.api.workflowservice.v1.StartActivityExecutionResponse(
+            run_id="activity-run",
+        )
+    )
+    impl = _make_client_impl(workflow_service)
+
+    await impl.start_activity(_start_activity_input())
+
+    assert len(nexus_ctx.nexus_context.outbound_links) == 1
+    link = nexus_ctx.nexus_context.outbound_links[0]
+    assert link.url == (
+        "temporal:///namespaces/test-namespace/"
+        "activities/activity-target/activity-run/details"
+    )
+    assert link.type == temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name
+
+
 @pytest.mark.usefixtures("nexus_ctx")
 async def test_backing_activity_start_gets_nexus_request_fields() -> None:
     impl = _make_client_impl(mock.MagicMock())

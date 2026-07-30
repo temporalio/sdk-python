@@ -591,7 +591,17 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
         nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
         if nexus_ctx is not None:
-            nexus_ctx._add_response_link(resp.link)
+            if resp.HasField("link"):
+                response_link = resp.link
+            else:
+                response_link = temporalio.api.common.v1.Link(
+                    activity=temporalio.api.common.v1.Link.Activity(
+                        namespace=self._client.namespace,
+                        activity_id=input.id,
+                        run_id=resp.run_id,
+                    )
+                )
+            nexus_ctx._add_response_link(response_link)
 
         return ActivityHandle(
             self._client,
