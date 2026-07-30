@@ -159,7 +159,7 @@ jobs:
       - run: poe gen-protos
       - name: Check generation unchanged
         run: |
-          [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
+          [[ -z $(git status --porcelain temporalio tests) ]] || (git diff temporalio tests; echo "Protos changed"; exit 1)
       - name: Test with protobuf 3.x
         run: poe test -s --ignore=tests/contrib/google_adk_agents/
         env:
