@@ -236,6 +236,37 @@ with tracer.start_as_current_span("my-operation") as span:
     })
 ```
 
+## Replay-Safe Metrics
+
+For Temporal SDK metrics inside workflows, use `temporalio.workflow.metric_meter()`,
+which is already replay-safe. However, third-party libraries (e.g. Google ADK) may
+record OpenTelemetry metrics through the process-global meter provider from code
+that runs inside workflows. Workflow code re-executes on every replay (cache
+eviction, worker restart, redeploy), so a plain global meter provider re-records
+those metrics on each replay, inflating counts.
+
+`ReplaySafeMeterProvider` wraps your meter provider so synchronous instrument
+recordings made from workflow code are dropped during replay, mirroring what
+`create_tracer_provider()` does for spans:
+
+```python
+import opentelemetry.metrics
+from opentelemetry.sdk.metrics import MeterProvider
+from temporalio.contrib.opentelemetry import ReplaySafeMeterProvider
+
+# set_meter_provider only takes effect once per process, so this wrapper must
+# be the first and only global meter provider set, installed before any
+# library records metrics.
+opentelemetry.metrics.set_meter_provider(
+    ReplaySafeMeterProvider(MeterProvider(metric_readers=[my_reader]))
+)
+```
+
+Recordings are first-execution-only, matching `workflow.metric_meter()`: a
+retried workflow task re-executes live and can record again. Observable
+(asynchronous) instruments and recordings made outside workflows pass through
+untouched.
+
 ## Best Practices
 
 1. **Register on Client**: Always register plugins/interceptors on the client, not the worker, to ensure proper context propagation
