@@ -17,13 +17,20 @@ CHANGELOG_HEADERS = (
     "Added",
     "Changed",
     "Deprecated",
-    "Breaking Changes",
+    ":boom: Breaking Changes",
     "Fixed",
     "Security",
 )
 VERSION_RE = re.compile(r"[0-9]+(?:\.[0-9]+)+(?:[a-zA-Z0-9_.+-]+)?")
 _CHANGELOG_HEADING_RE = re.compile(r"^## \[(?P<version>[^\]]+)\](?:\s+-\s+.*)?\s*$")
 _CHANGELOG_SUBHEADING_RE = re.compile(r"^### (?P<header>.+?)\s*$")
+_RELEASE_FILES = (
+    "CHANGELOG.md",
+    "pyproject.toml",
+    "temporalio/service.py",
+    "uv.lock",
+)
+_RELEASE_FILE_SET = frozenset(_RELEASE_FILES)
 
 
 def validate_version(version: str) -> str:
@@ -91,6 +98,82 @@ def replace_service_version(text: str, version: str) -> str:
         f'__version__ = "{validate_version(version)}"',
         text,
         description="service version",
+    )
+
+
+def create_release_branch(repo_root: pathlib.Path, version: str) -> None:
+    subprocess.run(["git", "fetch", "origin", "main"], cwd=repo_root, check=True)
+    subprocess.run(
+        ["git", "switch", "--create", f"chore/release-{version}", "origin/main"],
+        cwd=repo_root,
+        check=True,
+    )
+
+
+def changed_files(repo_root: pathlib.Path) -> set[str]:
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {line[3:] for line in result.stdout.splitlines()}
+
+
+def ensure_clean_worktree(repo_root: pathlib.Path) -> None:
+    changes = changed_files(repo_root)
+    if changes:
+        raise RuntimeError(
+            "Release preparation requires a clean worktree; found changes in "
+            + ", ".join(sorted(changes))
+        )
+
+
+def ensure_only_release_changes(repo_root: pathlib.Path) -> None:
+    unexpected_files = changed_files(repo_root) - _RELEASE_FILE_SET
+    if unexpected_files:
+        raise RuntimeError(
+            "Release preparation changed unexpected files: "
+            + ", ".join(sorted(unexpected_files))
+        )
+
+
+def commit_release_changes(repo_root: pathlib.Path, version: str) -> None:
+    subprocess.run(
+        ["git", "commit", "-m", f"Prepare release {version}", "--", *_RELEASE_FILES],
+        cwd=repo_root,
+        check=True,
+    )
+
+
+def push_release_branch(repo_root: pathlib.Path, version: str) -> None:
+    branch = f"chore/release-{version}"
+    subprocess.run(
+        ["git", "push", "--set-upstream", "origin", branch],
+        cwd=repo_root,
+        check=True,
+    )
+
+
+def create_release_pr(repo_root: pathlib.Path, version: str) -> None:
+    branch = f"chore/release-{version}"
+    subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            "main",
+            "--head",
+            branch,
+            "--title",
+            f"Prepare release {version}",
+            "--body",
+            f"Prepare release {version}.",
+        ],
+        cwd=repo_root,
+        check=True,
     )
 
 
@@ -197,6 +280,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     repo_root = pathlib.Path(__file__).resolve().parents[1]
     version = validate_version(args.version)
     release_date = parse_date(args.date)
+    ensure_clean_worktree(repo_root)
+    create_release_branch(repo_root, version)
     changelog_path = repo_root / "CHANGELOG.md"
     pyproject_path = repo_root / "pyproject.toml"
     service_path = repo_root / "temporalio" / "service.py"
@@ -228,7 +313,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     if not args.skip_lock:
         subprocess.run(["uv", "lock"], cwd=repo_root, check=True)
 
-    print(f"Prepared release {version} dated {release_date.isoformat()}")
+    ensure_only_release_changes(repo_root)
+    commit_release_changes(repo_root, version)
+    push_release_branch(repo_root, version)
+    create_release_pr(repo_root, version)
+
+    print(
+        f"Prepared release {version} dated {release_date.isoformat()} and opened a PR"
+    )
 
 
 if __name__ == "__main__":

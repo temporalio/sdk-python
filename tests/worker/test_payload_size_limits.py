@@ -7,7 +7,7 @@ import pytest
 
 import temporalio.api.enums.v1
 from temporalio import activity, workflow
-from temporalio.client import Client, PayloadLimitsConfig, WorkflowFailureError
+from temporalio.client import PayloadLimitsConfig, WorkflowFailureError
 from temporalio.exceptions import (
     TerminatedError,
     TimeoutError,
@@ -91,9 +91,7 @@ async def test_oversized_payload_fails_task_with_error_log(env: WorkflowEnvironm
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
     ) as env:
         worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
-        worker_client = await Client.connect(
-            env.client.service_client.config.target_host,
-            namespace=env.client.namespace,
+        worker_client = await env.connect_client(
             runtime=_forwarding_runtime(worker_logger),
         )
 
@@ -179,9 +177,7 @@ async def test_disable_payload_error_limit_sends_to_server(env: WorkflowEnvironm
 async def test_payload_size_warning_forwarded(env: WorkflowEnvironment):
     """The connection's warn threshold produces a forwarded [TMPRL1103] warning for over-threshold payloads."""
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
-    worker_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    worker_client = await env.connect_client(
         runtime=_forwarding_runtime(worker_logger),
         payload_limits=PayloadLimitsConfig(payloads_warn_size=1024),
     )
@@ -219,9 +215,7 @@ async def test_memo_size_warning_forwarded(env: WorkflowEnvironment):
     """The connection's memo warn threshold produces a forwarded [TMPRL1103] warning for an
     over-threshold memo."""
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
-    worker_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    worker_client = await env.connect_client(
         runtime=_forwarding_runtime(worker_logger),
         payload_limits=PayloadLimitsConfig(memo_warn_size=1024),
     )

@@ -373,6 +373,27 @@ class WorkflowEnvironment:
         """Client to this environment."""
         return self._client
 
+    async def connect_client(self, **kwargs: Any) -> temporalio.client.Client:
+        """Create another client connected to this environment.
+
+        Namespace and connection credentials from this environment's client are
+        used by default.
+        Keyword arguments are forwarded to :py:meth:`temporalio.client.Client.connect`
+        and override those defaults.
+        """
+        config = self.client.service_client.config
+        connect_kwargs: dict[str, Any] = {
+            "namespace": self.client.namespace,
+            "api_key": config.api_key,
+            "tls": config.tls,
+            "rpc_metadata": config.rpc_metadata,
+            "runtime": config.runtime or temporalio.runtime.Runtime.default(),
+        }
+        connect_kwargs.update(kwargs)
+        return await temporalio.client.Client.connect(
+            config.target_host, **connect_kwargs
+        )
+
     async def shutdown(self) -> None:
         """Shut down this environment."""
         pass

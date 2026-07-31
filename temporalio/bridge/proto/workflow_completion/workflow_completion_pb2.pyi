@@ -14,6 +14,7 @@ import google.protobuf.message
 import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.bridge.proto.common.common_pb2
 import temporalio.bridge.proto.workflow_commands.workflow_commands_pb2
 
 if sys.version_info >= (3, 8):
@@ -31,23 +32,52 @@ class WorkflowActivationCompletion(google.protobuf.message.Message):
     RUN_ID_FIELD_NUMBER: builtins.int
     SUCCESSFUL_FIELD_NUMBER: builtins.int
     FAILED_FIELD_NUMBER: builtins.int
+    PAYLOAD_DOWNLOAD_METRICS_FIELD_NUMBER: builtins.int
+    PAYLOAD_UPLOAD_METRICS_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run id from the workflow activation you are completing"""
     @property
     def successful(self) -> global___Success: ...
     @property
     def failed(self) -> global___Failure: ...
+    @property
+    def payload_download_metrics(
+        self,
+    ) -> temporalio.bridge.proto.common.common_pb2.ExternalStorageMetrics:
+        """Metrics for external payload storage downloads (retrievals) performed while processing
+        this activation. Only set when external storage retrieved payloads.
+        """
+    @property
+    def payload_upload_metrics(
+        self,
+    ) -> temporalio.bridge.proto.common.common_pb2.ExternalStorageMetrics:
+        """Metrics for external payload storage uploads (stores) performed while processing this
+        activation. Only set when external storage stored payloads.
+        """
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
         successful: global___Success | None = ...,
         failed: global___Failure | None = ...,
+        payload_download_metrics: temporalio.bridge.proto.common.common_pb2.ExternalStorageMetrics
+        | None = ...,
+        payload_upload_metrics: temporalio.bridge.proto.common.common_pb2.ExternalStorageMetrics
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "failed", b"failed", "status", b"status", "successful", b"successful"
+            "failed",
+            b"failed",
+            "payload_download_metrics",
+            b"payload_download_metrics",
+            "payload_upload_metrics",
+            b"payload_upload_metrics",
+            "status",
+            b"status",
+            "successful",
+            b"successful",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -55,6 +85,10 @@ class WorkflowActivationCompletion(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "failed",
             b"failed",
+            "payload_download_metrics",
+            b"payload_download_metrics",
+            "payload_upload_metrics",
+            b"payload_upload_metrics",
             "run_id",
             b"run_id",
             "status",

@@ -53,6 +53,7 @@ class TestPluginConstruction:
 class TestPluginIntegration:
     """End-to-end test using LangSmithPlugin as a Temporal client plugin."""
 
+    @pytest.mark.requires_local_server
     async def test_comprehensive_plugin_trace_hierarchy(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:

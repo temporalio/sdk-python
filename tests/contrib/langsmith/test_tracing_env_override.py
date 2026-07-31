@@ -162,6 +162,7 @@ class TestTracingEnvOverride:
             f"{[r.name for r in collector.runs]}"
         )
 
+    @pytest.mark.requires_local_server
     async def test_no_runs_when_tracing_disabled_for_nexus_start(
         self,
         client: Client,
