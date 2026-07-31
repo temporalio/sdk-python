@@ -756,6 +756,7 @@ async def test_worker_with_worker_deployment_config(
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-{uuid.uuid4()}"
+    workflow_id_prefix = f"basic-versioning-{uuid.uuid4()}"
     worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
     worker_v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
     worker_v3 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="3.0")
@@ -798,7 +799,7 @@ async def test_worker_with_worker_deployment_config(
         # Start workflow 1 which will use the 1.0 worker on auto-upgrade
         wf1 = await client.start_workflow(
             DeploymentVersioningWorkflowV1AutoUpgrade.run,
-            id="basic-versioning-v1",
+            id=f"{workflow_id_prefix}-v1",
             task_queue=w1.task_queue,
         )
         assert "v1" == await wf1.query("state")
@@ -810,7 +811,7 @@ async def test_worker_with_worker_deployment_config(
 
         wf2 = await client.start_workflow(
             DeploymentVersioningWorkflowV2Pinned.run,
-            id="basic-versioning-v2",
+            id=f"{workflow_id_prefix}-v2",
             task_queue=w1.task_queue,
         )
         assert "v2" == await wf2.query("state")
@@ -822,7 +823,7 @@ async def test_worker_with_worker_deployment_config(
 
         wf3 = await client.start_workflow(
             DeploymentVersioningWorkflowV3AutoUpgrade.run,
-            id="basic-versioning-v3",
+            id=f"{workflow_id_prefix}-v3",
             task_queue=w1.task_queue,
         )
         assert "v3" == await wf3.query("state")
