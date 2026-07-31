@@ -211,9 +211,11 @@ such constraint.
 
 The snapshot is one-way and should be treated as read-only: mutations inside
 the activity do not propagate back to the session, because the activity may
-run on a different worker. To modify session state, return the needed
-information from the activity and apply it in workflow-side code (for example
-an ADK callback or a plain tool function).
+run on a different worker (and in local ADK runs, where the snapshot is
+passed in memory, nested state values may alias the live session state, so
+mutating them can corrupt the session). To modify session state, return the
+needed information from the activity and apply it in workflow-side code (for
+example an ADK callback or a plain tool function).
 
 ### Local ADK Runs
 
