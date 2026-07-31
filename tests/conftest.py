@@ -4,6 +4,7 @@ import os
 import sys
 from collections.abc import AsyncGenerator, Iterator
 
+import opentelemetry.metrics._internal
 import opentelemetry.trace
 import pytest
 import pytest_asyncio
@@ -268,3 +269,13 @@ def reset_otel_tracer_provider():
     yield
     opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
     opentelemetry.trace._TRACER_PROVIDER = None
+
+
+@pytest.fixture
+def reset_otel_meter_provider():
+    """Reset global OpenTelemetry meter provider state around tests."""
+    opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.metrics._internal._METER_PROVIDER = None
+    yield
+    opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.metrics._internal._METER_PROVIDER = None

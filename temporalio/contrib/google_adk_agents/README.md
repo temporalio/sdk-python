@@ -199,6 +199,55 @@ agent = Agent(
 )
 ```
 
+## Telemetry and Workflow Replay
+
+ADK records OpenTelemetry metrics (scope `gcp.vertex.agent`, e.g.
+`gen_ai.client.token.usage`) and spans through the process-global
+OpenTelemetry providers from code that runs inside the workflow. Workflow
+code re-executes on every replay, so with a plain global provider each replay
+re-records all of that telemetry even though no model or tool actually ran
+again — for example, 1 real execution followed by 3 replays yields 4x the
+observations on every instrument. Replays happen routinely in production:
+workflow cache eviction, worker restarts, redeploys, or running with
+`max_cached_workflows=0`.
+
+To avoid this, install Temporal's replay-safe providers as the global
+OpenTelemetry providers. They pass recordings through on first execution and
+drop them during replay:
+
+```python
+import opentelemetry.metrics
+import opentelemetry.trace
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+from temporalio.contrib.opentelemetry import (
+    ReplaySafeMeterProvider,
+    create_tracer_provider,
+)
+
+# set_meter_provider/set_tracer_provider only take effect once per process,
+# so these wrappers must be the first and only global providers set.
+opentelemetry.metrics.set_meter_provider(
+    ReplaySafeMeterProvider(
+        MeterProvider(metric_readers=[PeriodicExportingMetricReader(my_exporter)])
+    )
+)
+tracer_provider = create_tracer_provider()
+tracer_provider.add_span_processor(BatchSpanProcessor(my_span_exporter))
+opentelemetry.trace.set_tracer_provider(tracer_provider)
+```
+
+`GoogleAdkPlugin` warns at worker configuration time when a global provider
+is installed that is not replay-safe.
+
+Recordings are first-execution-only, matching
+`temporalio.workflow.metric_meter()`: a retried workflow task re-executes
+live and can record again, and tokens consumed by failed activity attempts
+are not counted. Telemetry recorded from activities (worker-side) is
+unaffected.
+
 ## Integration Points
 
 This integration provides comprehensive support for running Google ADK Agents within Temporal workflows while maintaining:
