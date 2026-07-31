@@ -1,4 +1,4 @@
-import tests.worker.workflow_sandbox.testmodules.lazy_module  # noqa: F401
+import tests.worker.workflow_sandbox.testmodules.lazy_module  # type:ignore[reportUnusedImport] # noqa: F401
 from temporalio import workflow
 
 
