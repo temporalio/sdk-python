@@ -32,7 +32,6 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.nexus._operation_context
-import temporalio.nexus._token
 from temporalio.activity import ActivityCancellationDetails
 from temporalio.converter import (
     ActivitySerializationContext,
@@ -686,43 +685,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Set priority
         req.priority.CopyFrom(input.priority._to_proto())
 
-        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
-
-        request_links: list[temporalio.api.common.v1.Link] = []
-        if nexus_ctx is not None:
-            req.on_conflict_options.attach_request_id = True
-            req.on_conflict_options.attach_completion_callbacks = True
-            req.on_conflict_options.attach_links = True
-
-            # Add all Nexus links if we're in a Nexus context, backing or otherwise
-            request_links = nexus_ctx._get_request_links()
-
-        # Add request ID and callbacks only if we're in a backing Nexus context
-        if (
-            nexus_ctx is not None
-            and temporalio.nexus._operation_context._in_nexus_backing_start_context()
-        ):
-            req.request_id = nexus_ctx.nexus_context.request_id
-            callbacks = nexus_ctx._get_callbacks(
-                temporalio.nexus._token.OperationToken(
-                    type=temporalio.nexus._token.OperationTokenType.ACTIVITY,
-                    namespace=self._client.namespace,
-                    activity_id=input.id,
-                ).encode()
-            )
-            req.completion_callbacks.extend(
-                temporalio.api.common.v1.Callback(
-                    nexus=temporalio.api.common.v1.Callback.Nexus(
-                        url=callback.url,
-                        header=callback.headers,
-                    ),
-                    links=request_links,
-                )
-                for callback in callbacks
-            )
-
-        # Links are duplicated on request for compatibility with older server versions.
-        req.links.extend(request_links)
+        # Add request_id, links, and completion callbacks from the Nexus context
+        # if not in a Nexus context, this is a no-op
+        temporalio.nexus._operation_context._apply_nexus_context_to_start_activity_request(
+            req
+        )
 
         return req
 

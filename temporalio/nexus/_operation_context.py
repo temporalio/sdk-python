@@ -758,3 +758,48 @@ async def _start_nexus_operation_workflow_update(  # pyright: ignore[reportUnuse
         links=temporal_context._get_request_links(),
         request_id=temporal_context.nexus_context.request_id,
     )
+
+
+def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnusedFunction]
+    req: temporalio.api.workflowservice.v1.StartActivityExecutionRequest,
+) -> None:
+    """Apply the current Nexus operation context to an activity start request.
+
+    This is a no-op outside a Nexus operation context. Within one, it attaches
+    the Nexus request ID and inbound links and configures conflict handling to
+    preserve the Nexus metadata. Completion callbacks are added only when the
+    activity is backing the Nexus operation.
+    """
+    nexus_ctx = _try_start_operation_context()
+
+    if nexus_ctx is not None:
+        req.on_conflict_options.attach_request_id = True
+        req.on_conflict_options.attach_completion_callbacks = True
+        req.on_conflict_options.attach_links = True
+
+        # Add request_id and all Nexus links if we're in a Nexus context, backing or otherwise
+        req.request_id = nexus_ctx.nexus_context.request_id
+        request_links = nexus_ctx._get_request_links()
+
+        # Links are duplicated on request for compatibility with older server versions.
+        req.links.extend(request_links)
+
+        if _in_nexus_backing_start_context():
+            # Add callbacks only if we're in a backing Nexus context
+            callbacks = nexus_ctx._get_callbacks(
+                OperationToken(
+                    type=OperationTokenType.ACTIVITY,
+                    namespace=nexus_ctx.client.namespace,
+                    activity_id=req.activity_id,
+                ).encode()
+            )
+            req.completion_callbacks.extend(
+                temporalio.api.common.v1.Callback(
+                    nexus=temporalio.api.common.v1.Callback.Nexus(
+                        url=callback.url,
+                        header=callback.headers,
+                    ),
+                    links=request_links,
+                )
+                for callback in callbacks
+            )
