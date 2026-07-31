@@ -6279,6 +6279,17 @@ async def test_workflow_replace_worker_client_diff_runtimes_fail(
             worker.client = other_client
 
 
+async def test_workflow_replace_worker_client_default_runtime(client: Client):
+    # Do not pass a runtime here: this client should lazily use the same
+    # default runtime as the worker.
+    default_runtime_client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+    )
+    async with new_worker(client, HelloWorkflow) as worker:
+        worker.client = default_runtime_client
+
+
 @activity.defn(dynamic=True)
 async def return_name_activity(_args: Sequence[RawValue]) -> str:
     return activity.info().activity_type

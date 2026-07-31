@@ -735,7 +735,10 @@ class Worker:
         must be using the same runtime as the current client.
         """
         bridge_client = _extract_bridge_client_for_worker(value)
-        if self._runtime is not bridge_client.config.runtime:
+        new_runtime = (
+            bridge_client.config.runtime or temporalio.runtime.Runtime.default()
+        )
+        if self._runtime is not new_runtime:
             raise ValueError(
                 "New client is not on the same runtime as the existing client"
             )
