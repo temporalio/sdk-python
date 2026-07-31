@@ -860,6 +860,8 @@ class _RestrictionState:
 
 
 class _RestrictedProxyLookup:
+    bind_func: Callable[[_RestrictedProxy, Any], Callable[..., Any]] | None
+
     def __init__(
         self,
         access_func: Callable | None = None,
