@@ -771,7 +771,6 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
     activity is backing the Nexus operation.
     """
     nexus_ctx = _try_start_operation_context()
-
     if nexus_ctx is not None:
         req.on_conflict_options.attach_request_id = True
         req.on_conflict_options.attach_completion_callbacks = True
@@ -803,3 +802,22 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
                 )
                 for callback in callbacks
             )
+
+
+def _apply_start_activity_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
+    activity_id: str,
+    resp: temporalio.api.workflowservice.v1.StartActivityExecutionResponse,
+):
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None:
+        if resp.HasField("link"):
+            response_link = resp.link
+        else:
+            response_link = temporalio.api.common.v1.Link(
+                activity=temporalio.api.common.v1.Link.Activity(
+                    namespace=nexus_ctx.client.namespace,
+                    activity_id=activity_id,
+                    run_id=resp.run_id,
+                )
+            )
+        nexus_ctx._add_response_link(response_link)
