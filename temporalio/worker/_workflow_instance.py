@@ -761,6 +761,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 else:
                     self._current_activation_error = err
                     return
+            except _ContinueAsNewError:
+                # Continue-as-new is only valid from the top-level workflow or
+                # signal handlers. From an update handler it must fail the
+                # workflow task instead of escaping this detached task.
+                self._current_activation_error = RuntimeError(
+                    "Cannot continue as new from an update handler"
+                )
+                return
             except BaseException:
                 if self._deleting:
                     if LOG_IGNORE_DURING_DELETE:
