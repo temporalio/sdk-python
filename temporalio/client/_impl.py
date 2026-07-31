@@ -588,6 +588,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     )
             raise
 
+        # Apply StartActivity response elements to the current Nexus context.
+        # No-ops if called outside a Nexus context.
         temporalio.nexus._operation_context._apply_start_activity_response_to_nexus_context(
             input.id, resp
         )
