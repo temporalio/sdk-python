@@ -731,14 +731,13 @@ class Worker:
 
         Changing the client will make sure the worker starts using it for the
         next calls it makes. However, outstanding client calls will still
-        complete with the existing client. The new client cannot be "lazy" and
-        must be using the same runtime as the current client.
+        complete with the existing client. The new client cannot be "lazy" and,
+        when configured with an explicit runtime, must use the current client's
+        runtime.
         """
         bridge_client = _extract_bridge_client_for_worker(value)
-        new_runtime = (
-            bridge_client.config.runtime or temporalio.runtime.Runtime.default()
-        )
-        if self._runtime is not new_runtime:
+        new_runtime = bridge_client.config.runtime
+        if new_runtime is not None and self._runtime is not new_runtime:
             raise ValueError(
                 "New client is not on the same runtime as the existing client"
             )

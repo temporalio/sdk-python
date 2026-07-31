@@ -6279,14 +6279,19 @@ async def test_workflow_replace_worker_client_diff_runtimes_fail(
             worker.client = other_client
 
 
-async def test_workflow_replace_worker_client_default_runtime(client: Client):
-    # Do not pass a runtime here: this client should lazily use the same
-    # default runtime as the worker.
+async def test_workflow_replace_worker_client_implicit_runtime(
+    env: WorkflowEnvironment,
+):
+    # An implicit runtime must not be resolved just to compare it with the
+    # worker's explicit runtime. The worker owns the runtime for its bridge
+    # client replacement.
+    worker_runtime = Runtime(telemetry=TelemetryConfig())
+    worker_client = await env.connect_client(runtime=worker_runtime)
     default_runtime_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+        worker_client.service_client.config.target_host,
+        namespace=worker_client.namespace,
     )
-    async with new_worker(client, HelloWorkflow) as worker:
+    async with new_worker(worker_client, HelloWorkflow) as worker:
         worker.client = default_runtime_client
 
 
