@@ -2,7 +2,15 @@
 
 from collections.abc import Iterable
 
-from opentelemetry.metrics import CallbackOptions, Meter, MeterProvider, Observation
+from opentelemetry.metrics import (
+    CallbackOptions,
+    Histogram,
+    Meter,
+    MeterProvider,
+    NoOpMeter,
+    NoOpMeterProvider,
+    Observation,
+)
 from opentelemetry.sdk.metrics import MeterProvider as SdkMeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.util.types import Attributes
@@ -91,6 +99,48 @@ def test_replay_safe_meter_provider_delegates_get_meter_arguments():
     assert meter.name == "test-meter"
     assert meter.version == "1.2.3"
     assert meter.schema_url == "https://example.com/schema"
+
+
+def test_replay_safe_meter_provider_supports_older_otel_signatures():
+    """Newer opentelemetry-api parameters (get_meter attributes, 1.26;
+    create_histogram explicit_bucket_boundaries_advisory, 1.30) must only be
+    forwarded when set, so providers with older signatures keep working."""
+
+    class Pre130Meter(NoOpMeter):
+        def __init__(self) -> None:
+            super().__init__("pre-1.30-meter")
+            self.histogram_calls: list[tuple[str, str, str]] = []
+
+        def create_histogram(  # type: ignore[override]
+            self,
+            name: str,
+            unit: str = "",
+            description: str = "",
+        ) -> Histogram:
+            self.histogram_calls.append((name, unit, description))
+            return super().create_histogram(name, unit, description)
+
+    class Pre126MeterProvider(NoOpMeterProvider):
+        def __init__(self) -> None:
+            self.meter = Pre130Meter()
+            self.get_meter_calls: list[tuple[str, str | None, str | None]] = []
+
+        def get_meter(  # type: ignore[override]
+            self,
+            name: str,
+            version: str | None = None,
+            schema_url: str | None = None,
+        ) -> Meter:
+            self.get_meter_calls.append((name, version, schema_url))
+            return self.meter
+
+    inner_provider = Pre126MeterProvider()
+    provider = ReplaySafeMeterProvider(inner_provider)
+    meter = provider.get_meter("test-meter")
+    meter.create_histogram("histogram").record(1)
+
+    assert inner_provider.get_meter_calls == [("test-meter", None, None)]
+    assert inner_provider.meter.histogram_calls == [("histogram", "", "")]
 
 
 def test_replay_safe_meter_provider_delegates_other_attributes():

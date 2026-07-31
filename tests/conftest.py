@@ -273,7 +273,13 @@ def reset_otel_tracer_provider():
 
 @pytest.fixture
 def reset_otel_meter_provider():
-    """Reset global OpenTelemetry meter provider state around tests."""
+    """Reset global OpenTelemetry meter provider state around tests.
+
+    Proxy meters/instruments already bound to a real provider stay bound after
+    this reset; only the next set_meter_provider call rebinds them. Tests must
+    not assume an unset global provider drops recordings from instruments
+    created in earlier tests.
+    """
     opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
     opentelemetry.metrics._internal._METER_PROVIDER = None
     yield

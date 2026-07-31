@@ -102,6 +102,10 @@ class _ReplaySafeGauge(_Gauge):
 
 
 class _ReplaySafeMeter(Meter):
+    # Overrides every Meter method as of opentelemetry-api 1.42. OTel adds new
+    # instrument kinds as non-abstract no-op defaults on the Meter ABC (e.g.
+    # create_gauge in 1.23), which __getattr__ cannot intercept, so new Meter
+    # methods must be audited and overridden here on opentelemetry upgrades.
     def __init__(self, meter: Meter) -> None:
         super().__init__(meter.name, version=meter.version, schema_url=meter.schema_url)
         self._meter = meter
@@ -132,13 +136,16 @@ class _ReplaySafeMeter(Meter):
         *,
         explicit_bucket_boundaries_advisory: Sequence[float] | None = None,
     ) -> Histogram:
-        return _ReplaySafeHistogram(
-            self._meter.create_histogram(
-                name,
-                unit,
-                description,
-                explicit_bucket_boundaries_advisory=explicit_bucket_boundaries_advisory,
+        # Forward the advisory only when set: the parameter was added in
+        # opentelemetry 1.30 and unconditionally forwarding it raises TypeError
+        # on older APIs still within the supported version range.
+        kwargs: dict[str, Any] = {}
+        if explicit_bucket_boundaries_advisory is not None:
+            kwargs["explicit_bucket_boundaries_advisory"] = (
+                explicit_bucket_boundaries_advisory
             )
+        return _ReplaySafeHistogram(
+            self._meter.create_histogram(name, unit, description, **kwargs)
         )
 
     def create_gauge(
@@ -249,6 +256,13 @@ class ReplaySafeMeterProvider(MeterProvider):
         Returns:
             A replay-safe meter instance.
         """
-        return _ReplaySafeMeter(
-            self._meter_provider.get_meter(name, version, schema_url, attributes)
-        )
+        # Forward attributes only when set: the parameter was added in
+        # opentelemetry 1.26 and passing it to older providers raises
+        # TypeError.
+        if attributes is None:
+            inner = self._meter_provider.get_meter(name, version, schema_url)
+        else:
+            inner = self._meter_provider.get_meter(
+                name, version, schema_url, attributes
+            )
+        return _ReplaySafeMeter(inner)
