@@ -9,6 +9,7 @@ ReplaySafeMeterProvider as the global meter provider suppresses the replay
 recordings while leaving first-execution recordings intact.
 """
 
+import sys
 import uuid
 import warnings
 from collections.abc import AsyncGenerator
@@ -23,6 +24,8 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import InMemoryRunner
 from google.adk.utils.context_utils import Aclosing
 from google.genai import types
+from opentelemetry.metrics import NoOpMeterProvider
+from opentelemetry.metrics._internal import _ProxyMeterProvider
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace import TracerProvider
@@ -287,3 +290,63 @@ def test_plugin_does_not_warn_with_unset_providers(
         warnings.simplefilter("always")
         GoogleAdkPlugin().configure_worker(_worker_config())
     assert not [w for w in recorded if "replay-safe" in str(w.message)]
+
+
+def test_meter_provider_replay_safety_classification(monkeypatch: pytest.MonkeyPatch):
+    from temporalio.contrib.google_adk_agents._plugin import (
+        _meter_provider_replay_safe,
+    )
+
+    assert _meter_provider_replay_safe(ReplaySafeMeterProvider(MeterProvider())) is True
+    assert _meter_provider_replay_safe(NoOpMeterProvider()) is True
+    assert _meter_provider_replay_safe(_ProxyMeterProvider()) is True
+    assert _meter_provider_replay_safe(MeterProvider()) is False
+
+    # When the private proxy class cannot be imported, providers other than
+    # the replay-safe/no-op ones are unclassifiable and must not warn.
+    monkeypatch.setitem(sys.modules, "opentelemetry.metrics._internal", None)
+    assert _meter_provider_replay_safe(MeterProvider()) is None
+    assert _meter_provider_replay_safe(NoOpMeterProvider()) is True
+
+
+def test_plugin_does_not_warn_when_proxy_detection_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
+    reset_otel_tracer_provider,  # type: ignore[reportUnusedParameter]
+):
+    # A replay-unsafe provider is set, but with the private proxy class
+    # unimportable it cannot be classified, so the plugin stays silent rather
+    # than risking a false positive.
+    opentelemetry.metrics.set_meter_provider(MeterProvider())
+    monkeypatch.setitem(sys.modules, "opentelemetry.metrics._internal", None)
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
+        GoogleAdkPlugin().configure_worker(_worker_config())
+    assert not [
+        w for w in recorded if "MeterProvider is not replay-safe" in str(w.message)
+    ]
+
+
+async def test_plugin_warning_points_at_worker_construction(
+    client: Client,
+    reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
+    reset_otel_tracer_provider,  # type: ignore[reportUnusedParameter]
+):
+    # stacklevel on the warning must attribute it to the user's Worker(...)
+    # call, i.e. this file, not SDK internals.
+    opentelemetry.metrics.set_meter_provider(MeterProvider())
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
+        Worker(
+            client,
+            task_queue=f"replay-metrics-{uuid.uuid4()}",
+            activities=[replay_metrics_get_weather],
+            workflows=[ReplayMetricsAgent],
+            plugins=[GoogleAdkPlugin()],
+        )
+    warned = [
+        w for w in recorded if "MeterProvider is not replay-safe" in str(w.message)
+    ]
+    assert len(warned) == 1
+    assert warned[0].category is UserWarning
+    assert warned[0].filename == __file__

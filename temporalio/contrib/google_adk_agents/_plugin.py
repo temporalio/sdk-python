@@ -10,8 +10,7 @@ from typing import Any
 
 import opentelemetry.metrics
 import opentelemetry.trace
-from opentelemetry.metrics import NoOpMeterProvider
-from opentelemetry.metrics._internal import _ProxyMeterProvider
+from opentelemetry.metrics import MeterProvider, NoOpMeterProvider
 from opentelemetry.trace import NoOpTracerProvider, ProxyTracerProvider
 
 from temporalio import workflow
@@ -37,23 +36,47 @@ from temporalio.worker import (
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
+def _meter_provider_replay_safe(provider: MeterProvider) -> bool | None:
+    """Classify the global meter provider for replay safety.
+
+    Returns True when replay-safe (including providers that drop all
+    recordings), False when positively identified as replay-unsafe, and None
+    when it cannot be classified, in which case no warning should be issued
+    since a false positive is worse than a missed warning.
+    """
+    if isinstance(provider, (ReplaySafeMeterProvider, NoOpMeterProvider)):
+        return True
+    try:
+        # Unlike tracing's public ProxyTracerProvider, the proxy (unset) meter
+        # provider has no public counterpart. Import the private class lazily
+        # so a moved or removed symbol cannot break module import; it is
+        # present in opentelemetry-api 1.12 through at least 1.42.
+        from opentelemetry.metrics._internal import _ProxyMeterProvider
+    except ImportError:
+        return None
+    return isinstance(provider, _ProxyMeterProvider)
+
+
 def _warn_if_global_otel_providers_not_replay_safe() -> None:
     # ADK records metrics and spans through the process-global OpenTelemetry
     # providers from code that runs workflow-side, so a non-replay-safe global
     # provider re-emits that telemetry on every workflow replay. Unset (proxy)
     # and no-op providers drop recordings and are fine.
+    #
+    # stacklevel=4 attributes the warnings to the user's Worker(...) call:
+    # warn -> this helper -> GoogleAdkPlugin.configure_worker ->
+    # Worker.__init__ -> user code.
     meter_provider = opentelemetry.metrics.get_meter_provider()
-    if not isinstance(
-        meter_provider,
-        (ReplaySafeMeterProvider, NoOpMeterProvider, _ProxyMeterProvider),
-    ):
+    if _meter_provider_replay_safe(meter_provider) is False:
         warnings.warn(
             "The global OpenTelemetry MeterProvider is not replay-safe: Google ADK "
             "records metrics from workflow code, so every workflow replay will "
             "re-record them. Wrap your provider in "
             "temporalio.contrib.opentelemetry.ReplaySafeMeterProvider and make it "
             "the first and only global provider set: "
-            "opentelemetry.metrics.set_meter_provider(ReplaySafeMeterProvider(provider))"
+            "opentelemetry.metrics.set_meter_provider(ReplaySafeMeterProvider(provider))",
+            UserWarning,
+            stacklevel=4,
         )
     tracer_provider = opentelemetry.trace.get_tracer_provider()
     if not isinstance(
@@ -65,7 +88,9 @@ def _warn_if_global_otel_providers_not_replay_safe() -> None:
             "creates spans from workflow code, so every workflow replay will "
             "re-emit them. Install a replay-safe provider: "
             "opentelemetry.trace.set_tracer_provider("
-            "temporalio.contrib.opentelemetry.create_tracer_provider())"
+            "temporalio.contrib.opentelemetry.create_tracer_provider())",
+            UserWarning,
+            stacklevel=4,
         )
 
 
