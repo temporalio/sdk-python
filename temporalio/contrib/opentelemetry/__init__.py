@@ -23,6 +23,17 @@ except ImportError as err:
     # ReplaySafeMeterProvider is actually accessed (see __getattr__ below).
     _meter_provider_import_error = err
 
+_logger_provider_import_error: ImportError | None = None
+try:
+    from temporalio.contrib.opentelemetry._logger_provider import (
+        ReplaySafeLoggerProvider,
+    )
+except ImportError as err:
+    # opentelemetry-api < 1.15 has no opentelemetry._logs module. Keep the
+    # tracing integration importable and raise a clear error only when
+    # ReplaySafeLoggerProvider is actually accessed (see __getattr__ below).
+    _logger_provider_import_error = err
+
 from temporalio.contrib.opentelemetry._otel_interceptor import OpenTelemetryInterceptor
 from temporalio.contrib.opentelemetry._plugin import OpenTelemetryPlugin
 from temporalio.contrib.opentelemetry._tracer_provider import (
@@ -35,6 +46,7 @@ __all__ = [
     "TracingWorkflowInboundInterceptor",
     "OpenTelemetryInterceptor",
     "OpenTelemetryPlugin",
+    "ReplaySafeLoggerProvider",
     "ReplaySafeMeterProvider",
     "ReplaySafeTracerProvider",
     "create_tracer_provider",
@@ -42,8 +54,9 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    # Only reachable for ReplaySafeMeterProvider when the guarded import above
-    # failed; otherwise the module attribute exists and this is never called.
+    # Only reachable for the replay-safe providers when their guarded imports
+    # above failed; otherwise the module attributes exist and this is never
+    # called.
     if name == "ReplaySafeMeterProvider":
         raise ImportError(
             "ReplaySafeMeterProvider requires the OpenTelemetry metrics API "
@@ -51,4 +64,10 @@ def __getattr__(name: str) -> Any:
             "version does not provide. Install opentelemetry-api >= 1.12 "
             "(>= 1.23 for synchronous gauge support)."
         ) from _meter_provider_import_error
+    if name == "ReplaySafeLoggerProvider":
+        raise ImportError(
+            "ReplaySafeLoggerProvider requires the OpenTelemetry logs API "
+            "(opentelemetry._logs), which the installed opentelemetry-api "
+            "version does not provide. Install opentelemetry-api >= 1.15."
+        ) from _logger_provider_import_error
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

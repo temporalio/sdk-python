@@ -267,6 +267,30 @@ retried workflow task re-executes live and can record again. Observable
 (asynchronous) instruments and recordings made outside workflows pass through
 untouched.
 
+## Replay-Safe Log Events
+
+Libraries may also emit OpenTelemetry log records through the process-global
+logger provider from workflow code (e.g. Google ADK's `gen_ai.*` events),
+which duplicate on every replay the same way. `ReplaySafeLoggerProvider`
+wraps your logger provider so records emitted from workflow code are dropped
+during replay:
+
+```python
+import opentelemetry._logs
+from opentelemetry.sdk._logs import LoggerProvider
+from temporalio.contrib.opentelemetry import ReplaySafeLoggerProvider
+
+# set_logger_provider only takes effect once per process, so this wrapper
+# must be the first and only global logger provider set, installed before
+# any library emits log records.
+opentelemetry._logs.set_logger_provider(
+    ReplaySafeLoggerProvider(my_logger_provider)
+)
+```
+
+Emissions are first-execution-only: a retried workflow task re-executes live
+and can emit again. Emissions outside workflows pass through untouched.
+
 ## Best Practices
 
 1. **Register on Client**: Always register plugins/interceptors on the client, not the worker, to ensure proper context propagation
