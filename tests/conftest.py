@@ -4,6 +4,7 @@ import os
 import sys
 from collections.abc import AsyncGenerator, Iterator
 
+import opentelemetry._logs._internal
 import opentelemetry.metrics._internal
 import opentelemetry.trace
 import pytest
@@ -285,3 +286,19 @@ def reset_otel_meter_provider():
     yield
     opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
     opentelemetry.metrics._internal._METER_PROVIDER = None
+
+
+@pytest.fixture
+def reset_otel_logger_provider():
+    """Reset global OpenTelemetry logger provider state around tests.
+
+    Unlike proxy meters, proxy loggers cache their real logger on first use
+    and never rebind, even across a later set_logger_provider call. Tests
+    exercising a library's module-level logger must clear that cache
+    themselves (e.g. Google ADK's telemetry logger).
+    """
+    opentelemetry._logs._internal._LOGGER_PROVIDER_SET_ONCE = Once()
+    opentelemetry._logs._internal._LOGGER_PROVIDER = None
+    yield
+    opentelemetry._logs._internal._LOGGER_PROVIDER_SET_ONCE = Once()
+    opentelemetry._logs._internal._LOGGER_PROVIDER = None

@@ -1,20 +1,24 @@
-"""Tests for replay-safe handling of ADK's OpenTelemetry metrics.
+"""Tests for replay-safe handling of ADK's OpenTelemetry metrics and log events.
 
-Google ADK records token-usage/latency metrics through the process-global
-OpenTelemetry meter (scope "gcp.vertex.agent") from code that runs
-workflow-side under the Temporal adapter. Without gating, 1 real execution +
-N replays produces (1 + N) observations per instrument, while the activity
-(the model / tool call) runs exactly once. Installing
-ReplaySafeMeterProvider as the global meter provider suppresses the replay
+Google ADK records token-usage/latency metrics and emits gen_ai.* log events
+through the process-global OpenTelemetry providers (scope "gcp.vertex.agent")
+from code that runs workflow-side under the Temporal adapter. Without gating,
+1 real execution + N replays produces (1 + N) observations per instrument and
+(1 + N) copies of every log event, while the activity (the model / tool call)
+runs exactly once. Installing ReplaySafeMeterProvider /
+ReplaySafeLoggerProvider as the global providers suppresses the replay
 recordings while leaving first-execution recordings intact.
 """
 
+import inspect
 import sys
 import uuid
 import warnings
 from collections.abc import AsyncGenerator
 from datetime import timedelta
 
+import google.adk.telemetry.tracing
+import opentelemetry._logs
 import opentelemetry.metrics
 import pytest
 from google.adk import Agent
@@ -24,18 +28,29 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import InMemoryRunner
 from google.adk.utils.context_utils import Aclosing
 from google.genai import types
-from opentelemetry.metrics import NoOpMeterProvider
+from opentelemetry._logs import NoOpLoggerProvider
+from opentelemetry._logs._internal import ProxyLoggerProvider
+from opentelemetry.metrics import Meter, NoOpMeterProvider
+from opentelemetry.metrics import MeterProvider as ApiMeterProvider
 from opentelemetry.metrics._internal import _ProxyMeterProvider
+from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs.export import (
+    InMemoryLogRecordExporter,
+    SimpleLogRecordProcessor,
+)
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace import TracerProvider as ApiTracerProvider
 from opentelemetry.trace import set_tracer_provider
+from opentelemetry.util.types import Attributes
 
 import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowHistory
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
 from temporalio.contrib.opentelemetry import (
+    ReplaySafeLoggerProvider,
     ReplaySafeMeterProvider,
     create_tracer_provider,
 )
@@ -54,6 +69,15 @@ EXPECTED_BASELINE = {
     "gen_ai.execute_tool.duration": 1,
     "gen_ai.client.operation.duration": 2,
     "gen_ai.client.token.usage": 4,
+}
+
+# Log events per model call: one gen_ai.system.message, one
+# gen_ai.user.message per request content (1 for the first call; 3 for the
+# second: prompt + tool call + tool response), one gen_ai.choice per result.
+EXPECTED_LOG_BASELINE = {
+    "gen_ai.system.message": 2,
+    "gen_ai.user.message": 4,
+    "gen_ai.choice": 2,
 }
 
 # Counts real (worker-side) activity executions; replays must not add to it.
@@ -173,6 +197,40 @@ def adk_metric_counts(reader: InMemoryMetricReader) -> dict[str, int]:
     return counts
 
 
+def adk_log_event_counts(exporter: InMemoryLogRecordExporter) -> dict[str, int]:
+    """Emission count per ADK log event name."""
+    counts: dict[str, int] = {}
+    for log in exporter.get_finished_logs():
+        if log.instrumentation_scope is None or (
+            log.instrumentation_scope.name != ADK_METER_SCOPE
+        ):
+            continue
+        event_name = log.log_record.event_name
+        if event_name:
+            counts[event_name] = counts.get(event_name, 0) + 1
+    return counts
+
+
+@pytest.fixture
+def reset_adk_proxy_logger():
+    """Clear ADK's cached proxy logger binding around tests.
+
+    ADK's module-level otel_logger is a proxy that caches its real logger on
+    first emit and never rebinds, even across a later set_logger_provider
+    call, so each test must clear the cache for its own provider to receive
+    the events.
+    """
+
+    def clear() -> None:
+        proxy = google.adk.telemetry.tracing.otel_logger
+        if hasattr(proxy, "_real_logger"):
+            proxy._real_logger = None  # type: ignore[attr-defined]
+
+    clear()
+    yield
+    clear()
+
+
 async def _run_once_and_replay(
     client: Client, num_replays: int
 ) -> tuple[int, WorkflowHistory]:
@@ -250,6 +308,47 @@ async def test_replay_metrics_duplicate_without_replay_safe_meter_provider(
     }
 
 
+def _in_memory_logger_provider() -> tuple[LoggerProvider, InMemoryLogRecordExporter]:
+    exporter = InMemoryLogRecordExporter()
+    provider = LoggerProvider()
+    provider.add_log_record_processor(SimpleLogRecordProcessor(exporter))
+    return provider, exporter
+
+
+async def test_replay_safe_logger_provider_suppresses_replay_log_events(
+    client: Client,
+    reset_otel_logger_provider,  # type: ignore[reportUnusedParameter]
+    reset_adk_proxy_logger,  # type: ignore[reportUnusedParameter]
+):
+    provider, exporter = _in_memory_logger_provider()
+    opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(provider))
+
+    real_executions, _ = await _run_once_and_replay(client, num_replays=3)
+
+    # First execution emitted exactly once (not suppressed), replays added
+    # zero log events, and the activity never re-executed.
+    assert real_executions == 1
+    assert adk_log_event_counts(exporter) == EXPECTED_LOG_BASELINE
+
+
+async def test_replay_log_events_duplicate_without_replay_safe_logger_provider(
+    client: Client,
+    reset_otel_logger_provider,  # type: ignore[reportUnusedParameter]
+    reset_adk_proxy_logger,  # type: ignore[reportUnusedParameter]
+):
+    # Control: without the wrapper, every replay re-emits every workflow-side
+    # ADK log event even though nothing really re-executed.
+    provider, exporter = _in_memory_logger_provider()
+    opentelemetry._logs.set_logger_provider(provider)
+
+    real_executions, _ = await _run_once_and_replay(client, num_replays=3)
+
+    assert real_executions == 1
+    assert adk_log_event_counts(exporter) == {
+        name: count * (1 + 3) for name, count in EXPECTED_LOG_BASELINE.items()
+    }
+
+
 def _worker_config() -> WorkerConfig:
     return WorkerConfig(workflow_runner=SandboxedWorkflowRunner())
 
@@ -270,12 +369,32 @@ def test_plugin_warns_on_non_replay_safe_tracer_provider(
         GoogleAdkPlugin().configure_worker(_worker_config())
 
 
+def test_plugin_warns_on_non_replay_safe_logger_provider(
+    reset_otel_logger_provider,  # type: ignore[reportUnusedParameter]
+):
+    opentelemetry._logs.set_logger_provider(LoggerProvider())
+    with pytest.warns(UserWarning, match="LoggerProvider is not replay-safe"):
+        GoogleAdkPlugin().configure_worker(_worker_config())
+
+
+def test_plugin_warns_on_replayer_construction(
+    reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
+):
+    # Replayer replays are exactly where an unsafe global provider re-records
+    # telemetry, so the warning must fire there too.
+    opentelemetry.metrics.set_meter_provider(MeterProvider())
+    with pytest.warns(UserWarning, match="MeterProvider is not replay-safe"):
+        Replayer(workflows=[ReplayMetricsAgent], plugins=[GoogleAdkPlugin()])
+
+
 def test_plugin_does_not_warn_with_replay_safe_providers(
     reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
     reset_otel_tracer_provider,  # type: ignore[reportUnusedParameter]
+    reset_otel_logger_provider,  # type: ignore[reportUnusedParameter]
 ):
     opentelemetry.metrics.set_meter_provider(ReplaySafeMeterProvider(MeterProvider()))
     set_tracer_provider(create_tracer_provider())
+    opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(LoggerProvider()))
     with warnings.catch_warnings(record=True) as recorded:
         warnings.simplefilter("always")
         GoogleAdkPlugin().configure_worker(_worker_config())
@@ -285,11 +404,28 @@ def test_plugin_does_not_warn_with_replay_safe_providers(
 def test_plugin_does_not_warn_with_unset_providers(
     reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
     reset_otel_tracer_provider,  # type: ignore[reportUnusedParameter]
+    reset_otel_logger_provider,  # type: ignore[reportUnusedParameter]
 ):
     with warnings.catch_warnings(record=True) as recorded:
         warnings.simplefilter("always")
         GoogleAdkPlugin().configure_worker(_worker_config())
     assert not [w for w in recorded if "replay-safe" in str(w.message)]
+
+
+class _DelegatingMeterProvider(ApiMeterProvider):
+    """Unknown custom provider delegating to a replay-safe one."""
+
+    def __init__(self) -> None:
+        self._inner = ReplaySafeMeterProvider(MeterProvider())
+
+    def get_meter(
+        self,
+        name: str,
+        version: str | None = None,
+        schema_url: str | None = None,
+        attributes: Attributes | None = None,
+    ) -> Meter:
+        return self._inner.get_meter(name, version, schema_url)
 
 
 def test_meter_provider_replay_safety_classification(monkeypatch: pytest.MonkeyPatch):
@@ -301,30 +437,68 @@ def test_meter_provider_replay_safety_classification(monkeypatch: pytest.MonkeyP
     assert _meter_provider_replay_safe(NoOpMeterProvider()) is True
     assert _meter_provider_replay_safe(_ProxyMeterProvider()) is True
     assert _meter_provider_replay_safe(MeterProvider()) is False
+    # Unknown provider types (e.g. a custom provider delegating to a
+    # replay-safe one) are unclassifiable and must not warn.
+    assert _meter_provider_replay_safe(_DelegatingMeterProvider()) is None
 
-    # When the private proxy class cannot be imported, providers other than
-    # the replay-safe/no-op ones are unclassifiable and must not warn.
+    # SDK providers stay positively identified even when the private proxy
+    # class cannot be imported; the proxy instance becomes unclassifiable.
     monkeypatch.setitem(sys.modules, "opentelemetry.metrics._internal", None)
-    assert _meter_provider_replay_safe(MeterProvider()) is None
+    assert _meter_provider_replay_safe(MeterProvider()) is False
+    assert _meter_provider_replay_safe(_ProxyMeterProvider()) is None
     assert _meter_provider_replay_safe(NoOpMeterProvider()) is True
 
 
-def test_plugin_does_not_warn_when_proxy_detection_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
+def test_tracer_provider_replay_safety_classification():
+    from temporalio.contrib.google_adk_agents._plugin import (
+        _tracer_provider_replay_safe,
+    )
+
+    class DelegatingTracerProvider(ApiTracerProvider):
+        def __init__(self) -> None:
+            self._inner = create_tracer_provider()
+
+        def get_tracer(self, *args, **kwargs):
+            return self._inner.get_tracer(*args, **kwargs)
+
+    assert _tracer_provider_replay_safe(create_tracer_provider()) is True
+    assert _tracer_provider_replay_safe(TracerProvider()) is False
+    assert _tracer_provider_replay_safe(DelegatingTracerProvider()) is None
+
+
+def test_logger_provider_replay_safety_classification():
+    from temporalio.contrib.google_adk_agents._plugin import (
+        _logger_provider_replay_safe,
+    )
+
+    class DelegatingLoggerProvider(opentelemetry._logs.LoggerProvider):
+        def __init__(self) -> None:
+            self._inner = ReplaySafeLoggerProvider(LoggerProvider())
+
+        def get_logger(self, *args, **kwargs):
+            return self._inner.get_logger(*args, **kwargs)
+
+    assert _logger_provider_replay_safe(ReplaySafeLoggerProvider(LoggerProvider())) is (
+        True
+    )
+    assert _logger_provider_replay_safe(NoOpLoggerProvider()) is True
+    assert _logger_provider_replay_safe(ProxyLoggerProvider()) is True
+    assert _logger_provider_replay_safe(LoggerProvider()) is False
+    assert _logger_provider_replay_safe(DelegatingLoggerProvider()) is None
+
+
+def test_plugin_does_not_warn_on_unknown_custom_provider(
     reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
     reset_otel_tracer_provider,  # type: ignore[reportUnusedParameter]
 ):
-    # A replay-unsafe provider is set, but with the private proxy class
-    # unimportable it cannot be classified, so the plugin stays silent rather
-    # than risking a false positive.
-    opentelemetry.metrics.set_meter_provider(MeterProvider())
-    monkeypatch.setitem(sys.modules, "opentelemetry.metrics._internal", None)
+    # A custom provider delegating to a replay-safe one is a fully replay-safe
+    # configuration; an unclassifiable provider must not trigger a false
+    # positive.
+    opentelemetry.metrics.set_meter_provider(_DelegatingMeterProvider())
     with warnings.catch_warnings(record=True) as recorded:
         warnings.simplefilter("always")
         GoogleAdkPlugin().configure_worker(_worker_config())
-    assert not [
-        w for w in recorded if "MeterProvider is not replay-safe" in str(w.message)
-    ]
+    assert not [w for w in recorded if "replay-safe" in str(w.message)]
 
 
 async def test_plugin_warning_points_at_worker_construction(
@@ -350,3 +524,38 @@ async def test_plugin_warning_points_at_worker_construction(
     assert len(warned) == 1
     assert warned[0].category is UserWarning
     assert warned[0].filename == __file__
+
+
+class _WrappingPlugin:
+    """User plugin that delegates to GoogleAdkPlugin through an extra frame."""
+
+    def __init__(self) -> None:
+        self._inner = GoogleAdkPlugin()
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        return self._inner.configure_worker(config)
+
+
+def test_plugin_warning_points_at_wrapping_plugin_caller(
+    reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
+    reset_otel_tracer_provider,  # type: ignore[reportUnusedParameter]
+):
+    # When another plugin wraps GoogleAdkPlugin, the warning must attribute
+    # to the nearest user frame (the wrapper's delegation line), not SDK
+    # internals or a fixed frame depth.
+    opentelemetry.metrics.set_meter_provider(MeterProvider())
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
+        _WrappingPlugin().configure_worker(_worker_config())
+    warned = [
+        w for w in recorded if "MeterProvider is not replay-safe" in str(w.message)
+    ]
+    assert len(warned) == 1
+    assert warned[0].filename == __file__
+    source_lines, start = inspect.getsourcelines(_WrappingPlugin.configure_worker)
+    delegation_line = start + next(
+        offset
+        for offset, line in enumerate(source_lines)
+        if "self._inner.configure_worker" in line
+    )
+    assert warned[0].lineno == delegation_line

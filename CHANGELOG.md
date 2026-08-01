@@ -20,15 +20,17 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider`, a wrapping
-  OpenTelemetry `MeterProvider` that drops synchronous instrument recordings made from workflow
-  code during replay. Install it as the process-global meter provider when libraries record
-  OpenTelemetry metrics from workflow code (e.g. Google ADK) so that workflow replays (cache
-  eviction, worker restarts, redeploys) do not re-record metrics; recordings are
-  first-execution-only, matching `temporalio.workflow.metric_meter()`.
+- Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
+  `ReplaySafeLoggerProvider`, wrapping OpenTelemetry providers that drop synchronous instrument
+  recordings and emitted log records made from workflow code during replay. Install them as the
+  process-global providers when libraries record OpenTelemetry metrics or emit log events from
+  workflow code (e.g. Google ADK) so that workflow replays (cache eviction, worker restarts,
+  redeploys) do not duplicate telemetry; recordings are first-execution-only, matching
+  `temporalio.workflow.metric_meter()`.
   `temporalio.contrib.opentelemetry.ReplaySafeTracerProvider` is now also exported.
-  `GoogleAdkPlugin` now warns at worker configuration time when the global OpenTelemetry meter
-  or tracer provider is not replay-safe.
+  `GoogleAdkPlugin` now warns at worker and replayer configuration time when the global
+  OpenTelemetry meter, tracer, or logger provider is positively identified as not replay-safe
+  (an OpenTelemetry SDK provider used directly).
 
 ### Changed
 

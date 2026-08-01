@@ -202,13 +202,14 @@ agent = Agent(
 ## Telemetry and Workflow Replay
 
 ADK records OpenTelemetry metrics (scope `gcp.vertex.agent`, e.g.
-`gen_ai.client.token.usage`) and spans through the process-global
-OpenTelemetry providers from code that runs inside the workflow. Workflow
-code re-executes on every replay, so with a plain global provider each replay
-re-records all of that telemetry even though no model or tool actually ran
-again — for example, 1 real execution followed by 3 replays yields 4x the
-observations on every instrument. Replays happen routinely in production:
-workflow cache eviction, worker restarts, redeploys, or running with
+`gen_ai.client.token.usage`), spans, and log events (e.g. `gen_ai.choice`)
+through the process-global OpenTelemetry providers from code that runs
+inside the workflow. Workflow code re-executes on every replay, so with a
+plain global provider each replay re-records all of that telemetry even
+though no model or tool actually ran again — for example, 1 real execution
+followed by 3 replays yields 4x the observations on every instrument and 4
+copies of every log event. Replays happen routinely in production: workflow
+cache eviction, worker restarts, redeploys, or running with
 `max_cached_workflows=0`.
 
 To avoid this, install Temporal's replay-safe providers as the global
@@ -216,19 +217,23 @@ OpenTelemetry providers. They pass recordings through on first execution and
 drop them during replay:
 
 ```python
+import opentelemetry._logs
 import opentelemetry.metrics
 import opentelemetry.trace
+from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from temporalio.contrib.opentelemetry import (
+    ReplaySafeLoggerProvider,
     ReplaySafeMeterProvider,
     create_tracer_provider,
 )
 
-# set_meter_provider/set_tracer_provider only take effect once per process,
-# so these wrappers must be the first and only global providers set.
+# The global set_*_provider functions only take effect once per process, so
+# these wrappers must be the first and only global providers set.
 opentelemetry.metrics.set_meter_provider(
     ReplaySafeMeterProvider(
         MeterProvider(metric_readers=[PeriodicExportingMetricReader(my_exporter)])
@@ -237,10 +242,14 @@ opentelemetry.metrics.set_meter_provider(
 tracer_provider = create_tracer_provider()
 tracer_provider.add_span_processor(BatchSpanProcessor(my_span_exporter))
 opentelemetry.trace.set_tracer_provider(tracer_provider)
+logger_provider = LoggerProvider()
+logger_provider.add_log_record_processor(BatchLogRecordProcessor(my_log_exporter))
+opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(logger_provider))
 ```
 
-`GoogleAdkPlugin` warns at worker configuration time when a global provider
-is installed that is not replay-safe.
+`GoogleAdkPlugin` warns at worker and replayer configuration time when a
+global provider is installed that it can positively identify as not
+replay-safe (an OpenTelemetry SDK provider used directly).
 
 Recordings are first-execution-only, matching
 `temporalio.workflow.metric_meter()`: a retried workflow task re-executes
