@@ -64,6 +64,13 @@ jobs:
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
+      - name: Repeat OpenTelemetry tracing tests
+        shell: bash
+        run: |
+          for attempt in {1..20}; do
+            poe test -s tests/contrib/opentelemetry/test_opentelemetry.py tests/contrib/opentelemetry/test_opentelemetry_plugin.py
+          done
+        timeout-minutes: 15
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml

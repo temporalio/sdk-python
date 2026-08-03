@@ -56,7 +56,7 @@ from temporalio.contrib.google_adk_agents import (
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.worker import Worker
 from temporalio.workflow import ActivityConfig
-from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
+from tests.contrib.opentelemetry.test_opentelemetry import assert_span_hierarchy
 
 logger = logging.getLogger(__name__)
 
@@ -578,22 +578,24 @@ async def test_single_agent_telemetry(
         assert result.content.parts is not None
         assert result.content.parts[0].text == "warm and sunny"
 
-    print("\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)))
-    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
-        "StartWorkflow:WeatherAgent",
-        "  RunWorkflow:WeatherAgent",
-        "    invocation [test_app]",
-        "      agent_run [test_agent]",
-        "        call_llm",
-        "          StartActivity:invoke_model",
-        "            RunActivity:invoke_model",
-        "          execute_tool get_weather",
-        "            StartActivity:get_weather",
-        "              RunActivity:get_weather",
-        "        call_llm",
-        "          StartActivity:invoke_model",
-        "            RunActivity:invoke_model",
-    ]
+    assert_span_hierarchy(
+        exporter.get_finished_spans(),
+        [
+            "StartWorkflow:WeatherAgent",
+            "  RunWorkflow:WeatherAgent",
+            "    invocation [test_app]",
+            "      agent_run [test_agent]",
+            "        call_llm",
+            "          StartActivity:invoke_model",
+            "            RunActivity:invoke_model",
+            "          execute_tool get_weather",
+            "            StartActivity:get_weather",
+            "              RunActivity:get_weather",
+            "        call_llm",
+            "          StartActivity:invoke_model",
+            "            RunActivity:invoke_model",
+        ],
+    )
 
 
 async def test_unsetting_timeout():
