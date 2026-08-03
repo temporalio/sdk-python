@@ -531,8 +531,6 @@ def build_span_trees(spans: Sequence[ReadableSpan]) -> list[TraceNode]:
         key = _span_context_key(span)
         link_names: list[str] = []
         for link in span.links:
-            if link.context is None:
-                continue
             link_name = names_by_context.get(
                 (link.context.trace_id, link.context.span_id)
             )
@@ -591,7 +589,6 @@ def _span_details(span: ReadableSpan) -> str:
     links = [
         f"{link.context.trace_id:032x}/{link.context.span_id:016x}"
         for link in span.links
-        if link.context is not None
     ]
     trace_id, span_id = _span_context_key(span)
     return (
