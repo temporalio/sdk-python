@@ -36,7 +36,7 @@ workflowservice_request_response_proto = (
     / "v1"
     / "request_response.proto"
 )
-NEX_GEN_VERSION = "0.2.0"
+NEX_GEN_VERSION = "0.2.1"
 
 
 def nex_gen_command() -> list[str]:
