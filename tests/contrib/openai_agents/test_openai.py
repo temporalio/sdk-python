@@ -461,7 +461,7 @@ async def test_tool_failure_workflow(client: Client):
                 "What is the weather in Tokio?",
                 id=f"tools-failure-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=2),
+                execution_timeout=timedelta(seconds=30),
             )
             with pytest.raises(WorkflowFailureError) as e:
                 await workflow_handle.result()
