@@ -160,6 +160,35 @@ def test_type_adapter_reuse_across_threads_with_deferred_build():
     assert all(result == DeferredModel(value=1) for result in results)
 
 
+def test_type_adapter_cache_distinguishes_reimported_classes():
+    # The workflow sandbox re-imports user modules, producing distinct class
+    # objects with identical names. Class hints hash by identity, so each
+    # world's class must get its own cache slot and validate to itself.
+    import types
+
+    source = "from pydantic import BaseModel\n\nclass Foo(BaseModel):\n    name: str\n"
+
+    def load_module() -> types.ModuleType:
+        module = types.ModuleType("test_reimported_models")
+        exec(compile(source, "test_reimported_models.py", "exec"), module.__dict__)
+        return module
+
+    foo_outside = load_module().Foo
+    foo_sandbox = load_module().Foo
+    assert foo_outside is not foo_sandbox
+    assert hash(foo_outside) != hash(foo_sandbox)
+
+    # Worst case: one converter shared across both worlds (the real sandbox
+    # creates a separate converter per workflow instance).
+    converter = PydanticJSONPlainPayloadConverter()
+    payload = converter.to_payload(foo_outside(name="x"))
+    assert payload is not None
+    decoded_outside = converter.from_payload(payload, foo_outside)
+    decoded_sandbox = converter.from_payload(payload, foo_sandbox)
+    assert type(decoded_outside) is foo_outside
+    assert type(decoded_sandbox) is foo_sandbox
+
+
 @pytest.mark.parametrize(
     "converter_type",
     [PydanticJSONPlainPayloadConverter, PydanticPayloadConverter],
