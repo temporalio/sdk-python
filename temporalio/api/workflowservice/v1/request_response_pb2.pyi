@@ -8,7 +8,6 @@ import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.field_mask_pb2
 import google.protobuf.internal.containers
-import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 import sys
@@ -28,6 +27,7 @@ import temporalio.api.enums.v1.nexus_pb2
 import temporalio.api.enums.v1.query_pb2
 import temporalio.api.enums.v1.reset_pb2
 import temporalio.api.enums.v1.task_queue_pb2
+import temporalio.api.enums.v1.time_skipping_pb2
 import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
@@ -48,9 +48,8 @@ import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
 import temporalio.api.worker.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
-import typing
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 8):
     import typing as typing_extensions
 else:
     import typing_extensions
@@ -2905,18 +2904,23 @@ class QueryWorkflowResponse(google.protobuf.message.Message):
 
     QUERY_RESULT_FIELD_NUMBER: builtins.int
     QUERY_REJECTED_FIELD_NUMBER: builtins.int
+    LINK_FIELD_NUMBER: builtins.int
     @property
     def query_result(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     @property
     def query_rejected(self) -> temporalio.api.query.v1.message_pb2.QueryRejected: ...
+    @property
+    def link(self) -> temporalio.api.common.v1.message_pb2.Link:
+        """Holds the link to the Workflow execution that processed the Query."""
     def __init__(
         self,
         *,
         query_result: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         query_rejected: temporalio.api.query.v1.message_pb2.QueryRejected | None = ...,
+        link: temporalio.api.common.v1.message_pb2.Link | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["query_rejected", b"query_rejected", "query_result", b"query_result"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["query_rejected", b"query_rejected", "query_result", b"query_result"]) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["link", b"link", "query_rejected", b"query_rejected", "query_result", b"query_result"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["link", b"link", "query_rejected", b"query_rejected", "query_result", b"query_result"]) -> None: ...
 
 global___QueryWorkflowResponse = QueryWorkflowResponse
 
@@ -5193,6 +5197,7 @@ class UpdateActivityExecutionOptionsRequest(google.protobuf.message.Message):
     UPDATE_MASK_FIELD_NUMBER: builtins.int
     RESTORE_ORIGINAL_FIELD_NUMBER: builtins.int
     RESOURCE_ID_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
     workflow_id: builtins.str
@@ -5202,7 +5207,7 @@ class UpdateActivityExecutionOptionsRequest(google.protobuf.message.Message):
     activity_id: builtins.str
     """The ID of the activity to target."""
     run_id: builtins.str
-    """Run ID of the workflow or standalone activity."""
+    """Run ID of the workflow or standalone activity. If empty, targets the latest run."""
     identity: builtins.str
     """The identity of the client who initiated this request"""
     @property
@@ -5220,6 +5225,8 @@ class UpdateActivityExecutionOptionsRequest(google.protobuf.message.Message):
     """
     resource_id: builtins.str
     """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
+    request_id: builtins.str
+    """Used to de-dupe update requests."""
     def __init__(
         self,
         *,
@@ -5232,9 +5239,10 @@ class UpdateActivityExecutionOptionsRequest(google.protobuf.message.Message):
         update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
         restore_original: builtins.bool = ...,
         resource_id: builtins.str = ...,
+        request_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["activity_options", b"activity_options", "update_mask", b"update_mask"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "activity_options", b"activity_options", "identity", b"identity", "namespace", b"namespace", "resource_id", b"resource_id", "restore_original", b"restore_original", "run_id", b"run_id", "update_mask", b"update_mask", "workflow_id", b"workflow_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "activity_options", b"activity_options", "identity", b"identity", "namespace", b"namespace", "request_id", b"request_id", "resource_id", b"resource_id", "restore_original", b"restore_original", "run_id", b"run_id", "update_mask", b"update_mask", "workflow_id", b"workflow_id"]) -> None: ...
 
 global___UpdateActivityExecutionOptionsRequest = UpdateActivityExecutionOptionsRequest
 
@@ -5340,7 +5348,7 @@ class PauseActivityExecutionRequest(google.protobuf.message.Message):
     activity_id: builtins.str
     """The ID of the activity to target."""
     run_id: builtins.str
-    """Run ID of the workflow or standalone activity."""
+    """Run ID of the workflow or standalone activity. If empty, targets the latest run."""
     identity: builtins.str
     """The identity of the client who initiated this request."""
     reason: builtins.str
@@ -5451,6 +5459,7 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
     REASON_FIELD_NUMBER: builtins.int
     JITTER_FIELD_NUMBER: builtins.int
     RESOURCE_ID_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity."""
     workflow_id: builtins.str
@@ -5460,7 +5469,7 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
     activity_id: builtins.str
     """The ID of the activity to target."""
     run_id: builtins.str
-    """Run ID of the workflow or standalone activity."""
+    """Run ID of the workflow or standalone activity. If empty, targets the latest run."""
     identity: builtins.str
     """The identity of the client who initiated this request."""
     reset_attempts: builtins.bool
@@ -5474,6 +5483,8 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
         """If set, the activity will start at a random time within the specified jitter duration."""
     resource_id: builtins.str
     """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
+    request_id: builtins.str
+    """Used to de-dupe unpause requests."""
     def __init__(
         self,
         *,
@@ -5487,9 +5498,10 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
         reason: builtins.str = ...,
         jitter: google.protobuf.duration_pb2.Duration | None = ...,
         resource_id: builtins.str = ...,
+        request_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["jitter", b"jitter"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "namespace", b"namespace", "reason", b"reason", "reset_attempts", b"reset_attempts", "reset_heartbeat", b"reset_heartbeat", "resource_id", b"resource_id", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "namespace", b"namespace", "reason", b"reason", "request_id", b"request_id", "reset_attempts", b"reset_attempts", "reset_heartbeat", b"reset_heartbeat", "resource_id", b"resource_id", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
 
 global___UnpauseActivityExecutionRequest = UnpauseActivityExecutionRequest
 
@@ -5591,6 +5603,7 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     JITTER_FIELD_NUMBER: builtins.int
     RESTORE_ORIGINAL_OPTIONS_FIELD_NUMBER: builtins.int
     RESOURCE_ID_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity."""
     workflow_id: builtins.str
@@ -5600,7 +5613,7 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     activity_id: builtins.str
     """The ID of the activity to target."""
     run_id: builtins.str
-    """Run ID of the workflow or standalone activity."""
+    """Run ID of the workflow or standalone activity. If empty, targets the latest run."""
     identity: builtins.str
     """The identity of the client who initiated this request."""
     keep_paused: builtins.bool
@@ -5617,6 +5630,8 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     """
     resource_id: builtins.str
     """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
+    request_id: builtins.str
+    """Used to de-dupe reset requests."""
     def __init__(
         self,
         *,
@@ -5629,9 +5644,10 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
         jitter: google.protobuf.duration_pb2.Duration | None = ...,
         restore_original_options: builtins.bool = ...,
         resource_id: builtins.str = ...,
+        request_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["jitter", b"jitter"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "keep_paused", b"keep_paused", "namespace", b"namespace", "resource_id", b"resource_id", "restore_original_options", b"restore_original_options", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "keep_paused", b"keep_paused", "namespace", b"namespace", "request_id", b"request_id", "resource_id", b"resource_id", "restore_original_options", b"restore_original_options", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
 
 global___ResetActivityExecutionRequest = ResetActivityExecutionRequest
 
@@ -5713,8 +5729,8 @@ class UpdateWorkflowExecutionOptionsResponse(google.protobuf.message.Message):
         """The Workflow Execution time when the options were updated. When time skipping is
         enabled, this is the workflow's virtual time rather than wall-clock time.
 
-        This timestamp cannot be used for time-skipping fast-forward info verification,
-        use `fast_forward_id` instead.
+        This timestamp cannot be used for time-skipping fast-forward verification,
+        use `fast_forward_id` in `PollWorkflowExecutionTimeSkippingRequest` instead.
         """
     def __init__(
         self,
@@ -8380,7 +8396,7 @@ class RequestCancelActivityExecutionRequest(google.protobuf.message.Message):
     namespace: builtins.str
     activity_id: builtins.str
     run_id: builtins.str
-    """Activity run ID, targets the latest run if run_id is empty."""
+    """Activity run ID. If empty, targets the latest run."""
     identity: builtins.str
     """The identity of the worker/client."""
     request_id: builtins.str
@@ -8424,7 +8440,7 @@ class TerminateActivityExecutionRequest(google.protobuf.message.Message):
     namespace: builtins.str
     activity_id: builtins.str
     run_id: builtins.str
-    """Activity run ID, targets the latest run if run_id is empty."""
+    """Activity run ID. If empty, targets the latest run."""
     identity: builtins.str
     """The identity of the worker/client."""
     request_id: builtins.str
@@ -8599,8 +8615,10 @@ class DeleteNexusOperationExecutionResponse(google.protobuf.message.Message):
 global___DeleteNexusOperationExecutionResponse = DeleteNexusOperationExecutionResponse
 
 class PollWorkflowExecutionTimeSkippingRequest(google.protobuf.message.Message):
-    """A long-poll request that blocks until the time-skipping state of an execution changes, so callers
-    can observe fast-forward progress and time-skipping config updates without busy-polling.
+    """A long-poll request that blocks according to a time-skipping waiting policy on the workflow
+    execution. Currently the only supported policy is waiting for completion of the fast-forward
+    identified by `fast_forward_id`; the poll also returns once anything else settles that outcome
+    (e.g. the execution ends or time skipping is disabled).
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -8630,55 +8648,26 @@ global___PollWorkflowExecutionTimeSkippingRequest = PollWorkflowExecutionTimeSki
 class PollWorkflowExecutionTimeSkippingResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    class _Result:
-        ValueType = typing.NewType("ValueType", builtins.int)
-        V: typing_extensions.TypeAlias = ValueType
-
-    class _ResultEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[PollWorkflowExecutionTimeSkippingResponse._Result.ValueType], builtins.type):  # noqa: F821
-        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-        RESULT_UNSPECIFIED: PollWorkflowExecutionTimeSkippingResponse._Result.ValueType  # 0
-        """Never returned; guards against an unset result."""
-        RESULT_POLL_TIMEOUT: PollWorkflowExecutionTimeSkippingResponse._Result.ValueType  # 1
-        """The poll timed out server-side before the fast-forward completed. The caller may poll again."""
-        RESULT_FAST_FORWARD_COMPLETED: PollWorkflowExecutionTimeSkippingResponse._Result.ValueType  # 2
-        """The fast-forward identified by the request's `fast_forward_id` reached its target time and completed."""
-        RESULT_FAST_FORWARD_ID_MISMATCH: PollWorkflowExecutionTimeSkippingResponse._Result.ValueType  # 3
-        """The request's `fast_forward_id` does not match the execution's current `fast_forward_id`."""
-        RESULT_WORKFLOW_ENDED_BEFORE_FAST_FORWARD_COMPLETION: PollWorkflowExecutionTimeSkippingResponse._Result.ValueType  # 5
-        """The request's `fast_forward_id` matched the execution's current `fast_forward_id`,
-        but the workflow execution (the entire chain of runs) completed before the fast-forward
-        had a chance to complete.
-        """
-
-    class Result(_Result, metaclass=_ResultEnumTypeWrapper): ...
-    RESULT_UNSPECIFIED: PollWorkflowExecutionTimeSkippingResponse.Result.ValueType  # 0
-    """Never returned; guards against an unset result."""
-    RESULT_POLL_TIMEOUT: PollWorkflowExecutionTimeSkippingResponse.Result.ValueType  # 1
-    """The poll timed out server-side before the fast-forward completed. The caller may poll again."""
-    RESULT_FAST_FORWARD_COMPLETED: PollWorkflowExecutionTimeSkippingResponse.Result.ValueType  # 2
-    """The fast-forward identified by the request's `fast_forward_id` reached its target time and completed."""
-    RESULT_FAST_FORWARD_ID_MISMATCH: PollWorkflowExecutionTimeSkippingResponse.Result.ValueType  # 3
-    """The request's `fast_forward_id` does not match the execution's current `fast_forward_id`."""
-    RESULT_WORKFLOW_ENDED_BEFORE_FAST_FORWARD_COMPLETION: PollWorkflowExecutionTimeSkippingResponse.Result.ValueType  # 5
-    """The request's `fast_forward_id` matched the execution's current `fast_forward_id`,
-    but the workflow execution (the entire chain of runs) completed before the fast-forward
-    had a chance to complete.
-    """
-
-    RESULT_FIELD_NUMBER: builtins.int
+    FAST_FORWARD_POLLING_RESULT_FIELD_NUMBER: builtins.int
+    FAILED_REASON_FIELD_NUMBER: builtins.int
     FAST_FORWARD_INFO_FIELD_NUMBER: builtins.int
-    result: global___PollWorkflowExecutionTimeSkippingResponse.Result.ValueType
-    """The result of this poll."""
+    fast_forward_polling_result: temporalio.api.enums.v1.time_skipping_pb2.FastForwardPollingResult.ValueType
+    """The outcome of the poll for the fast-forward identified by the request's `fast_forward_id`."""
+    failed_reason: builtins.str
+    """Set only when the result is FAST_FORWARD_POLLING_RESULT_FAST_FORWARD_FAILED; explains why
+    the fast-forward can no longer complete.
+    """
     @property
     def fast_forward_info(self) -> temporalio.api.common.v1.message_pb2.TimeSkippingFastForwardInfo:
-        """The execution's most recent fast forward. Unset if time skipping was enabled without a fast-forward."""
+        """The execution's current fast-forward, if any."""
     def __init__(
         self,
         *,
-        result: global___PollWorkflowExecutionTimeSkippingResponse.Result.ValueType = ...,
+        fast_forward_polling_result: temporalio.api.enums.v1.time_skipping_pb2.FastForwardPollingResult.ValueType = ...,
+        failed_reason: builtins.str = ...,
         fast_forward_info: temporalio.api.common.v1.message_pb2.TimeSkippingFastForwardInfo | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["fast_forward_info", b"fast_forward_info"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["fast_forward_info", b"fast_forward_info", "result", b"result"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["failed_reason", b"failed_reason", "fast_forward_info", b"fast_forward_info", "fast_forward_polling_result", b"fast_forward_polling_result"]) -> None: ...
 
 global___PollWorkflowExecutionTimeSkippingResponse = PollWorkflowExecutionTimeSkippingResponse

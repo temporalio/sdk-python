@@ -6,6 +6,7 @@ from .message_pb2 import WorkerInfo
 from .message_pb2 import WorkerListInfo
 from .message_pb2 import PluginInfo
 from .message_pb2 import StorageDriverInfo
+from .message_pb2 import EnvironmentInfo
 from .message_pb2 import WorkerCommand
 from .message_pb2 import CancelActivityCommand
 from .message_pb2 import WorkerCommandResult
@@ -14,6 +15,7 @@ from .message_pb2 import CancelActivityResult
 __all__ = [
     "CancelActivityCommand",
     "CancelActivityResult",
+    "EnvironmentInfo",
     "PluginInfo",
     "StorageDriverInfo",
     "WorkerCommand",

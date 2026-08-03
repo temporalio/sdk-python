@@ -5,6 +5,7 @@ from .nexus_pb2 import NexusOperationWaitStage
 from .nexus_pb2 import NexusOperationIdReusePolicy
 from .nexus_pb2 import NexusOperationIdConflictPolicy
 from .event_type_pb2 import EventType
+from .time_skipping_pb2 import FastForwardPollingResult
 from .task_queue_pb2 import TaskQueueKind
 from .task_queue_pb2 import TaskQueueType
 from .task_queue_pb2 import TaskReachability
@@ -81,6 +82,7 @@ __all__ = [
     "EncodingType",
     "EventType",
     "ExecutionType",
+    "FastForwardPollingResult",
     "HistoryEventFilterType",
     "IndexedValueType",
     "NamespaceState",

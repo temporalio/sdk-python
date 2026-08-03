@@ -105,6 +105,8 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(google.protobuf.internal.enum_type
     """
     WORKFLOW_TASK_FAILED_CAUSE_WORKFLOW_PAUSE_REQUESTED_BEFORE_TASK_STARTED: _WorkflowTaskFailedCause.ValueType  # 39
     """A workflow task is failed because the workflow is paused before the task is started."""
+    WORKFLOW_TASK_FAILED_CAUSE_REQUEST_TOO_LARGE: _WorkflowTaskFailedCause.ValueType  # 40
+    """A workflow task failed because the request exceeded a size limit."""
 
 class WorkflowTaskFailedCause(_WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper):
     """Workflow tasks can fail for various reasons. Note that some of these reasons can only originate
@@ -195,6 +197,8 @@ Check the workflow task failure message for more information.
 """
 WORKFLOW_TASK_FAILED_CAUSE_WORKFLOW_PAUSE_REQUESTED_BEFORE_TASK_STARTED: WorkflowTaskFailedCause.ValueType  # 39
 """A workflow task is failed because the workflow is paused before the task is started."""
+WORKFLOW_TASK_FAILED_CAUSE_REQUEST_TOO_LARGE: WorkflowTaskFailedCause.ValueType  # 40
+"""A workflow task failed because the request exceeded a size limit."""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:

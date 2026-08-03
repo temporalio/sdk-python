@@ -1175,11 +1175,6 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse,
     ]
-    """PollWorkflowExecutionTimeSkipping long-polls until the time-skipping state of a workflow
-    execution changes (its time-skipping config is updated or an active fast-forward completes),
-    then returns the reason and the current fast-forward info. It lets callers observe fast-forward
-    progress without busy-polling.
-    """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -2594,11 +2589,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingRequest,
         context: grpc.ServicerContext,
-    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse:
-        """PollWorkflowExecutionTimeSkipping long-polls until the time-skipping state of a workflow
-        execution changes (its time-skipping config is updated or an active fast-forward completes),
-        then returns the reason and the current fast-forward info. It lets callers observe fast-forward
-        progress without busy-polling.
-        """
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse: ...
 
 def add_WorkflowServiceServicer_to_server(servicer: WorkflowServiceServicer, server: grpc.Server) -> None: ...

@@ -1963,11 +1963,7 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def PollWorkflowExecutionTimeSkipping(self, request, context):
-        """PollWorkflowExecutionTimeSkipping long-polls until the time-skipping state of a workflow
-        execution changes (its time-skipping config is updated or an active fast-forward completes),
-        then returns the reason and the current fast-forward info. It lets callers observe fast-forward
-        progress without busy-polling.
-        """
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')

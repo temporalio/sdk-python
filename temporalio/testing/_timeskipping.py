@@ -16,7 +16,7 @@ import temporalio.api.enums.v1.event_type_pb2 as _event_type
 import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.client
-from temporalio.api.workflowservice.v1 import PollWorkflowExecutionTimeSkippingResponse
+from temporalio.api.enums.v1.time_skipping_pb2 import FastForwardPollingResult
 
 
 @dataclass(frozen=True)
@@ -229,24 +229,30 @@ class TimeSkipper:
             resp = await self._client.workflow_service.poll_workflow_execution_time_skipping(
                 req, retry=True
             )
-            if resp.result == PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_COMPLETED:
+            if (
+                resp.fast_forward_polling_result
+                == FastForwardPollingResult.FAST_FORWARD_POLLING_RESULT_FAST_FORWARD_COMPLETED
+            ):
                 return True
             if (
-                resp.result
-                == PollWorkflowExecutionTimeSkippingResponse.RESULT_WORKFLOW_ENDED_BEFORE_FAST_FORWARD_COMPLETION
+                resp.fast_forward_polling_result
+                == FastForwardPollingResult.FAST_FORWARD_POLLING_RESULT_FAST_FORWARD_FAILED
             ):
+                # Server explains the specific cause in failed_reason (e.g.
+                # id mismatch, execution ended, config reset, TS disabled).
+                # In this SDK, id-mismatch means the caller (or the SDK)
+                # overrode the fast_forward — surface that loudly. Other
+                # causes (workflow ended, TS disabled before completion)
+                # mean the FF simply couldn't complete: return False.
+                if "fast_forward_id" in resp.failed_reason:
+                    raise RuntimeError(
+                        f"PollWorkflowExecutionTimeSkipping failed for id "
+                        f"{fast_forward_id!r}: {resp.failed_reason}. "
+                        "This is the expected result when another fast_forward() "
+                        "call overrode this one; if the caller did not do that, "
+                        "it's an internal bug."
+                    )
                 return False
-            if (
-                resp.result
-                == PollWorkflowExecutionTimeSkippingResponse.RESULT_FAST_FORWARD_ID_MISMATCH
-            ):
-                raise RuntimeError(
-                    f"PollWorkflowExecutionTimeSkipping returned "
-                    f"RESULT_FAST_FORWARD_ID_MISMATCH for id {fast_forward_id!r}: "
-                    "the workflow's active fast-forward id no longer matches. "
-                    "This is the expected result when another fast_forward() call "
-                    "overrode this one; if the caller did not do that, it's an internal bug."
-                )
             # RESULT_POLL_TIMEOUT (server-side long-poll expiry): re-poll.
 
     async def get_time_skipping_info(

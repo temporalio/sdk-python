@@ -556,7 +556,9 @@ async def test_get_time_skipping_info_during_workflow(
         try:
             tsi = await env.get_time_skipping_info(handle)
             assert tsi is not None
-            assert tsi.is_running, "expected time skipping to be running (env-stamped enabled)"
+            assert tsi.effective_config.enabled, (
+                "expected time skipping to be enabled (env-stamped)"
+            )
             assert tsi.HasField("current_time"), (
                 "TimeSkippingInfo.current_time is not populated"
             )
@@ -800,7 +802,7 @@ async def test_overriding_fast_forward_raises_on_original(
     second_ff = asyncio.create_task(env.fast_forward(handle, timedelta(minutes=30)))
     await _wait_for_ff_id(expect_change_from=first_ff)
 
-    with pytest.raises(RuntimeError, match=r"RESULT_FAST_FORWARD_ID_MISMATCH"):
+    with pytest.raises(RuntimeError, match=r"does not match"):
         await original
 
     # Attach a worker so the workflow can complete and the second fast-forward can happen.
