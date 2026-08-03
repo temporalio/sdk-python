@@ -1271,16 +1271,19 @@ async def wait_until_worker_deployment_visible(
                     deployment_name=version.deployment_name,
                 )
             )
-        except RPCError:
-            # Expected
-            assert False
+        except RPCError as err:
+            raise AssertionError(
+                "Worker deployment "
+                f"{version.to_canonical_string()} is not visible "
+                f"({err.status.name}): {err.message}"
+            ) from err
         assert any(
             vs.version == version.to_canonical_string()
             for vs in res.worker_deployment_info.version_summaries
         )
         return res
 
-    return await assert_eventually(mk_call)
+    return await assert_eventually(mk_call, timeout=timedelta(seconds=30))
 
 
 async def set_current_deployment_version(
