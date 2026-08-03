@@ -48,7 +48,7 @@ from tests.contrib.pydantic.workflows import (
 
 _MANY_TYPE_HINTS = tuple(
     typing.cast(type, typing.cast(object, typing.Annotated[list[int], index]))
-    for index in range(129)
+    for index in range(1025)
 )
 _UNHASHABLE_TYPE_HINT = typing.cast(
     type, typing.cast(object, typing.Annotated[list[int], []])
@@ -57,21 +57,36 @@ _UNHASHABLE_TYPE_HINT = typing.cast(
 
 @pytest.mark.parametrize(
     (
-        "max_cached_type_adapters",
+        "converter_kwargs",
         "type_hints",
         "expected_type_adapter_constructions",
     ),
     [
-        (None, (list[int], list[int]), 1),
-        (0, (list[int], list[int]), 2),
-        (None, (_UNHASHABLE_TYPE_HINT, _UNHASHABLE_TYPE_HINT), 2),
-        (None, _MANY_TYPE_HINTS + (_MANY_TYPE_HINTS[0],), 129),
-        (128, _MANY_TYPE_HINTS + (_MANY_TYPE_HINTS[0],), 130),
+        # Default caches repeated hints
+        ({}, (list[int], list[int]), 1),
+        # Zero disables caching
+        ({"max_cached_type_adapters": 0}, (list[int], list[int]), 2),
+        # Unhashable hints bypass the cache
+        ({}, (_UNHASHABLE_TYPE_HINT, _UNHASHABLE_TYPE_HINT), 2),
+        # Default bound is 1024: 1025 distinct hints evict the first
+        ({}, _MANY_TYPE_HINTS + (_MANY_TYPE_HINTS[0],), 1026),
+        # None is unbounded: no eviction
+        (
+            {"max_cached_type_adapters": None},
+            _MANY_TYPE_HINTS + (_MANY_TYPE_HINTS[0],),
+            1025,
+        ),
+        # Explicit bound evicts least recently used
+        (
+            {"max_cached_type_adapters": 1},
+            (list[int], _MANY_TYPE_HINTS[0], list[int]),
+            3,
+        ),
     ],
 )
 def test_type_adapter_reuse(
     monkeypatch: pytest.MonkeyPatch,
-    max_cached_type_adapters: int | None,
+    converter_kwargs: dict[str, typing.Any],
     type_hints: tuple[type, ...],
     expected_type_adapter_constructions: int,
 ):
@@ -88,9 +103,7 @@ def test_type_adapter_reuse(
     monkeypatch.setattr(
         "temporalio.contrib.pydantic.TypeAdapter", counting_type_adapter
     )
-    converter = PydanticJSONPlainPayloadConverter(
-        max_cached_type_adapters=max_cached_type_adapters
-    )
+    converter = PydanticJSONPlainPayloadConverter(**converter_kwargs)
     payload = converter.to_payload([1])
     assert payload is not None
     for type_hint in type_hints:

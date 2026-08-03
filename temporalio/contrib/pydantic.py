@@ -58,14 +58,16 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         self,
         to_json_options: ToJsonOptions | None = None,
         *,
-        max_cached_type_adapters: int | None = None,
+        max_cached_type_adapters: int | None = 1024,
     ) -> None:
         """Create a new payload converter.
 
         Args:
             to_json_options: Options for serializing values to JSON.
-            max_cached_type_adapters: Maximum number of type adapters to cache.
-                If ``None``, the cache is unbounded. If zero, caching is disabled.
+            max_cached_type_adapters: Maximum number of type adapters to
+                cache, with least-recently-used eviction. Defaults to 1024.
+                If ``None``, the cache is unbounded. If zero, caching is
+                disabled.
         """
         if max_cached_type_adapters is not None and max_cached_type_adapters < 0:
             raise ValueError("max_cached_type_adapters cannot be negative")
@@ -136,14 +138,16 @@ class PydanticPayloadConverter(CompositePayloadConverter):
         self,
         to_json_options: ToJsonOptions | None = None,
         *,
-        max_cached_type_adapters: int | None = None,
+        max_cached_type_adapters: int | None = 1024,
     ) -> None:
         """Initialize object.
 
         Args:
             to_json_options: Options for serializing values to JSON.
-            max_cached_type_adapters: Maximum number of type adapters to cache.
-                If ``None``, the cache is unbounded. If zero, caching is disabled.
+            max_cached_type_adapters: Maximum number of type adapters to
+                cache, with least-recently-used eviction. Defaults to 1024.
+                If ``None``, the cache is unbounded. If zero, caching is
+                disabled.
 
                 To configure this through a :py:class:`DataConverter`, use a
                 nullary subclass as the payload converter class::
