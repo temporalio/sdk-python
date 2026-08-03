@@ -1,14 +1,14 @@
-"""Unit tests for Nexus signal-backlink propagation.
+"""Unit tests for Nexus link propagation.
 
-These exercise the in/out link propagation that happens when a Nexus operation handler issues a
-signal, signal-with-start, or start-workflow RPC, against a mocked workflow service.
-The corresponding end-to-end behavior requires a real server with EnableCHASMSignalBacklinks=true and is therefore
-and is therefore not covered here.
+These exercise link propagation when a Nexus operation handler signals or starts a
+workflow or activity against a mocked workflow service. End-to-end signal backlinks
+require a server with EnableCHASMSignalBacklinks enabled and are not covered here.
 """
 
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import timedelta
 from typing import Any
 from unittest import mock
 
@@ -32,9 +32,11 @@ import temporalio.common
 import temporalio.converter
 import temporalio.nexus._link_conversion
 import temporalio.nexus._operation_context
+import temporalio.nexus._token
 from temporalio.client._impl import _ClientImpl
 from temporalio.client._interceptor import (
     SignalWorkflowInput,
+    StartActivityInput,
     StartWorkflowInput,
 )
 from temporalio.nexus._operation_context import _TemporalStartOperationContext
@@ -84,7 +86,7 @@ def nexus_ctx() -> Generator[_TemporalStartOperationContext]:
         operation="op",
         headers={},
         request_id="req-id",
-        callback_url=None,
+        callback_url="https://callback.example",
         inbound_links=[inbound],
         callback_headers={},
         task_cancellation=_NexusTaskCancellation(),
@@ -160,6 +162,30 @@ def _start_input(start_signal: str | None = None) -> StartWorkflowInput:
         links=[],
         request_id=None,
         versioning_override=None,
+    )
+
+
+def _start_activity_input() -> StartActivityInput:
+    return StartActivityInput(
+        activity_type="TestActivity",
+        args=[],
+        id="activity-target",
+        task_queue="tq",
+        result_type=None,
+        schedule_to_close_timeout=None,
+        start_to_close_timeout=timedelta(seconds=10),
+        schedule_to_start_timeout=None,
+        heartbeat_timeout=None,
+        id_reuse_policy=temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy=temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy=None,
+        priority=temporalio.common.Priority.default,
+        search_attributes=None,
+        summary=None,
+        start_delay=None,
+        headers={},
+        rpc_metadata={},
+        rpc_timeout=None,
     )
 
 
@@ -433,7 +459,7 @@ async def test_backing_workflow_start_sets_on_conflict_options_without_duplicati
     # also re-add the context's request links.
     start_input = _start_input()
     start_input.links = [_inbound_nexus_link()]
-    with temporalio.nexus._operation_context._nexus_backing_workflow_start_context():
+    with temporalio.nexus._operation_context._nexus_backing_start_context():
         await impl.start_workflow(start_input)
 
     sent = workflow_service.start_workflow_execution.call_args.args[0]
@@ -457,6 +483,65 @@ async def test_start_outside_nexus_context_leaves_on_conflict_options_unset() ->
 
     sent = workflow_service.start_workflow_execution.call_args.args[0]
     assert not sent.HasField("on_conflict_options")
+
+
+# ── activity start ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.usefixtures("nexus_ctx")
+async def test_activity_start_forwards_inbound_links() -> None:
+    impl = _make_client_impl(mock.MagicMock())
+
+    req = await impl._build_start_activity_execution_request(_start_activity_input())
+
+    assert len(req.links) == 1
+    assert req.links[0] == _inbound_nexus_link()
+    assert req.request_id == "req-id"
+    assert len(req.completion_callbacks) == 0
+
+
+async def test_activity_start_without_server_link_synthesizes_backlink(
+    nexus_ctx: _TemporalStartOperationContext,
+) -> None:
+    workflow_service = mock.MagicMock()
+    workflow_service.start_activity_execution = mock.AsyncMock(
+        return_value=temporalio.api.workflowservice.v1.StartActivityExecutionResponse(
+            run_id="activity-run",
+        )
+    )
+    impl = _make_client_impl(workflow_service)
+
+    await impl.start_activity(_start_activity_input())
+
+    assert len(nexus_ctx.nexus_context.outbound_links) == 1
+    link = nexus_ctx.nexus_context.outbound_links[0]
+    assert link.url == (
+        "temporal:///namespaces/test-namespace/"
+        "activities/activity-target/activity-run/details"
+    )
+    assert link.type == temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name
+
+
+@pytest.mark.usefixtures("nexus_ctx")
+async def test_backing_activity_start_gets_nexus_request_fields() -> None:
+    impl = _make_client_impl(mock.MagicMock())
+
+    with temporalio.nexus._operation_context._nexus_backing_start_context():
+        req = await impl._build_start_activity_execution_request(
+            _start_activity_input()
+        )
+
+    assert len(req.links) == 1
+    assert req.links[0] == _inbound_nexus_link()
+    assert req.request_id == "req-id"
+    assert len(req.completion_callbacks) == 1
+    operation_token = temporalio.nexus._token.OperationToken.decode(
+        req.completion_callbacks[0].nexus.header["nexus-operation-token"]
+    )
+    assert operation_token.type is temporalio.nexus._token.OperationTokenType.ACTIVITY
+    assert operation_token.namespace == NAMESPACE
+    assert operation_token.activity_id == "activity-target"
+    assert list(req.completion_callbacks[0].links) == [_inbound_nexus_link()]
 
 
 # ── handler-level: backlinks land on the StartOperationResponse ──────────────────────────────
