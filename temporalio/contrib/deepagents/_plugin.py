@@ -226,52 +226,21 @@ class DeepAgentsPlugin(SimplePlugin):
         return config
 
 
-async def _temporal_aio_to_thread(
-    default_aio_to_thread: Callable[..., Any],
-    ctx: Any,
-    func: Callable[..., Any],
-    /,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    """Run LangSmith's ``aio_to_thread`` seam safely inside a workflow.
-
-    Outside a workflow (activities, clients) we defer to LangSmith's default
-    thread hop. Inside a workflow the deterministic event loop cannot spawn a
-    thread, so we run the setup inline in the requested context. ``func`` here is
-    LangSmith's own run-tree bookkeeping — cheap and side-effect-free with respect
-    to workflow determinism.
-    """
-    from temporalio import workflow
-
-    if not workflow.in_workflow():
-        return await default_aio_to_thread(ctx, func, *args, **kwargs)
-    with workflow.unsafe.sandbox_unrestricted():
-        return ctx.run(func, *args, **kwargs)
-
-
 def _install_langsmith_temporal_override() -> None:
     """Route LangSmith's thread hop inline while in a workflow.
 
-    ``set_runtime_overrides`` mutates a module global in the sandbox-passthrough
-    ``langsmith`` package, so the in-workflow tracer sees it too. No-op (and
-    harmless) when LangSmith is not installed or too old to expose
+    Delegates to the shared installer in ``temporalio.contrib._langchain``
+    (the same override ``temporalio.contrib.langsmith`` installs, once per
+    process, never uninstalled — see its docstring for the rationale). No-op
+    (and harmless) when LangSmith is not installed or too old to expose
     ``set_runtime_overrides``.
-
-    The override is deliberately installed for the life of the process and
-    never uninstalled: LangSmith exposes a single process-wide override slot
-    (each ``set_runtime_overrides`` call replaces it wholesale), and
-    ``temporalio.contrib.langsmith`` installs a behaviorally identical override
-    exactly once, without reinstalling. Resetting the slot on this worker's
-    shutdown would therefore permanently strip a composed LangSmith plugin's
-    workflow-safety override. Leaving it installed is safe: the override defers
-    to LangSmith's default thread hop whenever ``workflow.in_workflow()`` is
-    false, so it is inert outside workflows.
     """
     try:
-        import langsmith
+        from temporalio.contrib._langchain._aio_to_thread import (
+            install_aio_to_thread_override,
+        )
 
-        langsmith.set_runtime_overrides(aio_to_thread=_temporal_aio_to_thread)
+        install_aio_to_thread_override()
     except Exception:
         pass
 

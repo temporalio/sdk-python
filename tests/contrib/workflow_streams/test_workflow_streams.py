@@ -45,6 +45,7 @@ from temporalio.contrib.workflow_streams import (
     WorkflowStreamItem,
     WorkflowStreamState,
     WorkflowTopicHandle,
+    current_workflow_stream,
 )
 from temporalio.contrib.workflow_streams._types import _encode_payload
 from temporalio.converter import DataConverter
@@ -2788,3 +2789,38 @@ async def test_cross_namespace_nexus_stream(
             await broker_handle.signal("close")
             result = await caller_handle.result()
             assert result == "done"
+
+
+@workflow.defn
+class StreamAccessorWorkflow:
+    @workflow.init
+    def __init__(self) -> None:
+        self.stream = WorkflowStream()
+
+    @workflow.run
+    async def run(self) -> bool:
+        return current_workflow_stream() is self.stream
+
+
+@workflow.defn
+class NoStreamAccessorWorkflow:
+    @workflow.run
+    async def run(self) -> bool:
+        return current_workflow_stream() is None
+
+
+async def test_current_workflow_stream_accessor(client: Client) -> None:
+    """The accessor returns the constructed stream instance, else None."""
+    async with new_worker(
+        client, StreamAccessorWorkflow, NoStreamAccessorWorkflow
+    ) as worker:
+        assert await client.execute_workflow(
+            StreamAccessorWorkflow.run,
+            id=f"stream-accessor-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await client.execute_workflow(
+            NoStreamAccessorWorkflow.run,
+            id=f"stream-accessor-none-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )

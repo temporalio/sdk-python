@@ -11,7 +11,7 @@ from langgraph.pregel import Pregel
 
 from temporalio import workflow
 from temporalio.contrib.langgraph._activity import clear_store_warning
-from temporalio.contrib.workflow_streams._stream import _PUBLISH_SIGNAL
+from temporalio.contrib.workflow_streams import current_workflow_stream
 from temporalio.worker import (
     ExecuteWorkflowInput,
     Interceptor,
@@ -54,10 +54,7 @@ class LangGraphInterceptor(Interceptor):
                 super().init(outbound)
 
             async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
-                if (
-                    streaming_topic is not None
-                    and workflow.get_signal_handler(_PUBLISH_SIGNAL) is None
-                ):
+                if streaming_topic is not None and current_workflow_stream() is None:
                     raise RuntimeError(
                         f"LangGraphPlugin was configured with "
                         f"streaming_topic={streaming_topic!r}, but workflow "

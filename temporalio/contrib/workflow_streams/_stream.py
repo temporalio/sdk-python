@@ -59,6 +59,24 @@ _MAX_POLL_RESPONSE_BYTES = 1_000_000
 T = TypeVar("T")
 
 
+def current_workflow_stream() -> WorkflowStream | None:
+    """Return the current workflow's :py:class:`WorkflowStream`, if any.
+
+    Must be called inside a workflow. A workflow that constructed a
+    ``WorkflowStream`` (in ``@workflow.init``) registers the stream's publish
+    signal handler; that registration is the marker this accessor reads.
+    Returns ``None`` when no stream was constructed.
+
+    .. warning::
+        This function is experimental and may change in future versions.
+    """
+    handler = workflow.get_signal_handler(_PUBLISH_SIGNAL)
+    if handler is None:
+        return None
+    stream = getattr(handler, "__self__", None)
+    return stream if isinstance(stream, WorkflowStream) else None
+
+
 def _payload_wire_size(payload: Payload, topic: str) -> int:
     """Approximate poll-response contribution of a single item.
 

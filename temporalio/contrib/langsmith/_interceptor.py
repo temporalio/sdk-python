@@ -24,6 +24,9 @@ import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
 from temporalio.api.common.v1 import Payload
+from temporalio.contrib._langchain._aio_to_thread import (
+    install_aio_to_thread_override,
+)
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
 # This logger is only used in _log_future_exception, which runs on the
@@ -151,49 +154,6 @@ def _get_current_run_for_propagation() -> RunTree | None:
     if isinstance(run, _RootReplaySafeRunTreeFactory):
         return None
     return run
-
-
-# ---------------------------------------------------------------------------
-# Workflow event loop safety: override @traceable's aio_to_thread
-# ---------------------------------------------------------------------------
-
-_aio_to_thread_override_installed = False
-
-
-async def _temporal_aio_to_thread(
-    default_aio_to_thread: Callable[..., Any],
-    ctx: Any,
-    func: Callable[..., Any],
-    /,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    """Run LangSmith's ``aio_to_thread`` synchronously inside Temporal workflows.
-
-    The ``@traceable`` decorator on async functions uses ``aio_to_thread()`` →
-    ``loop.run_in_executor()`` for run setup/teardown.  The Temporal workflow
-    event loop does not support ``run_in_executor``.  This override runs those
-    functions synchronously on the workflow thread when inside a workflow,
-    and delegates to the default implementation outside workflows.
-
-    Registered via ``langsmith.set_runtime_overrides(aio_to_thread=...)``.
-    """
-    if not temporalio.workflow.in_workflow():
-        return await default_aio_to_thread(ctx, func, *args, **kwargs)
-    with temporalio.workflow.unsafe.sandbox_unrestricted():
-        return ctx.run(func, *args, **kwargs)
-
-
-def _install_aio_to_thread_override() -> None:
-    """Install the ``aio_to_thread`` override via LangSmith's official API.
-
-    Safe to call multiple times; the override is only installed once.
-    """
-    global _aio_to_thread_override_installed  # noqa: PLW0603
-    if _aio_to_thread_override_installed:
-        return
-    langsmith.set_runtime_overrides(aio_to_thread=_temporal_aio_to_thread)
-    _aio_to_thread_override_installed = True
 
 
 # ---------------------------------------------------------------------------
@@ -609,7 +569,7 @@ class LangSmithInterceptor(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
     ) -> type[_LangSmithWorkflowInboundInterceptor]:
         """Return the workflow interceptor class with config bound."""
-        _install_aio_to_thread_override()
+        install_aio_to_thread_override()
         config = self
 
         class InterceptorWithConfig(_LangSmithWorkflowInboundInterceptor):

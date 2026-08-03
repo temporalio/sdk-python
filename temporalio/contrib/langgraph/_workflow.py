@@ -13,7 +13,7 @@ from langchain_core.runnables.config import var_child_runnable_config
 from langgraph._internal._constants import CONFIG_KEY_RUNTIME
 
 from temporalio import workflow
-from temporalio.contrib.workflow_streams._stream import _PUBLISH_SIGNAL
+from temporalio.contrib.workflow_streams import current_workflow_stream
 
 
 def wrap_workflow(
@@ -65,8 +65,14 @@ def wrap_workflow(
 
         if streaming_topic is None:
             return await run(stream_writer=None)
-        publish_handler = workflow.get_signal_handler(_PUBLISH_SIGNAL)
-        stream = getattr(publish_handler, "__self__")
+        stream = current_workflow_stream()
+        if stream is None:
+            # The interceptor validates stream presence at workflow start, so
+            # this is unreachable in a plugin-managed workflow; guard anyway.
+            raise RuntimeError(
+                "streaming_topic is configured but the workflow has no "
+                "WorkflowStream; construct WorkflowStream() in @workflow.init."
+            )
         topic = stream.topic(streaming_topic)
         return await run(stream_writer=topic.publish)
 
