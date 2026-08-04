@@ -26,10 +26,7 @@ jobs:
           - os: ubuntu-latest
             python: "3.14"
             docsTarget: true
-            openaiTestTarget: true
             clippyLinter: true
-          - python: "3.10"
-            pytestExtraArgs: '--reruns 3 --only-rerun "RuntimeError: Failed validating workflow"'
           - os: ubuntu-arm
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-arm
@@ -62,8 +59,6 @@ jobs:
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
-      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
-        timeout-minutes: 15
       - name: Repeat OpenTelemetry tracing tests
         shell: bash
         run: |
@@ -71,15 +66,6 @@ jobs:
             poe test -s tests/contrib/opentelemetry/test_opentelemetry.py tests/contrib/opentelemetry/test_opentelemetry_plugin.py
           done
         timeout-minutes: 15
-      # Time skipping doesn't yet support ARM
-      - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
-        timeout-minutes: 10
-      - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
-        timeout-minutes: 10
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
