@@ -43,7 +43,7 @@ from opentelemetry.util.types import Attributes
 import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
 from temporalio.api.enums.v1 import EventType
-from temporalio.client import Client, WorkflowHistory
+from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
 from temporalio.contrib.opentelemetry import (
     ReplaySafeLoggerProvider,
@@ -227,9 +227,7 @@ def reset_adk_proxy_logger():
     clear()
 
 
-async def _run_once_and_replay(
-    client: Client, num_replays: int
-) -> tuple[int, WorkflowHistory]:
+async def _run_once_and_replay(client: Client, num_replays: int) -> int:
     """Run the agent workflow once for real, then replay it num_replays times.
 
     Returns the number of real activity executions observed for this run.
@@ -284,7 +282,7 @@ async def _run_once_and_replay(
             plugins=[GoogleAdkPlugin()],
         ).replay_workflow(history)
 
-    return activity_executions - activity_executions_before, history
+    return activity_executions - activity_executions_before
 
 
 async def test_replay_safe_meter_provider_suppresses_replay_metrics(
@@ -296,7 +294,7 @@ async def test_replay_safe_meter_provider_suppresses_replay_metrics(
         ReplaySafeMeterProvider(MeterProvider(metric_readers=[reader]))
     )
 
-    real_executions, _ = await _run_once_and_replay(client, num_replays=3)
+    real_executions = await _run_once_and_replay(client, num_replays=3)
 
     # First execution recorded exactly once (not suppressed), replays added
     # zero observations, and the activity never re-executed.
@@ -313,7 +311,7 @@ async def test_replay_metrics_duplicate_without_replay_safe_meter_provider(
     reader = InMemoryMetricReader()
     opentelemetry.metrics.set_meter_provider(MeterProvider(metric_readers=[reader]))
 
-    real_executions, _ = await _run_once_and_replay(client, num_replays=3)
+    real_executions = await _run_once_and_replay(client, num_replays=3)
 
     assert real_executions == 1
     assert adk_metric_counts(reader) == {
@@ -336,7 +334,7 @@ async def test_replay_safe_logger_provider_suppresses_replay_log_events(
     provider, exporter = _in_memory_logger_provider()
     opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(provider))
 
-    real_executions, _ = await _run_once_and_replay(client, num_replays=3)
+    real_executions = await _run_once_and_replay(client, num_replays=3)
 
     # First execution emitted exactly once (not suppressed), replays added
     # zero log events, and the activity never re-executed.
@@ -354,7 +352,7 @@ async def test_replay_log_events_duplicate_without_replay_safe_logger_provider(
     provider, exporter = _in_memory_logger_provider()
     opentelemetry._logs.set_logger_provider(provider)
 
-    real_executions, _ = await _run_once_and_replay(client, num_replays=3)
+    real_executions = await _run_once_and_replay(client, num_replays=3)
 
     assert real_executions == 1
     assert adk_log_event_counts(exporter) == {
