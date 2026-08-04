@@ -16,11 +16,13 @@ from opentelemetry.trace import (
 
 import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
+from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.contrib.opentelemetry._tracer_provider import _ReplaySafeSpan
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
+from temporalio.worker._workflow_instance import _WorkflowInstanceImpl
 from tests.contrib.opentelemetry.test_opentelemetry import assert_span_hierarchy
 from tests.helpers import new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
@@ -259,6 +261,19 @@ async def test_opentelemetry_comprehensive_tracing(
 
     monkeypatch.setattr(_ReplaySafeSpan, "end", end_with_replay_state)
 
+    activations: list[str] = []
+    original_activate = _WorkflowInstanceImpl.activate
+
+    def record_activation(self: Any, act: Any) -> Any:
+        jobs = ", ".join(job.WhichOneof("variant") for job in act.jobs)
+        activations.append(
+            f"instance={id(self):x} replaying={act.is_replaying} "
+            f"history_length={act.history_length} jobs=[{jobs}]"
+        )
+        return original_activate(self, act)
+
+    monkeypatch.setattr(_WorkflowInstanceImpl, "activate", record_activation)
+
     new_config = client.config()
     new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
     new_client = Client(**new_config)
@@ -389,7 +404,19 @@ async def test_opentelemetry_comprehensive_tracing(
         "    HandleUpdate:update_status",
     ]
 
-    assert_span_hierarchy(spans, expected_hierarchy)
+    try:
+        assert_span_hierarchy(spans, expected_hierarchy)
+    except AssertionError as err:
+        history = await workflow_handle.fetch_history()
+        history_lines = [
+            f"{event.event_id}: "
+            f"{EventType.Name(event.event_type).removeprefix('EVENT_TYPE_')}"
+            for event in history.events
+        ]
+        raise AssertionError(
+            f"{err}\nWorkflow activations:\n{chr(10).join(activations)}"
+            f"\nWorkflow history:\n{chr(10).join(history_lines)}"
+        ) from err
 
 
 async def test_otel_tracing_with_added_spans(
