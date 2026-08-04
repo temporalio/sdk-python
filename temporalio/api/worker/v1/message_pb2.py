@@ -25,7 +25,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n$temporal/api/worker/v1/message.proto\x12\x16temporal.api.worker.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(temporal/api/deployment/v1/message.proto\x1a"temporal/api/enums/v1/common.proto"\x82\x01\n\x10WorkerPollerInfo\x12\x17\n\x0f\x63urrent_pollers\x18\x01 \x01(\x05\x12=\n\x19last_successful_poll_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0eis_autoscaling\x18\x03 \x01(\x08"\xf1\x01\n\x0fWorkerSlotsInfo\x12\x1f\n\x17\x63urrent_available_slots\x18\x01 \x01(\x05\x12\x1a\n\x12\x63urrent_used_slots\x18\x02 \x01(\x05\x12\x1a\n\x12slot_supplier_kind\x18\x03 \x01(\t\x12\x1d\n\x15total_processed_tasks\x18\x04 \x01(\x05\x12\x1a\n\x12total_failed_tasks\x18\x05 \x01(\x05\x12%\n\x1dlast_interval_processed_tasks\x18\x06 \x01(\x05\x12#\n\x1blast_interval_failure_tasks\x18\x07 \x01(\x05"\x94\x01\n\x0eWorkerHostInfo\x12\x11\n\thost_name\x18\x01 \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\x05 \x01(\t\x12\x12\n\nprocess_id\x18\x02 \x01(\t\x12\x1e\n\x16\x63urrent_host_cpu_usage\x18\x03 \x01(\x02\x12\x1e\n\x16\x63urrent_host_mem_usage\x18\x04 \x01(\x02"\x8b\n\n\x0fWorkerHeartbeat\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x39\n\thost_info\x18\x03 \x01(\x0b\x32&.temporal.api.worker.v1.WorkerHostInfo\x12\x12\n\ntask_queue\x18\x04 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x06 \x01(\t\x12\x13\n\x0bsdk_version\x18\x07 \x01(\t\x12\x33\n\x06status\x18\x08 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x32\n\x0eheartbeat_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12?\n\x1c\x65lapsed_since_last_heartbeat\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12I\n\x18workflow_task_slots_info\x18\x0c \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12I\n\x18\x61\x63tivity_task_slots_info\x18\r \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x15nexus_task_slots_info\x18\x0e \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12J\n\x19local_activity_slots_info\x18\x0f \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x14workflow_poller_info\x18\x10 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12M\n\x1bworkflow_sticky_poller_info\x18\x11 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x46\n\x14\x61\x63tivity_poller_info\x18\x12 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x43\n\x11nexus_poller_info\x18\x13 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x1e\n\x16total_sticky_cache_hit\x18\x14 \x01(\x05\x12\x1f\n\x17total_sticky_cache_miss\x18\x15 \x01(\x05\x12!\n\x19\x63urrent_sticky_cache_size\x18\x16 \x01(\x05\x12\x33\n\x07plugins\x18\x17 \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\x18 \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo"O\n\nWorkerInfo\x12\x41\n\x10worker_heartbeat\x18\x01 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\xec\x03\n\x0eWorkerListInfo\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x12\n\ntask_queue\x18\x03 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x04 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x05 \x01(\t\x12\x13\n\x0bsdk_version\x18\x06 \x01(\t\x12\x33\n\x06status\x18\x07 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\thost_name\x18\t \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\n \x01(\t\x12\x12\n\nprocess_id\x18\x0b \x01(\t\x12\x33\n\x07plugins\x18\x0c \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\r \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo"+\n\nPluginInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t"!\n\x11StorageDriverInfo\x12\x0c\n\x04type\x18\x01 \x01(\t"a\n\rWorkerCommand\x12H\n\x0f\x63\x61ncel_activity\x18\x01 \x01(\x0b\x32-.temporal.api.worker.v1.CancelActivityCommandH\x00\x42\x06\n\x04type"+\n\x15\x43\x61ncelActivityCommand\x12\x12\n\ntask_token\x18\x01 \x01(\x0c"f\n\x13WorkerCommandResult\x12G\n\x0f\x63\x61ncel_activity\x18\x01 \x01(\x0b\x32,.temporal.api.worker.v1.CancelActivityResultH\x00\x42\x06\n\x04type"\x16\n\x14\x43\x61ncelActivityResultB\x89\x01\n\x19io.temporal.api.worker.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/worker/v1;worker\xaa\x02\x18Temporalio.Api.Worker.V1\xea\x02\x1bTemporalio::Api::Worker::V1b\x06proto3'
+    b'\n$temporal/api/worker/v1/message.proto\x12\x16temporal.api.worker.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(temporal/api/deployment/v1/message.proto\x1a"temporal/api/enums/v1/common.proto"\x82\x01\n\x10WorkerPollerInfo\x12\x17\n\x0f\x63urrent_pollers\x18\x01 \x01(\x05\x12=\n\x19last_successful_poll_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0eis_autoscaling\x18\x03 \x01(\x08"\xf1\x01\n\x0fWorkerSlotsInfo\x12\x1f\n\x17\x63urrent_available_slots\x18\x01 \x01(\x05\x12\x1a\n\x12\x63urrent_used_slots\x18\x02 \x01(\x05\x12\x1a\n\x12slot_supplier_kind\x18\x03 \x01(\t\x12\x1d\n\x15total_processed_tasks\x18\x04 \x01(\x05\x12\x1a\n\x12total_failed_tasks\x18\x05 \x01(\x05\x12%\n\x1dlast_interval_processed_tasks\x18\x06 \x01(\x05\x12#\n\x1blast_interval_failure_tasks\x18\x07 \x01(\x05"\x94\x01\n\x0eWorkerHostInfo\x12\x11\n\thost_name\x18\x01 \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\x05 \x01(\t\x12\x12\n\nprocess_id\x18\x02 \x01(\t\x12\x1e\n\x16\x63urrent_host_cpu_usage\x18\x03 \x01(\x02\x12\x1e\n\x16\x63urrent_host_mem_usage\x18\x04 \x01(\x02"\xc9\n\n\x0fWorkerHeartbeat\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x39\n\thost_info\x18\x03 \x01(\x0b\x32&.temporal.api.worker.v1.WorkerHostInfo\x12\x12\n\ntask_queue\x18\x04 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x06 \x01(\t\x12\x13\n\x0bsdk_version\x18\x07 \x01(\t\x12\x33\n\x06status\x18\x08 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x32\n\x0eheartbeat_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12?\n\x1c\x65lapsed_since_last_heartbeat\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12I\n\x18workflow_task_slots_info\x18\x0c \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12I\n\x18\x61\x63tivity_task_slots_info\x18\r \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x15nexus_task_slots_info\x18\x0e \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12J\n\x19local_activity_slots_info\x18\x0f \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerSlotsInfo\x12\x46\n\x14workflow_poller_info\x18\x10 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12M\n\x1bworkflow_sticky_poller_info\x18\x11 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x46\n\x14\x61\x63tivity_poller_info\x18\x12 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x43\n\x11nexus_poller_info\x18\x13 \x01(\x0b\x32(.temporal.api.worker.v1.WorkerPollerInfo\x12\x1e\n\x16total_sticky_cache_hit\x18\x14 \x01(\x05\x12\x1f\n\x17total_sticky_cache_miss\x18\x15 \x01(\x05\x12!\n\x19\x63urrent_sticky_cache_size\x18\x16 \x01(\x05\x12\x33\n\x07plugins\x18\x17 \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\x18 \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo\x12<\n\x0b\x65nvironment\x18\x19 \x01(\x0b\x32\'.temporal.api.worker.v1.EnvironmentInfo"O\n\nWorkerInfo\x12\x41\n\x10worker_heartbeat\x18\x01 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\xec\x03\n\x0eWorkerListInfo\x12\x1b\n\x13worker_instance_key\x18\x01 \x01(\t\x12\x17\n\x0fworker_identity\x18\x02 \x01(\t\x12\x12\n\ntask_queue\x18\x03 \x01(\t\x12O\n\x12\x64\x65ployment_version\x18\x04 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x10\n\x08sdk_name\x18\x05 \x01(\t\x12\x13\n\x0bsdk_version\x18\x06 \x01(\t\x12\x33\n\x06status\x18\x07 \x01(\x0e\x32#.temporal.api.enums.v1.WorkerStatus\x12.\n\nstart_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\thost_name\x18\t \x01(\t\x12\x1b\n\x13worker_grouping_key\x18\n \x01(\t\x12\x12\n\nprocess_id\x18\x0b \x01(\t\x12\x33\n\x07plugins\x18\x0c \x03(\x0b\x32".temporal.api.worker.v1.PluginInfo\x12:\n\x07\x64rivers\x18\r \x03(\x0b\x32).temporal.api.worker.v1.StorageDriverInfo"+\n\nPluginInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t"!\n\x11StorageDriverInfo\x12\x0c\n\x04type\x18\x01 \x01(\t"\xa7\x11\n\x0f\x45nvironmentInfo\x12\x41\n\x08runtimes\x18\x01 \x03(\x0b\x32/.temporal.api.worker.v1.EnvironmentInfo.Runtime\x12X\n\x14hosting_environments\x18\x02 \x03(\x0b\x32:.temporal.api.worker.v1.EnvironmentInfo.HostingEnvironment\x12\x42\n\x08platform\x18\x03 \x01(\x0b\x32\x30.temporal.api.worker.v1.EnvironmentInfo.Platform\x1a\x94\x03\n\x07Runtime\x12I\n\x04type\x18\x01 \x01(\x0e\x32;.temporal.api.worker.v1.EnvironmentInfo.Runtime.RuntimeType\x12\x0f\n\x07version\x18\x02 \x01(\t"\xac\x02\n\x0bRuntimeType\x12\x1c\n\x18RUNTIME_TYPE_UNSPECIFIED\x10\x00\x12\x14\n\x10RUNTIME_TYPE_JVM\x10\x01\x12\x18\n\x14RUNTIME_TYPE_CPYTHON\x10\x02\x12\x15\n\x11RUNTIME_TYPE_NODE\x10\x03\x12\x14\n\x10RUNTIME_TYPE_BUN\x10\x04\x12\x16\n\x12RUNTIME_TYPE_CRUBY\x10\x05\x12\x13\n\x0fRUNTIME_TYPE_GO\x10\x06\x12!\n\x1dRUNTIME_TYPE_DOTNET_FRAMEWORK\x10\x07\x12\x1c\n\x18RUNTIME_TYPE_DOTNET_CORE\x10\x08\x12\x17\n\x13RUNTIME_TYPE_NATIVE\x10\t\x12\x1b\n\x17RUNTIME_TYPE_ROADRUNNER\x10\n\x1a\xd1\x04\n\x12HostingEnvironment\x12_\n\x04type\x18\x01 \x01(\x0e\x32Q.temporal.api.worker.v1.EnvironmentInfo.HostingEnvironment.HostingEnvironmentType\x12\x0f\n\x07version\x18\x02 \x01(\t"\xc8\x03\n\x16HostingEnvironmentType\x12(\n$HOSTING_ENVIRONMENT_TYPE_UNSPECIFIED\x10\x00\x12#\n\x1fHOSTING_ENVIRONMENT_TYPE_DOCKER\x10\x01\x12 \n\x1cHOSTING_ENVIRONMENT_TYPE_K8S\x10\x02\x12\'\n#HOSTING_ENVIRONMENT_TYPE_AWS_LAMBDA\x10\x03\x12$\n HOSTING_ENVIRONMENT_TYPE_AWS_ECS\x10\x04\x12-\n)HOSTING_ENVIRONMENT_TYPE_GOOGLE_CLOUD_RUN\x10\x06\x12.\n*HOSTING_ENVIRONMENT_TYPE_GOOGLE_APP_ENGINE\x10\x07\x12.\n*HOSTING_ENVIRONMENT_TYPE_AZURE_APP_SERVICE\x10\x08\x12,\n(HOSTING_ENVIRONMENT_TYPE_AZURE_FUNCTIONS\x10\t\x12\x31\n-HOSTING_ENVIRONMENT_TYPE_AZURE_CONTAINER_APPS\x10\n\x1a\xf1\x01\n\x08Platform\x12\x46\n\x05linux\x18\x01 \x01(\x0b\x32\x35.temporal.api.worker.v1.EnvironmentInfo.LinuxPlatformH\x00\x12\x46\n\x05macos\x18\x02 \x01(\x0b\x32\x35.temporal.api.worker.v1.EnvironmentInfo.MacOSPlatformH\x00\x12J\n\x07windows\x18\x03 \x01(\x0b\x32\x37.temporal.api.worker.v1.EnvironmentInfo.WindowsPlatformH\x00\x42\t\n\x07variant\x1a\xf3\x01\n\rLinuxPlatform\x12\x0f\n\x07version\x18\x01 \x01(\t\x12J\n\x0c\x61rchitecture\x18\x02 \x01(\x0e\x32\x34.temporal.api.worker.v1.EnvironmentInfo.Architecture\x12H\n\x04libc\x18\x03 \x01(\x0e\x32:.temporal.api.worker.v1.EnvironmentInfo.LinuxPlatform.Libc";\n\x04Libc\x12\x14\n\x10LIBC_UNSPECIFIED\x10\x00\x12\x0e\n\nLIBC_GLIBC\x10\x01\x12\r\n\tLIBC_MUSL\x10\x02\x1al\n\rMacOSPlatform\x12\x0f\n\x07version\x18\x01 \x01(\t\x12J\n\x0c\x61rchitecture\x18\x02 \x01(\x0e\x32\x34.temporal.api.worker.v1.EnvironmentInfo.Architecture\x1a\x91\x02\n\x0fWindowsPlatform\x12\x0f\n\x07version\x18\x01 \x01(\t\x12J\n\x0c\x61rchitecture\x18\x02 \x01(\x0e\x32\x34.temporal.api.worker.v1.EnvironmentInfo.Architecture\x12H\n\x03\x63rt\x18\x03 \x01(\x0e\x32;.temporal.api.worker.v1.EnvironmentInfo.WindowsPlatform.Crt"W\n\x03\x43rt\x12\x13\n\x0f\x43RT_UNSPECIFIED\x10\x00\x12\x0c\n\x08\x43RT_UCRT\x10\x01\x12\x0e\n\nCRT_MSVCRT\x10\x02\x12\r\n\tCRT_MINGW\x10\x03\x12\x0e\n\nCRT_CYGWIN\x10\x04"\\\n\x0c\x41rchitecture\x12\x1c\n\x18\x41RCHITECTURE_UNSPECIFIED\x10\x00\x12\x16\n\x12\x41RCHITECTURE_AMD64\x10\x01\x12\x16\n\x12\x41RCHITECTURE_ARM64\x10\x02"a\n\rWorkerCommand\x12H\n\x0f\x63\x61ncel_activity\x18\x01 \x01(\x0b\x32-.temporal.api.worker.v1.CancelActivityCommandH\x00\x42\x06\n\x04type"+\n\x15\x43\x61ncelActivityCommand\x12\x12\n\ntask_token\x18\x01 \x01(\x0c"f\n\x13WorkerCommandResult\x12G\n\x0f\x63\x61ncel_activity\x18\x01 \x01(\x0b\x32,.temporal.api.worker.v1.CancelActivityResultH\x00\x42\x06\n\x04type"\x16\n\x14\x43\x61ncelActivityResultB\x89\x01\n\x19io.temporal.api.worker.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/worker/v1;worker\xaa\x02\x18Temporalio.Api.Worker.V1\xea\x02\x1bTemporalio::Api::Worker::V1b\x06proto3'
 )
 
 
@@ -37,10 +37,34 @@ _WORKERINFO = DESCRIPTOR.message_types_by_name["WorkerInfo"]
 _WORKERLISTINFO = DESCRIPTOR.message_types_by_name["WorkerListInfo"]
 _PLUGININFO = DESCRIPTOR.message_types_by_name["PluginInfo"]
 _STORAGEDRIVERINFO = DESCRIPTOR.message_types_by_name["StorageDriverInfo"]
+_ENVIRONMENTINFO = DESCRIPTOR.message_types_by_name["EnvironmentInfo"]
+_ENVIRONMENTINFO_RUNTIME = _ENVIRONMENTINFO.nested_types_by_name["Runtime"]
+_ENVIRONMENTINFO_HOSTINGENVIRONMENT = _ENVIRONMENTINFO.nested_types_by_name[
+    "HostingEnvironment"
+]
+_ENVIRONMENTINFO_PLATFORM = _ENVIRONMENTINFO.nested_types_by_name["Platform"]
+_ENVIRONMENTINFO_LINUXPLATFORM = _ENVIRONMENTINFO.nested_types_by_name["LinuxPlatform"]
+_ENVIRONMENTINFO_MACOSPLATFORM = _ENVIRONMENTINFO.nested_types_by_name["MacOSPlatform"]
+_ENVIRONMENTINFO_WINDOWSPLATFORM = _ENVIRONMENTINFO.nested_types_by_name[
+    "WindowsPlatform"
+]
 _WORKERCOMMAND = DESCRIPTOR.message_types_by_name["WorkerCommand"]
 _CANCELACTIVITYCOMMAND = DESCRIPTOR.message_types_by_name["CancelActivityCommand"]
 _WORKERCOMMANDRESULT = DESCRIPTOR.message_types_by_name["WorkerCommandResult"]
 _CANCELACTIVITYRESULT = DESCRIPTOR.message_types_by_name["CancelActivityResult"]
+_ENVIRONMENTINFO_RUNTIME_RUNTIMETYPE = _ENVIRONMENTINFO_RUNTIME.enum_types_by_name[
+    "RuntimeType"
+]
+_ENVIRONMENTINFO_HOSTINGENVIRONMENT_HOSTINGENVIRONMENTTYPE = (
+    _ENVIRONMENTINFO_HOSTINGENVIRONMENT.enum_types_by_name["HostingEnvironmentType"]
+)
+_ENVIRONMENTINFO_LINUXPLATFORM_LIBC = _ENVIRONMENTINFO_LINUXPLATFORM.enum_types_by_name[
+    "Libc"
+]
+_ENVIRONMENTINFO_WINDOWSPLATFORM_CRT = (
+    _ENVIRONMENTINFO_WINDOWSPLATFORM.enum_types_by_name["Crt"]
+)
+_ENVIRONMENTINFO_ARCHITECTURE = _ENVIRONMENTINFO.enum_types_by_name["Architecture"]
 WorkerPollerInfo = _reflection.GeneratedProtocolMessageType(
     "WorkerPollerInfo",
     (_message.Message,),
@@ -129,6 +153,77 @@ StorageDriverInfo = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(StorageDriverInfo)
 
+EnvironmentInfo = _reflection.GeneratedProtocolMessageType(
+    "EnvironmentInfo",
+    (_message.Message,),
+    {
+        "Runtime": _reflection.GeneratedProtocolMessageType(
+            "Runtime",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _ENVIRONMENTINFO_RUNTIME,
+                "__module__": "temporalio.api.worker.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.EnvironmentInfo.Runtime)
+            },
+        ),
+        "HostingEnvironment": _reflection.GeneratedProtocolMessageType(
+            "HostingEnvironment",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _ENVIRONMENTINFO_HOSTINGENVIRONMENT,
+                "__module__": "temporalio.api.worker.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.EnvironmentInfo.HostingEnvironment)
+            },
+        ),
+        "Platform": _reflection.GeneratedProtocolMessageType(
+            "Platform",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _ENVIRONMENTINFO_PLATFORM,
+                "__module__": "temporalio.api.worker.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.EnvironmentInfo.Platform)
+            },
+        ),
+        "LinuxPlatform": _reflection.GeneratedProtocolMessageType(
+            "LinuxPlatform",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _ENVIRONMENTINFO_LINUXPLATFORM,
+                "__module__": "temporalio.api.worker.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.EnvironmentInfo.LinuxPlatform)
+            },
+        ),
+        "MacOSPlatform": _reflection.GeneratedProtocolMessageType(
+            "MacOSPlatform",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _ENVIRONMENTINFO_MACOSPLATFORM,
+                "__module__": "temporalio.api.worker.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.EnvironmentInfo.MacOSPlatform)
+            },
+        ),
+        "WindowsPlatform": _reflection.GeneratedProtocolMessageType(
+            "WindowsPlatform",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _ENVIRONMENTINFO_WINDOWSPLATFORM,
+                "__module__": "temporalio.api.worker.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.EnvironmentInfo.WindowsPlatform)
+            },
+        ),
+        "DESCRIPTOR": _ENVIRONMENTINFO,
+        "__module__": "temporalio.api.worker.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.EnvironmentInfo)
+    },
+)
+_sym_db.RegisterMessage(EnvironmentInfo)
+_sym_db.RegisterMessage(EnvironmentInfo.Runtime)
+_sym_db.RegisterMessage(EnvironmentInfo.HostingEnvironment)
+_sym_db.RegisterMessage(EnvironmentInfo.Platform)
+_sym_db.RegisterMessage(EnvironmentInfo.LinuxPlatform)
+_sym_db.RegisterMessage(EnvironmentInfo.MacOSPlatform)
+_sym_db.RegisterMessage(EnvironmentInfo.WindowsPlatform)
+
 WorkerCommand = _reflection.GeneratedProtocolMessageType(
     "WorkerCommand",
     (_message.Message,),
@@ -183,21 +278,45 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _WORKERHOSTINFO._serialized_start = 585
     _WORKERHOSTINFO._serialized_end = 733
     _WORKERHEARTBEAT._serialized_start = 736
-    _WORKERHEARTBEAT._serialized_end = 2027
-    _WORKERINFO._serialized_start = 2029
-    _WORKERINFO._serialized_end = 2108
-    _WORKERLISTINFO._serialized_start = 2111
-    _WORKERLISTINFO._serialized_end = 2603
-    _PLUGININFO._serialized_start = 2605
-    _PLUGININFO._serialized_end = 2648
-    _STORAGEDRIVERINFO._serialized_start = 2650
-    _STORAGEDRIVERINFO._serialized_end = 2683
-    _WORKERCOMMAND._serialized_start = 2685
-    _WORKERCOMMAND._serialized_end = 2782
-    _CANCELACTIVITYCOMMAND._serialized_start = 2784
-    _CANCELACTIVITYCOMMAND._serialized_end = 2827
-    _WORKERCOMMANDRESULT._serialized_start = 2829
-    _WORKERCOMMANDRESULT._serialized_end = 2931
-    _CANCELACTIVITYRESULT._serialized_start = 2933
-    _CANCELACTIVITYRESULT._serialized_end = 2955
+    _WORKERHEARTBEAT._serialized_end = 2089
+    _WORKERINFO._serialized_start = 2091
+    _WORKERINFO._serialized_end = 2170
+    _WORKERLISTINFO._serialized_start = 2173
+    _WORKERLISTINFO._serialized_end = 2665
+    _PLUGININFO._serialized_start = 2667
+    _PLUGININFO._serialized_end = 2710
+    _STORAGEDRIVERINFO._serialized_start = 2712
+    _STORAGEDRIVERINFO._serialized_end = 2745
+    _ENVIRONMENTINFO._serialized_start = 2748
+    _ENVIRONMENTINFO._serialized_end = 4963
+    _ENVIRONMENTINFO_RUNTIME._serialized_start = 2993
+    _ENVIRONMENTINFO_RUNTIME._serialized_end = 3397
+    _ENVIRONMENTINFO_RUNTIME_RUNTIMETYPE._serialized_start = 3097
+    _ENVIRONMENTINFO_RUNTIME_RUNTIMETYPE._serialized_end = 3397
+    _ENVIRONMENTINFO_HOSTINGENVIRONMENT._serialized_start = 3400
+    _ENVIRONMENTINFO_HOSTINGENVIRONMENT._serialized_end = 3993
+    _ENVIRONMENTINFO_HOSTINGENVIRONMENT_HOSTINGENVIRONMENTTYPE._serialized_start = 3537
+    _ENVIRONMENTINFO_HOSTINGENVIRONMENT_HOSTINGENVIRONMENTTYPE._serialized_end = 3993
+    _ENVIRONMENTINFO_PLATFORM._serialized_start = 3996
+    _ENVIRONMENTINFO_PLATFORM._serialized_end = 4237
+    _ENVIRONMENTINFO_LINUXPLATFORM._serialized_start = 4240
+    _ENVIRONMENTINFO_LINUXPLATFORM._serialized_end = 4483
+    _ENVIRONMENTINFO_LINUXPLATFORM_LIBC._serialized_start = 4424
+    _ENVIRONMENTINFO_LINUXPLATFORM_LIBC._serialized_end = 4483
+    _ENVIRONMENTINFO_MACOSPLATFORM._serialized_start = 4485
+    _ENVIRONMENTINFO_MACOSPLATFORM._serialized_end = 4593
+    _ENVIRONMENTINFO_WINDOWSPLATFORM._serialized_start = 4596
+    _ENVIRONMENTINFO_WINDOWSPLATFORM._serialized_end = 4869
+    _ENVIRONMENTINFO_WINDOWSPLATFORM_CRT._serialized_start = 4782
+    _ENVIRONMENTINFO_WINDOWSPLATFORM_CRT._serialized_end = 4869
+    _ENVIRONMENTINFO_ARCHITECTURE._serialized_start = 4871
+    _ENVIRONMENTINFO_ARCHITECTURE._serialized_end = 4963
+    _WORKERCOMMAND._serialized_start = 4965
+    _WORKERCOMMAND._serialized_end = 5062
+    _CANCELACTIVITYCOMMAND._serialized_start = 5064
+    _CANCELACTIVITYCOMMAND._serialized_end = 5107
+    _WORKERCOMMANDRESULT._serialized_start = 5109
+    _WORKERCOMMANDRESULT._serialized_end = 5211
+    _CANCELACTIVITYRESULT._serialized_start = 5213
+    _CANCELACTIVITYRESULT._serialized_end = 5235
 # @@protoc_insertion_point(module_scope)
