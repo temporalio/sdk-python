@@ -6,7 +6,7 @@ import logging
 import queue
 import threading
 import uuid
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Generator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -39,6 +39,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers import LogCapturer
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.helpers.trace import TraceNode, assert_trace_hierarchy
 
 
 @dataclass
@@ -327,41 +328,39 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
             await handle.execute_update(TracingWorkflow.update)
         await handle.result()
 
-    # Dump debug with attributes, but do string assertion test without
-    logging.debug(
-        "Spans:\n%s",
-        "\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)),
+    assert_span_hierarchy(
+        exporter.get_finished_spans(),
+        [
+            "StartWorkflow:TracingWorkflow",
+            "  RunWorkflow:TracingWorkflow",
+            "  MyCustomSpan",
+            "  HandleSignal:signal (links: SignalWorkflow:signal)",
+            "  StartActivity:tracing_activity",
+            "    RunActivity:tracing_activity",
+            "    RunActivity:tracing_activity",
+            "  ValidateUpdate:update (links: StartWorkflowUpdate:update)",
+            "  HandleUpdate:update (links: StartWorkflowUpdate:update)",
+            "  StartChildWorkflow:TracingWorkflow",
+            "    RunWorkflow:TracingWorkflow",
+            "    MyCustomSpan",
+            "    StartActivity:tracing_activity",
+            "      RunActivity:tracing_activity",
+            "    HandleSignal:signal (links: SignalChildWorkflow:signal)",
+            "    HandleSignal:signal (links: SignalExternalWorkflow:signal)",
+            "    CompleteWorkflow:TracingWorkflow",
+            "  SignalChildWorkflow:signal",
+            "  SignalExternalWorkflow:signal",
+            "  RunWorkflow:TracingWorkflow",
+            "  MyCustomSpan",
+            "  StartActivity:tracing_activity",
+            "    RunActivity:tracing_activity",
+            "  CompleteWorkflow:TracingWorkflow",
+            "QueryWorkflow:query",
+            "  HandleQuery:query (links: StartWorkflow:TracingWorkflow)",
+            "SignalWorkflow:signal",
+            "StartWorkflowUpdate:update",
+        ],
     )
-    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
-        "StartWorkflow:TracingWorkflow",
-        "  RunWorkflow:TracingWorkflow",
-        "  MyCustomSpan",
-        "  HandleSignal:signal (links: SignalWorkflow:signal)",
-        "  StartActivity:tracing_activity",
-        "    RunActivity:tracing_activity",
-        "    RunActivity:tracing_activity",
-        "  ValidateUpdate:update (links: StartWorkflowUpdate:update)",
-        "  HandleUpdate:update (links: StartWorkflowUpdate:update)",
-        "  StartChildWorkflow:TracingWorkflow",
-        "    RunWorkflow:TracingWorkflow",
-        "    MyCustomSpan",
-        "    StartActivity:tracing_activity",
-        "      RunActivity:tracing_activity",
-        "    HandleSignal:signal (links: SignalChildWorkflow:signal)",
-        "    HandleSignal:signal (links: SignalExternalWorkflow:signal)",
-        "    CompleteWorkflow:TracingWorkflow",
-        "  SignalChildWorkflow:signal",
-        "  SignalExternalWorkflow:signal",
-        "  RunWorkflow:TracingWorkflow",
-        "  MyCustomSpan",
-        "  StartActivity:tracing_activity",
-        "    RunActivity:tracing_activity",
-        "  CompleteWorkflow:TracingWorkflow",
-        "QueryWorkflow:query",
-        "  HandleQuery:query (links: StartWorkflow:TracingWorkflow)",
-        "SignalWorkflow:signal",
-        "StartWorkflowUpdate:update",
-    ]
 
 
 async def test_opentelemetry_tracing_update_with_start(
@@ -437,24 +436,22 @@ async def test_opentelemetry_tracing_update_with_start(
             id=workflow_id,
         )
 
-    # Dump debug with attributes, but do string assertion test without
-    logging.debug(
-        "Spans:\n%s",
-        "\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)),
+    assert_span_hierarchy(
+        exporter.get_finished_spans(),
+        [
+            "StartWorkflow:TracingWorkflow",
+            "  RunWorkflow:TracingWorkflow",
+            "  MyCustomSpan",
+            "  HandleUpdate:update_with_start (links: StartUpdateWithStartWorkflow:TracingWorkflow)",
+            "  CompleteWorkflow:TracingWorkflow",
+            "StartUpdateWithStartWorkflow:TracingWorkflow",
+            "StartUpdateWithStartWorkflow:TracingWorkflow",
+            "  HandleUpdate:update_with_start (links: StartUpdateWithStartWorkflow:TracingWorkflow)",
+            "  RunWorkflow:TracingWorkflow",
+            "  MyCustomSpan",
+            "  CompleteWorkflow:TracingWorkflow",
+        ],
     )
-    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
-        "StartWorkflow:TracingWorkflow",
-        "  RunWorkflow:TracingWorkflow",
-        "  MyCustomSpan",
-        "  HandleUpdate:update_with_start (links: StartUpdateWithStartWorkflow:TracingWorkflow)",
-        "  CompleteWorkflow:TracingWorkflow",
-        "StartUpdateWithStartWorkflow:TracingWorkflow",
-        "StartUpdateWithStartWorkflow:TracingWorkflow",
-        "  HandleUpdate:update_with_start (links: StartUpdateWithStartWorkflow:TracingWorkflow)",
-        "  RunWorkflow:TracingWorkflow",
-        "  MyCustomSpan",
-        "  CompleteWorkflow:TracingWorkflow",
-    ]
 
 
 @pytest.mark.requires_local_server
@@ -501,62 +498,112 @@ async def test_opentelemetry_tracing_nexus(client: Client, env: WorkflowEnvironm
         )
         await handle.result()
 
-    # Dump debug with attributes, but do string assertion test without
-    logging.debug(
-        "Spans:\n%s",
-        "\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)),
+    assert_span_hierarchy(
+        exporter.get_finished_spans(),
+        [
+            "StartWorkflow:TracingWorkflow",
+            "  RunWorkflow:TracingWorkflow",
+            "  MyCustomSpan",
+            "  StartNexusOperation:InterceptedNexusService/intercepted_operation",
+            "    RunStartNexusOperationHandler:InterceptedNexusService/intercepted_operation",
+            "      StartWorkflow:ExpectCancelNexusWorkflow",
+            "        RunWorkflow:ExpectCancelNexusWorkflow",
+            "    RunCancelNexusOperationHandler:InterceptedNexusService/intercepted_operation",
+            "  CompleteWorkflow:TracingWorkflow",
+        ],
     )
-    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
-        "StartWorkflow:TracingWorkflow",
-        "  RunWorkflow:TracingWorkflow",
-        "  MyCustomSpan",
-        "  StartNexusOperation:InterceptedNexusService/intercepted_operation",
-        "    RunStartNexusOperationHandler:InterceptedNexusService/intercepted_operation",
-        "      StartWorkflow:ExpectCancelNexusWorkflow",
-        "        RunWorkflow:ExpectCancelNexusWorkflow",
-        "    RunCancelNexusOperationHandler:InterceptedNexusService/intercepted_operation",
-        "  CompleteWorkflow:TracingWorkflow",
-    ]
 
 
-def dump_spans(
-    spans: Iterable[ReadableSpan],
-    *,
-    parent_id: int | None = None,
-    with_attributes: bool = True,
-    indent_depth: int = 0,
-) -> list[str]:
-    ret: list[str] = []
+def assert_span_hierarchy(
+    spans: Sequence[ReadableSpan], expected: Sequence[str]
+) -> None:
+    """Assert span parentage while retaining span IDs and attributes on failure."""
+    assert_trace_hierarchy(build_span_trees(spans), expected)
+
+
+def build_span_trees(spans: Sequence[ReadableSpan]) -> list[TraceNode]:
+    """Build span trees directly from span contexts and parent contexts."""
+    nodes: list[TraceNode] = []
+    nodes_by_context: dict[tuple[int, int], TraceNode] = {}
+    names_by_context = {_span_context_key(span): span.name for span in spans}
+    duplicate_contexts: set[tuple[int, int]] = set()
     for span in spans:
-        if (not span.parent and parent_id is None) or (
-            span.parent and span.parent.span_id == parent_id
-        ):
-            span_str = f"{'  ' * indent_depth}{span.name}"
-            if with_attributes:
-                span_str += f" (attributes: {dict(span.attributes or {})})"
-            # Add links
-            if span.links:
-                span_links: list[str] = []
-                for link in span.links:
-                    for link_span in spans:
-                        if (
-                            link_span.context is not None
-                            and link_span.context.span_id == link.context.span_id
-                        ):
-                            span_links.append(link_span.name)
-                span_str += f" (links: {', '.join(span_links)})"
-            # Signals can duplicate in rare situations, so we make sure not to
-            # re-add
-            if "Signal" in span_str and span_str in ret:
-                continue
-            ret.append(span_str)
-            ret += dump_spans(
-                spans,
-                parent_id=span.context.span_id if span.context else None,
-                with_attributes=with_attributes,
-                indent_depth=indent_depth + 1,
+        key = _span_context_key(span)
+        link_names: list[str] = []
+        for link in span.links:
+            link_name = names_by_context.get(
+                (link.context.trace_id, link.context.span_id)
             )
-    return ret
+            if link_name is not None:
+                link_names.append(link_name)
+        name = span.name
+        if link_names:
+            name += f" (links: {', '.join(link_names)})"
+        node = TraceNode(name, details=_span_details(span))
+        nodes.append(node)
+        if key in nodes_by_context:
+            duplicate_contexts.add(key)
+        else:
+            nodes_by_context[key] = node
+
+    roots: list[TraceNode] = []
+    for span, node in zip(spans, nodes):
+        parent = span.parent
+        if parent is None or not parent.is_valid:
+            roots.append(node)
+            continue
+        parent_node = nodes_by_context.get((parent.trace_id, parent.span_id))
+        if parent_node is None:
+            node.details = f"{node.details}; missing_parent"
+            roots.append(node)
+        else:
+            parent_node.children.append(node)
+
+    for span, node in zip(spans, nodes):
+        if _span_context_key(span) in duplicate_contexts:
+            node.details = f"{node.details}; duplicate_span_id"
+    return _deduplicate_signal_subtrees(roots)
+
+
+def _deduplicate_signal_subtrees(nodes: Sequence[TraceNode]) -> list[TraceNode]:
+    """Keep the first identical signal subtree, matching existing test semantics."""
+    deduplicated: list[TraceNode] = []
+    seen_signal_names: set[str] = set()
+    for node in nodes:
+        if "Signal" in node.name and node.name in seen_signal_names:
+            continue
+        if "Signal" in node.name:
+            seen_signal_names.add(node.name)
+        node.children = _deduplicate_signal_subtrees(node.children)
+        deduplicated.append(node)
+    return deduplicated
+
+
+def _span_details(span: ReadableSpan) -> str:
+    parent_span_id = (
+        f"{span.parent.span_id:016x}"
+        if span.parent is not None and span.parent.is_valid
+        else "None"
+    )
+    attributes = dict(span.attributes or {})
+    links = [
+        f"{link.context.trace_id:032x}/{link.context.span_id:016x}"
+        for link in span.links
+    ]
+    trace_id, span_id = _span_context_key(span)
+    return (
+        f"trace_id={trace_id:032x} "
+        f"span_id={span_id:016x} "
+        f"parent_span_id={parent_span_id} "
+        f"kind={span.kind.name} status={span.status.status_code.name} "
+        f"start_time={span.start_time} end_time={span.end_time} links={links!r} "
+        f"attributes={attributes!r}"
+    )
+
+
+def _span_context_key(span: ReadableSpan) -> tuple[int, int]:
+    assert span.context is not None
+    return span.context.trace_id, span.context.span_id
 
 
 @workflow.defn
@@ -587,7 +634,6 @@ async def test_opentelemetry_always_create_workflow_spans(client: Client):
         )
     # Confirm the spans are not there
     spans = exporter.get_finished_spans()
-    logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
     assert len(spans) == 0
 
     # Now create a worker with an interceptor with always create
@@ -604,7 +650,6 @@ async def test_opentelemetry_always_create_workflow_spans(client: Client):
         )
     # Confirm the spans are not there
     spans = exporter.get_finished_spans()
-    logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
     assert len(spans) > 0
     assert spans[0].name == "RunWorkflow:SimpleWorkflow"
 
@@ -977,10 +1022,13 @@ async def test_opentelemetry_standalone_activity_tracing(
         await handle.result()
 
     finished_spans = exporter.get_finished_spans()
-    assert dump_spans(finished_spans, with_attributes=False) == [
-        "StartActivity:tracing_activity",
-        "  RunActivity:tracing_activity",
-    ]
+    assert_span_hierarchy(
+        finished_spans,
+        [
+            "StartActivity:tracing_activity",
+            "  RunActivity:tracing_activity",
+        ],
+    )
     start_activity_span = next(
         s for s in finished_spans if s.name == "StartActivity:tracing_activity"
     )

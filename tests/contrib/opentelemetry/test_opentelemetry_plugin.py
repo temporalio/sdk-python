@@ -15,14 +15,23 @@ from opentelemetry.trace import (
 )
 
 import temporalio.contrib.opentelemetry.workflow
+import temporalio.worker._workflow
 from temporalio import activity, nexus, workflow
+from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
+from temporalio.contrib.opentelemetry._tracer_provider import _ReplaySafeSpan
 from temporalio.exceptions import ApplicationError
+from temporalio.runtime import (
+    LogForwardingConfig,
+    LoggingConfig,
+    Runtime,
+    TelemetryConfig,
+    TelemetryFilter,
+)
 from temporalio.testing import WorkflowEnvironment
-
-# Import the dump_spans function from the original opentelemetry test
-from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
+from temporalio.worker._workflow_instance import _WorkflowInstanceImpl
+from tests.contrib.opentelemetry.test_opentelemetry import assert_span_hierarchy
 from tests.helpers import new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 
@@ -121,11 +130,7 @@ async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: An
         "    Not context",
     ]
 
-    # Verify the span hierarchy matches expectations
-    actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert actual_hierarchy == expected_hierarchy, (
-        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
-    )
+    assert_span_hierarchy(spans, expected_hierarchy)
 
 
 @workflow.defn
@@ -235,9 +240,9 @@ class ComprehensiveWorkflow:
 
 @pytest.mark.requires_local_server
 async def test_opentelemetry_comprehensive_tracing(
-    client: Client,
     env: WorkflowEnvironment,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """Test OpenTelemetry v2 integration across all workflow operations."""
     if env.supports_time_skipping:
@@ -248,9 +253,48 @@ async def test_opentelemetry_comprehensive_tracing(
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
 
-    new_config = client.config()
-    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
-    new_client = Client(**new_config)
+    original_end = _ReplaySafeSpan.end
+
+    def end_with_replay_state(self: Any, end_time: int | None = None) -> None:
+        if workflow.in_workflow():
+            self.set_attribute(
+                "test.replaying_at_span_end", workflow.unsafe.is_replaying()
+            )
+            self.set_attribute(
+                "test.replaying_history_events_at_span_end",
+                workflow.unsafe.is_replaying_history_events(),
+            )
+        original_end(self, end_time)
+
+    monkeypatch.setattr(_ReplaySafeSpan, "end", end_with_replay_state)
+    monkeypatch.setattr(temporalio.worker._workflow, "LOG_PROTOS", True)
+
+    activations: list[str] = []
+    original_activate = _WorkflowInstanceImpl.activate
+
+    def record_activation(self: Any, act: Any) -> Any:
+        jobs = ", ".join(job.WhichOneof("variant") for job in act.jobs)
+        activations.append(
+            f"instance={id(self):x} replaying={act.is_replaying} "
+            f"history_length={act.history_length} jobs=[{jobs}]"
+        )
+        return original_activate(self, act)
+
+    monkeypatch.setattr(_WorkflowInstanceImpl, "activate", record_activation)
+
+    core_logger = logging.getLogger(f"{__name__}.core")
+    core_logger.setLevel(logging.DEBUG)
+    new_client = await env.connect_client(
+        plugins=[OpenTelemetryPlugin(add_temporal_spans=True)],
+        runtime=Runtime(
+            telemetry=TelemetryConfig(
+                logging=LoggingConfig(
+                    filter=TelemetryFilter(core_level="DEBUG", other_level="ERROR"),
+                    forwarding=LogForwardingConfig(logger=core_logger),
+                )
+            )
+        ),
+    )
 
     async with new_worker(
         new_client,
@@ -274,12 +318,12 @@ async def test_opentelemetry_comprehensive_tracing(
                 ComprehensiveWorkflow.run,
                 [
                     "activity",
-                    "local_activity",
                     "child_workflow",
                     "timer",
                     "nexus",
                     "wait_signal",
                     "wait_update",
+                    "local_activity",
                 ],
                 id=f"comprehensive-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
@@ -332,19 +376,12 @@ async def test_opentelemetry_comprehensive_tracing(
 
     spans = exporter.get_finished_spans()
 
-    # Note: Even though we call signal twice, dump_spans() deduplicates signal spans
-    # as they "can duplicate in rare situations" according to the original test
-
     expected_hierarchy = [
         "ComprehensiveTest",
         "  StartWorkflow:ComprehensiveWorkflow",
         "    RunWorkflow:ComprehensiveWorkflow",
         "      MainWorkflow",
         "        ActivitySection",
-        "          StartActivity:simple_no_context_activity",
-        "            RunActivity:simple_no_context_activity",
-        "              Activity",
-        "        LocalActivitySection",
         "          StartActivity:simple_no_context_activity",
         "            RunActivity:simple_no_context_activity",
         "              Activity",
@@ -372,6 +409,10 @@ async def test_opentelemetry_comprehensive_tracing(
         "                RunWorkflow:SimpleNexusWorkflow",
         "        WaitSignalSection",
         "        WaitUpdateSection",
+        "        LocalActivitySection",
+        "          StartActivity:simple_no_context_activity",
+        "            RunActivity:simple_no_context_activity",
+        "              Activity",
         "  QueryWorkflow:get_status",
         "    HandleQuery:get_status",
         "  SignalWorkflow:notify",
@@ -381,11 +422,19 @@ async def test_opentelemetry_comprehensive_tracing(
         "    HandleUpdate:update_status",
     ]
 
-    # Verify the span hierarchy matches expectations
-    actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert actual_hierarchy == expected_hierarchy, (
-        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
-    )
+    try:
+        assert_span_hierarchy(spans, expected_hierarchy)
+    except AssertionError as err:
+        history = await workflow_handle.fetch_history()
+        history_lines = [
+            f"{event.event_id}: "
+            f"{EventType.Name(event.event_type).removeprefix('EVENT_TYPE_')}"
+            for event in history.events
+        ]
+        raise AssertionError(
+            f"{err}\nWorkflow activations:\n{chr(10).join(activations)}"
+            f"\nWorkflow history:\n{chr(10).join(history_lines)}"
+        ) from err
 
 
 async def test_otel_tracing_with_added_spans(
@@ -438,11 +487,7 @@ async def test_otel_tracing_with_added_spans(
         "        Not context",
     ]
 
-    # Verify the span hierarchy matches expectations
-    actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert actual_hierarchy == expected_hierarchy, (
-        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
-    )
+    assert_span_hierarchy(spans, expected_hierarchy)
 
 
 task_fail_once_workflow_has_failed = False
@@ -507,10 +552,7 @@ async def test_otel_tracing_workflow_task_failure(
         "        FailingWorkflow CompletedSpan",
     ]
 
-    actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert actual_hierarchy == expected_hierarchy, (
-        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
-    )
+    assert_span_hierarchy(spans, expected_hierarchy)
 
 
 @workflow.defn
@@ -562,10 +604,7 @@ async def test_otel_tracing_workflow_failure(
         "      FailingWorkflowSpan",
     ]
 
-    actual_hierarchy = dump_spans(spans, with_attributes=False)
-    assert actual_hierarchy == expected_hierarchy, (
-        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
-    )
+    assert_span_hierarchy(spans, expected_hierarchy)
 
 
 async def test_otel_standalone_activity_tracing(
@@ -600,11 +639,14 @@ async def test_otel_standalone_activity_tracing(
         await handle.result()
 
     finished_spans = exporter.get_finished_spans()
-    assert dump_spans(finished_spans, with_attributes=False) == [
-        "StartActivity:simple_no_context_activity",
-        "  RunActivity:simple_no_context_activity",
-        "    Activity",
-    ]
+    assert_span_hierarchy(
+        finished_spans,
+        [
+            "StartActivity:simple_no_context_activity",
+            "  RunActivity:simple_no_context_activity",
+            "    Activity",
+        ],
+    )
     start_activity_span = next(
         s
         for s in finished_spans
