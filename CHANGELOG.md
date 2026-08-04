@@ -34,10 +34,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
-- The `opentelemetry` extra now requires `opentelemetry-api`/`opentelemetry-sdk` `>= 1.24`,
-  aligning the declared floor with what `temporalio.contrib.opentelemetry` already required in
-  practice (it has depended on an API added in `opentelemetry-api` 1.24 since the tracing
-  integration was introduced).
+- The `opentelemetry` and `lambda-worker-otel` extras now require
+  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.24`, aligning the declared floor with what
+  `temporalio.contrib.opentelemetry` already required in practice (it has depended on an API
+  added in `opentelemetry-api` 1.24 since the tracing integration was introduced, and the
+  lambda worker builds on it).
 
 ### Deprecated
 
