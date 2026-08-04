@@ -596,6 +596,15 @@ impl ClientRef {
                         poll_nexus_task_queue
                     )
                 }
+                "poll_workflow_execution_time_skipping" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        WorkflowService,
+                        workflow_service,
+                        poll_workflow_execution_time_skipping
+                    )
+                }
                 "poll_workflow_execution_update" => {
                     rpc_call!(
                         connection,

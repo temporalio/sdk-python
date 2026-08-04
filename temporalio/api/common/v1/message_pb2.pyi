@@ -1287,15 +1287,17 @@ class OnConflictOptions(google.protobuf.message.Message):
 global___OnConflictOptions = OnConflictOptions
 
 class TimeSkippingConfig(google.protobuf.message.Message):
-    """The configuration for time skipping of a workflow execution (a chain of runs including retries, cron, continue-as-new).
+    """The configuration for time skipping of an execution.
     When time skipping is enabled, virtual time advances automatically whenever there is no in-flight work.
-    In-flight work includes activities, child workflows, Nexus operations, signal/cancel external workflow operations,
-    and possibly other features added in the future.
-    User timers are not classified as in-flight work and will be skipped over; the virtual clock may also skip to the
-    time point of the registered fast forward when there is no in-flight work.
-    When time is skipped, a WorkflowExecutionTimeSkippingTransitionedEvent will be
-    added to the workflow history to capture the state changes.
+    Options like fast_forward, disable_propagation, and max_session_skip_count are provided for granular
+    control of the execution's time skipping behavior. See each field's comment for a detailed explanation.
 
+    An example of workflows with time skipping:
+    For workflows, an execution is a chain of runs including retries, cron, and continue-as-new.
+    In-flight work includes activities, child workflows, Nexus operations, signal/cancel external workflow operations, etc.
+    User timers are not classified as in-flight work and will be skipped over; the virtual clock may also skip to the
+    time point of the registered fast-forward when there is no in-flight work.
+    Whenever time is skipped, the skip count is incremented by one; max_session_skip_count bounds the number of skips allowed within a single time-skipping session.
     For child workflows, by default, if the parent execution is skipping time, the child execution will also skip time,
     but a parent's fast_forward won't affect its child's execution. A flag is provided to disable propagation of the
     "enabled" flag to child workflows; regardless of that flag, a child workflow inherits the virtual time from the
@@ -1305,39 +1307,45 @@ class TimeSkippingConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ENABLED_FIELD_NUMBER: builtins.int
-    FAST_FORWARD_FIELD_NUMBER: builtins.int
+    FAST_FORWARD_CONFIG_FIELD_NUMBER: builtins.int
     DISABLE_PROPAGATION_FIELD_NUMBER: builtins.int
+    MAX_SESSION_SKIP_COUNT_FIELD_NUMBER: builtins.int
     enabled: builtins.bool
     """Enables or disables time skipping for this workflow execution."""
     @property
-    def fast_forward(self) -> google.protobuf.duration_pb2.Duration:
-        """Optionally fast-forward the current workflow execution by this duration ahead of current workflow execution time.
-        After the fast-forward completes, time skipping is disabled, and this
-        action is recorded in the WorkflowExecutionTimeSkippingTransitionedEvent. It can be re-enabled by
-        setting `enabled` to true or setting `fast_forward` again via UpdateWorkflowExecutionOptions.
-        The current workflow execution is a chain of runs (retries, cron, continue-as-new);
-        child workflows are separate executions, so this fast_forward won't affect them.
-
-        For a given workflow execution, only one active fast-forward is allowed at a time.
-        If a new fast-forward is set via UpdateWorkflowExecutionOptions before the previous
-        one completes, the new one will override the previous one.
-        If the fast-forward duration exceeds the remaining execution timeout, time will only
-        be fast-forwarded up to the end of the execution.
-        """
+    def fast_forward_config(self) -> global___FastForwardConfig:
+        """An optional opt-in to control time-skipping behavior through fast-forward; see its definition for details."""
     disable_propagation: builtins.bool
     """By default, executions started by another execution (e.g. a child workflow of a parent workflow or
-    a schedule with the timeskipping policy enabled), inherit the "enabled" flag and skip time when possible.
+    a schedule with the time-skipping policy enabled) inherit the "enabled" flag and skip time when possible.
     This flag disables that inheritance.
+    """
+    max_session_skip_count: builtins.int
+    """The maximum number of skips allowed every time this field is updated. It protects the execution from
+    situations like unlimited retries when backoff is skipped.
+
+    Every time the execution skips time, the skip count is incremented by one, and when it reaches
+    max_session_skip_count, time skipping stops. Whenever this config field is updated, the accumulated
+    skip count is cleared, marking the start of a new session.
+    For an execution with a chain of runs (retry, cron, continue-as-new), the count is accumulated
+    across all runs within the same session.
+
+    If this field is not set, the server applies a large default value (e.g. 100). The default can
+    be changed through dynamic config, and is overridden by this field when set.
     """
     def __init__(
         self,
         *,
         enabled: builtins.bool = ...,
-        fast_forward: google.protobuf.duration_pb2.Duration | None = ...,
+        fast_forward_config: global___FastForwardConfig | None = ...,
         disable_propagation: builtins.bool = ...,
+        max_session_skip_count: builtins.int = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["fast_forward", b"fast_forward"]
+        self,
+        field_name: typing_extensions.Literal[
+            "fast_forward_config", b"fast_forward_config"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -1346,37 +1354,79 @@ class TimeSkippingConfig(google.protobuf.message.Message):
             b"disable_propagation",
             "enabled",
             b"enabled",
-            "fast_forward",
-            b"fast_forward",
+            "fast_forward_config",
+            b"fast_forward_config",
+            "max_session_skip_count",
+            b"max_session_skip_count",
         ],
     ) -> None: ...
 
 global___TimeSkippingConfig = TimeSkippingConfig
 
+class FastForwardConfig(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    DURATION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """A client-supplied ID, required field, set alongside `duration`. It is used to poll for
+    fast-forward completion via PollWorkflowExecutionTimeSkipping.
+    The server performs no idempotency check on this ID; the client is responsible for managing it.
+    """
+    @property
+    def duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Fast-forward the current execution by this duration ahead of the current execution time; required field.
+        The duration yields a target time (current execution time + duration), surfaced as `target_time` in
+        TimeSkippingFastForwardInfo. Once virtual time reaches that target, the fast-forward completes, time
+        skipping is disabled, and no further time is skipped. Time skipping can be resumed either
+        by updating the TimeSkippingConfig with a new FastForwardConfig, or by clearing the FastForwardConfig
+        to skip through to the end of the execution.
+
+        If this duration exceeds the remaining execution timeout, time will not pass beyond the end
+        of the execution, and the fast-forward won't have a chance to complete.
+        """
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        duration: google.protobuf.duration_pb2.Duration | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["duration", b"duration"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["duration", b"duration", "id", b"id"],
+    ) -> None: ...
+
+global___FastForwardConfig = FastForwardConfig
+
 class TimeSkippingStatePropagation(google.protobuf.message.Message):
-    """The time-skipping state that needs to be propagated from a parent workflow to a child workflow,
-    or through a chain of runs.
+    """The time-skipping state that needs to be propagated from one execution to another, or through a chain of runs
+    within the same execution.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     INITIAL_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
     FAST_FORWARD_TARGET_TIME_FIELD_NUMBER: builtins.int
+    INITIAL_SKIP_COUNT_FIELD_NUMBER: builtins.int
     @property
     def initial_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
-        """The time skipped by the previous execution that started this workflow.
-        It can happen in child workflows and a chain of runs (CaN, cron, retry).
+        """The time skipped by the previous run. It is propagated both to executions started by the
+        current execution and through a chain of runs (CaN, cron, retry).
         """
     @property
     def fast_forward_target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """If there is a fast-forward action set for the previous run in a chain of runs,
-        the target time should be propagated to the next run as well.
-        """
+        """The fast-forward target time. It only propagates across a chain of runs within the same execution."""
+    initial_skip_count: builtins.int
+    """The initial skip count. It only propagates across a chain of runs within the same execution."""
     def __init__(
         self,
         *,
         initial_skipped_duration: google.protobuf.duration_pb2.Duration | None = ...,
         fast_forward_target_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        initial_skip_count: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1392,9 +1442,126 @@ class TimeSkippingStatePropagation(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "fast_forward_target_time",
             b"fast_forward_target_time",
+            "initial_skip_count",
+            b"initial_skip_count",
             "initial_skipped_duration",
             b"initial_skipped_duration",
         ],
     ) -> None: ...
 
 global___TimeSkippingStatePropagation = TimeSkippingStatePropagation
+
+class TimeSkippingInfo(google.protobuf.message.Message):
+    """Describes the current time-skipping state of a workflow execution."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CURRENT_TIME_FIELD_NUMBER: builtins.int
+    EFFECTIVE_CONFIG_FIELD_NUMBER: builtins.int
+    FAST_FORWARD_INFO_FIELD_NUMBER: builtins.int
+    CURRENT_SESSION_SKIP_COUNT_FIELD_NUMBER: builtins.int
+    @property
+    def current_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Current virtual time of the execution. If the execution hasn't skipped
+        any time yet, it will be the same as wall clock time.
+        """
+    @property
+    def effective_config(self) -> global___TimeSkippingConfig:
+        """The current effective time-skipping config, which can differ from the config the user last set:
+        internally-defaulted fields are populated, and `enabled` reflects whether the execution is still
+        skipping time — e.g. it is set to false once `max_session_skip_count` is reached, the fast-forward
+        completes, or a client call disables time skipping.
+        """
+    @property
+    def fast_forward_info(self) -> global___TimeSkippingFastForwardInfo:
+        """The execution's current fast-forward, if any. Unset if time skipping is enabled without a fast-forward."""
+    current_session_skip_count: builtins.int
+    """The number of skips accumulated in the current session, bounded by `max_session_skip_count`.
+    A new session begins — and this resets to 0 — each time `max_session_skip_count` is updated.
+    """
+    def __init__(
+        self,
+        *,
+        current_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        effective_config: global___TimeSkippingConfig | None = ...,
+        fast_forward_info: global___TimeSkippingFastForwardInfo | None = ...,
+        current_session_skip_count: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "current_time",
+            b"current_time",
+            "effective_config",
+            b"effective_config",
+            "fast_forward_info",
+            b"fast_forward_info",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "current_session_skip_count",
+            b"current_session_skip_count",
+            "current_time",
+            b"current_time",
+            "effective_config",
+            b"effective_config",
+            "fast_forward_info",
+            b"fast_forward_info",
+        ],
+    ) -> None: ...
+
+global___TimeSkippingInfo = TimeSkippingInfo
+
+class TimeSkippingFastForwardInfo(google.protobuf.message.Message):
+    """TimeSkippingFastForwardInfo describes the current time-skipping fast-forward on an execution."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FAST_FORWARD_DURATION_FIELD_NUMBER: builtins.int
+    FAST_FORWARD_ID_FIELD_NUMBER: builtins.int
+    TARGET_TIME_FIELD_NUMBER: builtins.int
+    HAS_COMPLETED_FIELD_NUMBER: builtins.int
+    @property
+    def fast_forward_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """The client-supplied `fast_forward` duration."""
+    fast_forward_id: builtins.str
+    """The client-supplied ID set alongside `fast_forward` duration."""
+    @property
+    def target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The target virtual time at which the fast-forward completes."""
+    has_completed: builtins.bool
+    """True once `target_time` has been reached."""
+    def __init__(
+        self,
+        *,
+        fast_forward_duration: google.protobuf.duration_pb2.Duration | None = ...,
+        fast_forward_id: builtins.str = ...,
+        target_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        has_completed: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "fast_forward_duration",
+            b"fast_forward_duration",
+            "target_time",
+            b"target_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "fast_forward_duration",
+            b"fast_forward_duration",
+            "fast_forward_id",
+            b"fast_forward_id",
+            "has_completed",
+            b"has_completed",
+            "target_time",
+            b"target_time",
+        ],
+    ) -> None: ...
+
+global___TimeSkippingFastForwardInfo = TimeSkippingFastForwardInfo

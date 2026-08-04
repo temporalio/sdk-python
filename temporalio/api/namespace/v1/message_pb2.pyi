@@ -170,6 +170,7 @@ class NamespaceInfo(google.protobuf.message.Message):
 
         BLOB_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
         MEMO_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
+        WORKFLOW_TASK_COMPLETION_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
         blob_size_limit_error: builtins.int
         """Maximum size in bytes for payload fields in workflow history events
         (e.g., workflow/activity inputs and results, failure details, signal payloads).
@@ -177,11 +178,17 @@ class NamespaceInfo(google.protobuf.message.Message):
         """
         memo_size_limit_error: builtins.int
         """Maximum total memo size in bytes per workflow execution."""
+        workflow_task_completion_size_limit_error: builtins.int
+        """Maximum total size in bytes of a single RespondWorkflowTaskCompleted request.
+        Requests exceeding this fail the workflow task with
+        WORKFLOW_TASK_FAILED_CAUSE_REQUEST_TOO_LARGE. 0 means no explicit limit.
+        """
         def __init__(
             self,
             *,
             blob_size_limit_error: builtins.int = ...,
             memo_size_limit_error: builtins.int = ...,
+            workflow_task_completion_size_limit_error: builtins.int = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -190,6 +197,8 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"blob_size_limit_error",
                 "memo_size_limit_error",
                 b"memo_size_limit_error",
+                "workflow_task_completion_size_limit_error",
+                b"workflow_task_completion_size_limit_error",
             ],
         ) -> None: ...
 

@@ -1179,6 +1179,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def poll_workflow_execution_time_skipping(
+        self,
+        req: temporalio.api.workflowservice.v1.PollWorkflowExecutionTimeSkippingRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.PollWorkflowExecutionTimeSkippingResponse:
+        """Invokes the WorkflowService.poll_workflow_execution_time_skipping rpc method."""
+        return await self._client._rpc_call(
+            rpc="poll_workflow_execution_time_skipping",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.PollWorkflowExecutionTimeSkippingResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def poll_workflow_execution_update(
         self,
         req: temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest,

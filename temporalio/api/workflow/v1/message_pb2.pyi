@@ -326,6 +326,7 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
     RESET_RUN_ID_FIELD_NUMBER: builtins.int
     REQUEST_ID_INFOS_FIELD_NUMBER: builtins.int
     PAUSE_INFO_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_INFO_FIELD_NUMBER: builtins.int
     @property
     def execution_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Workflow execution expiration time is defined as workflow start time plus expiration timeout.
@@ -358,6 +359,13 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
     @property
     def pause_info(self) -> global___WorkflowExecutionPauseInfo:
         """Information about the workflow execution pause operation."""
+    @property
+    def time_skipping_info(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingInfo:
+        """Information about time skipping of the workflow execution.
+        If the execution has never enabled time skipping, it will be nil.
+        """
     def __init__(
         self,
         *,
@@ -370,6 +378,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
         request_id_infos: collections.abc.Mapping[builtins.str, global___RequestIdInfo]
         | None = ...,
         pause_info: global___WorkflowExecutionPauseInfo | None = ...,
+        time_skipping_info: temporalio.api.common.v1.message_pb2.TimeSkippingInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -384,6 +394,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
             b"pause_info",
             "run_expiration_time",
             b"run_expiration_time",
+            "time_skipping_info",
+            b"time_skipping_info",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -405,6 +417,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
             b"reset_run_id",
             "run_expiration_time",
             b"run_expiration_time",
+            "time_skipping_info",
+            b"time_skipping_info",
         ],
     ) -> None: ...
 
