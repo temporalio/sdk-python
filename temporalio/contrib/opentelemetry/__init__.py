@@ -2,7 +2,8 @@
 
 This package provides OpenTelemetry tracing integration for Temporal workflows,
 activities, and other operations. It includes automatic span creation and
-propagation for distributed tracing.
+propagation for distributed tracing. It also provides replay-safe wrappers for
+the global OpenTelemetry tracer, meter, and logger providers.
 """
 
 from temporalio.contrib.opentelemetry._interceptor import (

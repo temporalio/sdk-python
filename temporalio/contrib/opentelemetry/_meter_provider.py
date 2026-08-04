@@ -112,7 +112,7 @@ class _ReplaySafeGauge(_Gauge):
 
 
 class _ReplaySafeMeter(Meter):
-    # Overrides every Meter method as of opentelemetry-api 1.42. OTel adds new
+    # Overrides every Meter method as of opentelemetry-api 1.44. OTel adds new
     # instrument kinds as non-abstract no-op defaults on the Meter ABC (e.g.
     # create_gauge in 1.23), which __getattr__ cannot intercept, so new Meter
     # methods must be audited and overridden here on opentelemetry upgrades.

@@ -135,6 +135,10 @@ class GoogleAdkPlugin(SimplePlugin):
     This plugin configures:
     - Pydantic Payload Converter (required for ADK objects).
     - Sandbox Passthrough for google.adk and google.genai modules.
+
+    At worker and replayer configuration time it also warns when the global
+    OpenTelemetry meter or tracer provider is not replay-safe, since ADK
+    telemetry recorded from workflow code would duplicate on replay.
     """
 
     def __init__(
