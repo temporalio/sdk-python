@@ -42,6 +42,7 @@ from opentelemetry.util.types import Attributes
 
 import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
+from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client, WorkflowHistory
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
 from temporalio.contrib.opentelemetry import (
@@ -232,6 +233,10 @@ async def _run_once_and_replay(
     """Run the agent workflow once for real, then replay it num_replays times.
 
     Returns the number of real activity executions observed for this run.
+    Skips the calling test if the live run's history shows a workflow task
+    retry: a retried task legitimately re-records live telemetry
+    (at-least-once semantics), which would break the exact-count assertions
+    the callers make.
     """
     LLMRegistry.register(ReplayMetricsModel)
 
@@ -259,6 +264,19 @@ async def _run_once_and_replay(
         result = await handle.result()
         assert result == "warm and sunny"
         history = await handle.fetch_history()
+
+    if any(
+        event.event_type
+        in (
+            EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED,
+            EventType.EVENT_TYPE_WORKFLOW_TASK_TIMED_OUT,
+        )
+        for event in history.events
+    ):
+        pytest.skip(
+            "Workflow task retried during the live run; exact telemetry "
+            "counts require a retry-free history"
+        )
 
     for _ in range(num_replays):
         await Replayer(
