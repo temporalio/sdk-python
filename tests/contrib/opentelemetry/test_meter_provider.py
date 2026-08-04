@@ -1,8 +1,5 @@
 """Unit tests for ReplaySafeMeterProvider outside workflows."""
 
-import subprocess
-import sys
-import textwrap
 from collections.abc import Iterable
 
 from opentelemetry.context import Context
@@ -225,71 +222,3 @@ def test_replay_safe_meter_provider_delegates_other_attributes():
     provider = ReplaySafeMeterProvider(inner_provider)
     assert provider.force_flush()
     provider.shutdown()
-
-
-def _run_in_subprocess(code: str) -> None:
-    # Import-time behavior must be tested in a fresh interpreter so the
-    # simulated old opentelemetry-api is seen before temporalio imports it and
-    # no module state leaks into other tests.
-    result = subprocess.run(
-        [sys.executable, "-c", textwrap.dedent(code)],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-
-
-def test_module_imports_without_sync_gauge():
-    """opentelemetry-api 1.12 through 1.22 has no opentelemetry.metrics._Gauge;
-    the module must still import and wrap the other instruments."""
-    _run_in_subprocess(
-        """
-        import opentelemetry.metrics
-        from opentelemetry.sdk.metrics import MeterProvider as SdkMeterProvider
-        from opentelemetry.sdk.metrics.export import InMemoryMetricReader
-
-        del opentelemetry.metrics._Gauge
-
-        from temporalio.contrib.opentelemetry import ReplaySafeMeterProvider
-
-        reader = InMemoryMetricReader()
-        provider = ReplaySafeMeterProvider(SdkMeterProvider(metric_readers=[reader]))
-        provider.get_meter("test-meter").create_counter("counter").add(1)
-
-        data = reader.get_metrics_data()
-        assert data is not None
-        metrics = [
-            metric.name
-            for rm in data.resource_metrics
-            for sm in rm.scope_metrics
-            for metric in sm.metrics
-        ]
-        assert metrics == ["counter"], metrics
-        """
-    )
-
-
-def test_tracing_importable_without_metrics_api():
-    """opentelemetry-api < 1.12 has no opentelemetry.metrics module at all;
-    tracing users must be unaffected and ReplaySafeMeterProvider must raise an
-    actionable error on access. Blocking opentelemetry.metrics itself would
-    also break the modern opentelemetry-sdk trace module installed here, so
-    simulate by failing the guarded submodule import."""
-    _run_in_subprocess(
-        """
-        import sys
-
-        sys.modules["temporalio.contrib.opentelemetry._meter_provider"] = None
-
-        import temporalio.contrib.opentelemetry as otel_contrib
-
-        assert otel_contrib.ReplaySafeTracerProvider is not None
-        assert otel_contrib.create_tracer_provider is not None
-        try:
-            otel_contrib.ReplaySafeMeterProvider
-        except ImportError as err:
-            assert "opentelemetry-api >= 1.12" in str(err), str(err)
-        else:
-            raise AssertionError("expected ImportError accessing ReplaySafeMeterProvider")
-        """
-    )

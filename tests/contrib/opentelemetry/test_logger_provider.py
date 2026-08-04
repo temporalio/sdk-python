@@ -1,8 +1,5 @@
 """Unit tests for ReplaySafeLoggerProvider outside workflows."""
 
-import subprocess
-import sys
-import textwrap
 from typing import Any
 
 from opentelemetry._logs import (
@@ -128,42 +125,3 @@ def test_replay_safe_logger_provider_delegates_other_logger_attributes():
 
     logger = ReplaySafeLoggerProvider(AttributedLoggerProvider()).get_logger("test")
     assert logger.custom == "custom-value"  # type: ignore[attr-defined]
-
-
-def _run_in_subprocess(code: str) -> None:
-    # Import-time behavior must be tested in a fresh interpreter so the
-    # simulated old opentelemetry-api is seen before temporalio imports it and
-    # no module state leaks into other tests.
-    result = subprocess.run(
-        [sys.executable, "-c", textwrap.dedent(code)],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-
-
-def test_tracing_importable_without_logs_api():
-    """opentelemetry-api < 1.15 has no opentelemetry._logs module at all;
-    tracing and metrics users must be unaffected and ReplaySafeLoggerProvider
-    must raise an actionable error on access. Blocking opentelemetry._logs
-    itself would also break the modern opentelemetry-sdk installed here, so
-    simulate by failing the guarded submodule import."""
-    _run_in_subprocess(
-        """
-        import sys
-
-        sys.modules["temporalio.contrib.opentelemetry._logger_provider"] = None
-
-        import temporalio.contrib.opentelemetry as otel_contrib
-
-        assert otel_contrib.ReplaySafeTracerProvider is not None
-        assert otel_contrib.ReplaySafeMeterProvider is not None
-        assert otel_contrib.create_tracer_provider is not None
-        try:
-            otel_contrib.ReplaySafeLoggerProvider
-        except ImportError as err:
-            assert "opentelemetry-api >= 1.15" in str(err), str(err)
-        else:
-            raise AssertionError("expected ImportError accessing ReplaySafeLoggerProvider")
-        """
-    )

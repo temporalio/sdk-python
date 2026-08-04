@@ -1,7 +1,10 @@
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from opentelemetry.context import Context
+
+# _Gauge is OpenTelemetry's canonical exported name for the spec-experimental
+# synchronous gauge, re-exported by opentelemetry.metrics since 1.23.
 from opentelemetry.metrics import (
     CallbackT,
     Counter,
@@ -12,6 +15,7 @@ from opentelemetry.metrics import (
     ObservableGauge,
     ObservableUpDownCounter,
     UpDownCounter,
+    _Gauge,
 )
 from opentelemetry.util.types import Attributes
 
@@ -23,19 +27,6 @@ def _forward_context_kwarg(context: Context | None) -> dict[str, Any]:
     # synchronous instrument methods in opentelemetry 1.28 and older
     # instruments raise TypeError when it is passed.
     return {} if context is None else {"context": context}
-
-
-if TYPE_CHECKING:
-    from opentelemetry.metrics import _Gauge
-else:
-    try:
-        from opentelemetry.metrics import _Gauge
-    except ImportError:
-        # Synchronous gauges (and Meter.create_gauge) were added in
-        # opentelemetry-api 1.23. Fall back to a plain base class so this
-        # module stays importable on older versions in the supported range;
-        # meters there have no create_gauge to wrap anyway.
-        _Gauge = object
 
 
 def _skip_recording() -> bool:
@@ -173,8 +164,6 @@ class _ReplaySafeMeter(Meter):
         unit: str = "",
         description: str = "",
     ) -> _Gauge:
-        # On opentelemetry-api < 1.23 the underlying meter has no create_gauge
-        # and this raises AttributeError, same as calling it on the raw meter.
         return _ReplaySafeGauge(self._meter.create_gauge(name, unit, description))
 
     # Observable instruments pass through unwrapped: their callbacks run on the
