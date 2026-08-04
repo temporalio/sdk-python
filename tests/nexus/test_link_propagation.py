@@ -1,9 +1,9 @@
 """Unit tests for Nexus link propagation.
 
-These exercise link propagation when a Nexus operation handler signals a workflow or
-starts a workflow, workflow update, or activity against a mocked workflow service.
-End-to-end signal backlinks require a server with EnableCHASMSignalBacklinks enabled
-and are not covered here.
+These exercise link propagation when a Nexus operation handler queries or signals a
+workflow, or starts a workflow, workflow update, or activity against a mocked workflow
+service. End-to-end signal backlinks require a server with
+EnableCHASMSignalBacklinks enabled and are not covered here.
 """
 
 from __future__ import annotations
@@ -38,6 +38,7 @@ import temporalio.nexus._operation_context
 import temporalio.nexus._token
 from temporalio.client._impl import _ClientImpl
 from temporalio.client._interceptor import (
+    QueryWorkflowInput,
     SignalWorkflowInput,
     StartActivityInput,
     StartWorkflowInput,
@@ -64,6 +65,19 @@ def _workflow_event_link(
             event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
                 event_type=event_type,
             ),
+        )
+    )
+
+
+def _workflow_link(
+    workflow_id: str, run_id: str, *, reason: str
+) -> temporalio.api.common.v1.Link:
+    return temporalio.api.common.v1.Link(
+        workflow=temporalio.api.common.v1.Link.Workflow(
+            namespace=NAMESPACE,
+            workflow_id=workflow_id,
+            run_id=run_id,
+            reason=reason,
         )
     )
 
@@ -132,6 +146,20 @@ def _signal_input() -> SignalWorkflowInput:
         signal="test-signal",
         args=[],
         headers={},
+        rpc_metadata={},
+        rpc_timeout=None,
+    )
+
+
+def _query_input() -> QueryWorkflowInput:
+    return QueryWorkflowInput(
+        id=WORKFLOW_ID,
+        run_id=None,
+        query="query-done",
+        args=[],
+        reject_condition=None,
+        headers={},
+        ret_type=bool,
         rpc_metadata={},
         rpc_timeout=None,
     )
@@ -222,9 +250,56 @@ def _outbound_link_urls(ctx: Any) -> list[str]:
     return [link.url for link in ctx.nexus_context.outbound_links]
 
 
+def test_response_link_captures_workflow_link(
+    nexus_ctx: _TemporalStartOperationContext,
+) -> None:
+    nexus_ctx._add_response_link(
+        _workflow_link(WORKFLOW_ID, "target-run", reason="Query processed")
+    )
+
+    assert nexus_ctx.nexus_context.outbound_links == [
+        nexusrpc.Link(
+            type=temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name,
+            url=(
+                "temporal:///namespaces/test-namespace/workflows/"
+                "wf-target/target-run?reason=Query+processed"
+            ),
+        )
+    ]
+
+
 # ── signal ────────────────────────────────────────────────────────────────────────────────
 
 
+# Query responses differ from Signal responses by linking to the Workflow rather than an event.
+async def test_query_captures_response_workflow_link(
+    nexus_ctx: _TemporalStartOperationContext,
+) -> None:
+    payloads = await temporalio.converter.DataConverter.default.encode([False])
+    workflow_service = mock.MagicMock()
+    workflow_service.query_workflow = mock.AsyncMock(
+        return_value=temporalio.api.workflowservice.v1.QueryWorkflowResponse(
+            query_result=temporalio.api.common.v1.Payloads(payloads=payloads),
+            link=_workflow_link(WORKFLOW_ID, "target-run", reason="Query processed"),
+        )
+    )
+    impl = _make_client_impl(workflow_service)
+
+    result = await impl.query_workflow(_query_input())
+
+    assert result is False
+    assert nexus_ctx.nexus_context.outbound_links == [
+        nexusrpc.Link(
+            type=temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name,
+            url=(
+                "temporal:///namespaces/test-namespace/workflows/"
+                "wf-target/target-run?reason=Query+processed"
+            ),
+        )
+    ]
+
+
+# Signal responses link to the event that accepted the Signal.
 async def test_signal_forwards_inbound_links_and_captures_response_backlink(
     nexus_ctx: _TemporalStartOperationContext,
 ) -> None:
@@ -519,6 +594,8 @@ async def test_start_outside_nexus_context_leaves_on_conflict_options_unset() ->
 
 
 # ── workflow update ──────────────────────────────────────────────────────────────
+
+
 
 
 def _workflow_update_response(
