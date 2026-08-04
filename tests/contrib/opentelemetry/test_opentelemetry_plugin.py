@@ -15,12 +15,20 @@ from opentelemetry.trace import (
 )
 
 import temporalio.contrib.opentelemetry.workflow
+import temporalio.worker._workflow
 from temporalio import activity, nexus, workflow
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.contrib.opentelemetry._tracer_provider import _ReplaySafeSpan
 from temporalio.exceptions import ApplicationError
+from temporalio.runtime import (
+    LogForwardingConfig,
+    LoggingConfig,
+    Runtime,
+    TelemetryConfig,
+    TelemetryFilter,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker._workflow_instance import _WorkflowInstanceImpl
 from tests.contrib.opentelemetry.test_opentelemetry import assert_span_hierarchy
@@ -232,7 +240,6 @@ class ComprehensiveWorkflow:
 
 @pytest.mark.requires_local_server
 async def test_opentelemetry_comprehensive_tracing(
-    client: Client,
     env: WorkflowEnvironment,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
     monkeypatch: pytest.MonkeyPatch,
@@ -260,6 +267,7 @@ async def test_opentelemetry_comprehensive_tracing(
         original_end(self, end_time)
 
     monkeypatch.setattr(_ReplaySafeSpan, "end", end_with_replay_state)
+    monkeypatch.setattr(temporalio.worker._workflow, "LOG_PROTOS", True)
 
     activations: list[str] = []
     original_activate = _WorkflowInstanceImpl.activate
@@ -274,9 +282,19 @@ async def test_opentelemetry_comprehensive_tracing(
 
     monkeypatch.setattr(_WorkflowInstanceImpl, "activate", record_activation)
 
-    new_config = client.config()
-    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
-    new_client = Client(**new_config)
+    core_logger = logging.getLogger(f"{__name__}.core")
+    core_logger.setLevel(logging.DEBUG)
+    new_client = await env.connect_client(
+        plugins=[OpenTelemetryPlugin(add_temporal_spans=True)],
+        runtime=Runtime(
+            telemetry=TelemetryConfig(
+                logging=LoggingConfig(
+                    filter=TelemetryFilter(core_level="DEBUG", other_level="ERROR"),
+                    forwarding=LogForwardingConfig(logger=core_logger),
+                )
+            )
+        ),
+    )
 
     async with new_worker(
         new_client,
