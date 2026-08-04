@@ -11,7 +11,6 @@ recordings while leaving first-execution recordings intact.
 """
 
 import inspect
-import sys
 import uuid
 import warnings
 from collections.abc import AsyncGenerator
@@ -28,11 +27,8 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import InMemoryRunner
 from google.adk.utils.context_utils import Aclosing
 from google.genai import types
-from opentelemetry._logs import NoOpLoggerProvider
-from opentelemetry._logs._internal import ProxyLoggerProvider
-from opentelemetry.metrics import Meter, NoOpMeterProvider
+from opentelemetry.metrics import Meter
 from opentelemetry.metrics import MeterProvider as ApiMeterProvider
-from opentelemetry.metrics._internal import _ProxyMeterProvider
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import (
     InMemoryLogRecordExporter,
@@ -41,7 +37,6 @@ from opentelemetry.sdk._logs.export import (
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.trace import TracerProvider as ApiTracerProvider
 from opentelemetry.trace import set_tracer_provider
 from opentelemetry.util.types import Attributes
 
@@ -369,14 +364,6 @@ def test_plugin_warns_on_non_replay_safe_tracer_provider(
         GoogleAdkPlugin().configure_worker(_worker_config())
 
 
-def test_plugin_warns_on_non_replay_safe_logger_provider(
-    reset_otel_logger_provider,  # type: ignore[reportUnusedParameter]
-):
-    opentelemetry._logs.set_logger_provider(LoggerProvider())
-    with pytest.warns(UserWarning, match="LoggerProvider is not replay-safe"):
-        GoogleAdkPlugin().configure_worker(_worker_config())
-
-
 def test_plugin_warns_on_replayer_construction(
     reset_otel_meter_provider,  # type: ignore[reportUnusedParameter]
 ):
@@ -426,65 +413,6 @@ class _DelegatingMeterProvider(ApiMeterProvider):
         attributes: Attributes | None = None,
     ) -> Meter:
         return self._inner.get_meter(name, version, schema_url)
-
-
-def test_meter_provider_replay_safety_classification(monkeypatch: pytest.MonkeyPatch):
-    from temporalio.contrib.google_adk_agents._plugin import (
-        _meter_provider_replay_safe,
-    )
-
-    assert _meter_provider_replay_safe(ReplaySafeMeterProvider(MeterProvider())) is True
-    assert _meter_provider_replay_safe(NoOpMeterProvider()) is True
-    assert _meter_provider_replay_safe(_ProxyMeterProvider()) is True
-    assert _meter_provider_replay_safe(MeterProvider()) is False
-    # Unknown provider types (e.g. a custom provider delegating to a
-    # replay-safe one) are unclassifiable and must not warn.
-    assert _meter_provider_replay_safe(_DelegatingMeterProvider()) is None
-
-    # SDK providers stay positively identified even when the private proxy
-    # class cannot be imported; the proxy instance becomes unclassifiable.
-    monkeypatch.setitem(sys.modules, "opentelemetry.metrics._internal", None)
-    assert _meter_provider_replay_safe(MeterProvider()) is False
-    assert _meter_provider_replay_safe(_ProxyMeterProvider()) is None
-    assert _meter_provider_replay_safe(NoOpMeterProvider()) is True
-
-
-def test_tracer_provider_replay_safety_classification():
-    from temporalio.contrib.google_adk_agents._plugin import (
-        _tracer_provider_replay_safe,
-    )
-
-    class DelegatingTracerProvider(ApiTracerProvider):
-        def __init__(self) -> None:
-            self._inner = create_tracer_provider()
-
-        def get_tracer(self, *args, **kwargs):
-            return self._inner.get_tracer(*args, **kwargs)
-
-    assert _tracer_provider_replay_safe(create_tracer_provider()) is True
-    assert _tracer_provider_replay_safe(TracerProvider()) is False
-    assert _tracer_provider_replay_safe(DelegatingTracerProvider()) is None
-
-
-def test_logger_provider_replay_safety_classification():
-    from temporalio.contrib.google_adk_agents._plugin import (
-        _logger_provider_replay_safe,
-    )
-
-    class DelegatingLoggerProvider(opentelemetry._logs.LoggerProvider):
-        def __init__(self) -> None:
-            self._inner = ReplaySafeLoggerProvider(LoggerProvider())
-
-        def get_logger(self, *args, **kwargs):
-            return self._inner.get_logger(*args, **kwargs)
-
-    assert _logger_provider_replay_safe(ReplaySafeLoggerProvider(LoggerProvider())) is (
-        True
-    )
-    assert _logger_provider_replay_safe(NoOpLoggerProvider()) is True
-    assert _logger_provider_replay_safe(ProxyLoggerProvider()) is True
-    assert _logger_provider_replay_safe(LoggerProvider()) is False
-    assert _logger_provider_replay_safe(DelegatingLoggerProvider()) is None
 
 
 def test_plugin_does_not_warn_on_unknown_custom_provider(

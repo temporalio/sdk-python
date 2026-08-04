@@ -247,9 +247,11 @@ logger_provider.add_log_record_processor(BatchLogRecordProcessor(my_log_exporter
 opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(logger_provider))
 ```
 
-`GoogleAdkPlugin` warns at worker and replayer configuration time when a
-global provider is installed that it can positively identify as not
-replay-safe (an OpenTelemetry SDK provider used directly).
+`GoogleAdkPlugin` warns at worker and replayer configuration time when the
+global meter or tracer provider is positively identified as not replay-safe
+(an OpenTelemetry SDK provider used directly). The global logger provider is
+not checked because the OpenTelemetry logs SDK has no public import path yet,
+but the same replay duplication applies to it.
 
 Recordings are first-execution-only, matching
 `temporalio.workflow.metric_meter()`: a retried workflow task re-executes

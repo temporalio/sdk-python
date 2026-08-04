@@ -29,7 +29,7 @@ to include examples, links to docs, or any other relevant information.
   `temporalio.workflow.metric_meter()`.
   `temporalio.contrib.opentelemetry.ReplaySafeTracerProvider` is now also exported.
   `GoogleAdkPlugin` now warns at worker and replayer configuration time when the global
-  OpenTelemetry meter, tracer, or logger provider is positively identified as not replay-safe
+  OpenTelemetry meter or tracer provider is positively identified as not replay-safe
   (an OpenTelemetry SDK provider used directly).
 
 ### Changed

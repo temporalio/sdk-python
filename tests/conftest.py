@@ -262,9 +262,15 @@ def continue_as_new_suggest_history_count() -> int:
     return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT
 
 
+# OpenTelemetry's global providers are set-once per process with no public
+# way to unset them, so tests needing their own provider must reset the
+# globals directly -- the same isolation pattern OpenTelemetry's own test
+# suite uses (opentelemetry.test.globals_test).
+
+
 @pytest.fixture
 def reset_otel_tracer_provider():
-    """Reset global OpenTelemetry tracer provider state around tests."""
+    """Isolate global OpenTelemetry tracer provider state around a test."""
     opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
     opentelemetry.trace._TRACER_PROVIDER = None
     yield
@@ -274,7 +280,7 @@ def reset_otel_tracer_provider():
 
 @pytest.fixture
 def reset_otel_meter_provider():
-    """Reset global OpenTelemetry meter provider state around tests.
+    """Isolate global OpenTelemetry meter provider state around a test.
 
     Proxy meters/instruments already bound to a real provider stay bound after
     this reset; only the next set_meter_provider call rebinds them. Tests must
@@ -290,7 +296,7 @@ def reset_otel_meter_provider():
 
 @pytest.fixture
 def reset_otel_logger_provider():
-    """Reset global OpenTelemetry logger provider state around tests.
+    """Isolate global OpenTelemetry logger provider state around a test.
 
     Unlike proxy meters, proxy loggers cache their real logger on first use
     and never rebind, even across a later set_logger_provider call. Tests
