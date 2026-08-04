@@ -300,9 +300,9 @@ class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext
     def _add_response_link(self, link: temporalio.api.common.v1.Link | None) -> None:
         """Append a response link returned by an RPC the operation handler issued.
 
-        ``link`` is the ``common.v1.Link`` returned on a signal, signal-with-start, or start
-        response (or ``None`` against a server that did not return one). When present, it is
-        converted to a Nexus link and added to the operation's outbound links.
+        ``link`` is the ``common.v1.Link`` returned by a Temporal RPC (or ``None`` against a
+        server that did not return one). When present, it is converted to a Nexus link and added
+        to the operation's outbound links.
 
         This is only safe to call from the single thread/task that runs the operation handler.
         """

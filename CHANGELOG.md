@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added Nexus operation link propagation for Workflow Queries issued from operation handlers. The
+  queried Workflow link returned by the server is attached to the caller's Nexus operation event.
+
 ### Changed
 
 ### Deprecated
