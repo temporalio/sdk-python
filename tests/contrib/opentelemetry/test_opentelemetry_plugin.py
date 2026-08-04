@@ -18,6 +18,7 @@ import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
+from temporalio.contrib.opentelemetry._tracer_provider import _ReplaySafeSpan
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.opentelemetry.test_opentelemetry import assert_span_hierarchy
@@ -232,6 +233,7 @@ async def test_opentelemetry_comprehensive_tracing(
     client: Client,
     env: WorkflowEnvironment,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """Test OpenTelemetry v2 integration across all workflow operations."""
     if env.supports_time_skipping:
@@ -241,6 +243,21 @@ async def test_opentelemetry_comprehensive_tracing(
     provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
+
+    original_end = _ReplaySafeSpan.end
+
+    def end_with_replay_state(self: Any, end_time: int | None = None) -> None:
+        if workflow.in_workflow():
+            self.set_attribute(
+                "test.replaying_at_span_end", workflow.unsafe.is_replaying()
+            )
+            self.set_attribute(
+                "test.replaying_history_events_at_span_end",
+                workflow.unsafe.is_replaying_history_events(),
+            )
+        original_end(self, end_time)
+
+    monkeypatch.setattr(_ReplaySafeSpan, "end", end_with_replay_state)
 
     new_config = client.config()
     new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
