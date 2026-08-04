@@ -278,14 +278,15 @@ during replay:
 ```python
 import opentelemetry._logs
 from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from temporalio.contrib.opentelemetry import ReplaySafeLoggerProvider
 
 # set_logger_provider only takes effect once per process, so this wrapper
 # must be the first and only global logger provider set, installed before
 # any library emits log records.
-opentelemetry._logs.set_logger_provider(
-    ReplaySafeLoggerProvider(my_logger_provider)
-)
+logger_provider = LoggerProvider()
+logger_provider.add_log_record_processor(BatchLogRecordProcessor(my_log_exporter))
+opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(logger_provider))
 ```
 
 Emissions are first-execution-only: a retried workflow task re-executes live
