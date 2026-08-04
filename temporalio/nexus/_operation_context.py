@@ -814,10 +814,10 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
         req.on_conflict_options.attach_completion_callbacks = True
         req.on_conflict_options.attach_links = True
 
-        req.request_id = nexus_ctx.nexus_context.request_id
         request_links = nexus_ctx._get_request_links()
 
         if _in_nexus_backing_start_context():
+            req.request_id = nexus_ctx.nexus_context.request_id
             callbacks = nexus_ctx._get_callbacks(
                 OperationToken(
                     type=OperationTokenType.ACTIVITY,
