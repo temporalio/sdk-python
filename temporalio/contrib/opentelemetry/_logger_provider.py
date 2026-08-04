@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+# opentelemetry._logs is the import path OpenTelemetry itself documents for
+# the logs bridge API while it is pre-GA (there is no non-underscore
+# counterpart); the only alternative would be not gating ADK-style log
+# emission at all.
 from opentelemetry._logs import Logger, LoggerProvider
 
 from temporalio import workflow
 
 if TYPE_CHECKING:
+    # _ExtendedAttributes is the annotation OpenTelemetry's own public
+    # get_logger signature uses; there is no public alias.
     from opentelemetry.util.types import _ExtendedAttributes
 
 
@@ -17,7 +23,14 @@ def _skip_emitting() -> bool:
 
 
 class _ReplaySafeLogger(Logger):
-    def __init__(self, logger: Logger) -> None:
+    def __init__(
+        self,
+        logger: Logger,
+        name: str,
+        version: str | None = None,
+        schema_url: str | None = None,
+    ) -> None:
+        super().__init__(name, version=version, schema_url=schema_url)
         self._logger = logger
 
     def __getattr__(self, name: str) -> object:
@@ -58,12 +71,11 @@ class ReplaySafeLoggerProvider(LoggerProvider):
             ReplaySafeLoggerProvider(my_logger_provider)
         )
 
-    On opentelemetry-api 1.23+ proxy loggers late-bind, so calling
-    ``set_logger_provider`` after such libraries are imported still routes
-    their loggers through this wrapper; on 1.15 through 1.22 loggers obtained
-    before ``set_logger_provider`` stay no-op, so install this provider first.
-    ``set_logger_provider`` only takes effect once per process, so this
-    wrapper must be the one and only global logger provider ever set.
+    OpenTelemetry proxy loggers late-bind, so calling ``set_logger_provider``
+    after such libraries are imported still routes their loggers through this
+    wrapper. However, ``set_logger_provider`` only takes effect once per
+    process, so this wrapper must be the one and only global logger provider
+    ever set.
     """
 
     def __init__(self, logger_provider: LoggerProvider) -> None:
@@ -107,4 +119,4 @@ class ReplaySafeLoggerProvider(LoggerProvider):
             inner = self._logger_provider.get_logger(
                 name, version, schema_url, attributes
             )
-        return _ReplaySafeLogger(inner)
+        return _ReplaySafeLogger(inner, name, version=version, schema_url=schema_url)
