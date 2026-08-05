@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import threading
 import typing
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
@@ -52,6 +53,55 @@ if typing.TYPE_CHECKING:
         StatefulMCPServerProvider,
         StatelessMCPServerProvider,
     )
+
+
+_otel_trace_start_patch_lock = threading.RLock()
+_otel_trace_start_patch_ref_count = 0
+_otel_trace_start_original: Callable[..., typing.Any] | None = None
+
+
+def _install_otel_trace_start_patch() -> None:
+    """Make an OpenInference root span current while tracing is configured."""
+    global _otel_trace_start_original
+    global _otel_trace_start_patch_ref_count
+
+    from openinference.instrumentation.openai_agents._processor import (
+        OpenInferenceTracingProcessor,
+    )
+    from opentelemetry.context import attach
+    from opentelemetry.trace import set_span_in_context
+
+    with _otel_trace_start_patch_lock:
+        if _otel_trace_start_patch_ref_count == 0:
+            _otel_trace_start_original = OpenInferenceTracingProcessor.on_trace_start
+
+            def on_trace_start(self: typing.Any, trace: Trace) -> None:  # type: ignore[reportUnusedFunction]
+                _otel_trace_start_original(self, trace)  # type: ignore[operator]
+                attach(set_span_in_context(self._root_spans[trace.trace_id]))
+
+            setattr(OpenInferenceTracingProcessor, "on_trace_start", on_trace_start)
+        _otel_trace_start_patch_ref_count += 1
+
+
+def _uninstall_otel_trace_start_patch() -> None:
+    """Restore OpenInference after the final tracing context exits."""
+    global _otel_trace_start_original
+    global _otel_trace_start_patch_ref_count
+
+    from openinference.instrumentation.openai_agents._processor import (
+        OpenInferenceTracingProcessor,
+    )
+
+    with _otel_trace_start_patch_lock:
+        _otel_trace_start_patch_ref_count -= 1
+        if _otel_trace_start_patch_ref_count == 0:
+            if _otel_trace_start_original is not None:
+                setattr(
+                    OpenInferenceTracingProcessor,
+                    "on_trace_start",
+                    _otel_trace_start_original,
+                )
+            _otel_trace_start_original = None
 
 
 @contextmanager
@@ -377,28 +427,15 @@ class OpenAIAgentsPlugin(SimplePlugin):
         """
         # Set up OTEL instrumentation if exporters are provided
         otel_instrumentor = None
+        otel_trace_start_patch_installed = False
         if self._use_otel_instrumentation and not self._instrumented:
             from openinference.instrumentation.openai_agents import (
                 OpenAIAgentsInstrumentor,
             )
-            from openinference.instrumentation.openai_agents._processor import (
-                OpenInferenceTracingProcessor,
-            )
             from opentelemetry import trace
-            from opentelemetry.context import attach
-            from opentelemetry.trace import set_span_in_context
 
-            # Unfortunate monkey patching is needed to ensure the trace is set in context so we can propagate it.
-            original_on_trace_start = OpenInferenceTracingProcessor.on_trace_start
-
-            def on_trace_start(self, trace: Trace) -> None:  # type: ignore[reportMissingParameterType]
-                original_on_trace_start(self, trace)
-                otel_span = self._root_spans[trace.trace_id]
-                attach(set_span_in_context(otel_span))
-
-            OpenInferenceTracingProcessor.on_trace_start = on_trace_start  # type:ignore[method-assign]
-
-            # Set up instrumentor
+            _install_otel_trace_start_patch()
+            otel_trace_start_patch_installed = True
             otel_instrumentor = OpenAIAgentsInstrumentor()
             otel_instrumentor.instrument(tracer_provider=trace.get_tracer_provider())
             self._instrumented = True
@@ -408,3 +445,5 @@ class OpenAIAgentsPlugin(SimplePlugin):
             # Clean up OTEL instrumentation
             if otel_instrumentor is not None:
                 otel_instrumentor.uninstrument()
+            if otel_trace_start_patch_installed:
+                _uninstall_otel_trace_start_patch()
