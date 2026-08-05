@@ -119,11 +119,16 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         _type_hint = type_hint if type_hint is not None else Any
         type_adapter: TypeAdapter[Any]
         try:
-            hash(_type_hint)
-        except TypeError:
-            type_adapter = TypeAdapter(_type_hint)
-        else:
             type_adapter = self._type_adapter(_type_hint)
+        except TypeError:
+            # Distinguish an unhashable hint (bypass the cache) from a
+            # TypeError raised while constructing the adapter (re-raise).
+            try:
+                hash(_type_hint)
+            except TypeError:
+                type_adapter = TypeAdapter(_type_hint)
+            else:
+                raise
         return type_adapter.validate_json(payload.data)
 
 
