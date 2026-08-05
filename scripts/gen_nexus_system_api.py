@@ -11,7 +11,7 @@ import gen_protos
 
 base_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(base_dir))
-wit_input_dir = (
+sdk_core_wit_input_dir = (
     base_dir
     / "temporalio"
     / "bridge"
@@ -22,8 +22,9 @@ wit_input_dir = (
     / "api_upstream"
     / "nexus"
 )
-wit_path = wit_input_dir / "workflow-service.wit"
-wit_deps_dir = wit_input_dir / "deps"
+# Temporary checked-in WIT used until sdk-core updates its API snapshot.
+wit_path = base_dir / "scripts" / "nexus_system_workflow_service.wit"
+wit_deps_dir = sdk_core_wit_input_dir / "deps"
 python_support_path = base_dir / "scripts" / "nex_gen_support.py"
 output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
@@ -35,15 +36,28 @@ workflowservice_request_response_proto = (
     / "v1"
     / "request_response.proto"
 )
+NEX_GEN_VERSION = "0.2.1"
 
 
 def nex_gen_command() -> list[str]:
     if bin_path := os.environ.get("NEX_GEN_BIN"):
         return [bin_path]
 
-    if shutil.which("nex-gen") is None:
-        subprocess.check_call(["cargo", "install", "--locked", "nex-gen", "--force"])
-    return ["nex-gen"]
+    if shutil.which("nexgen") is None:
+        subprocess.check_call(
+            [
+                "cargo",
+                "install",
+                "--locked",
+                "nex-gen",
+                "--version",
+                NEX_GEN_VERSION,
+                "--features",
+                "advanced",
+                "--force",
+            ]
+        )
+    return ["nexgen"]
 
 
 def build_descriptor_set(descriptor_path: Path) -> None:
@@ -114,13 +128,10 @@ def generate_nexus_system_api() -> None:
         subprocess.check_call(
             [
                 *command,
-                "generate",
-                "--lang",
                 "python",
-                "--input",
                 str(wit_path),
-                "--input",
                 str(wit_deps_dir),
+                "--native-api",
                 "--support-file",
                 str(python_support_path),
                 "--descriptors",
