@@ -776,15 +776,15 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
         req.on_conflict_options.attach_completion_callbacks = True
         req.on_conflict_options.attach_links = True
 
-        # Add request_id and all Nexus links if we're in a Nexus context, backing or otherwise
-        req.request_id = nexus_ctx.nexus_context.request_id
+        # Add all Nexus links if we're in a Nexus context, backing or otherwise
         request_links = nexus_ctx._get_request_links()
 
         # Links are duplicated on request for compatibility with older server versions.
         req.links.extend(request_links)
 
         if _in_nexus_backing_start_context():
-            # Add callbacks only if we're in a backing Nexus context
+            # Add request_id and callbacks only if we're in a backing Nexus context
+            req.request_id = nexus_ctx.nexus_context.request_id
             callbacks = nexus_ctx._get_callbacks(
                 OperationToken(
                     type=OperationTokenType.ACTIVITY,

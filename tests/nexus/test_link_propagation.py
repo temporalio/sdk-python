@@ -496,7 +496,7 @@ async def test_activity_start_forwards_inbound_links() -> None:
 
     assert len(req.links) == 1
     assert req.links[0] == _inbound_nexus_link()
-    assert req.request_id == "req-id"
+    assert not req.request_id
     assert len(req.completion_callbacks) == 0
 
 
