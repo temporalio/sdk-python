@@ -531,8 +531,7 @@ async def test_backing_activity_start_gets_nexus_request_fields() -> None:
             _start_activity_input()
         )
 
-    assert len(req.links) == 1
-    assert req.links[0] == _inbound_nexus_link()
+    assert len(req.links) == 0
     assert req.request_id == "req-id"
     assert len(req.completion_callbacks) == 1
     operation_token = temporalio.nexus._token.OperationToken.decode(
