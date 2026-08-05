@@ -13,6 +13,7 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 Pydantic v1 is not supported.
 """
 
+import functools
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,6 +39,31 @@ class ToJsonOptions:
     """Options for converting to JSON with pydantic."""
 
     exclude_unset: bool = False
+
+
+# `TypeAdapter.__init__` builds a core schema. Pydantic caches that on the class
+# for `BaseModel` subclasses, but not for non-class hints such as `Annotated`
+# discriminated unions, `list[Union[...]]` or generics, so constructing one per
+# payload rebuilds the schema every time and construction dominates validation.
+# The cache is bounded because hints are held strongly; a worker sees a small,
+# fixed set of activity and workflow signatures, so a modest ceiling covers them
+# while keeping a pathological caller from retaining unbounded types.
+_TYPE_ADAPTER_CACHE_SIZE = 256
+
+
+@functools.lru_cache(maxsize=_TYPE_ADAPTER_CACHE_SIZE)
+def _cached_type_adapter(type_hint: Any) -> TypeAdapter[Any]:
+    return TypeAdapter(type_hint)
+
+
+def _type_adapter_for(type_hint: Any) -> TypeAdapter[Any]:
+    """Return a ``TypeAdapter`` for ``type_hint``, reusing one where possible."""
+    try:
+        return _cached_type_adapter(type_hint)
+    except TypeError:
+        # Unhashable hints (or hints holding unhashable metadata) cannot be cache
+        # keys. Fall back to constructing per call rather than failing conversion.
+        return TypeAdapter(type_hint)
 
 
 class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
@@ -96,7 +122,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         https://docs.pydantic.dev/latest/api/type_adapter/#pydantic.type_adapter.TypeAdapter.validate_json.
         """
         _type_hint = type_hint if type_hint is not None else Any
-        return TypeAdapter(_type_hint).validate_json(payload.data)
+        return _type_adapter_for(_type_hint).validate_json(payload.data)
 
 
 class PydanticPayloadConverter(CompositePayloadConverter):

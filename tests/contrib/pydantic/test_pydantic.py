@@ -2,14 +2,20 @@ import dataclasses
 import datetime
 import os
 import pathlib
+import typing
 import uuid
 
 import pydantic
 import pytest
 from pydantic import BaseModel
 
+import temporalio.api.common.v1
 from temporalio.client import Client
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.pydantic import (
+    PydanticJSONPlainPayloadConverter,
+    _cached_type_adapter,
+    pydantic_data_converter,
+)
 from temporalio.worker import Worker
 from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictionContext,
@@ -380,3 +386,133 @@ def test_model_instantiation_from_restricted_proxy_values():
     assert p.path_field == restricted_path
     assert p.uuid_field == restricted_uuid
     assert p.datetime_field == restricted_datetime
+
+
+# ----------------------------------------------------------------------
+# TypeAdapter reuse
+# ----------------------------------------------------------------------
+
+
+class _CachePart(BaseModel):
+    kind: typing.Literal["cache_part"] = "cache_part"
+    text: str
+
+
+class _OtherCachePart(BaseModel):
+    kind: typing.Literal["other_cache_part"] = "other_cache_part"
+    count: int
+
+
+_CacheUnion = typing.Annotated[
+    typing.Union[_CachePart, _OtherCachePart], pydantic.Field(discriminator="kind")
+]
+
+
+def _json_payload(data: bytes) -> temporalio.api.common.v1.Payload:
+    return temporalio.api.common.v1.Payload(
+        metadata={"encoding": b"json/plain"}, data=data
+    )
+
+
+def test_type_adapter_is_reused_across_payloads():
+    """Repeated conversions of one hint must not rebuild its core schema.
+
+    Pydantic caches the core schema on the class for ``BaseModel`` subclasses, but
+    not for non-class hints such as an ``Annotated`` discriminated union, so a
+    ``TypeAdapter`` built per payload rebuilt the schema every time.
+    """
+    _cached_type_adapter.cache_clear()
+    converter = PydanticJSONPlainPayloadConverter()
+    payload = _json_payload(b'[{"kind":"cache_part","text":"a"}]')
+    hint = list[_CacheUnion]
+
+    for _ in range(5):
+        result = converter.from_payload(payload, hint)
+        assert [type(part).__name__ for part in result] == ["_CachePart"]
+
+    info = _cached_type_adapter.cache_info()
+    assert info.misses == 1
+    assert info.hits == 4
+
+
+def test_distinct_hints_do_not_share_a_type_adapter():
+    _cached_type_adapter.cache_clear()
+    converter = PydanticJSONPlainPayloadConverter()
+
+    single = converter.from_payload(
+        _json_payload(b'{"kind":"cache_part","text":"a"}'), _CachePart
+    )
+    other = converter.from_payload(
+        _json_payload(b'{"kind":"other_cache_part","count":2}'), _OtherCachePart
+    )
+
+    assert isinstance(single, _CachePart)
+    assert isinstance(other, _OtherCachePart)
+    assert _cached_type_adapter.cache_info().misses == 2
+
+
+def test_unhashable_type_hint_still_converts():
+    """An unhashable hint cannot be a cache key, so it must fall back cleanly."""
+
+    class _UnhashableMetadata:
+        __hash__ = None  # type: ignore[assignment]
+
+    _cached_type_adapter.cache_clear()
+    converter = PydanticJSONPlainPayloadConverter()
+    hint = typing.Annotated[list[_CachePart], _UnhashableMetadata()]
+
+    result = converter.from_payload(
+        _json_payload(b'[{"kind":"cache_part","text":"a"}]'), hint
+    )
+
+    assert [type(part).__name__ for part in result] == ["_CachePart"]
+    assert _cached_type_adapter.cache_info().misses == 0
+
+
+def test_untyped_payload_still_converts():
+    """The ``type_hint is None`` path resolves to ``Any`` and stays cacheable."""
+    _cached_type_adapter.cache_clear()
+    converter = PydanticJSONPlainPayloadConverter()
+
+    assert converter.from_payload(_json_payload(b'{"a":1}')) == {"a": 1}
+    assert converter.from_payload(_json_payload(b'{"a":2}')) == {"a": 2}
+    assert _cached_type_adapter.cache_info().hits == 1
+
+
+def test_repeated_conversion_builds_one_type_adapter(monkeypatch):
+    """Behavioral form of the above, with no dependency on cache internals.
+
+    Counts ``TypeAdapter`` constructions across two conversions of the same hint.
+    Uses a hint defined inside the test so the key is cold regardless of test
+    order. Fails on the unfixed converter, which builds one adapter per payload.
+    """
+
+    class _LocalPart(BaseModel):
+        kind: typing.Literal["local_part"] = "local_part"
+        text: str
+
+    hint = typing.Annotated[
+        typing.Union[_LocalPart, _OtherCachePart], pydantic.Field(discriminator="kind")
+    ]
+
+    import temporalio.contrib.pydantic as pydantic_contrib
+
+    constructed = 0
+    real_type_adapter = pydantic_contrib.TypeAdapter
+
+    def counting_type_adapter(*args, **kwargs):
+        nonlocal constructed
+        constructed += 1
+        return real_type_adapter(*args, **kwargs)
+
+    monkeypatch.setattr(pydantic_contrib, "TypeAdapter", counting_type_adapter)
+
+    converter = PydanticJSONPlainPayloadConverter()
+    payload = _json_payload(b'{"kind":"local_part","text":"a"}')
+
+    first = converter.from_payload(payload, hint)
+    second = converter.from_payload(payload, hint)
+
+    assert isinstance(first, _LocalPart)
+    assert isinstance(second, _LocalPart)
+    assert constructed == 1, f"built {constructed} TypeAdapters for one hint"
