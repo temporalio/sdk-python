@@ -387,7 +387,7 @@ class TemporalStatefulMcpToolSetProvider:
     activity on a task queue scoped to that specific run
     (``name@run_id``); that activity builds the toolset once via
     ``toolset_factory(factory_argument)``, holds it open, and runs a nested
-    :class:`~temporalio.worker.Worker` serving the ``-list-tools``/``-call-tool``
+    :py:class:`temporalio.worker.Worker` serving the ``-list-tools``/``-call-tool``
     activities off the same run-scoped queue. The toolset is closed when the
     workflow cancels the session activity on cleanup.
 
