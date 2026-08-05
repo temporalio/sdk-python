@@ -655,6 +655,7 @@ class TemporalStatefulMcpToolSet(BaseToolset):
         await self.cleanup()
 
     async def __aenter__(self) -> "TemporalStatefulMcpToolSet":
+        """Connects the toolset and returns it for use as a context manager."""
         await self.connect()
         return self
 
@@ -664,6 +665,7 @@ class TemporalStatefulMcpToolSet(BaseToolset):
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """Cleans up the toolset when exiting the context manager."""
         await self.cleanup()
 
     @_handle_worker_failure
