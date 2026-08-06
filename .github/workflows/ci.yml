@@ -230,19 +230,46 @@ jobs:
       - run: uv tool install poethepoet
       - run: uv sync --all-extras
       - run: poe build-develop
+      - name: Generate Cloud test certificates
+        run: |
+          cert_dir="$RUNNER_TEMP/cloud-test-certs"
+          mkdir "$cert_dir"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout "$cert_dir/ca.key" -out "$cert_dir/ca.pem" \
+            -subj '/CN=Temporal Python SDK Cloud CI CA'
+          openssl req -newkey rsa:2048 -nodes \
+            -keyout "$cert_dir/client.key" -out "$cert_dir/client.csr" \
+            -subj '/CN=Temporal Python SDK Cloud CI'
+          openssl x509 -req -days 1 -in "$cert_dir/client.csr" \
+            -CA "$cert_dir/ca.pem" -CAkey "$cert_dir/ca.key" -CAcreateserial \
+            -out "$cert_dir/client.pem" -extfile <(printf 'extendedKeyUsage=clientAuth')
+          {
+            echo "TEMPORAL_CLOUD_CLIENT_CA_PATH=$cert_dir/ca.pem"
+            echo "TEMPORAL_TLS_CLIENT_CERT_PATH=$cert_dir/client.pem"
+            echo "TEMPORAL_TLS_CLIENT_KEY_PATH=$cert_dir/client.key"
+          } >> "$GITHUB_ENV"
+      - name: Create Cloud namespace
+        id: create-cloud-namespace
+        run: uv run python .github/scripts/cloud_namespace.py create
+        env:
+          TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
+          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
       - run: mkdir junit-xml
       - run: poe test -s --workflow-environment envconfig --junit-xml=junit-xml/cloud.xml
         timeout-minutes: 15
         env:
-          TEMPORAL_ADDRESS: sdk-ci.a2dd6.tmprl.cloud:7233
-          TEMPORAL_NAMESPACE: sdk-ci.a2dd6
-          TEMPORAL_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
-          TEMPORAL_TLS_CLIENT_CERT_DATA: ${{ secrets.TEMPORAL_CLIENT_CERT }}
-          TEMPORAL_TLS_CLIENT_KEY_DATA: ${{ secrets.TEMPORAL_CLIENT_KEY }}
+          TEMPORAL_ADDRESS: ${{ steps.create-cloud-namespace.outputs.namespace }}.tmprl.cloud:7233
+          TEMPORAL_NAMESPACE: ${{ steps.create-cloud-namespace.outputs.namespace }}
           TEMPORAL_IS_CLOUD_TESTS: true
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
-          TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
+          TEMPORAL_CLIENT_CLOUD_NAMESPACE: ${{ steps.create-cloud-namespace.outputs.namespace }}
+      - name: Delete Cloud namespace
+        if: ${{ always() && steps.create-cloud-namespace.outputs.namespace != '' }}
+        run: uv run python .github/scripts/cloud_namespace.py delete "${{ steps.create-cloud-namespace.outputs.namespace }}"
+        env:
+          TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
+          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
