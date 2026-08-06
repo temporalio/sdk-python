@@ -766,9 +766,9 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
     """Apply the current Nexus operation context to an activity start request.
 
     This is a no-op outside a Nexus operation context. Within one, it attaches
-    the Nexus request ID and inbound links and configures conflict handling to
-    preserve the Nexus metadata. Completion callbacks are added only when the
-    activity is backing the Nexus operation.
+    the Nexus request ID and configures conflict handling to preserve the Nexus
+    metadata. Inbound links are attached to the completion callback when the
+    activity backs the operation and to the request otherwise.
     """
     nexus_ctx = _try_start_operation_context()
     if nexus_ctx is not None:
@@ -776,15 +776,10 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
         req.on_conflict_options.attach_completion_callbacks = True
         req.on_conflict_options.attach_links = True
 
-        # Add request_id and all Nexus links if we're in a Nexus context, backing or otherwise
         req.request_id = nexus_ctx.nexus_context.request_id
         request_links = nexus_ctx._get_request_links()
 
-        # Links are duplicated on request for compatibility with older server versions.
-        req.links.extend(request_links)
-
         if _in_nexus_backing_start_context():
-            # Add callbacks only if we're in a backing Nexus context
             callbacks = nexus_ctx._get_callbacks(
                 OperationToken(
                     type=OperationTokenType.ACTIVITY,
@@ -802,6 +797,8 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
                 )
                 for callback in callbacks
             )
+        else:
+            req.links.extend(request_links)
 
 
 def _apply_start_activity_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
