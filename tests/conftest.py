@@ -4,6 +4,8 @@ import os
 import sys
 from collections.abc import AsyncGenerator, Iterator
 
+import opentelemetry._logs._internal
+import opentelemetry.metrics._internal
 import opentelemetry.trace
 import pytest
 import pytest_asyncio
@@ -262,11 +264,49 @@ def continue_as_new_suggest_history_count() -> int:
     return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT
 
 
+# OpenTelemetry's global providers are set-once per process with no public
+# way to unset them, so tests needing their own provider must reset the
+# globals directly -- the same isolation pattern OpenTelemetry's own test
+# suite uses (opentelemetry.test.globals_test).
+
+
 @pytest.fixture
 def reset_otel_tracer_provider():
-    """Reset global OpenTelemetry tracer provider state around tests."""
+    """Isolate global OpenTelemetry tracer provider state around a test."""
     opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
     opentelemetry.trace._TRACER_PROVIDER = None
     yield
     opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
     opentelemetry.trace._TRACER_PROVIDER = None
+
+
+@pytest.fixture
+def reset_otel_meter_provider():
+    """Isolate global OpenTelemetry meter provider state around a test.
+
+    Proxy meters/instruments already bound to a real provider stay bound after
+    this reset; only the next set_meter_provider call rebinds them. Tests must
+    not assume an unset global provider drops recordings from instruments
+    created in earlier tests.
+    """
+    opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.metrics._internal._METER_PROVIDER = None
+    yield
+    opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.metrics._internal._METER_PROVIDER = None
+
+
+@pytest.fixture
+def reset_otel_logger_provider():
+    """Isolate global OpenTelemetry logger provider state around a test.
+
+    Unlike proxy meters, proxy loggers cache their real logger on first use
+    and never rebind, even across a later set_logger_provider call. Tests
+    exercising a library's module-level logger must clear that cache
+    themselves (e.g. Google ADK's telemetry logger).
+    """
+    opentelemetry._logs._internal._LOGGER_PROVIDER_SET_ONCE = Once()
+    opentelemetry._logs._internal._LOGGER_PROVIDER = None
+    yield
+    opentelemetry._logs._internal._LOGGER_PROVIDER_SET_ONCE = Once()
+    opentelemetry._logs._internal._LOGGER_PROVIDER = None

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import time
 import uuid
+import warnings
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from types import FrameType
 from typing import Any
+
+import opentelemetry.metrics
+import opentelemetry.trace
 
 from temporalio import workflow
 from temporalio.contrib.google_adk_agents._mcp import (
@@ -23,9 +29,70 @@ from temporalio.contrib.pydantic import (
 from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import (
+    ReplayerConfig,
+    WorkerConfig,
     WorkflowRunner,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+
+def _stacklevel_outside_temporalio() -> int:
+    # Attribute provider warnings to the nearest frame outside temporalio,
+    # e.g. the user's Worker(...)/Replayer(...) call or a user plugin that
+    # delegates here, however many plugin frames sit in between.
+    level = 1
+    own_frame: FrameType | None = inspect.currentframe()
+    frame = own_frame.f_back if own_frame is not None else None
+    while frame is not None:
+        module = frame.f_globals.get("__name__", "")
+        if module != "temporalio" and not module.startswith("temporalio."):
+            return level
+        frame = frame.f_back
+        level += 1
+    return 1
+
+
+def _warn_if_global_otel_providers_not_replay_safe() -> None:
+    # ADK records metrics, spans, and log events through the process-global
+    # OpenTelemetry providers from code that runs workflow-side, so a
+    # non-replay-safe global provider re-emits that telemetry on every
+    # workflow replay. Warn only on providers positively identified as
+    # replay-unsafe: an OpenTelemetry SDK provider used directly as the
+    # global. Anything else stays silent -- unset (proxy) and no-op providers
+    # drop recordings, and unknown provider types (e.g. a custom provider
+    # delegating to a replay-safe one) cannot be classified, where a false
+    # positive is worse than a missed warning. The SDK logger provider is not
+    # checked because its class is only importable from the underscore
+    # namespace opentelemetry.sdk._logs while OpenTelemetry logs are pre-GA.
+    try:
+        from opentelemetry.sdk.metrics import MeterProvider as SdkMeterProvider
+        from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
+    except ImportError:
+        # Without the opentelemetry-sdk package installed no SDK provider can
+        # exist, so there is nothing replay-unsafe to warn about.
+        return
+    stacklevel = _stacklevel_outside_temporalio()
+    if isinstance(opentelemetry.metrics.get_meter_provider(), SdkMeterProvider):
+        warnings.warn(
+            "The global OpenTelemetry MeterProvider is not replay-safe: Google ADK "
+            "records metrics from workflow code, so every workflow replay will "
+            "re-record them. Wrap your provider in "
+            "temporalio.contrib.opentelemetry.ReplaySafeMeterProvider and make it "
+            "the first and only global provider set: "
+            "opentelemetry.metrics.set_meter_provider(ReplaySafeMeterProvider(provider))",
+            UserWarning,
+            stacklevel=stacklevel,
+        )
+    if isinstance(opentelemetry.trace.get_tracer_provider(), SdkTracerProvider):
+        warnings.warn(
+            "The global OpenTelemetry TracerProvider is not replay-safe: Google ADK "
+            "creates spans from workflow code, so every workflow replay will "
+            "re-emit them. Install a replay-safe provider: "
+            "opentelemetry.trace.set_tracer_provider("
+            "temporalio.contrib.opentelemetry.create_tracer_provider())",
+            UserWarning,
+            stacklevel=stacklevel,
+        )
 
 
 def setup_deterministic_runtime():
@@ -71,6 +138,10 @@ class GoogleAdkPlugin(SimplePlugin):
     This plugin configures:
     - Pydantic Payload Converter (required for ADK objects).
     - Sandbox Passthrough for google.adk and google.genai modules.
+
+    At worker and replayer configuration time it also warns when the global
+    OpenTelemetry meter or tracer provider is not replay-safe, since ADK
+    telemetry recorded from workflow code would duplicate on replay.
     """
 
     def __init__(
@@ -126,6 +197,22 @@ class GoogleAdkPlugin(SimplePlugin):
             run_context=lambda: run_context(),
             workflow_runner=workflow_runner,
         )
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        """See base class. Also warns when the global OpenTelemetry meter or
+        tracer provider is not replay-safe, since ADK telemetry would
+        duplicate on replay.
+        """
+        _warn_if_global_otel_providers_not_replay_safe()
+        return super().configure_worker(config)
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        """See base class. Also warns when the global OpenTelemetry meter or
+        tracer provider is not replay-safe, since every replayed workflow
+        would re-emit ADK telemetry.
+        """
+        _warn_if_global_otel_providers_not_replay_safe()
+        return super().configure_replayer(config)
 
     def _configure_data_converter(
         self, converter: DataConverter | None

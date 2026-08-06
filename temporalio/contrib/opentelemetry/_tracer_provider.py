@@ -174,16 +174,20 @@ class ReplaySafeTracerProvider(TracerProvider):
     ):
         """Initialize the replay-safe tracer provider.
 
+        Prefer :py:func:`create_tracer_provider`, which constructs a provider
+        that satisfies these requirements.
+
         Args:
             tracer_provider: The underlying OpenTelemetry TracerProvider to wrap.
-                Must use a _TemporalIdGenerator for replay safety.
+                Must use a ``TemporalIdGenerator`` for replay safety.
+            id_generator: The ``TemporalIdGenerator`` used by ``tracer_provider``.
 
         Raises:
-            ValueError: If the tracer provider doesn't use a _TemporalIdGenerator.
+            ValueError: If the tracer provider doesn't use a ``TemporalIdGenerator``.
         """
         if not isinstance(tracer_provider.id_generator, TemporalIdGenerator):
             raise ValueError(
-                "ReplaySafeTracerProvider should only be used with a TemporalIdGenerator for replay safety. The given TracerProvider doesnt use one."
+                "ReplaySafeTracerProvider should only be used with a TemporalIdGenerator for replay safety. The given TracerProvider doesn't use one."
             )
         self._id_generator = id_generator
         self._tracer_provider = tracer_provider
