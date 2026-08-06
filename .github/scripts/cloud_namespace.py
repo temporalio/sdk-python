@@ -92,7 +92,6 @@ async def delete(namespace: str) -> None:
 async def cloud_client() -> CloudOperationsClient:
     return await CloudOperationsClient.connect(
         api_key=os.environ["TEMPORAL_CLIENT_CLOUD_API_KEY"],
-        version=os.environ["TEMPORAL_CLIENT_CLOUD_API_VERSION"],
     )
 
 

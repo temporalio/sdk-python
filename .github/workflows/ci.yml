@@ -253,7 +253,6 @@ jobs:
         run: uv run python .github/scripts/cloud_namespace.py create
         env:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
-          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
       - run: mkdir junit-xml
       - run: poe test -s --workflow-environment envconfig --junit-xml=junit-xml/cloud.xml
         timeout-minutes: 15
@@ -269,7 +268,6 @@ jobs:
         run: uv run python .github/scripts/cloud_namespace.py delete "${{ steps.create-cloud-namespace.outputs.namespace }}"
         env:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
-          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
