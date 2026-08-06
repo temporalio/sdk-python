@@ -374,6 +374,8 @@ def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
     assert roundtripped == proto_value
 
 
+# Cloud namespaces created by CI do not have the System Nexus dynamic config.
+@pytest.mark.requires_local_server
 async def test_external_workflow_handle_signal_with_start_workflow_uses_system_nexus(
     env: WorkflowEnvironment,
 ):
