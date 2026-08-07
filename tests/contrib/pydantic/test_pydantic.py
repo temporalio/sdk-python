@@ -2,6 +2,7 @@ import dataclasses
 import datetime
 import os
 import pathlib
+import typing
 import uuid
 
 import pydantic
@@ -9,7 +10,11 @@ import pytest
 from pydantic import BaseModel
 
 from temporalio.client import Client
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.pydantic import (
+    PydanticJSONPlainPayloadConverter,
+    PydanticPayloadConverter,
+    pydantic_data_converter,
+)
 from temporalio.worker import Worker
 from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictionContext,
@@ -40,6 +45,157 @@ from tests.contrib.pydantic.workflows import (
     _test_pydantic_model_with_strict_field,
     clone_objects,
 )
+
+_MANY_TYPE_HINTS = tuple(
+    typing.cast(type, typing.cast(object, typing.Annotated[list[int], index]))
+    for index in range(1025)
+)
+_UNHASHABLE_TYPE_HINT = typing.cast(
+    type, typing.cast(object, typing.Annotated[list[int], []])
+)
+
+
+@pytest.mark.parametrize(
+    (
+        "converter_kwargs",
+        "type_hints",
+        "expected_type_adapter_constructions",
+    ),
+    [
+        # Default caches repeated hints
+        ({}, (list[int], list[int]), 1),
+        # Zero disables caching
+        ({"max_cached_type_adapters": 0}, (list[int], list[int]), 2),
+        # Unhashable hints bypass the cache
+        ({}, (_UNHASHABLE_TYPE_HINT, _UNHASHABLE_TYPE_HINT), 2),
+        # Default bound is 1024: 1025 distinct hints evict the first
+        ({}, _MANY_TYPE_HINTS + (_MANY_TYPE_HINTS[0],), 1026),
+        # None is unbounded: no eviction
+        (
+            {"max_cached_type_adapters": None},
+            _MANY_TYPE_HINTS + (_MANY_TYPE_HINTS[0],),
+            1025,
+        ),
+        # Explicit bound evicts least recently used
+        (
+            {"max_cached_type_adapters": 1},
+            (list[int], _MANY_TYPE_HINTS[0], list[int]),
+            3,
+        ),
+    ],
+)
+def test_type_adapter_reuse(
+    monkeypatch: pytest.MonkeyPatch,
+    converter_kwargs: dict[str, typing.Any],
+    type_hints: tuple[type, ...],
+    expected_type_adapter_constructions: int,
+):
+    actual_type_adapter = pydantic.TypeAdapter
+    type_adapter_constructions = 0
+
+    def counting_type_adapter(
+        type_hint: typing.Any,
+    ) -> pydantic.TypeAdapter[typing.Any]:
+        nonlocal type_adapter_constructions
+        type_adapter_constructions += 1
+        return actual_type_adapter(type_hint)
+
+    monkeypatch.setattr(
+        "temporalio.contrib.pydantic.TypeAdapter", counting_type_adapter
+    )
+    converter = PydanticJSONPlainPayloadConverter(**converter_kwargs)
+    payload = converter.to_payload([1])
+    assert payload is not None
+    for type_hint in type_hints:
+        assert converter.from_payload(payload, type_hint) == [1]
+    assert type_adapter_constructions == expected_type_adapter_constructions
+
+
+@pytest.mark.parametrize(
+    ("max_cached_type_adapters", "expected_type_adapter_constructions"),
+    [(None, 1), (0, 2)],
+)
+def test_composite_converter_forwards_type_adapter_cache_size(
+    monkeypatch: pytest.MonkeyPatch,
+    max_cached_type_adapters: int | None,
+    expected_type_adapter_constructions: int,
+):
+    actual_type_adapter = pydantic.TypeAdapter
+    type_adapter_constructions = 0
+
+    def counting_type_adapter(
+        type_hint: typing.Any,
+    ) -> pydantic.TypeAdapter[typing.Any]:
+        nonlocal type_adapter_constructions
+        type_adapter_constructions += 1
+        return actual_type_adapter(type_hint)
+
+    monkeypatch.setattr(
+        "temporalio.contrib.pydantic.TypeAdapter", counting_type_adapter
+    )
+    converter = PydanticPayloadConverter(
+        max_cached_type_adapters=max_cached_type_adapters
+    )
+    payloads = converter.to_payloads([[1], [2]])
+    assert converter.from_payloads(payloads, [list[int], list[int]]) == [[1], [2]]
+    assert type_adapter_constructions == expected_type_adapter_constructions
+
+
+def test_type_adapter_reuse_across_threads_with_deferred_build():
+    import concurrent.futures
+
+    class DeferredModel(BaseModel):
+        model_config = pydantic.ConfigDict(defer_build=True)
+        value: int
+
+    converter = PydanticJSONPlainPayloadConverter()
+    payload = converter.to_payload(DeferredModel(value=1))
+    assert payload is not None
+
+    def decode() -> DeferredModel:
+        return converter.from_payload(payload, DeferredModel)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(lambda _: decode(), range(64)))
+    assert all(result == DeferredModel(value=1) for result in results)
+
+
+def test_type_adapter_cache_distinguishes_reimported_classes():
+    # The workflow sandbox re-imports user modules, producing distinct class
+    # objects with identical names. Class hints hash by identity, so each
+    # world's class must get its own cache slot and validate to itself.
+    import types
+
+    source = "from pydantic import BaseModel\n\nclass Foo(BaseModel):\n    name: str\n"
+
+    def load_module() -> types.ModuleType:
+        module = types.ModuleType("test_reimported_models")
+        exec(compile(source, "test_reimported_models.py", "exec"), module.__dict__)
+        return module
+
+    foo_outside = load_module().Foo
+    foo_sandbox = load_module().Foo
+    assert foo_outside is not foo_sandbox
+    assert hash(foo_outside) != hash(foo_sandbox)
+
+    # Worst case: one converter shared across both worlds (the real sandbox
+    # creates a separate converter per workflow instance).
+    converter = PydanticJSONPlainPayloadConverter()
+    payload = converter.to_payload(foo_outside(name="x"))
+    assert payload is not None
+    decoded_outside = converter.from_payload(payload, foo_outside)
+    decoded_sandbox = converter.from_payload(payload, foo_sandbox)
+    assert type(decoded_outside) is foo_outside
+    assert type(decoded_sandbox) is foo_sandbox
+
+
+@pytest.mark.parametrize(
+    "converter_type",
+    [PydanticJSONPlainPayloadConverter, PydanticPayloadConverter],
+)
+def test_type_adapter_cache_rejects_negative_size(converter_type: type):
+    with pytest.raises(ValueError, match="max_cached_type_adapters cannot be negative"):
+        converter_type(max_cached_type_adapters=-1)
 
 
 async def test_instantiation_outside_sandbox():
