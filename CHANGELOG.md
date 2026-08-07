@@ -22,6 +22,17 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
+  for repeated type hints instead of rebuilding their schemas for every
+  payload, greatly speeding up decode of non-model hints such as discriminated
+  unions ([#1695](https://github.com/temporalio/sdk-python/issues/1695)). Up
+  to 1024 type adapters are cached per converter instance by default, with
+  least-recently-used eviction. To change the bound, pass
+  ``max_cached_type_adapters`` to ``PydanticPayloadConverter`` (or
+  ``PydanticJSONPlainPayloadConverter``) from a nullary subclass used as the
+  ``DataConverter.payload_converter_class``; ``None`` makes the cache
+  unbounded and zero disables caching.
+
 ### Deprecated
 
 ### :boom: Breaking Changes

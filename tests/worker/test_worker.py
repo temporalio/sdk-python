@@ -875,9 +875,15 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
                 client, describe_resp.conflict_token, v1
             )
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id
+        )
         conflict_token = (
             await set_ramping_version(client, conflict_token, v2, 100)
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 100
+        )
 
         # Run workflows and verify they run on v2
         for i in range(3):
@@ -894,6 +900,9 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
         conflict_token = (
             await set_ramping_version(client, conflict_token, v2, 0)
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 0
+        )
         for i in range(3):
             wfa = await client.start_workflow(
                 DeploymentVersioningWorkflowV1AutoUpgrade.run,
@@ -906,6 +915,9 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
 
         # Set ramp to 50 and eventually verify workflows run on both versions
         await set_ramping_version(client, conflict_token, v2, 50)
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 50
+        )
         seen_results = set()
 
         async def run_and_record():
@@ -1319,6 +1331,7 @@ async def wait_for_worker_deployment_routing_config_propagation(
     deployment_name: str,
     expected_current_build_id: str,
     expected_ramping_build_id: str = "",
+    expected_ramping_percentage: float | None = None,
 ) -> None:
     """Wait for routing config to be propagated to all task queues."""
     import temporalio.api.enums.v1
@@ -1339,6 +1352,11 @@ async def wait_for_worker_deployment_routing_config_propagation(
         if (
             routing_config.ramping_deployment_version.build_id
             != expected_ramping_build_id
+        ):
+            return False
+        if (
+            expected_ramping_percentage is not None
+            and routing_config.ramping_version_percentage != expected_ramping_percentage
         ):
             return False
         state = resp.worker_deployment_info.routing_config_update_state

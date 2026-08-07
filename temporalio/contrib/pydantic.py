@@ -13,6 +13,7 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 Pydantic v1 is not supported.
 """
 
+import functools
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,10 +54,28 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     See https://docs.pydantic.dev/latest/api/standard_library_types/
     """
 
-    def __init__(self, to_json_options: ToJsonOptions | None = None):
-        """Create a new payload converter."""
+    def __init__(
+        self,
+        to_json_options: ToJsonOptions | None = None,
+        *,
+        max_cached_type_adapters: int | None = 1024,
+    ) -> None:
+        """Create a new payload converter.
+
+        Args:
+            to_json_options: Options for serializing values to JSON.
+            max_cached_type_adapters: Maximum number of type adapters to
+                cache, with least-recently-used eviction. Defaults to 1024.
+                If ``None``, the cache is unbounded. If zero, caching is
+                disabled.
+        """
+        if max_cached_type_adapters is not None and max_cached_type_adapters < 0:
+            raise ValueError("max_cached_type_adapters cannot be negative")
         self._schema_serializer = SchemaSerializer(any_schema())
         self._to_json_options = to_json_options
+        self._type_adapter = functools.lru_cache(maxsize=max_cached_type_adapters)(
+            TypeAdapter
+        )
 
     @property
     def encoding(self) -> str:
@@ -91,12 +110,26 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
 
         Uses ``pydantic.TypeAdapter.validate_json`` to construct an
         instance of the type specified by ``type_hint`` from the JSON payload.
+        Type adapters are cached per hashable type hint; see
+        ``max_cached_type_adapters`` on the constructor.
 
         See
         https://docs.pydantic.dev/latest/api/type_adapter/#pydantic.type_adapter.TypeAdapter.validate_json.
         """
         _type_hint = type_hint if type_hint is not None else Any
-        return TypeAdapter(_type_hint).validate_json(payload.data)
+        type_adapter: TypeAdapter[Any]
+        try:
+            type_adapter = self._type_adapter(_type_hint)
+        except TypeError:
+            # Distinguish an unhashable hint (bypass the cache) from a
+            # TypeError raised while constructing the adapter (re-raise).
+            try:
+                hash(_type_hint)
+            except TypeError:
+                type_adapter = TypeAdapter(_type_hint)
+            else:
+                raise
+        return type_adapter.validate_json(payload.data)
 
 
 class PydanticPayloadConverter(CompositePayloadConverter):
@@ -106,9 +139,36 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     :py:class:`PydanticJSONPlainPayloadConverter`.
     """
 
-    def __init__(self, to_json_options: ToJsonOptions | None = None) -> None:
-        """Initialize object"""
-        json_payload_converter = PydanticJSONPlainPayloadConverter(to_json_options)
+    def __init__(
+        self,
+        to_json_options: ToJsonOptions | None = None,
+        *,
+        max_cached_type_adapters: int | None = 1024,
+    ) -> None:
+        """Initialize object.
+
+        Args:
+            to_json_options: Options for serializing values to JSON.
+            max_cached_type_adapters: Maximum number of type adapters to
+                cache, with least-recently-used eviction. Defaults to 1024.
+                If ``None``, the cache is unbounded. If zero, caching is
+                disabled.
+
+                To configure this through a :py:class:`DataConverter`, use a
+                nullary subclass as the payload converter class::
+
+                    class MyPayloadConverter(PydanticPayloadConverter):
+                        def __init__(self) -> None:
+                            super().__init__(max_cached_type_adapters=128)
+
+                    my_data_converter = DataConverter(
+                        payload_converter_class=MyPayloadConverter
+                    )
+        """
+        json_payload_converter = PydanticJSONPlainPayloadConverter(
+            to_json_options,
+            max_cached_type_adapters=max_cached_type_adapters,
+        )
         super().__init__(
             *(
                 c

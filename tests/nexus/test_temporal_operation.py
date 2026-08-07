@@ -16,6 +16,7 @@ from typing_extensions import override
 
 import temporalio.exceptions
 from temporalio import activity, nexus, workflow
+from temporalio.api.activity.v1 import ActivityExecutionInfo
 from temporalio.api.common.v1 import Link
 from temporalio.client import (
     ActivityExecutionStatus,
@@ -33,7 +34,11 @@ from temporalio.nexus._token import OperationToken, OperationTokenType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import EventType, assert_event_subsequence, assert_eventually
-from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.helpers.nexus import (
+    assert_links_match,
+    expected_nexus_operation_link,
+    make_nexus_endpoint_name,
+)
 
 # Cloud CI's namespace credentials cannot manage Nexus endpoints.
 # See https://github.com/temporalio/sdk-python/issues/1704.
@@ -336,19 +341,21 @@ class TestServiceHandler:
         self,
         _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
-        input: Input,
+        _input: Input,
     ) -> nexus.TemporalOperationResult[None]:
+        # Keep the first activity running so its callback cannot race the
+        # handler error raised by the second start.
         await client.start_activity(
-            echo_activity,
-            input,
+            wait_for_cancel_activity,
             id=f"double-start-activity-{uuid.uuid4()}",
-            start_to_close_timeout=timedelta(seconds=5),
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
         )
         await client.start_activity(
-            echo_activity,
-            input,
+            wait_for_cancel_activity,
             id=f"double-start-activity-{uuid.uuid4()}",
-            start_to_close_timeout=timedelta(seconds=5),
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
         )
         return nexus.TemporalOperationResult.sync(None)
 
@@ -1132,6 +1139,67 @@ async def test_temporal_operation_start_activity(
         assert result == "test"
 
 
+async def test_temporal_operation_backing_activity_does_not_duplicate_links(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    activity_id = f"link-activity-{uuid.uuid4()}"
+
+    @service_handler
+    class LinkActivityHandler:
+        @nexus.temporal_operation
+        async def echo_activity(
+            self,
+            _ctx: nexus.TemporalStartOperationContext,
+            client: nexus.TemporalNexusClient,
+            input: Input,
+        ) -> nexus.TemporalOperationResult[str]:
+            return await client.start_activity(
+                echo_activity,
+                input,
+                id=activity_id,
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[LinkActivityHandler()],
+        activities=[echo_activity],
+    ):
+        nexus_client = client.create_nexus_client(LinkActivityHandler, endpoint_name)
+        operation_handle = await nexus_client.start_operation(
+            LinkActivityHandler.echo_activity,
+            Input(value="test", task_queue=task_queue),
+            id=str(uuid.uuid4()),
+        )
+
+        assert await operation_handle.result() == "test"
+        activity_description = await client.get_activity_handle(activity_id).describe()
+        assert isinstance(activity_description.raw_info, ActivityExecutionInfo)
+        assert operation_handle.run_id is not None
+        callback_links = [
+            link
+            for callback in activity_description.raw_callbacks
+            for link in callback.info.callback.links
+        ]
+        assert_links_match(
+            [*activity_description.raw_info.links, *callback_links],
+            expected_nexus_operation_link(
+                namespace=client.namespace,
+                operation_id=operation_handle.operation_id,
+                run_id=operation_handle.run_id,
+            ),
+        )
+
+
 async def test_temporal_operation_start_activity_raises_error(
     client: Client, env: WorkflowEnvironment
 ):
@@ -1264,7 +1332,7 @@ async def test_temporal_operation_double_start_activity_raises_handler_err(
         env.client,
         task_queue=task_queue,
         nexus_service_handlers=[TestServiceHandler()],
-        activities=[echo_activity],
+        activities=[wait_for_cancel_activity],
     ):
         nexus_client = client.create_nexus_client(TestService, endpoint_name)
 
