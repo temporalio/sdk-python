@@ -33,7 +33,7 @@ from temporalio.converter._payload_converter import (
     _TemporalTransferTypePayloadConverter,
 )
 
-from .types import CallableType
+from .types import AnyType, CallableType
 
 if TYPE_CHECKING:
     from temporalio.client import Client
@@ -209,6 +209,7 @@ class _Context:
     runtime_metric_meter: temporalio.common.MetricMeter | None
     client: Client | None
     cancellation_details: _ActivityCancellationDetailsHolder
+    data_converter: temporalio.converter.DataConverter | None = None
     _logger_details: Mapping[str, Any] | None = None
     _payload_converter: temporalio.converter.PayloadConverter | None = None
     _metric_meter: temporalio.common.MetricMeter | None = None
@@ -463,6 +464,26 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     This is often used for dynamic activities to convert payloads.
     """
     return _Context.current().payload_converter
+
+
+async def get_handle_value(
+    handle: temporalio.converter.PayloadHandle[AnyType],
+) -> AnyType:
+    """Acquire the value a :py:class:`temporalio.converter.PayloadHandle` refers to.
+
+    Uses this activity's data converter to run the handle's deferred inbound
+    pipeline (external-storage retrieval if offloaded, codec decode, then
+    deserialization) under the activity's serialization context. Call it from
+    activity code, where acquisition I/O is permitted; a workflow forwards
+    handles but does not acquire their values.
+    """
+    context = _Context.current()
+    if context.data_converter is None:
+        raise RuntimeError(
+            "No data converter is available in this activity context; "
+            "cannot acquire a PayloadHandle value."
+        )
+    return await context.data_converter.get_handle_value(handle)
 
 
 def metric_meter() -> temporalio.common.MetricMeter:

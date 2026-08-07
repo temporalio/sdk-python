@@ -31,13 +31,14 @@ from temporalio.converter._payload_converter import (
     _TemporalTransferTypePayloadConverter,
 )
 from temporalio.converter._payload_handle import (
-    _bind_data_converter,
+    PayloadHandle,
     _is_payload_handle_hint,
 )
 from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
 )
+from temporalio.types import AnyType
 
 
 def _is_reference_payload(p: temporalio.api.common.v1.Payload) -> bool:
@@ -139,9 +140,9 @@ class DataConverter(WithSerializationContext):
         """
         # Positions annotated as PayloadHandle defer acquisition: keep their
         # opaque payload and skip eager external-storage retrieval + codec
-        # decode so the produced handle can materialize on demand. The handle
-        # binds to this (context-applied) converter so materialize() uses the
-        # correct serialization context and codec.
+        # decode, producing a data-only handle. Acquisition is a boundary
+        # operation (get_handle_value), not something the handle does itself, so
+        # no converter is captured here.
         if type_hints is not None and any(
             _is_payload_handle_hint(h) for h in type_hints
         ):
@@ -159,12 +160,40 @@ class DataConverter(WithSerializationContext):
                 transformed = await self._decode_payload_sequence(transformed)
                 for i, payload in zip(transform_indexes, transformed):
                     payloads[i] = payload
-            with _bind_data_converter(self):
-                return self.payload_converter.from_payloads(payloads, type_hints)
+            return self.payload_converter.from_payloads(payloads, type_hints)
 
         payloads = await self._external_retrieve_payload_sequence(payloads)
         payloads = await self._decode_payload_sequence(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)
+
+    async def get_handle_value(self, handle: PayloadHandle[AnyType]) -> AnyType:
+        """Acquire the value a :py:class:`PayloadHandle` refers to.
+
+        This is the boundary operation for handles: the handle is a plain value
+        carrying the opaque payload and its inner type, and this converter
+        supplies the machinery. It runs the deferred inbound pipeline
+        (external-storage retrieval if offloaded, then codec decode) under this
+        converter's serialization context, and deserializes into the handle's
+        captured type ``T``.
+
+        Call it where acquisition I/O is permitted (an activity or client
+        boundary), never inside the workflow sandbox. In activity code, prefer
+        :py:func:`temporalio.activity.get_handle_value`, which uses the
+        activity's converter.
+
+        Raises:
+            RuntimeError: if the handle carries no concrete type (a bare
+                ``PayloadHandle`` annotation), since conversion needs a type.
+        """
+        inner_type = handle._type
+        if inner_type is None:
+            raise RuntimeError(
+                "[TMPRL1106] PayloadHandle has no type to acquire into. "
+                "Annotate the value as PayloadHandle[T] with a concrete type T."
+            )
+        payload = await self._transform_inbound_payload(handle._payload)
+        values = self.payload_converter.from_payloads([payload], [inner_type])
+        return values[0]
 
     async def encode_wrapper(
         self, values: Sequence[Any]

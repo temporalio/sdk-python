@@ -2,10 +2,19 @@
 
 A :py:class:`PayloadHandle` is used as a parameter or return annotation
 (``PayloadHandle[T]``) to defer *acquiring* a value -- external-storage
-retrieval, codec decoding, and deserialization -- until it is explicitly
-awaited via :py:meth:`PayloadHandle.materialize`. Until then the handle just
-carries the opaque, end-of-pipeline payload and can be forwarded (e.g. from a
-workflow to an activity) without paying to materialize it.
+retrieval, codec decoding, and deserialization. A handle is a plain, immutable
+*value*: it carries the opaque, end-of-pipeline payload and the inner type, and
+can be forwarded (e.g. from a workflow to an activity) without paying to
+acquire it.
+
+The handle deliberately owns no behavior beyond introspection of what it
+carries. Acquiring the value needs machinery -- a data converter, codec chain,
+and storage driver -- that belongs to an execution surface (the activity worker
+or the client), not to a payload value. So acquisition is a boundary operation
+(:py:meth:`temporalio.converter.DataConverter.get_handle_value`, and
+:py:func:`temporalio.activity.get_handle_value` in activity code), never a
+method on the handle. This keeps the handle portable with no captured runtime
+state, and avoids relying on an ambient mechanism to inject a converter.
 
 This mirrors :py:class:`temporalio.common.RawValue`: the annotation, not any
 wire encoding, is what triggers handle behavior, so a handle works on any
@@ -14,45 +23,17 @@ already-stored payload in history and is replay-safe.
 
 from __future__ import annotations
 
-import contextvars
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import (
-    TYPE_CHECKING,
     Any,
     Generic,
-    Iterator,
     Optional,
-    cast,
     get_args,
     get_origin,
 )
 
 import temporalio.api.common.v1
 from temporalio.types import AnyType
-
-if TYPE_CHECKING:
-    from temporalio.converter._data_converter import DataConverter
-
-
-# The data converter needed to materialize a handle only exists at the async
-# worker/client boundary (never inside the workflow sandbox, where I/O is
-# forbidden). Boundary decodes publish it here so handles built during
-# conversion can bind to it; the sandbox leaves it unset, yielding forward-only
-# handles.
-_current_data_converter: contextvars.ContextVar[Optional[DataConverter]] = (
-    contextvars.ContextVar("_temporal_payload_handle_data_converter", default=None)
-)
-
-
-@contextmanager
-def _bind_data_converter(data_converter: DataConverter) -> Iterator[None]:
-    """Bind the data converter used by handles created within this context."""
-    token = _current_data_converter.set(data_converter)
-    try:
-        yield
-    finally:
-        _current_data_converter.reset(token)
 
 
 @dataclass(frozen=True)
@@ -61,63 +42,23 @@ class PayloadHandle(Generic[AnyType]):
 
     Annotate a workflow/activity/signal parameter or return value as
     ``PayloadHandle[T]`` to receive one of these instead of the materialized
-    value. Forward it onward without cost, or call
-    :py:meth:`materialize` where the value is actually needed.
+    value. Forward it onward without cost, and acquire its value at a boundary
+    (an activity or client) where fetching data is permitted, via
+    :py:func:`temporalio.activity.get_handle_value` or
+    :py:meth:`temporalio.converter.DataConverter.get_handle_value`. A handle
+    does not acquire its own value.
     """
 
     # The opaque end-of-pipeline payload (may be an external-storage reference
-    # or a codec-encoded inline payload). Kept private: the handle is
-    # backing-agnostic and exposes nothing about how the value is stored.
+    # or a codec-encoded inline payload). The handle is backing-agnostic; this
+    # is read by the boundary converter when acquiring the value.
     _payload: temporalio.api.common.v1.Payload
-    # Inner type ``T`` captured from the annotation, used as the decode hint at
-    # materialize time. May be None for a bare ``PayloadHandle`` annotation.
+    # Inner type ``T`` captured from the annotation, used as the decode hint
+    # when acquiring the value. May be None for a bare ``PayloadHandle``.
     _type: Optional[type] = field(default=None, compare=False)
-    # Set only for handles created at the async boundary; None => forward-only.
-    _data_converter: Optional[DataConverter] = field(
-        default=None, compare=False, repr=False
-    )
-
-    async def materialize(self) -> AnyType:
-        """Acquire and return the underlying value.
-
-        Runs the deferred inbound pipeline (external-storage retrieval if
-        offloaded, codec decoding, then deserialization into the real type
-        ``T`` captured from the ``PayloadHandle[T]`` annotation). The return type
-        is that ``T`` -- annotate handles as ``PayloadHandle[T]`` so callers keep
-        full type information rather than an untyped value.
-
-        Raises:
-            RuntimeError: if the handle is forward-only (e.g. received inside a
-                workflow, where acquisition I/O is not permitted), or if it
-                carries no real type (a bare ``PayloadHandle`` annotation), since
-                payload conversion needs a concrete type.
-        """
-        data_converter = self._data_converter
-        if data_converter is None:
-            raise RuntimeError(
-                "[TMPRL1106] PayloadHandle is forward-only in this context "
-                "(such as inside a workflow) and cannot be materialized. Forward "
-                "it to an activity, or materialize it from client code, instead."
-            )
-        if self._type is None:
-            raise RuntimeError(
-                "[TMPRL1106] PayloadHandle has no type to materialize into. "
-                "Annotate the value as PayloadHandle[T] with a concrete type T."
-            )
-        # Reuse the standard inbound transform (retrieve -> codec-decode) that
-        # eager decoding would have applied, then deserialize to the real type.
-        payload = await data_converter._transform_inbound_payload(self._payload)
-        [value] = data_converter.payload_converter.from_payloads(
-            [payload], [self._type]
-        )
-        return cast(AnyType, value)
 
     def __getstate__(self) -> object:
-        """Pickle support (workflow sandbox caching).
-
-        Excludes the bound data converter so a rehydrated handle is forward-only,
-        reinforcing that materialization never happens on the sandbox side.
-        """
+        """Pickle support (workflow sandbox caching)."""
         return {"payload": self._payload.SerializeToString(), "type": self._type}
 
     def __setstate__(self, state: object) -> None:
@@ -130,16 +71,35 @@ class PayloadHandle(Generic[AnyType]):
             temporalio.api.common.v1.Payload.FromString(state["payload"]),
         )
         object.__setattr__(self, "_type", state.get("type"))
-        object.__setattr__(self, "_data_converter", None)
+
+
+class AsHandle:
+    """Marker for ``Annotated[T, AsHandle]``: consume ``T`` as a forward-only
+    :py:class:`PayloadHandle` without ``T`` leaving the shared contract.
+
+    ``Annotated[T, AsHandle]`` is transparent to type checkers (both a caller and
+    the callee still see ``T``), so a caller passes a plain ``T`` -- no coupling.
+    The SDK recovers the marker via ``get_type_hints(..., include_extras=True)``
+    and delivers a handle instead of materializing. This is the *forward-only*
+    (type-erased) option: the callee's variable is still statically ``T``, so it
+    can forward the value but cannot call handle methods on it statically.
+    """
 
 
 def _is_payload_handle_hint(hint: Any) -> bool:
-    """Return True if a type hint is ``PayloadHandle`` or ``PayloadHandle[T]``."""
-    return hint is PayloadHandle or get_origin(hint) is PayloadHandle
+    """Return True for ``PayloadHandle``, ``PayloadHandle[T]``, or ``Annotated[T, AsHandle]``."""
+    return (
+        hint is PayloadHandle
+        or get_origin(hint) is PayloadHandle
+        or AsHandle in getattr(hint, "__metadata__", ())
+    )
 
 
 def _payload_handle_inner_type(hint: Any) -> Optional[type]:
-    """Return ``T`` from ``PayloadHandle[T]``, or None for a bare hint."""
+    """Return ``T`` from ``PayloadHandle[T]`` or ``Annotated[T, AsHandle]``, else None."""
+    # Annotated[T, AsHandle]: the base type T is the inner (materialized) type.
+    if AsHandle in getattr(hint, "__metadata__", ()):
+        return hint.__origin__
     args = get_args(hint)
     return args[0] if args else None
 
@@ -160,5 +120,5 @@ def _payload_handle_hint(inner_type: Optional[type]) -> Any:
 def _create_handle(
     payload: temporalio.api.common.v1.Payload, inner_type: Optional[type]
 ) -> PayloadHandle[Any]:
-    """Build a handle, binding it to the current boundary converter if any."""
-    return PayloadHandle(payload, inner_type, _current_data_converter.get())
+    """Build a data-only handle (no captured converter)."""
+    return PayloadHandle(payload, inner_type)
