@@ -113,6 +113,7 @@ informal introduction to the features and their implementation.
     - [Observability](#observability)
       - [Metrics](#metrics)
       - [OpenTelemetry Tracing](#opentelemetry-tracing)
+      - [OpenTelemetry Metrics](#opentelemetry-metrics)
     - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
     - [Known Compatibility Issues](#known-compatibility-issues)
       - [gevent Patching](#gevent-patching)
@@ -1988,6 +1989,38 @@ will install needed dependencies. Then the `temporalio.contrib.opentelemetry.Tra
 as an interceptor on the `interceptors` argument of `Client.connect`. When set, spans will be created for all client
 calls and for all activity and workflow invocations on the worker, spans will be created and properly serialized through
 the server to give one proper trace for a workflow execution.
+
+#### OpenTelemetry Metrics
+
+Metrics support also requires the `opentelemetry` extra (see above). Rather than using
+`temporalio.runtime.PrometheusConfig` or `temporalio.runtime.OpenTelemetryConfig`, set a
+`temporalio.runtime.MetricBuffer` as the `metrics` on `TelemetryConfig`, then drain it into a real OpenTelemetry
+`MeterProvider` using `temporalio.contrib.opentelemetry.MetricsExporter`:
+
+```python
+from datetime import timedelta
+
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
+
+from temporalio.client import Client
+from temporalio.contrib.opentelemetry import MetricsExporter
+from temporalio.runtime import MetricBuffer, Runtime, TelemetryConfig
+
+buffer = MetricBuffer(10_000)
+runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
+meter_provider = MeterProvider(
+    metric_readers=[PeriodicExportingMetricReader(ConsoleMetricExporter(), export_interval_millis=5000)]
+)
+
+async with MetricsExporter(buffer, meter_provider):
+    client = await Client.connect("localhost:7233", runtime=runtime)
+    # ... run workers/workflows while the exporter drains the buffer in the background
+```
+
+`MetricsExporter` must be running (via `async with` or manual `run()`/`shutdown()`) for as long as metrics should be
+exported, since it works by draining the buffer on a fixed interval (`poll_interval`, default one second) -- per the
+warning on `MetricBuffer`, updates are dropped if the buffer isn't drained regularly.
 
 ### Protobuf 3.x vs 4.x
 
