@@ -73,7 +73,7 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
             index_run_args: If True, workflow run arguments are visited one at a
                 time with :py:data:`current_run_arg_index` set, so retrieval can
                 be deferred per argument position. Left False (batched) unless a
-                run argument is consumed as a PayloadHandle.
+                run argument is consumed as a ValueHandle.
         """
         super().__init__(
             skip_search_attributes=skip_search_attributes,

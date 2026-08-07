@@ -299,7 +299,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         The predicate reads the payload visitor's current context (run-argument
         index, or command seq for a resolved activity/child result) and returns
-        True when that position's payload should stay a forward-only PayloadHandle
+        True when that position's payload should stay a forward-only ValueHandle
         -- so retrieval and codec decode are skipped. It decides purely from
         API-declared types by position, never by inspecting the payload proto.
 

@@ -30,7 +30,8 @@ from temporalio.converter._payload_converter import (
     PayloadConverter,
 )
 from temporalio.converter._payload_handle import (
-    PayloadHandle,
+    ValueHandle,
+    _attach_metadata,
     _is_payload_handle_hint,
 )
 from temporalio.converter._serialization_context import (
@@ -133,10 +134,10 @@ class DataConverter(WithSerializationContext):
         Returns:
             Decoded and converted values.
         """
-        # Positions annotated as PayloadHandle defer acquisition: keep their
+        # Positions annotated as ValueHandle defer acquisition: keep their
         # opaque payload and skip eager external-storage retrieval + codec
         # decode, producing a data-only handle. Acquisition is a boundary
-        # operation (get_handle_value), not something the handle does itself, so
+        # operation (resolve_value_handle), not something the handle does itself, so
         # no converter is captured here.
         if type_hints is not None and any(
             _is_payload_handle_hint(h) for h in type_hints
@@ -161,8 +162,8 @@ class DataConverter(WithSerializationContext):
         payloads = await self._decode_payload_sequence(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)
 
-    async def get_handle_value(self, handle: PayloadHandle[AnyType]) -> AnyType:
-        """Acquire the value a :py:class:`PayloadHandle` refers to.
+    async def resolve_value_handle(self, handle: ValueHandle[AnyType]) -> AnyType:
+        """Acquire the value a :py:class:`ValueHandle` refers to.
 
         This is the boundary operation for handles: the handle is a plain value
         carrying the opaque payload and its inner type, and this converter
@@ -173,22 +174,46 @@ class DataConverter(WithSerializationContext):
 
         Call it where acquisition I/O is permitted (an activity or client
         boundary), never inside the workflow sandbox. In activity code, prefer
-        :py:func:`temporalio.activity.get_handle_value`, which uses the
+        :py:func:`temporalio.activity.resolve_value_handle`, which uses the
         activity's converter.
 
         Raises:
             RuntimeError: if the handle carries no concrete type (a bare
-                ``PayloadHandle`` annotation), since conversion needs a type.
+                ``ValueHandle`` annotation), since conversion needs a type.
         """
         inner_type = handle._type
         if inner_type is None:
             raise RuntimeError(
-                "[TMPRL1106] PayloadHandle has no type to acquire into. "
-                "Annotate the value as PayloadHandle[T] with a concrete type T."
+                "[TMPRL1106] ValueHandle has no type to acquire into. "
+                "Annotate the value as ValueHandle[T] with a concrete type T."
             )
         payload = await self._transform_inbound_payload(handle._payload)
         values = self.payload_converter.from_payloads([payload], [inner_type])
         return values[0]
+
+    async def create_value_handle(
+        self,
+        value: Any,
+        *,
+        metadata: Mapping[str, str] | None = None,
+    ) -> ValueHandle[Any]:
+        """Produce a :py:class:`ValueHandle` from a value.
+
+        The producer-side counterpart to :py:meth:`resolve_value_handle`: it runs the
+        outbound pipeline (convert, codec encode, external-storage offload if
+        configured) under this converter's serialization context, so the value
+        is stored once and the handle carries a reference. Optional ``metadata``
+        is attached as server-opaque keys that a consumer can probe without
+        acquiring the value.
+
+        Call it where storage I/O is permitted (an activity or client boundary),
+        never inside the workflow sandbox. In activity code, prefer
+        :py:func:`temporalio.activity.create_value_handle`.
+        """
+        [payload] = await self.encode([value])
+        if metadata:
+            _attach_metadata(payload, metadata)
+        return ValueHandle(payload, type(value))
 
     async def encode_wrapper(
         self, values: Sequence[Any]

@@ -1,8 +1,8 @@
-"""Unit tests for PayloadHandle (Phase 1 prototype), server-free.
+"""Unit tests for ValueHandle (Phase 1 prototype), server-free.
 
-These exercise the converter-level behavior: a PayloadHandle[T] annotation
+These exercise the converter-level behavior: a ValueHandle[T] annotation
 defers acquisition (external-storage retrieval, codec decode, deserialization)
-until the value is acquired at a boundary via DataConverter.get_handle_value,
+until the value is acquired at a boundary via DataConverter.resolve_value_handle,
 and forwarding a handle re-emits its opaque payload without downloading. The
 proof is the driver's retrieve-call count.
 """
@@ -15,11 +15,11 @@ from collections.abc import Sequence
 import pytest
 
 from temporalio.api.common.v1 import Payload
+from temporalio.common import ValueHandle
 from temporalio.converter import (
     DataConverter,
     ExternalStorage,
     PayloadCodec,
-    PayloadHandle,
 )
 from tests.test_extstore import InMemoryTestDriver
 
@@ -43,13 +43,13 @@ async def test_toplevel_reference_becomes_handle() -> None:
     payloads = await dc.encode([_BIG])
     assert driver._store_calls == 1
 
-    [handle] = await dc.decode(payloads, [PayloadHandle[str]])
-    assert isinstance(handle, PayloadHandle)
+    [handle] = await dc.decode(payloads, [ValueHandle[str]])
+    assert isinstance(handle, ValueHandle)
     # No download happened just by receiving the handle.
     assert driver._retrieve_calls == 0
 
     # The value is acquired at the boundary, through the converter.
-    assert await dc.get_handle_value(handle) == _BIG
+    assert await dc.resolve_value_handle(handle) == _BIG
     assert driver._retrieve_calls == 1
 
 
@@ -61,11 +61,11 @@ async def test_handle_is_data_only_and_forwards_without_download() -> None:
     # A handle is a data-only value: holding it downloads nothing, and it owns
     # no acquire behavior (acquisition is a boundary operation, not a method on
     # the handle). Forward-only-ness lives on the workflow surface, which simply
-    # does not expose get_handle_value, not in the handle's state.
-    [handle] = dc.payload_converter.from_payloads([reference], [PayloadHandle[str]])
-    assert isinstance(handle, PayloadHandle)
+    # does not expose resolve_value_handle, not in the handle's state.
+    [handle] = dc.payload_converter.from_payloads([reference], [ValueHandle[str]])
+    assert isinstance(handle, ValueHandle)
     assert not hasattr(handle, "materialize")
-    assert not hasattr(handle, "get_handle_value")
+    assert not hasattr(handle, "resolve_value_handle")
     assert driver._retrieve_calls == 0
 
     # Forwarding re-emits a byte-identical reference payload, still no download.
@@ -74,7 +74,7 @@ async def test_handle_is_data_only_and_forwards_without_download() -> None:
     assert driver._retrieve_calls == 0
 
     # The value is acquired only through a boundary converter.
-    assert await dc.get_handle_value(handle) == _BIG
+    assert await dc.resolve_value_handle(handle) == _BIG
     assert driver._retrieve_calls == 1
 
 
@@ -86,7 +86,7 @@ async def test_non_handle_annotation_is_eager() -> None:
     # Default behavior is unchanged: a real-type hint materializes eagerly.
     [value] = await dc.decode(payloads, [str])
     assert value == _BIG
-    assert not isinstance(value, PayloadHandle)
+    assert not isinstance(value, ValueHandle)
     assert driver._retrieve_calls == 1
 
 
@@ -126,11 +126,11 @@ async def test_codec_deferred_until_acquired() -> None:
     dc = _storage_converter(driver, codec=codec)
     payloads = await dc.encode([_BIG])
 
-    [handle] = await dc.decode(payloads, [PayloadHandle[str]])
+    [handle] = await dc.decode(payloads, [ValueHandle[str]])
     # The reference is not codec-decoded when the handle is produced.
     assert codec.decode_calls == 0
 
-    assert await dc.get_handle_value(handle) == _BIG
+    assert await dc.resolve_value_handle(handle) == _BIG
     assert codec.decode_calls == 1
 
 
@@ -138,13 +138,32 @@ async def test_pickled_handle_survives_and_forwards() -> None:
     driver = InMemoryTestDriver()
     dc = _storage_converter(driver)
     payloads = await dc.encode([_BIG])
-    [handle] = await dc.decode(payloads, [PayloadHandle[str]])
+    [handle] = await dc.decode(payloads, [ValueHandle[str]])
 
     restored = pickle.loads(pickle.dumps(handle))
-    assert isinstance(restored, PayloadHandle)
+    assert isinstance(restored, ValueHandle)
     # The opaque payload survives, so a rehydrated handle can still be forwarded
     # and acquired at a boundary. Compare with proto equality: re-parsing may
     # reorder the metadata map, so serialized bytes are not a reliable check.
     [out] = dc.payload_converter.to_payloads([restored])
     assert out == payloads[0]
-    assert await dc.get_handle_value(restored) == _BIG
+    assert await dc.resolve_value_handle(restored) == _BIG
+
+
+async def test_create_value_handle_stores_once_with_probeable_metadata() -> None:
+    driver = InMemoryTestDriver()
+    dc = _storage_converter(driver)
+
+    # Producing a handle from a value stores it once and wraps the reference.
+    handle = await dc.create_value_handle(_BIG, metadata={"pages": "42"})
+    assert isinstance(handle, ValueHandle)
+    assert driver._store_calls == 1
+    assert driver._retrieve_calls == 0
+
+    # Metadata is readable without acquiring (downloading) the value.
+    assert handle.metadata == {"pages": "42"}
+    assert driver._retrieve_calls == 0
+
+    # The value round-trips through a boundary acquire.
+    assert await dc.resolve_value_handle(handle) == _BIG
+    assert driver._retrieve_calls == 1

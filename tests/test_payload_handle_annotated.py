@@ -5,7 +5,7 @@ shared contract type stays ``T``, and a *marker* on the annotation (not the type
 itself) drives handle consumption. A caller passes a plain ``T`` because
 ``Annotated[T, AsHandle]`` is transparent to type checkers, so there is no
 coupling; the SDK recovers the marker and delivers a forward-only
-:py:class:`PayloadHandle` instead of materializing.
+:py:class:`ValueHandle` instead of materializing.
 
 Scope note: this exercises the converter layer directly, which is where the
 mechanism lives. It does NOT yet work end to end through a running workflow,
@@ -20,9 +20,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any, get_type_hints
 
-from temporalio.converter import DataConverter, PayloadHandle
+from temporalio.common import AsHandle, ValueHandle
+from temporalio.converter import DataConverter
 from temporalio.converter._payload_handle import (
-    AsHandle,
     _is_payload_handle_hint,
     _payload_handle_inner_type,
 )
@@ -32,7 +32,7 @@ def test_annotated_is_transparent_but_marker_recoverable() -> None:
     def handler(data: Annotated[str, AsHandle]) -> None: ...
 
     # A caller and a type checker see a plain `str` -- the contract is unchanged,
-    # so there is no coupling: the caller passes a `str`, not a PayloadHandle.
+    # so there is no coupling: the caller passes a `str`, not a ValueHandle.
     assert get_type_hints(handler)["data"] is str
     # The SDK can still recover the marker when it asks for extras.
     assert (
@@ -57,12 +57,12 @@ async def test_same_payload_consumed_as_value_or_handle_by_marker() -> None:
     [value] = await dc.decode([payload], [str])
     assert value == "big-value"
 
-    # Consumed via the marker -> a PayloadHandle, with no change to the `str`
+    # Consumed via the marker -> a ValueHandle, with no change to the `str`
     # contract. Its value is acquired at the boundary through the converter.
     handle_hint: Any = Annotated[str, AsHandle]
     [handle] = await dc.decode([payload], [handle_hint])
-    assert isinstance(handle, PayloadHandle)
-    assert await dc.get_handle_value(handle) == "big-value"
+    assert isinstance(handle, ValueHandle)
+    assert await dc.resolve_value_handle(handle) == "big-value"
 
 
 async def test_annotated_handle_is_a_data_only_value() -> None:
@@ -71,11 +71,11 @@ async def test_annotated_handle_is_a_data_only_value() -> None:
 
     # Sync conversion, as inside the workflow sandbox, yields a data-only handle:
     # it carries the payload but owns no acquire behavior. Forward-only-ness is a
-    # property of the workflow surface (which does not expose get_handle_value),
+    # property of the workflow surface (which does not expose resolve_value_handle),
     # not of the handle; acquisition is a boundary operation.
     handle_hint: Any = Annotated[str, AsHandle]
     [handle] = dc.payload_converter.from_payloads([payload], [handle_hint])
-    assert isinstance(handle, PayloadHandle)
+    assert isinstance(handle, ValueHandle)
     assert not hasattr(handle, "materialize")
     # Through a boundary converter the value is acquirable.
-    assert await dc.get_handle_value(handle) == "big-value"
+    assert await dc.resolve_value_handle(handle) == "big-value"

@@ -9,7 +9,7 @@ import types
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import IntEnum
 from typing import (
@@ -376,6 +376,77 @@ class RawValue:
         object.__setattr__(
             self, "payload", temporalio.api.common.v1.Payload.FromString(state[1:])
         )
+
+
+# User metadata attached to a value handle is stored under payload-metadata keys
+# with this prefix. It is server-opaque and travels with the reference, so
+# consumers can read it without acquiring the value.
+_HANDLE_METADATA_PREFIX = "_temporal-handle-meta."
+
+
+@dataclass(frozen=True)
+class ValueHandle(Generic[temporalio.types.AnyType]):
+    """A lazy, immutable, pass-by-reference handle to a value.
+
+    The lazy sibling of :py:class:`RawValue`. Annotate a workflow/activity/signal
+    parameter or return value as ``ValueHandle[T]`` to receive one of these
+    instead of the materialized value. Forward it onward without cost, and
+    acquire its value at a boundary (an activity or client) where fetching data
+    is permitted, via :py:func:`temporalio.activity.resolve_value_handle` or
+    :py:meth:`temporalio.converter.DataConverter.resolve_value_handle`. A handle
+    does not acquire its own value.
+    """
+
+    # The opaque end-of-pipeline payload (may be an external-storage reference
+    # or a codec-encoded inline payload). The handle is backing-agnostic; this
+    # is read by the boundary converter when acquiring the value.
+    _payload: temporalio.api.common.v1.Payload
+    # Inner type ``T`` captured from the annotation, used as the decode hint
+    # when acquiring the value. May be None for a bare ``ValueHandle``.
+    _type: type | None = field(default=None, compare=False)
+
+    @property
+    def metadata(self) -> Mapping[str, str]:
+        """User metadata attached at creation, readable without acquiring the value.
+
+        Lets a consumer route or filter on small descriptive data (size, format,
+        etc.) without downloading the underlying payload. Empty if none was
+        attached.
+        """
+        prefix = _HANDLE_METADATA_PREFIX
+        return {
+            key[len(prefix) :]: value.decode()
+            for key, value in self._payload.metadata.items()
+            if key.startswith(prefix)
+        }
+
+    def __getstate__(self) -> object:
+        """Pickle support (workflow sandbox caching)."""
+        return {"payload": self._payload.SerializeToString(), "type": self._type}
+
+    def __setstate__(self, state: object) -> None:
+        """Pickle support."""
+        if not isinstance(state, dict):
+            raise TypeError(f"Expected dict state, got {type(state)}")
+        object.__setattr__(
+            self,
+            "_payload",
+            temporalio.api.common.v1.Payload.FromString(state["payload"]),
+        )
+        object.__setattr__(self, "_type", state.get("type"))
+
+
+class AsHandle:
+    """Marker for ``Annotated[T, AsHandle]``: consume ``T`` as a forward-only
+    :py:class:`ValueHandle` without ``T`` leaving the shared contract.
+
+    ``Annotated[T, AsHandle]`` is transparent to type checkers (both a caller and
+    the callee still see ``T``), so a caller passes a plain ``T`` -- no coupling.
+    The SDK recovers the marker via ``get_type_hints(..., include_extras=True)``
+    and delivers a handle instead of materializing. This is the *forward-only*
+    (type-erased) option: the callee's variable is still statically ``T``, so it
+    can forward the value but cannot call handle methods on it statically.
+    """
 
 
 # We choose to make this a list instead of an sequence so we can catch if people

@@ -35,7 +35,6 @@ from temporalio.converter._payload_converter import (
     PayloadConverter,
     value_to_type,
 )
-from temporalio.converter._payload_handle import PayloadHandle
 from temporalio.converter._search_attributes import (
     decode_search_attributes,
     decode_typed_search_attributes,
@@ -77,7 +76,6 @@ __all__ = [
     "JSONTypeConverterUnhandled",
     "PayloadCodec",
     "PayloadConverter",
-    "PayloadHandle",
     "SerializationContext",
     "WithSerializationContext",
     "WorkflowSerializationContext",

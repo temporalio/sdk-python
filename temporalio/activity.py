@@ -459,10 +459,10 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     return _Context.current().payload_converter
 
 
-async def get_handle_value(
-    handle: temporalio.converter.PayloadHandle[AnyType],
+async def resolve_value_handle(
+    handle: temporalio.common.ValueHandle[AnyType],
 ) -> AnyType:
-    """Acquire the value a :py:class:`temporalio.converter.PayloadHandle` refers to.
+    """Acquire the value a :py:class:`temporalio.common.ValueHandle` refers to.
 
     Uses this activity's data converter to run the handle's deferred inbound
     pipeline (external-storage retrieval if offloaded, codec decode, then
@@ -474,9 +474,32 @@ async def get_handle_value(
     if context.data_converter is None:
         raise RuntimeError(
             "No data converter is available in this activity context; "
-            "cannot acquire a PayloadHandle value."
+            "cannot acquire a ValueHandle value."
         )
-    return await context.data_converter.get_handle_value(handle)
+    return await context.data_converter.resolve_value_handle(handle)
+
+
+async def create_value_handle(
+    value: AnyType,
+    *,
+    metadata: Mapping[str, str] | None = None,
+) -> temporalio.common.ValueHandle[AnyType]:
+    """Produce a :py:class:`~temporalio.common.ValueHandle` from a value.
+
+    Stores the value via this activity's data converter (offloading to external
+    storage if configured) under the activity's serialization context, and
+    returns a handle carrying a reference plus any ``metadata``. A consumer can
+    read that metadata without acquiring the value. Call it from activity code,
+    where storage I/O is permitted; a workflow forwards handles but does not
+    create or acquire their values.
+    """
+    context = _Context.current()
+    if context.data_converter is None:
+        raise RuntimeError(
+            "No data converter is available in this activity context; "
+            "cannot create a ValueHandle."
+        )
+    return await context.data_converter.create_value_handle(value, metadata=metadata)
 
 
 def metric_meter() -> temporalio.common.MetricMeter:

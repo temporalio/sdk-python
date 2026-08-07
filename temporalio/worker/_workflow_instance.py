@@ -232,7 +232,7 @@ class WorkflowInstance(ABC):
 
         Not abstract: defaults to False (eager retrieval, the prior behavior).
         Overridden to return True when the pending activity/child-workflow
-        requested its result as a ``PayloadHandle``, so the worker can skip
+        requested its result as a ``ValueHandle``, so the worker can skip
         downloading an offloaded result the workflow only forwards.
         """
         return False
@@ -3221,7 +3221,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             )
         )
 
-    def as_payload_handle(self) -> temporalio.workflow.ActivityHandle[Any]:
+    def as_value_handle(self) -> temporalio.workflow.ActivityHandle[Any]:
         ph = temporalio.converter._payload_handle
         if not ph._is_payload_handle_hint(self._input.ret_type):
             self._input.ret_type = ph._payload_handle_hint(self._input.ret_type)
@@ -3380,7 +3380,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             workflow_context
         )
 
-    def as_payload_handle(self) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
+    def as_value_handle(self) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         ph = temporalio.converter._payload_handle
         if not ph._is_payload_handle_hint(self._input.ret_type):
             self._input.ret_type = ph._payload_handle_hint(self._input.ret_type)

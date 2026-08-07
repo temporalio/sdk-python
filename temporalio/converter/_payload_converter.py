@@ -46,7 +46,7 @@ if sys.version_info >= (3, 11):
     from enum import StrEnum  # type: ignore[reportUnreachable]
 
 from temporalio.converter._payload_handle import (
-    PayloadHandle,
+    ValueHandle,
     _create_handle,
     _is_payload_handle_hint,
     _payload_handle_inner_type,
@@ -267,10 +267,10 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             # RawValue should just pass through
             if isinstance(value, temporalio.common.RawValue):
                 payload = value.payload
-            # A PayloadHandle re-emits its opaque payload unchanged, so
+            # A ValueHandle re-emits its opaque payload unchanged, so
             # forwarding it (e.g. workflow -> activity) neither downloads nor
             # re-stores the underlying data.
-            elif isinstance(value, PayloadHandle):
+            elif isinstance(value, ValueHandle):
                 payload = value._payload
             else:
                 for converter in self.converters.values():
@@ -304,7 +304,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             if type_hint == temporalio.common.RawValue:
                 values.append(temporalio.common.RawValue(payload))
                 continue
-            # A PayloadHandle[T] hint defers acquisition: wrap the opaque payload
+            # A ValueHandle[T] hint defers acquisition: wrap the opaque payload
             # regardless of its encoding rather than materializing it now. The
             # handle binds to the current boundary converter (via contextvar) if
             # one is set, else it is forward-only.
