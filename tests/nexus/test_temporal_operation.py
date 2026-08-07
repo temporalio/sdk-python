@@ -341,19 +341,21 @@ class TestServiceHandler:
         self,
         _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
-        input: Input,
+        _input: Input,
     ) -> nexus.TemporalOperationResult[None]:
+        # Keep the first activity running so its callback cannot race the
+        # handler error raised by the second start.
         await client.start_activity(
-            echo_activity,
-            input,
+            wait_for_cancel_activity,
             id=f"double-start-activity-{uuid.uuid4()}",
-            start_to_close_timeout=timedelta(seconds=5),
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
         )
         await client.start_activity(
-            echo_activity,
-            input,
+            wait_for_cancel_activity,
             id=f"double-start-activity-{uuid.uuid4()}",
-            start_to_close_timeout=timedelta(seconds=5),
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
         )
         return nexus.TemporalOperationResult.sync(None)
 
@@ -1330,7 +1332,7 @@ async def test_temporal_operation_double_start_activity_raises_handler_err(
         env.client,
         task_queue=task_queue,
         nexus_service_handlers=[TestServiceHandler()],
-        activities=[echo_activity],
+        activities=[wait_for_cancel_activity],
     ):
         nexus_client = client.create_nexus_client(TestService, endpoint_name)
 
