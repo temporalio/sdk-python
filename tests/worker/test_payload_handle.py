@@ -3,7 +3,7 @@
 Demonstrates the headline behavior: a workflow whose run argument is annotated
 ``PayloadHandle[T]`` receives a forward-only handle instead of an eagerly
 downloaded value, forwards it to an activity without downloading, and the
-activity materializes it on demand. The proof is the driver's retrieve count:
+activity acquires it on demand. The proof is the driver's retrieve count:
 0 for pass-through (and on replay), exactly 1 when an activity materializes.
 """
 
@@ -29,8 +29,8 @@ _THRESHOLD = 1024
 
 @activity.defn
 async def consume_handle(data: PayloadHandle[str]) -> int:
-    # The activity needs the bytes, so it materializes on demand.
-    value = await data.materialize()
+    # The activity needs the bytes, so it acquires them on demand at the boundary.
+    value = await activity.get_handle_value(data)
     return len(value)
 
 

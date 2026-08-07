@@ -2,8 +2,9 @@
 
 These exercise the converter-level behavior: a PayloadHandle[T] annotation
 defers acquisition (external-storage retrieval, codec decode, deserialization)
-until materialize() is awaited, and forwarding a handle re-emits its opaque
-payload without downloading. The proof is the driver's retrieve-call count.
+until the value is acquired at a boundary via DataConverter.get_handle_value,
+and forwarding a handle re-emits its opaque payload without downloading. The
+proof is the driver's retrieve-call count.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ def _storage_converter(
     )
 
 
-async def test_toplevel_reference_becomes_bound_handle() -> None:
+async def test_toplevel_reference_becomes_handle() -> None:
     driver = InMemoryTestDriver()
     dc = _storage_converter(driver)
 
@@ -47,27 +48,34 @@ async def test_toplevel_reference_becomes_bound_handle() -> None:
     # No download happened just by receiving the handle.
     assert driver._retrieve_calls == 0
 
-    assert await handle.materialize() == _BIG
+    # The value is acquired at the boundary, through the converter.
+    assert await dc.get_handle_value(handle) == _BIG
     assert driver._retrieve_calls == 1
 
 
-async def test_forward_only_handle_roundtrips_without_download() -> None:
+async def test_handle_is_data_only_and_forwards_without_download() -> None:
     driver = InMemoryTestDriver()
     dc = _storage_converter(driver)
     [reference] = await dc.encode([_BIG])
 
-    # Decoding through the bare payload converter (no boundary binding, as in
-    # the workflow sandbox) yields a forward-only handle.
+    # A handle is a data-only value: holding it downloads nothing, and it owns
+    # no acquire behavior (acquisition is a boundary operation, not a method on
+    # the handle). Forward-only-ness lives on the workflow surface, which simply
+    # does not expose get_handle_value, not in the handle's state.
     [handle] = dc.payload_converter.from_payloads([reference], [PayloadHandle[str]])
     assert isinstance(handle, PayloadHandle)
+    assert not hasattr(handle, "materialize")
+    assert not hasattr(handle, "get_handle_value")
+    assert driver._retrieve_calls == 0
 
-    with pytest.raises(RuntimeError, match="forward-only"):
-        await handle.materialize()
-
-    # Forwarding re-emits a byte-identical reference payload.
+    # Forwarding re-emits a byte-identical reference payload, still no download.
     [out] = dc.payload_converter.to_payloads([handle])
     assert out.SerializeToString() == reference.SerializeToString()
     assert driver._retrieve_calls == 0
+
+    # The value is acquired only through a boundary converter.
+    assert await dc.get_handle_value(handle) == _BIG
+    assert driver._retrieve_calls == 1
 
 
 async def test_non_handle_annotation_is_eager() -> None:
@@ -112,7 +120,7 @@ class _MarkerCodec(PayloadCodec):
         return out
 
 
-async def test_codec_deferred_until_materialize() -> None:
+async def test_codec_deferred_until_acquired() -> None:
     driver = InMemoryTestDriver()
     codec = _MarkerCodec()
     dc = _storage_converter(driver, codec=codec)
@@ -122,11 +130,11 @@ async def test_codec_deferred_until_materialize() -> None:
     # The reference is not codec-decoded when the handle is produced.
     assert codec.decode_calls == 0
 
-    assert await handle.materialize() == _BIG
+    assert await dc.get_handle_value(handle) == _BIG
     assert codec.decode_calls == 1
 
 
-async def test_pickled_handle_is_forward_only() -> None:
+async def test_pickled_handle_survives_and_forwards() -> None:
     driver = InMemoryTestDriver()
     dc = _storage_converter(driver)
     payloads = await dc.encode([_BIG])
@@ -134,10 +142,9 @@ async def test_pickled_handle_is_forward_only() -> None:
 
     restored = pickle.loads(pickle.dumps(handle))
     assert isinstance(restored, PayloadHandle)
-    with pytest.raises(RuntimeError, match="forward-only"):
-        await restored.materialize()
-    # The opaque payload survives, so a rehydrated handle can still be forwarded.
-    # Compare with proto equality: re-parsing may reorder the metadata map, so
-    # serialized bytes are not a reliable equality check here.
+    # The opaque payload survives, so a rehydrated handle can still be forwarded
+    # and acquired at a boundary. Compare with proto equality: re-parsing may
+    # reorder the metadata map, so serialized bytes are not a reliable check.
     [out] = dc.payload_converter.to_payloads([restored])
     assert out == payloads[0]
+    assert await dc.get_handle_value(restored) == _BIG
