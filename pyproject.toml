@@ -82,7 +82,7 @@ dev = [
   "moto[s3,server]>=5",
   "langgraph>=1.1.0",
   "langsmith>=0.7.34,<0.9",
-  "setuptools<82",
+  "setuptools<84",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
