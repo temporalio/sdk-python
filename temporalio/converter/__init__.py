@@ -37,7 +37,6 @@ from temporalio.converter._payload_converter import (
     transfer_type_convertible,
     value_to_type,
 )
-from temporalio.converter._payload_handle import PayloadHandle
 from temporalio.converter._payload_validation_error import (
     create_payload_validation_error,
 )
@@ -83,7 +82,6 @@ __all__ = [
     "JSONTypeConverterUnhandled",
     "PayloadCodec",
     "PayloadConverter",
-    "PayloadHandle",
     "SerializationContext",
     "WithSerializationContext",
     "WorkflowSerializationContext",

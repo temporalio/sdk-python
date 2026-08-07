@@ -66,13 +66,13 @@ class ActivityHandle(_AsyncioTask[ReturnType]):  # type: ignore[type-var]
     This extends :py:class:`asyncio.Task` and supports all task features.
     """
 
-    def as_payload_handle(
+    def as_value_handle(
         self,
-    ) -> ActivityHandle[temporalio.converter.PayloadHandle[ReturnType]]:
-        """Consume this activity's result as a lazy PayloadHandle.
+    ) -> ActivityHandle[temporalio.common.ValueHandle[ReturnType]]:
+        """Consume this activity's result as a lazy ValueHandle.
 
         The activity is unchanged and still returns its declared type; awaiting
-        this handle yields a :py:class:`temporalio.converter.PayloadHandle` of
+        this handle yields a :py:class:`temporalio.common.ValueHandle` of
         that type instead of the materialized value. If the result was offloaded
         to external storage it is not downloaded into the workflow -- forward the
         handle to an activity (or materialize it there) to avoid paying for data

@@ -1,7 +1,7 @@
-"""End-to-end tests for PayloadHandle (Phase 1 prototype).
+"""End-to-end tests for ValueHandle (Phase 1 prototype).
 
 Demonstrates the headline behavior: a workflow whose run argument is annotated
-``PayloadHandle[T]`` receives a forward-only handle instead of an eagerly
+``ValueHandle[T]`` receives a forward-only handle instead of an eagerly
 downloaded value, forwards it to an activity without downloading, and the
 activity acquires it on demand. The proof is the driver's retrieve count:
 0 for pass-through (and on replay), exactly 1 when an activity materializes.
@@ -16,7 +16,8 @@ from datetime import timedelta
 import temporalio.converter
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.converter import ExternalStorage, PayloadHandle
+from temporalio.common import ValueHandle
+from temporalio.converter import ExternalStorage
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer
 from tests.helpers import new_worker
@@ -28,14 +29,14 @@ _THRESHOLD = 1024
 
 
 @activity.defn
-async def consume_handle(data: PayloadHandle[str]) -> int:
+async def consume_handle(data: ValueHandle[str]) -> int:
     # The activity needs the bytes, so it acquires them on demand at the boundary.
-    value = await activity.get_handle_value(data)
+    value = await activity.resolve_value_handle(data)
     return len(value)
 
 
 @activity.defn
-async def ignore_handle(data: PayloadHandle[str]) -> str:
+async def ignore_handle(data: ValueHandle[str]) -> str:
     # Never materializes; the handle is just passed through.
     return "ignored"
 
@@ -43,7 +44,7 @@ async def ignore_handle(data: PayloadHandle[str]) -> str:
 @workflow.defn
 class ForwardToConsumeWorkflow:
     @workflow.run
-    async def run(self, data: PayloadHandle[str]) -> int:
+    async def run(self, data: ValueHandle[str]) -> int:
         # Forward the handle to an activity without materializing it here.
         return await workflow.execute_activity(
             consume_handle, data, start_to_close_timeout=timedelta(seconds=30)
@@ -53,7 +54,7 @@ class ForwardToConsumeWorkflow:
 @workflow.defn
 class ForwardToIgnoreWorkflow:
     @workflow.run
-    async def run(self, data: PayloadHandle[str]) -> str:
+    async def run(self, data: ValueHandle[str]) -> str:
         return await workflow.execute_activity(
             ignore_handle, data, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -74,7 +75,7 @@ class ResultAsHandleConsumeWorkflow:
         # an activity that materializes it.
         handle = await workflow.start_activity(
             produce_big, start_to_close_timeout=timedelta(seconds=30)
-        ).as_payload_handle()
+        ).as_value_handle()
         return await workflow.execute_activity(
             consume_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -86,7 +87,7 @@ class ResultAsHandlePassThroughWorkflow:
     async def run(self) -> str:
         handle = await workflow.start_activity(
             produce_big, start_to_close_timeout=timedelta(seconds=30)
-        ).as_payload_handle()
+        ).as_value_handle()
         return await workflow.execute_activity(
             ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -106,9 +107,32 @@ class ParentChildResultAsHandleWorkflow:
         # Upgrade an unchanged child workflow's result to a handle and forward it
         # without materializing it in this (parent) workflow.
         child = await workflow.start_child_workflow(ChildProducerWorkflow.run)
-        handle = await child.as_payload_handle()
+        handle = await child.as_value_handle()
         return await workflow.execute_activity(
             ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+@activity.defn
+async def produce_handle_with_metadata() -> ValueHandle[str]:
+    # The activity creates a handle from its (large) result and attaches metadata
+    # that a consumer can probe without downloading the value.
+    return await activity.create_value_handle(_BIG, metadata={"length": str(len(_BIG))})
+
+
+@workflow.defn
+class ProbeMetadataThenForwardWorkflow:
+    @workflow.run
+    async def run(self) -> int:
+        handle = await workflow.execute_activity(
+            produce_handle_with_metadata,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        # Probe metadata in the workflow to decide, without downloading the value.
+        assert handle.metadata["length"] == str(len(_BIG))
+        # Forward the handle to an activity that materializes it.
+        return await workflow.execute_activity(
+            consume_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
 
 
@@ -237,3 +261,26 @@ async def test_child_workflow_result_as_handle_pass_through(
     # The child workflow's offloaded result was upgraded to a handle in the
     # parent and forwarded without ever being downloaded.
     assert driver._retrieve_calls == 0
+
+
+async def test_activity_creates_handle_with_probeable_metadata(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = InMemoryTestDriver()
+    client = await _client(env, driver)
+    async with new_worker(
+        client,
+        ProbeMetadataThenForwardWorkflow,
+        activities=[produce_handle_with_metadata, consume_handle],
+    ) as worker:
+        result = await client.execute_workflow(
+            ProbeMetadataThenForwardWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == len(_BIG)
+    # Stored once (when the activity created the handle) and downloaded once (when
+    # the consuming activity materialized it). The workflow probed metadata and
+    # forwarded the handle without any download.
+    assert driver._store_calls == 1
+    assert driver._retrieve_calls == 1

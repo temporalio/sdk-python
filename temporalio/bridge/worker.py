@@ -339,9 +339,9 @@ async def decode_activation(
         defer: content-neutral predicate (reads the visitor's current command /
             run-argument context) returning True when the payload(s) being
             visited should be left un-retrieved and un-codec-decoded so they
-            surface as forward-only PayloadHandles.
+            surface as forward-only ValueHandles.
         index_run_args: visit run arguments one at a time so ``defer`` can decide
-            per argument position (only needed when a run arg is a PayloadHandle).
+            per argument position (only needed when a run arg is a ValueHandle).
 
     Returns:
         Metrics from any external storage retrieval operations that occurred.
