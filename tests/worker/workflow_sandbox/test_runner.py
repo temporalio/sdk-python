@@ -525,6 +525,59 @@ class LazyImportWorkflow:
             ) from err
 
 
+async def test_workflow_sandbox_initial_workflow_import_does_not_warn() -> None:
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH,
+    )
+
+    with warnings.catch_warnings(record=True) as recorder:
+        warnings.simplefilter("always")
+        definition = workflow._Definition.from_class(LazyImportWorkflow)
+        assert definition is not None
+        SandboxedWorkflowRunner(restrictions).prepare_workflow(definition)
+
+    assert (
+        "Module tests.worker.workflow_sandbox.test_runner was not intentionally "
+        "passed through to the sandbox."
+        not in {str(warning.message) for warning in recorder}
+    )
+
+
+async def test_workflow_sandbox_initial_workflow_import_warns_for_dependencies() -> (
+    None
+):
+    from tests.worker.workflow_sandbox.testmodules.initial_import_warning_dependency import (
+        InitialImportWarningDependencyWorkflow,
+    )
+
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH,
+    )
+
+    with warnings.catch_warnings(record=True) as recorder:
+        warnings.simplefilter("always")
+        definition = workflow._Definition.from_class(
+            InitialImportWarningDependencyWorkflow
+        )
+        assert definition is not None
+        SandboxedWorkflowRunner(restrictions).prepare_workflow(definition)
+
+    assert (
+        "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not "
+        "intentionally passed through to the sandbox."
+        in {str(warning.message) for warning in recorder}
+    )
+
+    raising_restrictions = dataclasses.replace(
+        restrictions,
+        import_notification_policy=SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH,
+    )
+    with pytest.raises(UnintentionalPassthroughError, match="lazy_module"):
+        SandboxedWorkflowRunner(raising_restrictions).prepare_workflow(definition)
+
+
 async def test_workflow_sandbox_import_default_warnings(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,

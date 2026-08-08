@@ -95,6 +95,9 @@ to include examples, links to docs, or any other relevant information.
 
 - Marked system Nexus envelope payloads so nested payloads can be detected and
   visited after the envelope is already stored as a payload.
+- Suppressed intentional passthrough notifications for the initial workflow
+  module import while retaining configured notifications for that module's
+  import-time dependencies.
 
 ## [1.30.0] - 2026-07-01
 

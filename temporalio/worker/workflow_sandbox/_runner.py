@@ -135,14 +135,17 @@ class _Instance(WorkflowInstance):
         if module_name == "__main__":
             module_name = "__temporal_main__"
         try:
-            # Import user code
-            self._run_code(
-                "with __temporal_importer.applied():\n"
-                # Import the workflow code
-                f"  from {module_name} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
-                f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n",
-                __temporal_importer=self.importer,
-            )
+            # Import user code. The workflow module is intentionally loaded
+            # into every sandbox instance, while its import-time dependencies
+            # must retain the configured warning/error policy.
+            with self.importer.initial_workflow_module_import(module_name):
+                self._run_code(
+                    "with __temporal_importer.applied():\n"
+                    # Import the workflow code
+                    f"  from {module_name} import {self.instance_details.defn.cls.__name__} as __temporal_workflow_class\n"
+                    f"  from {self.runner_class.__module__} import {self.runner_class.__name__} as __temporal_runner_class\n",
+                    __temporal_importer=self.importer,
+                )
 
             # Set context as in runtime
             self.importer.restriction_context.is_runtime = True
