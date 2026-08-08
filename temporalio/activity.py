@@ -484,14 +484,19 @@ async def create_value_handle(
     *,
     metadata: Mapping[str, str] | None = None,
 ) -> temporalio.common.ValueHandle[AnyType]:
-    """Produce a :py:class:`~temporalio.common.ValueHandle` from a value.
+    """Produce a :py:class:`~temporalio.common.ValueHandle` from a value, deferring the store.
 
-    Stores the value via this activity's data converter (offloading to external
-    storage if configured) under the activity's serialization context, and
-    returns a handle carrying a reference plus any ``metadata``. A consumer can
-    read that metadata without acquiring the value. Call it from activity code,
-    where storage I/O is permitted; a workflow forwards handles but does not
-    create or acquire their values.
+    Converts the value immediately (the convert does no I/O) and returns a
+    *pending* handle. The stored form -- codec encode plus external-storage upload
+    if configured, with the ``metadata`` attached -- is produced only when the
+    activity's result is committed, using the activity's serialization context. If
+    the activity faults before returning the handle, nothing is uploaded and no
+    external-storage blob is orphaned. A consumer can read the metadata without
+    acquiring the value. A workflow forwards handles but does not create or acquire
+    their values.
+
+    Async for consistency with :py:func:`resolve_value_handle` and the SDK's other
+    boundary operations, even though the convert itself does no I/O.
     """
     context = _Context.current()
     if context.data_converter is None:
