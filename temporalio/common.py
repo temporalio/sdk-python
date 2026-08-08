@@ -397,13 +397,22 @@ class ValueHandle(Generic[temporalio.types.AnyType]):
     does not acquire its own value.
     """
 
-    # The opaque end-of-pipeline payload (may be an external-storage reference
-    # or a codec-encoded inline payload). The handle is backing-agnostic; this
-    # is read by the boundary converter when acquiring the value.
-    _payload: temporalio.api.common.v1.Payload
+    # The handle's payload. For a realized handle this is the stored reference
+    # the boundary converter acquires from. For a *pending* handle (see create at
+    # the activity boundary) it is the value already converted at create time,
+    # still awaiting the deferred codec encode and external-storage upload.
+    _payload: temporalio.api.common.v1.Payload | None = None
     # Inner type ``T`` captured from the annotation, used as the decode hint
     # when acquiring the value. May be None for a bare ``ValueHandle``.
     _type: type | None = field(default=None, compare=False)
+    # Pending-handle state: True while the store (codec encode + external-storage
+    # upload) is still deferred to commit, plus the metadata to attach when it is
+    # stored. This state is transient and producer-side only; a handle only ever
+    # crosses the wire realized.
+    _pending: bool = field(default=False, compare=False)
+    _pending_metadata: Mapping[str, str] | None = field(
+        default=None, compare=False, repr=False
+    )
 
     @property
     def metadata(self) -> Mapping[str, str]:
@@ -413,6 +422,10 @@ class ValueHandle(Generic[temporalio.types.AnyType]):
         etc.) without downloading the underlying payload. Empty if none was
         attached.
         """
+        if self._pending_metadata is not None:
+            return dict(self._pending_metadata)
+        if self._payload is None:
+            return {}
         prefix = _HANDLE_METADATA_PREFIX
         return {
             key[len(prefix) :]: value.decode()

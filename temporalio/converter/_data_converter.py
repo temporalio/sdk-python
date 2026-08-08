@@ -119,6 +119,17 @@ class DataConverter(WithSerializationContext):
             same number as values given, but must be at least one and cannot be
             more than was given.
         """
+        # Realize any pending (deferred-store) value handles here, at commit.
+        # This is where a deferred create_value_handle actually stores. If a
+        # producing activity faults before returning its result, encode is never
+        # called for that result, so a pending handle is simply dropped: nothing
+        # is uploaded and no external-storage blob is orphaned.
+        values = [
+            await self._realize_value_handle(value)
+            if isinstance(value, ValueHandle) and value._pending
+            else value
+            for value in values
+        ]
         payloads = self.payload_converter.to_payloads(values)
         payloads = await self._encode_payload_sequence(payloads)
         payloads = await self._external_store_payload_sequence(payloads)
@@ -186,6 +197,12 @@ class DataConverter(WithSerializationContext):
             RuntimeError: if the handle carries no concrete type (a bare
                 ``ValueHandle`` annotation), since conversion needs a type.
         """
+        # A pending handle (created but not yet committed) holds the value as an
+        # already-converted payload; deserialize it directly, with no I/O.
+        if handle._pending:
+            return self.payload_converter.from_payloads(
+                [handle._payload], [handle._type]
+            )[0]
         inner_type = handle._type
         if inner_type is None:
             raise RuntimeError(
@@ -202,23 +219,47 @@ class DataConverter(WithSerializationContext):
         *,
         metadata: Mapping[str, str] | None = None,
     ) -> ValueHandle[Any]:
-        """Produce a :py:class:`ValueHandle` from a value.
+        """Produce a :py:class:`ValueHandle` from a value, deferring the store.
 
-        The producer-side counterpart to :py:meth:`resolve_value_handle`: it runs the
-        outbound pipeline (convert, codec encode, external-storage offload if
-        configured) under this converter's serialization context, so the value
-        is stored once and the handle carries a reference. Optional ``metadata``
-        is attached as server-opaque keys that a consumer can probe without
-        acquiring the value.
+        The producer-side counterpart to :py:meth:`resolve_value_handle`. The
+        value is *converted* immediately (as a workflow method invocation does),
+        so it is snapshotted and any serialization error surfaces here at the call
+        site. But the I/O-bearing tail -- codec encode and external-storage upload
+        -- is deferred: it runs only when the handle is encoded at result/input
+        commit (see :py:meth:`encode` and :py:meth:`_realize_value_handle`). So if
+        a producing activity faults before returning the handle, nothing is
+        uploaded and no external-storage blob is orphaned.
 
-        Call it where storage I/O is permitted (an activity or client boundary),
-        never inside the workflow sandbox. In activity code, prefer
-        :py:func:`temporalio.activity.create_value_handle`.
+        This is async for consistency with :py:meth:`resolve_value_handle` and the
+        SDK's other boundary operations, and to leave room to perform I/O (such as
+        an eager store) without a breaking signature change; the convert itself
+        does none. Call it where the deferred upload will be permitted at commit
+        (an activity or client boundary), never inside the workflow sandbox. In
+        activity code, prefer :py:func:`temporalio.activity.create_value_handle`.
         """
-        [payload] = await self.encode([value])
-        if metadata:
-            _attach_metadata(payload, metadata)
-        return ValueHandle(payload, type(value))
+        [payload] = self.payload_converter.to_payloads([value])
+        return ValueHandle(
+            _payload=payload,
+            _type=type(value),
+            _pending=True,
+            _pending_metadata=metadata,
+        )
+
+    async def _realize_value_handle(
+        self, handle: ValueHandle[Any]
+    ) -> ValueHandle[Any]:
+        """Store a pending handle's converted value now, returning a realized handle.
+
+        The value was already converted at create time; this runs the deferred,
+        I/O-bearing tail of the outbound pipeline -- codec encode, then
+        external-storage offload if configured -- and attaches the pending
+        metadata to the resulting reference. Called from :py:meth:`encode` at commit.
+        """
+        [payload] = await self._encode_payload_sequence([handle._payload])
+        [payload] = await self._external_store_payload_sequence([payload])
+        if handle._pending_metadata:
+            _attach_metadata(payload, handle._pending_metadata)
+        return ValueHandle(payload, handle._type)
 
     async def encode_wrapper(
         self, values: Sequence[Any]

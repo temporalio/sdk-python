@@ -150,20 +150,41 @@ async def test_pickled_handle_survives_and_forwards() -> None:
     assert await dc.resolve_value_handle(restored) == _BIG
 
 
-async def test_create_value_handle_stores_once_with_probeable_metadata() -> None:
+async def test_create_value_handle_defers_store_until_commit() -> None:
+    driver = InMemoryTestDriver()
+    # A realistic threshold: the value offloads, its small reference does not.
+    dc = DataConverter(
+        external_storage=ExternalStorage(drivers=[driver], payload_size_threshold=1024)
+    )
+    value = "x" * 4096
+
+    # Creating a handle stores nothing: the store is deferred to commit (encode).
+    # create_value_handle does no I/O at call time (the convert is synchronous).
+    handle = await dc.create_value_handle(value, metadata={"pages": "42"})
+    assert isinstance(handle, ValueHandle)
+    assert driver._store_calls == 0
+    # Metadata is known without any store.
+    assert handle.metadata == {"pages": "42"}
+
+    # Encoding the handle, as at result/input commit, is where the store happens.
+    [payload] = await dc.encode([handle])
+    assert driver._store_calls == 1
+
+    # The committed payload is a realized reference carrying the metadata: a
+    # consumer probes the metadata without downloading, then resolves to the value.
+    [realized] = await dc.decode([payload], [ValueHandle[str]])
+    assert realized.metadata == {"pages": "42"}
+    assert driver._retrieve_calls == 0
+    assert await dc.resolve_value_handle(realized) == value
+    assert driver._retrieve_calls == 1
+
+
+async def test_pending_handle_dropped_without_commit_is_never_stored() -> None:
     driver = InMemoryTestDriver()
     dc = _storage_converter(driver)
 
-    # Producing a handle from a value stores it once and wraps the reference.
-    handle = await dc.create_value_handle(_BIG, metadata={"pages": "42"})
-    assert isinstance(handle, ValueHandle)
-    assert driver._store_calls == 1
-    assert driver._retrieve_calls == 0
-
-    # Metadata is readable without acquiring (downloading) the value.
-    assert handle.metadata == {"pages": "42"}
-    assert driver._retrieve_calls == 0
-
-    # The value round-trips through a boundary acquire.
-    assert await dc.resolve_value_handle(handle) == _BIG
-    assert driver._retrieve_calls == 1
+    # A producer that creates a handle but never commits it (e.g. an activity that
+    # faults before returning) uploads nothing, so no external-storage blob is
+    # orphaned.
+    _ = await dc.create_value_handle(_BIG, metadata={"pages": "42"})
+    assert driver._store_calls == 0
