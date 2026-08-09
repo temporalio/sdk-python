@@ -769,7 +769,9 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         "urllib": SandboxMatcher(
             children={"request": SandboxMatcher.all_uses},
         ),
-        "uuid": SandboxMatcher(use={"uuid1", "uuid4"}, only_runtime=True),
+        # uuid7 only exists in the stdlib on Python 3.14+; matching a
+        # nonexistent attribute is harmless on older versions
+        "uuid": SandboxMatcher(use={"uuid1", "uuid4", "uuid7"}, only_runtime=True),
         "webbrowser": SandboxMatcher.all_uses,
         "xmlrpc": SandboxMatcher.all_uses,
         "zipfile": SandboxMatcher(

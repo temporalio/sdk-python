@@ -20,6 +20,14 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- `temporalio.workflow.uuid7()` generates a determinism-safe, time-sortable
+  UUIDv7 (RFC 9562) from workflow time and the workflow's deterministic random
+  generator, complementing the existing `workflow.uuid4()`
+  ([#1450](https://github.com/temporalio/sdk-python/issues/1450)). The
+  workflow sandbox now also restricts the non-deterministic `uuid.uuid7()`
+  added to the standard library in Python 3.14, matching the existing
+  `uuid.uuid1()`/`uuid.uuid4()` restrictions.
+
 ### Changed
 
 - `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters

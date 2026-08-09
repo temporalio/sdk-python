@@ -197,6 +197,10 @@ async def test_workflow_sandbox_restrictions(client: Client):
         if sys.version_info < (3, 14):
             invalid_code_to_check.append("import os.path\nos.path.abspath('foo')")  # type: ignore[reportUnreachable]
 
+        # uuid7 was only added to the stdlib in 3.14
+        if sys.version_info >= (3, 14):
+            invalid_code_to_check.append("import uuid\nuuid.uuid7()")
+
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
                 await client.execute_workflow(
