@@ -47,21 +47,23 @@ class StorageOperationMetrics:
     """Names of the drivers that participated in the operations."""
 
     def record_batch(
-        self, count: int, size: int, duration: timedelta, driver_names: set[str]
+        self, count: int, size: int, driver_names: set[str]
     ) -> None:
         """Record metrics from a batch of storage operations."""
         self.payload_count += count
         self.total_size += size
-        self.total_duration += duration
         self.driver_names.update(driver_names)
 
     @contextlib.contextmanager
     def track(self) -> Generator[Self, None, None]:
-        """Set this instance as the current metrics context and reset on exit."""
+        """Set this instance as the current metrics context and measure
+        wall-clock duration of the enclosed block."""
         token = _current_storage_metrics.set(self)
+        start = time.monotonic()
         try:
             yield self
         finally:
+            self.total_duration = timedelta(seconds=time.monotonic() - start)
             _current_storage_metrics.reset(token)
 
 
@@ -357,8 +359,6 @@ class ExternalStorage:
         return result
 
     async def _store_payload(self, payload: Payload) -> Payload:
-        start_time = time.monotonic()
-
         driver = self._select_driver(self._store_context, payload)
         if driver is None:
             return payload
@@ -379,7 +379,7 @@ class ExternalStorage:
             )
         reference_payload.external_payloads.add().size_bytes = external_size
 
-        ExternalStorage._record_metrics(1, external_size, start_time, {driver.name()})
+        ExternalStorage._record_metrics(1, external_size, {driver.name()})
 
         return reference_payload
 
@@ -394,8 +394,6 @@ class ExternalStorage:
     ) -> list[Payload]:
         if len(payloads) == 1:
             return [await self._store_payload(payloads[0])]
-
-        start_time = time.monotonic()
 
         results = list(payloads)
 
@@ -448,9 +446,7 @@ class ExternalStorage:
             external_count += len(claims)
             driver_names.add(driver.name())
 
-        ExternalStorage._record_metrics(
-            external_count, external_size, start_time, driver_names
-        )
+        ExternalStorage._record_metrics(external_count, external_size, driver_names)
 
         return results
 
@@ -480,7 +476,6 @@ class ExternalStorage:
         if ref is None:
             return payload
 
-        start_time = time.monotonic()
         driver = self._get_driver_by_name(ref.driver_name)
         context = StorageDriverRetrieveContext()
         claim = StorageDriverClaim(claim_data=dict(ref.claim_data))
@@ -492,7 +487,7 @@ class ExternalStorage:
         stored_payload = stored_payloads[0]
 
         ExternalStorage._record_metrics(
-            1, stored_payload.ByteSize(), start_time, {driver.name()}
+            1, stored_payload.ByteSize(), {driver.name()}
         )
 
         return stored_payload
@@ -508,8 +503,6 @@ class ExternalStorage:
     ) -> list[Payload]:
         if len(payloads) == 1:
             return [await self._retrieve_payload(payloads[0])]
-
-        start_time = time.monotonic()
 
         results = list(payloads)
 
@@ -564,9 +557,7 @@ class ExternalStorage:
         for i, retrieved_payload in enumerate(stored_list):
             results[retrieve_indices[i]] = retrieved_payload
 
-        ExternalStorage._record_metrics(
-            external_count, external_size, start_time, driver_names
-        )
+        ExternalStorage._record_metrics(external_count, external_size, driver_names)
 
         return results
 
@@ -587,14 +578,7 @@ class ExternalStorage:
             )
 
     @staticmethod
-    def _record_metrics(
-        count: int, size: int, start_time: float, driver_names: set[str]
-    ):
+    def _record_metrics(count: int, size: int, driver_names: set[str]):
         metrics = _current_storage_metrics.get()
         if metrics is not None:
-            metrics.record_batch(
-                count,
-                size,
-                timedelta(seconds=time.monotonic() - start_time),
-                driver_names,
-            )
+            metrics.record_batch(count, size, driver_names)

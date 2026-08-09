@@ -801,5 +801,56 @@ class TestBackwardCompat:
         assert decoded[0] == value
 
 
+class TestStorageOperationMetrics:
+    def test_track_records_wall_clock_duration(self):
+        """total_duration should reflect the wall-clock span of the track()
+        context, not the sum of individual record_batch calls."""
+        from datetime import timedelta
+
+        from temporalio.converter._extstore import StorageOperationMetrics
+
+        metrics = StorageOperationMetrics()
+        with metrics.track():
+            metrics.record_batch(2, 100, {"driver-a"})
+            metrics.record_batch(3, 200, {"driver-b"})
+
+        assert metrics.payload_count == 5
+        assert metrics.total_size == 300
+        assert metrics.driver_names == {"driver-a", "driver-b"}
+        assert metrics.total_duration > timedelta(0)
+        # Wall-clock should be very short (< 1s); the old sum-of-durations
+        # bug would have produced timedelta(0) since no duration was passed.
+        assert metrics.total_duration < timedelta(seconds=1)
+
+    @pytest.mark.asyncio
+    async def test_concurrent_operations_report_wall_clock(self):
+        """When operations run concurrently, total_duration should reflect
+        wall-clock time (~sleep_time), not the sum of all operations
+        (~sleep_time * concurrency)."""
+        from datetime import timedelta
+
+        from temporalio.converter._extstore import StorageOperationMetrics
+
+        metrics = StorageOperationMetrics()
+
+        async def simulate_driver(name: str, size: int):
+            await asyncio.sleep(0.05)
+            metrics.record_batch(1, size, {name})
+
+        with metrics.track():
+            await asyncio.gather(
+                simulate_driver("a", 100),
+                simulate_driver("b", 200),
+                simulate_driver("c", 300),
+            )
+
+        assert metrics.payload_count == 3
+        assert metrics.total_size == 600
+        assert metrics.driver_names == {"a", "b", "c"}
+        # Wall-clock: ~50ms (concurrent), not ~150ms (sum of three)
+        assert metrics.total_duration < timedelta(milliseconds=120)
+        assert metrics.total_duration >= timedelta(milliseconds=40)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
