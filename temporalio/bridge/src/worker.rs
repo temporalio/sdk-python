@@ -899,24 +899,25 @@ fn convert_versioning_strategy(
         },
         WorkerVersioningStrategy::DeploymentBased(options) => {
             temporalio_sdk_core::WorkerVersioningStrategy::WorkerDeploymentBased(
-                temporalio_common::worker::WorkerDeploymentOptions {
-                    version: temporalio_common::worker::WorkerDeploymentVersion {
+                temporalio_common::worker::WorkerDeploymentOptions::new(
+                    temporalio_common::worker::WorkerDeploymentVersion {
                         deployment_name: options.version.deployment_name,
                         build_id: options.version.build_id,
                     },
-                    use_worker_versioning: options.use_worker_versioning,
-                    default_versioning_behavior: if options.use_worker_versioning {
-                        Some(
-                            temporalio_common::protos::temporal::api::enums::v1::VersioningBehavior::try_from(
-                                options.default_versioning_behavior,
-                            )
-                            .unwrap_or_default()
-                            .into(),
+                )
+                .use_worker_versioning(options.use_worker_versioning)
+                .maybe_default_versioning_behavior(if options.use_worker_versioning {
+                    Some(
+                        temporalio_common::protos::temporal::api::enums::v1::VersioningBehavior::try_from(
+                            options.default_versioning_behavior,
                         )
-                    } else {
-                        None
-                    },
-                },
+                        .unwrap_or_default()
+                        .into(),
+                    )
+                } else {
+                    None
+                })
+                .build(),
             )
         }
         WorkerVersioningStrategy::LegacyBuildIdBased(lb) => {
