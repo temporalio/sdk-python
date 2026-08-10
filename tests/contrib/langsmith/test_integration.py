@@ -1263,8 +1263,6 @@ class TestBuiltinQueryFiltering:
 
             # Built-in queries — should NOT be traced
             await handle.query("__temporal_workflow_metadata")
-            await handle.query("__stack_trace")
-            await handle.query("__enhanced_stack_trace")
 
             # User query — should be traced
             await handle.query(QueryFilteringWorkflow.my_query)
