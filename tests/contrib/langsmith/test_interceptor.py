@@ -16,9 +16,11 @@ from temporalio.contrib.langsmith._interceptor import (
     HEADER_KEY,
     _extract_context,
     _inject_context,
+    _LangSmithWorkflowInboundInterceptor,
     _maybe_run,
     _ReplaySafeRunTree,
 )
+from temporalio.worker import HandleQueryInput
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -86,6 +88,48 @@ def _get_runtree_metadata(MockRunTree: MagicMock) -> dict[str, Any]:
         return extra["metadata"]
     # Alternatively, metadata might be passed directly
     return kwargs.get("metadata", {})
+
+
+# ===================================================================
+# TestBuiltinQueryFiltering
+# ===================================================================
+
+
+class _RecordingWorkflowInboundInterceptor:
+    def __init__(self) -> None:
+        self.queries: list[HandleQueryInput] = []
+
+    async def handle_query(self, input: HandleQueryInput) -> str:
+        self.queries.append(input)
+        return "forwarded"
+
+
+class TestBuiltinQueryFiltering:
+    async def test_builtin_queries_bypass_tracing(self) -> None:
+        next_interceptor = _RecordingWorkflowInboundInterceptor()
+        interceptor = _LangSmithWorkflowInboundInterceptor(
+            next_interceptor  # type: ignore[arg-type]
+        )
+
+        with patch.object(interceptor, "_workflow_maybe_run") as maybe_run:
+            for query in (
+                "__temporal_workflow_metadata",
+                "__stack_trace",
+                "__enhanced_stack_trace",
+            ):
+                assert (
+                    await interceptor.handle_query(
+                        HandleQueryInput(id="id", query=query, args=[], headers={})
+                    )
+                    == "forwarded"
+                )
+
+        assert [input.query for input in next_interceptor.queries] == [
+            "__temporal_workflow_metadata",
+            "__stack_trace",
+            "__enhanced_stack_trace",
+        ]
+        maybe_run.assert_not_called()
 
 
 # ===================================================================
