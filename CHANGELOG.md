@@ -39,6 +39,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- The `google-adk` extra now depends on `mcp`, so fresh installs of
+  `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
+  without separately installing `mcp`. Previously the import failed with an
+  `ImportError` because `google.adk.tools.mcp_tool` only exports `McpToolset`
+  when `mcp` is installed.
+
 ### Security
 
 ## [1.31.0] - 2026-07-29

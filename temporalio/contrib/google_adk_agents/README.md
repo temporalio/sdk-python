@@ -170,6 +170,53 @@ worker = Worker(
 
 **Do not pass secrets, credentials, or API keys through `factory_argument`.** It is an activity argument, so it is recorded in workflow history and, without a payload codec, visible in the web UI. Resolve credentials worker-side inside the toolset factory instead.
 
+### Reading Session State in Activity Tools
+
+ADK's live `ToolContext` holds non-serializable objects, so it cannot be an
+activity argument. To read the serializable subset from an activity-backed
+tool, declare a parameter named `tool_context` annotated with
+`ToolContextSnapshot`:
+
+```python
+from datetime import timedelta
+
+from temporalio import activity
+from temporalio.contrib.google_adk_agents.workflow import (
+    ToolContextSnapshot,
+    activity_tool,
+)
+
+
+@activity.defn
+async def get_weather(query: str, tool_context: ToolContextSnapshot) -> dict:
+    db_url = tool_context.state.get("url", "")
+    ...
+
+
+weather_tool = activity_tool(get_weather, start_to_close_timeout=timedelta(seconds=30))
+```
+
+Exactly like a native ADK function tool's `tool_context` parameter, it is
+excluded from the LLM-facing tool schema; at invocation the wrapper snapshots
+the live `ToolContext` (session state as a plain dict, plus the function-call
+id) and passes it to the activity. Annotating any parameter with a live ADK
+context type raises `ValueError` at wrap time, since ADK would inject the
+non-serializable context into it regardless of its name.
+
+When running under Temporal, the entire session state crosses the activity
+boundary: every value in it must be serializable by the configured data
+converter and the total size must fit within payload limits, even for keys
+the tool never reads. Local ADK runs pass the snapshot in memory and have no
+such constraint.
+
+The snapshot is one-way and should be treated as read-only: mutations inside
+the activity do not propagate back to the session, because the activity may
+run on a different worker (and in local ADK runs, where the snapshot is
+passed in memory, nested state values may alias the live session state, so
+mutating them can corrupt the session). To modify session state, return the
+needed information from the activity and apply it in workflow-side code (for
+example an ADK callback or a plain tool function).
+
 ### Local ADK Runs
 
 The same agent definitions can also be exercised outside Temporal with
