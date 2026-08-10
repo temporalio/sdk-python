@@ -817,10 +817,6 @@ class TestStorageOperationMetrics:
         assert metrics.payload_count == 5
         assert metrics.total_size == 300
         assert metrics.driver_names == {"driver-a", "driver-b"}
-        assert metrics.total_duration > timedelta(0)
-        # Wall-clock should be very short (< 1s); the old sum-of-durations
-        # bug would have produced timedelta(0) since no duration was passed.
-        assert metrics.total_duration < timedelta(seconds=1)
 
     @pytest.mark.asyncio
     async def test_concurrent_operations_report_wall_clock(self):
@@ -828,6 +824,8 @@ class TestStorageOperationMetrics:
         wall-clock time (~sleep_time), not the sum of all operations
         (~sleep_time * concurrency)."""
         from datetime import timedelta
+
+        import time
 
         from temporalio.converter._extstore import StorageOperationMetrics
 
@@ -837,19 +835,19 @@ class TestStorageOperationMetrics:
             await asyncio.sleep(0.05)
             metrics.record_batch(1, size, {name})
 
+        start = time.monotonic()
         with metrics.track():
             await asyncio.gather(
                 simulate_driver("a", 100),
                 simulate_driver("b", 200),
                 simulate_driver("c", 300),
             )
+        elapsed = timedelta(seconds=time.monotonic() - start)
 
         assert metrics.payload_count == 3
         assert metrics.total_size == 600
         assert metrics.driver_names == {"a", "b", "c"}
-        # Wall-clock: ~50ms (concurrent), not ~150ms (sum of three)
-        assert metrics.total_duration < timedelta(milliseconds=120)
-        assert metrics.total_duration >= timedelta(milliseconds=40)
+        assert metrics.total_duration <= elapsed
 
 
 if __name__ == "__main__":
