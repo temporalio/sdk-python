@@ -1,7 +1,9 @@
 """Tests for external storage functionality."""
 
 import asyncio
+import time
 from collections.abc import Sequence
+from datetime import timedelta
 
 import pytest
 
@@ -17,7 +19,11 @@ from temporalio.converter import (
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
 )
-from temporalio.converter._extstore import _REFERENCE_ENCODING, _StorageReference
+from temporalio.converter._extstore import (
+    StorageOperationMetrics,
+    _REFERENCE_ENCODING,
+    _StorageReference,
+)
 from temporalio.converter._payload_converter import JSONProtoPayloadConverter
 from temporalio.exceptions import ApplicationError
 
@@ -805,10 +811,6 @@ class TestStorageOperationMetrics:
     def test_track_records_wall_clock_duration(self):
         """total_duration should reflect the wall-clock span of the track()
         context, not the sum of individual record_batch calls."""
-        from datetime import timedelta
-
-        from temporalio.converter._extstore import StorageOperationMetrics
-
         metrics = StorageOperationMetrics()
         with metrics.track():
             metrics.record_batch(2, 100, {"driver-a"})
@@ -823,12 +825,6 @@ class TestStorageOperationMetrics:
         """When operations run concurrently, total_duration should reflect
         wall-clock time (~sleep_time), not the sum of all operations
         (~sleep_time * concurrency)."""
-        from datetime import timedelta
-
-        import time
-
-        from temporalio.converter._extstore import StorageOperationMetrics
-
         metrics = StorageOperationMetrics()
 
         async def simulate_driver(name: str, size: int):
