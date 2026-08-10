@@ -51,26 +51,31 @@ class MemoryTracingProcessor(TracingProcessor):
         pass
 
 
-def test_otel_trace_start_patch_does_not_nest() -> None:
+def test_otel_instrumentation_lifecycle_does_not_nest() -> None:
     from openinference.instrumentation.openai_agents._processor import (
         OpenInferenceTracingProcessor,
     )
+    from opentelemetry import trace
 
     original = OpenInferenceTracingProcessor.on_trace_start
-    _temporal_openai_agents._install_otel_trace_start_patch()
+    _temporal_openai_agents._install_otel_instrumentation(
+        trace.get_tracer_provider()
+    )
     try:
         installed_patch = OpenInferenceTracingProcessor.on_trace_start
         assert installed_patch is not original
 
-        _temporal_openai_agents._install_otel_trace_start_patch()
+        _temporal_openai_agents._install_otel_instrumentation(
+            trace.get_tracer_provider()
+        )
         try:
             assert OpenInferenceTracingProcessor.on_trace_start is installed_patch
         finally:
-            _temporal_openai_agents._uninstall_otel_trace_start_patch()
+            _temporal_openai_agents._uninstall_otel_instrumentation()
 
         assert OpenInferenceTracingProcessor.on_trace_start is installed_patch
     finally:
-        _temporal_openai_agents._uninstall_otel_trace_start_patch()
+        _temporal_openai_agents._uninstall_otel_instrumentation()
 
     assert OpenInferenceTracingProcessor.on_trace_start is original
 
