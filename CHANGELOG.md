@@ -48,6 +48,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.opentelemetry` replay-safe spans now delegate
+  `Span.add_link` to the wrapped span. Previously the wrapper inherited
+  OpenTelemetry's non-abstract no-op default, silently dropping links added
+  after span creation.
 - The `google-adk` extra now depends on `mcp`, so fresh installs of
   `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
   without separately installing `mcp`. Previously the import failed with an

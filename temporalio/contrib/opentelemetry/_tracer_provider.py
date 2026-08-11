@@ -69,6 +69,16 @@ class _ReplaySafeSpan(Span):
     ) -> None:
         self._span.add_event(name, attributes, timestamp)
 
+    def add_link(
+        self,
+        context: SpanContext,
+        attributes: types.Attributes = None,
+    ) -> None:
+        # Must be overridden explicitly: the Span ABC ships add_link as a
+        # non-abstract warn-and-no-op default that __getattr__ cannot
+        # intercept, which would silently drop links added after creation.
+        self._span.add_link(context, attributes)
+
     def update_name(self, name: str) -> None:
         self._span.update_name(name)
 
