@@ -448,7 +448,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         Yields:
             Context with tracing instrumentation enabled.
         """
-        # Set up OTEL instrumentation if exporters are provided
+        # Set up OTEL instrumentation if enabled
         otel_instrumentation_installed = False
         if self._use_otel_instrumentation:
             from opentelemetry import trace
