@@ -2077,13 +2077,14 @@ class AssertDifferentModelProvider(ModelProvider):
         return self._model
 
 
+MULTIPLE_MODELS_FINAL_RESPONSE = "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
+
+
 def multiple_models_mock_model():
     return TestModel.returning_responses(
         [
             ResponseBuilders.tool_call("{}", "transfer_to_underling"),
-            ResponseBuilders.output_message(
-                "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
-            ),
+            ResponseBuilders.output_message(MULTIPLE_MODELS_FINAL_RESPONSE),
         ]
     )
 
@@ -2218,10 +2219,7 @@ async def test_dict_run_config_models(client: Client):
 
             # Only the model from the runconfig override is used
             assert provider.model_names == {"gpt-4o"}
-            assert (
-                result
-                == "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
-            )
+            assert result == MULTIPLE_MODELS_FINAL_RESPONSE
 
 
 def test_coerce_run_config_validation():
