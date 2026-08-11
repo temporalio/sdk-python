@@ -20,8 +20,8 @@ from temporalio.converter import (
     StorageDriverStoreContext,
 )
 from temporalio.converter._extstore import (
-    StorageOperationMetrics,
     _REFERENCE_ENCODING,
+    StorageOperationMetrics,
     _StorageReference,
 )
 from temporalio.converter._payload_converter import JSONProtoPayloadConverter
