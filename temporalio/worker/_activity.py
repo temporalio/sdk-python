@@ -727,7 +727,7 @@ class _RunningActivity:
                 )
             # If not sync and there's a task, cancel it
             if not self.sync and self.task:
-                # TODO(cretz): Check that Python >= 3.9 and set msg?
+                # TODO(cretz): Set msg?
                 self.task.cancel()
 
 
