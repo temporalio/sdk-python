@@ -21,26 +21,16 @@ to include examples, links to docs, or any other relevant information.
 ### Added
 
 - Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
-  `ReplaySafeLoggerProvider`, which wrap a user-supplied OpenTelemetry provider and drop
-  synchronous instrument recordings and emitted log records made from workflow code during
-  replay. Install them as the
-  process-global providers when libraries record OpenTelemetry metrics or emit log events from
-  workflow code (e.g. Google ADK) so that workflow replays (cache eviction, worker restarts,
-  redeploys) do not duplicate telemetry; recordings are first-execution-only, matching
-  `temporalio.workflow.metric_meter()`.
-  `temporalio.contrib.opentelemetry.ReplaySafeTracerProvider` is now also exported.
-  `GoogleAdkPlugin` now warns at worker and replayer configuration time when the global
-  OpenTelemetry meter or tracer provider is positively identified as not replay-safe
-  (an OpenTelemetry SDK provider used directly).
+  `ReplaySafeLoggerProvider` (and exported `ReplaySafeTracerProvider`): wrap an
+  OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
+  Google ADK) are not duplicated on replay. `GoogleAdkPlugin` warns when a global OTel
+  provider is not replay-safe.
 
 ### Changed
 
 - The `opentelemetry` and `lambda-worker-otel` extras now require
-  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.26`, aligning the declared floor with what
-  `temporalio.contrib.opentelemetry` already required in practice: importing the contrib has
-  needed an API added in `opentelemetry-api` 1.24 since the tracing integration was
-  introduced, and `ReplaySafeTracerProvider.get_tracer` has always forwarded the
-  `attributes` parameter added in 1.26 (the lambda worker builds on the same contrib).
+  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.26`, matching what
+  `temporalio.contrib.opentelemetry` already required in practice.
 - `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
   for repeated type hints instead of rebuilding their schemas for every
   payload, greatly speeding up decode of non-model hints such as discriminated
