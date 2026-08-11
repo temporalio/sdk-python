@@ -53,6 +53,9 @@ to include examples, links to docs, or any other relevant information.
   without separately installing `mcp`. Previously the import failed with an
   `ImportError` because `google.adk.tools.mcp_tool` only exports `McpToolset`
   when `mcp` is installed.
+- `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
+  is passed for `run_config`. (openai-agents >= 0.19.0 accepts `dict` run
+  configs at its public runner API)
 
 ### Security
 

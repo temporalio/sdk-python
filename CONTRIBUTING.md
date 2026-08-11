@@ -82,6 +82,12 @@ Avoid changes that make review harder without improving the contribution:
 Using AI tools while contributing is acceptable. You are responsible for the
 correctness, quality, and maintainability of everything you submit.
 
+Contributors must fully understand the issue they are fixing and be able to explain
+the proposed change. We expect that human understanding to be evident in pull
+request responses and design discussions. If a contribution's interaction appears
+entirely AI-driven, maintainers may close it: it does not provide a benefit over
+maintainers using AI tooling themselves.
+
 Thoroughly self-review AI-generated code and documentation before opening a pull
 request. Make sure it is correct, tested where appropriate, and consistent with the
 style and patterns of the codebase.
