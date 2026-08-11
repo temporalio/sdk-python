@@ -266,13 +266,5 @@ class ReplaySafeMeterProvider(MeterProvider):
         Returns:
             A replay-safe meter instance.
         """
-        # Forward attributes only when set: the parameter was added in
-        # opentelemetry 1.26 and passing it to older providers raises
-        # TypeError.
-        if attributes is None:
-            inner = self._meter_provider.get_meter(name, version, schema_url)
-        else:
-            inner = self._meter_provider.get_meter(
-                name, version, schema_url, attributes
-            )
+        inner = self._meter_provider.get_meter(name, version, schema_url, attributes)
         return _ReplaySafeMeter(inner)

@@ -36,10 +36,11 @@ to include examples, links to docs, or any other relevant information.
 ### Changed
 
 - The `opentelemetry` and `lambda-worker-otel` extras now require
-  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.24`, aligning the declared floor with what
-  `temporalio.contrib.opentelemetry` already required in practice (it has depended on an API
-  added in `opentelemetry-api` 1.24 since the tracing integration was introduced, and the
-  lambda worker builds on it).
+  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.26`, aligning the declared floor with what
+  `temporalio.contrib.opentelemetry` already required in practice: importing the contrib has
+  needed an API added in `opentelemetry-api` 1.24 since the tracing integration was
+  introduced, and `ReplaySafeTracerProvider.get_tracer` has always forwarded the
+  `attributes` parameter added in 1.26 (the lambda worker builds on the same contrib).
 - `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
   for repeated type hints instead of rebuilding their schemas for every
   payload, greatly speeding up decode of non-model hints such as discriminated

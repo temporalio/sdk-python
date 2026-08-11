@@ -72,9 +72,9 @@ def test_replay_safe_logger_provider_delegates_get_logger_arguments():
 
 
 def test_replay_safe_logger_provider_supports_older_otel_signatures():
-    """Newer opentelemetry-api parameters (get_logger attributes, 1.26; emit
-    keyword fields, 1.38) must only be forwarded when the caller passes them,
-    so loggers and providers with older signatures keep working."""
+    """Newer opentelemetry-api parameters (emit keyword fields, 1.38) must
+    only be forwarded when the caller passes them, so loggers with older
+    signatures keep working."""
 
     class Pre138Logger(NoOpLogger):
         def __init__(self) -> None:
@@ -84,26 +84,27 @@ def test_replay_safe_logger_provider_supports_older_otel_signatures():
         def emit(self, record: LogRecord) -> None:  # type: ignore[override]
             self.records.append(record)
 
-    class Pre126LoggerProvider(NoOpLoggerProvider):
+    class Pre138LoggerProvider(NoOpLoggerProvider):
         def __init__(self) -> None:
             self.logger = Pre138Logger()
-            self.get_logger_calls: list[tuple[str, str | None, str | None]] = []
+            self.get_logger_calls: list[tuple[str, str | None, str | None, object]] = []
 
         def get_logger(  # type: ignore[override]
             self,
             name: str,
             version: str | None = None,
             schema_url: str | None = None,
+            attributes: object = None,
         ) -> Logger:
-            self.get_logger_calls.append((name, version, schema_url))
+            self.get_logger_calls.append((name, version, schema_url, attributes))
             return self.logger
 
-    inner_provider = Pre126LoggerProvider()
+    inner_provider = Pre138LoggerProvider()
     provider = ReplaySafeLoggerProvider(inner_provider)
     record = LogRecord(event_name="event", body="hello")
     provider.get_logger("test-logger").emit(record)
 
-    assert inner_provider.get_logger_calls == [("test-logger", None, None)]
+    assert inner_provider.get_logger_calls == [("test-logger", None, None, None)]
     assert inner_provider.logger.records == [record]
 
 

@@ -104,10 +104,9 @@ def test_replay_safe_meter_provider_delegates_get_meter_arguments():
 
 
 def test_replay_safe_meter_provider_supports_older_otel_signatures():
-    """Newer opentelemetry-api parameters (get_meter attributes, 1.26; sync
-    instrument context, 1.28; create_histogram
-    explicit_bucket_boundaries_advisory, 1.30) must only be forwarded when
-    set, so providers with older signatures keep working."""
+    """Newer opentelemetry-api parameters (sync instrument context, 1.28;
+    create_histogram explicit_bucket_boundaries_advisory, 1.30) must only be
+    forwarded when set, so providers with older signatures keep working."""
 
     class Pre128Counter(Counter):
         def __init__(self) -> None:
@@ -143,27 +142,30 @@ def test_replay_safe_meter_provider_supports_older_otel_signatures():
             self.histogram_calls.append((name, unit, description))
             return super().create_histogram(name, unit, description)
 
-    class Pre126MeterProvider(NoOpMeterProvider):
+    class Pre128MeterProvider(NoOpMeterProvider):
         def __init__(self) -> None:
             self.meter = Pre130Meter()
-            self.get_meter_calls: list[tuple[str, str | None, str | None]] = []
+            self.get_meter_calls: list[
+                tuple[str, str | None, str | None, Attributes | None]
+            ] = []
 
         def get_meter(  # type: ignore[override]
             self,
             name: str,
             version: str | None = None,
             schema_url: str | None = None,
+            attributes: Attributes | None = None,
         ) -> Meter:
-            self.get_meter_calls.append((name, version, schema_url))
+            self.get_meter_calls.append((name, version, schema_url, attributes))
             return self.meter
 
-    inner_provider = Pre126MeterProvider()
+    inner_provider = Pre128MeterProvider()
     provider = ReplaySafeMeterProvider(inner_provider)
     meter = provider.get_meter("test-meter")
     meter.create_histogram("histogram").record(1)
     meter.create_counter("counter").add(2, {"attr": "val"})
 
-    assert inner_provider.get_meter_calls == [("test-meter", None, None)]
+    assert inner_provider.get_meter_calls == [("test-meter", None, None, None)]
     assert inner_provider.meter.histogram_calls == [("histogram", "", "")]
     assert inner_provider.meter.counter.calls == [(2, {"attr": "val"})]
 

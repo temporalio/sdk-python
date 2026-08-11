@@ -110,13 +110,5 @@ class ReplaySafeLoggerProvider(LoggerProvider):
         Returns:
             A replay-safe logger instance.
         """
-        # Forward attributes only when set: the parameter was added in
-        # opentelemetry 1.26 and passing it to older providers raises
-        # TypeError.
-        if attributes is None:
-            inner = self._logger_provider.get_logger(name, version, schema_url)
-        else:
-            inner = self._logger_provider.get_logger(
-                name, version, schema_url, attributes
-            )
+        inner = self._logger_provider.get_logger(name, version, schema_url, attributes)
         return _ReplaySafeLogger(inner, name, version=version, schema_url=schema_url)
