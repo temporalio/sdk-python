@@ -44,11 +44,14 @@ to include examples, links to docs, or any other relevant information.
   without separately installing `mcp`. Previously the import failed with an
   `ImportError` because `google.adk.tools.mcp_tool` only exports `McpToolset`
   when `mcp` is installed.
-- `temporalio.contrib.openai_agents` now accepts a plain `dict` for
-  `run_config` inside workflows, matching openai-agents >= 0.19.0, which
-  accepts `dict` run configs at its public runner boundaries and includes
-  `dict` in the `run_config` type. Previously the Temporal runner assumed a
-  `RunConfig` instance and failed on attribute access.
+- `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
+  is passed for `run_config`. openai-agents >= 0.19.0 accepts `dict` run
+  configs at its public runner API and normalizes them inside each concrete
+  runner's `run()`; because the Temporal runner implements that runner
+  interface and inspects `run_config` before delegating, it now performs the
+  same normalization upstream does. Previously such calls — valid vanilla
+  openai-agents code on >= 0.19.0 — failed with `AttributeError` under
+  Temporal.
 
 ### Security
 
