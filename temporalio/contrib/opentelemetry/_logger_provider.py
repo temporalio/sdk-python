@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-# opentelemetry._logs is the import path OpenTelemetry itself documents for
-# the logs bridge API while it is pre-GA (there is no non-underscore
-# counterpart); the only alternative would be not gating ADK-style log
-# emission at all.
+# The OpenTelemetry Logs API specification is stable, but opentelemetry-python
+# exposes the logs bridge API only under the private opentelemetry._logs
+# module path (there is no public opentelemetry.logs as of 1.42), so _logs is
+# the import path OpenTelemetry itself documents until the Python SIG promotes
+# it to a public namespace.
 from opentelemetry._logs import Logger, LoggerProvider
 
 from temporalio import workflow
