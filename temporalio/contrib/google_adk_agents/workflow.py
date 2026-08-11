@@ -28,7 +28,7 @@ class ToolContextSnapshot:
 
     Declare a parameter named ``tool_context`` annotated with this type (or
     ``ToolContextSnapshot | None``) on an activity wrapped by
-    :func:`activity_tool`:
+    :func:`activity_as_tool`:
 
     .. code-block:: python
 
@@ -187,7 +187,7 @@ def _snapshot_tool_context(tool_context: Any) -> ToolContextSnapshot:
     )
 
 
-def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
+def activity_as_tool(activity_def: Callable, **kwargs: Any) -> Callable:
     """Decorator/Wrapper to wrap a Temporal Activity as an ADK Tool.
 
     .. warning::

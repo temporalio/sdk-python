@@ -183,7 +183,7 @@ from datetime import timedelta
 from temporalio import activity
 from temporalio.contrib.google_adk_agents.workflow import (
     ToolContextSnapshot,
-    activity_tool,
+    activity_as_tool,
 )
 
 
@@ -193,7 +193,9 @@ async def get_weather(query: str, tool_context: ToolContextSnapshot) -> dict:
     ...
 
 
-weather_tool = activity_tool(get_weather, start_to_close_timeout=timedelta(seconds=30))
+weather_tool = activity_as_tool(
+    get_weather, start_to_close_timeout=timedelta(seconds=30)
+)
 ```
 
 Exactly like a native ADK function tool's `tool_context` parameter, it is
@@ -222,7 +224,7 @@ example an ADK callback or a plain tool function).
 The same agent definitions can also be exercised outside Temporal with
 `adk run` or `adk web`.
 
-- `TemporalModel` and `activity_tool(...)` work in local ADK runs without
+- `TemporalModel` and `activity_as_tool(...)` work in local ADK runs without
   additional configuration.
 - If the agent uses `TemporalMcpToolSet`, define a shared toolset factory,
   register it with `TemporalMcpToolSetProvider(...)` for workflow runs, and

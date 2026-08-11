@@ -1,7 +1,7 @@
 """Tests for ToolContextSnapshot injection into activity-backed tools.
 
 Covers https://github.com/temporalio/sdk-python/issues/1470: activities
-wrapped with activity_tool can read the serializable subset of the ADK
+wrapped with activity_as_tool can read the serializable subset of the ADK
 ToolContext (session state and function-call id) without the live,
 non-serializable ToolContext ever crossing the activity boundary, and
 without the parameter leaking into the LLM-facing tool schema.
@@ -30,7 +30,7 @@ from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, TemporalModel
 from temporalio.contrib.google_adk_agents.workflow import (
     ToolContextSnapshot,
-    activity_tool,
+    activity_as_tool,
 )
 from temporalio.worker import Worker
 
@@ -67,7 +67,9 @@ def weather_agent(model_name: str) -> Agent:
         name="state_agent",
         model=TemporalModel(model_name),
         tools=[
-            activity_tool(lookup_weather, start_to_close_timeout=timedelta(seconds=30))
+            activity_as_tool(
+                lookup_weather, start_to_close_timeout=timedelta(seconds=30)
+            )
         ],
     )
 
@@ -144,7 +146,7 @@ class StateToolWorkflow:
 
 
 @pytest.mark.asyncio
-async def test_activity_tool_receives_tool_context_snapshot(client: Client):
+async def test_activity_as_tool_receives_tool_context_snapshot(client: Client):
     new_config = client.config()
     new_config["plugins"] = [GoogleAdkPlugin()]
     client = Client(**new_config)
@@ -172,7 +174,7 @@ async def test_activity_tool_receives_tool_context_snapshot(client: Client):
 
 
 @pytest.mark.asyncio
-async def test_activity_tool_snapshot_outside_workflow():
+async def test_activity_as_tool_snapshot_outside_workflow():
     """Local ADK runs (no Temporal) receive the same snapshot."""
     LLMRegistry.register(StateToolModel)
     result = await run_state_agent("state_tool_model")
@@ -192,7 +194,9 @@ def _declared_properties(tool: FunctionTool) -> dict[str, Any]:
 def test_tool_schema_excludes_tool_context():
     """The tool_context parameter never appears in the LLM-facing schema."""
     tool = FunctionTool(
-        func=activity_tool(lookup_weather, start_to_close_timeout=timedelta(seconds=30))
+        func=activity_as_tool(
+            lookup_weather, start_to_close_timeout=timedelta(seconds=30)
+        )
     )
     properties = _declared_properties(tool)
     assert "city" in properties
@@ -205,7 +209,7 @@ def test_tool_schema_excludes_tool_context_legacy_declaration():
     override_feature_enabled(FeatureName.JSON_SCHEMA_FOR_FUNC_DECL, False)
     try:
         tool = FunctionTool(
-            func=activity_tool(
+            func=activity_as_tool(
                 lookup_weather, start_to_close_timeout=timedelta(seconds=30)
             )
         )
@@ -229,7 +233,9 @@ def test_tool_schema_context_only_parameter():
         return str(tool_context.state)
 
     tool = FunctionTool(
-        func=activity_tool(ctx_only_tool, start_to_close_timeout=timedelta(seconds=30))
+        func=activity_as_tool(
+            ctx_only_tool, start_to_close_timeout=timedelta(seconds=30)
+        )
     )
     declaration = tool._get_declaration()
     if declaration is not None:
@@ -243,7 +249,7 @@ def test_tool_schema_context_only_parameter():
         assert not legacy_properties
 
 
-def test_activity_tool_accepts_optional_snapshot_annotation():
+def test_activity_as_tool_accepts_optional_snapshot_annotation():
     """ToolContextSnapshot | None is accepted and still excluded from the schema."""
 
     @activity.defn
@@ -254,13 +260,15 @@ def test_activity_tool_accepts_optional_snapshot_annotation():
         return query
 
     tool = FunctionTool(
-        func=activity_tool(optional_tool, start_to_close_timeout=timedelta(seconds=30))
+        func=activity_as_tool(
+            optional_tool, start_to_close_timeout=timedelta(seconds=30)
+        )
     )
     properties = _declared_properties(tool)
     assert set(properties) == {"query"}
 
 
-def test_activity_tool_rejects_adk_tool_context_annotation():
+def test_activity_as_tool_rejects_adk_tool_context_annotation():
     """Annotating with the live ADK ToolContext gives an actionable error."""
 
     @activity.defn
@@ -268,10 +276,10 @@ def test_activity_tool_rejects_adk_tool_context_annotation():
         return query
 
     with pytest.raises(ValueError, match="ToolContextSnapshot"):
-        activity_tool(bad_tool, start_to_close_timeout=timedelta(seconds=30))
+        activity_as_tool(bad_tool, start_to_close_timeout=timedelta(seconds=30))
 
 
-def test_activity_tool_rejects_optional_adk_tool_context_annotation():
+def test_activity_as_tool_rejects_optional_adk_tool_context_annotation():
     """Optional[ToolContext] is rejected with the ADK-specific message."""
 
     @activity.defn
@@ -282,10 +290,12 @@ def test_activity_tool_rejects_optional_adk_tool_context_annotation():
         return query
 
     with pytest.raises(ValueError, match="not serializable"):
-        activity_tool(optional_bad_tool, start_to_close_timeout=timedelta(seconds=30))
+        activity_as_tool(
+            optional_bad_tool, start_to_close_timeout=timedelta(seconds=30)
+        )
 
 
-def test_activity_tool_rejects_adk_context_under_any_name():
+def test_activity_as_tool_rejects_adk_context_under_any_name():
     """ADK injects into any param annotated with a context type, so all are rejected."""
 
     @activity.defn
@@ -293,10 +303,10 @@ def test_activity_tool_rejects_adk_context_under_any_name():
         return query
 
     with pytest.raises(ValueError, match="not serializable"):
-        activity_tool(sneaky_tool, start_to_close_timeout=timedelta(seconds=30))
+        activity_as_tool(sneaky_tool, start_to_close_timeout=timedelta(seconds=30))
 
 
-def test_activity_tool_rejects_snapshot_under_other_name():
+def test_activity_as_tool_rejects_snapshot_under_other_name():
     """ToolContextSnapshot on a differently-named param would leak into the schema."""
 
     @activity.defn
@@ -304,10 +314,10 @@ def test_activity_tool_rejects_snapshot_under_other_name():
         return query
 
     with pytest.raises(ValueError, match="named 'tool_context'"):
-        activity_tool(misnamed_tool, start_to_close_timeout=timedelta(seconds=30))
+        activity_as_tool(misnamed_tool, start_to_close_timeout=timedelta(seconds=30))
 
 
-def test_activity_tool_rejects_unannotated_tool_context():
+def test_activity_as_tool_rejects_unannotated_tool_context():
     """The reserved name without an annotation gives an actionable error."""
 
     @activity.defn
@@ -315,10 +325,10 @@ def test_activity_tool_rejects_unannotated_tool_context():
         return query
 
     with pytest.raises(ValueError, match="unannotated 'tool_context'"):
-        activity_tool(untyped_tool, start_to_close_timeout=timedelta(seconds=30))
+        activity_as_tool(untyped_tool, start_to_close_timeout=timedelta(seconds=30))
 
 
-def test_activity_tool_rejects_other_tool_context_annotation():
+def test_activity_as_tool_rejects_other_tool_context_annotation():
     """The reserved name with an unrelated annotation gives an actionable error."""
 
     @activity.defn
@@ -326,10 +336,10 @@ def test_activity_tool_rejects_other_tool_context_annotation():
         return query
 
     with pytest.raises(ValueError, match="reserved by ADK"):
-        activity_tool(confused_tool, start_to_close_timeout=timedelta(seconds=30))
+        activity_as_tool(confused_tool, start_to_close_timeout=timedelta(seconds=30))
 
 
-def test_activity_tool_without_tool_context_unchanged():
+def test_activity_as_tool_without_tool_context_unchanged():
     """Activities without a tool_context parameter keep their exact schema."""
 
     @activity.defn
@@ -337,6 +347,6 @@ def test_activity_tool_without_tool_context_unchanged():
         return query
 
     tool = FunctionTool(
-        func=activity_tool(plain_tool, start_to_close_timeout=timedelta(seconds=30))
+        func=activity_as_tool(plain_tool, start_to_close_timeout=timedelta(seconds=30))
     )
     assert set(_declared_properties(tool)) == {"query"}
