@@ -89,7 +89,10 @@ from temporalio.contrib.openai_agents import (
 )
 from temporalio.contrib.openai_agents._invoke_model_activity import _build_tool
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
-from temporalio.contrib.openai_agents._openai_runner import _convert_agent
+from temporalio.contrib.openai_agents._openai_runner import (
+    _coerce_run_config,
+    _convert_agent,
+)
 from temporalio.contrib.openai_agents._temporal_model_stub import (
     _TemporalModelStub,
 )
@@ -2158,6 +2161,87 @@ async def test_run_config_models(client: Client):
 
             # Only the model from the runconfig override is used
             assert provider.model_names == {"gpt-4o"}
+
+
+@workflow.defn
+class DictRunConfigWorkflow:
+    """Same agents as MultipleModelWorkflow, but passes run_config as a plain
+    dict, which openai-agents >= 0.19 accepts at its public runner boundaries."""
+
+    @workflow.run
+    async def run(self) -> str:
+        underling = Agent[None](
+            name="Underling",
+            instructions="You do all the work you are told.",
+        )
+
+        starting_agent = Agent[None](
+            name="Lazy Assistant",
+            model="gpt-4o-mini",
+            instructions="You delegate all your work to another agent.",
+            handoffs=[underling],
+        )
+        # Typed as Any so this also type-checks against openai-agents
+        # versions whose run_config annotation does not include dict.
+        dict_run_config: Any = {"model": "gpt-4o"}
+        result = await Runner.run(
+            starting_agent=starting_agent,
+            input="Have you cleaned the store room yet?",
+            run_config=dict_run_config,
+        )
+        return result.final_output
+
+
+async def test_dict_run_config_models(client: Client):
+    # A dict run_config must behave identically to the equivalent
+    # RunConfig(model="gpt-4o") in test_run_config_models above.
+    provider = AssertDifferentModelProvider(multiple_models_mock_model())
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120)
+        ),
+        model_provider=provider,
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client,
+            DictRunConfigWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                DictRunConfigWorkflow.run,
+                id=f"dict-run-config-model-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=10),
+            )
+            result = await workflow_handle.result()
+
+            # Only the model from the runconfig override is used
+            assert provider.model_names == {"gpt-4o"}
+            assert (
+                result
+                == "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
+            )
+
+
+def test_coerce_run_config_validation():
+    # Mirrors upstream agents' normalization: equivalent RunConfig out of a
+    # dict, and the same TypeErrors for invalid input.
+    coerced = _coerce_run_config({"model": "gpt-4o", "workflow_name": "wf"})
+    assert isinstance(coerced, RunConfig)
+    assert coerced.model == "gpt-4o"
+    assert coerced.workflow_name == "wf"
+
+    run_config = RunConfig(model="gpt-4o")
+    assert _coerce_run_config(run_config) is run_config
+
+    with pytest.raises(TypeError, match="Unknown run_config settings: bogus_setting"):
+        _coerce_run_config({"model": "gpt-4o", "bogus_setting": True})
+
+    with pytest.raises(
+        TypeError, match="run_config must be a RunConfig instance or a dict, got int"
+    ):
+        _coerce_run_config(42)
 
 
 async def test_summary_provider(client: Client):
