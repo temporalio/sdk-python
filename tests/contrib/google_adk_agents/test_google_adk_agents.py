@@ -538,45 +538,51 @@ async def test_single_agent_telemetry(
     provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     set_tracer_provider(provider)
+    # Instrumentors are process-global singletons bound to the provider seen
+    # at instrument() time; without uninstrument() ADK code in every later
+    # test in this process would keep emitting spans into this test's
+    # provider, and re-instrumentation attempts would silently no-op.
     GoogleADKInstrumentor().instrument()
+    try:
+        new_config = client.config()
+        new_config["plugins"] = [
+            GoogleAdkPlugin(),
+            OpenTelemetryPlugin(add_temporal_spans=True),
+        ]
+        client = Client(**new_config)
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        GoogleAdkPlugin(),
-        OpenTelemetryPlugin(add_temporal_spans=True),
-    ]
-    client = Client(**new_config)
-
-    # Run Worker with the ADK plugin
-    async with Worker(
-        client,
-        task_queue="adk-task-queue-telemetry",
-        activities=[
-            get_weather,
-        ],
-        workflows=[WeatherAgent],
-        max_cached_workflows=0,
-    ):
-        LLMRegistry.register(WeatherModel)
-
-        # Test Weather Agent
-        handle = await client.start_workflow(
-            WeatherAgent.run,
-            args=[
-                "What is the weather in New York?",
-                "weather_model",
-            ],
-            id=f"weather-agent-telemetry-workflow-{uuid.uuid4()}",
+        # Run Worker with the ADK plugin
+        async with Worker(
+            client,
             task_queue="adk-task-queue-telemetry",
-            execution_timeout=timedelta(seconds=60),
-        )
-        result = await handle.result()
-        print(f"Workflow result: {result}")
+            activities=[
+                get_weather,
+            ],
+            workflows=[WeatherAgent],
+            max_cached_workflows=0,
+        ):
+            LLMRegistry.register(WeatherModel)
 
-        assert result is not None
-        assert result.content is not None
-        assert result.content.parts is not None
-        assert result.content.parts[0].text == "warm and sunny"
+            # Test Weather Agent
+            handle = await client.start_workflow(
+                WeatherAgent.run,
+                args=[
+                    "What is the weather in New York?",
+                    "weather_model",
+                ],
+                id=f"weather-agent-telemetry-workflow-{uuid.uuid4()}",
+                task_queue="adk-task-queue-telemetry",
+                execution_timeout=timedelta(seconds=60),
+            )
+            result = await handle.result()
+            print(f"Workflow result: {result}")
+
+            assert result is not None
+            assert result.content is not None
+            assert result.content.parts is not None
+            assert result.content.parts[0].text == "warm and sunny"
+    finally:
+        GoogleADKInstrumentor().uninstrument()
 
     print("\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)))
     assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
