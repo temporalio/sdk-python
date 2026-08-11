@@ -199,7 +199,7 @@ async def test_workflow_sandbox_restrictions(client: Client):
 
         # uuid7 was only added to the stdlib in 3.14
         if sys.version_info >= (3, 14):
-            invalid_code_to_check.append("import uuid\nuuid.uuid7()")
+            invalid_code_to_check.append("import uuid\nuuid.uuid7()")  # type: ignore[reportUnreachable]
 
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
