@@ -58,9 +58,7 @@ def test_otel_instrumentation_lifecycle_does_not_nest() -> None:
     from opentelemetry import trace
 
     original = OpenInferenceTracingProcessor.on_trace_start
-    _temporal_openai_agents._install_otel_instrumentation(
-        trace.get_tracer_provider()
-    )
+    _temporal_openai_agents._install_otel_instrumentation(trace.get_tracer_provider())
     try:
         installed_patch = OpenInferenceTracingProcessor.on_trace_start
         assert installed_patch is not original
