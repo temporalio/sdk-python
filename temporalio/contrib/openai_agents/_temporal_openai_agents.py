@@ -76,10 +76,11 @@ def _install_otel_instrumentation(tracer_provider: typing.Any) -> None:
 
     with _otel_trace_start_patch_lock:
         if _otel_trace_start_patch_ref_count == 0:
-            _otel_trace_start_original = OpenInferenceTracingProcessor.on_trace_start
+            original_on_trace_start = OpenInferenceTracingProcessor.on_trace_start
+            _otel_trace_start_original = original_on_trace_start
 
             def on_trace_start(self: typing.Any, trace: Trace) -> None:  # type: ignore[reportUnusedFunction]
-                _otel_trace_start_original(self, trace)  # type: ignore[operator]
+                original_on_trace_start(self, trace)
                 attach(set_span_in_context(self._root_spans[trace.trace_id]))
 
             setattr(OpenInferenceTracingProcessor, "on_trace_start", on_trace_start)
