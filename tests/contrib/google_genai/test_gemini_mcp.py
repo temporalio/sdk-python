@@ -15,6 +15,7 @@ Plus the server-side pass-through paths that need no shim code:
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -36,6 +37,11 @@ from temporalio.contrib.google_genai import (
     TemporalMcpClientSession,
 )
 from temporalio.contrib.google_genai._temporal_interactions import _deserialize
+from temporalio.contrib.google_genai.testing import (
+    GeminiTestServer,
+    function_call_response,
+    text_response,
+)
 from temporalio.worker import Replayer
 from temporalio.workflow import ActivityConfig
 from tests.contrib.google_genai.test_gemini import (
@@ -323,6 +329,51 @@ async def test_mcp_side_effects(client: Client):
         "gemini_api_client_async_request": 2,
         f"{server}-call-tool": 1,
     }
+
+
+async def test_mcp_via_gemini_test_server(client: Client):
+    """GeminiTestServer.plugin(mcp_servers=...) scripts the model, runs MCP for real.
+
+    This is the public testing path — the tests above reach into
+    ``GeminiApiCaller`` to also count API calls, but a user testing an
+    MCP-grounded workflow should need nothing but ``GeminiTestServer``.
+    """
+    server = "echo_public"
+    test_server = GeminiTestServer(
+        [
+            function_call_response("echo", {"message": "durable execution"}),
+            text_response("The echo tool returned: durable execution"),
+        ]
+    )
+
+    config = client.config()
+    config["plugins"] = [test_server.plugin(mcp_servers={server: _echo_session})]
+    new_client = Client(**config)
+
+    async with new_worker(new_client, McpToolWorkflow) as worker:
+        handle = await new_client.start_workflow(
+            McpToolWorkflow.run,
+            args=[server, "echo the phrase: durable execution"],
+            id=f"gemini-mcp-public-{uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        result = await handle.result()
+        names = await _activity_names(handle)
+
+    assert result == "The echo tool returned: durable execution"
+    # The MCP activities really ran; only the model HTTP layer was scripted.
+    assert names == [
+        f"{server}-list-tools",
+        "gemini_api_client_async_request",
+        f"{server}-call-tool",
+        "gemini_api_client_async_request",
+    ]
+    # The echoed message reached the model as a function response.
+    assert any(
+        "durable execution" in json.dumps(request)
+        for request in test_server.requests[1:]
+    )
 
 
 # ---------------------------------------------------------------------------

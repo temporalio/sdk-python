@@ -23,6 +23,8 @@ from tests.helpers.nexus import (
     make_nexus_endpoint_name,
 )
 
+# Cloud CI's namespace credentials cannot manage Nexus endpoints.
+# See https://github.com/temporalio/sdk-python/issues/1704.
 pytestmark = pytest.mark.requires_local_server
 
 

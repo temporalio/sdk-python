@@ -6,17 +6,19 @@ isort:skip_file
 import builtins
 import collections.abc
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
+import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.deployment.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
@@ -217,6 +219,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     CURRENT_STICKY_CACHE_SIZE_FIELD_NUMBER: builtins.int
     PLUGINS_FIELD_NUMBER: builtins.int
     DRIVERS_FIELD_NUMBER: builtins.int
+    ENVIRONMENT_FIELD_NUMBER: builtins.int
     worker_instance_key: builtins.str
     """Worker identifier, should be unique for the namespace.
     It is distinct from worker identity, which is not necessarily namespace-unique.
@@ -287,6 +290,9 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         global___StorageDriverInfo
     ]:
         """Storage drivers in use by this SDK."""
+    @property
+    def environment(self) -> global___EnvironmentInfo:
+        """Information about the environment this SDK is running in."""
     def __init__(
         self,
         *,
@@ -316,6 +322,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         current_sticky_cache_size: builtins.int = ...,
         plugins: collections.abc.Iterable[global___PluginInfo] | None = ...,
         drivers: collections.abc.Iterable[global___StorageDriverInfo] | None = ...,
+        environment: global___EnvironmentInfo | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -328,6 +335,8 @@ class WorkerHeartbeat(google.protobuf.message.Message):
             b"deployment_version",
             "elapsed_since_last_heartbeat",
             b"elapsed_since_last_heartbeat",
+            "environment",
+            b"environment",
             "heartbeat_time",
             b"heartbeat_time",
             "host_info",
@@ -363,6 +372,8 @@ class WorkerHeartbeat(google.protobuf.message.Message):
             b"drivers",
             "elapsed_since_last_heartbeat",
             b"elapsed_since_last_heartbeat",
+            "environment",
+            b"environment",
             "heartbeat_time",
             b"heartbeat_time",
             "host_info",
@@ -592,6 +603,446 @@ class StorageDriverInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___StorageDriverInfo = StorageDriverInfo
+
+class EnvironmentInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _Architecture:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _ArchitectureEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            EnvironmentInfo._Architecture.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        ARCHITECTURE_UNSPECIFIED: EnvironmentInfo._Architecture.ValueType  # 0
+        ARCHITECTURE_AMD64: EnvironmentInfo._Architecture.ValueType  # 1
+        ARCHITECTURE_ARM64: EnvironmentInfo._Architecture.ValueType  # 2
+
+    class Architecture(_Architecture, metaclass=_ArchitectureEnumTypeWrapper): ...
+    ARCHITECTURE_UNSPECIFIED: EnvironmentInfo.Architecture.ValueType  # 0
+    ARCHITECTURE_AMD64: EnvironmentInfo.Architecture.ValueType  # 1
+    ARCHITECTURE_ARM64: EnvironmentInfo.Architecture.ValueType  # 2
+
+    class Runtime(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class _RuntimeType:
+            ValueType = typing.NewType("ValueType", builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _RuntimeTypeEnumTypeWrapper(
+            google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+                EnvironmentInfo.Runtime._RuntimeType.ValueType
+            ],
+            builtins.type,
+        ):  # noqa: F821
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            RUNTIME_TYPE_UNSPECIFIED: (
+                EnvironmentInfo.Runtime._RuntimeType.ValueType
+            )  # 0
+            """Should never actually be set, exists to follow convention of having a default.
+            SDKs should just leave `runtimes` empty if none can be determined.
+            """
+            RUNTIME_TYPE_JVM: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 1
+            RUNTIME_TYPE_CPYTHON: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 2
+            RUNTIME_TYPE_NODE: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 3
+            RUNTIME_TYPE_BUN: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 4
+            RUNTIME_TYPE_CRUBY: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 5
+            RUNTIME_TYPE_GO: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 6
+            RUNTIME_TYPE_DOTNET_FRAMEWORK: (
+                EnvironmentInfo.Runtime._RuntimeType.ValueType
+            )  # 7
+            RUNTIME_TYPE_DOTNET_CORE: (
+                EnvironmentInfo.Runtime._RuntimeType.ValueType
+            )  # 8
+            RUNTIME_TYPE_NATIVE: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 9
+            RUNTIME_TYPE_ROADRUNNER: (
+                EnvironmentInfo.Runtime._RuntimeType.ValueType
+            )  # 10
+
+        class RuntimeType(_RuntimeType, metaclass=_RuntimeTypeEnumTypeWrapper): ...
+        RUNTIME_TYPE_UNSPECIFIED: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 0
+        """Should never actually be set, exists to follow convention of having a default.
+        SDKs should just leave `runtimes` empty if none can be determined.
+        """
+        RUNTIME_TYPE_JVM: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 1
+        RUNTIME_TYPE_CPYTHON: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 2
+        RUNTIME_TYPE_NODE: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 3
+        RUNTIME_TYPE_BUN: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 4
+        RUNTIME_TYPE_CRUBY: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 5
+        RUNTIME_TYPE_GO: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 6
+        RUNTIME_TYPE_DOTNET_FRAMEWORK: (
+            EnvironmentInfo.Runtime.RuntimeType.ValueType
+        )  # 7
+        RUNTIME_TYPE_DOTNET_CORE: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 8
+        RUNTIME_TYPE_NATIVE: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 9
+        RUNTIME_TYPE_ROADRUNNER: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 10
+
+        TYPE_FIELD_NUMBER: builtins.int
+        VERSION_FIELD_NUMBER: builtins.int
+        type: global___EnvironmentInfo.Runtime.RuntimeType.ValueType
+        """The type of the runtime."""
+        version: builtins.str
+        """The version of the runtime, if obtainable."""
+        def __init__(
+            self,
+            *,
+            type: global___EnvironmentInfo.Runtime.RuntimeType.ValueType = ...,
+            version: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "type", b"type", "version", b"version"
+            ],
+        ) -> None: ...
+
+    class HostingEnvironment(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class _HostingEnvironmentType:
+            ValueType = typing.NewType("ValueType", builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _HostingEnvironmentTypeEnumTypeWrapper(
+            google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            ],
+            builtins.type,
+        ):  # noqa: F821
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            HOSTING_ENVIRONMENT_TYPE_UNSPECIFIED: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 0
+            """Should never actually be set, exists to follow convention of having a default.
+            SDKs should just leave `hosting_environments` empty if none can be determined.
+            """
+            HOSTING_ENVIRONMENT_TYPE_DOCKER: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 1
+            """Should always be in the list if we're running inside a docker container"""
+            HOSTING_ENVIRONMENT_TYPE_K8S: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 2
+            """Should always be in the list if we're running inside any k8s environment"""
+            HOSTING_ENVIRONMENT_TYPE_AWS_LAMBDA: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 3
+            """Detect via `AWS_LAMBDA_FUNCTION_NAME`"""
+            HOSTING_ENVIRONMENT_TYPE_AWS_ECS: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 4
+            """Detect via `ECS_CONTAINER_METADATA_URI_V4` or `ECS_CONTAINER_METADATA_URI`"""
+            HOSTING_ENVIRONMENT_TYPE_GOOGLE_CLOUD_RUN: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 6
+            """Detect via `K_SERVICE`"""
+            HOSTING_ENVIRONMENT_TYPE_GOOGLE_APP_ENGINE: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 7
+            """Detect via `GAE_SERVICE`"""
+            HOSTING_ENVIRONMENT_TYPE_AZURE_APP_SERVICE: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 8
+            """Detect via `WEBSITE_SITE_NAME`"""
+            HOSTING_ENVIRONMENT_TYPE_AZURE_FUNCTIONS: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 9
+            """Detect via `FUNCTIONS_EXTENSION_VERSION`"""
+            HOSTING_ENVIRONMENT_TYPE_AZURE_CONTAINER_APPS: (
+                EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
+            )  # 10
+            """Detect via `CONTAINER_APP_NAME`"""
+
+        class HostingEnvironmentType(
+            _HostingEnvironmentType, metaclass=_HostingEnvironmentTypeEnumTypeWrapper
+        ):
+            """What kind of hosting environment we're running in. This list is about what can actually be
+            detected reliably and is unrelated to what SDKs can actually run in.
+            """
+
+        HOSTING_ENVIRONMENT_TYPE_UNSPECIFIED: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 0
+        """Should never actually be set, exists to follow convention of having a default.
+        SDKs should just leave `hosting_environments` empty if none can be determined.
+        """
+        HOSTING_ENVIRONMENT_TYPE_DOCKER: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 1
+        """Should always be in the list if we're running inside a docker container"""
+        HOSTING_ENVIRONMENT_TYPE_K8S: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 2
+        """Should always be in the list if we're running inside any k8s environment"""
+        HOSTING_ENVIRONMENT_TYPE_AWS_LAMBDA: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 3
+        """Detect via `AWS_LAMBDA_FUNCTION_NAME`"""
+        HOSTING_ENVIRONMENT_TYPE_AWS_ECS: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 4
+        """Detect via `ECS_CONTAINER_METADATA_URI_V4` or `ECS_CONTAINER_METADATA_URI`"""
+        HOSTING_ENVIRONMENT_TYPE_GOOGLE_CLOUD_RUN: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 6
+        """Detect via `K_SERVICE`"""
+        HOSTING_ENVIRONMENT_TYPE_GOOGLE_APP_ENGINE: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 7
+        """Detect via `GAE_SERVICE`"""
+        HOSTING_ENVIRONMENT_TYPE_AZURE_APP_SERVICE: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 8
+        """Detect via `WEBSITE_SITE_NAME`"""
+        HOSTING_ENVIRONMENT_TYPE_AZURE_FUNCTIONS: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 9
+        """Detect via `FUNCTIONS_EXTENSION_VERSION`"""
+        HOSTING_ENVIRONMENT_TYPE_AZURE_CONTAINER_APPS: (
+            EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )  # 10
+        """Detect via `CONTAINER_APP_NAME`"""
+
+        TYPE_FIELD_NUMBER: builtins.int
+        VERSION_FIELD_NUMBER: builtins.int
+        type: (
+            global___EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType
+        )
+        """The type of hosting environment."""
+        version: builtins.str
+        """The version of the hosting environment, if obtainable."""
+        def __init__(
+            self,
+            *,
+            type: global___EnvironmentInfo.HostingEnvironment.HostingEnvironmentType.ValueType = ...,
+            version: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "type", b"type", "version", b"version"
+            ],
+        ) -> None: ...
+
+    class Platform(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        LINUX_FIELD_NUMBER: builtins.int
+        MACOS_FIELD_NUMBER: builtins.int
+        WINDOWS_FIELD_NUMBER: builtins.int
+        @property
+        def linux(self) -> global___EnvironmentInfo.LinuxPlatform: ...
+        @property
+        def macos(self) -> global___EnvironmentInfo.MacOSPlatform: ...
+        @property
+        def windows(self) -> global___EnvironmentInfo.WindowsPlatform: ...
+        def __init__(
+            self,
+            *,
+            linux: global___EnvironmentInfo.LinuxPlatform | None = ...,
+            macos: global___EnvironmentInfo.MacOSPlatform | None = ...,
+            windows: global___EnvironmentInfo.WindowsPlatform | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "linux",
+                b"linux",
+                "macos",
+                b"macos",
+                "variant",
+                b"variant",
+                "windows",
+                b"windows",
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "linux",
+                b"linux",
+                "macos",
+                b"macos",
+                "variant",
+                b"variant",
+                "windows",
+                b"windows",
+            ],
+        ) -> None: ...
+        def WhichOneof(
+            self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+        ) -> typing_extensions.Literal["linux", "macos", "windows"] | None: ...
+
+    class LinuxPlatform(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class _Libc:
+            ValueType = typing.NewType("ValueType", builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _LibcEnumTypeWrapper(
+            google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+                EnvironmentInfo.LinuxPlatform._Libc.ValueType
+            ],
+            builtins.type,
+        ):  # noqa: F821
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            LIBC_UNSPECIFIED: EnvironmentInfo.LinuxPlatform._Libc.ValueType  # 0
+            LIBC_GLIBC: EnvironmentInfo.LinuxPlatform._Libc.ValueType  # 1
+            LIBC_MUSL: EnvironmentInfo.LinuxPlatform._Libc.ValueType  # 2
+
+        class Libc(_Libc, metaclass=_LibcEnumTypeWrapper): ...
+        LIBC_UNSPECIFIED: EnvironmentInfo.LinuxPlatform.Libc.ValueType  # 0
+        LIBC_GLIBC: EnvironmentInfo.LinuxPlatform.Libc.ValueType  # 1
+        LIBC_MUSL: EnvironmentInfo.LinuxPlatform.Libc.ValueType  # 2
+
+        VERSION_FIELD_NUMBER: builtins.int
+        ARCHITECTURE_FIELD_NUMBER: builtins.int
+        LIBC_FIELD_NUMBER: builtins.int
+        version: builtins.str
+        """The Linux kernel or distribution version, if obtainable."""
+        architecture: global___EnvironmentInfo.Architecture.ValueType
+        """The architecture of the worker process."""
+        libc: global___EnvironmentInfo.LinuxPlatform.Libc.ValueType
+        """The libc used by the worker process."""
+        def __init__(
+            self,
+            *,
+            version: builtins.str = ...,
+            architecture: global___EnvironmentInfo.Architecture.ValueType = ...,
+            libc: global___EnvironmentInfo.LinuxPlatform.Libc.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "architecture", b"architecture", "libc", b"libc", "version", b"version"
+            ],
+        ) -> None: ...
+
+    class MacOSPlatform(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        VERSION_FIELD_NUMBER: builtins.int
+        ARCHITECTURE_FIELD_NUMBER: builtins.int
+        version: builtins.str
+        """The macOS version, if obtainable."""
+        architecture: global___EnvironmentInfo.Architecture.ValueType
+        """The architecture of the worker process."""
+        def __init__(
+            self,
+            *,
+            version: builtins.str = ...,
+            architecture: global___EnvironmentInfo.Architecture.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "architecture", b"architecture", "version", b"version"
+            ],
+        ) -> None: ...
+
+    class WindowsPlatform(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class _Crt:
+            ValueType = typing.NewType("ValueType", builtins.int)
+            V: typing_extensions.TypeAlias = ValueType
+
+        class _CrtEnumTypeWrapper(
+            google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+                EnvironmentInfo.WindowsPlatform._Crt.ValueType
+            ],
+            builtins.type,
+        ):  # noqa: F821
+            DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+            CRT_UNSPECIFIED: EnvironmentInfo.WindowsPlatform._Crt.ValueType  # 0
+            CRT_UCRT: EnvironmentInfo.WindowsPlatform._Crt.ValueType  # 1
+            CRT_MSVCRT: EnvironmentInfo.WindowsPlatform._Crt.ValueType  # 2
+            CRT_MINGW: EnvironmentInfo.WindowsPlatform._Crt.ValueType  # 3
+            CRT_CYGWIN: EnvironmentInfo.WindowsPlatform._Crt.ValueType  # 4
+
+        class Crt(_Crt, metaclass=_CrtEnumTypeWrapper): ...
+        CRT_UNSPECIFIED: EnvironmentInfo.WindowsPlatform.Crt.ValueType  # 0
+        CRT_UCRT: EnvironmentInfo.WindowsPlatform.Crt.ValueType  # 1
+        CRT_MSVCRT: EnvironmentInfo.WindowsPlatform.Crt.ValueType  # 2
+        CRT_MINGW: EnvironmentInfo.WindowsPlatform.Crt.ValueType  # 3
+        CRT_CYGWIN: EnvironmentInfo.WindowsPlatform.Crt.ValueType  # 4
+
+        VERSION_FIELD_NUMBER: builtins.int
+        ARCHITECTURE_FIELD_NUMBER: builtins.int
+        CRT_FIELD_NUMBER: builtins.int
+        version: builtins.str
+        """The Windows version, if obtainable."""
+        architecture: global___EnvironmentInfo.Architecture.ValueType
+        """The architecture of the worker process."""
+        crt: global___EnvironmentInfo.WindowsPlatform.Crt.ValueType
+        """The C runtime used by the worker process, if obtainable."""
+        def __init__(
+            self,
+            *,
+            version: builtins.str = ...,
+            architecture: global___EnvironmentInfo.Architecture.ValueType = ...,
+            crt: global___EnvironmentInfo.WindowsPlatform.Crt.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "architecture", b"architecture", "crt", b"crt", "version", b"version"
+            ],
+        ) -> None: ...
+
+    RUNTIMES_FIELD_NUMBER: builtins.int
+    HOSTING_ENVIRONMENTS_FIELD_NUMBER: builtins.int
+    PLATFORM_FIELD_NUMBER: builtins.int
+    @property
+    def runtimes(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___EnvironmentInfo.Runtime
+    ]:
+        """The runtime(s) the SDK is operating in."""
+    @property
+    def hosting_environments(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___EnvironmentInfo.HostingEnvironment
+    ]:
+        """The hosting environment(s) the SDK is operating in. Repeated to allow for layering (ex: Docker inside k8s)."""
+    @property
+    def platform(self) -> global___EnvironmentInfo.Platform:
+        """The platform the SDK is operating on."""
+    def __init__(
+        self,
+        *,
+        runtimes: collections.abc.Iterable[global___EnvironmentInfo.Runtime]
+        | None = ...,
+        hosting_environments: collections.abc.Iterable[
+            global___EnvironmentInfo.HostingEnvironment
+        ]
+        | None = ...,
+        platform: global___EnvironmentInfo.Platform | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["platform", b"platform"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "hosting_environments",
+            b"hosting_environments",
+            "platform",
+            b"platform",
+            "runtimes",
+            b"runtimes",
+        ],
+    ) -> None: ...
+
+global___EnvironmentInfo = EnvironmentInfo
 
 class WorkerCommand(google.protobuf.message.Message):
     """A command sent from the server to a worker."""

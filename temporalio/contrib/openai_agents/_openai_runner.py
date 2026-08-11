@@ -99,6 +99,28 @@ def _has_sandbox_agent(agent: Agent[Any], seen: set[int] | None = None) -> bool:
     return False
 
 
+def _coerce_run_config(value: object) -> RunConfig:
+    """openai-agents >= 0.19 also accepts a plain dict for ``run_config``.
+
+    This function normalizes to a RunConfig instance.
+    """
+    if isinstance(value, RunConfig):
+        return value
+    if not isinstance(value, dict):
+        raise TypeError(
+            f"run_config must be a RunConfig instance or a dict, got {type(value).__name__}"
+        )
+    field_names = {
+        config_field.name
+        for config_field in dataclasses.fields(RunConfig)
+        if config_field.init
+    }
+    unknown_fields = sorted(str(name) for name in value if name not in field_names)
+    if unknown_fields:
+        raise TypeError(f"Unknown run_config settings: {', '.join(unknown_fields)}")
+    return RunConfig(**value)
+
+
 class TemporalOpenAIRunner(AgentRunner):
     """Temporal Runner for OpenAI agents.
 
@@ -148,8 +170,9 @@ class TemporalOpenAIRunner(AgentRunner):
             raise ValueError("Temporal workflows don't support SQLite sessions.")
 
         run_config = kwargs.get("run_config")
-        if run_config is None:
-            run_config = RunConfig()
+        run_config = (
+            RunConfig() if run_config is None else _coerce_run_config(run_config)
+        )
 
         if run_config.model and not isinstance(run_config.model, _TemporalModelStub):
             if not isinstance(run_config.model, str):

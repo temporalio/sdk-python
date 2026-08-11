@@ -99,7 +99,7 @@ class ActivityToolInterruptWorkflow:
 
 
 async def test_in_workflow_tool_interrupt(client: Client):
-    task_queue = "test_in_workflow_tool_interrupt"
+    task_queue = f"test_in_workflow_tool_interrupt-{uuid4()}"
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(
@@ -140,7 +140,7 @@ async def test_in_workflow_tool_interrupt(client: Client):
 async def test_activity_tool_interrupt(client: Client):
     global _activity_delete_calls
     _activity_delete_calls = 0
-    task_queue = "test_activity_tool_interrupt"
+    task_queue = f"test_activity_tool_interrupt-{uuid4()}"
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(

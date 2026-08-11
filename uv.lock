@@ -4718,6 +4718,7 @@ deepagents = [
 ]
 google-adk = [
     { name = "google-adk" },
+    { name = "mcp" },
 ]
 google-genai = [
     { name = "google-genai" },
@@ -4812,6 +4813,7 @@ requires-dist = [
     { name = "langchain-core", marker = "python_full_version >= '3.11' and extra == 'deepagents'", specifier = ">=1.4.8,<2" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=1.1.0" },
     { name = "langsmith", marker = "extra == 'langsmith'", specifier = ">=0.7.34,<0.9" },
+    { name = "mcp", marker = "extra == 'google-adk'", specifier = ">=1.24,<2" },
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
     { name = "nexus-rpc", specifier = "==1.4.0" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.17.5" },
