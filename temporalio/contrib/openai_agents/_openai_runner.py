@@ -100,12 +100,9 @@ def _has_sandbox_agent(agent: Agent[Any], seen: set[int] | None = None) -> bool:
 
 
 def _coerce_run_config(value: object) -> RunConfig:
-    """Normalize ``run_config`` the way ``agents.run`` does at its public
-    runner boundaries.
+    """openai-agents >= 0.19 also accepts a plain dict for ``run_config``.
 
-    openai-agents >= 0.19 also accepts a plain dict for ``run_config``. This
-    mirrors ``agents.run_config._coerce_run_config`` (which older versions
-    lack) so dict configs behave identically through the Temporal runner.
+    This function normalizes to a RunConfig instance.
     """
     if isinstance(value, RunConfig):
         return value
