@@ -119,6 +119,8 @@ class _ReplaySafeMeter(Meter):
     # instrument kinds as non-abstract no-op defaults on the Meter ABC (e.g.
     # create_gauge in 1.23), which __getattr__ cannot intercept, so new Meter
     # methods must be audited and overridden here on opentelemetry upgrades.
+    # tests/contrib/opentelemetry/test_wrapper_abc_drift.py fails when the
+    # installed opentelemetry-api grows surface not covered here.
     def __init__(self, meter: Meter) -> None:
         super().__init__(meter.name, version=meter.version, schema_url=meter.schema_url)
         self._meter = meter
