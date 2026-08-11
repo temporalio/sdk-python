@@ -246,8 +246,8 @@ eviction, worker restart, redeploy), so a plain global meter provider re-records
 those metrics on each replay, inflating counts.
 
 `ReplaySafeMeterProvider` wraps your meter provider so synchronous instrument
-recordings made from workflow code are dropped during replay, mirroring what
-`create_tracer_provider()` does for spans:
+recordings made from workflow code are dropped while the workflow is replaying
+history events, mirroring what `create_tracer_provider()` does for spans:
 
 ```python
 import opentelemetry.metrics
@@ -263,7 +263,9 @@ opentelemetry.metrics.set_meter_provider(
 ```
 
 Recordings are first-execution-only, matching `workflow.metric_meter()`: a
-retried workflow task re-executes live and can record again. Observable
+retried workflow task re-executes live and can record again. Queries and
+update validators are live, once-per-request operations even when they run
+while the workflow is replaying, so their recordings are kept. Observable
 (asynchronous) instruments and recordings made outside workflows pass through
 untouched.
 
@@ -273,7 +275,7 @@ Libraries may also emit OpenTelemetry log records through the process-global
 logger provider from workflow code (e.g. Google ADK's `gen_ai.*` events),
 which duplicate on every replay the same way. `ReplaySafeLoggerProvider`
 wraps your logger provider so records emitted from workflow code are dropped
-during replay:
+while the workflow is replaying history events:
 
 ```python
 import opentelemetry._logs
@@ -290,7 +292,9 @@ opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(logger_provider
 ```
 
 Emissions are first-execution-only: a retried workflow task re-executes live
-and can emit again. Emissions outside workflows pass through untouched.
+and can emit again. Queries and update validators are live, once-per-request
+operations even when they run while the workflow is replaying, so their
+emissions are kept. Emissions outside workflows pass through untouched.
 
 ## Best Practices
 

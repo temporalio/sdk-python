@@ -30,9 +30,12 @@ def _forward_context_kwarg(context: Context | None) -> dict[str, Any]:
 
 
 def _skip_recording() -> bool:
-    # in_workflow() must be evaluated first: is_replaying() requires an active
-    # workflow context.
-    return workflow.in_workflow() and workflow.unsafe.is_replaying()
+    # in_workflow() must be evaluated first: is_replaying_history_events()
+    # requires an active workflow context. The history-events predicate is
+    # deliberate (not is_replaying()): queries and update validators are live,
+    # at-most-once-per-request operations even when they execute while the
+    # workflow is replaying, so their recordings must not be dropped.
+    return workflow.in_workflow() and workflow.unsafe.is_replaying_history_events()
 
 
 class _ReplaySafeCounter(Counter):
@@ -209,16 +212,18 @@ class ReplaySafeMeterProvider(MeterProvider):
     This meter provider wraps an OpenTelemetry MeterProvider and drops
     synchronous instrument recordings (counter ``add()``, up-down counter
     ``add()``, histogram ``record()``, and gauge ``set()``) made from workflow
-    code while the workflow is replaying. Without this, libraries that record
-    metrics from workflow code (e.g. ``google-adk``) re-record every
-    measurement on each replay, inflating counts.
+    code while the workflow is replaying history events. Without this,
+    libraries that record metrics from workflow code (e.g. ``google-adk``)
+    re-record every measurement on each replay, inflating counts.
 
     Recordings are therefore first-execution-only, matching
     :py:meth:`temporalio.workflow.metric_meter`: a workflow task retry
-    re-executes live and can record again. Observable (asynchronous)
-    instruments pass through untouched since their callbacks run on the metric
-    reader's collect thread, never inside workflow code. Recordings outside
-    workflows are unaffected.
+    re-executes live and can record again. Queries and update validators are
+    live, at-most-once-per-request operations even when they execute while the
+    workflow is replaying, so their recordings are kept. Observable
+    (asynchronous) instruments pass through untouched since their callbacks
+    run on the metric reader's collect thread, never inside workflow code.
+    Recordings outside workflows are unaffected.
 
     Install this as the process-global meter provider before any library
     (e.g. ``google-adk``) creates instruments::

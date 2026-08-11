@@ -1,6 +1,9 @@
-"""Unit tests for ReplaySafeLoggerProvider outside workflows."""
+"""Unit tests for ReplaySafeLoggerProvider."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
+from unittest.mock import patch
 
 from opentelemetry._logs import (
     Logger,
@@ -16,6 +19,7 @@ from opentelemetry.sdk._logs.export import (
 )
 from opentelemetry.util.types import _ExtendedAttributes
 
+from temporalio import workflow
 from temporalio.contrib.opentelemetry import ReplaySafeLoggerProvider
 
 
@@ -106,6 +110,48 @@ def test_replay_safe_logger_provider_supports_older_otel_signatures():
 
     assert inner_provider.get_logger_calls == [("test-logger", None, None, None)]
     assert inner_provider.logger.records == [record]
+
+
+@contextmanager
+def _workflow_replay_state(*, replaying_history_events: bool) -> Iterator[None]:
+    """Simulate workflow context during replay. When replaying_history_events
+    is False this is the query/update-validator state: is_replaying() is True
+    but is_replaying_history_events() is False."""
+    with (
+        patch.object(workflow, "in_workflow", return_value=True),
+        patch.object(workflow.unsafe, "is_replaying", return_value=True),
+        patch.object(
+            workflow.unsafe,
+            "is_replaying_history_events",
+            return_value=replaying_history_events,
+        ),
+    ):
+        yield
+
+
+def test_replay_safe_logger_provider_drops_emissions_replaying_history_events():
+    provider, exporter = _sdk_provider()
+    logger = provider.get_logger("test-logger")
+
+    with _workflow_replay_state(replaying_history_events=True):
+        logger.emit(LogRecord(event_name="replayed", body="dropped"))
+
+    assert not exporter.get_finished_logs()
+
+
+def test_replay_safe_logger_provider_emits_from_live_operations_during_replay():
+    """Queries and update validators execute at most once per request even
+    when the workflow is replaying, so the gate must use
+    is_replaying_history_events(), not is_replaying(), and keep their
+    emissions."""
+    provider, exporter = _sdk_provider()
+    logger = provider.get_logger("test-logger")
+
+    with _workflow_replay_state(replaying_history_events=False):
+        logger.emit(LogRecord(event_name="live-query", body="kept"))
+
+    records = [log.log_record for log in exporter.get_finished_logs()]
+    assert [(r.event_name, r.body) for r in records] == [("live-query", "kept")]
 
 
 def test_replay_safe_logger_provider_delegates_other_attributes():

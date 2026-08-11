@@ -17,9 +17,12 @@ if TYPE_CHECKING:
 
 
 def _skip_emitting() -> bool:
-    # in_workflow() must be evaluated first: is_replaying() requires an active
-    # workflow context.
-    return workflow.in_workflow() and workflow.unsafe.is_replaying()
+    # in_workflow() must be evaluated first: is_replaying_history_events()
+    # requires an active workflow context. The history-events predicate is
+    # deliberate (not is_replaying()): queries and update validators are live,
+    # at-most-once-per-request operations even when they execute while the
+    # workflow is replaying, so their emissions must not be dropped.
+    return workflow.in_workflow() and workflow.unsafe.is_replaying_history_events()
 
 
 class _ReplaySafeLogger(Logger):
@@ -56,13 +59,16 @@ class ReplaySafeLoggerProvider(LoggerProvider):
 
     This logger provider wraps an OpenTelemetry LoggerProvider and drops log
     records emitted (``Logger.emit()``) from workflow code while the workflow
-    is replaying. Without this, libraries that emit OpenTelemetry log records
-    from workflow code (e.g. ``google-adk``'s ``gen_ai.*`` events) re-emit
-    every record on each replay, duplicating telemetry.
+    is replaying history events. Without this, libraries that emit
+    OpenTelemetry log records from workflow code (e.g. ``google-adk``'s
+    ``gen_ai.*`` events) re-emit every record on each replay, duplicating
+    telemetry.
 
     Emissions are therefore first-execution-only: a workflow task retry
-    re-executes live and can emit again. Emissions outside workflows are
-    unaffected.
+    re-executes live and can emit again. Queries and update validators are
+    live, at-most-once-per-request operations even when they execute while the
+    workflow is replaying, so their emissions are kept. Emissions outside
+    workflows are unaffected.
 
     Install this as the process-global logger provider before any library
     (e.g. ``google-adk``) obtains loggers::
