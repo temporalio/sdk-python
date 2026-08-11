@@ -144,7 +144,7 @@ class ReplayMetricsModel(BaseLlm):
 class ReplayMetricsAgent:
     @workflow.run
     async def run(self, prompt: str, model_name: str) -> str | None:
-        weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+        weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
             replay_metrics_get_weather,
             start_to_close_timeout=timedelta(seconds=60),
         )

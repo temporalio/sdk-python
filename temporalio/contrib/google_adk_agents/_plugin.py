@@ -14,7 +14,10 @@ import opentelemetry.metrics
 import opentelemetry.trace
 
 from temporalio import workflow
-from temporalio.contrib.google_adk_agents._mcp import TemporalMcpToolSetProvider
+from temporalio.contrib.google_adk_agents._mcp import (
+    TemporalMcpToolSetProvider,
+    TemporalStatefulMcpToolSetProvider,
+)
 from temporalio.contrib.google_adk_agents._model import (
     invoke_model,
     invoke_model_streaming,
@@ -143,12 +146,18 @@ class GoogleAdkPlugin(SimplePlugin):
 
     def __init__(
         self,
-        toolset_providers: list[TemporalMcpToolSetProvider] | None = None,
+        toolset_providers: list[
+            TemporalMcpToolSetProvider | TemporalStatefulMcpToolSetProvider
+        ]
+        | None = None,
     ):
         """Initializes the Temporal ADK Plugin.
 
         Args:
-            toolset_providers: Optional list of toolset providers for MCP integration.
+            toolset_providers: Optional list of stateless
+                (:class:`TemporalMcpToolSetProvider`) or stateful
+                (:class:`TemporalStatefulMcpToolSetProvider`) toolset providers
+                for MCP integration.
         """
 
         @asynccontextmanager

@@ -1174,6 +1174,10 @@ class WorkflowServiceStub:
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Nexus operation deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
+    PollWorkflowExecutionTimeSkipping: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse,
+    ]
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -2595,6 +2599,12 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         (-- api-linter: core::0127::http-annotation=disabled
             aip.dev/not-precedent: Nexus operation deletion not exposed to HTTP, users should use cancel or terminate. --)
         """
+    @abc.abstractmethod
+    def PollWorkflowExecutionTimeSkipping(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse: ...
 
 def add_WorkflowServiceServicer_to_server(
     servicer: WorkflowServiceServicer, server: grpc.Server

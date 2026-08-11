@@ -860,6 +860,8 @@ class _RestrictionState:
 
 
 class _RestrictedProxyLookup:
+    bind_func: Callable[[_RestrictedProxy, Any], Callable[..., Any]] | None
+
     def __init__(
         self,
         access_func: Callable | None = None,
@@ -951,12 +953,12 @@ class _RestrictedProxyIOp(_RestrictedProxyLookup):
 
         def bind_f(instance: _RestrictedProxy, obj: Any) -> Callable:
             def i_op(self: Any, other: Any) -> _RestrictedProxy:
-                f(self, other)  # type: ignore
+                access_func(self, other)  # type: ignore
                 return instance
 
             return i_op.__get__(obj, type(obj))  # type: ignore
 
-        self.bind_f = bind_f
+        self.bind_func = bind_f
 
 
 _OpF = TypeVar("_OpF", bound=Callable[..., Any])

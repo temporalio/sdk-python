@@ -246,7 +246,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             # inside a Nexus operation handler must forward the inbound Nexus task links
             # explicitly so the started callee's WorkflowExecutionStarted event links back to
             # the caller.
-            if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+            if not temporalio.nexus._operation_context._in_nexus_backing_start_context():
                 req.links.extend(nexus_ctx._get_request_links())
 
         return req
@@ -277,7 +277,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # If this signal-with-start is issued from inside a Nexus operation handler (but not the
         # nexus-backing workflow), forward the inbound Nexus task links so both the callee's
         # WorkflowExecutionStarted and WorkflowExecutionSignaled events link back to the caller.
-        if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+        if not temporalio.nexus._operation_context._in_nexus_backing_start_context():
             nexus_ctx = (
                 temporalio.nexus._operation_context._try_start_operation_context()
             )
@@ -587,6 +587,13 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                         input.id, input.activity_type, run_id=details.run_id
                     )
             raise
+
+        # Apply StartActivity response elements to the current Nexus context.
+        # No-ops if called outside a Nexus context.
+        temporalio.nexus._operation_context._apply_start_activity_response_to_nexus_context(
+            input.id, resp
+        )
+
         return ActivityHandle(
             self._client,
             input.id,
@@ -670,6 +677,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Set priority
         req.priority.CopyFrom(input.priority._to_proto())
 
+        # Add request_id, links, and completion callbacks from the Nexus context
+        # if not in a Nexus context, this is a no-op
+        temporalio.nexus._operation_context._apply_nexus_context_to_start_activity_request(
+            req
+        )
+
         return req
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
@@ -733,6 +746,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     is_local=False,
                 )
             ),
+            callbacks=resp.callbacks,
         )
 
     def list_activities(

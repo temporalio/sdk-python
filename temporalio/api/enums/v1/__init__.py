@@ -52,6 +52,7 @@ from .task_queue_pb2 import (
     TaskQueueType,
     TaskReachability,
 )
+from .time_skipping_pb2 import FastForwardPollingResult
 from .update_pb2 import UpdateAdmittedEventOrigin, UpdateWorkflowExecutionLifecycleStage
 from .workflow_pb2 import (
     ContinueAsNewInitiator,
@@ -88,6 +89,7 @@ __all__ = [
     "EncodingType",
     "EventType",
     "ExecutionType",
+    "FastForwardPollingResult",
     "HistoryEventFilterType",
     "IndexedValueType",
     "NamespaceState",

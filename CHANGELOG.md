@@ -40,12 +40,28 @@ to include examples, links to docs, or any other relevant information.
   `temporalio.contrib.opentelemetry` already required in practice (it has depended on an API
   added in `opentelemetry-api` 1.24 since the tracing integration was introduced, and the
   lambda worker builds on it).
+- `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
+  for repeated type hints instead of rebuilding their schemas for every
+  payload, greatly speeding up decode of non-model hints such as discriminated
+  unions ([#1695](https://github.com/temporalio/sdk-python/issues/1695)). Up
+  to 1024 type adapters are cached per converter instance by default, with
+  least-recently-used eviction. To change the bound, pass
+  ``max_cached_type_adapters`` to ``PydanticPayloadConverter`` (or
+  ``PydanticJSONPlainPayloadConverter``) from a nullary subclass used as the
+  ``DataConverter.payload_converter_class``; ``None`` makes the cache
+  unbounded and zero disables caching.
 
 ### Deprecated
 
 ### :boom: Breaking Changes
 
 ### Fixed
+
+- The `google-adk` extra now depends on `mcp`, so fresh installs of
+  `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
+  without separately installing `mcp`. Previously the import failed with an
+  `ImportError` because `google.adk.tools.mcp_tool` only exports `McpToolset`
+  when `mcp` is installed.
 
 ### Security
 

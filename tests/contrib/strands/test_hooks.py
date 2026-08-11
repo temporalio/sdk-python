@@ -67,7 +67,7 @@ class HooksWorkflow:
 
 async def test_hooks(client: Client):
     _AUDIT_LOG.clear()
-    task_queue = "test_hooks"
+    task_queue = f"test_hooks-{uuid4()}"
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(
