@@ -233,12 +233,22 @@ class ReplaySafeTracerProvider(TracerProvider):
         Returns:
             A replay-safe tracer instance.
         """
-        tracer = self._tracer_provider.get_tracer(
-            instrumenting_module_name,
-            instrumenting_library_version,
-            schema_url,
-            attributes,
-        )
+        # Forward attributes only when set: the parameter was added in
+        # opentelemetry 1.26 and passing it to older providers raises
+        # TypeError.
+        if attributes is None:
+            tracer = self._tracer_provider.get_tracer(
+                instrumenting_module_name,
+                instrumenting_library_version,
+                schema_url,
+            )
+        else:
+            tracer = self._tracer_provider.get_tracer(
+                instrumenting_module_name,
+                instrumenting_library_version,
+                schema_url,
+                attributes,
+            )
         return _ReplaySafeTracer(tracer)
 
     def id_generator(self) -> TemporalIdGenerator:
