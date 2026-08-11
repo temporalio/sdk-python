@@ -5454,8 +5454,6 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
-    RESET_ATTEMPTS_FIELD_NUMBER: builtins.int
-    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
     JITTER_FIELD_NUMBER: builtins.int
     RESOURCE_ID_FIELD_NUMBER: builtins.int
@@ -5472,10 +5470,6 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
     """Run ID of the workflow or standalone activity. If empty, targets the latest run."""
     identity: builtins.str
     """The identity of the client who initiated this request."""
-    reset_attempts: builtins.bool
-    """Providing this flag will also reset the number of attempts."""
-    reset_heartbeat: builtins.bool
-    """Providing this flag will also reset the heartbeat details."""
     reason: builtins.str
     """Reason to unpause the activity."""
     @property
@@ -5493,15 +5487,13 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
         activity_id: builtins.str = ...,
         run_id: builtins.str = ...,
         identity: builtins.str = ...,
-        reset_attempts: builtins.bool = ...,
-        reset_heartbeat: builtins.bool = ...,
         reason: builtins.str = ...,
         jitter: google.protobuf.duration_pb2.Duration | None = ...,
         resource_id: builtins.str = ...,
         request_id: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["jitter", b"jitter"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "namespace", b"namespace", "reason", b"reason", "request_id", b"request_id", "reset_attempts", b"reset_attempts", "reset_heartbeat", b"reset_heartbeat", "resource_id", b"resource_id", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "namespace", b"namespace", "reason", b"reason", "request_id", b"request_id", "resource_id", b"resource_id", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
 
 global___UnpauseActivityExecutionRequest = UnpauseActivityExecutionRequest
 
@@ -5604,6 +5596,7 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     RESTORE_ORIGINAL_OPTIONS_FIELD_NUMBER: builtins.int
     RESOURCE_ID_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
+    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity."""
     workflow_id: builtins.str
@@ -5632,6 +5625,11 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
     request_id: builtins.str
     """Used to de-dupe reset requests."""
+    reset_heartbeat: builtins.bool
+    """Reset persisted heartbeat details.
+    Reset always resets the attempt counter. Passing this flag causes reset to additionally
+    discard any persisted heartbeat details.
+    """
     def __init__(
         self,
         *,
@@ -5645,9 +5643,10 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
         restore_original_options: builtins.bool = ...,
         resource_id: builtins.str = ...,
         request_id: builtins.str = ...,
+        reset_heartbeat: builtins.bool = ...,
     ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["jitter", b"jitter"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "keep_paused", b"keep_paused", "namespace", b"namespace", "request_id", b"request_id", "resource_id", b"resource_id", "restore_original_options", b"restore_original_options", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "identity", b"identity", "jitter", b"jitter", "keep_paused", b"keep_paused", "namespace", b"namespace", "request_id", b"request_id", "reset_heartbeat", b"reset_heartbeat", "resource_id", b"resource_id", "restore_original_options", b"restore_original_options", "run_id", b"run_id", "workflow_id", b"workflow_id"]) -> None: ...
 
 global___ResetActivityExecutionRequest = ResetActivityExecutionRequest
 
