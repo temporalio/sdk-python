@@ -69,7 +69,7 @@ async def get_weather(city: str) -> str:  #  type: ignore[reportUnusedParameter]
 
 def weather_agent(model_name: str) -> Agent:
     # Wraps 'get_weather' activity as a Tool
-    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
         get_weather, start_to_close_timeout=timedelta(seconds=60)
     )
 
@@ -700,7 +700,7 @@ def test_summary_and_summary_fn_raises():
 
 @pytest.mark.asyncio
 async def test_agent_outside_workflow():
-    """Test that an agent using TemporalModel and activity_tool works outside a Temporal workflow."""
+    """Test that an agent using TemporalModel and activity_as_tool works outside a Temporal workflow."""
     LLMRegistry.register(WeatherModel)
 
     agent = weather_agent("weather_model")
@@ -827,13 +827,13 @@ class ComplexActivityInputAgent:
             name="complex_input_agent",
             model=TemporalModel(model_name),
             tools=[
-                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
                     book_trip, start_to_close_timeout=timedelta(seconds=60)
                 ),
-                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
                     summarize_payload, start_to_close_timeout=timedelta(seconds=60)
                 ),
-                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
                     method_holder.annotate_trip,
                     start_to_close_timeout=timedelta(seconds=60),
                 ),
@@ -934,7 +934,7 @@ class ComplexActivityInputModel(TestModel):
 
 
 @pytest.mark.asyncio
-async def test_activity_tool_supports_complex_inputs_via_adk(client: Client):
+async def test_activity_as_tool_supports_complex_inputs_via_adk(client: Client):
     new_config = client.config()
     new_config["plugins"] = [GoogleAdkPlugin()]
     client = Client(**new_config)
@@ -1122,8 +1122,8 @@ def test_explicitly_set_none_preserved() -> None:
     assert serialized["cache_config"] is None
 
 
-def test_activity_tool_preserves_metadata() -> None:
-    """activity_tool wrapper preserves the original function's metadata.
+def test_activity_as_tool_preserves_metadata() -> None:
+    """activity_as_tool wrapper preserves the original function's metadata.
 
     This ensures ADK's tool schema generation can inspect __annotations__
     and __module__ on the wrapper, which are needed by
@@ -1135,7 +1135,7 @@ def test_activity_tool_preserves_metadata() -> None:
         """Get info for a city."""
         return f"{city}: {count}"
 
-    tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+    tool = temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
         my_activity, start_to_close_timeout=timedelta(seconds=30)
     )
 
