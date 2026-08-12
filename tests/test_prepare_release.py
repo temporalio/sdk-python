@@ -63,6 +63,28 @@ def test_sdk_core_changelog_entries_runs_core_script(
     ]
 
 
+def test_sdk_core_release_notes_embed_core_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    release_verify = _release_verify_module()
+    (tmp_path / ".git").mkdir()
+    monkeypatch.setattr(release_verify, "_previous_release_tag", lambda _version: "old")
+    monkeypatch.setattr(release_verify, "_gitlink", lambda revision, _path: revision)
+    monkeypatch.setattr(
+        subprocess,
+        "check_output",
+        lambda *_args, **_kwargs: "#### Commits\n\n- Core commit\n",
+    )
+
+    assert release_verify._sdk_core_release_notes("1.30.0", str(tmp_path)) == [
+        "### SDK Core",
+        "",
+        "#### Commits",
+        "",
+        "- Core commit",
+    ]
+
+
 def test_finalize_changelog_release() -> None:
     text = "## [Unreleased]\n\n### Added\n\n- A thing.\n"
     assert "## [1.30.0] - 2026-06-18" in finalize_changelog_release(

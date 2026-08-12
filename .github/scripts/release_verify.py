@@ -294,37 +294,23 @@ def _sdk_core_release_notes(version: str, path: str) -> list[str]:
             f"Submodule {path!r} is not initialized; checkout with submodules"
         )
 
-    log_args = [
-        "log",
-        "--format=%H%x00%h%x00%s",
-        "--reverse",
-        f"{previous_commit}..{current_commit}",
-    ]
     try:
-        log_output = _git(log_args, cwd=submodule_path)
+        notes = _sdk_core_changelog_entries(
+            previous_commit,
+            current_commit,
+            submodule_path,
+        )
     except subprocess.CalledProcessError:
         _git(["fetch", "--quiet", "origin", "main"], cwd=submodule_path)
-        log_output = _git(log_args, cwd=submodule_path)
-    if not log_output:
+        notes = _sdk_core_changelog_entries(
+            previous_commit,
+            current_commit,
+            submodule_path,
+        )
+    if not notes:
         return []
 
-    lines = ["### SDK Core", ""]
-    changelog_entries = _sdk_core_changelog_entries(
-        previous_commit,
-        current_commit,
-        submodule_path,
-    )
-    if changelog_entries:
-        lines.extend(["#### Changelog", "", *changelog_entries, ""])
-    lines.extend(["#### Commits", ""])
-    for line in log_output.splitlines():
-        full_hash, short_hash, subject = line.split("\0", 2)
-        subject = _link_sdk_core_prs(_clean_commit_subject(subject))
-        lines.append(
-            f"- [`{short_hash}`](https://github.com/temporalio/sdk-rust/commit/"
-            f"{full_hash}) {subject}"
-        )
-    return lines
+    return ["### SDK Core", "", *notes]
 
 
 def changelog_notes(args: argparse.Namespace) -> None:
