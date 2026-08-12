@@ -727,8 +727,7 @@ class _RunningActivity:
                 )
             # If not sync and there's a task, cancel it
             if not self.sync and self.task:
-                # TODO(cretz): Set msg?
-                self.task.cancel()
+                self.task.cancel("Activity cancelled")
 
 
 class _ThreadExceptionRaiser:
