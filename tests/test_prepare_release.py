@@ -107,7 +107,13 @@ def test_create_release_branch(monkeypatch: pytest.MonkeyPatch) -> None:
         subprocess, "run", lambda command, **_kwargs: calls.append(command)
     )
     create_release_branch(pathlib.Path("/repo"), "1.30.0")
-    assert calls[1] == ["git", "switch", "--create", "chore/release-1.30.0", "origin/main"]
+    assert calls[1] == [
+        "git",
+        "switch",
+        "--create",
+        "chore/release-1.30.0",
+        "origin/main",
+    ]
 
 
 def test_clean_worktree_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -137,4 +143,6 @@ def test_push_release_branch(monkeypatch: pytest.MonkeyPatch) -> None:
         subprocess, "run", lambda command, **_kwargs: calls.append(command)
     )
     push_release_branch(pathlib.Path("/repo"), "1.30.0")
-    assert calls == [["git", "push", "--set-upstream", "origin", "chore/release-1.30.0"]]
+    assert calls == [
+        ["git", "push", "--set-upstream", "origin", "chore/release-1.30.0"]
+    ]
