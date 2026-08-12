@@ -130,11 +130,10 @@ The key to making this work is to separate the applications repeatable (determin
 Workflow code can run for extended periods and, if interrupted, resume exactly where it left off.
 Activity code faces no restrictions on I/O or external interactions, but if it fails part-way through it restarts from the beginning.
 
-In the AI-agent example above, model invocations and tool calls run inside activities, while the logic that coordinates them lives in the workflow.
+In this integration, model invocations are automatically routed through Temporal activities, while the logic that coordinates them lives in the workflow.
+Tool execution depends on how each tool is configured: I/O-bound tools should run as Temporal activities, while deterministic tools can run directly in the workflow.
 This pattern generalizes to more sophisticated agents.
-We refer to that coordinating logic as _agent orchestration_.
-
-As a general rule, agent orchestration code executes within the Temporal workflow, whereas model calls and any I/O-bound tool invocations execute as Temporal activities.
+We refer to the coordinating logic as _agent orchestration_.
 
 The diagram below shows the overall architecture of an agentic application in Temporal.
 The Temporal Server is responsible to tracking program execution and making sure associated state is preserved reliably (i.e., stored to a database, possibly replicated across cloud regions).
@@ -267,10 +266,22 @@ To run this example, see the detailed instructions in the [Temporal Python Sampl
 
 ## Tool Calling
 
+Tools do not all automatically execute as Temporal activities when an OpenAI Agent runs inside a Temporal workflow.
+Where a tool executes depends on how it is defined:
+
+| Tool | Execution | Use for |
+| --- | --- | --- |
+| `activity_as_tool()` | Temporal activity | External I/O and non-deterministic operations |
+| `@function_tool` | Workflow | Deterministic, workflow-safe computation |
+| Hosted tool | Model provider | Provider-hosted features executed as part of the model invocation |
+
+The integration automatically routes model invocations through Temporal activities, but it does not automatically convert regular custom function tools into activities.
+
 ### Temporal Activities as OpenAI Agents Tools
 
 One of the powerful features of this integration is the ability to convert Temporal activities into agent tools using `activity_as_tool`.
 This allows your agent to leverage Temporal's durable execution for tool calls.
+`activity_as_tool()` creates an OpenAI Agents `FunctionTool` whose invocation schedules the underlying Temporal activity.
 
 In the example below, we apply the `@activity.defn` decorator to the `get_weather` function to create a Temporal activity.
 We then pass this through the `activity_as_tool` helper function to create an OpenAI Agents tool that is passed to the `Agent`.
@@ -311,9 +322,23 @@ class WeatherAgent:
         return result.final_output
 ```
 
+The activity must also be registered with a Worker.
+`activity_as_tool()` controls how the Agent invokes the activity; it does not register the activity with the Worker.
+
+```python
+from temporalio.worker import Worker
+
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[WeatherAgent],
+    activities=[get_weather],
+)
+```
+
 ### Calling OpenAI Agents Tools inside Temporal Workflows
 
-For simple computations that don't involve external calls you can call the tool directly from the workflow by using the standard OpenAI Agents SDK `@functiontool` annotation.
+For simple computations that don't involve external calls, you can call the tool directly from the workflow by using the standard OpenAI Agents SDK `@function_tool` decorator.
 
 ```python
 from temporalio import workflow
@@ -339,8 +364,10 @@ class MathAssistantAgent:
         return result.final_output
 ```
 
-Note that any tools that run in the workflow must respect the workflow execution restrictions, meaning no I/O or non-deterministic operations.
-Of course, code running in the workflow can invoke a Temporal activity at any time.
+Use regular `@function_tool` tools only for deterministic, workflow-safe logic.
+Do not perform network, database, filesystem, or other external I/O directly from these tools.
+Use a Temporal activity with `activity_as_tool()` instead.
+Code running in the workflow can also invoke a Temporal activity directly when needed.
 
 Tools that run in the workflow can also update OpenAI Agents context, which is read-only for tools run as Temporal activities.
 
