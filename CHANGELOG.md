@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `Runtime(disable_environment_info=...)` option to control whether
+  runtime, hosting, and platform information is included in worker heartbeats.
+
 - `temporalio.workflow.uuid7()` generates a determinism-safe, time-sortable
   UUIDv7 (RFC 9562) from workflow time and the workflow's deterministic random
   generator, complementing the existing `workflow.uuid4()`
