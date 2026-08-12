@@ -197,20 +197,38 @@ def _sdk_core_changelog_entries(
     current_commit: str,
     path: pathlib.Path,
 ) -> list[str]:
-    previous_entries = _changelog_entries(
-        _git(["show", f"{previous_commit}:CHANGELOG.md"], cwd=path)
-    )
-    current_entries = _changelog_entries(
-        _git(["show", f"{current_commit}:CHANGELOG.md"], cwd=path)
-    )
+    commits = _git(
+        [
+            "log",
+            "--format=%H",
+            "--reverse",
+            f"{previous_commit}..{current_commit}",
+            "--",
+            "CHANGELOG.md",
+        ],
+        cwd=path,
+    ).splitlines()
+    entries: dict[str, list[list[str]]] = {}
+    for commit in commits:
+        previous_entries = _changelog_entries(
+            _git(["show", f"{commit}^:CHANGELOG.md"], cwd=path)
+        )
+        previous = {
+            tuple(entry)
+            for category_entries in previous_entries.values()
+            for entry in category_entries
+        }
+        for header, current_entries in _changelog_entries(
+            _git(["show", f"{commit}:CHANGELOG.md"], cwd=path)
+        ).items():
+            for entry in current_entries:
+                if tuple(entry) not in previous:
+                    entries.setdefault(header, []).append(entry)
+
     lines: list[str] = []
-    for header, entries in current_entries.items():
-        previous = {tuple(entry) for entry in previous_entries.get(header, [])}
-        new_entries = [entry for entry in entries if tuple(entry) not in previous]
-        if not new_entries:
-            continue
+    for header, header_entries in entries.items():
         lines.extend([f"#### {header}", ""])
-        for entry in new_entries:
+        for entry in header_entries:
             lines.extend(entry)
         lines.append("")
     return lines[:-1] if lines else []

@@ -104,43 +104,87 @@ def test_replace_versions() -> None:
     )
 
 
-def test_sdk_core_changelog_entries_include_only_new_entries(
+def test_sdk_core_changelog_entries_preserve_introduction_heading(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     release_verify = _release_verify_module()
     changelogs = {
-        "old:CHANGELOG.md": """# Changelog
+        "introduce^:CHANGELOG.md": """# Changelog
 
 ## [Unreleased]
 
 ### Added
 
 * Existing feature.
-
-### Fixed
-
-* Existing fix.
 """,
-        "new:CHANGELOG.md": """# Changelog
+        "introduce:CHANGELOG.md": """# Changelog
+
+## [Unreleased]
+
+### Added
+
+* Existing feature.
+* Released feature.
+""",
+        "release^:CHANGELOG.md": """# Changelog
+
+## [Unreleased]
+
+### Added
+
+* Existing feature.
+* Released feature.
+""",
+        "release:CHANGELOG.md": """# Changelog
 
 ## [0.5.0]
 
 ### Added
 
 * Existing feature.
-* New feature.
+
+* Released feature.
+
+## [Unreleased]
+""",
+        "unreleased^:CHANGELOG.md": """# Changelog
+
+## [0.5.0]
+
+### Added
+
+* Existing feature.
+
+* Released feature.
+
+## [Unreleased]
+""",
+        "unreleased:CHANGELOG.md": """# Changelog
+
+## [0.5.0]
+
+### Added
+
+* Existing feature.
+
+* Released feature.
+
+## [Unreleased]
 
 ### Fixed
 
-* Existing fix.
-* New fix.
+* Unreleased fix.
 """,
     }
 
     monkeypatch.setattr(
         release_verify,
         "_git",
-        lambda args, *, cwd=None: changelogs[args[1]],
+        lambda args, *, cwd=None: (
+            "introduce\nrelease\nunreleased"
+            if args[:2] == ["log", "--format=%H"]
+            else changelogs[args[1]]
+        ),
     )
 
     assert release_verify._sdk_core_changelog_entries(
@@ -148,11 +192,11 @@ def test_sdk_core_changelog_entries_include_only_new_entries(
     ) == [
         "#### Added",
         "",
-        "* New feature.",
+        "* Released feature.",
         "",
         "#### Fixed",
         "",
-        "* New fix.",
+        "* Unreleased fix.",
     ]
 
 
