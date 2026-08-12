@@ -6498,12 +6498,6 @@ async def test_workflow_current_update(client: Client):
         )
 
 
-def skip_unfinished_handler_tests_in_older_python():
-    # These tests reliably fail or timeout in 3.9
-    if sys.version_info < (3, 10):
-        pytest.skip("Skipping unfinished handler tests in Python < 3.10")
-
-
 @workflow.defn
 class UnfinishedHandlersWarningsWorkflow:
     def __init__(self):
@@ -6561,7 +6555,6 @@ async def test_unfinished_update_handler(client: Client):
 
 
 async def test_unfinished_signal_handler(client: Client):
-    skip_unfinished_handler_tests_in_older_python()
     async with new_worker(client, UnfinishedHandlersWarningsWorkflow) as worker:
         test = _UnfinishedHandlersWarningsTest(client, worker, "signal")
         await test.test_wait_all_handlers_finished_and_unfinished_handlers_warning()
@@ -6803,7 +6796,6 @@ async def test_unfinished_handler_on_workflow_termination(
         "-cancellation-", "-failure-", "-continue-as-new-"
     ],
 ):
-    skip_unfinished_handler_tests_in_older_python()
     await _UnfinishedHandlersOnWorkflowTerminationTest(
         client,
         handler_type,
