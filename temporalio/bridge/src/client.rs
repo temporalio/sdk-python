@@ -280,10 +280,12 @@ impl ClientConfig {
         .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
         .dns_load_balancing(dns_load_balancing)
         .grpc_compression(grpc_compression_from_str(&self.grpc_compression)?)
-        .payload_limits(temporalio_client::PayloadLimitsOptions {
-            payloads_warn_size: self.payloads_warn_size,
-            memo_warn_size: self.memo_warn_size,
-        })
+        .payload_limits(
+            temporalio_client::PayloadLimitsOptions::builder()
+                .payloads_warn_size(self.payloads_warn_size)
+                .memo_warn_size(self.memo_warn_size)
+                .build(),
+        )
         .headers(ascii_headers)
         .binary_headers(binary_headers)
         .maybe_api_key(self.api_key)
@@ -325,25 +327,26 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
                 Some(fixed_server_name_verifier(&name, &ca_cert)?)
             }
         };
-        Ok(temporalio_client::TlsOptions {
-            server_root_ca_cert,
-            domain: conf.domain,
-            client_tls_options: match (conf.client_cert, conf.client_private_key) {
-                (None, None) => None,
-                (Some(client_cert), Some(client_private_key)) => {
-                    Some(temporalio_client::ClientTlsOptions {
-                        client_cert,
-                        client_private_key,
-                    })
-                }
-                _ => {
-                    return Err(PyValueError::new_err(
-                        "Must have both client cert and private key or neither",
-                    ))
-                }
-            },
-            server_cert_verifier,
-        })
+        let client_tls_options = match (conf.client_cert, conf.client_private_key) {
+            (None, None) => None,
+            (Some(client_cert), Some(client_private_key)) => Some(
+                temporalio_client::ClientTlsOptions::builder()
+                    .client_cert(client_cert)
+                    .client_private_key(client_private_key)
+                    .build(),
+            ),
+            _ => {
+                return Err(PyValueError::new_err(
+                    "Must have both client cert and private key or neither",
+                ))
+            }
+        };
+        Ok(temporalio_client::TlsOptions::builder()
+            .maybe_server_root_ca_cert(server_root_ca_cert)
+            .maybe_domain(conf.domain)
+            .maybe_client_tls_options(client_tls_options)
+            .maybe_server_cert_verifier(server_cert_verifier)
+            .build())
     }
 }
 
@@ -430,32 +433,31 @@ impl ServerCertVerifier for FixedServerNameVerifier {
 
 impl From<ClientRetryConfig> for RetryOptions {
     fn from(conf: ClientRetryConfig) -> Self {
-        RetryOptions {
-            initial_interval: Duration::from_millis(conf.initial_interval_millis),
-            randomization_factor: conf.randomization_factor,
-            multiplier: conf.multiplier,
-            max_interval: Duration::from_millis(conf.max_interval_millis),
-            max_elapsed_time: conf.max_elapsed_time_millis.map(Duration::from_millis),
-            max_retries: conf.max_retries,
-        }
+        RetryOptions::builder()
+            .initial_interval(Duration::from_millis(conf.initial_interval_millis))
+            .randomization_factor(conf.randomization_factor)
+            .multiplier(conf.multiplier)
+            .max_interval(Duration::from_millis(conf.max_interval_millis))
+            .max_elapsed_time(conf.max_elapsed_time_millis.map(Duration::from_millis))
+            .max_retries(conf.max_retries)
+            .build()
     }
 }
 
 impl From<ClientKeepAliveConfig> for CoreClientKeepAliveConfig {
     fn from(conf: ClientKeepAliveConfig) -> Self {
-        CoreClientKeepAliveConfig {
-            interval: Duration::from_millis(conf.interval_millis),
-            timeout: Duration::from_millis(conf.timeout_millis),
-        }
+        CoreClientKeepAliveConfig::builder()
+            .interval(Duration::from_millis(conf.interval_millis))
+            .timeout(Duration::from_millis(conf.timeout_millis))
+            .build()
     }
 }
 
 impl From<ClientHttpConnectProxyConfig> for HttpConnectProxyOptions {
     fn from(conf: ClientHttpConnectProxyConfig) -> Self {
-        HttpConnectProxyOptions {
-            target_addr: conf.target_host,
-            basic_auth: conf.basic_auth,
-        }
+        HttpConnectProxyOptions::new(conf.target_host)
+            .maybe_basic_auth(conf.basic_auth)
+            .build()
     }
 }
 
