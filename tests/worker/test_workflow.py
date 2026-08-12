@@ -3934,6 +3934,73 @@ async def test_workflow_uuid(client: Client):
         assert handle2_query_result == await handle2.query(UUIDWorkflow.result)
 
 
+@workflow.defn
+class UUID7Workflow:
+    def __init__(self) -> None:
+        self._result = "<unset>"
+        self._time_ms = -1
+
+    @workflow.run
+    async def run(self) -> None:
+        self._time_ms = workflow.time_ns() // 1_000_000
+        self._result = str(workflow.uuid7())
+
+    @workflow.query
+    def result(self) -> str:
+        return self._result
+
+    @workflow.query
+    def time_ms(self) -> int:
+        return self._time_ms
+
+
+async def test_workflow_uuid7(client: Client):
+    task_queue = str(uuid.uuid4())
+    async with new_worker(
+        client, UUID7Workflow, task_queue=task_queue, max_cached_workflows=0
+    ):
+        # Get two handle UUID results. Need to disable workflow cache since we
+        # restart the worker and don't want to pay the sticky queue penalty.
+        handle1 = await client.start_workflow(
+            UUID7Workflow.run, id=f"workflow-{uuid.uuid4()}", task_queue=task_queue
+        )
+        await handle1.result()
+        handle1_query_result = await handle1.query(UUID7Workflow.result)
+
+        handle2 = await client.start_workflow(
+            UUID7Workflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        await handle2.result()
+        handle2_query_result = await handle2.query(UUID7Workflow.result)
+
+        # Confirm they aren't equal to each other but they are equal to retries
+        # of the same query
+        assert handle1_query_result != handle2_query_result
+        assert handle1_query_result == await handle1.query(UUID7Workflow.result)
+        assert handle2_query_result == await handle2.query(UUID7Workflow.result)
+
+        # Confirm RFC 9562 shape: version 7, RFC variant, and the leading 48
+        # bits are the workflow time in milliseconds at generation
+        for handle, query_result in (
+            (handle1, handle1_query_result),
+            (handle2, handle2_query_result),
+        ):
+            result_uuid = uuid.UUID(query_result)
+            assert result_uuid.version == 7
+            assert result_uuid.variant == uuid.RFC_4122
+            workflow_time_ms = await handle.query(UUID7Workflow.time_ms)
+            assert int(result_uuid) >> 80 == workflow_time_ms
+
+    # Now confirm those results are the same even on a new worker
+    async with new_worker(
+        client, UUID7Workflow, task_queue=task_queue, max_cached_workflows=0
+    ):
+        assert handle1_query_result == await handle1.query(UUID7Workflow.result)
+        assert handle2_query_result == await handle2.query(UUID7Workflow.result)
+
+
 @activity.defn(name="custom-name")
 class CallableClassActivity:
     def __init__(self, orig_field1: str) -> None:
