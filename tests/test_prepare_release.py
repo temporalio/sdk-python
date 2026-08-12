@@ -200,6 +200,45 @@ def test_sdk_core_changelog_entries_preserve_introduction_heading(
     ]
 
 
+def test_sdk_core_changelog_entries_exclude_modified_existing_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_verify = _release_verify_module()
+    changelogs = {
+        "modify^:CHANGELOG.md": """# Changelog
+
+## [Unreleased]
+
+### Added
+
+* Existing feature.
+""",
+        "modify:CHANGELOG.md": """# Changelog
+
+## [Unreleased]
+
+### Added
+
+* Corrected existing feature.
+""",
+    }
+
+    monkeypatch.setattr(
+        release_verify,
+        "_git",
+        lambda args, *, cwd=None: (
+            "modify" if args[:2] == ["log", "--format=%H"] else changelogs[args[1]]
+        ),
+    )
+
+    assert (
+        release_verify._sdk_core_changelog_entries(
+            "old", "new", pathlib.Path("sdk-core")
+        )
+        == []
+    )
+
+
 def test_create_release_branch_fetches_main_and_branches_from_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

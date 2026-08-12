@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import difflib
 import pathlib
 import re
 import subprocess
@@ -192,6 +193,31 @@ def _changelog_entries(text: str) -> dict[str, list[list[str]]]:
     return entries
 
 
+def _introduced_changelog_entries(
+    previous_entries: dict[str, list[list[str]]],
+    current_entries: dict[str, list[list[str]]],
+) -> dict[str, list[list[str]]]:
+    previous = {
+        tuple(entry)
+        for category_entries in previous_entries.values()
+        for entry in category_entries
+    }
+    introduced: dict[str, list[list[str]]] = {}
+    for header, header_entries in current_entries.items():
+        matcher = difflib.SequenceMatcher(
+            a=[tuple(entry) for entry in previous_entries.get(header, [])],
+            b=[tuple(entry) for entry in header_entries],
+            autojunk=False,
+        )
+        for operation, _, _, current_start, current_end in matcher.get_opcodes():
+            if operation != "insert":
+                continue
+            for entry in header_entries[current_start:current_end]:
+                if tuple(entry) not in previous:
+                    introduced.setdefault(header, []).append(entry)
+    return introduced
+
+
 def _sdk_core_changelog_entries(
     previous_commit: str,
     current_commit: str,
@@ -213,17 +239,13 @@ def _sdk_core_changelog_entries(
         previous_entries = _changelog_entries(
             _git(["show", f"{commit}^:CHANGELOG.md"], cwd=path)
         )
-        previous = {
-            tuple(entry)
-            for category_entries in previous_entries.values()
-            for entry in category_entries
-        }
-        for header, current_entries in _changelog_entries(
+        current_entries = _changelog_entries(
             _git(["show", f"{commit}:CHANGELOG.md"], cwd=path)
+        )
+        for header, header_entries in _introduced_changelog_entries(
+            previous_entries, current_entries
         ).items():
-            for entry in current_entries:
-                if tuple(entry) not in previous:
-                    entries.setdefault(header, []).append(entry)
+            entries.setdefault(header, []).extend(header_entries)
 
     lines: list[str] = []
     for header, header_entries in entries.items():
