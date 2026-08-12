@@ -165,6 +165,57 @@ def _link_sdk_core_prs(subject: str) -> str:
     )
 
 
+def _changelog_entries(text: str) -> dict[str, list[list[str]]]:
+    entries: dict[str, list[list[str]]] = {}
+    header: str | None = None
+    entry: list[str] | None = None
+
+    for line in text.splitlines():
+        if line.startswith("### "):
+            if entry is not None:
+                entries.setdefault(header or "Other", []).append(entry)
+                entry = None
+            header = line.removeprefix("### ").strip()
+        elif line.startswith(("* ", "- ")):
+            if entry is not None:
+                entries.setdefault(header or "Other", []).append(entry)
+            entry = [line]
+        elif entry is not None:
+            if line.strip():
+                entry.append(line)
+            else:
+                entries.setdefault(header or "Other", []).append(entry)
+                entry = None
+
+    if entry is not None:
+        entries.setdefault(header or "Other", []).append(entry)
+    return entries
+
+
+def _sdk_core_changelog_entries(
+    previous_commit: str,
+    current_commit: str,
+    path: pathlib.Path,
+) -> list[str]:
+    previous_entries = _changelog_entries(
+        _git(["show", f"{previous_commit}:CHANGELOG.md"], cwd=path)
+    )
+    current_entries = _changelog_entries(
+        _git(["show", f"{current_commit}:CHANGELOG.md"], cwd=path)
+    )
+    lines: list[str] = []
+    for header, entries in current_entries.items():
+        previous = {tuple(entry) for entry in previous_entries.get(header, [])}
+        new_entries = [entry for entry in entries if tuple(entry) not in previous]
+        if not new_entries:
+            continue
+        lines.extend([f"#### {header}", ""])
+        for entry in new_entries:
+            lines.extend(entry)
+        lines.append("")
+    return lines[:-1] if lines else []
+
+
 def _sdk_core_release_notes(version: str, path: str) -> list[str]:
     previous_tag = _previous_release_tag(version)
     previous_commit = _gitlink(previous_tag, path)
@@ -193,6 +244,14 @@ def _sdk_core_release_notes(version: str, path: str) -> list[str]:
         return []
 
     lines = ["### SDK Core", ""]
+    changelog_entries = _sdk_core_changelog_entries(
+        previous_commit,
+        current_commit,
+        submodule_path,
+    )
+    if changelog_entries:
+        lines.extend(["#### Changelog", "", *changelog_entries, ""])
+    lines.extend(["#### Commits", ""])
     for line in log_output.splitlines():
         full_hash, short_hash, subject = line.split("\0", 2)
         subject = _link_sdk_core_prs(_clean_commit_subject(subject))

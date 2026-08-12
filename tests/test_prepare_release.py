@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import datetime
+import importlib.util
 import pathlib
 import subprocess
+from types import ModuleType
 
 import pytest
 
@@ -16,6 +18,15 @@ from scripts.prepare_release import (
     replace_project_version,
     replace_service_version,
 )
+
+
+def _release_verify_module() -> ModuleType:
+    path = pathlib.Path(__file__).parents[1] / ".github/scripts/release_verify.py"
+    spec = importlib.util.spec_from_file_location("release_verify", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_finalize_changelog_release_seeds_unreleased_and_versions_notes() -> None:
@@ -91,6 +102,58 @@ def test_replace_versions() -> None:
         )
         == '__version__ = "1.30.0"\n\nServiceRequest = TypeVar("ServiceRequest")'
     )
+
+
+def test_sdk_core_changelog_entries_include_only_new_entries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_verify = _release_verify_module()
+    changelogs = {
+        "old:CHANGELOG.md": """# Changelog
+
+## [Unreleased]
+
+### Added
+
+* Existing feature.
+
+### Fixed
+
+* Existing fix.
+""",
+        "new:CHANGELOG.md": """# Changelog
+
+## [0.5.0]
+
+### Added
+
+* Existing feature.
+* New feature.
+
+### Fixed
+
+* Existing fix.
+* New fix.
+""",
+    }
+
+    monkeypatch.setattr(
+        release_verify,
+        "_git",
+        lambda args, *, cwd=None: changelogs[args[1]],
+    )
+
+    assert release_verify._sdk_core_changelog_entries(
+        "old", "new", pathlib.Path("sdk-core")
+    ) == [
+        "#### Added",
+        "",
+        "* New feature.",
+        "",
+        "#### Fixed",
+        "",
+        "* New fix.",
+    ]
 
 
 def test_create_release_branch_fetches_main_and_branches_from_it(
