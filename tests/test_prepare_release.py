@@ -4,6 +4,7 @@ import datetime
 import importlib.util
 import pathlib
 import subprocess
+import sys
 from types import ModuleType
 
 import pytest
@@ -25,6 +26,7 @@ def _release_verify_module() -> ModuleType:
     spec = importlib.util.spec_from_file_location("release_verify", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -109,7 +111,7 @@ def test_sdk_core_changelog_entries_preserve_introduction_heading(
 ) -> None:
     release_verify = _release_verify_module()
     changelogs = {
-        "introduce^:CHANGELOG.md": """# Changelog
+        "old:CHANGELOG.md": """# Changelog
 
 ## [Unreleased]
 
@@ -126,32 +128,11 @@ def test_sdk_core_changelog_entries_preserve_introduction_heading(
 * Existing feature.
 * Released feature.
 """,
-        "release^:CHANGELOG.md": """# Changelog
-
-## [Unreleased]
-
-### Added
-
-* Existing feature.
-* Released feature.
-""",
         "release:CHANGELOG.md": """# Changelog
 
 ## [0.5.0]
 
-### Added
-
-* Existing feature.
-
-* Released feature.
-
-## [Unreleased]
-""",
-        "unreleased^:CHANGELOG.md": """# Changelog
-
-## [0.5.0]
-
-### Added
+### Released additions
 
 * Existing feature.
 
@@ -205,7 +186,7 @@ def test_sdk_core_changelog_entries_exclude_modified_existing_entry(
 ) -> None:
     release_verify = _release_verify_module()
     changelogs = {
-        "modify^:CHANGELOG.md": """# Changelog
+        "old:CHANGELOG.md": """# Changelog
 
 ## [Unreleased]
 
@@ -229,6 +210,72 @@ def test_sdk_core_changelog_entries_exclude_modified_existing_entry(
         lambda args, *, cwd=None: (
             "modify" if args[:2] == ["log", "--format=%H"] else changelogs[args[1]]
         ),
+    )
+
+    assert (
+        release_verify._sdk_core_changelog_entries(
+            "old", "new", pathlib.Path("sdk-core")
+        )
+        == []
+    )
+
+
+def test_updated_changelog_entries_keep_final_wording_for_new_entry() -> None:
+    release_verify = _release_verify_module()
+    entries = {
+        "Added": [
+            release_verify._ChangelogEntry(
+                ["* Initial wording."], introduced_header="Added"
+            )
+        ]
+    }
+
+    updated = release_verify._updated_changelog_entries(
+        entries, {"Added": [["* Final wording."]]}
+    )
+
+    assert updated["Added"][0].lines == ["* Final wording."]
+    assert updated["Added"][0].introduced_header == "Added"
+
+
+def test_updated_changelog_entries_exclude_modified_old_entry_and_keep_new_one() -> (
+    None
+):
+    release_verify = _release_verify_module()
+    entries = {"Added": [release_verify._ChangelogEntry(["* Existing feature."])]}
+
+    updated = release_verify._updated_changelog_entries(
+        entries,
+        {"Added": [["* Corrected existing feature."], ["* New feature."]]},
+    )
+
+    assert [entry.introduced_header for entry in updated["Added"]] == [None, "Added"]
+
+
+def test_updated_changelog_entries_exclude_multiline_old_entry_modification() -> None:
+    release_verify = _release_verify_module()
+    entries = {
+        "Fixed": [
+            release_verify._ChangelogEntry(["* Existing fix.", "  Original detail."])
+        ]
+    }
+
+    updated = release_verify._updated_changelog_entries(
+        entries,
+        {"Fixed": [["* Existing fix.", "  Corrected detail."]]},
+    )
+
+    assert updated["Fixed"][0].introduced_header is None
+
+
+def test_sdk_core_changelog_entries_ignore_commits_without_changelog_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_verify = _release_verify_module()
+    monkeypatch.setattr(
+        release_verify,
+        "_git",
+        lambda args, *, cwd=None: "# Changelog" if args[0] == "show" else "",
     )
 
     assert (

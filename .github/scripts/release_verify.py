@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import dataclasses
 import difflib
 import pathlib
 import re
@@ -193,29 +194,74 @@ def _changelog_entries(text: str) -> dict[str, list[list[str]]]:
     return entries
 
 
-def _introduced_changelog_entries(
-    previous_entries: dict[str, list[list[str]]],
+@dataclasses.dataclass
+class _ChangelogEntry:
+    lines: list[str]
+    introduced_header: str | None = None
+
+
+def _updated_changelog_entries(
+    previous_entries: dict[str, list[_ChangelogEntry]],
     current_entries: dict[str, list[list[str]]],
-) -> dict[str, list[list[str]]]:
-    previous = {
-        tuple(entry)
-        for category_entries in previous_entries.values()
-        for entry in category_entries
-    }
-    introduced: dict[str, list[list[str]]] = {}
+) -> dict[str, list[_ChangelogEntry]]:
+    exact_matches: dict[tuple[str, ...], list[_ChangelogEntry]] = {}
+    for category_entries in previous_entries.values():
+        for entry in category_entries:
+            exact_matches.setdefault(tuple(entry.lines), []).append(entry)
+
+    updated: dict[str, list[_ChangelogEntry]] = {}
+    matched_entries: set[int] = set()
     for header, header_entries in current_entries.items():
+        unmatched_current: list[list[str]] = []
+        for entry in header_entries:
+            matches = exact_matches.get(tuple(entry))
+            if matches:
+                matched_entry = matches.pop(0)
+                updated.setdefault(header, []).append(matched_entry)
+                matched_entries.add(id(matched_entry))
+            else:
+                unmatched_current.append(entry)
+
+        unmatched_previous = [
+            entry
+            for entry in previous_entries.get(header, [])
+            if id(entry) not in matched_entries
+        ]
         matcher = difflib.SequenceMatcher(
-            a=[tuple(entry) for entry in previous_entries.get(header, [])],
-            b=[tuple(entry) for entry in header_entries],
+            a=[tuple(entry.lines) for entry in unmatched_previous],
+            b=[tuple(entry) for entry in unmatched_current],
             autojunk=False,
         )
-        for operation, _, _, current_start, current_end in matcher.get_opcodes():
-            if operation != "insert":
+        for (
+            operation,
+            previous_start,
+            previous_end,
+            current_start,
+            current_end,
+        ) in matcher.get_opcodes():
+            if operation == "delete":
                 continue
-            for entry in header_entries[current_start:current_end]:
-                if tuple(entry) not in previous:
-                    introduced.setdefault(header, []).append(entry)
-    return introduced
+            if operation == "insert":
+                for entry in unmatched_current[current_start:current_end]:
+                    updated.setdefault(header, []).append(
+                        _ChangelogEntry(entry, introduced_header=header)
+                    )
+                continue
+
+            for previous_entry, current_entry in zip(
+                unmatched_previous[previous_start:previous_end],
+                unmatched_current[current_start:current_end],
+            ):
+                updated.setdefault(header, []).append(
+                    _ChangelogEntry(current_entry, previous_entry.introduced_header)
+                )
+            for entry in unmatched_current[
+                current_start + previous_end - previous_start : current_end
+            ]:
+                updated.setdefault(header, []).append(
+                    _ChangelogEntry(entry, introduced_header=header)
+                )
+    return updated
 
 
 def _sdk_core_changelog_entries(
@@ -234,24 +280,28 @@ def _sdk_core_changelog_entries(
         ],
         cwd=path,
     ).splitlines()
-    entries: dict[str, list[list[str]]] = {}
+    entries = {
+        header: [_ChangelogEntry(entry) for entry in header_entries]
+        for header, header_entries in _changelog_entries(
+            _git(["show", f"{previous_commit}:CHANGELOG.md"], cwd=path)
+        ).items()
+    }
     for commit in commits:
-        previous_entries = _changelog_entries(
-            _git(["show", f"{commit}^:CHANGELOG.md"], cwd=path)
+        entries = _updated_changelog_entries(
+            entries,
+            _changelog_entries(_git(["show", f"{commit}:CHANGELOG.md"], cwd=path)),
         )
-        current_entries = _changelog_entries(
-            _git(["show", f"{commit}:CHANGELOG.md"], cwd=path)
-        )
-        for header, header_entries in _introduced_changelog_entries(
-            previous_entries, current_entries
-        ).items():
-            entries.setdefault(header, []).extend(header_entries)
 
     lines: list[str] = []
-    for header, header_entries in entries.items():
+    introduced_entries: dict[str, list[_ChangelogEntry]] = {}
+    for header_entries in entries.values():
+        for entry in header_entries:
+            if entry.introduced_header is not None:
+                introduced_entries.setdefault(entry.introduced_header, []).append(entry)
+    for header, header_entries in introduced_entries.items():
         lines.extend([f"#### {header}", ""])
         for entry in header_entries:
-            lines.extend(entry)
+            lines.extend(entry.lines)
         lines.append("")
     return lines[:-1] if lines else []
 
