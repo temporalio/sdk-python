@@ -51,8 +51,14 @@ def test_sdk_core_changelog_entries_runs_core_script(
     assert calls == [
         (
             [
-                "python3",
-                "scripts/changelog_release_notes.py",
+                "cargo",
+                "run",
+                "--quiet",
+                "-p",
+                "temporalio-sdk-core",
+                "--bin",
+                "changelog-release-notes",
+                "--",
                 "--from",
                 "old",
                 "--to",

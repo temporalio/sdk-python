@@ -267,8 +267,14 @@ def _sdk_core_changelog_entries(
 ) -> list[str]:
     output = subprocess.check_output(
         [
-            "python3",
-            "scripts/changelog_release_notes.py",
+            "cargo",
+            "run",
+            "--quiet",
+            "-p",
+            "temporalio-sdk-core",
+            "--bin",
+            "changelog-release-notes",
+            "--",
             "--from",
             previous_commit,
             "--to",
