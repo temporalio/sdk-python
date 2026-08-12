@@ -131,7 +131,7 @@ Workflow code can run for extended periods and, if interrupted, resume exactly w
 Activity code faces no restrictions on I/O or external interactions, but if it fails part-way through it restarts from the beginning.
 
 In this integration, model invocations are automatically routed through Temporal activities, while the logic that coordinates them lives in the workflow.
-Tool execution depends on how each tool is configured: I/O-bound tools should run as Temporal activities, while deterministic tools can run directly in the workflow.
+Tools that perform I/O or other non-deterministic work should run as Temporal activities, while deterministic, workflow-safe tools can run directly in the workflow.
 This pattern generalizes to more sophisticated agents.
 We refer to the coordinating logic as _agent orchestration_.
 
@@ -153,18 +153,18 @@ Temporal Server manages data in encrypted form, so all data processing occurs on
 |                      Worker                          |
 |   +----------------------------------------------+   |
 |   |              Workflow Code                   |   |
-|   |       (Agent Orchestration Loop)             |   |
+|   | (Agent orchestration + deterministic tools)  |   |
 |   +----------------------------------------------+   |
-|          |          |                |               |
-|          v          v                v               |
-|   +-----------+ +-----------+ +-------------+        |
-|   | Activity  | | Activity  | |  Activity   |        |
-|   | (Tool 1)  | | (Tool 2)  | | (Model API) |        |
-|   +-----------+ +-----------+ +-------------+        |
-|         |           |                |               |
+|              |                     |                 |
+|              v                     v                 |
+|       +-------------+       +-------------+          |
+|       |  Activity   |       |  Activity   |          |
+|       | (I/O Tool)  |       | (Model API) |          |
+|       +-------------+       +-------------+          |
+|              |                     |                 |
 +------------------------------------------------------+
-          |           |                |
-          v           v                v
+               |                     |
+               v                     v
       [External APIs, services, databases, etc.]
 ```
 
@@ -266,16 +266,16 @@ To run this example, see the detailed instructions in the [Temporal Python Sampl
 
 ## Tool Calling
 
-Tools do not all automatically execute as Temporal activities when an OpenAI Agent runs inside a Temporal workflow.
+Model invocations are automatically routed through Temporal activities.
+OpenAI-hosted tools execute as part of those model invocations.
+User-defined `FunctionTool`s, including tools created with `@function_tool`, are not automatically converted into Temporal activities; they execute in the workflow unless explicitly backed by a Temporal activity.
 Where a tool executes depends on how it is defined:
 
 | Tool | Execution | Use for |
 | --- | --- | --- |
 | `activity_as_tool()` | Temporal activity | External I/O and non-deterministic operations |
-| `@function_tool` | Workflow | Deterministic, workflow-safe computation |
-| Hosted tool | Model provider | Provider-hosted features executed as part of the model invocation |
-
-The integration automatically routes model invocations through Temporal activities, but it does not automatically convert regular custom function tools into activities.
+| `FunctionTool` / `@function_tool` | Workflow | Deterministic, workflow-safe computation |
+| OpenAI-hosted tool | Model provider | Provider-hosted features executed as part of the model invocation |
 
 ### Temporal Activities as OpenAI Agents Tools
 
