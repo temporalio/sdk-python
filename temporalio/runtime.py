@@ -118,6 +118,7 @@ class Runtime:
         *,
         telemetry: TelemetryConfig,
         worker_heartbeat_interval: timedelta | None = timedelta(seconds=60),
+        disable_environment_info: bool = False,
     ) -> None:
         """Create a runtime with the provided configuration.
 
@@ -128,6 +129,8 @@ class Runtime:
                 ``runtime_options``.
             worker_heartbeat_interval: Interval for worker heartbeats. ``None``
                 disables heartbeating. Interval must be between 1s and 60s.
+            disable_environment_info: Whether to omit runtime, hosting, and
+                platform information from worker heartbeats.
 
         Raises:
             ValueError: If both ```runtime_options`` is a negative value.
@@ -142,6 +145,7 @@ class Runtime:
         runtime_options = temporalio.bridge.runtime.RuntimeOptions(
             telemetry=telemetry._to_bridge_config(),
             worker_heartbeat_interval_millis=heartbeat_millis,
+            disable_environment_info=disable_environment_info,
         )
 
         self._core_runtime = temporalio.bridge.runtime.Runtime(options=runtime_options)
