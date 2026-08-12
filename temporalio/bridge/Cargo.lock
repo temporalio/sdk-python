@@ -2359,6 +2359,7 @@ dependencies = [
  "hyper-util",
  "parking_lot",
  "rand 0.10.2",
+ "serde_json",
  "temporalio-common",
  "thiserror",
  "tokio",
