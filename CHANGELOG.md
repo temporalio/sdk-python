@@ -27,6 +27,8 @@ to include examples, links to docs, or any other relevant information.
   workflow sandbox now also restricts the non-deterministic `uuid.uuid7()`
   added to the standard library in Python 3.14, matching the existing
   `uuid.uuid1()`/`uuid.uuid4()` restrictions.
+- **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
+  Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
 
 ### Changed
 
