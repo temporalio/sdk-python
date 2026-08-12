@@ -265,41 +265,20 @@ def _sdk_core_changelog_entries(
     current_commit: str,
     path: pathlib.Path,
 ) -> list[str]:
-    commits = _git(
+    output = subprocess.check_output(
         [
-            "log",
-            "--format=%H",
-            "--reverse",
-            f"{previous_commit}..{current_commit}",
-            "--",
-            "CHANGELOG.md",
+            "python3",
+            "scripts/changelog_release_notes.py",
+            "--from",
+            previous_commit,
+            "--to",
+            current_commit,
         ],
         cwd=path,
-    ).splitlines()
-    entries = {
-        header: [_ChangelogEntry(entry) for entry in header_entries]
-        for header, header_entries in _changelog_entries(
-            _git(["show", f"{previous_commit}:CHANGELOG.md"], cwd=path)
-        ).items()
-    }
-    for commit in commits:
-        entries = _updated_changelog_entries(
-            entries,
-            _changelog_entries(_git(["show", f"{commit}:CHANGELOG.md"], cwd=path)),
-        )
-
-    lines: list[str] = []
-    introduced_entries: dict[str, list[_ChangelogEntry]] = {}
-    for header_entries in entries.values():
-        for entry in header_entries:
-            if entry.introduced_header is not None:
-                introduced_entries.setdefault(entry.introduced_header, []).append(entry)
-    for header, header_entries in introduced_entries.items():
-        lines.extend([f"#### {header}", ""])
-        for entry in header_entries:
-            lines.extend(entry.lines)
-        lines.append("")
-    return lines[:-1] if lines else []
+        encoding="utf-8",
+        stderr=subprocess.STDOUT,
+    ).strip()
+    return output.splitlines() if output else []
 
 
 def _sdk_core_release_notes(version: str, path: str) -> list[str]:

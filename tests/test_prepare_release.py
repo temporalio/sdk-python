@@ -167,6 +167,11 @@ def test_sdk_core_changelog_entries_preserve_introduction_heading(
             else changelogs[args[1]]
         ),
     )
+    monkeypatch.setattr(
+        subprocess,
+        "check_output",
+        lambda *_args, **_kwargs: "#### Added\n\n* Released feature.\n\n#### Fixed\n\n* Unreleased fix.\n",
+    )
 
     assert release_verify._sdk_core_changelog_entries(
         "old", "new", pathlib.Path("sdk-core")
@@ -211,6 +216,7 @@ def test_sdk_core_changelog_entries_exclude_modified_existing_entry(
             "modify" if args[:2] == ["log", "--format=%H"] else changelogs[args[1]]
         ),
     )
+    monkeypatch.setattr(subprocess, "check_output", lambda *_args, **_kwargs: "")
 
     assert (
         release_verify._sdk_core_changelog_entries(
@@ -306,6 +312,7 @@ def test_sdk_core_changelog_entries_ignore_commits_without_changelog_changes(
         "_git",
         lambda args, *, cwd=None: "# Changelog" if args[0] == "show" else "",
     )
+    monkeypatch.setattr(subprocess, "check_output", lambda *_args, **_kwargs: "")
 
     assert (
         release_verify._sdk_core_changelog_entries(
