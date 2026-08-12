@@ -204,63 +204,59 @@ def _updated_changelog_entries(
     previous_entries: dict[str, list[_ChangelogEntry]],
     current_entries: dict[str, list[list[str]]],
 ) -> dict[str, list[_ChangelogEntry]]:
+    current = [
+        (header, entry)
+        for header, header_entries in current_entries.items()
+        for entry in header_entries
+    ]
+    previous = [
+        entry
+        for category_entries in previous_entries.values()
+        for entry in category_entries
+    ]
     exact_matches: dict[tuple[str, ...], list[_ChangelogEntry]] = {}
-    for category_entries in previous_entries.values():
-        for entry in category_entries:
-            exact_matches.setdefault(tuple(entry.lines), []).append(entry)
+    for entry in previous:
+        exact_matches.setdefault(tuple(entry.lines), []).append(entry)
+
+    matches: dict[int, _ChangelogEntry] = {}
+    matched_previous: set[int] = set()
+    for current_index, (_, entry) in enumerate(current):
+        exact = exact_matches.get(tuple(entry))
+        if exact:
+            previous_entry = exact.pop(0)
+            matches[current_index] = previous_entry
+            matched_previous.add(id(previous_entry))
+
+    candidates: list[tuple[float, int, _ChangelogEntry]] = []
+    for current_index, (_, current_entry) in enumerate(current):
+        if current_index in matches:
+            continue
+        for previous_entry in previous:
+            if id(previous_entry) in matched_previous:
+                continue
+            similarity = difflib.SequenceMatcher(
+                a="\n".join(previous_entry.lines),
+                b="\n".join(current_entry),
+                autojunk=False,
+            ).ratio()
+            if similarity >= 0.6:
+                candidates.append((similarity, current_index, previous_entry))
+    for _, current_index, previous_entry in sorted(
+        candidates, key=lambda candidate: candidate[0], reverse=True
+    ):
+        if current_index not in matches and id(previous_entry) not in matched_previous:
+            matches[current_index] = previous_entry
+            matched_previous.add(id(previous_entry))
 
     updated: dict[str, list[_ChangelogEntry]] = {}
-    matched_entries: set[int] = set()
-    for header, header_entries in current_entries.items():
-        unmatched_current: list[list[str]] = []
-        for entry in header_entries:
-            matches = exact_matches.get(tuple(entry))
-            if matches:
-                matched_entry = matches.pop(0)
-                updated.setdefault(header, []).append(matched_entry)
-                matched_entries.add(id(matched_entry))
-            else:
-                unmatched_current.append(entry)
-
-        unmatched_previous = [
-            entry
-            for entry in previous_entries.get(header, [])
-            if id(entry) not in matched_entries
-        ]
-        matcher = difflib.SequenceMatcher(
-            a=[tuple(entry.lines) for entry in unmatched_previous],
-            b=[tuple(entry) for entry in unmatched_current],
-            autojunk=False,
+    for current_index, (header, entry) in enumerate(current):
+        previous_entry = matches.get(current_index)
+        updated.setdefault(header, []).append(
+            _ChangelogEntry(
+                entry,
+                previous_entry.introduced_header if previous_entry else header,
+            )
         )
-        for (
-            operation,
-            previous_start,
-            previous_end,
-            current_start,
-            current_end,
-        ) in matcher.get_opcodes():
-            if operation == "delete":
-                continue
-            if operation == "insert":
-                for entry in unmatched_current[current_start:current_end]:
-                    updated.setdefault(header, []).append(
-                        _ChangelogEntry(entry, introduced_header=header)
-                    )
-                continue
-
-            for previous_entry, current_entry in zip(
-                unmatched_previous[previous_start:previous_end],
-                unmatched_current[current_start:current_end],
-            ):
-                updated.setdefault(header, []).append(
-                    _ChangelogEntry(current_entry, previous_entry.introduced_header)
-                )
-            for entry in unmatched_current[
-                current_start + previous_end - previous_start : current_end
-            ]:
-                updated.setdefault(header, []).append(
-                    _ChangelogEntry(entry, introduced_header=header)
-                )
     return updated
 
 

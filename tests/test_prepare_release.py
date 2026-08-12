@@ -268,6 +268,35 @@ def test_updated_changelog_entries_exclude_multiline_old_entry_modification() ->
     assert updated["Fixed"][0].introduced_header is None
 
 
+def test_updated_changelog_entries_preserve_heading_when_moved_and_edited() -> None:
+    release_verify = _release_verify_module()
+    entries = {
+        "Added": [
+            release_verify._ChangelogEntry(
+                ["* Initial feature wording."], introduced_header="Added"
+            )
+        ]
+    }
+
+    updated = release_verify._updated_changelog_entries(
+        entries, {"Changed": [["* Updated feature wording."]]}
+    )
+
+    assert updated["Changed"][0].lines == ["* Updated feature wording."]
+    assert updated["Changed"][0].introduced_header == "Added"
+
+
+def test_updated_changelog_entries_include_unrelated_replacement() -> None:
+    release_verify = _release_verify_module()
+    entries = {"Added": [release_verify._ChangelogEntry(["* Old feature."])]}
+
+    updated = release_verify._updated_changelog_entries(
+        entries, {"Added": [["* New capability for another API."]]}
+    )
+
+    assert updated["Added"][0].introduced_header == "Added"
+
+
 def test_sdk_core_changelog_entries_ignore_commits_without_changelog_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
