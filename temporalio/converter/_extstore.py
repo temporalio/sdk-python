@@ -46,9 +46,7 @@ class StorageOperationMetrics:
     driver_names: set[str] = dataclasses.field(default_factory=set)
     """Names of the drivers that participated in the operations."""
 
-    def record_batch(
-        self, count: int, size: int, driver_names: set[str]
-    ) -> None:
+    def record_batch(self, count: int, size: int, driver_names: set[str]) -> None:
         """Record metrics from a batch of storage operations."""
         self.payload_count += count
         self.total_size += size
@@ -486,9 +484,7 @@ class ExternalStorage:
 
         stored_payload = stored_payloads[0]
 
-        ExternalStorage._record_metrics(
-            1, stored_payload.ByteSize(), {driver.name()}
-        )
+        ExternalStorage._record_metrics(1, stored_payload.ByteSize(), {driver.name()})
 
         return stored_payload
 
