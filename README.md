@@ -121,6 +121,7 @@ informal introduction to the features and their implementation.
       - [Prepare](#prepare)
       - [Build](#build)
       - [Use](#use)
+      - [FIPS Compliance (Experimental)](#fips-compliance-experimental)
     - [Local SDK development environment](#local-sdk-development-environment)
       - [Testing](#testing-2)
       - [Proto Generation and Testing](#proto-generation-and-testing)
@@ -2111,6 +2112,41 @@ python example.py
 It should output:
 
     Result: Hello, Temporal!
+
+#### FIPS Compliance (Experimental)
+
+> **NOTE**: FIPS support is **experimental**. It is opt-in, source-build only, and currently exercised
+> on Linux only.
+
+FIPS 140-3 compliant cryptography is available as an **opt-in source build**. The published wheels are
+**not** FIPS compliant — they use the [`ring`](https://github.com/briansmith/ring) backend, which is not
+FIPS-validated. Because the crypto backend is chosen at compile time, FIPS cannot be enabled on a
+precompiled wheel: you must build the native extension yourself with `TEMPORALIO_FIPS=1`. When set, the
+build selects [`aws-lc-rs`](https://github.com/aws/aws-lc-rs) in FIPS mode (AWS-LC's FIPS 140-3 module)
+for the gRPC client (and the OTLP metric exporter, when enabled), in place of `ring`.
+
+Building `aws-lc-rs` in FIPS mode compiles AWS-LC from source, so in addition to the
+[Prepare](#prepare) prerequisites it requires **Go**, **CMake**, **Perl**, and a **C compiler**.
+
+To produce an installable FIPS wheel:
+
+```bash
+TEMPORALIO_FIPS=1 uv run maturin build --release --no-default-features --features fips
+```
+
+or, equivalently, the provided task:
+
+```bash
+poe build-wheel-fips
+```
+
+For a local develop build, use `poe build-develop-fips`. You can confirm at runtime that a FIPS build is
+loaded:
+
+```python
+from temporalio.bridge import temporal_sdk_bridge
+assert temporal_sdk_bridge.FIPS
+```
 
 ### Local SDK development environment
 

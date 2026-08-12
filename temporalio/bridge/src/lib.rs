@@ -11,6 +11,19 @@ mod worker;
 
 #[pymodule]
 fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Lets ops assert at runtime that the FIPS wheel is actually loaded, e.g.
+    // `temporalio.bridge.temporal_sdk_bridge.FIPS is True`. Mirrors sdk-ruby PR #466.
+    m.add("FIPS", cfg!(feature = "fips"))?;
+
+    // Under a FIPS build, install aws-lc-rs (FIPS mode) as the process-wide
+    // rustls provider before any client is constructed. This makes
+    // CryptoProvider::get_default() resolve to aws-lc-rs everywhere (including
+    // the custom verifier in client.rs), so no `ring` provider is ever used.
+    #[cfg(feature = "fips")]
+    {
+        let _ = tokio_rustls::rustls::crypto::aws_lc_rs::default_provider().install_default();
+    }
+
     // Client stuff
     m.add("RPCError", py.get_type::<client::RPCError>())?;
     m.add_class::<client::ClientRef>()?;
