@@ -481,7 +481,7 @@ Both `stateless_mcp_server()` and `stateful_mcp_server()` accept an optional `fa
 
 A stateless factory that declares no parameters — like the `lambda: MCPServerStdio(...)` example above — ignores the value, but it is still recorded in history.
 
-**Do not pass secrets, credentials, or API keys through `factory_argument`.** It is an activity argument, so it is recorded in workflow history and, without a payload codec, visible in the web UI. Resolve credentials worker-side inside the server factory instead.
+**Do not pass secrets, credentials, or API keys through `factory_argument`.** Its value is written into workflow history, where anyone who can read the workflow can read it in the web UI unless you have configured a payload codec. Resolve credentials worker-side inside the server factory instead.
 
 ### Hosted MCP Tool
 
@@ -525,7 +525,7 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, SandboxClientProvider, ModelActivityParameters
 from agents.extensions.sandbox.daytona import DaytonaSandboxClient
-from agents.extensions.sandbox.unix_local import UnixLocalSandboxClient
+from agents.sandbox.sandboxes.unix_local import UnixLocalSandboxClient
 
 async def main():
     client = await Client.connect(
@@ -587,6 +587,20 @@ class MyWorkflow:
 ```
 
 The name passed to `temporal_sandbox_client()` must exactly match the name used in `SandboxClientProvider` on the worker.
+
+### Keeping Options Out of History
+
+Whatever you put in `options` — including any API key it carries — is written into workflow history, where anyone who can read the workflow can read it in the web UI unless you have configured a payload codec.
+
+When the worker-side sandbox client's class declares `supports_default_options = True` — meaning it supplies its own defaults — you can mirror that declaration in the `temporal_sandbox_client()` call and leave `options` out entirely. `UnixLocalSandboxClient` and `RunloopSandboxClient` declare it, and a client you write yourself can too. History then records the options as `null`:
+
+```python
+run_config = RunConfig(sandbox=SandboxRunConfig(
+    client=temporal_sandbox_client("local", supports_default_options=True),
+))
+```
+
+Set the flag only for a client you have confirmed supplies its own defaults: on one that requires its options the sandbox never starts, and the workflow fails immediately with a non-retryable error naming the flag and the backend.
 
 ### Multiple Backends
 

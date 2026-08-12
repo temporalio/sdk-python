@@ -117,6 +117,23 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_client_create")
         async def create_session(args: CreateSessionArgs) -> SessionResult:
+            # Non-retryable: every retry would hit the same mismatch.
+            if (
+                args.client_options is None
+                and not self._client.supports_default_options
+            ):
+                raise ApplicationError(
+                    f"Sandbox backend {self._name!r} "
+                    f"({type(self._client).__name__}) does not declare "
+                    "`supports_default_options`, so it cannot create a session "
+                    "without options. Either set `options` on `SandboxRunConfig` "
+                    "and drop `supports_default_options=True` from the "
+                    "`temporal_sandbox_client()` call, or, if the client does "
+                    "supply its own defaults, declare "
+                    "`supports_default_options = True` on its class.",
+                    type="sandbox_options_required",
+                    non_retryable=True,
+                )
             with _translate_sandbox_errors():
                 session = await self._client.create(
                     snapshot=args.snapshot_spec,

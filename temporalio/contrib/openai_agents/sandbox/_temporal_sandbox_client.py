@@ -28,12 +28,12 @@ from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_session import (
 from temporalio.workflow import ActivityConfig
 
 
-class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
+class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions | None]):
     """Stateless client that dispatches all lifecycle operations as Temporal activities.
 
     No inner client is needed -- session creation, resumption, and deletion are
     all handled by activities whose names are prefixed with the provider
-    ``name`` (e.g. ``"daytona-sandbox_create_session"``).  The real
+    ``name`` (e.g. ``"daytona-sandbox_client_create"``).  The real
     ``BaseSandboxClient`` lives inside :class:`SandboxClientProvider` on the worker.
 
     Users should never need to instantiate this directly -- use
@@ -46,12 +46,17 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
             sandbox backend is targeted.
         config: Optional activity configuration for controlling timeouts,
             retries, etc.  Defaults to a 5-minute ``start_to_close_timeout``.
+        supports_default_options: Your declaration that the worker-side sandbox
+            client registered under ``name`` supplies its own defaults, so
+            ``options`` may be omitted.
     """
 
     def __init__(
         self,
         name: str,
         config: ActivityConfig | None = None,
+        *,
+        supports_default_options: bool = False,
     ) -> None:
         """Initialize the client."""
         self._name = name
@@ -59,13 +64,14 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
             start_to_close_timeout=timedelta(minutes=5),
         )
         self.backend_id = name
+        self.supports_default_options = supports_default_options
 
     async def create(
         self,
         *,
         snapshot: SnapshotSpec | SnapshotBase | None = None,
         manifest: Manifest | None = None,
-        options: BaseSandboxClientOptions,
+        options: BaseSandboxClientOptions | None,
     ) -> SandboxSession:
         """Create a new sandbox session via activity."""
         result: SessionResult = await workflow.execute_activity(

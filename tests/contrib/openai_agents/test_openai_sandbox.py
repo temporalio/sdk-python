@@ -1,7 +1,11 @@
 """Tests for sandbox validation in TemporalOpenAIRunner."""
 
 import io
+import json
+import sys
 import uuid
+from base64 import b64encode
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -27,7 +31,8 @@ from pydantic import TypeAdapter
 from pydantic_core import to_json
 
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.api.history.v1 import HistoryEvent
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
     OpenAIAgentsPlugin,
@@ -285,6 +290,7 @@ class _MockSandboxClient(BaseSandboxClient[BaseSandboxClientOptions | None]):
         self.create_calls: int = 0
         self.resume_calls: int = 0
         self.delete_calls: int = 0
+        self.create_options: list[BaseSandboxClientOptions | None] = []
 
     async def create(
         self,
@@ -294,6 +300,7 @@ class _MockSandboxClient(BaseSandboxClient[BaseSandboxClientOptions | None]):
         options: BaseSandboxClientOptions | None = None,
     ) -> SandboxSession:
         self.create_calls += 1
+        self.create_options.append(options)
         if manifest is not None:
             self.inner_session.state.manifest = manifest
         return self.session
@@ -818,6 +825,12 @@ class SandboxE2EWorkflow:
         return result.final_output
 
 
+def _client_with_plugin(client: Client, plugin: OpenAIAgentsPlugin) -> Client:
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    return Client(**new_config)
+
+
 async def test_sandbox_e2e_runner(client: Client):
     """End-to-end: Runner.run() with SandboxAgent exercises the full sandbox
     lifecycle (create, start, stop, shutdown, delete) through Temporal activities."""
@@ -843,9 +856,7 @@ async def test_sandbox_e2e_runner(client: Client):
         sandbox_clients=[SandboxClientProvider("mock", mock_sandbox_client)],
     )
 
-    new_config = client.config()
-    new_config["plugins"] = [plugin]
-    test_client = Client(**new_config)
+    test_client = _client_with_plugin(client, plugin)
 
     async with new_worker(
         test_client,
@@ -869,6 +880,361 @@ async def test_sandbox_e2e_runner(client: Client):
     assert mock_session.stop_calls >= 1, "session.stop() not called"
     assert mock_session.shutdown_calls >= 1, "session.shutdown() not called"
     assert mock_sandbox_client.delete_calls == 1, "client.delete() not called"
+
+
+# ── Default (omitted) client options ──
+
+_SANDBOX_OPTIONS_SECRET = "sk-sandbox-must-not-reach-history"
+
+
+class _SecretSandboxClientOptions(BaseSandboxClientOptions):
+    type: str = "secret-test"  # type: ignore[reportIncompatibleVariableOverride]
+    # Required so the workflow must set it: ``exclude_unset`` drops a defaulted field.
+    api_key: str
+
+
+def test_temporal_sandbox_client_supports_default_options_false_by_default():
+    assert temporal_sandbox_client("my-backend").supports_default_options is False
+
+
+def test_temporal_sandbox_client_supports_default_options():
+    client = temporal_sandbox_client("my-backend", supports_default_options=True)
+    assert client.supports_default_options is True
+
+
+@workflow.defn
+class SandboxOptionsRequiredWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            await Runner.run(
+                starting_agent=SandboxAgent[None](name="sandbox-no-options"),
+                input="hello",
+                run_config=RunConfig(
+                    sandbox=SandboxRunConfig(client=temporal_sandbox_client("mock")),
+                ),
+            )
+        except ValueError as e:
+            return str(e)
+        return "FAIL: omitting options should have been rejected"
+
+
+async def test_sandbox_options_required_by_default(client: Client):
+    async with AgentEnvironment(model=_mock_model()) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client,
+            SandboxOptionsRequiredWorkflow,
+            workflow_failure_exception_types=[ValueError, AssertionError],
+        ) as worker:
+            result = await client.execute_workflow(
+                SandboxOptionsRequiredWorkflow.run,
+                id=f"sandbox-options-required-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=10),
+            )
+    assert "requires `run_config.sandbox.options`" in result
+
+
+@workflow.defn
+class SandboxDefaultOptionsWorkflow:
+    @workflow.run
+    async def run(self, include_options: bool) -> str:
+        agent = SandboxAgent[None](
+            name="sandbox-default-options", capabilities=[_TestSandboxCapability()]
+        )
+        result = await Runner.run(
+            starting_agent=agent,
+            input="run a command",
+            run_config=RunConfig(
+                sandbox=SandboxRunConfig(
+                    client=temporal_sandbox_client(
+                        "mock", supports_default_options=True
+                    ),
+                    options=_SecretSandboxClientOptions(api_key=_SANDBOX_OPTIONS_SECRET)
+                    if include_options
+                    else None,
+                ),
+            ),
+        )
+        return result.final_output
+
+
+def _mock_sandbox_plugin(provider: SandboxClientProvider) -> OpenAIAgentsPlugin:
+    return OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses(
+                [
+                    ResponseBuilders.tool_call('{"cmd": "echo one"}', "run_command"),
+                    ResponseBuilders.tool_call('{"cmd": "echo two"}', "run_command"),
+                    ResponseBuilders.output_message("Done."),
+                ]
+            )
+        ),
+        sandbox_clients=[provider],
+    )
+
+
+def _activity_payloads(
+    events: Sequence[HistoryEvent], activity_name: str
+) -> tuple[list[bytes], list[bytes]]:
+    """The ``(arguments, results)`` payload bytes of every ``activity_name`` activity."""
+    scheduled_ids: set[int] = set()
+    args: list[bytes] = []
+    results: list[bytes] = []
+    for event in events:
+        if event.HasField("activity_task_scheduled_event_attributes"):
+            scheduled = event.activity_task_scheduled_event_attributes
+            if scheduled.activity_type.name == activity_name:
+                scheduled_ids.add(event.event_id)
+                args.extend(p.data for p in scheduled.input.payloads)
+        elif event.HasField("activity_task_completed_event_attributes"):
+            completed = event.activity_task_completed_event_attributes
+            # A completion event carries no activity type, so the only way to
+            # attribute a result is through the scheduled event it points back to.
+            if completed.scheduled_event_id in scheduled_ids:
+                results.extend(p.data for p in completed.result.payloads)
+    return args, results
+
+
+@pytest.mark.parametrize("include_options", [False, True], ids=["omitted", "provided"])
+async def test_sandbox_client_options_reach_history_only_when_provided(
+    client: Client, include_options: bool
+):
+    mock_sandbox_client = _MockSandboxClient()
+    provider = SandboxClientProvider("mock", mock_sandbox_client)
+    test_client = _client_with_plugin(client, _mock_sandbox_plugin(provider))
+
+    async with new_worker(
+        test_client,
+        SandboxDefaultOptionsWorkflow,
+        workflow_failure_exception_types=[Exception],
+    ) as worker:
+        handle = await test_client.start_workflow(
+            SandboxDefaultOptionsWorkflow.run,
+            include_options,
+            id=f"sandbox-default-options-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=20),
+        )
+        assert await handle.result() == "Done."
+        events = (await handle.fetch_history()).events
+
+    payloads, _ = _activity_payloads(events, "mock-sandbox_client_create")
+    assert len(payloads) == 1
+    serialized = json.loads(payloads[0])
+    if include_options:
+        assert _SANDBOX_OPTIONS_SECRET.encode() in payloads[0]
+        assert serialized["client_options"]["api_key"] == _SANDBOX_OPTIONS_SECRET
+        assert isinstance(
+            mock_sandbox_client.create_options[0], _SecretSandboxClientOptions
+        )
+    else:
+        assert _SANDBOX_OPTIONS_SECRET.encode() not in payloads[0]
+        assert serialized["client_options"] is None
+        assert mock_sandbox_client.create_options == [None]
+
+
+class _CacheEvictingSession(_MockSandboxSession):
+    """Mock session that drops the provider's session cache after its first exec,
+    so the next operation has to take the implicit-resume path."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.evict: Callable[[], None] | None = None
+
+    async def _exec_internal(
+        self,
+        *command: str | Path,
+        timeout: float | None = None,
+    ) -> ExecResult:
+        if self.evict is not None:
+            self.evict()
+            self.evict = None
+        return await super()._exec_internal(*command, timeout=timeout)
+
+
+async def test_sandbox_default_options_survive_worker_cache_miss(client: Client):
+    """Options only reach the create activity, so an implicit resume must not need them."""
+    inner_session = _CacheEvictingSession()
+    mock_sandbox_client = _MockSandboxClient(inner_session)
+    provider = SandboxClientProvider("mock", mock_sandbox_client)
+    inner_session.evict = provider._sessions.clear
+    test_client = _client_with_plugin(client, _mock_sandbox_plugin(provider))
+
+    async with new_worker(
+        test_client,
+        SandboxDefaultOptionsWorkflow,
+        workflow_failure_exception_types=[Exception],
+    ) as worker:
+        result = await test_client.execute_workflow(
+            SandboxDefaultOptionsWorkflow.run,
+            False,
+            id=f"sandbox-cache-miss-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=20),
+        )
+
+    assert result == "Done."
+    assert mock_sandbox_client.create_options == [None]
+    assert len(inner_session.exec_calls) == 2
+    # One resume for the second exec, one for teardown after shutdown evicts again.
+    assert mock_sandbox_client.resume_calls == 2
+
+
+class _OptionsRequiringSandboxClient(_MockSandboxClient):
+    """Mock of a backend that reads a required field off ``options``."""
+
+    # Overrides the base mock's ``True``, which is what makes the guard fire.
+    supports_default_options = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.create_entries: int = 0
+
+    async def create(
+        self,
+        *,
+        snapshot: Any = None,
+        manifest: Manifest | None = None,
+        options: BaseSandboxClientOptions | None = None,
+    ) -> SandboxSession:
+        self.create_entries += 1
+        _ = options.image  # type: ignore[attr-defined, union-attr]
+        return await super().create(
+            snapshot=snapshot, manifest=manifest, options=options
+        )
+
+
+@workflow.defn
+class SandboxDefaultOptionsUnsupportedWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        result = await Runner.run(
+            starting_agent=SandboxAgent[None](name="sandbox-needs-options"),
+            input="hello",
+            run_config=RunConfig(
+                sandbox=SandboxRunConfig(
+                    client=temporal_sandbox_client(
+                        "needs-options", supports_default_options=True
+                    ),
+                ),
+            ),
+        )
+        return result.final_output
+
+
+async def test_sandbox_default_options_rejected_when_client_requires_them(
+    client: Client,
+):
+    """Claiming default options for a client that requires them fails the workflow fast."""
+    mock_sandbox_client = _OptionsRequiringSandboxClient()
+    provider = SandboxClientProvider("needs-options", mock_sandbox_client)
+    test_client = _client_with_plugin(client, _mock_sandbox_plugin(provider))
+
+    async with new_worker(
+        test_client,
+        SandboxDefaultOptionsUnsupportedWorkflow,
+        workflow_failure_exception_types=[Exception],
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as exc_info:
+            await test_client.execute_workflow(
+                SandboxDefaultOptionsUnsupportedWorkflow.run,
+                id=f"sandbox-needs-options-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=15),
+            )
+
+    causes: list[BaseException] = []
+    err: BaseException | None = exc_info.value
+    while err is not None:
+        causes.append(err)
+        err = err.__cause__
+    app_error = next(e for e in causes if isinstance(e, ApplicationError))
+    assert app_error.non_retryable is True
+    assert app_error.type == "sandbox_options_required"
+    assert "supports_default_options" in str(app_error)
+    assert "'needs-options'" in str(app_error)
+    assert mock_sandbox_client.create_entries == 0
+
+
+@workflow.defn
+class SandboxUnixLocalWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        agent = SandboxAgent[None](
+            name="sandbox-unix-local", capabilities=[_TestSandboxCapability()]
+        )
+        result = await Runner.run(
+            starting_agent=agent,
+            input="write then read a file",
+            run_config=RunConfig(
+                sandbox=SandboxRunConfig(
+                    client=temporal_sandbox_client(
+                        "unix-local", supports_default_options=True
+                    ),
+                ),
+            ),
+        )
+        return result.final_output
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="agents.sandbox.sandboxes.unix_local raises ImportError at import time on Windows.",
+)
+async def test_sandbox_default_options_unix_local(client: Client):
+    """A real backend that advertises default options creates a working session
+    from an activity argument that carries no options at all."""
+    from agents.sandbox.sandboxes.unix_local import UnixLocalSandboxClient
+
+    plugin = OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses(
+                [
+                    ResponseBuilders.tool_call(
+                        '{"path": "greeting.txt", "data": "from-unix-local"}',
+                        "write_file",
+                    ),
+                    ResponseBuilders.tool_call(
+                        '{"cmd": "cat greeting.txt"}', "run_command"
+                    ),
+                    ResponseBuilders.output_message("Done."),
+                ]
+            )
+        ),
+        sandbox_clients=[SandboxClientProvider("unix-local", UnixLocalSandboxClient())],
+    )
+    test_client = _client_with_plugin(client, plugin)
+
+    async with new_worker(
+        test_client,
+        SandboxUnixLocalWorkflow,
+        workflow_failure_exception_types=[Exception],
+    ) as worker:
+        handle = await test_client.start_workflow(
+            SandboxUnixLocalWorkflow.run,
+            id=f"sandbox-unix-local-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        assert await handle.result() == "Done."
+        events = (await handle.fetch_history()).events
+
+    create_args, _ = _activity_payloads(events, "unix-local-sandbox_client_create")
+    assert len(create_args) == 1
+    assert json.loads(create_args[0])["client_options"] is None
+
+    _, exec_results = _activity_payloads(events, "unix-local-sandbox_session_exec")
+    stdouts = [json.loads(result)["stdout"] for result in exec_results]
+    # ``ExecResult.stdout`` is ``JsonSafeBytes``, so history holds it base64-encoded.
+    assert b64encode(b"from-unix-local").decode() in stdouts
 
 
 # ── JsonSafeBytes lossless serialization tests ──

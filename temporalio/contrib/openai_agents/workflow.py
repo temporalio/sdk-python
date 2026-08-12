@@ -247,6 +247,8 @@ def nexus_operation_as_tool(
 def temporal_sandbox_client(
     name: str,
     config: ActivityConfig | None = None,
+    *,
+    supports_default_options: bool = False,
 ) -> Any:
     """Create a sandbox client reference for use in a Temporal workflow ``RunConfig``.
 
@@ -267,13 +269,33 @@ def temporal_sandbox_client(
             ),
         )
 
+    .. warning::
+        ``options`` -- including any API key they carry -- are written into
+        workflow history, so anyone who can read the workflow can read them in
+        the web UI unless a payload codec is configured.  Leaving ``options``
+        unset with ``supports_default_options=True`` keeps them out, but only
+        works on a client you have confirmed supplies its own defaults; on one
+        that requires its options the sandbox never starts and the workflow
+        fails immediately with a non-retryable error naming the flag.
+
     Args:
         name: The name of the ``SandboxClientProvider`` registered on the
             worker.  Must match exactly.
         config: Optional activity configuration for controlling timeouts,
             retries, etc.  Defaults to a 5-minute ``start_to_close_timeout``.
+        supports_default_options: Set to ``True`` to declare that the sandbox
+            client registered on the worker supplies its own defaults, allowing
+            ``options`` to be omitted from ``SandboxRunConfig``.  Set it when
+            that client's own ``supports_default_options`` attribute is
+            ``True`` -- ``UnixLocalSandboxClient`` and ``RunloopSandboxClient``
+            are two such clients, and a client you write yourself can declare
+            it as well.
     """
-    return TemporalSandboxClient(name=name, config=config)
+    return TemporalSandboxClient(
+        name=name,
+        config=config,
+        supports_default_options=supports_default_options,
+    )
 
 
 def stateless_mcp_server(
