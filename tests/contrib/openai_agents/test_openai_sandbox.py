@@ -14,6 +14,7 @@ from agents.sandbox.errors import (
     SandboxError,
     WorkspaceArchiveReadError,
 )
+from agents.sandbox.manifest import Environment
 from agents.sandbox.session.base_sandbox_session import BaseSandboxSession
 from agents.sandbox.session.sandbox_client import (
     BaseSandboxClient,
@@ -23,15 +24,19 @@ from agents.sandbox.session.sandbox_session import SandboxSession
 from agents.sandbox.session.sandbox_session_state import SandboxSessionState
 from agents.sandbox.snapshot import NoopSnapshot
 from agents.sandbox.types import ExecResult
-from pydantic import TypeAdapter
+from agents.sandbox.workspace_paths import SandboxPathGrant
+from pydantic import BaseModel, TypeAdapter
 from pydantic_core import to_json
 
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.openai_agents import (
+    AgentsWorkflowError,
     ModelActivityParameters,
     OpenAIAgentsPlugin,
+    OpenAIPayloadConverter,
     SandboxClientProvider,
+    SecretRef,
 )
 from temporalio.contrib.openai_agents._openai_runner import _has_sandbox_agent
 from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
@@ -185,6 +190,30 @@ class SandboxValidationWorkflow:
         except ValueError as e:
             assert "temporal_sandbox_client(name)" in str(e)
 
+        # Case 5: run_config as a dict must reach the same validation
+        try:
+            agent = SandboxAgent[None](name="sandbox")
+            await Runner.run(
+                starting_agent=agent,
+                input="hello",
+                run_config={"sandbox": SandboxRunConfig(client=None)},  # type: ignore[typeddict-item]
+            )
+            return "FAIL: dict-run-config should have raised"
+        except ValueError as e:
+            assert "run_config.sandbox.client must be set" in str(e)
+
+        # Case 6: fully nested dict, where SandboxRunConfig is itself a dict
+        try:
+            agent = SandboxAgent[None](name="sandbox")
+            await Runner.run(
+                starting_agent=agent,
+                input="hello",
+                run_config={"sandbox": {"client": None}},  # type: ignore[typeddict-item]
+            )
+            return "FAIL: nested-dict-run-config should have raised"
+        except ValueError as e:
+            assert "run_config.sandbox.client must be set" in str(e)
+
         return "OK"
 
 
@@ -195,7 +224,12 @@ async def test_sandbox_validation_errors(client: Client):
         async with new_worker(
             client,
             SandboxValidationWorkflow,
-            workflow_failure_exception_types=[ValueError, AssertionError],
+            # Deliberately wider than production, where these types hang the workflow.
+            workflow_failure_exception_types=[
+                ValueError,
+                AssertionError,
+                AttributeError,
+            ],
         ) as worker:
             result = await client.execute_workflow(
                 SandboxValidationWorkflow.run,
@@ -285,6 +319,7 @@ class _MockSandboxClient(BaseSandboxClient[BaseSandboxClientOptions | None]):
         self.create_calls: int = 0
         self.resume_calls: int = 0
         self.delete_calls: int = 0
+        self.resolved_envs: dict[str, str] | None = None
 
     async def create(
         self,
@@ -296,6 +331,7 @@ class _MockSandboxClient(BaseSandboxClient[BaseSandboxClientOptions | None]):
         self.create_calls += 1
         if manifest is not None:
             self.inner_session.state.manifest = manifest
+            self.resolved_envs = await manifest.environment.resolve()
         return self.session
 
     async def resume(self, state: SandboxSessionState) -> SandboxSession:
@@ -356,6 +392,40 @@ async def test_activities_create_session_delegates(
     assert mock_client.create_calls == 1
     assert result.state is not None
     assert isinstance(result.supports_pty, bool)
+
+
+async def test_create_session_activity_resolves_secret_ref_but_returns_the_reference(
+    sandbox_activities: SandboxClientProvider,
+    mock_client: _MockSandboxClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Both activity payloads carry the reference while the worker sees the secret."""
+    secret = "sk-activity-boundary-secret"
+    monkeypatch.setenv("WORKER_ACTIVITY_SECRET", secret)
+
+    def payload_bytes(value: BaseModel) -> bytes:
+        payload = OpenAIPayloadConverter().to_payload(value)
+        assert payload is not None
+        return payload.data
+
+    args = CreateSessionArgs(
+        snapshot_spec=None,
+        manifest=Manifest(
+            environment=Environment(
+                value={"API_KEY": SecretRef(key="WORKER_ACTIVITY_SECRET")}
+            )
+        ),
+        client_options=None,
+    )
+    assert secret.encode() not in payload_bytes(args)
+
+    acts = _activity_map(sandbox_activities)
+    result = await acts["mock-sandbox_client_create"](args)
+
+    assert mock_client.resolved_envs == {"API_KEY": secret}
+    returned = payload_bytes(result)
+    assert secret.encode() not in returned
+    assert b"temporal.secret_ref" in returned
 
 
 async def test_activities_resume_session_delegates(
@@ -816,6 +886,313 @@ class SandboxE2EWorkflow:
             ),
         )
         return result.final_output
+
+
+_HOST_PATH = "/host/private-dir"
+_HOST_PATH_GRANT_MANIFEST = Manifest(
+    extra_path_grants=(
+        SandboxPathGrant(path="/workspace/shared", host_path=_HOST_PATH),
+    )
+)
+# A clean grant first, so a check that only inspects index 0 fails this.
+_TRAILING_GRANT_MANIFEST = Manifest(
+    extra_path_grants=(
+        SandboxPathGrant(path="/workspace/clean"),
+        SandboxPathGrant(path="/workspace/shared", host_path=_HOST_PATH),
+    )
+)
+_TWO_BOUND_GRANTS_MANIFEST = Manifest(
+    extra_path_grants=(
+        SandboxPathGrant(path="/workspace/shared", host_path=_HOST_PATH),
+        SandboxPathGrant(path="/workspace/other", host_path="/host/second-dir"),
+    )
+)
+
+
+class _GrantInjectingCapability(Capability):
+    """Adds a bound grant in ``process_manifest``, after the run boundary has looked."""
+
+    def __init__(self) -> None:
+        super().__init__(type="grant_injecting")
+
+    def process_manifest(self, manifest: Manifest) -> Manifest:
+        return manifest.model_copy(
+            update={
+                "extra_path_grants": (
+                    *manifest.extra_path_grants,
+                    SandboxPathGrant(path="/workspace/injected", host_path=_HOST_PATH),
+                )
+            }
+        )
+
+
+@workflow.defn
+class HostPathGrantWorkflow:
+    @workflow.run
+    async def run(self, route: str) -> str:
+        agent = SandboxAgent[None](name="sandbox-grant")
+        client = temporal_sandbox_client("mock")
+        options = _TestSandboxClientOptions()
+        expected = "/workspace/shared"
+
+        if route == "run_config_manifest":
+            sandbox = SandboxRunConfig(
+                client=client, options=options, manifest=_HOST_PATH_GRANT_MANIFEST
+            )
+        elif route == "default_manifest":
+            agent = SandboxAgent[None](
+                name="sandbox-grant", default_manifest=_HOST_PATH_GRANT_MANIFEST
+            )
+            sandbox = SandboxRunConfig(client=client, options=options)
+        elif route == "session_state":
+            sandbox = SandboxRunConfig(
+                client=client,
+                options=options,
+                session_state=TestSessionState(
+                    manifest=_HOST_PATH_GRANT_MANIFEST,
+                    snapshot=NoopSnapshot(id=str(workflow.uuid4())),
+                ),
+            )
+        elif route == "capability":
+            # Only the client boundary sees this: it is appended after upstream
+            # resolves the effective manifest. The manifest is empty but present,
+            # because upstream skips capabilities entirely when there is none.
+            agent = SandboxAgent[None](
+                name="sandbox-grant", capabilities=[_GrantInjectingCapability()]
+            )
+            sandbox = SandboxRunConfig(
+                client=client, options=options, manifest=Manifest()
+            )
+            expected = "/workspace/injected"
+        elif route == "trailing_grant":
+            sandbox = SandboxRunConfig(
+                client=client, options=options, manifest=_TRAILING_GRANT_MANIFEST
+            )
+        elif route == "two_bound_grants":
+            sandbox = SandboxRunConfig(
+                client=client, options=options, manifest=_TWO_BOUND_GRANTS_MANIFEST
+            )
+            expected = "/workspace/shared, /workspace/other"
+        else:
+            raise AssertionError(f"unknown route {route}")
+
+        try:
+            await Runner.run(
+                starting_agent=agent,
+                input="hello",
+                run_config=RunConfig(sandbox=sandbox),
+            )
+        except AgentsWorkflowError as e:
+            assert expected in str(e), str(e)
+            # The guard must not name the host path: this text reaches history.
+            assert _HOST_PATH not in str(e), str(e)
+            return "REJECTED"
+        return "NOT REJECTED"
+
+
+@pytest.mark.parametrize(
+    "route",
+    [
+        "run_config_manifest",
+        "default_manifest",
+        "session_state",
+        "capability",
+        "trailing_grant",
+        "two_bound_grants",
+    ],
+)
+async def test_host_path_grants_are_rejected_per_manifest_source(
+    client: Client, route: str
+):
+    """Each manifest source, including one only the client boundary can see."""
+    mock_sandbox_client = _MockSandboxClient(_MockSandboxSession())
+    plugin = OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses([ResponseBuilders.output_message("done")])
+        ),
+        sandbox_clients=[SandboxClientProvider("mock", mock_sandbox_client)],
+    )
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    test_client = Client(**new_config)
+
+    async with new_worker(
+        test_client,
+        HostPathGrantWorkflow,
+        workflow_failure_exception_types=[Exception],
+    ) as worker:
+        result = await test_client.execute_workflow(
+            HostPathGrantWorkflow.run,
+            route,
+            id=f"host-path-grant-{route}-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=15),
+        )
+
+    assert result == "REJECTED"
+    assert mock_sandbox_client.create_calls == 0
+    assert mock_sandbox_client.resume_calls == 0
+
+
+@workflow.defn
+class UncaughtHostPathGrantWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        await Runner.run(
+            starting_agent=SandboxAgent[None](name="sandbox-grant"),
+            input="hello",
+            run_config=RunConfig(
+                sandbox=SandboxRunConfig(
+                    client=temporal_sandbox_client("mock"),
+                    options=_TestSandboxClientOptions(),
+                    manifest=_HOST_PATH_GRANT_MANIFEST,
+                ),
+            ),
+        )
+        return "NOT REJECTED"
+
+
+async def test_host_path_grant_fails_the_workflow_on_a_production_like_worker(
+    client: Client,
+):
+    """Given no ``workflow_failure_exception_types``, so only the plugin's own applies.
+
+    If the error were rewrapped into an unregistered type the workflow task
+    would retry until ``execution_timeout`` and this would report a timeout.
+    """
+    mock_sandbox_client = _MockSandboxClient(_MockSandboxSession())
+    plugin = OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses([ResponseBuilders.output_message("done")])
+        ),
+        sandbox_clients=[SandboxClientProvider("mock", mock_sandbox_client)],
+    )
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    test_client = Client(**new_config)
+
+    async with new_worker(test_client, UncaughtHostPathGrantWorkflow) as worker:
+        with pytest.raises(WorkflowFailureError) as exc_info:
+            await test_client.execute_workflow(
+                UncaughtHostPathGrantWorkflow.run,
+                id=f"host-path-uncaught-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=15),
+            )
+
+    cause = exc_info.value.cause
+    assert isinstance(cause, ApplicationError), cause
+    assert cause.type == "AgentsWorkflowError", cause.type
+    assert "/workspace/shared" in str(cause)
+    # The WorkflowExecutionFailed event must not carry the host path.
+    assert _HOST_PATH not in str(cause)
+    assert mock_sandbox_client.create_calls == 0
+
+
+@workflow.defn
+class ResolveOnWorkflowThreadWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            await SecretRef(key="WORKER_THREAD_PROBE_KEY").resolve()
+        except ApplicationError as e:
+            return e.type or ""
+        return "NO RAISE"
+
+
+async def test_secret_ref_resolve_raises_inside_a_real_workflow(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+):
+    """``in_workflow()`` is genuinely True here, unlike the monkeypatched unit test.
+
+    The variable is set in this process so that removing the guard makes
+    ``resolve()`` succeed and this fail, rather than raising for being unset.
+    """
+    monkeypatch.setenv("WORKER_THREAD_PROBE_KEY", "value-that-must-not-be-read")
+    plugin = OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses([ResponseBuilders.output_message("done")])
+        ),
+    )
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    test_client = Client(**new_config)
+
+    async with new_worker(
+        test_client,
+        ResolveOnWorkflowThreadWorkflow,
+        workflow_failure_exception_types=[Exception],
+    ) as worker:
+        result = await test_client.execute_workflow(
+            ResolveOnWorkflowThreadWorkflow.run,
+            id=f"resolve-in-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=15),
+        )
+
+    assert result == "SecretRefUnusable"
+
+
+@workflow.defn
+class LiveSandboxSessionWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            await Runner.run(
+                starting_agent=SandboxAgent[None](name="sandbox-live"),
+                input="hello",
+                run_config=RunConfig(
+                    sandbox=SandboxRunConfig(
+                        # Rejected on presence, so the value is never used.
+                        session=object(),  # type: ignore[arg-type]
+                    ),
+                ),
+            )
+        except AgentsWorkflowError as e:
+            assert "run_config.sandbox.session" in str(e), str(e)
+            return "REJECTED"
+        return "NOT REJECTED"
+
+
+async def test_live_sandbox_session_is_rejected(client: Client):
+    """A live session returns before ``_resolve_client()``, so no activity guard runs."""
+    mock_sandbox_client = _MockSandboxClient(_MockSandboxSession())
+    plugin = OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses([ResponseBuilders.output_message("done")])
+        ),
+        sandbox_clients=[SandboxClientProvider("mock", mock_sandbox_client)],
+    )
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    test_client = Client(**new_config)
+
+    async with new_worker(
+        test_client,
+        LiveSandboxSessionWorkflow,
+        workflow_failure_exception_types=[Exception],
+    ) as worker:
+        result = await test_client.execute_workflow(
+            LiveSandboxSessionWorkflow.run,
+            id=f"live-session-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=15),
+        )
+
+    assert result == "REJECTED"
+    assert mock_sandbox_client.create_calls == 0
 
 
 async def test_sandbox_e2e_runner(client: Client):

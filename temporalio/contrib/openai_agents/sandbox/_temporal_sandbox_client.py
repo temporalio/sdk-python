@@ -68,6 +68,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
         options: BaseSandboxClientOptions,
     ) -> SandboxSession:
         """Create a new sandbox session via activity."""
+        _reject_host_path_grants(manifest)
         result: SessionResult = await workflow.execute_activity(
             f"{self._name}-sandbox_client_create",
             arg=CreateSessionArgs(
@@ -93,6 +94,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
 
     async def resume(self, state: SandboxSessionState) -> SandboxSession:
         """Resume an existing sandbox session via activity."""
+        _reject_host_path_grants(state.manifest)
         result: SessionResult = await workflow.execute_activity(
             f"{self._name}-sandbox_client_resume",
             arg=ResumeSessionArgs(state=state),
@@ -122,3 +124,21 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
     def deserialize_session_state(self, payload: dict[str, Any]) -> SandboxSessionState:
         """Deserialize a session state from a dict."""
         return SandboxSessionState.parse(payload)
+
+
+def _reject_host_path_grants(manifest: Manifest | None) -> None:
+    """Reject path grants bound to a host path before the manifest reaches a payload."""
+    # Imported here because workflow.py imports this module.
+    from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
+
+    if manifest is None:
+        return
+    # Names the sandbox-side path, never host_path: this message is recorded in
+    # the WorkflowExecutionFailed event.
+    bound = [g.path for g in manifest.extra_path_grants if g.host_path is not None]
+    if bound:
+        raise AgentsWorkflowError(
+            "Sandbox path grants with a host_path are not supported by the Temporal OpenAI "
+            f"Agents plugin (found: {', '.join(bound)}). The host path is recorded in "
+            "workflow history in plaintext. Remove host_path from these grants."
+        )

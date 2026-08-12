@@ -196,6 +196,15 @@ class TemporalOpenAIRunner(AgentRunner):
                     "  from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client\n"
                     "  run_config = RunConfig(sandbox=SandboxRunConfig(client=temporal_sandbox_client('my-backend')))"
                 )
+            # Checked before the client, which upstream never resolves for a live
+            # session: it configures the session and returns, so no activity --
+            # and no manifest check -- ever runs.
+            elif run_config.sandbox.session is not None:
+                raise AgentsWorkflowError(
+                    "run_config.sandbox.session is not supported by the Temporal OpenAI Agents "
+                    "plugin. A live sandbox session is not a durable construct in a workflow. "
+                    "Pass run_config.sandbox.client=temporal_sandbox_client(name) instead."
+                )
             elif run_config.sandbox.client is None:
                 raise ValueError(
                     "run_config.sandbox.client must be set to a temporal sandbox client. "
