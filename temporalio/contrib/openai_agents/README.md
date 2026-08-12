@@ -153,18 +153,19 @@ Temporal Server manages data in encrypted form, so all data processing occurs on
 |                      Worker                          |
 |   +----------------------------------------------+   |
 |   |              Workflow Code                   |   |
-|   | (Agent orchestration + deterministic tools)  |   |
+|   |  (Agent orchestration + deterministic tools) |   |
 |   +----------------------------------------------+   |
-|              |                     |                 |
-|              v                     v                 |
-|       +-------------+       +-------------+          |
-|       |  Activity   |       |  Activity   |          |
-|       | (I/O Tool)  |       | (Model API) |          |
-|       +-------------+       +-------------+          |
-|              |                     |                 |
+|          |          |                |               |
+|          v          v                v               |
+|   +-----------+ +-----------+ +-------------+        |
+|   | Activity  | | Activity  | |  Activity   |        |
+|   | (I/O Tool | | (I/O Tool | | (Model API) |        |
+|   |     1)    | |     2)    | |             |        |
+|   +-----------+ +-----------+ +-------------+        |
+|         |           |                |               |
 +------------------------------------------------------+
-               |                     |
-               v                     v
+          |           |                |
+          v           v                v
       [External APIs, services, databases, etc.]
 ```
 
@@ -267,7 +268,7 @@ To run this example, see the detailed instructions in the [Temporal Python Sampl
 ## Tool Calling
 
 Model invocations are automatically routed through Temporal activities.
-OpenAI-hosted tools execute as part of those model invocations.
+OpenAI-hosted tools are passed through the model invocation and executed by the model provider.
 User-defined `FunctionTool`s, including tools created with `@function_tool`, are not automatically converted into Temporal activities; they execute in the workflow unless explicitly backed by a Temporal activity.
 Where a tool executes depends on how it is defined:
 
