@@ -9,6 +9,8 @@ from urllib.request import urlopen
 
 import pytest
 
+import temporalio.bridge.metric
+import temporalio.bridge.runtime
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.runtime import (
@@ -367,6 +369,31 @@ def test_runtime_options_invalid_heartbeat() -> None:
         Runtime(
             telemetry=TelemetryConfig(), worker_heartbeat_interval=timedelta(seconds=-5)
         )
+
+
+def test_runtime_environment_info_option(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_options = []
+
+    class MockRuntime:
+        def __init__(self, *, options: Any) -> None:
+            captured_options.append(options)
+
+    monkeypatch.setattr(temporalio.bridge.runtime, "Runtime", MockRuntime)
+    monkeypatch.setattr(
+        temporalio.bridge.metric.MetricMeter, "create", staticmethod(lambda _: None)
+    )
+
+    Runtime(telemetry=TelemetryConfig())
+    Runtime(telemetry=TelemetryConfig(), disable_environment_info=True)
+
+    assert [option.disable_environment_info for option in captured_options] == [
+        False,
+        True,
+    ]
+
+
+def test_runtime_environment_info_can_be_enabled() -> None:
+    Runtime(telemetry=TelemetryConfig(), disable_environment_info=False)
 
 
 def test_runtime_ref_creates_default():

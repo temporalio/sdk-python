@@ -91,6 +91,7 @@ pub struct PrometheusConfig {
 pub struct RuntimeOptions {
     telemetry: TelemetryConfig,
     worker_heartbeat_interval_millis: Option<u64>,
+    disable_environment_info: bool,
 }
 
 const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
@@ -100,6 +101,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
     let RuntimeOptions {
         telemetry: TelemetryConfig { logging, metrics },
         worker_heartbeat_interval_millis,
+        disable_environment_info,
     } = options;
 
     // Have to build/start telemetry config pieces
@@ -134,6 +136,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
                 .build(),
         )
         .heartbeat_interval(worker_heartbeat_interval_millis.map(Duration::from_millis))
+        .disable_environment_info(disable_environment_info)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid runtime options: {err}")))?;
 

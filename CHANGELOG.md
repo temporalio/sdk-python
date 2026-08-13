@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `Runtime(disable_environment_info=...)` option to control whether
+  runtime, hosting, and platform information is included in worker heartbeats.
+
 - `temporalio.workflow.uuid7()` generates a determinism-safe, time-sortable
   UUIDv7 (RFC 9562) from workflow time and the workflow's deterministic random
   generator, complementing the existing `workflow.uuid4()`
@@ -27,6 +30,8 @@ to include examples, links to docs, or any other relevant information.
   workflow sandbox now also restricts the non-deterministic `uuid.uuid7()`
   added to the standard library in Python 3.14, matching the existing
   `uuid.uuid1()`/`uuid.uuid4()` restrictions.
+- **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
+  Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
 
 ### Changed
 
