@@ -105,6 +105,9 @@ dev = [
 [tool.poe.tasks]
 build-develop = "uv run maturin develop --uv"
 build-develop-with-release = { cmd = "uv run maturin develop --release --uv" }
+# FIPS builds: swap the rustls stack onto aws-lc-rs FIPS mode (aws-lc-fips-sys), eliminating `ring`.
+build-develop-fips = { cmd = "uv run maturin develop --uv --no-default-features --features fips", env = { TEMPORALIO_FIPS = "1" } }
+build-wheel-fips = { cmd = "uv run maturin build --release --no-default-features --features fips", env = { TEMPORALIO_FIPS = "1" } }
 format = [
   { cmd = "uv run ruff check --select I --fix" },
   { cmd = "uv run ruff format" },
