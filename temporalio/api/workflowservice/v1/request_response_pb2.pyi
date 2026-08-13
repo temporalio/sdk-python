@@ -8965,6 +8965,7 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     RESTORE_ORIGINAL_OPTIONS_FIELD_NUMBER: builtins.int
     RESOURCE_ID_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
+    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity."""
     workflow_id: builtins.str
@@ -8993,6 +8994,11 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
     """Resource ID for routing. Contains "workflow:{workflow_id}" for workflow activities or "activity:{activity_id}" for standalone activities."""
     request_id: builtins.str
     """Used to de-dupe reset requests."""
+    reset_heartbeat: builtins.bool
+    """Reset persisted heartbeat details.
+    Reset always resets the attempt counter. Passing this flag causes reset to additionally
+    discard any persisted heartbeat details.
+    """
     def __init__(
         self,
         *,
@@ -9006,6 +9012,7 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
         restore_original_options: builtins.bool = ...,
         resource_id: builtins.str = ...,
         request_id: builtins.str = ...,
+        reset_heartbeat: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["jitter", b"jitter"]
@@ -9025,6 +9032,8 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
             b"namespace",
             "request_id",
             b"request_id",
+            "reset_heartbeat",
+            b"reset_heartbeat",
             "resource_id",
             b"resource_id",
             "restore_original_options",
