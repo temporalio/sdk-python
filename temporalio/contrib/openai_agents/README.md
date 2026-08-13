@@ -487,6 +487,36 @@ A stateless factory that declares no parameters — like the `lambda: MCPServerS
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
 
+## Secrets for Hosted Tools
+
+⚠️ **Experimental** - This functionality is subject to change prior to General Availability.
+
+Use `secret_reference()` for a hosted tool credential that should come from the worker's environment rather than being written into your workflow. Pass it the *name of an environment variable*, in place of the credential itself:
+
+```python
+from agents import HostedMCPTool
+from temporalio.contrib.openai_agents import secret_reference
+
+tool = HostedMCPTool(
+    tool_config={
+        "type": "mcp",
+        "server_label": "my_server",
+        "server_url": "https://example.com/mcp",
+        "authorization": secret_reference("MY_MCP_TOKEN"),
+    }
+)
+```
+
+Set `MY_MCP_TOKEN` on every worker that runs model activities. `secret_reference("MY_MCP_TOKEN")` returns the placeholder `temporal.secret_reference:MY_MCP_TOKEN`; each worker reads the variable from its own environment and sends that value on to the model provider in the placeholder's place. A worker without a value for it fails the model call with a non-retryable `ApplicationError` of type `SecretReferenceFailure`, naming the variable.
+
+The placeholder is substituted in these fields and no others:
+
+- `authorization`, and the value of each entry in `headers`, in a `HostedMCPTool`'s `tool_config`
+- `value` in each entry of `network_policy.domain_secrets` under a hosted `ShellTool`'s `environment`
+- `value` in each entry of `network_policy.domain_secrets` under a `CodeInterpreterTool`'s `container`
+
+Anywhere else — in a header *name*, or as an MCP server `factory_argument` (see [Factory Arguments](#factory-arguments)) — the placeholder is passed on as the literal string `temporal.secret_reference:MY_MCP_TOKEN`, and the receiving system gets text that is not a credential. Nothing in this SDK validates or complains about that; you find out from whatever that system does with it, typically a failed authentication.
+
 ## Sandbox Support
 
 ⚠️ **Pre-release** - This functionality is subject to change prior to General Availability.

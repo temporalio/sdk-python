@@ -46,6 +46,11 @@ from typing_extensions import Required, TypedDict
 
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import auto_heartbeater
+from temporalio.contrib.openai_agents._secret_reference import (
+    resolve_code_interpreter_tool_config,
+    resolve_mcp_tool_config,
+    resolve_shell_tool_environment,
+)
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
@@ -231,22 +236,33 @@ def _build_tool(tool: ToolInput) -> Tool:
             FileSearchTool,
             WebSearchTool,
             ImageGenerationTool,
-            CodeInterpreterTool,
             LocalShellTool,
             ToolSearchTool,
         ),
     ):
         return tool
+    elif isinstance(tool, CodeInterpreterTool):
+        return CodeInterpreterTool(
+            tool_config=resolve_code_interpreter_tool_config(tool.tool_config)
+        )
     elif isinstance(tool, ShellToolInput):
+        environment = (
+            None
+            if tool.environment is None
+            else resolve_shell_tool_environment(tool.environment)
+        )
+        # Only a local environment takes an executor, and an absent type means
+        # local, matching how ShellTool normalizes its environment.
+        hosted = environment is not None and environment.get("type", "local") != "local"
         return ShellTool(
             name=tool.name,
-            environment=tool.environment,
-            executor=_noop_shell_executor,
+            environment=environment,
+            executor=None if hosted else _noop_shell_executor,
         )
     elif isinstance(tool, ApplyPatchToolInput):
         return ApplyPatchTool(name=tool.name, editor=_NoopApplyPatchEditor())
     elif isinstance(tool, HostedMCPToolInput):
-        return HostedMCPTool(tool_config=tool.tool_config)
+        return HostedMCPTool(tool_config=resolve_mcp_tool_config(tool.tool_config))
     elif isinstance(tool, CustomToolInput):
         return CustomTool(
             name=tool.tool_config["name"],

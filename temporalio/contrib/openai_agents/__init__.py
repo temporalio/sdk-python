@@ -9,6 +9,7 @@ from temporalio.contrib.openai_agents._mcp import (
     StatelessMCPServerProvider,
 )
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._secret_reference import secret_reference
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
@@ -28,6 +29,7 @@ __all__ = [
     "SandboxClientProvider",
     "StatelessMCPServerProvider",
     "StatefulMCPServerProvider",
+    "secret_reference",
     "testing",
     "workflow",
 ]
