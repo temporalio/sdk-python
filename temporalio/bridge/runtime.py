@@ -47,6 +47,7 @@ class LoggingConfig:
 
     filter: str
     forward_to: Callable[[Sequence[BufferedLogEntry]], None] | None
+    format: str | None
 
 
 @dataclass(frozen=True)

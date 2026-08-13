@@ -195,6 +195,14 @@ class TelemetryFilter:
         return ",".join(parts)
 
 
+class LoggingFormat(Enum):
+    """Format for Core logs written to the console."""
+
+    COMPACT = "compact"
+    PRETTY = "pretty"
+    JSON = "json"
+
+
 @dataclass(frozen=True)
 class LoggingConfig:
     """Configuration for runtime logging."""
@@ -205,6 +213,12 @@ class LoggingConfig:
     forwarding: LogForwardingConfig | None = None
     """If present, Core logger messages will be forwarded to a Python logger.
     See the :py:class:`LogForwardingConfig` docs for more info.
+    """
+
+    format: LoggingFormat | None = None
+    """Format for Core logs written to the console. This is ignored when
+    :py:attr:`forwarding` is set. If unset, Core preserves its existing output
+    selection, including ``TEMPORAL_CORE_PRETTY_LOGS`` support.
     """
 
     default: ClassVar[LoggingConfig]
@@ -218,6 +232,7 @@ class LoggingConfig:
             if isinstance(self.filter, str)
             else self.filter.formatted(),
             forward_to=None if not self.forwarding else self.forwarding._on_logs,
+            format=None if not self.format else self.format.value,
         )
 
 

@@ -16,6 +16,7 @@ from temporalio.client import Client
 from temporalio.runtime import (
     LogForwardingConfig,
     LoggingConfig,
+    LoggingFormat,
     OpenTelemetryConfig,
     PrometheusConfig,
     Runtime,
@@ -141,6 +142,11 @@ async def test_runtime_log_forwarding():
         assert log_queue_list[2].message.startswith(
             "[sdk_core::temporal_sdk_bridge::runtime] info6"
         )
+
+
+def test_runtime_console_logging_format():
+    config = LoggingConfig(filter="INFO", format=LoggingFormat.JSON)._to_bridge_config()
+    assert config.format == "json"
 
 
 @workflow.defn
