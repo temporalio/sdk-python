@@ -128,12 +128,26 @@ jobs:
       - name: Verify FIPS linkage (aws-lc-fips-sys present, ring absent)
         working-directory: temporalio/bridge
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          # `cargo tree -i <pkg>` exits 0 whether or not <pkg> is in the graph --
+          # when it is absent it just prints "nothing to print" to stderr. So the
+          # linkage must be judged on captured stdout, NOT the exit code (ported
+          # from sdk-ruby PR #466's fips_tree guard).
+          fips_tree() {
+            cargo tree -p temporal-sdk-bridge --no-default-features --features fips -i "$1" 2>/dev/null
+          }
           echo "== aws-lc-fips-sys must be PRESENT =="
-          cargo tree -p temporal-sdk-bridge --no-default-features --features fips -i aws-lc-fips-sys
+          present="$(fips_tree aws-lc-fips-sys)"
+          if [ -z "$present" ]; then
+            echo "ERROR: aws-lc-fips-sys is absent from the FIPS dependency tree" >&2
+            exit 1
+          fi
+          echo "$present"
           echo "== ring must be ABSENT =="
-          if cargo tree -p temporal-sdk-bridge --no-default-features --features fips -i ring; then
+          ring_tree="$(fips_tree ring)"
+          if [ -n "$ring_tree" ]; then
             echo "ERROR: 'ring' is still linked in the FIPS build" >&2
+            echo "$ring_tree" >&2
             exit 1
           fi
           echo "FIPS linkage verified: aws-lc-fips-sys linked, ring absent."
