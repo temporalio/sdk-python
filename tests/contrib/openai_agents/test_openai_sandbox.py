@@ -36,7 +36,7 @@ from temporalio.contrib.openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
     SandboxClientProvider,
-    SecretRef,
+    TemporalWorkerEnvValue,
 )
 from temporalio.contrib.openai_agents._openai_runner import _has_sandbox_agent
 from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
@@ -394,12 +394,12 @@ async def test_activities_create_session_delegates(
     assert isinstance(result.supports_pty, bool)
 
 
-async def test_create_session_activity_resolves_secret_ref_but_returns_the_reference(
+async def test_create_session_activity_resolves_worker_env_value_but_returns_it_unresolved(
     sandbox_activities: SandboxClientProvider,
     mock_client: _MockSandboxClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Both activity payloads carry the reference while the worker sees the secret."""
+    """Both activity payloads carry the variable name while the worker sees the secret."""
     secret = "sk-activity-boundary-secret"
     monkeypatch.setenv("WORKER_ACTIVITY_SECRET", secret)
 
@@ -412,7 +412,7 @@ async def test_create_session_activity_resolves_secret_ref_but_returns_the_refer
         snapshot_spec=None,
         manifest=Manifest(
             environment=Environment(
-                value={"API_KEY": SecretRef(key="WORKER_ACTIVITY_SECRET")}
+                value={"API_KEY": TemporalWorkerEnvValue(key="WORKER_ACTIVITY_SECRET")}
             )
         ),
         client_options=None,
@@ -425,7 +425,7 @@ async def test_create_session_activity_resolves_secret_ref_but_returns_the_refer
     assert mock_client.resolved_envs == {"API_KEY": secret}
     returned = payload_bytes(result)
     assert secret.encode() not in returned
-    assert b"temporal.secret_ref" in returned
+    assert b"temporal.worker_env_value" in returned
 
 
 async def test_activities_resume_session_delegates(
@@ -1100,13 +1100,13 @@ class ResolveOnWorkflowThreadWorkflow:
     @workflow.run
     async def run(self) -> str:
         try:
-            await SecretRef(key="WORKER_THREAD_PROBE_KEY").resolve()
+            await TemporalWorkerEnvValue(key="WORKER_THREAD_PROBE_KEY").resolve()
         except ApplicationError as e:
             return e.type or ""
         return "NO RAISE"
 
 
-async def test_secret_ref_resolve_raises_inside_a_real_workflow(
+async def test_worker_env_value_resolve_raises_inside_a_real_workflow(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ):
     """``in_workflow()`` is genuinely True here, unlike the monkeypatched unit test.
@@ -1139,7 +1139,7 @@ async def test_secret_ref_resolve_raises_inside_a_real_workflow(
             execution_timeout=timedelta(seconds=15),
         )
 
-    assert result == "SecretRefUnusable"
+    assert result == "TemporalWorkerEnvValueUnresolved"
 
 
 @workflow.defn

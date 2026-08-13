@@ -43,6 +43,15 @@ to include examples, links to docs, or any other relevant information.
   every worker that runs sandbox activities; a worker without a value for
   it fails the sandbox operation with a non-retryable error naming the
   variable. Requires `openai-agents >= 0.19.2`.
+- `temporalio.contrib.openai_agents.TemporalWorkerEnvValue` supplies a sandbox
+  environment variable from the worker's own environment, so the manifest
+  carries the variable's name and workflow history never holds its value.
+  `{"OPENAI_API_KEY": TemporalWorkerEnvValue(key="PROD_KEY")}` reads
+  `PROD_KEY` on the worker and sets `OPENAI_API_KEY` inside the sandbox. Set
+  the variable on every worker that runs sandbox activities; a worker without
+  a value for it fails the sandbox operation with a non-retryable
+  `TemporalWorkerEnvValueUnresolved` error naming the variable. Requires
+  `openai-agents >= 0.19.2`.
 
 ### Changed
 

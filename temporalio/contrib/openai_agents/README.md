@@ -648,11 +648,9 @@ result = await Runner.run(
 )
 ```
 
-### Environment Variables and Secrets
+### Environment Variables
 
-Environment variables you give a sandbox are written into workflow history, which is durable and visible in the web UI. A literal value stays there after you rotate it.
-
-`SecretRef` records the variable's name instead of its value. The worker reads the value from its own environment when the sandbox needs it:
+Use `TemporalWorkerEnvValue` for a sandbox environment value that should come from the worker's environment rather than being written into the manifest — a secret especially. It carries the name of a variable, and the worker reads that variable when the sandbox environment is needed:
 
 ```python
 from agents import RunConfig, Runner
@@ -660,13 +658,13 @@ from agents.sandbox import Manifest, SandboxRunConfig
 from agents.sandbox.manifest import Environment
 from agents.extensions.sandbox.daytona import DaytonaSandboxClientOptions
 
-from temporalio.contrib.openai_agents import SecretRef
+from temporalio.contrib.openai_agents import TemporalWorkerEnvValue
 from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
 
 manifest = Manifest(
     environment=Environment(
         value={
-            "OPENAI_API_KEY": SecretRef(key="OPENAI_API_KEY"),
+            "OPENAI_API_KEY": TemporalWorkerEnvValue(key="PROD_OPENAI_KEY"),
             "REGION": "us-west-2",
         }
     )
@@ -682,21 +680,13 @@ result = await Runner.run(
 )
 ```
 
-Set the variable on every worker that runs sandbox activities. If it is missing or empty, the run fails with a non-retryable error naming it.
+This reads `PROD_OPENAI_KEY` on the worker and sets `OPENAI_API_KEY` inside the sandbox; the two names need not match. Set the variable on every worker that runs sandbox activities — if it is missing or empty there, the run fails with a non-retryable error naming it.
 
-The two names need not match. `{"OPENAI_API_KEY": SecretRef(key="PROD_OPENAI_KEY")}` reads `PROD_OPENAI_KEY` on the worker and sets `OPENAI_API_KEY` inside the sandbox.
+Keep secrets out of inline file contents (`File(content=...)`), environment fields on client options such as `DaytonaSandboxClientOptions.env_vars`, and credential fields on client options such as `CloudflareSandboxClientOptions.api_key`.
 
-#### Where secrets still do not belong
+### Unsupported Inputs
 
-Environment variables are the only place a `SecretRef` fits. Everything else you put in a manifest or in client options is recorded as you wrote it, so keep secrets out of:
-
-- **Inline file contents.** `File(content=b"...")` appears verbatim in history. Write the file from inside the sandbox, using an environment variable for the secret.
-- **Environment fields on client options**, such as `DaytonaSandboxClientOptions.env_vars`. Put the values in the manifest environment instead.
-- **Credential fields on client options**, such as `CloudflareSandboxClientOptions.api_key`.
-
-#### Unsupported inputs
-
-Path grants that bind a host path are rejected, because the host path itself would be recorded. Grant paths inside the sandbox instead.
+Path grants that bind a host path are rejected. Grant paths inside the sandbox instead.
 
 A live sandbox session passed to `SandboxRunConfig(session=...)` is also rejected — the plugin needs to create the session itself so its work runs in activities.
 
