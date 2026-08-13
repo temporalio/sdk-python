@@ -756,6 +756,7 @@ async def test_worker_with_worker_deployment_config(
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-{uuid.uuid4()}"
+    workflow_id_prefix = f"basic-versioning-{uuid.uuid4()}"
     worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
     worker_v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
     worker_v3 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="3.0")
@@ -798,7 +799,7 @@ async def test_worker_with_worker_deployment_config(
         # Start workflow 1 which will use the 1.0 worker on auto-upgrade
         wf1 = await client.start_workflow(
             DeploymentVersioningWorkflowV1AutoUpgrade.run,
-            id="basic-versioning-v1",
+            id=f"{workflow_id_prefix}-v1",
             task_queue=w1.task_queue,
         )
         assert "v1" == await wf1.query("state")
@@ -810,7 +811,7 @@ async def test_worker_with_worker_deployment_config(
 
         wf2 = await client.start_workflow(
             DeploymentVersioningWorkflowV2Pinned.run,
-            id="basic-versioning-v2",
+            id=f"{workflow_id_prefix}-v2",
             task_queue=w1.task_queue,
         )
         assert "v2" == await wf2.query("state")
@@ -822,7 +823,7 @@ async def test_worker_with_worker_deployment_config(
 
         wf3 = await client.start_workflow(
             DeploymentVersioningWorkflowV3AutoUpgrade.run,
-            id="basic-versioning-v3",
+            id=f"{workflow_id_prefix}-v3",
             task_queue=w1.task_queue,
         )
         assert "v3" == await wf3.query("state")
@@ -874,9 +875,15 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
                 client, describe_resp.conflict_token, v1
             )
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id
+        )
         conflict_token = (
             await set_ramping_version(client, conflict_token, v2, 100)
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 100
+        )
 
         # Run workflows and verify they run on v2
         for i in range(3):
@@ -893,6 +900,9 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
         conflict_token = (
             await set_ramping_version(client, conflict_token, v2, 0)
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 0
+        )
         for i in range(3):
             wfa = await client.start_workflow(
                 DeploymentVersioningWorkflowV1AutoUpgrade.run,
@@ -905,6 +915,9 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
 
         # Set ramp to 50 and eventually verify workflows run on both versions
         await set_ramping_version(client, conflict_token, v2, 50)
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 50
+        )
         seen_results = set()
 
         async def run_and_record():
@@ -1318,6 +1331,7 @@ async def wait_for_worker_deployment_routing_config_propagation(
     deployment_name: str,
     expected_current_build_id: str,
     expected_ramping_build_id: str = "",
+    expected_ramping_percentage: float | None = None,
 ) -> None:
     """Wait for routing config to be propagated to all task queues."""
     import temporalio.api.enums.v1
@@ -1338,6 +1352,11 @@ async def wait_for_worker_deployment_routing_config_propagation(
         if (
             routing_config.ramping_deployment_version.build_id
             != expected_ramping_build_id
+        ):
+            return False
+        if (
+            expected_ramping_percentage is not None
+            and routing_config.ramping_version_percentage != expected_ramping_percentage
         ):
             return False
         state = resp.worker_deployment_info.routing_config_update_state

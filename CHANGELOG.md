@@ -20,13 +20,46 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `Runtime(disable_environment_info=...)` option to control whether
+  runtime, hosting, and platform information is included in worker heartbeats.
+
+- `temporalio.workflow.uuid7()` generates a determinism-safe, time-sortable
+  UUIDv7 (RFC 9562) from workflow time and the workflow's deterministic random
+  generator, complementing the existing `workflow.uuid4()`
+  ([#1450](https://github.com/temporalio/sdk-python/issues/1450)). The
+  workflow sandbox now also restricts the non-deterministic `uuid.uuid7()`
+  added to the standard library in Python 3.14, matching the existing
+  `uuid.uuid1()`/`uuid.uuid4()` restrictions.
+- **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
+  Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
+
 ### Changed
+
+- `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
+  for repeated type hints instead of rebuilding their schemas for every
+  payload, greatly speeding up decode of non-model hints such as discriminated
+  unions ([#1695](https://github.com/temporalio/sdk-python/issues/1695)). Up
+  to 1024 type adapters are cached per converter instance by default, with
+  least-recently-used eviction. To change the bound, pass
+  ``max_cached_type_adapters`` to ``PydanticPayloadConverter`` (or
+  ``PydanticJSONPlainPayloadConverter``) from a nullary subclass used as the
+  ``DataConverter.payload_converter_class``; ``None`` makes the cache
+  unbounded and zero disables caching.
 
 ### Deprecated
 
 ### :boom: Breaking Changes
 
 ### Fixed
+
+- The `google-adk` extra now depends on `mcp`, so fresh installs of
+  `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
+  without separately installing `mcp`. Previously the import failed with an
+  `ImportError` because `google.adk.tools.mcp_tool` only exports `McpToolset`
+  when `mcp` is installed.
+- `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
+  is passed for `run_config`. (openai-agents >= 0.19.0 accepts `dict` run
+  configs at its public runner API)
 
 ### Security
 

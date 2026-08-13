@@ -769,7 +769,9 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         "urllib": SandboxMatcher(
             children={"request": SandboxMatcher.all_uses},
         ),
-        "uuid": SandboxMatcher(use={"uuid1", "uuid4"}, only_runtime=True),
+        # uuid7 only exists in the stdlib on Python 3.14+; matching a
+        # nonexistent attribute is harmless on older versions
+        "uuid": SandboxMatcher(use={"uuid1", "uuid4", "uuid7"}, only_runtime=True),
         "webbrowser": SandboxMatcher.all_uses,
         "xmlrpc": SandboxMatcher.all_uses,
         "zipfile": SandboxMatcher(
@@ -860,6 +862,8 @@ class _RestrictionState:
 
 
 class _RestrictedProxyLookup:
+    bind_func: Callable[[_RestrictedProxy, Any], Callable[..., Any]] | None
+
     def __init__(
         self,
         access_func: Callable | None = None,
@@ -951,12 +955,12 @@ class _RestrictedProxyIOp(_RestrictedProxyLookup):
 
         def bind_f(instance: _RestrictedProxy, obj: Any) -> Callable:
             def i_op(self: Any, other: Any) -> _RestrictedProxy:
-                f(self, other)  # type: ignore
+                access_func(self, other)  # type: ignore
                 return instance
 
             return i_op.__get__(obj, type(obj))  # type: ignore
 
-        self.bind_f = bind_f
+        self.bind_func = bind_f
 
 
 _OpF = TypeVar("_OpF", bound=Callable[..., Any])

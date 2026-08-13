@@ -1,6 +1,6 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
-[![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.10+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
@@ -2014,7 +2014,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.9 and newer. It is built using
+The Python SDK is built to work with Python 3.10 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-rust/) which is written in Rust.
 
 ### Building

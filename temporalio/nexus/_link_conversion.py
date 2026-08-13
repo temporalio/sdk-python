@@ -23,6 +23,10 @@ _NEXUS_OPERATION_LINK_URL_PATH_REGEX = re.compile(
     r"^/namespaces/(?P<namespace>[^/]+)/nexus-operations/(?P<operation_id>[^/]+)/(?P<run_id>[^/]*)/details$"
 )
 
+_ACTIVITY_LINK_URL_PATH_REGEX = re.compile(
+    r"^/namespaces/(?P<namespace>[^/]+)/activities/(?P<activity_id>[^/]+)/(?P<run_id>[^/]+)/details$"
+)
+
 _WORKFLOW_LINK_URL_PATH_REGEX = re.compile(
     r"^/namespaces/(?P<namespace>[^/]+)/workflows/(?P<workflow_id>[^/]+)/(?P<run_id>[^/]+)(?P<history>/history)?$"
 )
@@ -32,6 +36,7 @@ class _LinkType(str, Enum):
     WORKFLOW_EVENT = temporalio.api.common.v1.Link.WorkflowEvent.DESCRIPTOR.full_name
     WORKFLOW = temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name
     NEXUS_OPERATION = temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name
+    ACTIVITY = temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name
 
 
 LINK_EVENT_ID_PARAM_NAME = "eventID"
@@ -88,6 +93,9 @@ def nexus_link_to_temporal_link(
         case _LinkType.NEXUS_OPERATION:
             return nexus_link_to_nexus_operation_link(nexus_link)
 
+        case _LinkType.ACTIVITY:
+            return nexus_link_to_activity_link(nexus_link)
+
 
 def temporal_link_to_nexus_link(
     temporal_link: temporalio.api.common.v1.Link,
@@ -106,10 +114,11 @@ def temporal_link_to_nexus_link(
         case "nexus_operation":
             return nexus_operation_to_nexus_link(temporal_link.nexus_operation)
 
-        case "activity" | "batch_job":
-            raise NotImplementedError(
-                "only workflow_event and nexus operation links are supported"
-            )
+        case "activity":
+            return activity_link_to_nexus_link(temporal_link.activity)
+
+        case "batch_job":
+            raise NotImplementedError("batch_job links are not supported")
 
         case None:
             logger.warning("Invalid Temporal link: missing variant")
@@ -188,6 +197,17 @@ def nexus_operation_to_nexus_link(
         url=_temporal_nexus_url(path),
         type=_LinkType.NEXUS_OPERATION.value,
     )
+
+
+def activity_link_to_nexus_link(
+    activity: temporalio.api.common.v1.Link.Activity,
+) -> nexusrpc.Link:
+    """Convert an Activity link into a nexusrpc link."""
+    namespace = urllib.parse.quote(activity.namespace, safe="")
+    activity_id = urllib.parse.quote(activity.activity_id, safe="")
+    run_id = urllib.parse.quote(activity.run_id, safe="")
+    path = f"/namespaces/{namespace}/activities/{activity_id}/{run_id}/details"
+    return nexusrpc.Link(url=_temporal_nexus_url(path), type=_LinkType.ACTIVITY.value)
 
 
 def _workflow_nexus_url(
@@ -332,6 +352,28 @@ def nexus_link_to_nexus_operation_link(
         run_id=urllib.parse.unquote(groups["run_id"]),
     )
     return temporalio.api.common.v1.Link(nexus_operation=nexus_op_link)
+
+
+def nexus_link_to_activity_link(
+    nexus_link: nexusrpc.Link,
+) -> temporalio.api.common.v1.Link | None:
+    """Convert a Nexus Activity link into a Temporal Activity link."""
+    match = _ACTIVITY_LINK_URL_PATH_REGEX.match(
+        urllib.parse.urlparse(nexus_link.url).path
+    )
+    if not match:
+        logger.warning(
+            f"Invalid Nexus link: {nexus_link}. Expected path to match {_ACTIVITY_LINK_URL_PATH_REGEX.pattern}"
+        )
+        return None
+    groups = match.groupdict()
+    return temporalio.api.common.v1.Link(
+        activity=temporalio.api.common.v1.Link.Activity(
+            namespace=urllib.parse.unquote(groups["namespace"]),
+            activity_id=urllib.parse.unquote(groups["activity_id"]),
+            run_id=urllib.parse.unquote(groups["run_id"]),
+        )
+    )
 
 
 def _event_reference_to_query_params(

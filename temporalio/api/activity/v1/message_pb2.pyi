@@ -36,17 +36,23 @@ class ActivityExecutionOutcome(google.protobuf.message.Message):
 
     RESULT_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
+    RETRY_STATE_FIELD_NUMBER: builtins.int
     @property
     def result(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """The result if the activity completed successfully."""
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """The failure if the activity completed unsuccessfully."""
+    retry_state: temporalio.api.enums.v1.workflow_pb2.RetryState.ValueType
+    """The retry state associated with an unsuccessful activity execution.
+    This field is only meaningful when `failure` is set.
+    """
     def __init__(
         self,
         *,
         result: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        retry_state: temporalio.api.enums.v1.workflow_pb2.RetryState.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -57,7 +63,14 @@ class ActivityExecutionOutcome(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "failure", b"failure", "result", b"result", "value", b"value"
+            "failure",
+            b"failure",
+            "result",
+            b"result",
+            "retry_state",
+            b"retry_state",
+            "value",
+            b"value",
         ],
     ) -> None: ...
     def WhichOneof(

@@ -56,6 +56,8 @@ from tests.helpers.nexus import (
     workflow_event_link_event_type,
 )
 
+# Cloud CI's namespace credentials cannot manage Nexus endpoints.
+# See https://github.com/temporalio/sdk-python/issues/1704.
 pytestmark = pytest.mark.requires_local_server
 
 EventType = temporalio.api.enums.v1.EventType
