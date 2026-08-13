@@ -129,25 +129,28 @@ jobs:
         working-directory: temporalio/bridge
         run: |
           set -uo pipefail
-          # `cargo tree -i <pkg>` exits 0 whether or not <pkg> is in the graph --
-          # when it is absent it just prints "nothing to print" to stderr. So the
-          # linkage must be judged on captured stdout, NOT the exit code (ported
-          # from sdk-ruby PR #466's fips_tree guard).
-          fips_tree() {
+          # Resolve the FIPS build's dependency graph once and query it for a
+          # single crate. `cargo tree -i <crate>` ("invert") prints the chain of
+          # packages that pull in <crate>, or nothing if <crate> is not in the
+          # graph at all. We capture that output and decide PRESENT/ABSENT by
+          # whether the string is empty -- NOT by the exit code, because
+          # `cargo tree -i` exits 0 either way (an absent crate just prints
+          # "nothing to print" to stderr). Ported from sdk-ruby PR #466.
+          links_in_fips_build() {
             cargo tree -p temporal-sdk-bridge --no-default-features --features fips -i "$1" 2>/dev/null
           }
           echo "== aws-lc-fips-sys must be PRESENT =="
-          present="$(fips_tree aws-lc-fips-sys)"
-          if [ -z "$present" ]; then
+          aws_lc_fips="$(links_in_fips_build aws-lc-fips-sys)"
+          if [ -z "$aws_lc_fips" ]; then
             echo "ERROR: aws-lc-fips-sys is absent from the FIPS dependency tree" >&2
             exit 1
           fi
-          echo "$present"
+          echo "$aws_lc_fips"
           echo "== ring must be ABSENT =="
-          ring_tree="$(fips_tree ring)"
-          if [ -n "$ring_tree" ]; then
+          ring="$(links_in_fips_build ring)"
+          if [ -n "$ring" ]; then
             echo "ERROR: 'ring' is still linked in the FIPS build" >&2
-            echo "$ring_tree" >&2
+            echo "$ring" >&2
             exit 1
           fi
           echo "FIPS linkage verified: aws-lc-fips-sys linked, ring absent."
