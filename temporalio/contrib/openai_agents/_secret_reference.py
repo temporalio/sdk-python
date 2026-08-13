@@ -1,8 +1,7 @@
 """References to secrets held in the worker process environment.
 
 A resolved secret is never written back into the activity's own input: the
-resolving helpers copy shallowly at every level they write to, so the input goes
-on holding the marker.
+resolvers copy at every level they write to, so the input keeps the marker.
 """
 
 from __future__ import annotations
@@ -86,8 +85,6 @@ def secret_reference(key: str) -> str:
 def _resolve_secret_reference(value: str) -> str:
     """Return ``value`` with a secret reference marker replaced by its secret.
 
-    A string that is not a marker is returned unchanged.
-
     Raises:
         ApplicationError: If the marker names no environment variable, or the
             variable it names is unset or empty in the worker process
@@ -116,11 +113,6 @@ def _resolve_secret_reference(value: str) -> str:
 
 
 def _shallow_copy(mapping: Any) -> Any:
-    """A writable plain ``dict`` copy of a mapping read off an activity argument.
-
-    Anything resolved is written to the copy, never to the argument, which is
-    what leaves the activity's own input holding the marker.
-    """
     return dict(cast(Mapping[str, Any], mapping))
 
 
@@ -142,29 +134,20 @@ def _malformed_domain_secret_error(e: ValidationError) -> ApplicationError:
 
 
 class _UnreadDomainSecrets:
-    """Stands in for domain secrets that a failed read left consumed.
-
-    Every read of it raises that failure again, rather than coming back as a
-    policy with no domain secrets at all.
-    """
+    """Raises when iterated, so secrets a failed read consumed never read as absent."""
 
     def __init__(self, error: ApplicationError) -> None:
-        """Hold the failure to raise."""
         self._error = error
 
     def __iter__(self) -> Iterator[Any]:
-        """Raise the failure that consumed the domain secrets."""
         raise self._error
 
 
 def _resolve_network_policy(network_policy: Any) -> Any:
     """Copy a container network policy, resolving each domain secret value.
 
-    On the code interpreter path ``domain_secrets`` is declared as an iterable,
-    and pydantic deserializes it into a single-pass iterator. Reading it here
-    would leave the activity's own input holding nothing, so the entries — still
-    the markers the workflow sent — are materialized back onto the input before
-    the copy resolves them.
+    On the code interpreter path pydantic deserializes ``domain_secrets`` into a
+    single-pass iterator, so the entries read here go back onto the input.
 
     Raises:
         ApplicationError: If a marker cannot be resolved, or a domain secret is
@@ -178,8 +161,6 @@ def _resolve_network_policy(network_policy: Any) -> Any:
         unresolved = list(domain_secrets)
     except ValidationError as e:
         error = _malformed_domain_secret_error(e)
-        # A failed read consumes the iterator too, so what goes back in its
-        # place fails the same way rather than reading as no secrets at all.
         policy["domain_secrets"] = _UnreadDomainSecrets(error)
         # Not chained: the validation error carries the entry it rejected.
         raise error from None
@@ -192,15 +173,11 @@ def _resolve_network_policy(network_policy: Any) -> Any:
 
 
 def _resolve_domain_secret(secret: Mapping[str, Any]) -> dict[str, Any]:
-    """Copy one domain secret, with its ``value`` resolved."""
     return {**secret, "value": _resolve_secret_reference(secret["value"])}
 
 
 def resolve_mcp_tool_config(tool_config: Mcp) -> Mcp:
     """Copy a hosted MCP tool config, resolving its authorization and headers.
-
-    A header's name is passed through: a marker belongs where a credential
-    belongs, and a name is not that.
 
     Raises:
         ApplicationError: If a marker cannot be resolved. Non-retryable.
@@ -219,16 +196,18 @@ def resolve_mcp_tool_config(tool_config: Mcp) -> Mcp:
 
 
 def resolve_shell_tool_environment(
-    environment: ShellToolEnvironment,
+    environment: ShellToolEnvironment | None,
 ) -> ShellToolEnvironment:
     """Copy a shell tool environment, resolving its domain secret values.
 
-    Only an auto-provisioned container has a network policy to carry secrets.
+    An absent environment comes back as the local one ``ShellTool`` normalizes it to.
 
     Raises:
         ApplicationError: If a marker cannot be resolved, or a domain secret is
             malformed. Non-retryable.
     """
+    if environment is None:
+        return {"type": "local"}
     if environment.get("type") != "container_auto":
         return _shallow_copy(environment)
     auto = cast(ShellToolContainerAutoEnvironment, environment)
@@ -243,8 +222,6 @@ def resolve_code_interpreter_tool_config(
     tool_config: CodeInterpreter,
 ) -> CodeInterpreter:
     """Copy a code interpreter tool config, resolving its domain secret values.
-
-    A container given by ID carries no network policy, so it has no secrets.
 
     Raises:
         ApplicationError: If a marker cannot be resolved, or a domain secret is

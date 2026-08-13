@@ -225,6 +225,7 @@ async def _empty_on_invoke_handoff(_ctx: RunContextWrapper[Any], _input: str) ->
 
 
 async def _noop_shell_executor(*_a: Any, **_kw: Any) -> str:
+    """Satisfies the ShellExecutor type for tool reconstruction during model calls."""
     return ""
 
 
@@ -246,18 +247,17 @@ def _build_tool(tool: ToolInput) -> Tool:
             tool_config=resolve_code_interpreter_tool_config(tool.tool_config)
         )
     elif isinstance(tool, ShellToolInput):
-        environment = (
-            None
-            if tool.environment is None
-            else resolve_shell_tool_environment(tool.environment)
-        )
+        environment = resolve_shell_tool_environment(tool.environment)
         # Only a local environment takes an executor, and an absent type means
         # local, matching how ShellTool normalizes its environment.
-        hosted = environment is not None and environment.get("type", "local") != "local"
         return ShellTool(
             name=tool.name,
             environment=environment,
-            executor=None if hosted else _noop_shell_executor,
+            executor=(
+                _noop_shell_executor
+                if environment.get("type", "local") == "local"
+                else None
+            ),
         )
     elif isinstance(tool, ApplyPatchToolInput):
         return ApplyPatchTool(name=tool.name, editor=_NoopApplyPatchEditor())
