@@ -2116,7 +2116,8 @@ It should output:
 #### FIPS Compliance (Experimental)
 
 > **NOTE**: FIPS support is **experimental**. It is opt-in, source-build only, and currently exercised
-> on Linux only.
+> on Linux only. This build wires the TLS/gRPC cryptography through a FIPS-validated module; it is
+> **not** a claim that the SDK has passed a FIPS compliance audit or certification.
 
 FIPS 140-3 compliant cryptography is available as an **opt-in source build**. The published wheels are
 **not** FIPS compliant — they use the [`ring`](https://github.com/briansmith/ring) backend, which is not
@@ -2147,6 +2148,14 @@ loaded:
 from temporalio.bridge import temporal_sdk_bridge
 assert temporal_sdk_bridge.FIPS
 ```
+
+> **NOTE**: When a `Worker` or `Replayer` is created without a `build_id` (or `deployment_config`), the
+> SDK derives a default build ID by hashing loaded module bytecode with MD5 (via
+> `hashlib.md5(usedforsecurity=False)`). Although md5 is among Python's
+> [guaranteed hash algorithms](https://docs.python.org/3/library/hashlib.html#hashlib.algorithms_guaranteed),
+> some vendors ship "FIPS" Python builds that remove it entirely — on such an interpreter this call
+> raises. If you run on one, pass an explicit `build_id` (directly or inside `deployment_config`) so the
+> default MD5-based path is not used.
 
 ### Local SDK development environment
 

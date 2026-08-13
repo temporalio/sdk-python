@@ -101,10 +101,11 @@ jobs:
           [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
 
   # Verify the optional FIPS build: the Rust core must link aws-lc-fips-sys
-  # (aws-lc-rs FIPS mode) and must NOT link `ring`. Ported from sdk-ruby PR #466's
-  # `fips_tree` cargo-tree guard.
+  # (aws-lc-rs FIPS mode) and must NOT link `ring` (the cargo-tree guard, ported
+  # from sdk-ruby PR #466's `fips_tree` guard); then run the test suite against the
+  # FIPS binary and build the release wheel.
   fips-build:
-    timeout-minutes: 30
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -141,8 +142,26 @@ jobs:
           version: "23.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
+      - run: uv tool install poethepoet
       - run: uv sync --all-extras
-      - name: Build FIPS wheel (proves the feature set compiles)
+      # Develop build so the FIPS extension is importable, then run the suite
+      # against it to confirm the aws-lc-rs stack works end to end (not just links).
+      - run: poe build-develop-fips
+      - name: Confirm the FIPS build is loaded
+        run: uv run python -c "from temporalio.bridge import temporal_sdk_bridge; assert temporal_sdk_bridge.FIPS, 'not a FIPS build'"
+      - run: mkdir junit-xml
+      - name: Run tests against the FIPS build
+        run: |
+          poe test --reruns 3 --only-rerun "RuntimeError: Failed validating workflow" -s --junit-xml=junit-xml/fips.xml
+        timeout-minutes: 15
+      - name: "Upload junit-xml artifacts"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--fips
+          path: junit-xml
+          retention-days: 14
+      - name: Build FIPS wheel (proves the release feature set compiles)
         run: uv run maturin build --release --no-default-features --features fips
         env:
           TEMPORALIO_FIPS: "1"
