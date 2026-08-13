@@ -329,23 +329,18 @@ class Importer:
             not temporalio.workflow.unsafe.is_imports_passed_through()
             and not self.module_configured_passthrough(name)
         ):
-            if (
-                not is_initial_workflow_module
-                and self._is_import_notification_policy_applied(
+            if not is_initial_workflow_module:
+                if self._is_import_notification_policy_applied(
                     temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH
-                )
-            ):
-                raise UnintentionalPassthroughError(name)
+                ):
+                    raise UnintentionalPassthroughError(name)
 
-            if (
-                not is_initial_workflow_module
-                and self._is_import_notification_policy_applied(
+                if self._is_import_notification_policy_applied(
                     temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
-                )
-            ):
-                warnings.warn(
-                    f"Module {name} was not intentionally passed through to the sandbox."
-                )
+                ):
+                    warnings.warn(
+                        f"Module {name} was not intentionally passed through to the sandbox."
+                    )
 
             return None
         # Do the pass through
