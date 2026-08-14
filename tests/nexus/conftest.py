@@ -15,7 +15,9 @@ from temporalio.api.cloud.cloudservice.v1 import (
     GetNexusEndpointRequest,
 )
 from temporalio.api.cloud.nexus.v1 import (
+    AllowedCloudNamespacePolicySpec,
     Endpoint,
+    EndpointPolicySpec,
     EndpointSpec,
     EndpointTargetSpec,
     WorkerTargetSpec,
@@ -104,6 +106,13 @@ async def cloud_nexus_endpoints(
                             task_queue=task_queue,
                         )
                     ),
+                    policy_specs=[
+                        EndpointPolicySpec(
+                            allowed_cloud_namespace_policy_spec=AllowedCloudNamespacePolicySpec(
+                                namespace_id=cloud_nexus_endpoint_client.namespace_id
+                            )
+                        )
+                    ],
                 )
             )
         )
