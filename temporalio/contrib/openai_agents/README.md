@@ -507,15 +507,15 @@ tool = HostedMCPTool(
 )
 ```
 
-Set `MY_MCP_TOKEN` on every worker that runs model activities. `secret_reference("MY_MCP_TOKEN")` returns the placeholder `temporal.secret_reference:MY_MCP_TOKEN`; each worker reads the variable from its own environment and sends that value on to the model provider in the placeholder's place. A worker without a value for it fails the model call with a non-retryable `ApplicationError` of type `SecretReferenceFailure`, naming the variable.
+Set `MY_MCP_TOKEN` on every worker that runs model activities — if it is missing or empty there, the model call fails with a non-retryable error naming it.
 
-The placeholder is substituted in these fields and no others:
+The variable's value is substituted in these fields and no others:
 
 - `authorization`, and the value of each entry in `headers`, in a `HostedMCPTool`'s `tool_config`
 - `value` in each entry of `network_policy.domain_secrets` under a hosted `ShellTool`'s `environment`
 - `value` in each entry of `network_policy.domain_secrets` under a `CodeInterpreterTool`'s `container`
 
-Anywhere else — in a header *name*, or as an MCP server `factory_argument` (see [Factory Arguments](#factory-arguments)) — the placeholder is passed on as the literal string `temporal.secret_reference:MY_MCP_TOKEN`, and the receiving system gets text that is not a credential. Nothing in this SDK validates or complains about that; you find out from whatever that system does with it, typically a failed authentication.
+Anywhere else — a header *name*, or an MCP server `factory_argument` (see [Factory Arguments](#factory-arguments)) — the placeholder is passed on as literal text, with no error from this SDK.
 
 ## Sandbox Support
 

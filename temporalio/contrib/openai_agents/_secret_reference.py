@@ -29,10 +29,12 @@ def secret_reference(key: str) -> str:
         This function is experimental and may change in future versions.
         Use with caution in production environments.
 
-    A hosted tool's credential is sent from workflow code to the model, so
-    writing the credential into the tool config puts the credential itself in
-    the workflow. Pass the *name of an environment variable* here instead, and
-    put the placeholder returned where the credential would have gone::
+    Use it for a hosted tool credential that should come from the worker's
+    environment rather than being written into your workflow. Put the
+    placeholder returned where the credential would have gone. Only the
+    variable's name is recorded in workflow history.
+
+    ::
 
         from agents import HostedMCPTool
 
@@ -47,23 +49,9 @@ def secret_reference(key: str) -> str:
             }
         )
 
-    The worker reads the variable from its own environment and substitutes its
-    value for the placeholder immediately before the model call.
-
-    Set the variable on every worker that runs model activities; a worker
-    without a value for it fails the model call with a non-retryable
-    ``ApplicationError`` of type ``SecretReferenceFailure``, naming the
-    variable.
-
-    The placeholder returned is the string
-    ``"temporal.secret_reference:<key>"``. It is substituted in a hosted MCP
-    tool's ``authorization`` and in the value of each of its ``headers``, and in
-    the ``value`` of each domain secret under a hosted shell or code interpreter
-    container's ``network_policy``. Anywhere else — in a header *name*, or as an
-    MCP server ``factory_argument`` — it reaches the receiving system as that
-    literal string. Nothing in this SDK validates or complains about one that
-    was not substituted; you find out from whatever that system does with text
-    that is not a credential, typically a failed authentication.
+    Set the variable on every worker that runs model activities — if it is
+    missing or empty there, the model call fails with a non-retryable
+    ``ApplicationError`` of type ``SecretReferenceFailure`` naming it.
 
     Args:
         key: Name of the environment variable to read on the worker.
