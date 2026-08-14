@@ -995,7 +995,7 @@ async def test_retryable_converter_input_payload_validation_failure_keeps_generi
     assert cause.message == _PAYLOAD_VALIDATION_FAILURE_MESSAGE
 
 
-async def test_nexus_operation_fails_without_retry_on_input_validation_failure(
+async def test_nexus_operation_fails_without_retry_on_codec_input_validation_failure(
     client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
@@ -1048,6 +1048,67 @@ async def test_nexus_operation_fails_without_retry_on_input_validation_failure(
         assert isinstance(handler_error, nexusrpc.HandlerError)
         assert handler_error.type == nexusrpc.HandlerErrorType.BAD_REQUEST
         assert not handler_error.retryable
+        assert handler_error.message == "Invalid operation input"
+        cause = handler_error.__cause__
+        assert isinstance(cause, ApplicationError)
+        assert cause.type == "PayloadValidationError"
+        assert cause.message == _PAYLOAD_VALIDATION_FAILURE_MESSAGE
+
+
+async def test_nexus_operation_fails_without_retry_on_converter_input_validation_failure(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    validation_error = ApplicationError(
+        _PAYLOAD_VALIDATION_FAILURE_MESSAGE,
+        type="PayloadValidationError",
+        non_retryable=True,
+    )
+    handler_client = Client(
+        client.service_client,
+        namespace=client.namespace,
+        data_converter=DataConverter(
+            payload_converter_class=_converter_class_raising(validation_error)
+        ),
+    )
+    input = ErrorTestInput(
+        service_name="DataConverterTestService",
+        operation_name="succeed",
+        task_queue=task_queue,
+        id=str(uuid.uuid4()),
+    )
+    async with (
+        Worker(
+            client,
+            workflows=[CallerWorkflow],
+            task_queue=task_queue,
+        ),
+        Worker(
+            handler_client,
+            nexus_service_handlers=[DataConverterTestService()],
+            nexus_task_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+            task_queue=task_queue,
+        ),
+    ):
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(input.task_queue), input.task_queue
+        )
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                CallerWorkflow.run,
+                input,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        assert isinstance(err.value.__cause__, NexusOperationError)
+        handler_error = err.value.__cause__.__cause__
+        assert isinstance(handler_error, nexusrpc.HandlerError)
+        assert handler_error.type == nexusrpc.HandlerErrorType.BAD_REQUEST
+        assert not handler_error.retryable
+        # A validation failure gets its own message, distinct from the generic decode failure.
         assert handler_error.message == "Invalid operation input"
         cause = handler_error.__cause__
         assert isinstance(cause, ApplicationError)
