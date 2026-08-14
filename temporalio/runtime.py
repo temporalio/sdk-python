@@ -217,8 +217,7 @@ class LoggingConfig:
 
     format: LoggingFormat | None = None
     """Format for Core logs written to the console. This is ignored when
-    :py:attr:`forwarding` is set. If unset, Core preserves its existing output
-    selection, including ``TEMPORAL_CORE_PRETTY_LOGS`` support.
+    :py:attr:`forwarding` is set. If unset, this defaults to compact output.
     """
 
     default: ClassVar[LoggingConfig]
