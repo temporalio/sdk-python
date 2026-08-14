@@ -23,6 +23,7 @@ from temporalio.api.cloud.nexus.v1 import (
     WorkerTargetSpec,
 )
 from temporalio.api.cloud.operation.v1 import AsyncOperation
+from temporalio.api.cloud.resource.v1 import ResourceState
 from temporalio.client import CloudOperationsClient
 from temporalio.testing import WorkflowEnvironment
 
@@ -63,6 +64,34 @@ class _CloudNexusEndpointClient:
                 1,
             )
             await asyncio.sleep(min(delay, deadline - time.monotonic()))
+
+    async def wait_for_endpoint(self, endpoint_id: str) -> Endpoint:
+        deadline = time.monotonic() + 10 * 60
+        while True:
+            endpoint = (
+                await self.client.cloud_service.get_nexus_endpoint(
+                    GetNexusEndpointRequest(endpoint_id=endpoint_id)
+                )
+            ).endpoint
+            if endpoint.state == ResourceState.RESOURCE_STATE_ACTIVE:
+                return endpoint
+            if endpoint.state in {
+                ResourceState.RESOURCE_STATE_ACTIVATION_FAILED,
+                ResourceState.RESOURCE_STATE_UPDATE_FAILED,
+                ResourceState.RESOURCE_STATE_DELETE_FAILED,
+                ResourceState.RESOURCE_STATE_SUSPENDED,
+                ResourceState.RESOURCE_STATE_EXPIRED,
+            }:
+                raise RuntimeError(
+                    "Cloud Nexus endpoint "
+                    f"{endpoint_id} "
+                    f"{ResourceState.Name(endpoint.state).lower()}"
+                )
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Timed out waiting for Cloud Nexus endpoint {endpoint_id}"
+                )
+            await asyncio.sleep(1)
 
 
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
@@ -117,11 +146,9 @@ async def cloud_nexus_endpoints(
             )
         )
         await cloud_nexus_endpoint_client.wait_for_operation(response.async_operation)
-        endpoint = (
-            await cloud_nexus_endpoint_client.client.cloud_service.get_nexus_endpoint(
-                GetNexusEndpointRequest(endpoint_id=response.endpoint_id)
-            )
-        ).endpoint
+        endpoint = await cloud_nexus_endpoint_client.wait_for_endpoint(
+            response.endpoint_id
+        )
         endpoints.append(endpoint)
         return endpoint
 
