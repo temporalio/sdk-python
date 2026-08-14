@@ -51,8 +51,10 @@ async def wait_for_operation(
 
 async def create() -> None:
     client = await cloud_client()
-    namespace_name = "sdk-python-ci-{}-{}".format(
-        os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"]
+    namespace_name = "sdk-python-ci-{}-{}{}".format(
+        os.environ["GITHUB_RUN_ID"],
+        os.environ["GITHUB_RUN_ATTEMPT"],
+        os.environ.get("TEMPORAL_CLOUD_NAMESPACE_SUFFIX", ""),
     )
     result = await client.cloud_service.create_namespace(
         CreateNamespaceRequest(
