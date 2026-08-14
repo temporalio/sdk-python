@@ -63,7 +63,7 @@ class _CloudNexusEndpointClient:
             await asyncio.sleep(min(delay, deadline - time.monotonic()))
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def cloud_nexus_endpoint_client() -> AsyncGenerator[
     _CloudNexusEndpointClient | None, None
 ]:
@@ -81,17 +81,16 @@ async def cloud_nexus_endpoint_client() -> AsyncGenerator[
     yield _CloudNexusEndpointClient(client, namespace.namespace.namespace)
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)  # type: ignore[reportUntypedFunctionDecorator]
 async def cloud_nexus_endpoints(
     cloud_nexus_endpoint_client: _CloudNexusEndpointClient | None,
+    env: WorkflowEnvironment,
     monkeypatch: pytest.MonkeyPatch,
-    request: pytest.FixtureRequest,
 ) -> AsyncGenerator[None, None]:
     if cloud_nexus_endpoint_client is None:
         yield
         return
 
-    env: WorkflowEnvironment = request.getfixturevalue("env")
     endpoints: list[Endpoint] = []
 
     async def create_nexus_endpoint(endpoint_name: str, task_queue: str) -> Endpoint:
