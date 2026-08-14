@@ -45,6 +45,11 @@ to include examples, links to docs, or any other relevant information.
   ``PydanticJSONPlainPayloadConverter``) from a nullary subclass used as the
   ``DataConverter.payload_converter_class``; ``None`` makes the cache
   unbounded and zero disables caching.
+- A data converter can now report that it understood a Nexus operation's input
+  but considers it invalid by raising a non-retryable `ApplicationError` of type
+  `PayloadValidationError` while decoding it. Such a failure is reported to the
+  caller as a `BAD_REQUEST` Nexus handler error instead of a handler-side
+  `INTERNAL` error. Any other decode failure keeps its existing treatment.
 
 ### Deprecated
 
