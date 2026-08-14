@@ -24,7 +24,11 @@ from temporalio.api.cloud.nexus.v1 import (
 )
 from temporalio.api.cloud.operation.v1 import AsyncOperation
 from temporalio.api.cloud.resource.v1 import ResourceState
+from temporalio.api.operatorservice.v1 import (
+    GetNexusEndpointRequest as GetDataPlaneNexusEndpointRequest,
+)
 from temporalio.client import CloudOperationsClient
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 
 
@@ -93,6 +97,26 @@ class _CloudNexusEndpointClient:
                 )
             await asyncio.sleep(1)
 
+    async def wait_for_data_plane_endpoint(
+        self, env: WorkflowEnvironment, endpoint_id: str
+    ) -> None:
+        deadline = time.monotonic() + 10 * 60
+        while True:
+            try:
+                await env.client.operator_service.get_nexus_endpoint(
+                    GetDataPlaneNexusEndpointRequest(id=endpoint_id)
+                )
+                return
+            except RPCError as err:
+                if err.status != RPCStatusCode.NOT_FOUND:
+                    raise
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    "Timed out waiting for Cloud Nexus endpoint "
+                    f"{endpoint_id} to reach the data plane"
+                )
+            await asyncio.sleep(1)
+
 
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def cloud_nexus_endpoint_client() -> AsyncGenerator[
@@ -149,6 +173,7 @@ async def cloud_nexus_endpoints(
         endpoint = await cloud_nexus_endpoint_client.wait_for_endpoint(
             response.endpoint_id
         )
+        await cloud_nexus_endpoint_client.wait_for_data_plane_endpoint(env, endpoint.id)
         endpoints.append(endpoint)
         return endpoint
 
