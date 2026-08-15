@@ -46,7 +46,7 @@ def _make_gauge_callback(
     # runs concurrently with the drain loop mutating last_values -- hence the
     # lock on both sides.
     def callback(
-        options: opentelemetry.metrics.CallbackOptions,
+        _options: opentelemetry.metrics.CallbackOptions,
     ) -> Iterable[opentelemetry.metrics.Observation]:
         with state.lock:
             return [
@@ -72,9 +72,7 @@ class MetricsExporter:
     :py:class:`temporalio.runtime.MetricBuffer`, updates are dropped (with an
     error logged by Core) if the buffer is not drained regularly.
 
-    Example:
-
-    .. code-block:: python
+    Example::
 
         from datetime import timedelta
 
@@ -158,7 +156,6 @@ class MetricsExporter:
         if self._started:
             raise RuntimeError("MetricsExporter is already running")
         self._started = True
-        self._shutdown_event.clear()
         self._run_complete_event.clear()
         try:
             while not self._shutdown_event.is_set():
@@ -172,6 +169,12 @@ class MetricsExporter:
             self._drain_once()
         finally:
             self._started = False
+            # Clear here (rather than at the top of this method) so a
+            # shutdown() requested before this run() got a chance to start
+            # is still observed on the loop's first check above -- clearing
+            # up front would silently erase that pending request and poll
+            # forever, since shutdown() only sets the event once.
+            self._shutdown_event.clear()
             self._run_complete_event.set()
 
     async def shutdown(self) -> None:

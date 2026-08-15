@@ -90,6 +90,10 @@ to include examples, links to docs, or any other relevant information.
   This lets types with transfer type converters delegate their wire representation to the
   configured payload converter, preserving SDK behavior such as serialization
   contexts.
+- Added `temporalio.contrib.opentelemetry.MetricsExporter`, which drains a
+  `temporalio.runtime.MetricBuffer` on a fixed interval and exports through a
+  real OpenTelemetry `MeterProvider`, giving SDK/Core metrics access to
+  standard OTel features (views, resource, exemplars). Experimental.
 - Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
   instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
   HTTP/2 authority values, which keep following the connected host, so it can be used when the

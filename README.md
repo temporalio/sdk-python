@@ -1993,10 +1993,12 @@ the server to give one proper trace for a workflow execution.
 
 #### OpenTelemetry Metrics
 
-Metrics support also requires the `opentelemetry` extra (see above). Rather than using
-`temporalio.runtime.PrometheusConfig` or `temporalio.runtime.OpenTelemetryConfig`, set a
-`temporalio.runtime.MetricBuffer` as the `metrics` on `TelemetryConfig`, then drain it into a real OpenTelemetry
-`MeterProvider` using `temporalio.contrib.opentelemetry.MetricsExporter`:
+Metrics support also requires the `opentelemetry` extra (see above). If you want your Temporal SDK/Core metrics (and
+any custom metrics recorded via `activity.metric_meter()`/`workflow.metric_meter()`) to flow through the standard
+OpenTelemetry metrics pipeline (views, resources, any OTel-compatible backend) rather than only through
+`PrometheusConfig`/`OpenTelemetryConfig`, set a `temporalio.runtime.MetricBuffer` as the `metrics` on
+`TelemetryConfig`, then drain it into a real OpenTelemetry `MeterProvider` using
+`temporalio.contrib.opentelemetry.MetricsExporter`:
 
 ```python
 from datetime import timedelta
