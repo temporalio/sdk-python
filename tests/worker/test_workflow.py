@@ -6845,6 +6845,14 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             id=workflow_id,
             task_queue=task_queue,
         )
+        # Keep the update on the run that receives it so continue-as-new cannot
+        # make a completion poll look for the update on the successor run.
+        assert handle.result_run_id
+        handle = self.client.get_workflow_handle(
+            workflow_id,
+            run_id=handle.result_run_id,
+            first_execution_run_id=handle.first_execution_run_id,
+        )
         if self.workflow_termination_type == "-cancellation-":
             await handle.cancel()
 
