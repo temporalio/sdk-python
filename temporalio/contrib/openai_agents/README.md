@@ -491,23 +491,31 @@ For network-accessible MCP servers, you can also use `HostedMCPTool` from the Op
 
 ⚠️ **Experimental** - This functionality is subject to change prior to General Availability.
 
-Use `secret_reference()` for a hosted tool credential that should come from the worker's environment rather than being written into your workflow. Pass it the *name of an environment variable*, in place of the credential itself:
+Use `temporal_worker_env_ref()` for a hosted tool credential that should come from the worker's environment rather than being written into your workflow. Pass it the *name of an environment variable*, in place of the credential itself:
 
 ```python
 from agents import HostedMCPTool
-from temporalio.contrib.openai_agents import secret_reference
+from temporalio.contrib.openai_agents import temporal_worker_env_ref
 
 tool = HostedMCPTool(
     tool_config={
         "type": "mcp",
         "server_label": "my_server",
         "server_url": "https://example.com/mcp",
-        "authorization": secret_reference("MY_MCP_TOKEN"),
+        "authorization": temporal_worker_env_ref("MY_MCP_TOKEN"),
     }
 )
 ```
 
-Set `MY_MCP_TOKEN` on every worker that runs model activities — if it is missing or empty there, the model call fails with a non-retryable error naming it.
+Every worker that runs model activities must both set `MY_MCP_TOKEN` and name it as resolvable:
+
+```python
+plugin = OpenAIAgentsPlugin(resolvable_worker_env_vars=["MY_MCP_TOKEN"])
+```
+
+Nothing resolves unless the worker names it. A reference to a name the worker does not allow is sent to the model provider as literal text. Names are matched exactly — no globbing, no prefixes — and `"*"` anywhere in the list allows every environment variable on the worker.
+
+A reference need not be the whole value: `"Bearer " + temporal_worker_env_ref("MY_MCP_TOKEN")` substitutes the credential inside a larger string. Each reference in a value is checked against the list on its own, so one value can end up holding both a resolved credential and the literal text of a name the worker does not allow. A name the worker does allow but has not set resolves to an empty value.
 
 The variable's value is substituted in these fields and no others:
 
@@ -515,7 +523,7 @@ The variable's value is substituted in these fields and no others:
 - `value` in each entry of `network_policy.domain_secrets` under a hosted `ShellTool`'s `environment`
 - `value` in each entry of `network_policy.domain_secrets` under a `CodeInterpreterTool`'s `container`
 
-Anywhere else — a header *name*, or an MCP server `factory_argument` (see [Factory Arguments](#factory-arguments)) — the placeholder is passed on as literal text, with no error from this SDK.
+Anywhere else — in a header *name*, or as an MCP server `factory_argument` (see [Factory Arguments](#factory-arguments)) — the reference is passed on as literal text, with no error from this SDK.
 
 ## Sandbox Support
 
@@ -749,6 +757,7 @@ Certain tools are not suitable for a distributed computing environment, so these
 | HostedMCPTool       |    Yes    |
 | ImageGenerationTool |    Yes    |
 | CodeInterpreterTool |    Yes    |
+| ShellTool           |    Yes    |
 | ComputerTool        |    No     |
 
 #### Tool Context
