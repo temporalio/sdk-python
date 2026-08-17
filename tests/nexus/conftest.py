@@ -1,11 +1,14 @@
 import asyncio
 import os
 import time
+import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
+import nexusrpc
 import pytest
 import pytest_asyncio
+from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 from temporalio.api.cloud.cloudservice.v1 import (
     CreateNexusEndpointRequest,
@@ -24,12 +27,23 @@ from temporalio.api.cloud.nexus.v1 import (
 )
 from temporalio.api.cloud.operation.v1 import AsyncOperation
 from temporalio.api.cloud.resource.v1 import ResourceState
-from temporalio.api.operatorservice.v1 import (
-    GetNexusEndpointRequest as GetDataPlaneNexusEndpointRequest,
-)
+from temporalio.api.workflowservice.v1 import DeleteNexusOperationExecutionRequest
 from temporalio.client import CloudOperationsClient
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
+
+
+@nexusrpc.service
+class CloudNexusEndpointReadinessService:
+    ready: nexusrpc.Operation[None, None]
+
+
+@service_handler(service=CloudNexusEndpointReadinessService)
+class CloudNexusEndpointReadinessServiceHandler:
+    @sync_operation
+    async def ready(self, _ctx: StartOperationContext, _input: None) -> None:
+        pass
 
 
 @dataclass
@@ -97,25 +111,47 @@ class _CloudNexusEndpointClient:
                 )
             await asyncio.sleep(1)
 
-    async def wait_for_data_plane_endpoint(
-        self, env: WorkflowEnvironment, endpoint_id: str
+    async def wait_for_endpoint_readiness(
+        self, env: WorkflowEnvironment, endpoint_name: str, task_queue: str
     ) -> None:
         deadline = time.monotonic() + 10 * 60
-        while True:
-            try:
-                await env.client.operator_service.get_nexus_endpoint(
-                    GetDataPlaneNexusEndpointRequest(id=endpoint_id)
-                )
-                return
-            except RPCError as err:
-                if err.status != RPCStatusCode.NOT_FOUND:
-                    raise
-            if time.monotonic() >= deadline:
-                raise TimeoutError(
-                    "Timed out waiting for Cloud Nexus endpoint "
-                    f"{endpoint_id} to reach the data plane"
-                )
-            await asyncio.sleep(1)
+        operation_id = f"cloud-nexus-readiness-{uuid.uuid4()}"
+        nexus_client = env.client.create_nexus_client(
+            CloudNexusEndpointReadinessService, endpoint_name
+        )
+        # Cloud reports endpoint activation before the Workflow Service can always
+        # resolve it. A successful disposable operation verifies that propagation.
+        async with Worker(
+            env.client,
+            task_queue=task_queue,
+            nexus_service_handlers=[CloudNexusEndpointReadinessServiceHandler()],
+        ):
+            while True:
+                try:
+                    await nexus_client.execute_operation(
+                        CloudNexusEndpointReadinessService.ready,
+                        None,
+                        id=operation_id,
+                    )
+                    break
+                except RPCError as err:
+                    if (
+                        err.status != RPCStatusCode.NOT_FOUND
+                        or str(err) != "endpoint not found"
+                    ):
+                        raise
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError(
+                            f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
+                            "to become available"
+                        ) from err
+                    await asyncio.sleep(1)
+        await env.client.workflow_service.delete_nexus_operation_execution(
+            DeleteNexusOperationExecutionRequest(
+                namespace=env.client.namespace,
+                operation_id=operation_id,
+            )
+        )
 
 
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
@@ -170,11 +206,19 @@ async def cloud_nexus_endpoints(
             )
         )
         await cloud_nexus_endpoint_client.wait_for_operation(response.async_operation)
+        endpoint = (
+            await cloud_nexus_endpoint_client.client.cloud_service.get_nexus_endpoint(
+                GetNexusEndpointRequest(endpoint_id=response.endpoint_id)
+            )
+        ).endpoint
+        endpoints.append(endpoint)
         endpoint = await cloud_nexus_endpoint_client.wait_for_endpoint(
             response.endpoint_id
         )
-        await cloud_nexus_endpoint_client.wait_for_data_plane_endpoint(env, endpoint.id)
-        endpoints.append(endpoint)
+        endpoints[-1] = endpoint
+        await cloud_nexus_endpoint_client.wait_for_endpoint_readiness(
+            env, endpoint_name, task_queue
+        )
         return endpoint
 
     monkeypatch.setattr(env, "create_nexus_endpoint", create_nexus_endpoint)
