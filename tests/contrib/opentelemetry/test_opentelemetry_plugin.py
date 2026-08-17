@@ -1,5 +1,7 @@
 import logging
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from typing import Any
 
@@ -10,6 +12,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
+from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
 from opentelemetry.trace import (
     get_tracer,
 )
@@ -18,6 +21,7 @@ import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
+from temporalio.contrib.opentelemetry._id_generator import TemporalIdGenerator
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 
@@ -27,6 +31,43 @@ from tests.helpers import new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.mark.parametrize(
+    ("seed_method", "generate_method"),
+    [
+        ("seed_span_id", "generate_span_id"),
+        ("seed_trace_id", "generate_trace_id"),
+    ],
+)
+def test_temporal_id_generator_seeds_are_context_local(
+    seed_method: str, generate_method: str
+) -> None:
+    generator = TemporalIdGenerator(RandomIdGenerator())
+    first_seeded = threading.Event()
+    second_seeded = threading.Event()
+    first_generated = threading.Event()
+    seed_values = (123, 456)
+
+    def generate_first() -> int:
+        getattr(generator, seed_method)(seed_values[0])
+        first_seeded.set()
+        assert second_seeded.wait(timeout=5)
+        generated = getattr(generator, generate_method)()
+        first_generated.set()
+        return generated
+
+    def generate_second() -> int:
+        assert first_seeded.wait(timeout=5)
+        getattr(generator, seed_method)(seed_values[1])
+        second_seeded.set()
+        assert first_generated.wait(timeout=5)
+        return getattr(generator, generate_method)()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(generate_first)
+        second = executor.submit(generate_second)
+        assert (first.result(), second.result()) == seed_values
 
 
 @activity.defn
