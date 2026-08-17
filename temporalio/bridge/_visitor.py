@@ -368,6 +368,18 @@ class PayloadVisitor:
         if o.HasField("details"):
             await self._visit_temporal_api_common_v1_Payload(fs, o.details)
 
+    async def _visit_temporal_api_sdk_v1_EventGroupMarker_Label(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("label"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.label)
+
+    async def _visit_temporal_api_sdk_v1_EventGroupMarker(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("label"):
+            await self._visit_temporal_api_sdk_v1_EventGroupMarker_Label(fs, o.label)
+
     async def _visit_coresdk_workflow_commands_ScheduleActivity(
         self, fs: VisitorFunctions, o: Any
     ):
@@ -479,6 +491,8 @@ class PayloadVisitor:
     ):
         if o.HasField("user_metadata"):
             await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
+        for v in o.event_group_markers:
+            await self._visit_temporal_api_sdk_v1_EventGroupMarker(fs, v)
         if o.HasField("schedule_activity"):
             await self._visit_coresdk_workflow_commands_ScheduleActivity(
                 fs, o.schedule_activity
