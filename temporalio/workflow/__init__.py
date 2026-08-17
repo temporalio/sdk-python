@@ -107,6 +107,13 @@ from ._definition import (
     init,
     run,
 )
+from ._event_groups import (
+    EventGroup,
+    _event_group_markers_to_proto,
+    _inbound_event_group,
+    _inbound_update_event_group,
+    create_event_group,
+)
 from ._exceptions import (
     ContinueAsNewVersioningBehavior,
     NondeterminismError,
@@ -228,6 +235,8 @@ __all__ = [
     "uuid4",
     "uuid7",
     "wait_condition",
+    "EventGroup",
+    "create_event_group",
     "DynamicWorkflowConfig",
     "defn",
     "dynamic_config",
@@ -281,6 +290,9 @@ __all__ = [
     "_release_waiter",
     "_wait",
     "_current_update_info",
+    "_event_group_markers_to_proto",
+    "_inbound_event_group",
+    "_inbound_update_event_group",
     "_Runtime",
     "_set_current_update_info",
     "_Definition",

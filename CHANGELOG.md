@@ -20,6 +20,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: Event Groups tag logically related commands so that the UI and CLI can
+  visualize, analyze, and debug them together. Create a group with
+  `workflow.create_event_group(label)`, then attach it either per call
+  (`workflow.start_activity(..., event_groups=[group])`) or ambiently to everything issued inside
+  `with group.scope():`. Each signal and update handler is also implicitly wrapped in a group of
+  its own. Requires a server that understands the Event Groups fields.
+
 ### Changed
 
 - System Nexus Signal-with-Start Workflow operations now use the typed

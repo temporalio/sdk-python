@@ -976,6 +976,49 @@ await workflow.wait_condition(workflow.all_handlers_finished)
 * `await handle.signal()` can be called on the handle to signal the external workflow
 * `await handle.cancel()` can be called on the handle to send a cancel to the external workflow
 
+#### Event Groups
+
+Event Groups regroup logically related events of a Workflow Execution's history, so that UIs and other tools can
+present them together. A group is created with `workflow.create_event_group(label)` and can be attached to the
+commands a workflow produces, either explicitly through the `event_groups` option of the API producing the command,
+or implicitly to every command produced within `group.scope()`:
+
+```python
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        payment_group = workflow.create_event_group("payment-processing")
+        customer_group = workflow.create_event_group(
+            "customer-james-watkins", id="customer-123456"
+        )
+
+        # Explicit attachment of Event Groups to a single command
+        await workflow.execute_activity(
+            my_activity,
+            arg,
+            start_to_close_timeout=timedelta(minutes=1),
+            event_groups=[payment_group, customer_group],
+        )
+
+        # Scope-based propagation, applying to every command produced in the block
+        with payment_group.scope(), customer_group.scope():
+            await authorize_payment(...)
+            await capture_payment(...)
+```
+
+Scopes nest, and coroutines started inside a scope inherit it, since they capture the context active at their
+creation. Two Event Groups group events together if and only if they have the same id; by default the id is derived
+deterministically from the label, so two groups created with the same label in the same execution are the same group.
+Pass an explicit `id` to distinguish groups that share a label, or to group events under a business identifier. Note
+that a derived id is a hash of the label, so avoid putting sensitive information in labels of groups without an
+explicit id.
+
+The SDK also creates Event Groups implicitly around the workflow main method, signal handlers, and update handlers, so
+that the commands they produce are grouped with the event that triggered them.
+
+WARNING: Event Groups is an experimental API and may change without notice.
+
 #### Testing
 
 Workflow testing can be done in an integration-test fashion against a real server, however it is hard to simulate
