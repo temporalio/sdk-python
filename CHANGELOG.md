@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added `LoggingConfig.format` to select compact, pretty, or newline-delimited JSON output for
+  Core logs written to the console.
+
 - Added the `Runtime(disable_environment_info=...)` option to control whether
   runtime, hosting, and platform information is included in worker heartbeats.
 
