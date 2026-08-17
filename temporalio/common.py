@@ -390,11 +390,15 @@ class ValueHandle(Generic[temporalio.types.AnyType]):
 
     The lazy sibling of :py:class:`RawValue`. Annotate a workflow/activity/signal
     parameter or return value as ``ValueHandle[T]`` to receive one of these
-    instead of the materialized value. Forward it onward without cost, and
-    acquire its value at a boundary (an activity or client) where fetching data
-    is permitted, via :py:func:`temporalio.activity.resolve_value_handle` or
-    :py:meth:`temporalio.converter.DataConverter.resolve_value_handle`. A handle
-    does not acquire its own value.
+    instead of the materialized value. Forward it onward without cost, and acquire
+    its value where fetching data is permitted via :py:meth:`get_value`.
+
+    The handle is **data-only on the wire**: it captures no converter and
+    serializes, forwards, and pickles like any value. :py:meth:`get_value` is a
+    method on the handle (matching the other SDK handles' value getters), but it
+    reaches the current execution context's converter *at call time* rather than
+    capturing one, so the wire form stays a plain value. Getting its value is
+    available in an activity or client; a workflow forwards handles but cannot.
     """
 
     # The handle's payload. For a realized handle this is the stored reference
@@ -432,6 +436,52 @@ class ValueHandle(Generic[temporalio.types.AnyType]):
             for key, value in self._payload.metadata.items()
             if key.startswith(prefix)
         }
+
+    async def get_value(self) -> temporalio.types.AnyType:
+        """Acquire the value this handle refers to, using the ambient context.
+
+        The convention-matching counterpart to other SDK handles' value getters
+        (``WorkflowHandle.result``, Go's ``Future.Get``): the method lives on the
+        handle but captures no converter. It reaches the current execution
+        context's data converter *at call time* and runs the deferred inbound
+        pipeline (external-storage retrieval if offloaded, codec decode, then
+        deserialization) under that context's serialization context.
+
+        Available only where acquisition I/O is permitted:
+
+        - In an **activity**, it uses the activity's data converter.
+        - In a **workflow** it raises: the sandbox cannot perform the I/O, and
+          materializing here would force the value into history, defeating the
+          handle. Forward the handle to an activity and get its value there.
+        - With no ambient context (client code, tests), use
+          :py:meth:`temporalio.converter.DataConverter.get_handle_value` with
+          an explicit converter.
+        """
+        # Lazy imports: common is low-level and activity/workflow import it, so
+        # reaching back up at call time must not create a load-time import cycle.
+        import temporalio.activity
+        import temporalio.workflow
+
+        if temporalio.workflow.in_workflow():
+            raise RuntimeError(
+                "[TMPRL1107] ValueHandle.get_value() is not available in a workflow: "
+                "it requires I/O the sandbox cannot perform, and materializing here "
+                "would force the value into history, defeating the handle. Forward "
+                "the handle to an activity and get its value there."
+            )
+        if temporalio.activity.in_activity():
+            data_converter = temporalio.activity._Context.current().data_converter
+            if data_converter is None:
+                raise RuntimeError(
+                    "No data converter is available in this activity context; "
+                    "cannot acquire a ValueHandle value."
+                )
+            return await data_converter.get_handle_value(self)
+        raise RuntimeError(
+            "ValueHandle.get_value() must be called from an activity. In client code "
+            "or tests, use DataConverter.get_handle_value with an explicit "
+            "converter."
+        )
 
     def __getstate__(self) -> object:
         """Pickle support (workflow sandbox caching)."""

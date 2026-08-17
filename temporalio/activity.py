@@ -466,26 +466,6 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     return _Context.current().payload_converter
 
 
-async def resolve_value_handle(
-    handle: temporalio.common.ValueHandle[AnyType],
-) -> AnyType:
-    """Acquire the value a :py:class:`temporalio.common.ValueHandle` refers to.
-
-    Uses this activity's data converter to run the handle's deferred inbound
-    pipeline (external-storage retrieval if offloaded, codec decode, then
-    deserialization) under the activity's serialization context. Call it from
-    activity code, where acquisition I/O is permitted; a workflow forwards
-    handles but does not acquire their values.
-    """
-    context = _Context.current()
-    if context.data_converter is None:
-        raise RuntimeError(
-            "No data converter is available in this activity context; "
-            "cannot acquire a ValueHandle value."
-        )
-    return await context.data_converter.resolve_value_handle(handle)
-
-
 async def create_value_handle(
     value: AnyType,
     *,
@@ -502,8 +482,8 @@ async def create_value_handle(
     acquiring the value. A workflow forwards handles but does not create or acquire
     their values.
 
-    Async for consistency with :py:func:`resolve_value_handle` and the SDK's other
-    boundary operations, even though the convert itself does no I/O.
+    Async for consistency with :py:meth:`~temporalio.common.ValueHandle.get_value`
+    and the SDK's other boundary operations, even though the convert does no I/O.
     """
     context = _Context.current()
     if context.data_converter is None:

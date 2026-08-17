@@ -30,8 +30,9 @@ _THRESHOLD = 1024
 
 @activity.defn
 async def consume_handle(data: ValueHandle[str]) -> int:
-    # The activity needs the bytes, so it acquires them on demand at the boundary.
-    value = await activity.resolve_value_handle(data)
+    # The activity needs the bytes, so it acquires them on demand via the handle's
+    # own get_value method, which reaches the activity's converter at call time.
+    value = await data.get_value()
     return len(value)
 
 

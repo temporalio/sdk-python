@@ -153,7 +153,7 @@ class DataConverter(WithSerializationContext):
         # Positions annotated as ValueHandle defer acquisition: keep their
         # opaque payload and skip eager external-storage retrieval + codec
         # decode, producing a data-only handle. Acquisition is a boundary
-        # operation (resolve_value_handle), not something the handle does itself, so
+        # operation (get_handle_value), not something the handle does itself, so
         # no converter is captured here.
         if type_hints is not None and any(
             _is_payload_handle_hint(h) for h in type_hints
@@ -178,20 +178,22 @@ class DataConverter(WithSerializationContext):
         payloads = await self._decode_payload_sequence(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)
 
-    async def resolve_value_handle(self, handle: ValueHandle[AnyType]) -> AnyType:
+    async def get_handle_value(self, handle: ValueHandle[AnyType]) -> AnyType:
         """Acquire the value a :py:class:`ValueHandle` refers to.
 
-        This is the boundary operation for handles: the handle is a plain value
-        carrying the opaque payload and its inner type, and this converter
-        supplies the machinery. It runs the deferred inbound pipeline
+        This is the converter-level machinery that :py:meth:`ValueHandle.get_value`
+        delegates to once it has reached a context's converter. The handle is a
+        plain value carrying the opaque payload and its inner type, and this
+        converter supplies the machinery. It runs the deferred inbound pipeline
         (external-storage retrieval if offloaded, then codec decode) under this
         converter's serialization context, and deserializes into the handle's
         captured type ``T``.
 
         Call it where acquisition I/O is permitted (an activity or client
-        boundary), never inside the workflow sandbox. In activity code, prefer
-        :py:func:`temporalio.activity.resolve_value_handle`, which uses the
-        activity's converter.
+        boundary), never inside the workflow sandbox. In activity code, prefer the
+        ergonomic :py:meth:`temporalio.common.ValueHandle.get_value`; use this
+        explicit-converter form from client code or tests that have no ambient
+        context.
 
         Raises:
             RuntimeError: if the handle carries no concrete type (a bare
@@ -221,7 +223,7 @@ class DataConverter(WithSerializationContext):
     ) -> ValueHandle[Any]:
         """Produce a :py:class:`ValueHandle` from a value, deferring the store.
 
-        The producer-side counterpart to :py:meth:`resolve_value_handle`. The
+        The producer-side counterpart to :py:meth:`get_handle_value`. The
         value is *converted* immediately (as a workflow method invocation does),
         so it is snapshotted and any serialization error surfaces here at the call
         site. But the I/O-bearing tail -- codec encode and external-storage upload
@@ -230,7 +232,7 @@ class DataConverter(WithSerializationContext):
         a producing activity faults before returning the handle, nothing is
         uploaded and no external-storage blob is orphaned.
 
-        This is async for consistency with :py:meth:`resolve_value_handle` and the
+        This is async for consistency with :py:meth:`get_handle_value` and the
         SDK's other boundary operations, and to leave room to perform I/O (such as
         an eager store) without a breaking signature change; the convert itself
         does none. Call it where the deferred upload will be permitted at commit

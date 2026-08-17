@@ -62,7 +62,7 @@ async def test_same_payload_consumed_as_value_or_handle_by_marker() -> None:
     handle_hint: Any = Annotated[str, AsHandle]
     [handle] = await dc.decode([payload], [handle_hint])
     assert isinstance(handle, ValueHandle)
-    assert await dc.resolve_value_handle(handle) == "big-value"
+    assert await dc.get_handle_value(handle) == "big-value"
 
 
 async def test_annotated_handle_is_a_data_only_value() -> None:
@@ -71,11 +71,11 @@ async def test_annotated_handle_is_a_data_only_value() -> None:
 
     # Sync conversion, as inside the workflow sandbox, yields a data-only handle:
     # it carries the payload but owns no acquire behavior. Forward-only-ness is a
-    # property of the workflow surface (which does not expose resolve_value_handle),
+    # property of the workflow surface (which does not expose get_handle_value),
     # not of the handle; acquisition is a boundary operation.
     handle_hint: Any = Annotated[str, AsHandle]
     [handle] = dc.payload_converter.from_payloads([payload], [handle_hint])
     assert isinstance(handle, ValueHandle)
     assert not hasattr(handle, "materialize")
     # Through a boundary converter the value is acquirable.
-    assert await dc.resolve_value_handle(handle) == "big-value"
+    assert await dc.get_handle_value(handle) == "big-value"

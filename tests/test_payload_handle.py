@@ -2,7 +2,7 @@
 
 These exercise the converter-level behavior: a ValueHandle[T] annotation
 defers acquisition (external-storage retrieval, codec decode, deserialization)
-until the value is acquired at a boundary via DataConverter.resolve_value_handle,
+until the value is acquired at a boundary via DataConverter.get_handle_value,
 and forwarding a handle re-emits its opaque payload without downloading. The
 proof is the driver's retrieve-call count.
 """
@@ -49,23 +49,21 @@ async def test_toplevel_reference_becomes_handle() -> None:
     assert driver._retrieve_calls == 0
 
     # The value is acquired at the boundary, through the converter.
-    assert await dc.resolve_value_handle(handle) == _BIG
+    assert await dc.get_handle_value(handle) == _BIG
     assert driver._retrieve_calls == 1
 
 
-async def test_handle_is_data_only_and_forwards_without_download() -> None:
+async def test_handle_is_data_only_on_the_wire_and_forwards_without_download() -> None:
     driver = InMemoryTestDriver()
     dc = _storage_converter(driver)
     [reference] = await dc.encode([_BIG])
 
-    # A handle is a data-only value: holding it downloads nothing, and it owns
-    # no acquire behavior (acquisition is a boundary operation, not a method on
-    # the handle). Forward-only-ness lives on the workflow surface, which simply
-    # does not expose resolve_value_handle, not in the handle's state.
+    # A handle is data-only *on the wire*: it captures no converter, so holding it
+    # downloads nothing and forwarding re-emits its opaque reference unchanged. The
+    # get_value method lives on the handle (like other SDK handles' value getters),
+    # but it reaches a converter at call time rather than capturing one.
     [handle] = dc.payload_converter.from_payloads([reference], [ValueHandle[str]])
     assert isinstance(handle, ValueHandle)
-    assert not hasattr(handle, "materialize")
-    assert not hasattr(handle, "resolve_value_handle")
     assert driver._retrieve_calls == 0
 
     # Forwarding re-emits a byte-identical reference payload, still no download.
@@ -73,8 +71,15 @@ async def test_handle_is_data_only_and_forwards_without_download() -> None:
     assert out.SerializeToString() == reference.SerializeToString()
     assert driver._retrieve_calls == 0
 
-    # The value is acquired only through a boundary converter.
-    assert await dc.resolve_value_handle(handle) == _BIG
+    # Because the handle captured no converter, get_value() cannot acquire on its own
+    # outside any execution context: it raises rather than silently downloading.
+    with pytest.raises(RuntimeError):
+        await handle.get_value()
+    assert driver._retrieve_calls == 0
+
+    # The value is still acquirable through an explicit converter, the machinery
+    # get_value() delegates to inside an activity or client context.
+    assert await dc.get_handle_value(handle) == _BIG
     assert driver._retrieve_calls == 1
 
 
@@ -130,7 +135,7 @@ async def test_codec_deferred_until_acquired() -> None:
     # The reference is not codec-decoded when the handle is produced.
     assert codec.decode_calls == 0
 
-    assert await dc.resolve_value_handle(handle) == _BIG
+    assert await dc.get_handle_value(handle) == _BIG
     assert codec.decode_calls == 1
 
 
@@ -147,7 +152,7 @@ async def test_pickled_handle_survives_and_forwards() -> None:
     # reorder the metadata map, so serialized bytes are not a reliable check.
     [out] = dc.payload_converter.to_payloads([restored])
     assert out == payloads[0]
-    assert await dc.resolve_value_handle(restored) == _BIG
+    assert await dc.get_handle_value(restored) == _BIG
 
 
 async def test_create_value_handle_defers_store_until_commit() -> None:
@@ -175,7 +180,7 @@ async def test_create_value_handle_defers_store_until_commit() -> None:
     [realized] = await dc.decode([payload], [ValueHandle[str]])
     assert realized.metadata == {"pages": "42"}
     assert driver._retrieve_calls == 0
-    assert await dc.resolve_value_handle(realized) == value
+    assert await dc.get_handle_value(realized) == value
     assert driver._retrieve_calls == 1
 
 
