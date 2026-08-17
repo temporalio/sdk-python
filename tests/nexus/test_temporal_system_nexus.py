@@ -627,6 +627,8 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
     _assert_start_nexus_operation_interceptor_trace()
 
 
+# Cloud namespaces created by CI do not have the System Nexus dynamic config.
+@pytest.mark.requires_local_server
 async def test_signal_with_start_uses_target_workflow_serialization_context(
     env: WorkflowEnvironment,
     monkeypatch: pytest.MonkeyPatch,
