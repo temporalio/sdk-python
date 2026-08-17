@@ -20,6 +20,7 @@ from ..types import (
 )
 from ._activities import _AsyncioTask
 from ._context import _Runtime, uuid4
+from ._event_groups import EventGroup
 from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
 
 __all__ = [
@@ -172,6 +173,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
     versioning_intent: VersioningIntent | None
     static_summary: str | None
     static_details: str | None
+    event_groups: Sequence[EventGroup] | None
     priority: temporalio.common.Priority
 
 
@@ -198,6 +200,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
@@ -226,6 +229,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
@@ -254,6 +258,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
@@ -284,6 +289,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[Any, Any]: ...
 
@@ -312,6 +318,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
@@ -374,6 +381,7 @@ async def start_child_workflow(
         versioning_intent=versioning_intent,
         static_summary=static_summary,
         static_details=static_details,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -401,6 +409,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -429,6 +438,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -457,6 +467,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -487,6 +498,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any: ...
 
@@ -515,6 +527,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start a child workflow and wait for completion.
@@ -543,6 +556,7 @@ async def execute_child_workflow(
         versioning_intent=versioning_intent,
         static_summary=static_summary,
         static_details=static_details,
+        event_groups=event_groups,
         priority=priority,
     )
     return await handle
@@ -692,6 +706,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -712,6 +727,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -733,6 +749,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -754,6 +771,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -775,6 +793,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -795,6 +814,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
 
@@ -840,6 +860,7 @@ def continue_as_new(
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
         initial_versioning_behavior=initial_versioning_behavior,
+        event_groups=event_groups,
     )
 
 

@@ -35,6 +35,12 @@ to include examples, links to docs, or any other relevant information.
   `uuid.uuid1()`/`uuid.uuid4()` restrictions.
 - **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
   Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
+- **Experimental**: Event Groups tag logically related commands so that the UI and CLI can
+  visualize, analyze, and debug them together. Create a group with
+  `workflow.create_event_group(label)`, then attach it either per call
+  (`workflow.start_activity(..., event_groups=[group])`) or ambiently to everything issued inside
+  `with group.scope():`. Groups also wrap the workflow main function and each signal and update
+  handler implicitly. Requires a server that understands the Event Groups fields.
 
 ### Changed
 
