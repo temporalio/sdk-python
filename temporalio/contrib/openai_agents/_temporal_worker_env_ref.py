@@ -25,31 +25,15 @@ def temporal_worker_env_ref(name: str) -> str:
         Use with caution in production environments.
 
     Use it for a hosted tool credential that should come from the worker's
-    environment rather than being written into your workflow. Put the reference
-    returned in a ``HostedMCPTool``'s ``authorization`` or header value, or in the
-    ``value`` of a ``domain_secrets`` entry under a ``ShellTool`` or
-    ``CodeInterpreterTool``; the reference carries only the variable's name, never
-    its value.
-
-    ::
-
-        from agents import HostedMCPTool
-
-        from temporalio.contrib.openai_agents import temporal_worker_env_ref
-
-        tool = HostedMCPTool(
-            tool_config={
-                "type": "mcp",
-                "server_label": "my_server",
-                "server_url": "https://example.com/mcp",
-                "authorization": temporal_worker_env_ref("MY_MCP_TOKEN"),
-            }
-        )
+    environment rather than being written into your workflow. Put the returned
+    reference in a ``HostedMCPTool``'s ``authorization`` or header value, or in
+    the ``value`` of a ``domain_secrets`` entry under a ``ShellTool`` or
+    ``CodeInterpreterTool``. The reference carries only the variable's name,
+    never its value.
 
     Every worker that runs model activities must set the variable and name it in
-    ``OpenAIAgentsPlugin(resolvable_worker_env_vars=["MY_MCP_TOKEN"])``. A name the
-    worker does not allow is sent to the model provider as literal text; an allowed
-    name that is unset resolves to an empty value.
+    ``OpenAIAgentsPlugin(resolvable_worker_env_vars=[...])``. A name the worker
+    allows but has not set resolves to an empty value.
 
     Args:
         name: Name of the environment variable to read on the worker.
@@ -83,14 +67,13 @@ class _WorkerEnvRefResolver:  # type:ignore[reportUnusedClass]
         return {**secret, "value": self._resolve_ref(secret["value"])}
 
     def _resolve_network_policy(self, network_policy: Any) -> Any:
-        """On the code interpreter path pydantic deserializes ``domain_secrets`` into a
-        single-pass iterator, so the entries read here go back onto the input.
-        """
         policy = cast(MutableMapping[str, Any], network_policy)
         domain_secrets = policy.get("domain_secrets")
         if domain_secrets is None:
             return network_policy
         unresolved = list(domain_secrets)
+        # On the code interpreter path pydantic deserializes domain_secrets into a
+        # single-pass iterator, so the entries read here go back onto the input.
         policy["domain_secrets"] = unresolved
         return {
             **policy,

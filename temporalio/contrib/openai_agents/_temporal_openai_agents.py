@@ -249,7 +249,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 Use with caution in production environments.
             resolvable_worker_env_vars: Names of the environment variables that
                 ``temporal_worker_env_ref()`` may read on this worker. Names are
-                matched exactly, with no globbing or prefix matching; ``"*"``
+                matched exactly, with no globbing; ``"*"``
                 anywhere in the collection allows every name.
                 Warning: resolvable_worker_env_vars is experimental and behavior may change in future versions.
                 Use with caution in production environments.

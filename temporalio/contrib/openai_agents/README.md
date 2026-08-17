@@ -513,17 +513,15 @@ Every worker that runs model activities must both set `MY_MCP_TOKEN` and name it
 plugin = OpenAIAgentsPlugin(resolvable_worker_env_vars=["MY_MCP_TOKEN"])
 ```
 
-Nothing resolves unless the worker names it. A reference to a name the worker does not allow is sent to the model provider as literal text. Names are matched exactly — no globbing, no prefixes — and `"*"` anywhere in the list allows every environment variable on the worker.
+Names are matched exactly, with no globbing, and `"*"` anywhere in the list allows every environment variable on the worker.
 
-A reference need not be the whole value: `"Bearer " + temporal_worker_env_ref("MY_MCP_TOKEN")` substitutes the credential inside a larger string. Each reference in a value is checked against the list on its own, so one value can end up holding both a resolved credential and the literal text of a name the worker does not allow. A name the worker does allow but has not set resolves to an empty value.
+A reference can sit inside a larger value: in `"Bearer " + temporal_worker_env_ref("MY_MCP_TOKEN")`, the reference is replaced in place and the rest of the string is sent unchanged.
 
-The variable's value is substituted in these fields and no others:
+The environment variable's value is substituted in these fields and no others:
 
 - `authorization`, and the value of each entry in `headers`, in a `HostedMCPTool`'s `tool_config`
 - `value` in each entry of `network_policy.domain_secrets` under a hosted `ShellTool`'s `environment`
-- `value` in each entry of `network_policy.domain_secrets` under a `CodeInterpreterTool`'s `container`
-
-Anywhere else — in a header *name*, or as an MCP server `factory_argument` (see [Factory Arguments](#factory-arguments)) — the reference is passed on as literal text, with no error from this SDK.
+- `value` in each entry of `network_policy.domain_secrets` under the `container` in a `CodeInterpreterTool`'s `tool_config`
 
 ## Sandbox Support
 
