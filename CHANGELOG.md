@@ -25,6 +25,21 @@ to include examples, links to docs, or any other relevant information.
   OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
   Google ADK) are not duplicated on replay. `GoogleAdkPlugin` warns when a global OTel
   provider is not replay-safe.
+- Added `LoggingConfig.format` to select compact, pretty, or newline-delimited JSON output for
+  Core logs written to the console.
+
+- Added the `Runtime(disable_environment_info=...)` option to control whether
+  runtime, hosting, and platform information is included in worker heartbeats.
+
+- `temporalio.workflow.uuid7()` generates a determinism-safe, time-sortable
+  UUIDv7 (RFC 9562) from workflow time and the workflow's deterministic random
+  generator, complementing the existing `workflow.uuid4()`
+  ([#1450](https://github.com/temporalio/sdk-python/issues/1450)). The
+  workflow sandbox now also restricts the non-deterministic `uuid.uuid7()`
+  added to the standard library in Python 3.14, matching the existing
+  `uuid.uuid1()`/`uuid.uuid4()` restrictions.
+- **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
+  Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
 
 ### Changed
 
@@ -52,6 +67,8 @@ to include examples, links to docs, or any other relevant information.
   `Span.add_link` to the wrapped span. Previously the wrapper inherited
   OpenTelemetry's non-abstract no-op default, silently dropping links added
   after span creation.
+- OpenTelemetry trace and span IDs propagated by concurrent workers no longer
+  interfere with each other, preserving the correct parent-child hierarchy.
 - The `google-adk` extra now depends on `mcp`, so fresh installs of
   `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
   without separately installing `mcp`. Previously the import failed with an

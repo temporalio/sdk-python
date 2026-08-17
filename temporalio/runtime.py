@@ -118,6 +118,7 @@ class Runtime:
         *,
         telemetry: TelemetryConfig,
         worker_heartbeat_interval: timedelta | None = timedelta(seconds=60),
+        disable_environment_info: bool = False,
     ) -> None:
         """Create a runtime with the provided configuration.
 
@@ -128,6 +129,8 @@ class Runtime:
                 ``runtime_options``.
             worker_heartbeat_interval: Interval for worker heartbeats. ``None``
                 disables heartbeating. Interval must be between 1s and 60s.
+            disable_environment_info: Whether to omit runtime, hosting, and
+                platform information from worker heartbeats.
 
         Raises:
             ValueError: If both ```runtime_options`` is a negative value.
@@ -142,6 +145,7 @@ class Runtime:
         runtime_options = temporalio.bridge.runtime.RuntimeOptions(
             telemetry=telemetry._to_bridge_config(),
             worker_heartbeat_interval_millis=heartbeat_millis,
+            disable_environment_info=disable_environment_info,
         )
 
         self._core_runtime = temporalio.bridge.runtime.Runtime(options=runtime_options)
@@ -191,6 +195,14 @@ class TelemetryFilter:
         return ",".join(parts)
 
 
+class LoggingFormat(Enum):
+    """Format for Core logs written to the console."""
+
+    COMPACT = "compact"
+    PRETTY = "pretty"
+    JSON = "json"
+
+
 @dataclass(frozen=True)
 class LoggingConfig:
     """Configuration for runtime logging."""
@@ -201,6 +213,11 @@ class LoggingConfig:
     forwarding: LogForwardingConfig | None = None
     """If present, Core logger messages will be forwarded to a Python logger.
     See the :py:class:`LogForwardingConfig` docs for more info.
+    """
+
+    format: LoggingFormat | None = None
+    """Format for Core logs written to the console. This is ignored when
+    :py:attr:`forwarding` is set. If unset, this defaults to compact output.
     """
 
     default: ClassVar[LoggingConfig]
@@ -214,6 +231,7 @@ class LoggingConfig:
             if isinstance(self.filter, str)
             else self.filter.formatted(),
             forward_to=None if not self.forwarding else self.forwarding._on_logs,
+            format=None if not self.format else self.format.value,
         )
 
 

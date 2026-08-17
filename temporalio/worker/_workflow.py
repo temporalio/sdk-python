@@ -9,13 +9,13 @@ import logging
 import os
 import sys
 import threading
-import time
 from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import dataclass
-from datetime import timedelta, timezone
+from datetime import timezone
 from types import TracebackType
 
 import temporalio.api.common.v1
+import temporalio.bridge.proto.common
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
@@ -62,6 +62,17 @@ LOG_PROTOS = False
 # Advise customers to adjust based on their workload needs and to report issues with the
 # value if problems are encountered. This setting is experimental.
 _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY: int = 3
+
+
+def _set_external_storage_metrics(
+    target: temporalio.bridge.proto.common.ExternalStorageMetrics,
+    metrics: temporalio.converter._extstore.StorageOperationMetrics,
+) -> None:
+    """Populate a proto ``ExternalStorageMetrics`` from measured storage metrics."""
+    target.payload_count = metrics.payload_count
+    target.total_size_bytes = metrics.total_size
+    target.total_duration.FromTimedelta(metrics.total_duration)
+    target.driver_names.extend(sorted(metrics.driver_names))
 
 
 class _WorkflowWorker:  # type:ignore[reportUnusedClass]
@@ -325,7 +336,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         completion.successful.SetInParent()
         workflow = None
         data_converter = self._data_converter
-        task_start_time = time.monotonic()
         download_metrics = temporalio.converter._extstore.StorageOperationMetrics()
         try:
             if LOG_PROTOS:
@@ -500,6 +510,17 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             completion.failed.Clear()
             completion.failed.failure.message = f"Failed encoding completion: {err}"
 
+        # Reported on the completion so core can include them in its workflow-task duration
+        # log; core measures the duration itself.
+        if download_metrics.payload_count > 0:
+            _set_external_storage_metrics(
+                completion.payload_download_metrics, download_metrics
+            )
+        if upload_metrics.payload_count > 0:
+            _set_external_storage_metrics(
+                completion.payload_upload_metrics, upload_metrics
+            )
+
         # Send off completion
         if LOG_PROTOS:
             logger.debug("Sending workflow completion:\n%s", completion)
@@ -509,84 +530,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             # TODO(cretz): Per others, this is supposed to crash the worker
             logger.exception(
                 "Failed completing activation on workflow with run ID %s", act.run_id
-            )
-
-        # Log workflow task duration with external storage metrics
-        self._log_workflow_task_duration(
-            act, workflow, task_start_time, download_metrics, upload_metrics
-        )
-
-    def _log_workflow_task_duration(
-        self,
-        act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-        workflow: _RunningWorkflow | None,
-        task_start_time: float,
-        download_metrics: temporalio.converter._extstore.StorageOperationMetrics,
-        upload_metrics: temporalio.converter._extstore.StorageOperationMetrics,
-    ) -> None:
-        task_duration = timedelta(seconds=time.monotonic() - task_start_time)
-
-        def _fmt_duration(td: timedelta) -> str:
-            secs = td.total_seconds()
-            if secs >= 1:
-                return f"{secs:.3f}s"
-            return f"{secs * 1000:.3f}ms"
-
-        completed_event_id = act.history_length + 1
-        _info = workflow.get_info() if workflow is not None else None
-        attempt = _info.attempt if _info is not None else "unknown"
-        log_id = f"{act.run_id}:{completed_event_id}:{attempt}"
-        msg_details, extra = temporalio.workflow._build_log_context(
-            _info._logger_details() if _info is not None else None,
-            full_workflow_info=_info,
-        )
-        msg_details["event_id"] = completed_event_id
-        msg_details["workflow_task_duration"] = _fmt_duration(task_duration)
-        msg_details["workflow_history_size"] = act.history_size_bytes
-        extra["event_id"] = completed_event_id
-        extra["workflow_task_duration"] = task_duration
-        extra["workflow_history_size"] = act.history_size_bytes
-        if download_metrics.payload_count > 0:
-            msg_details["payload_download_count"] = download_metrics.payload_count
-            msg_details["payload_download_size"] = download_metrics.total_size
-            msg_details["payload_download_duration"] = _fmt_duration(
-                download_metrics.total_duration
-            )
-            msg_details["payload_download_drivers"] = sorted(
-                download_metrics.driver_names
-            )
-            extra["payload_download_count"] = download_metrics.payload_count
-            extra["payload_download_size"] = download_metrics.total_size
-            extra["payload_download_duration"] = download_metrics.total_duration
-            extra["payload_download_drivers"] = sorted(download_metrics.driver_names)
-        if upload_metrics.payload_count > 0:
-            msg_details["payload_upload_count"] = upload_metrics.payload_count
-            msg_details["payload_upload_size"] = upload_metrics.total_size
-            msg_details["payload_upload_duration"] = _fmt_duration(
-                upload_metrics.total_duration
-            )
-            msg_details["payload_upload_drivers"] = sorted(upload_metrics.driver_names)
-            extra["payload_upload_count"] = upload_metrics.payload_count
-            extra["payload_upload_size"] = upload_metrics.total_size
-            extra["payload_upload_duration"] = upload_metrics.total_duration
-            extra["payload_upload_drivers"] = sorted(upload_metrics.driver_names)
-        if task_duration.total_seconds() > 10:
-            logger.warning(
-                f"[TMPRL1104] {log_id} Workflow task exceeded 10 seconds (%s)",
-                msg_details,
-                extra=extra,
-            )
-        elif task_duration.total_seconds() > 5:
-            logger.info(
-                f"[TMPRL1104] {log_id} Workflow task exceeded 5 seconds (%s)",
-                msg_details,
-                extra=extra,
-            )
-        else:
-            logger.debug(
-                f"[TMPRL1104] {log_id} Workflow task duration information (%s)",
-                msg_details,
-                extra=extra,
             )
 
     async def _handle_cache_eviction(

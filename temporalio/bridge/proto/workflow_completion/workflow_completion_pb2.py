@@ -31,7 +31,7 @@ from temporalio.bridge.proto.workflow_commands import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n?temporal/sdk/core/workflow_completion/workflow_completion.proto\x12\x1b\x63oresdk.workflow_completion\x1a%temporal/api/failure/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a%temporal/sdk/core/common/common.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto"\xac\x01\n\x1cWorkflowActivationCompletion\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12:\n\nsuccessful\x18\x02 \x01(\x0b\x32$.coresdk.workflow_completion.SuccessH\x00\x12\x36\n\x06\x66\x61iled\x18\x03 \x01(\x0b\x32$.coresdk.workflow_completion.FailureH\x00\x42\x08\n\x06status"\xac\x01\n\x07Success\x12<\n\x08\x63ommands\x18\x01 \x03(\x0b\x32*.coresdk.workflow_commands.WorkflowCommand\x12\x1b\n\x13used_internal_flags\x18\x06 \x03(\r\x12\x46\n\x13versioning_behavior\x18\x07 \x01(\x0e\x32).temporal.api.enums.v1.VersioningBehavior"\x81\x01\n\x07\x46\x61ilure\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x43\n\x0b\x66orce_cause\x18\x02 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowTaskFailedCauseB8\xea\x02\x35Temporalio::Internal::Bridge::Api::WorkflowCompletionb\x06proto3'
+    b'\n?temporal/sdk/core/workflow_completion/workflow_completion.proto\x12\x1b\x63oresdk.workflow_completion\x1a%temporal/api/failure/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a%temporal/sdk/core/common/common.proto\x1a;temporal/sdk/core/workflow_commands/workflow_commands.proto"\xbe\x02\n\x1cWorkflowActivationCompletion\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12:\n\nsuccessful\x18\x02 \x01(\x0b\x32$.coresdk.workflow_completion.SuccessH\x00\x12\x36\n\x06\x66\x61iled\x18\x03 \x01(\x0b\x32$.coresdk.workflow_completion.FailureH\x00\x12H\n\x18payload_download_metrics\x18\x04 \x01(\x0b\x32&.coresdk.common.ExternalStorageMetrics\x12\x46\n\x16payload_upload_metrics\x18\x05 \x01(\x0b\x32&.coresdk.common.ExternalStorageMetricsB\x08\n\x06status"\xac\x01\n\x07Success\x12<\n\x08\x63ommands\x18\x01 \x03(\x0b\x32*.coresdk.workflow_commands.WorkflowCommand\x12\x1b\n\x13used_internal_flags\x18\x06 \x03(\r\x12\x46\n\x13versioning_behavior\x18\x07 \x01(\x0e\x32).temporal.api.enums.v1.VersioningBehavior"\x81\x01\n\x07\x46\x61ilure\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x43\n\x0b\x66orce_cause\x18\x02 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowTaskFailedCauseB8\xea\x02\x35Temporalio::Internal::Bridge::Api::WorkflowCompletionb\x06proto3'
 )
 
 
@@ -79,9 +79,9 @@ if _descriptor._USE_C_DESCRIPTORS == False:
         b"\352\0025Temporalio::Internal::Bridge::Api::WorkflowCompletion"
     )
     _WORKFLOWACTIVATIONCOMPLETION._serialized_start = 316
-    _WORKFLOWACTIVATIONCOMPLETION._serialized_end = 488
-    _SUCCESS._serialized_start = 491
-    _SUCCESS._serialized_end = 663
-    _FAILURE._serialized_start = 666
-    _FAILURE._serialized_end = 795
+    _WORKFLOWACTIVATIONCOMPLETION._serialized_end = 634
+    _SUCCESS._serialized_start = 637
+    _SUCCESS._serialized_end = 809
+    _FAILURE._serialized_start = 812
+    _FAILURE._serialized_end = 941
 # @@protoc_insertion_point(module_scope)

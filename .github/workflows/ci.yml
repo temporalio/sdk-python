@@ -100,6 +100,89 @@ jobs:
           npx doctoc README.md
           [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
 
+  # Verify the optional FIPS build: the Rust core must link aws-lc-fips-sys
+  # (aws-lc-rs FIPS mode) and must NOT link `ring` (the cargo-tree guard, ported
+  # from sdk-ruby PR #466's `fips_tree` guard); then run the test suite against the
+  # FIPS binary and build the release wheel.
+  fips-build:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.10"
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: temporalio/bridge -> target
+          key: fips-${{ env.pythonLocation }}
+      # aws-lc-fips-sys builds the validated AWS-LC module from source, which
+      # needs Go, CMake, Perl and a C compiler (see the FIPS Compliance section
+      # in the README).
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: "1.24"
+      - name: Verify FIPS linkage (aws-lc-fips-sys present, ring absent)
+        working-directory: temporalio/bridge
+        run: |
+          set -uo pipefail
+          # Resolve the FIPS build's dependency graph once and query it for a
+          # single crate. `cargo tree -i <crate>` ("invert") prints the chain of
+          # packages that pull in <crate>, or nothing if <crate> is not in the
+          # graph at all. We capture that output and decide PRESENT/ABSENT by
+          # whether the string is empty -- NOT by the exit code, because
+          # `cargo tree -i` exits 0 either way (an absent crate just prints
+          # "nothing to print" to stderr). Ported from sdk-ruby PR #466.
+          links_in_fips_build() {
+            cargo tree -p temporal-sdk-bridge --no-default-features --features fips -i "$1" 2>/dev/null
+          }
+          echo "== aws-lc-fips-sys must be PRESENT =="
+          aws_lc_fips="$(links_in_fips_build aws-lc-fips-sys)"
+          if [ -z "$aws_lc_fips" ]; then
+            echo "ERROR: aws-lc-fips-sys is absent from the FIPS dependency tree" >&2
+            exit 1
+          fi
+          echo "$aws_lc_fips"
+          echo "== ring must be ABSENT =="
+          ring="$(links_in_fips_build ring)"
+          if [ -n "$ring" ]; then
+            echo "ERROR: 'ring' is still linked in the FIPS build" >&2
+            echo "$ring" >&2
+            exit 1
+          fi
+          echo "FIPS linkage verified: aws-lc-fips-sys linked, ring absent."
+      - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+        with:
+          version: "23.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
+      - run: uv tool install poethepoet
+      - run: uv sync --all-extras
+      # Develop build so the FIPS extension is importable, then run the suite
+      # against it to confirm the aws-lc-rs stack works end to end (not just links).
+      - run: poe build-develop-fips
+      - name: Confirm the FIPS build is loaded
+        run: uv run python -c "from temporalio.bridge import temporal_sdk_bridge; assert temporal_sdk_bridge.FIPS, 'not a FIPS build'"
+      - run: mkdir junit-xml
+      - name: Run tests against the FIPS build
+        run: |
+          poe test --reruns 3 --only-rerun "RuntimeError: Failed validating workflow" -s --junit-xml=junit-xml/fips.xml
+        timeout-minutes: 15
+      - name: "Upload junit-xml artifacts"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--fips
+          path: junit-xml
+          retention-days: 14
+      - name: Build FIPS wheel (proves the release feature set compiles)
+        run: uv run maturin build --release --no-default-features --features fips
+        env:
+          TEMPORALIO_FIPS: "1"
+
   alpine-package-test:
     timeout-minutes: 60
     strategy:

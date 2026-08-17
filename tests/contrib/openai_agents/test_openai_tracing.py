@@ -11,6 +11,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from temporalio import activity, workflow
 from temporalio.client import Client
+from temporalio.contrib.openai_agents import _temporal_openai_agents
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
 )
@@ -48,6 +49,33 @@ class MemoryTracingProcessor(TracingProcessor):
 
     def force_flush(self) -> None:
         pass
+
+
+def test_otel_instrumentation_lifecycle_does_not_nest() -> None:
+    from openinference.instrumentation.openai_agents._processor import (
+        OpenInferenceTracingProcessor,
+    )
+    from opentelemetry import trace
+
+    original = OpenInferenceTracingProcessor.on_trace_start
+    _temporal_openai_agents._install_otel_instrumentation(trace.get_tracer_provider())
+    try:
+        installed_patch = OpenInferenceTracingProcessor.on_trace_start
+        assert installed_patch is not original
+
+        _temporal_openai_agents._install_otel_instrumentation(
+            trace.get_tracer_provider()
+        )
+        try:
+            assert OpenInferenceTracingProcessor.on_trace_start is installed_patch
+        finally:
+            _temporal_openai_agents._uninstall_otel_instrumentation()
+
+        assert OpenInferenceTracingProcessor.on_trace_start is installed_patch
+    finally:
+        _temporal_openai_agents._uninstall_otel_instrumentation()
+
+    assert OpenInferenceTracingProcessor.on_trace_start is original
 
 
 async def test_tracing(client: Client):
