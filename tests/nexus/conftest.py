@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import nexusrpc
 import pytest
 import pytest_asyncio
-from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 from temporalio.api.cloud.cloudservice.v1 import (
     CreateNexusEndpointRequest,
@@ -31,19 +30,11 @@ from temporalio.api.workflowservice.v1 import DeleteNexusOperationExecutionReque
 from temporalio.client import CloudOperationsClient
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
 
 
 @nexusrpc.service
 class CloudNexusEndpointReadinessService:
     ready: nexusrpc.Operation[None, None]
-
-
-@service_handler(service=CloudNexusEndpointReadinessService)
-class CloudNexusEndpointReadinessServiceHandler:
-    @sync_operation
-    async def ready(self, _ctx: StartOperationContext, _input: None) -> None:
-        pass
 
 
 @dataclass
@@ -112,7 +103,7 @@ class _CloudNexusEndpointClient:
             await asyncio.sleep(1)
 
     async def wait_for_endpoint_readiness(
-        self, env: WorkflowEnvironment, endpoint_name: str, task_queue: str
+        self, env: WorkflowEnvironment, endpoint_name: str
     ) -> None:
         deadline = time.monotonic() + 10 * 60
         operation_id = f"cloud-nexus-readiness-{uuid.uuid4()}"
@@ -120,32 +111,27 @@ class _CloudNexusEndpointClient:
             CloudNexusEndpointReadinessService, endpoint_name
         )
         # Cloud reports endpoint activation before the Workflow Service can always
-        # resolve it. A successful disposable operation verifies that propagation.
-        async with Worker(
-            env.client,
-            task_queue=task_queue,
-            nexus_service_handlers=[CloudNexusEndpointReadinessServiceHandler()],
-        ):
-            while True:
-                try:
-                    await nexus_client.execute_operation(
-                        CloudNexusEndpointReadinessService.ready,
-                        None,
-                        id=operation_id,
-                    )
-                    break
-                except RPCError as err:
-                    if (
-                        err.status != RPCStatusCode.NOT_FOUND
-                        or str(err) != "endpoint not found"
-                    ):
-                        raise
-                    if time.monotonic() >= deadline:
-                        raise TimeoutError(
-                            f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
-                            "to become available"
-                        ) from err
-                    await asyncio.sleep(1)
+        # resolve it. A successful disposable start request verifies that propagation.
+        while True:
+            try:
+                await nexus_client.start_operation(
+                    CloudNexusEndpointReadinessService.ready,
+                    None,
+                    id=operation_id,
+                )
+                break
+            except RPCError as err:
+                if (
+                    err.status != RPCStatusCode.NOT_FOUND
+                    or str(err) != "endpoint not found"
+                ):
+                    raise
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
+                        "to become available"
+                    ) from err
+                await asyncio.sleep(1)
         await env.client.workflow_service.delete_nexus_operation_execution(
             DeleteNexusOperationExecutionRequest(
                 namespace=env.client.namespace,
@@ -217,7 +203,7 @@ async def cloud_nexus_endpoints(
         )
         endpoints[-1] = endpoint
         await cloud_nexus_endpoint_client.wait_for_endpoint_readiness(
-            env, endpoint_name, task_queue
+            env, endpoint_name
         )
         return endpoint
 
