@@ -22,8 +22,7 @@ sdk_core_wit_input_dir = (
     / "api_upstream"
     / "nexus"
 )
-# Temporary checked-in WIT used until sdk-core updates its API snapshot.
-wit_path = base_dir / "scripts" / "nexus_system_workflow_service.wit"
+wit_path = sdk_core_wit_input_dir / "workflow-service.wit"
 wit_deps_dir = sdk_core_wit_input_dir / "deps"
 python_support_path = base_dir / "scripts" / "nex_gen_support.py"
 output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
