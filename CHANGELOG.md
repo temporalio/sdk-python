@@ -55,6 +55,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- OpenTelemetry trace and span IDs propagated by concurrent workers no longer
+  interfere with each other, preserving the correct parent-child hierarchy.
 - The `google-adk` extra now depends on `mcp`, so fresh installs of
   `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
   without separately installing `mcp`. Previously the import failed with an
