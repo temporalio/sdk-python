@@ -263,7 +263,8 @@ cache eviction, worker restarts, redeploys, or running with
 
 To avoid this, install Temporal's replay-safe providers as the global
 OpenTelemetry providers. They pass recordings through on first execution and
-drop them during replay:
+drop them while history events are replaying (queries and update validators
+are live operations and still record):
 
 ```python
 import opentelemetry._logs

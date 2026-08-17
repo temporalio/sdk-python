@@ -4,12 +4,11 @@ from typing import TYPE_CHECKING, Any
 
 # The OpenTelemetry Logs API specification is stable, but opentelemetry-python
 # exposes the logs bridge API only under the private opentelemetry._logs
-# module path (there is no public opentelemetry.logs as of 1.42; upstream
+# module path (there is no public opentelemetry.logs as of 1.44; upstream
 # stabilization is tracked in opentelemetry-python#3361, open since 2023 with
-# the module surface unchanged since 1.26 apart from additive parameters), so
-# _logs is
-# the import path OpenTelemetry itself documents until the Python SIG promotes
-# it to a public namespace.
+# the module surface unchanged since 1.26 apart from additive parameters).
+# _logs is therefore the import path OpenTelemetry itself documents, until
+# the Python SIG promotes it to a public namespace.
 from opentelemetry._logs import Logger, LoggerProvider
 
 from temporalio import workflow

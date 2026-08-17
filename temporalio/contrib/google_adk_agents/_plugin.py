@@ -63,7 +63,8 @@ def _warn_if_global_otel_providers_not_replay_safe() -> None:
     # delegating to a replay-safe one) cannot be classified, where a false
     # positive is worse than a missed warning. The SDK logger provider is not
     # checked because its class is only importable from the underscore
-    # namespace opentelemetry.sdk._logs while OpenTelemetry logs are pre-GA.
+    # namespace opentelemetry.sdk._logs while opentelemetry-python has not
+    # promoted the logs SDK to a public namespace.
     try:
         from opentelemetry.sdk.metrics import MeterProvider as SdkMeterProvider
         from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider

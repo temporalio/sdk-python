@@ -42,7 +42,7 @@ from mcp import StdioServerParameters
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import set_tracer_provider
+from opentelemetry.trace import get_tracer_provider, set_tracer_provider
 
 import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
@@ -538,6 +538,10 @@ async def test_single_agent_telemetry(
     provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     set_tracer_provider(provider)
+    assert get_tracer_provider() is provider, (
+        "Global tracer provider install was a no-op; a previous test in this"
+        " process left a provider set without resetting it"
+    )
     # Instrumentors are process-global singletons bound to the provider seen
     # at instrument() time; without uninstrument() ADK code in every later
     # test in this process would keep emitting spans into this test's
