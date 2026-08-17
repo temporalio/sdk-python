@@ -13,8 +13,8 @@ use temporalio_common::telemetry::metrics::core::MetricCallBufferer;
 use temporalio_common::telemetry::metrics::CoreMeter;
 use temporalio_common::telemetry::{
     build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLog, CoreLogStreamConsumer,
-    Logger, MetricTemporality, OtelCollectorOptions, OtlpProtocol, PrometheusExporterOptions,
-    TelemetryOptions,
+    Logger, LoggerFormat, MetricTemporality, OtelCollectorOptions, OtlpProtocol,
+    PrometheusExporterOptions, TelemetryOptions,
 };
 use temporalio_sdk_core::telemetry::MetricsCallBuffer;
 use temporalio_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
@@ -48,6 +48,7 @@ pub struct TelemetryConfig {
 pub struct LoggingConfig {
     filter: String,
     forward_to: Option<Py<PyAny>>,
+    format: Option<String>,
 }
 
 #[pyclass]
@@ -121,6 +122,15 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         } else {
             Logger::Console {
                 filter: logging_conf.filter.to_string(),
+                format: logging_conf
+                    .format
+                    .map(|format| match format.as_str() {
+                        "compact" => Ok(LoggerFormat::Compact),
+                        "pretty" => Ok(LoggerFormat::Pretty),
+                        "json" => Ok(LoggerFormat::Json),
+                        _ => Err(PyValueError::new_err("Unrecognized logging format")),
+                    })
+                    .transpose()?,
             }
         })
     } else {
