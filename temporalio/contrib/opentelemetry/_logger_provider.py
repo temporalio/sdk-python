@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING, Any
 
 # The OpenTelemetry Logs API specification is stable, but opentelemetry-python
 # exposes the logs bridge API only under the private opentelemetry._logs
-# module path (there is no public opentelemetry.logs as of 1.42), so _logs is
+# module path (there is no public opentelemetry.logs as of 1.42; upstream
+# stabilization is tracked in opentelemetry-python#3361, open since 2023 with
+# the module surface unchanged since 1.26 apart from additive parameters), so
+# _logs is
 # the import path OpenTelemetry itself documents until the Python SIG promotes
 # it to a public namespace.
 from opentelemetry._logs import Logger, LoggerProvider
@@ -56,7 +59,11 @@ class ReplaySafeLoggerProvider(LoggerProvider):
 
     .. warning::
         This class is experimental and may change in future versions.
-        Use with caution in production environments.
+        Use with caution in production environments. It wraps the
+        OpenTelemetry Python logs bridge API, which upstream still ships
+        under the private ``opentelemetry._logs`` namespace (stabilization
+        is tracked in opentelemetry-python#3361); if that surface moves when
+        upstream stabilizes it, this class will follow it in a minor release.
 
     This logger provider wraps an OpenTelemetry LoggerProvider and drops log
     records emitted (``Logger.emit()``) from workflow code while the workflow
