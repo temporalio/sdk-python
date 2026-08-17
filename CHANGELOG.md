@@ -55,6 +55,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Standalone activity start requests now include a unique request ID so RPC retries are deduplicated.
 - The `google-adk` extra now depends on `mcp`, so fresh installs of
   `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
   without separately installing `mcp`. Previously the import failed with an
