@@ -121,6 +121,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         } else {
             Logger::Console {
                 filter: logging_conf.filter.to_string(),
+                format: None,
             }
         })
     } else {
