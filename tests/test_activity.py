@@ -742,10 +742,9 @@ async def test_manual_cancellation(client: Client, env: WorkflowEnvironment):
             RPCStatusCode.FAILED_PRECONDITION,
             RPCStatusCode.INVALID_ARGUMENT,
         }
-        assert (
-            "invalid transition from Started" in str(err.value)
-            or "unable to mark activity as canceled" in str(err.value)
-        )
+        assert "invalid transition from Started" in str(
+            err.value
+        ) or "unable to mark activity as canceled" in str(err.value)
 
         # Request cancellation to transition activity to CANCELLATION_REQUESTED state
         await activity_handle.cancel()
