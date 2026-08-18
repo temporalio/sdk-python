@@ -4,7 +4,7 @@ import dataclasses
 import json
 import threading
 import typing
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 
@@ -295,6 +295,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         register_activities: bool = True,
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
+        resolvable_worker_env_vars: Collection[str] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -321,6 +322,12 @@ class OpenAIAgentsPlugin(SimplePlugin):
             add_temporal_spans: Whether to add temporal spans to traces
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
                 Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
+                Use with caution in production environments.
+            resolvable_worker_env_vars: Names of the environment variables that
+                ``temporal_worker_env_ref()`` may read on this worker. Names are
+                matched exactly, with no globbing; ``"*"``
+                anywhere in the collection allows every name.
+                Warning: resolvable_worker_env_vars is experimental and behavior may change in future versions.
                 Use with caution in production environments.
 
         """
@@ -349,7 +356,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
             if not register_activities:
                 return activities or []
 
-            model_activity = ModelActivity(model_provider)
+            model_activity = ModelActivity(
+                model_provider, resolvable_worker_env_vars=resolvable_worker_env_vars
+            )
             new_activities = [
                 model_activity.invoke_model_activity,
                 model_activity.invoke_model_activity_streaming,

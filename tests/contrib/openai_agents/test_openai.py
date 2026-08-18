@@ -96,6 +96,9 @@ from temporalio.contrib.openai_agents._openai_runner import (
 from temporalio.contrib.openai_agents._temporal_model_stub import (
     _TemporalModelStub,
 )
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    _WorkerEnvRefResolver,
+)
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
     ResponseBuilders,
@@ -2713,7 +2716,7 @@ def test_sandbox_apply_patch_tool_round_trips_through_activity_input():
 
     tool_inputs = activity_input.get("tools") or []
     assert len(tool_inputs) == 1
-    rebuilt = _build_tool(tool_inputs[0])
+    rebuilt = _build_tool(tool_inputs[0], _WorkerEnvRefResolver(()))
     assert isinstance(rebuilt, CustomTool)
     assert rebuilt.name == tool.name
     assert rebuilt.description == tool.description
@@ -2753,7 +2756,7 @@ def test_custom_tool_with_defer_loading_round_trips_through_activity_input():
 
     tool_inputs = activity_input.get("tools") or []
     assert len(tool_inputs) == 1
-    rebuilt = _build_tool(tool_inputs[0])
+    rebuilt = _build_tool(tool_inputs[0], _WorkerEnvRefResolver(()))
     assert isinstance(rebuilt, CustomTool)
     assert rebuilt.tool_config == tool.tool_config
     assert rebuilt.defer_loading is True

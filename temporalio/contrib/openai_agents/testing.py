@@ -1,6 +1,6 @@
 """Testing utilities for OpenAI agents."""
 
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Sequence
 from typing import Any
 
 from agents import (
@@ -181,6 +181,7 @@ class AgentEnvironment:
         register_activities: bool = True,
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
+        resolvable_worker_env_vars: Collection[str] = (),
     ) -> None:
         """Initialize the AgentEnvironment.
 
@@ -201,6 +202,10 @@ class AgentEnvironment:
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
                 Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
                 Use with caution in production environments.
+            resolvable_worker_env_vars: Names of the environment variables that
+                ``temporal_worker_env_ref()`` may read on this environment's workers.
+                Warning: resolvable_worker_env_vars is experimental and behavior may change in future versions.
+                Use with caution in production environments.
         """
         self._model_params = model_params
         self._model_provider = None
@@ -213,6 +218,7 @@ class AgentEnvironment:
         self._plugin: OpenAIAgentsPlugin | None = None
         self._add_temporal_spans = add_temporal_spans
         self._use_otel_instrumentation = use_otel_instrumentation
+        self._resolvable_worker_env_vars = resolvable_worker_env_vars
 
     async def __aenter__(self) -> "AgentEnvironment":
         """Enter the async context manager."""
@@ -224,6 +230,7 @@ class AgentEnvironment:
             register_activities=self._register_activities,
             add_temporal_spans=self._add_temporal_spans,
             use_otel_instrumentation=self._use_otel_instrumentation,
+            resolvable_worker_env_vars=self._resolvable_worker_env_vars,
         )
 
         return self
