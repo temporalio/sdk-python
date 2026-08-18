@@ -26,7 +26,7 @@ classifiers = [
 
 [project.optional-dependencies]
 grpc = ["grpcio>=1.48.2,<2"]
-opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
+opentelemetry = ["opentelemetry-api>=1.12.0,<2", "opentelemetry-sdk>=1.12.0,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.17.5", "mcp>=1.9.4, <2"]
 google-adk = ["google-adk>=2.2.0,<3", "mcp>=1.24,<2"]
@@ -38,8 +38,8 @@ deepagents = [
   "langchain-core>=1.4.8,<2; python_version >= '3.11'",
 ]
 lambda-worker-otel = [
-  "opentelemetry-api>=1.11.1,<2",
-  "opentelemetry-sdk>=1.11.1,<2",
+  "opentelemetry-api>=1.12.0,<2",
+  "opentelemetry-sdk>=1.12.0,<2",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
