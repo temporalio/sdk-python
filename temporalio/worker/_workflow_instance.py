@@ -1043,7 +1043,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
                 if serialization_context is not None:
                     payload_converter = temporalio.nexus.system._get_payload_converter(
-                        self._payload_converter_with_context(serialization_context)
+                        self._payload_converter_with_context(serialization_context),
+                        self._failure_converter_with_context(serialization_context),
                     )
             [output] = self._convert_payloads(
                 [result.completed],

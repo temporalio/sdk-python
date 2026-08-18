@@ -642,10 +642,13 @@ async def test_signal_with_start_uses_target_workflow_serialization_context(
 
     def capture_get_payload_converter(
         user_payload_converter: temporalio.converter.PayloadConverter,
+        user_failure_converter: temporalio.converter.FailureConverter,
     ) -> temporalio.converter.PayloadConverter:
         nonlocal system_payload_converter_wrap_count
         system_payload_converter_wrap_count += 1
-        return original_get_payload_converter(user_payload_converter)
+        return original_get_payload_converter(
+            user_payload_converter, user_failure_converter
+        )
 
     monkeypatch.setattr(
         nexus_system, "_get_payload_converter", capture_get_payload_converter
