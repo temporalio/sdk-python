@@ -130,11 +130,10 @@ The key to making this work is to separate the applications repeatable (determin
 Workflow code can run for extended periods and, if interrupted, resume exactly where it left off.
 Activity code faces no restrictions on I/O or external interactions, but if it fails part-way through it restarts from the beginning.
 
-In the AI-agent example above, model invocations and tool calls run inside activities, while the logic that coordinates them lives in the workflow.
+In this integration, model invocations are automatically routed through Temporal activities, while the logic that coordinates them lives in the workflow.
+Tools that perform I/O or other non-deterministic work should run as Temporal activities, while deterministic, workflow-safe tools can run directly in the workflow.
 This pattern generalizes to more sophisticated agents.
-We refer to that coordinating logic as _agent orchestration_.
-
-As a general rule, agent orchestration code executes within the Temporal workflow, whereas model calls and any I/O-bound tool invocations execute as Temporal activities.
+We refer to the coordinating logic as _agent orchestration_.
 
 The diagram below shows the overall architecture of an agentic application in Temporal.
 The Temporal Server is responsible to tracking program execution and making sure associated state is preserved reliably (i.e., stored to a database, possibly replicated across cloud regions).
@@ -154,13 +153,14 @@ Temporal Server manages data in encrypted form, so all data processing occurs on
 |                      Worker                          |
 |   +----------------------------------------------+   |
 |   |              Workflow Code                   |   |
-|   |       (Agent Orchestration Loop)             |   |
+|   |  (Agent orchestration + deterministic tools) |   |
 |   +----------------------------------------------+   |
 |          |          |                |               |
 |          v          v                v               |
 |   +-----------+ +-----------+ +-------------+        |
 |   | Activity  | | Activity  | |  Activity   |        |
-|   | (Tool 1)  | | (Tool 2)  | | (Model API) |        |
+|   | (I/O Tool | | (I/O Tool | | (Model API) |        |
+|   |     1)    | |     2)    | |             |        |
 |   +-----------+ +-----------+ +-------------+        |
 |         |           |                |               |
 +------------------------------------------------------+
@@ -267,10 +267,22 @@ To run this example, see the detailed instructions in the [Temporal Python Sampl
 
 ## Tool Calling
 
+Model invocations are automatically routed through Temporal activities.
+OpenAI-hosted tools are passed through the model invocation and executed by the model provider.
+User-defined `FunctionTool`s, including tools created with `@function_tool`, are not automatically converted into Temporal activities; they execute in the workflow unless explicitly backed by a Temporal activity.
+Where a tool executes depends on how it is defined:
+
+| Tool | Execution | Use for |
+| --- | --- | --- |
+| `activity_as_tool()` | Temporal activity | External I/O and non-deterministic operations |
+| `FunctionTool` / `@function_tool` | Workflow | Deterministic, workflow-safe computation |
+| OpenAI-hosted tool | Model provider | Provider-hosted features executed as part of the model invocation |
+
 ### Temporal Activities as OpenAI Agents Tools
 
 One of the powerful features of this integration is the ability to convert Temporal activities into agent tools using `activity_as_tool`.
 This allows your agent to leverage Temporal's durable execution for tool calls.
+`activity_as_tool()` creates an OpenAI Agents `FunctionTool` whose invocation schedules the underlying Temporal activity.
 
 In the example below, we apply the `@activity.defn` decorator to the `get_weather` function to create a Temporal activity.
 We then pass this through the `activity_as_tool` helper function to create an OpenAI Agents tool that is passed to the `Agent`.
@@ -311,9 +323,23 @@ class WeatherAgent:
         return result.final_output
 ```
 
+The activity must also be registered with a Worker.
+`activity_as_tool()` controls how the Agent invokes the activity; it does not register the activity with the Worker.
+
+```python
+from temporalio.worker import Worker
+
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[WeatherAgent],
+    activities=[get_weather],
+)
+```
+
 ### Calling OpenAI Agents Tools inside Temporal Workflows
 
-For simple computations that don't involve external calls you can call the tool directly from the workflow by using the standard OpenAI Agents SDK `@functiontool` annotation.
+For simple computations that don't involve external calls, you can call the tool directly from the workflow by using the standard OpenAI Agents SDK `@function_tool` decorator.
 
 ```python
 from temporalio import workflow
@@ -339,8 +365,10 @@ class MathAssistantAgent:
         return result.final_output
 ```
 
-Note that any tools that run in the workflow must respect the workflow execution restrictions, meaning no I/O or non-deterministic operations.
-Of course, code running in the workflow can invoke a Temporal activity at any time.
+Use regular `@function_tool` tools only for deterministic, workflow-safe logic.
+Do not perform network, database, filesystem, or other external I/O directly from these tools.
+Use a Temporal activity with `activity_as_tool()` instead.
+Code running in the workflow can also invoke a Temporal activity directly when needed.
 
 Tools that run in the workflow can also update OpenAI Agents context, which is read-only for tools run as Temporal activities.
 
@@ -447,9 +475,53 @@ For implementation details and examples, see the [samples repository](https://gi
 When using stateful servers, the dedicated worker maintaining the connection may fail due to network issues or server problems. When this happens, Temporal raises an `ApplicationError` and cannot automatically recover because it cannot restore the lost server state.
 To recover from such failures, you need to implement your own application-level retry logic.
 
+### Factory Arguments
+
+Both `stateless_mcp_server()` and `stateful_mcp_server()` accept an optional `factory_argument`, which is passed to the registered server factory when the MCP server is created.
+
+A stateless factory that declares no parameters — like the `lambda: MCPServerStdio(...)` example above — ignores the value, but it is still recorded in history.
+
+**Do not pass secrets, credentials, or API keys through `factory_argument`.** It is an activity argument, so it is recorded in workflow history and, without a payload codec, visible in the web UI. Resolve credentials worker-side inside the server factory instead.
+
 ### Hosted MCP Tool
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
+
+## Secrets for Hosted Tools
+
+⚠️ **Experimental** - This functionality is subject to change prior to General Availability.
+
+Use `temporal_worker_env_ref()` for a hosted tool credential that should come from the worker's environment rather than being written into your workflow. Pass it the *name of an environment variable*, in place of the credential itself:
+
+```python
+from agents import HostedMCPTool
+from temporalio.contrib.openai_agents import temporal_worker_env_ref
+
+tool = HostedMCPTool(
+    tool_config={
+        "type": "mcp",
+        "server_label": "my_server",
+        "server_url": "https://example.com/mcp",
+        "authorization": temporal_worker_env_ref("MY_MCP_TOKEN"),
+    }
+)
+```
+
+Every worker that runs model activities must both set `MY_MCP_TOKEN` and name it as resolvable:
+
+```python
+plugin = OpenAIAgentsPlugin(resolvable_worker_env_vars=["MY_MCP_TOKEN"])
+```
+
+Names are matched exactly, with no globbing, and `"*"` anywhere in the list allows every environment variable on the worker.
+
+A reference can sit inside a larger value: in `"Bearer " + temporal_worker_env_ref("MY_MCP_TOKEN")`, the reference is replaced in place and the rest of the string is sent unchanged.
+
+The environment variable's value is substituted in these fields and no others:
+
+- `authorization`, and the value of each entry in `headers`, in a `HostedMCPTool`'s `tool_config`
+- `value` in each entry of `network_policy.domain_secrets` under a hosted `ShellTool`'s `environment`
+- `value` in each entry of `network_policy.domain_secrets` under the `container` in a `CodeInterpreterTool`'s `tool_config`
 
 ## Sandbox Support
 
@@ -683,6 +755,7 @@ Certain tools are not suitable for a distributed computing environment, so these
 | HostedMCPTool       |    Yes    |
 | ImageGenerationTool |    Yes    |
 | CodeInterpreterTool |    Yes    |
+| ShellTool           |    Yes    |
 | ComputerTool        |    No     |
 
 #### Tool Context

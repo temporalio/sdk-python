@@ -2,8 +2,9 @@
 
 import dataclasses
 import json
+import threading
 import typing
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 
@@ -52,6 +53,81 @@ if typing.TYPE_CHECKING:
         StatefulMCPServerProvider,
         StatelessMCPServerProvider,
     )
+
+
+_otel_trace_start_patch_lock = threading.RLock()
+_otel_trace_start_patch_ref_count = 0
+_otel_trace_start_original: Callable[..., typing.Any] | None = None
+_otel_trace_start_instrumentor: typing.Any | None = None
+
+
+def _install_otel_instrumentation(tracer_provider: typing.Any) -> None:
+    """Configure OpenInference while at least one tracing context is active."""
+    global _otel_trace_start_instrumentor
+    global _otel_trace_start_original
+    global _otel_trace_start_patch_ref_count
+
+    from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
+    from openinference.instrumentation.openai_agents._processor import (
+        OpenInferenceTracingProcessor,
+    )
+    from opentelemetry.context import attach
+    from opentelemetry.trace import set_span_in_context
+
+    with _otel_trace_start_patch_lock:
+        if _otel_trace_start_patch_ref_count == 0:
+            original_on_trace_start = OpenInferenceTracingProcessor.on_trace_start
+            _otel_trace_start_original = original_on_trace_start
+
+            def on_trace_start(self: typing.Any, trace: Trace) -> None:  # type: ignore[reportUnusedFunction]
+                original_on_trace_start(self, trace)
+                attach(set_span_in_context(self._root_spans[trace.trace_id]))
+
+            setattr(OpenInferenceTracingProcessor, "on_trace_start", on_trace_start)
+            try:
+                _otel_trace_start_instrumentor = OpenAIAgentsInstrumentor()
+                _otel_trace_start_instrumentor.instrument(
+                    tracer_provider=tracer_provider
+                )
+            except BaseException:
+                setattr(
+                    OpenInferenceTracingProcessor,
+                    "on_trace_start",
+                    _otel_trace_start_original,
+                )
+                _otel_trace_start_original = None
+                _otel_trace_start_instrumentor = None
+                raise
+        _otel_trace_start_patch_ref_count += 1
+
+
+def _uninstall_otel_instrumentation() -> None:
+    """Tear down OpenInference after the final tracing context exits."""
+    global _otel_trace_start_instrumentor
+    global _otel_trace_start_original
+    global _otel_trace_start_patch_ref_count
+
+    from openinference.instrumentation.openai_agents._processor import (
+        OpenInferenceTracingProcessor,
+    )
+
+    with _otel_trace_start_patch_lock:
+        if _otel_trace_start_patch_ref_count == 0:
+            raise RuntimeError("OpenInference instrumentation was not acquired")
+        _otel_trace_start_patch_ref_count -= 1
+        if _otel_trace_start_patch_ref_count == 0:
+            try:
+                if _otel_trace_start_instrumentor is not None:
+                    _otel_trace_start_instrumentor.uninstrument()
+            finally:
+                if _otel_trace_start_original is not None:
+                    setattr(
+                        OpenInferenceTracingProcessor,
+                        "on_trace_start",
+                        _otel_trace_start_original,
+                    )
+                _otel_trace_start_original = None
+                _otel_trace_start_instrumentor = None
 
 
 @contextmanager
@@ -219,6 +295,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         register_activities: bool = True,
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
+        resolvable_worker_env_vars: Collection[str] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -246,6 +323,12 @@ class OpenAIAgentsPlugin(SimplePlugin):
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
                 Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
                 Use with caution in production environments.
+            resolvable_worker_env_vars: Names of the environment variables that
+                ``temporal_worker_env_ref()`` may read on this worker. Names are
+                matched exactly, with no globbing; ``"*"``
+                anywhere in the collection allows every name.
+                Warning: resolvable_worker_env_vars is experimental and behavior may change in future versions.
+                Use with caution in production environments.
 
         """
         if model_params is None:
@@ -264,8 +347,6 @@ class OpenAIAgentsPlugin(SimplePlugin):
                     "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
                 )
 
-        # Store OTEL configuration for later setup
-        self._instrumented = False
         self._use_otel_instrumentation = use_otel_instrumentation
 
         # Delay activity construction until they are actually needed
@@ -275,7 +356,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
             if not register_activities:
                 return activities or []
 
-            model_activity = ModelActivity(model_provider)
+            model_activity = ModelActivity(
+                model_provider, resolvable_worker_env_vars=resolvable_worker_env_vars
+            )
             new_activities = [
                 model_activity.invoke_model_activity,
                 model_activity.invoke_model_activity_streaming,
@@ -375,36 +458,16 @@ class OpenAIAgentsPlugin(SimplePlugin):
         Yields:
             Context with tracing instrumentation enabled.
         """
-        # Set up OTEL instrumentation if exporters are provided
-        otel_instrumentor = None
-        if self._use_otel_instrumentation and not self._instrumented:
-            from openinference.instrumentation.openai_agents import (
-                OpenAIAgentsInstrumentor,
-            )
-            from openinference.instrumentation.openai_agents._processor import (
-                OpenInferenceTracingProcessor,
-            )
+        # Set up OTEL instrumentation if enabled
+        otel_instrumentation_installed = False
+        if self._use_otel_instrumentation:
             from opentelemetry import trace
-            from opentelemetry.context import attach
-            from opentelemetry.trace import set_span_in_context
 
-            # Unfortunate monkey patching is needed to ensure the trace is set in context so we can propagate it.
-            original_on_trace_start = OpenInferenceTracingProcessor.on_trace_start
-
-            def on_trace_start(self, trace: Trace) -> None:  # type: ignore[reportMissingParameterType]
-                original_on_trace_start(self, trace)
-                otel_span = self._root_spans[trace.trace_id]
-                attach(set_span_in_context(otel_span))
-
-            OpenInferenceTracingProcessor.on_trace_start = on_trace_start  # type:ignore[method-assign]
-
-            # Set up instrumentor
-            otel_instrumentor = OpenAIAgentsInstrumentor()
-            otel_instrumentor.instrument(tracer_provider=trace.get_tracer_provider())
-            self._instrumented = True
+            _install_otel_instrumentation(trace.get_tracer_provider())
+            otel_instrumentation_installed = True
         try:
             yield
         finally:
             # Clean up OTEL instrumentation
-            if otel_instrumentor is not None:
-                otel_instrumentor.uninstrument()
+            if otel_instrumentation_installed:
+                _uninstall_otel_instrumentation()

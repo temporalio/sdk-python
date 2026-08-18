@@ -1,8 +1,7 @@
+import contextlib
 import dataclasses
-import logging
-import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest import mock
@@ -11,10 +10,10 @@ import pytest
 
 import temporalio
 import temporalio.bridge.client
+import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
-import temporalio.worker._workflow
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
@@ -31,7 +30,7 @@ from temporalio.converter import (
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
 from temporalio.worker import Replayer
-from tests.helpers import LogCapturer, assert_task_fail_eventually, new_worker
+from tests.helpers import assert_task_fail_eventually, new_worker
 from tests.test_extstore import InMemoryTestDriver
 
 
@@ -181,9 +180,7 @@ async def test_extstore_activity_input_no_retrieve(
     WorkflowFailureError wrapping an ActivityError."""
     driver = BadTestDriver(no_retrieve=True)
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -225,9 +222,7 @@ async def test_extstore_activity_result_no_store(
     terminates with a WorkflowFailureError wrapping an ActivityError."""
     driver = BadTestDriver(no_store=True)
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -274,9 +269,7 @@ async def test_extstore_worker_missing_driver(
     """
     driver = InMemoryTestDriver()
 
-    far_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    far_client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -286,10 +279,7 @@ async def test_extstore_worker_missing_driver(
         ),
     )
 
-    worker_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
-    )
+    worker_client = await env.connect_client()
 
     async with new_worker(
         worker_client, ExtStoreWorkflow, activities=[ext_store_activity]
@@ -315,9 +305,7 @@ async def test_extstore_payload_not_found_fails_workflow(
     """When a non-retryable ApplicationError is raised while retrieving workflow input,
     the workflow must fail terminally (not retry as a task failure).
     """
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -363,9 +351,7 @@ async def _run_extstore_workflow_and_fetch_history(
     activity_output_size: int = 10,
 ) -> WorkflowHandle:
     """Helper: run ExtStoreWorkflow with the given driver and return its history handle."""
-    extstore_client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    extstore_client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -515,9 +501,7 @@ async def test_extstore_chained_activities(
     """
     driver = InMemoryTestDriver()
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -567,9 +551,7 @@ async def test_worker_storage_drivers_populated_from_client(
     driver2 = InMemoryTestDriver(driver_name="driver2")
     driver3 = DifferentTestDriver(driver_name="driver3")
 
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -616,19 +598,32 @@ async def test_worker_storage_drivers_empty_without_external_storage(
 # TMPRL1104 workflow task duration logging
 # ---------------------------------------------------------------------------
 
-_workflow_logger = logging.getLogger(temporalio.worker._workflow.__name__)
+# The duration log itself is emitted (and tested) in sdk-core. The Python worker's part is
+# attaching the external-storage metrics to the completion, so these tests capture the
+# completion and assert on its fields directly rather than on core's asynchronously
+# forwarded log, which would be nondeterministic to observe here.
 
 
-def _tmprl1104_records(capturer: LogCapturer) -> list[logging.LogRecord]:
-    """Return all TMPRL1104 log records from the capturer."""
-    return capturer.find_all(lambda r: r.getMessage().startswith("[TMPRL1104]"))
+@contextlib.contextmanager
+def _capture_completions() -> Iterator[
+    list[temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion]
+]:
+    """Capture every WorkflowActivationCompletion the worker hands to core."""
+    completions: list[
+        temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion
+    ] = []
+    original = temporalio.bridge.worker.Worker.complete_workflow_activation
 
+    async def capturing(self, completion):  # type: ignore[no-untyped-def]
+        completions.append(completion)
+        return await original(self, completion)
 
-# Accept any duration-bucket wording: a loaded host can push a trivial task past 5s.
-_TMPRL1104_DURATION_MESSAGE = re.compile(
-    r"\[TMPRL1104\] [^:]+:\d+:\d+ Workflow task "
-    r"(?:duration information|exceeded \d+ seconds) \("
-)
+    with mock.patch.object(
+        temporalio.bridge.worker.Worker,
+        "complete_workflow_activation",
+        capturing,
+    ):
+        yield completions
 
 
 async def _expected_payload_size(
@@ -639,44 +634,33 @@ async def _expected_payload_size(
     return payloads[0].ByteSize()
 
 
-@workflow.defn
-class SimpleWorkflow:
-    """Minimal workflow for testing logging without external storage."""
-
-    @workflow.run
-    async def run(self) -> str:
-        return "done"
-
-
 async def test_tmprl1104_no_extstore(env: WorkflowEnvironment) -> None:
-    """Without external storage, TMPRL1104 logs contain duration but no
-    download/upload metrics."""
-    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
-        async with new_worker(env.client, SimpleWorkflow) as worker:
+    """Without external storage configured, completions carry no storage metrics."""
+    with _capture_completions() as completions:
+        async with new_worker(
+            env.client, ExtStoreWorkflow, activities=[ext_store_activity]
+        ) as worker:
             await env.client.execute_workflow(
-                SimpleWorkflow.run,
+                ExtStoreWorkflow.run,
+                ExtStoreWorkflowInput(
+                    input_data="small",
+                    activity_input_size=10,
+                    activity_output_size=10,
+                    output_size=10,
+                ),
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
 
-    records = _tmprl1104_records(capturer)
-    assert len(records) == 1
-    record = records[0]
-    assert _TMPRL1104_DURATION_MESSAGE.match(record.getMessage())
-    assert hasattr(record, "workflow_task_duration")
-    assert hasattr(record, "event_id")
-    # No external storage — download/upload fields must be absent
-    assert not hasattr(record, "payload_download_count")
-    assert not hasattr(record, "payload_download_size")
-    assert not hasattr(record, "payload_download_duration")
-    assert not hasattr(record, "payload_upload_count")
-    assert not hasattr(record, "payload_upload_size")
-    assert not hasattr(record, "payload_upload_duration")
+    assert completions, "expected the worker to complete at least one activation"
+    for c in completions:
+        assert not c.HasField("payload_download_metrics")
+        assert not c.HasField("payload_upload_metrics")
 
 
 async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> None:
-    """When external storage decodes payloads, TMPRL1104 logs include download
-    metrics on the activation that retrieves them."""
+    """When external storage retrieves payloads, the completion for the WFT that
+    retrieved them carries download metrics."""
     driver = InMemoryTestDriver()
     data_converter = dataclasses.replace(
         temporalio.converter.default(),
@@ -685,9 +669,7 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
             payload_size_threshold=512,
         ),
     )
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=data_converter,
     )
 
@@ -699,7 +681,7 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
     )
     expected_input_size = await _expected_payload_size(data_converter, wf_input)
 
-    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
+    with _capture_completions() as completions:
         async with new_worker(
             client, ExtStoreWorkflow, activities=[ext_store_activity]
         ) as worker:
@@ -710,25 +692,19 @@ async def test_tmprl1104_with_extstore_download(env: WorkflowEnvironment) -> Non
                 task_queue=worker.task_queue,
             )
 
-    records = _tmprl1104_records(capturer)
-    assert len(records) == 2
-
-    # WFT 1: retrieves the externalized workflow input
-    assert _TMPRL1104_DURATION_MESSAGE.match(records[0].getMessage())
-    assert getattr(records[0], "payload_download_count") == 1
-    assert getattr(records[0], "payload_download_size") == expected_input_size
-    assert getattr(records[0], "payload_download_duration") > timedelta(0)
-    assert not hasattr(records[0], "payload_upload_count")
-
-    # WFT 2: activity result is small — no external storage
-    assert _TMPRL1104_DURATION_MESSAGE.match(records[1].getMessage())
-    assert not hasattr(records[1], "payload_download_count")
-    assert not hasattr(records[1], "payload_upload_count")
+    downloads = [c for c in completions if c.HasField("payload_download_metrics")]
+    assert len(downloads) == 1
+    m = downloads[0].payload_download_metrics
+    assert m.payload_count == 1
+    assert m.total_size_bytes == expected_input_size
+    assert m.total_duration.ToTimedelta() > timedelta(0)
+    assert list(m.driver_names) == [driver.name()]
+    assert not any(c.HasField("payload_upload_metrics") for c in completions)
 
 
 async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
-    """When external storage encodes payloads, TMPRL1104 logs include upload
-    metrics on the WFT that produces them."""
+    """When external storage stores payloads, the completion for the WFT that
+    produced them carries upload metrics."""
     driver = InMemoryTestDriver()
     data_converter = dataclasses.replace(
         temporalio.converter.default(),
@@ -737,16 +713,14 @@ async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
             payload_size_threshold=512,
         ),
     )
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=data_converter,
     )
 
     wf_output = "wo" * 1024  # 2048 bytes → stored externally
     expected_output_size = await _expected_payload_size(data_converter, wf_output)
 
-    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
+    with _capture_completions() as completions:
         async with new_worker(
             client, ExtStoreWorkflow, activities=[ext_store_activity]
         ) as worker:
@@ -762,27 +736,21 @@ async def test_tmprl1104_with_extstore_upload(env: WorkflowEnvironment) -> None:
                 task_queue=worker.task_queue,
             )
 
-    records = _tmprl1104_records(capturer)
-    assert len(records) == 2
-
-    # WFT 1: small input — no external storage
-    assert _TMPRL1104_DURATION_MESSAGE.match(records[0].getMessage())
-    assert not hasattr(records[0], "payload_download_count")
-    assert not hasattr(records[0], "payload_upload_count")
-
-    # WFT 2: workflow returns large result → uploaded
-    assert _TMPRL1104_DURATION_MESSAGE.match(records[1].getMessage())
-    assert not hasattr(records[1], "payload_download_count")
-    assert getattr(records[1], "payload_upload_count") == 1
-    assert getattr(records[1], "payload_upload_size") == expected_output_size
-    assert getattr(records[1], "payload_upload_duration") > timedelta(0)
+    uploads = [c for c in completions if c.HasField("payload_upload_metrics")]
+    assert len(uploads) == 1
+    m = uploads[0].payload_upload_metrics
+    assert m.payload_count == 1
+    assert m.total_size_bytes == expected_output_size
+    assert m.total_duration.ToTimedelta() > timedelta(0)
+    assert list(m.driver_names) == [driver.name()]
+    assert not any(c.HasField("payload_download_metrics") for c in completions)
 
 
 async def test_tmprl1104_with_extstore_download_and_upload(
     env: WorkflowEnvironment,
 ) -> None:
-    """When both download and upload happen across WFTs, TMPRL1104 logs include
-    both sets of metrics."""
+    """When both download and upload happen across WFTs, the respective completions
+    carry the matching metrics."""
     driver = InMemoryTestDriver()
     data_converter = dataclasses.replace(
         temporalio.converter.default(),
@@ -791,9 +759,7 @@ async def test_tmprl1104_with_extstore_download_and_upload(
             payload_size_threshold=512,
         ),
     )
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=data_converter,
     )
 
@@ -807,7 +773,7 @@ async def test_tmprl1104_with_extstore_download_and_upload(
     wf_output = "wo" * 1024
     expected_output_size = await _expected_payload_size(data_converter, wf_output)
 
-    with LogCapturer().logs_captured(_workflow_logger, level=logging.DEBUG) as capturer:
+    with _capture_completions() as completions:
         async with new_worker(
             client, ExtStoreWorkflow, activities=[ext_store_activity]
         ) as worker:
@@ -818,22 +784,19 @@ async def test_tmprl1104_with_extstore_download_and_upload(
                 task_queue=worker.task_queue,
             )
 
-    records = _tmprl1104_records(capturer)
-    assert len(records) == 2
+    downloads = [c for c in completions if c.HasField("payload_download_metrics")]
+    assert len(downloads) == 1
+    dm = downloads[0].payload_download_metrics
+    assert dm.payload_count == 1
+    assert dm.total_size_bytes == expected_input_size
+    assert dm.total_duration.ToTimedelta() > timedelta(0)
 
-    # WFT 1: retrieves externalized workflow input
-    assert _TMPRL1104_DURATION_MESSAGE.match(records[0].getMessage())
-    assert getattr(records[0], "payload_download_count") == 1
-    assert getattr(records[0], "payload_download_size") == expected_input_size
-    assert getattr(records[0], "payload_download_duration") > timedelta(0)
-    assert not hasattr(records[0], "payload_upload_count")
-
-    # WFT 2: uploads externalized workflow result
-    assert _TMPRL1104_DURATION_MESSAGE.match(records[1].getMessage())
-    assert not hasattr(records[1], "payload_download_count")
-    assert getattr(records[1], "payload_upload_count") == 1
-    assert getattr(records[1], "payload_upload_size") == expected_output_size
-    assert getattr(records[1], "payload_upload_duration") > timedelta(0)
+    uploads = [c for c in completions if c.HasField("payload_upload_metrics")]
+    assert len(uploads) == 1
+    um = uploads[0].payload_upload_metrics
+    assert um.payload_count == 1
+    assert um.total_size_bytes == expected_output_size
+    assert um.total_duration.ToTimedelta() > timedelta(0)
 
 
 # ---------------------------------------------------------------------------
@@ -914,9 +877,7 @@ async def _make_tracking_client(
     env: WorkflowEnvironment,
 ) -> tuple[Client, ContextTrackingStorageDriver]:
     driver = ContextTrackingStorageDriver()
-    client = await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    client = await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(

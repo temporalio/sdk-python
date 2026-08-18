@@ -9,9 +9,11 @@ from __future__ import annotations
 import contextlib
 import contextvars
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import temporalio.api.common.v1
+import temporalio.common
 import temporalio.converter
 from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.converter import BinaryProtoPayloadConverter, CompositePayloadConverter
@@ -20,29 +22,48 @@ from temporalio.converter._payload_converter import (
 )
 
 TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
-_user_payload_converter: contextvars.ContextVar[
-    temporalio.converter.PayloadConverter | None
-] = contextvars.ContextVar("temporal-system-nexus-user-payload-converter", default=None)
+
+
+@dataclass(frozen=True)
+class _SystemNexusUserConverters:
+    payload_converter: temporalio.converter.PayloadConverter
+    failure_converter: temporalio.converter.FailureConverter
+
+
+_user_converters: contextvars.ContextVar[_SystemNexusUserConverters | None] = (
+    contextvars.ContextVar("temporal-system-nexus-user-converters", default=None)
+)
+_SYSTEM_PAYLOAD_METADATA_KEY = "__temporal_system_payload"
+_SYSTEM_PAYLOAD_METADATA_VALUE = b"true"
 
 
 @contextlib.contextmanager
-def _user_payload_converter_context(
-    payload_converter: temporalio.converter.PayloadConverter,
+def _user_converter_context(
+    converters: _SystemNexusUserConverters,
 ) -> Iterator[None]:
-    """Set the user payload converter for system Nexus model conversion."""
-    token = _user_payload_converter.set(payload_converter)
+    """Set the user converters for system Nexus model conversion."""
+    token = _user_converters.set(converters)
     try:
         yield
     finally:
-        _user_payload_converter.reset(token)
+        _user_converters.reset(token)
+
+
+def _current_user_converters() -> _SystemNexusUserConverters:
+    converters = _user_converters.get()
+    if converters is None:
+        raise RuntimeError("System Nexus user converter context is not active")
+    return converters
 
 
 def _current_user_payload_converter() -> temporalio.converter.PayloadConverter:  # pyright: ignore[reportUnusedFunction]
     """Return the active user payload converter for system Nexus model conversion."""
-    payload_converter = _user_payload_converter.get()
-    if payload_converter is None:
-        raise RuntimeError("System Nexus user payload converter context is not active")
-    return payload_converter
+    return _current_user_converters().payload_converter
+
+
+def _current_user_failure_converter() -> temporalio.converter.FailureConverter:  # pyright: ignore[reportUnusedFunction]
+    """Return the active user failure converter for system Nexus model conversion."""
+    return _current_user_converters().failure_converter
 
 
 class _SystemNexusOuterPayloadConverter(CompositePayloadConverter):
@@ -52,18 +73,35 @@ class _SystemNexusOuterPayloadConverter(CompositePayloadConverter):
         """Create a payload converter for system Nexus outer envelopes."""
         super().__init__(BinaryProtoPayloadConverter())
 
+    def to_payloads(
+        self, values: Sequence[Any]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """See base class."""
+        payloads = super().to_payloads(values)
+        for value, payload in zip(values, payloads):
+            if isinstance(value, temporalio.common.RawValue):
+                continue
+            payload.metadata[_SYSTEM_PAYLOAD_METADATA_KEY] = (
+                _SYSTEM_PAYLOAD_METADATA_VALUE
+            )
+        return payloads
+
 
 class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
     """Payload converter for system Nexus outer envelopes."""
 
-    _user_payload_converter: temporalio.converter.PayloadConverter
+    _user_converters: _SystemNexusUserConverters
     _outer_payload_converter: temporalio.converter.PayloadConverter
 
     def __init__(
-        self, user_payload_converter: temporalio.converter.PayloadConverter
+        self,
+        user_payload_converter: temporalio.converter.PayloadConverter,
+        user_failure_converter: temporalio.converter.FailureConverter,
     ) -> None:
         """Create a payload converter for system Nexus outer envelopes."""
-        self._user_payload_converter = user_payload_converter
+        self._user_converters = _SystemNexusUserConverters(
+            user_payload_converter, user_failure_converter
+        )
         self._outer_payload_converter = _TemporalTransferTypePayloadConverter.wrap(
             _SystemNexusOuterPayloadConverter()
         )
@@ -72,7 +110,7 @@ class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
-        with _user_payload_converter_context(self._user_payload_converter):
+        with _user_converter_context(self._user_converters):
             return self._outer_payload_converter.to_payloads(values)
 
     def from_payloads(
@@ -81,7 +119,7 @@ class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
         type_hints: list[type] | None = None,
     ) -> list[Any]:
         """See base class."""
-        with _user_payload_converter_context(self._user_payload_converter):
+        with _user_converter_context(self._user_converters):
             return self._outer_payload_converter.from_payloads(payloads, type_hints)
 
 
@@ -94,31 +132,40 @@ def is_system_endpoint(endpoint: str) -> bool:
     return endpoint == TEMPORAL_SYSTEM_ENDPOINT
 
 
-async def _maybe_visit_payload(  # pyright: ignore[reportUnusedFunction]
-    endpoint: str,
+def _is_system_payload(payload: temporalio.api.common.v1.Payload) -> bool:
+    return (
+        payload.metadata.get(_SYSTEM_PAYLOAD_METADATA_KEY)
+        == _SYSTEM_PAYLOAD_METADATA_VALUE
+    )
+
+
+async def maybe_visit_payload(
     payload: temporalio.api.common.v1.Payload,
     visitor_functions: VisitorFunctions,
     skip_search_attributes: bool,
 ) -> temporalio.api.common.v1.Payload | None:
-    """Visit nested payloads if the payload is for the Temporal system endpoint."""
-    if not is_system_endpoint(endpoint):
+    """Visit nested payloads if the payload is a Temporal system Nexus envelope."""
+    if not _is_system_payload(payload):
         return None
 
     payload_converter = _SystemNexusOuterPayloadConverter()
     value = payload_converter.from_payload(payload)
-    from ._payload_visitor import PayloadVisitor
+    from temporalio.bridge._visitor import PayloadVisitor
 
-    await PayloadVisitor(skip_search_attributes=skip_search_attributes).visit(
-        visitor_functions, value
-    )
+    payload_visitor = PayloadVisitor(skip_search_attributes=skip_search_attributes)
+    checkpoint = visitor_functions.checkpoint()
+    await payload_visitor.visit(visitor_functions, value)
+    if checkpoint is not None:
+        await visitor_functions.drain_since(checkpoint)
     return payload_converter.to_payload(value)
 
 
 def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
     user_payload_converter: temporalio.converter.PayloadConverter,
+    user_failure_converter: temporalio.converter.FailureConverter,
 ) -> temporalio.converter.PayloadConverter:
     """Return the fixed payload converter for system Nexus outer envelopes."""
-    return _SystemNexusPayloadConverter(user_payload_converter)
+    return _SystemNexusPayloadConverter(user_payload_converter, user_failure_converter)
 
 
 __all__ = [

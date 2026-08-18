@@ -203,7 +203,7 @@ class ConfirmationModel(BaseLlm):
 
 @workflow.defn
 class ConfirmationAgentWorkflow(_HitlLoopMixin):
-    """Tool confirmation gates an activity_tool: the activity only runs on approval."""
+    """Tool confirmation gates an activity_as_tool: the activity only runs on approval."""
 
     @workflow.query
     def pending_requests(self) -> list[HitlRequest]:
@@ -215,7 +215,7 @@ class ConfirmationAgentWorkflow(_HitlLoopMixin):
 
     @workflow.run
     async def run(self, model_name: str) -> str:
-        danger_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+        danger_tool = temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
             danger_activity, start_to_close_timeout=timedelta(seconds=30)
         )
         agent = LlmAgent(
@@ -370,7 +370,7 @@ async def test_human_input_node_update_resume(client: Client):
 
 @pytest.mark.parametrize("confirmed", [True, False])
 @pytest.mark.asyncio
-async def test_tool_confirmation_activity_tool(client: Client, confirmed: bool):
+async def test_tool_confirmation_activity_as_tool(client: Client, confirmed: bool):
     client = _adk_client(client)
     workflow_id = f"hitl-confirm-{confirmed}-{uuid.uuid4()}"
     # max_cached_workflows=0 forces a full history replay on every workflow

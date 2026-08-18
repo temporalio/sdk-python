@@ -12,6 +12,8 @@ from temporalio.contrib.google_adk_agents._hitl import (
 from temporalio.contrib.google_adk_agents._mcp import (
     TemporalMcpToolSet,
     TemporalMcpToolSetProvider,
+    TemporalStatefulMcpToolSet,
+    TemporalStatefulMcpToolSetProvider,
 )
 from temporalio.contrib.google_adk_agents._model import TemporalModel
 from temporalio.contrib.google_adk_agents._plugin import (
@@ -23,6 +25,8 @@ __all__ = [
     "HitlRequest",
     "TemporalMcpToolSet",
     "TemporalMcpToolSetProvider",
+    "TemporalStatefulMcpToolSet",
+    "TemporalStatefulMcpToolSetProvider",
     "TemporalModel",
     "hitl_confirmation_response",
     "hitl_input_response",

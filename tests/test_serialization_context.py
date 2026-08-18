@@ -217,19 +217,19 @@ async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
             )
         )
         child_workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=f"{workflow_id}_child",
             )
         )
         activity_context = dataclasses.asdict(
             ActivitySerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
                 workflow_type=PayloadConversionWorkflow.__name__,
                 activity_type=passthrough_activity.__name__,
@@ -363,14 +363,14 @@ async def test_heartbeat_details_payload_conversion(client: Client):
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
             )
         )
 
         activity_context = dataclasses.asdict(
             ActivitySerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
                 workflow_type=HeartbeatDetailsSerializationContextTestWorkflow.__name__,
                 activity_type=activity_with_heartbeat_details.__name__,
@@ -455,13 +455,13 @@ async def test_local_activity_payload_conversion(client: Client):
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
             )
         )
         local_activity_context = dataclasses.asdict(
             ActivitySerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
                 workflow_type=LocalActivityWorkflow.__name__,
                 activity_type=local_activity.__name__,
@@ -572,11 +572,11 @@ async def test_async_activity_completion_payload_conversion(
         workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
     ):
         workflow_context = WorkflowSerializationContext(
-            namespace="default",
+            namespace=client.namespace,
             workflow_id=workflow_id,
         )
         activity_context = ActivitySerializationContext(
-            namespace="default",
+            namespace=client.namespace,
             workflow_id=workflow_id,
             workflow_type=AsyncActivityCompletionSerializationContextTestWorkflow.__name__,
             activity_type=async_activity.__name__,
@@ -649,7 +649,7 @@ class MyAsyncActivityHandleWithOverriddenConstructor(AsyncActivityHandle):
 
 def test_subclassed_async_activity_handle(client: Client):
     activity_context = ActivitySerializationContext(
-        namespace="default",
+        namespace=client.namespace,
         workflow_id="workflow-id",
         workflow_type="workflow-type",
         activity_type="activity-type",
@@ -742,7 +742,7 @@ async def test_signal_payload_conversion(
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
             )
         )
@@ -811,7 +811,7 @@ async def test_query_payload_conversion(
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
             )
         )
@@ -909,7 +909,7 @@ async def test_update_payload_conversion(
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
             )
         )
@@ -1016,13 +1016,13 @@ async def test_external_workflow_signal_and_cancel_payload_conversion(
 
         signaler_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=signaler_workflow_id,
             )
         )
         target_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=target_workflow_id,
             )
         )
@@ -1157,13 +1157,13 @@ async def test_failure_converter_with_context(client: Client):
 
         workflow_context = dataclasses.asdict(
             WorkflowSerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
             )
         )
         activity_context = dataclasses.asdict(
             ActivitySerializationContext(
-                namespace="default",
+                namespace=client.namespace,
                 workflow_id=workflow_id,
                 workflow_type=FailureConverterTestWorkflow.__name__,
                 activity_type=failing_activity.__name__,
@@ -1731,6 +1731,7 @@ class NexusOperationTestWorkflow:
         )
 
 
+@pytest.mark.requires_local_server
 async def test_nexus_payload_codec_operations_lack_context(
     env: WorkflowEnvironment,
 ):

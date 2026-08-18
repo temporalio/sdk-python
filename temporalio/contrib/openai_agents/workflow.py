@@ -291,12 +291,19 @@ def stateless_mcp_server(
     and you don't need to maintain state between operations. It should be preferred to stateful when possible due to its
     superior durability guarantees.
 
+    .. warning::
+        Do not pass secrets, credentials, or API keys through ``factory_argument``. It is an
+        activity argument, so it is recorded in workflow history and, without a payload codec,
+        visible in the web UI. Resolve credentials worker-side inside the server factory
+        instead.
+
     Args:
         name: A string name for the server. Should match that provided in the plugin.
         config: Optional activity configuration for MCP operation activities.
                Defaults to 1-minute start-to-close timeout.
         cache_tools_list: If true, the list of tools will be cached for the duration of the server
-        factory_argument: Optional argument to be provided to the factory when producing an MCPServer
+        factory_argument: Optional argument to be provided to the factory when producing an MCPServer.
+               Must not contain secrets.
     """
     from temporalio.contrib.openai_agents._mcp import (
         _StatelessMCPServerReference,
@@ -326,13 +333,20 @@ def stateful_mcp_server(
     The caller will have to handle cases where the dedicated worker fails, as Temporal is
     unable to seamlessly recreate any lost state in that case.
 
+    .. warning::
+        Do not pass secrets, credentials, or API keys through ``factory_argument``. It is an
+        activity argument, so it is recorded in workflow history and, without a payload codec,
+        visible in the web UI. Resolve credentials worker-side inside the server factory
+        instead.
+
     Args:
         name: A string name for the server. Should match that provided in the plugin.
         config: Optional activity configuration for MCP operation activities.
                Defaults to 1-minute start-to-close and 30-second schedule-to-start timeouts.
         server_session_config: Optional activity configuration for the connection activity.
                        Defaults to 1-hour start-to-close timeout.
-        factory_argument: Optional argument to be provided to the factory when producing an MCPServer
+        factory_argument: Optional argument to be provided to the factory when producing an MCPServer.
+               Must not contain secrets.
     """
     from temporalio.contrib.openai_agents._mcp import (
         _StatefulMCPServerReference,

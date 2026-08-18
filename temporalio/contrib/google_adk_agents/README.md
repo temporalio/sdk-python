@@ -166,12 +166,65 @@ worker = Worker(
 )
 ```
 
+`TemporalMcpToolSet` also accepts an optional `factory_argument`. It is sent to the toolset activities and passed to the registered `toolset_factory` when the `McpToolset` is created.
+
+**Do not pass secrets, credentials, or API keys through `factory_argument`.** It is an activity argument, so it is recorded in workflow history and, without a payload codec, visible in the web UI. Resolve credentials worker-side inside the toolset factory instead.
+
+### Reading Session State in Activity Tools
+
+ADK's live `ToolContext` holds non-serializable objects, so it cannot be an
+activity argument. To read the serializable subset from an activity-backed
+tool, declare a parameter named `tool_context` annotated with
+`ToolContextSnapshot`:
+
+```python
+from datetime import timedelta
+
+from temporalio import activity
+from temporalio.contrib.google_adk_agents.workflow import (
+    ToolContextSnapshot,
+    activity_as_tool,
+)
+
+
+@activity.defn
+async def get_weather(query: str, tool_context: ToolContextSnapshot) -> dict:
+    db_url = tool_context.state.get("url", "")
+    ...
+
+
+weather_tool = activity_as_tool(
+    get_weather, start_to_close_timeout=timedelta(seconds=30)
+)
+```
+
+Exactly like a native ADK function tool's `tool_context` parameter, it is
+excluded from the LLM-facing tool schema; at invocation the wrapper snapshots
+the live `ToolContext` (session state as a plain dict, plus the function-call
+id) and passes it to the activity. Annotating any parameter with a live ADK
+context type raises `ValueError` at wrap time, since ADK would inject the
+non-serializable context into it regardless of its name.
+
+When running under Temporal, the entire session state crosses the activity
+boundary: every value in it must be serializable by the configured data
+converter and the total size must fit within payload limits, even for keys
+the tool never reads. Local ADK runs pass the snapshot in memory and have no
+such constraint.
+
+The snapshot is one-way and should be treated as read-only: mutations inside
+the activity do not propagate back to the session, because the activity may
+run on a different worker (and in local ADK runs, where the snapshot is
+passed in memory, nested state values may alias the live session state, so
+mutating them can corrupt the session). To modify session state, return the
+needed information from the activity and apply it in workflow-side code (for
+example an ADK callback or a plain tool function).
+
 ### Local ADK Runs
 
 The same agent definitions can also be exercised outside Temporal with
 `adk run` or `adk web`.
 
-- `TemporalModel` and `activity_tool(...)` work in local ADK runs without
+- `TemporalModel` and `activity_as_tool(...)` work in local ADK runs without
   additional configuration.
 - If the agent uses `TemporalMcpToolSet`, define a shared toolset factory,
   register it with `TemporalMcpToolSetProvider(...)` for workflow runs, and
@@ -245,7 +298,7 @@ async def pipeline(ctx):
 
 On a HITL resume, a `rerun_on_resume=True` dynamic node re-executes its body
 while completed children are skipped from the session cache. Place activity
-invocations in child nodes (`activity_node`, `activity_tool`) rather than
+invocations in child nodes (`activity_node`, `activity_as_tool`) rather than
 inline in the dynamic node body, or make them idempotent — inline calls run
 again on re-entry (ADK's documented at-least-once semantics).
 
@@ -315,8 +368,8 @@ class ApprovalWorkflow:
             message = types.Content(role="user", parts=parts)
 ```
 
-Tool confirmation composes with `activity_tool` with no extra plumbing —
-`FunctionTool(func=activity_tool(risky_activity, ...), require_confirmation=True)`
+Tool confirmation composes with `activity_as_tool` with no extra plumbing —
+`FunctionTool(func=activity_as_tool(risky_activity, ...), require_confirmation=True)`
 never schedules the activity until the human approves (answer with
 `hitl_confirmation_response(interrupt_id, confirmed=True)`). MCP tools
 requesting confirmation via `tool_context.request_confirmation(...)` flow

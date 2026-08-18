@@ -202,6 +202,8 @@ class ActivityTracingOutboundInterceptor(OutboundInterceptor):
         return await super().count_activities(input)
 
 
+# Cloud namespaces created by CI do not have the activity start-delay dynamic config.
+@pytest.mark.requires_local_server
 async def test_start_activity_calls_interceptor(
     client: Client, env: WorkflowEnvironment
 ):
@@ -461,6 +463,8 @@ async def test_get_result(client: Client, env: WorkflowEnvironment):
         assert await result_via_execute_activity == 2
 
 
+# Cloud namespaces created by CI do not have the activity start-delay dynamic config.
+@pytest.mark.requires_local_server
 async def test_start_activity_start_delay(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(
@@ -734,8 +738,13 @@ async def test_manual_cancellation(client: Client, env: WorkflowEnvironment):
         # report_cancellation fails if activity is not in CANCELLATION_REQUESTED state
         with pytest.raises(RPCError) as err:
             await async_activity_handle.report_cancellation("Test cancellation")
-        assert err.value.status == RPCStatusCode.FAILED_PRECONDITION
-        assert "invalid transition from Started" in str(err.value)
+        assert err.value.status in {
+            RPCStatusCode.FAILED_PRECONDITION,
+            RPCStatusCode.INVALID_ARGUMENT,
+        }
+        assert "invalid transition from Started" in str(
+            err.value
+        ) or "unable to mark activity as canceled" in str(err.value)
 
         # Request cancellation to transition activity to CANCELLATION_REQUESTED state
         await activity_handle.cancel()

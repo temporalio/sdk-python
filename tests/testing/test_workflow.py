@@ -252,6 +252,7 @@ async def test_workflow_env_assert(client: Client):
             assert_proper_error(err.value.cause)
 
 
+@pytest.mark.requires_local_server
 async def test_search_attributes_on_dev_server(
     client: Client, env: WorkflowEnvironment
 ):

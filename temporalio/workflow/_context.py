@@ -65,6 +65,7 @@ __all__ = [
     "upsert_memo",
     "upsert_search_attributes",
     "uuid4",
+    "uuid7",
     "wait_condition",
 ]
 
@@ -899,6 +900,33 @@ def uuid4() -> uuid.UUID:
         A deterministically-seeded v4 UUID.
     """
     return uuid.UUID(bytes=random().getrandbits(16 * 8).to_bytes(16, "big"), version=4)
+
+
+def uuid7() -> uuid.UUID:
+    """Get a new, determinism-safe v7 UUID based on :py:func:`time_ns` and
+    :py:func:`random`.
+
+    Per RFC 9562, the UUID's leading 48 bits are the current workflow time as
+    milliseconds since the epoch, so UUIDs from successive workflow tasks sort
+    by creation time. The remaining 74 bits are random. UUIDs generated within
+    the same workflow task share the same workflow time and are not guaranteed
+    to be monotonically ordered with respect to one another.
+
+    Note, this UUID is not cryptographically safe and should not be used for
+    security purposes.
+
+    Returns:
+        A deterministically-seeded v7 UUID.
+    """
+    # uuid.UUID's version parameter only accepts 1-5 before Python 3.14, so
+    # the version and variant bits are set manually.
+    unix_ts_ms = (time_ns() // 1_000_000) & 0xFFFF_FFFF_FFFF
+    rand = random()
+    rand_a = rand.getrandbits(12)
+    rand_b = rand.getrandbits(62)
+    return uuid.UUID(
+        int=(unix_ts_ms << 80) | (0x7 << 76) | (rand_a << 64) | (0b10 << 62) | rand_b
+    )
 
 
 async def sleep(duration: float | timedelta, *, summary: str | None = None) -> None:

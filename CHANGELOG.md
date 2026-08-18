@@ -9,7 +9,7 @@ to include examples, links to docs, or any other relevant information.
 ### Added            — new features
 ### Changed          — changes in existing functionality
 ### Deprecated       — soon-to-be-removed features
-### Breaking Changes — removed or backwards-incompatible features
+### :boom: Breaking Changes — removed or backwards-incompatible features
 ### Fixed            — notable bug fixes
 ### Security         — notable security fixes
 -->
@@ -17,6 +17,58 @@ to include examples, links to docs, or any other relevant information.
 # Changelog
 
 ## [Unreleased]
+
+### Added
+
+- Added `LoggingConfig.format` to select compact, pretty, or newline-delimited JSON output for
+  Core logs written to the console.
+
+- Added the `Runtime(disable_environment_info=...)` option to control whether
+  runtime, hosting, and platform information is included in worker heartbeats.
+
+- `temporalio.workflow.uuid7()` generates a determinism-safe, time-sortable
+  UUIDv7 (RFC 9562) from workflow time and the workflow's deterministic random
+  generator, complementing the existing `workflow.uuid4()`
+  ([#1450](https://github.com/temporalio/sdk-python/issues/1450)). The
+  workflow sandbox now also restricts the non-deterministic `uuid.uuid7()`
+  added to the standard library in Python 3.14, matching the existing
+  `uuid.uuid1()`/`uuid.uuid4()` restrictions.
+- **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
+  Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
+
+### Changed
+
+- `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
+  for repeated type hints instead of rebuilding their schemas for every
+  payload, greatly speeding up decode of non-model hints such as discriminated
+  unions ([#1695](https://github.com/temporalio/sdk-python/issues/1695)). Up
+  to 1024 type adapters are cached per converter instance by default, with
+  least-recently-used eviction. To change the bound, pass
+  ``max_cached_type_adapters`` to ``PydanticPayloadConverter`` (or
+  ``PydanticJSONPlainPayloadConverter``) from a nullary subclass used as the
+  ``DataConverter.payload_converter_class``; ``None`` makes the cache
+  unbounded and zero disables caching.
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+### Fixed
+
+- OpenTelemetry trace and span IDs propagated by concurrent workers no longer
+  interfere with each other, preserving the correct parent-child hierarchy.
+- The `google-adk` extra now depends on `mcp`, so fresh installs of
+  `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
+  without separately installing `mcp`. Previously the import failed with an
+  `ImportError` because `google.adk.tools.mcp_tool` only exports `McpToolset`
+  when `mcp` is installed.
+- `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
+  is passed for `run_config`. (openai-agents >= 0.19.0 accepts `dict` run
+  configs at its public runner API)
+
+### Security
+
+## [1.31.0] - 2026-07-29
 
 ### Added
 
@@ -38,12 +90,20 @@ to include examples, links to docs, or any other relevant information.
 - Added the experimental `Worker` `patch_activation_callback` option, allowing workers
   to decide whether a first non-replay `workflow.patched` call should activate a patch
   during rolling deployments.
+- Added external storage support to Nexus task handling.
 
 ### Changed
 
-### Deprecated
+- Prepared replay-safe workflow activation scheduling that prevents cancellation
+  from being lost when another event becomes ready in the same workflow task. The
+  behavior is guarded by internal workflow logic flag 2 and remains disabled by
+  default during its compatibility rollout.
+  **Maintainer reminder:** keep flag 2 default-disabled for the first two published
+  SDK releases that recognize it; enable it in the third release, remove the explicit
+  overrides for this flag from `tests/worker/test_workflow.py`, and replace this rollout
+  note with a `Fixed` entry announcing the behavior change.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - Custom workflow runners that construct `WorkflowInstanceDetails` must now pass
   `payload_converter_factory` instead of `payload_converter_class`. The factory
@@ -60,7 +120,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-### Security
+- Marked system Nexus envelope payloads so nested payloads can be detected and
+  visited after the envelope is already stored as a payload.
 
 ## [1.30.0] - 2026-07-01
 
@@ -82,7 +143,7 @@ to include examples, links to docs, or any other relevant information.
   with the selected optional dependencies.
 - Standalone Nexus operation links are now forwarded on start workflow and signal requests.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - AWS Lambda worker `configure` parameter has been changed to be invoked
   per-invocation of the worker instead of only at startup. It is advised that
@@ -105,7 +166,7 @@ to include examples, links to docs, or any other relevant information.
   Pass `grpc_compression=GrpcCompression.NONE` to `Client.connect` or
   `CloudOperationsClient.connect` to disable it.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - `StartWorkflowUpdateWithStartInput` now owns the authoritative
   `rpc_metadata` and `rpc_timeout` fields for

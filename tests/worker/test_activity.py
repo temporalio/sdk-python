@@ -382,8 +382,13 @@ async def test_activity_cancel_catch(
             while True:
                 await asyncio.sleep(0.3)
                 activity.heartbeat()
-        except asyncio.CancelledError:
-            return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
+        except asyncio.CancelledError as err:
+            return (
+                "Got cancelled error, cancelled? "
+                + str(activity.is_cancelled())
+                + ", reason: "
+                + str(err)
+            )
 
     result = await _execute_workflow_with_activity(
         client,
@@ -394,7 +399,10 @@ async def test_activity_cancel_catch(
         heartbeat_timeout_ms=2000,
         shared_state_manager=shared_state_manager,
     )
-    assert result.result == "Got cancelled error, cancelled? True"
+    assert (
+        result.result
+        == "Got cancelled error, cancelled? True, reason: Activity cancelled"
+    )
 
 
 async def test_activity_cancel_throw(
