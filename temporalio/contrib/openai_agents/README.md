@@ -556,12 +556,12 @@ Register one or more `SandboxClientProvider` instances with the plugin. Each pro
 
 ```python
 import asyncio
-import docker
+from datetime import timedelta
 from temporalio.client import Client
 from temporalio.worker import Worker
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, SandboxClientProvider, ModelActivityParameters
 from agents.extensions.sandbox.daytona import DaytonaSandboxClient
-from agents.extensions.sandbox.unix_local import UnixLocalSandboxClient
+from agents.sandbox.sandboxes.unix_local import UnixLocalSandboxClient
 
 async def main():
     client = await Client.connect(
@@ -599,6 +599,7 @@ from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
 from agents import Runner
 from agents.sandbox import SandboxAgent, SandboxRunConfig
 from agents.run import RunConfig
+from agents.extensions.sandbox.daytona import DaytonaSandboxClientOptions
 
 @workflow.defn
 class MyWorkflow:
@@ -626,7 +627,7 @@ The name passed to `temporal_sandbox_client()` must exactly match the name used 
 
 ### Multiple Backends
 
-A single workflow can target different backends by name. Register all backends on the worker and reference each by name in the workflow:
+A single workflow can target different backends by name. Register all backends on the worker and reference each by name in the workflow. Each backend's options class ships with that backend: `DaytonaSandboxClientOptions` in `agents.extensions.sandbox.daytona`, `UnixLocalSandboxClientOptions` in `agents.sandbox.sandboxes.unix_local`.
 
 ```python
 # Run a task on the "daytona" backend
