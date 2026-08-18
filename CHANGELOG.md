@@ -35,6 +35,14 @@ to include examples, links to docs, or any other relevant information.
   `uuid.uuid1()`/`uuid.uuid4()` restrictions.
 - **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
   Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows (including `activity_node(...)` for running Temporal
+  activities as graph nodes), dynamic `@node` workflows, and durable
+  human-in-the-loop via the `HitlRequest` / `pending_hitl_requests` /
+  `hitl_input_response` / `hitl_confirmation_response` helpers. The plugin
+  installs ADK's platform time, uuid, and random providers as process-wide
+  defaults so ADK-generated timestamps, ids (including default `RequestInput`
+  interrupt ids), and retry jitter replay deterministically.
 
 ### Changed
 

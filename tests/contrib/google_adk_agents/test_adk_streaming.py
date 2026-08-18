@@ -12,7 +12,11 @@ from datetime import timedelta
 
 import pytest
 from google.adk import Agent
-from google.adk.agents.run_config import RunConfig, StreamingMode
+
+# google-adk does not re-export StreamingMode publicly; import it from its
+# defining module, as ADK's own code does.
+from google.adk.agents._streaming_mode import StreamingMode
+from google.adk.agents.run_config import RunConfig
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
