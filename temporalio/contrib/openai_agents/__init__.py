@@ -14,6 +14,7 @@ from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIPayloadConverter,
 )
 from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
     temporal_worker_env_ref,
 )
 from temporalio.contrib.openai_agents.sandbox._sandbox_client_provider import (
@@ -28,6 +29,7 @@ from . import testing, workflow
 
 __all__ = [
     "AgentsWorkflowError",
+    "AllowAllWorkerEnvVars",
     "ModelActivityParameters",
     "OpenAIAgentsPlugin",
     "OpenAIPayloadConverter",

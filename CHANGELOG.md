@@ -35,23 +35,14 @@ to include examples, links to docs, or any other relevant information.
   `uuid.uuid1()`/`uuid.uuid4()` restrictions.
 - **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
   Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
-- `temporalio.contrib.openai_agents.SecretRef` lets a sandbox environment
-  variable carry the name of a worker environment variable instead of the
-  secret itself, so only the name is recorded in workflow history.
-  `{"OPENAI_API_KEY": SecretRef(key="PROD_KEY")}` reads `PROD_KEY` on the
-  worker and sets `OPENAI_API_KEY` inside the sandbox. Set the variable on
-  every worker that runs sandbox activities; a worker without a value for
-  it fails the sandbox operation with a non-retryable error naming the
-  variable. Requires `openai-agents >= 0.19.2`.
-- `temporalio.contrib.openai_agents.TemporalWorkerEnvValue` supplies a sandbox
-  environment variable from the worker's own environment, so the manifest
-  carries the variable's name and workflow history never holds its value.
-  `{"OPENAI_API_KEY": TemporalWorkerEnvValue(key="PROD_KEY")}` reads
-  `PROD_KEY` on the worker and sets `OPENAI_API_KEY` inside the sandbox. Set
-  the variable on every worker that runs sandbox activities; a worker without
-  a value for it fails the sandbox operation with a non-retryable
-  `TemporalWorkerEnvValueUnresolved` error naming the variable. Requires
-  `openai-agents >= 0.19.2`.
+- **Experimental**: `temporalio.contrib.openai_agents.temporal_worker_env_ref` names an environment
+  variable the worker reads for a hosted tool credential, keeping it out of workflow history.
+- **Experimental**: `temporalio.contrib.openai_agents.TemporalWorkerEnvValue` names an environment
+  variable the worker reads for a sandbox environment value, keeping it out of workflow history.
+- **Experimental**: `OpenAIAgentsPlugin(resolvable_worker_env_vars=...)` allowlists the environment
+  variable names a worker will read.
+- **Experimental**: `temporalio.contrib.openai_agents.AllowAllWorkerEnvVars` allowlists every
+  environment variable name on the worker.
 
 ### Changed
 
@@ -70,14 +61,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
-- `temporalio.contrib.openai_agents` now rejects sandbox path grants that
-  are bound to a host path. A `SandboxPathGrant` with `host_path` set wrote
-  that path into workflow history in plaintext on every sandbox operation,
-  so such a grant is refused before the manifest is serialized and the
-  workflow fails with an error naming the sandbox-side paths. Remove
-  `host_path` from those grants. `SandboxPathGrant.host_path` was added in
-  `openai-agents` 0.19.2, so this affects only workflows already running
-  against 0.19.2 or later.
+- The `openai-agents` extra now requires `openai-agents>=0.19.2,<0.20`, up from `>=0.17.5` with no
+  upper bound.
+- `temporalio.contrib.openai_agents` now rejects a sandbox `SandboxPathGrant` bound to a
+  `host_path`.
+- `temporalio.contrib.openai_agents` now rejects `run_config.sandbox.session`.
 
 ### Fixed
 

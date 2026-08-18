@@ -29,6 +29,10 @@ from temporalio.contrib.openai_agents._mcp import (
 )
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_openai_agents import OpenAIAgentsPlugin
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
+    _snapshot_resolvable_env_vars,
+)
 
 __all__ = [
     "AgentEnvironment",
@@ -181,7 +185,7 @@ class AgentEnvironment:
         register_activities: bool = True,
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
-        resolvable_worker_env_vars: Collection[str] = (),
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ) -> None:
         """Initialize the AgentEnvironment.
 
@@ -203,7 +207,9 @@ class AgentEnvironment:
                 Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
                 Use with caution in production environments.
             resolvable_worker_env_vars: Names of the environment variables that
-                ``temporal_worker_env_ref()`` may read on this environment's workers.
+                ``temporal_worker_env_ref()`` may read on this environment's workers;
+                pass ``AllowAllWorkerEnvVars()`` in place of the names to allow every
+                variable.
                 Warning: resolvable_worker_env_vars is experimental and behavior may change in future versions.
                 Use with caution in production environments.
         """
@@ -218,7 +224,9 @@ class AgentEnvironment:
         self._plugin: OpenAIAgentsPlugin | None = None
         self._add_temporal_spans = add_temporal_spans
         self._use_otel_instrumentation = use_otel_instrumentation
-        self._resolvable_worker_env_vars = resolvable_worker_env_vars
+        self._resolvable_worker_env_vars = _snapshot_resolvable_env_vars(
+            resolvable_worker_env_vars
+        )
 
     async def __aenter__(self) -> "AgentEnvironment":
         """Enter the async context manager."""

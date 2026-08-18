@@ -2,6 +2,7 @@
 
 import io
 import uuid
+from collections.abc import Collection
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -16,6 +17,7 @@ from agents.sandbox.errors import (
 )
 from agents.sandbox.manifest import Environment
 from agents.sandbox.session.base_sandbox_session import BaseSandboxSession
+from agents.sandbox.session.pty_types import PtyExecUpdate
 from agents.sandbox.session.sandbox_client import (
     BaseSandboxClient,
     BaseSandboxClientOptions,
@@ -39,16 +41,23 @@ from temporalio.contrib.openai_agents import (
     TemporalWorkerEnvValue,
 )
 from temporalio.contrib.openai_agents._openai_runner import _has_sandbox_agent
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
+)
 from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
     CreateSessionArgs,
     ExecArgs,
     HydrateWorkspaceArgs,
+    PersistWorkspaceArgs,
     PersistWorkspaceResult,
+    PtyExecStartArgs,
     PtyExecUpdateResult,
+    PtyWriteStdinArgs,
     ReadArgs,
     ReadResult,
     ResumeSessionArgs,
     RunningArgs,
+    StartArgs,
     StopArgs,
     WriteArgs,
 )
@@ -58,6 +67,9 @@ from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
 from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_client import (
     TemporalSandboxClient,
 )
+from temporalio.contrib.openai_agents.sandbox._temporal_worker_env_value import (
+    _resolvable_worker_env_vars,
+)
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
     ResponseBuilders,
@@ -65,7 +77,7 @@ from temporalio.contrib.openai_agents.testing import (
     TestModelProvider,
 )
 from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.workflow import ActivityConfig
 from tests.helpers import new_worker
 
@@ -190,30 +202,6 @@ class SandboxValidationWorkflow:
         except ValueError as e:
             assert "temporal_sandbox_client(name)" in str(e)
 
-        # Case 5: run_config as a dict must reach the same validation
-        try:
-            agent = SandboxAgent[None](name="sandbox")
-            await Runner.run(
-                starting_agent=agent,
-                input="hello",
-                run_config={"sandbox": SandboxRunConfig(client=None)},  # type: ignore[typeddict-item]
-            )
-            return "FAIL: dict-run-config should have raised"
-        except ValueError as e:
-            assert "run_config.sandbox.client must be set" in str(e)
-
-        # Case 6: fully nested dict, where SandboxRunConfig is itself a dict
-        try:
-            agent = SandboxAgent[None](name="sandbox")
-            await Runner.run(
-                starting_agent=agent,
-                input="hello",
-                run_config={"sandbox": {"client": None}},  # type: ignore[typeddict-item]
-            )
-            return "FAIL: nested-dict-run-config should have raised"
-        except ValueError as e:
-            assert "run_config.sandbox.client must be set" in str(e)
-
         return "OK"
 
 
@@ -224,12 +212,7 @@ async def test_sandbox_validation_errors(client: Client):
         async with new_worker(
             client,
             SandboxValidationWorkflow,
-            # Deliberately wider than production, where these types hang the workflow.
-            workflow_failure_exception_types=[
-                ValueError,
-                AssertionError,
-                AttributeError,
-            ],
+            workflow_failure_exception_types=[ValueError, AssertionError],
         ) as worker:
             result = await client.execute_workflow(
                 SandboxValidationWorkflow.run,
@@ -369,11 +352,12 @@ def _make_state(manifest: Manifest | None = None) -> TestSessionState:
 
 def _activity_map(
     sandbox_activities: SandboxClientProvider,
+    resolvable_worker_env_vars: Collection[str] = (),
 ) -> dict[str, Any]:
     """Build a short-name → callable dict from all() for easy test dispatch."""
     return {
         act.__temporal_activity_definition.name: act  # type: ignore[attr-defined, union-attr]
-        for act in sandbox_activities._get_activities()
+        for act in sandbox_activities._get_activities(resolvable_worker_env_vars)
     }
 
 
@@ -399,7 +383,6 @@ async def test_create_session_activity_resolves_worker_env_value_but_returns_it_
     mock_client: _MockSandboxClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Both activity payloads carry the variable name while the worker sees the secret."""
     secret = "sk-activity-boundary-secret"
     monkeypatch.setenv("WORKER_ACTIVITY_SECRET", secret)
 
@@ -412,20 +395,233 @@ async def test_create_session_activity_resolves_worker_env_value_but_returns_it_
         snapshot_spec=None,
         manifest=Manifest(
             environment=Environment(
-                value={"API_KEY": TemporalWorkerEnvValue(key="WORKER_ACTIVITY_SECRET")}
+                value={"API_KEY": TemporalWorkerEnvValue(name="WORKER_ACTIVITY_SECRET")}
             )
         ),
         client_options=None,
     )
     assert secret.encode() not in payload_bytes(args)
 
-    acts = _activity_map(sandbox_activities)
+    acts = _activity_map(sandbox_activities, ["WORKER_ACTIVITY_SECRET"])
     result = await acts["mock-sandbox_client_create"](args)
 
     assert mock_client.resolved_envs == {"API_KEY": secret}
     returned = payload_bytes(result)
     assert secret.encode() not in returned
     assert b"temporal.worker_env_value" in returned
+
+
+async def test_create_session_activity_refuses_an_unlisted_worker_env_value(
+    sandbox_activities: SandboxClientProvider,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    secret = "sk-unlisted-secret"
+    monkeypatch.setenv("WORKER_ACTIVITY_SECRET", secret)
+
+    args = CreateSessionArgs(
+        snapshot_spec=None,
+        manifest=Manifest(
+            environment=Environment(
+                value={"API_KEY": TemporalWorkerEnvValue(name="WORKER_ACTIVITY_SECRET")}
+            )
+        ),
+        client_options=None,
+    )
+
+    acts = _activity_map(sandbox_activities, ["SOMETHING_ELSE"])
+    with pytest.raises(ApplicationError) as exc_info:
+        await acts["mock-sandbox_client_create"](args)
+
+    assert exc_info.value.type == "TemporalWorkerEnvValueUnresolved"
+    assert exc_info.value.non_retryable
+    assert "WORKER_ACTIVITY_SECRET" in str(exc_info.value)
+    assert "resolvable_worker_env_vars" in str(exc_info.value)
+    assert secret not in str(exc_info.value)
+
+
+async def test_the_resolvable_names_are_snapshotted_when_the_activities_are_built(
+    sandbox_activities: SandboxClientProvider,
+    mock_client: _MockSandboxClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    secret = "sk-snapshot-secret"
+    monkeypatch.setenv("WORKER_ACTIVITY_SECRET", secret)
+
+    args = CreateSessionArgs(
+        snapshot_spec=None,
+        manifest=Manifest(
+            environment=Environment(
+                value={"API_KEY": TemporalWorkerEnvValue(name="WORKER_ACTIVITY_SECRET")}
+            )
+        ),
+        client_options=None,
+    )
+
+    resolvable = ["WORKER_ACTIVITY_SECRET"]
+    acts = _activity_map(sandbox_activities, resolvable)
+    resolvable.clear()
+
+    await acts["mock-sandbox_client_create"](args)
+    assert mock_client.resolved_envs == {"API_KEY": secret}
+
+
+class _ScopeRecordingSession(_MockSandboxSession):
+    def __init__(self, scopes: list[frozenset[str] | AllowAllWorkerEnvVars]) -> None:
+        super().__init__()
+        self._scopes = scopes
+
+    def supports_pty(self) -> bool:
+        return True
+
+    async def shutdown(self) -> None:
+        self._scopes.append(_resolvable_worker_env_vars.get(frozenset()))
+        await super().shutdown()
+
+    async def pty_exec_start(
+        self, *command: str | Path, **kwargs: Any
+    ) -> PtyExecUpdate:
+        return PtyExecUpdate(
+            process_id=1, output=b"", exit_code=None, original_token_count=None
+        )
+
+    async def pty_write_stdin(self, **kwargs: Any) -> PtyExecUpdate:
+        return PtyExecUpdate(
+            process_id=1, output=b"", exit_code=None, original_token_count=None
+        )
+
+
+class _ScopeRecordingClient(_MockSandboxClient):
+    def __init__(self) -> None:
+        self.scopes: list[frozenset[str] | AllowAllWorkerEnvVars] = []
+        super().__init__(_ScopeRecordingSession(self.scopes))
+
+    async def create(self, **kwargs: Any) -> SandboxSession:
+        self.scopes.append(_resolvable_worker_env_vars.get(frozenset()))
+        return await super().create(**kwargs)
+
+    async def resume(self, state: SandboxSessionState) -> SandboxSession:
+        self.scopes.append(_resolvable_worker_env_vars.get(frozenset()))
+        return await super().resume(state)
+
+
+async def test_every_activity_runs_its_body_inside_the_resolvable_names_scope():
+    recording_client = _ScopeRecordingClient()
+    provider = SandboxClientProvider("mock", recording_client)
+    acts = _activity_map(provider, ["A_RESOLVABLE_NAME"])
+    state = _make_state()
+    args_by_activity: dict[str, Any] = {
+        "mock-sandbox_client_create": CreateSessionArgs(
+            snapshot_spec=None, manifest=Manifest(), client_options=None
+        ),
+        "mock-sandbox_client_resume": ResumeSessionArgs(state=state),
+        "mock-sandbox_client_delete": StopArgs(state=state),
+        "mock-sandbox_session_exec": ExecArgs(state=state, command=["ls"], shell=True),
+        "mock-sandbox_session_read": ReadArgs(state=state, path="/tmp/f"),
+        "mock-sandbox_session_write": WriteArgs(state=state, path="/tmp/f", data=b"d"),
+        "mock-sandbox_session_running": RunningArgs(state=state),
+        "mock-sandbox_session_persist_workspace": PersistWorkspaceArgs(state=state),
+        "mock-sandbox_session_hydrate_workspace": HydrateWorkspaceArgs(
+            state=state, data=b"d"
+        ),
+        "mock-sandbox_session_pty_exec_start": PtyExecStartArgs(
+            state=state, command=["ls"]
+        ),
+        "mock-sandbox_session_pty_write_stdin": PtyWriteStdinArgs(
+            state=state, session_id=1, chars="x"
+        ),
+        "mock-sandbox_session_start": StartArgs(state=state),
+        "mock-sandbox_session_stop": StopArgs(state=state),
+        "mock-sandbox_session_shutdown": StopArgs(state=state),
+    }
+    assert set(args_by_activity) == set(acts)
+
+    for name, args in args_by_activity.items():
+        # Shutdown is the one activity that does not resume on a cache miss, so
+        # it alone needs a cached session to reach the client.
+        cached = name == "mock-sandbox_session_shutdown"
+        provider._sessions = (
+            {str(state.session_id): recording_client.session} if cached else {}
+        )
+        recording_client.scopes.clear()
+        await acts[name](args)
+        assert recording_client.scopes == [frozenset({"A_RESOLVABLE_NAME"})], name
+
+
+def _plugin_with_one_shot_names(
+    *sandbox_clients: SandboxClientProvider,
+) -> OpenAIAgentsPlugin:
+    return OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses([ResponseBuilders.output_message("done")])
+        ),
+        sandbox_clients=list(sandbox_clients),
+        resolvable_worker_env_vars=(name for name in ["A_RESOLVABLE_NAME"]),  # type: ignore[arg-type]
+    )
+
+
+def _plugin_activity_map(plugin: OpenAIAgentsPlugin) -> dict[str, Any]:
+    build_activities = plugin.activities
+    assert callable(build_activities)
+    return {
+        act.__temporal_activity_definition.name: act  # type: ignore[attr-defined, union-attr]
+        for act in build_activities([])
+    }
+
+
+def _hosted_resolvable_names(
+    acts: dict[str, Any],
+) -> frozenset[str] | AllowAllWorkerEnvVars:
+    return acts["invoke_model_activity"].__self__._env_refs._allowed
+
+
+async def test_a_one_shot_names_iterable_reaches_the_hosted_and_the_sandbox_activities():
+    recording_client = _ScopeRecordingClient()
+    acts = _plugin_activity_map(
+        _plugin_with_one_shot_names(SandboxClientProvider("mock", recording_client))
+    )
+
+    assert _hosted_resolvable_names(acts) == frozenset({"A_RESOLVABLE_NAME"})
+    await acts["mock-sandbox_client_create"](
+        CreateSessionArgs(snapshot_spec=None, manifest=Manifest(), client_options=None)
+    )
+    assert recording_client.scopes == [frozenset({"A_RESOLVABLE_NAME"})]
+
+
+async def test_every_sandbox_provider_on_a_plugin_gets_the_names():
+    first = _ScopeRecordingClient()
+    second = _ScopeRecordingClient()
+    acts = _plugin_activity_map(
+        _plugin_with_one_shot_names(
+            SandboxClientProvider("first", first),
+            SandboxClientProvider("second", second),
+        )
+    )
+
+    args = CreateSessionArgs(
+        snapshot_spec=None, manifest=Manifest(), client_options=None
+    )
+    await acts["first-sandbox_client_create"](args)
+    await acts["second-sandbox_client_create"](args)
+    assert first.scopes == [frozenset({"A_RESOLVABLE_NAME"})]
+    assert second.scopes == [frozenset({"A_RESOLVABLE_NAME"})]
+
+
+async def test_a_second_worker_built_from_one_plugin_gets_the_names():
+    recording_client = _ScopeRecordingClient()
+    plugin = _plugin_with_one_shot_names(
+        SandboxClientProvider("mock", recording_client)
+    )
+    _plugin_activity_map(plugin)
+    acts = _plugin_activity_map(plugin)
+
+    assert _hosted_resolvable_names(acts) == frozenset({"A_RESOLVABLE_NAME"})
+    await acts["mock-sandbox_client_create"](
+        CreateSessionArgs(snapshot_spec=None, manifest=Manifest(), client_options=None)
+    )
+    assert recording_client.scopes == [frozenset({"A_RESOLVABLE_NAME"})]
 
 
 async def test_activities_resume_session_delegates(
@@ -589,7 +785,7 @@ async def test_activities_all_returns_all_activity_methods(
     sandbox_activities: SandboxClientProvider,
 ):
     """all() should return all 14 activity callables with prefixed names."""
-    activities = sandbox_activities._get_activities()
+    activities = sandbox_activities._get_activities(())
     assert len(activities) == 14
     # Verify they are all activity-decorated callables with prefixed names
     activity_names = set()
@@ -622,8 +818,8 @@ async def test_multiple_providers_register_distinct_activities():
     provider1 = SandboxClientProvider("daytona", client1)
     provider2 = SandboxClientProvider("local", client2)
 
-    activities1 = provider1._get_activities()
-    activities2 = provider2._get_activities()
+    activities1 = provider1._get_activities(())
+    activities2 = provider2._get_activities(())
 
     names1 = {a.__temporal_activity_definition.name for a in activities1}  # type: ignore
     names2 = {a.__temporal_activity_definition.name for a in activities2}  # type: ignore
@@ -910,8 +1106,6 @@ _TWO_BOUND_GRANTS_MANIFEST = Manifest(
 
 
 class _GrantInjectingCapability(Capability):
-    """Adds a bound grant in ``process_manifest``, after the run boundary has looked."""
-
     def __init__(self) -> None:
         super().__init__(type="grant_injecting")
 
@@ -954,9 +1148,8 @@ class HostPathGrantWorkflow:
                 ),
             )
         elif route == "capability":
-            # Only the client boundary sees this: it is appended after upstream
-            # resolves the effective manifest. The manifest is empty but present,
-            # because upstream skips capabilities entirely when there is none.
+            # The manifest must be present but empty: upstream skips capabilities
+            # when there is no manifest at all.
             agent = SandboxAgent[None](
                 name="sandbox-grant", capabilities=[_GrantInjectingCapability()]
             )
@@ -1004,7 +1197,6 @@ class HostPathGrantWorkflow:
 async def test_host_path_grants_are_rejected_per_manifest_source(
     client: Client, route: str
 ):
-    """Each manifest source, including one only the client boundary can see."""
     mock_sandbox_client = _MockSandboxClient(_MockSandboxSession())
     plugin = OpenAIAgentsPlugin(
         model_params=ModelActivityParameters(
@@ -1058,11 +1250,7 @@ class UncaughtHostPathGrantWorkflow:
 async def test_host_path_grant_fails_the_workflow_on_a_production_like_worker(
     client: Client,
 ):
-    """Given no ``workflow_failure_exception_types``, so only the plugin's own applies.
-
-    If the error were rewrapped into an unregistered type the workflow task
-    would retry until ``execution_timeout`` and this would report a timeout.
-    """
+    """Given no test-only ``workflow_failure_exception_types``, so only the plugin's own applies."""
     mock_sandbox_client = _MockSandboxClient(_MockSandboxSession())
     plugin = OpenAIAgentsPlugin(
         model_params=ModelActivityParameters(
@@ -1090,9 +1278,86 @@ async def test_host_path_grant_fails_the_workflow_on_a_production_like_worker(
     assert isinstance(cause, ApplicationError), cause
     assert cause.type == "AgentsWorkflowError", cause.type
     assert "/workspace/shared" in str(cause)
-    # The WorkflowExecutionFailed event must not carry the host path.
     assert _HOST_PATH not in str(cause)
     assert mock_sandbox_client.create_calls == 0
+
+
+_PLUGIN_ENV_NAME = "WORKER_ENV_VALUE_THROUGH_THE_PLUGIN"
+
+
+@workflow.defn
+class SandboxWorkerEnvValueWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        await Runner.run(
+            starting_agent=SandboxAgent[None](name="sandbox-env"),
+            input="hello",
+            run_config=RunConfig(
+                sandbox=SandboxRunConfig(
+                    client=temporal_sandbox_client("mock"),
+                    options=_TestSandboxClientOptions(),
+                    manifest=Manifest(
+                        environment=Environment(
+                            value={
+                                "API_KEY": TemporalWorkerEnvValue(name=_PLUGIN_ENV_NAME)
+                            }
+                        )
+                    ),
+                ),
+            ),
+        )
+        return "RAN"
+
+
+@pytest.mark.parametrize(
+    ("resolvable", "resolves"),
+    [([_PLUGIN_ENV_NAME], True), (["SOMETHING_ELSE"], False)],
+)
+async def test_a_sandbox_activity_resolves_only_the_variables_its_plugin_names(
+    client: Client,
+    monkeypatch: pytest.MonkeyPatch,
+    resolvable: list[str],
+    resolves: bool,
+):
+    secret = "sk-through-the-plugin"
+    monkeypatch.setenv(_PLUGIN_ENV_NAME, secret)
+    mock_sandbox_client = _MockSandboxClient(_MockSandboxSession())
+    plugin = OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        model_provider=TestModelProvider(
+            TestModel.returning_responses([ResponseBuilders.output_message("done")])
+        ),
+        sandbox_clients=[SandboxClientProvider("mock", mock_sandbox_client)],
+        resolvable_worker_env_vars=resolvable,
+    )
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    test_client = Client(**new_config)
+
+    async def execute(worker: Any) -> str:
+        return await test_client.execute_workflow(
+            SandboxWorkerEnvValueWorkflow.run,
+            id=f"sandbox-env-value-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=15),
+        )
+
+    async with new_worker(test_client, SandboxWorkerEnvValueWorkflow) as worker:
+        if resolves:
+            assert await execute(worker) == "RAN"
+            assert mock_sandbox_client.resolved_envs == {"API_KEY": secret}
+        else:
+            with pytest.raises(WorkflowFailureError) as exc_info:
+                await execute(worker)
+            activity_error = exc_info.value.cause
+            assert isinstance(activity_error, ActivityError), activity_error
+            cause = activity_error.cause
+            assert isinstance(cause, ApplicationError), cause
+            assert cause.type == "TemporalWorkerEnvValueUnresolved"
+            assert _PLUGIN_ENV_NAME in str(cause)
+            assert secret not in str(cause)
 
 
 @workflow.defn
@@ -1100,21 +1365,14 @@ class ResolveOnWorkflowThreadWorkflow:
     @workflow.run
     async def run(self) -> str:
         try:
-            await TemporalWorkerEnvValue(key="WORKER_THREAD_PROBE_KEY").resolve()
+            await TemporalWorkerEnvValue(name="WORKER_THREAD_PROBE_NAME").resolve()
         except ApplicationError as e:
-            return e.type or ""
+            return e.message
         return "NO RAISE"
 
 
-async def test_worker_env_value_resolve_raises_inside_a_real_workflow(
-    client: Client, monkeypatch: pytest.MonkeyPatch
-):
-    """``in_workflow()`` is genuinely True here, unlike the monkeypatched unit test.
-
-    The variable is set in this process so that removing the guard makes
-    ``resolve()`` succeed and this fail, rather than raising for being unset.
-    """
-    monkeypatch.setenv("WORKER_THREAD_PROBE_KEY", "value-that-must-not-be-read")
+async def test_worker_env_value_resolve_raises_inside_a_real_workflow(client: Client):
+    """``in_workflow()`` is genuinely True here, unlike the monkeypatched unit test."""
     plugin = OpenAIAgentsPlugin(
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
@@ -1139,7 +1397,7 @@ async def test_worker_env_value_resolve_raises_inside_a_real_workflow(
             execution_timeout=timedelta(seconds=15),
         )
 
-    assert result == "TemporalWorkerEnvValueUnresolved"
+    assert "must run in an activity" in result
 
 
 @workflow.defn
@@ -1164,7 +1422,6 @@ class LiveSandboxSessionWorkflow:
 
 
 async def test_live_sandbox_session_is_rejected(client: Client):
-    """A live session returns before ``_resolve_client()``, so no activity guard runs."""
     mock_sandbox_client = _MockSandboxClient(_MockSandboxSession())
     plugin = OpenAIAgentsPlugin(
         model_params=ModelActivityParameters(

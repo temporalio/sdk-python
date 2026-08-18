@@ -40,6 +40,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
 )
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
 from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
     _WorkerEnvRefResolver,
 )
 from temporalio.contrib.openai_agents.testing import (
@@ -217,11 +218,17 @@ def test_hosted_mcp_secrets_resolve_for_the_model_call(
 
 @pytest.mark.parametrize(
     ("resolvable", "resolves"),
-    [([ENV_NAME], True), (["*"], True), ([OTHER_ENV_NAME], False)],
-    ids=["the_name", "star", "another_name"],
+    [
+        ([ENV_NAME], True),
+        (AllowAllWorkerEnvVars(), True),
+        ([OTHER_ENV_NAME], False),
+    ],
+    ids=["the_name", "allow_all", "another_name"],
 )
 def test_a_reference_resolves_only_from_a_variable_the_worker_allows(
-    monkeypatch: pytest.MonkeyPatch, resolvable: Collection[str], resolves: bool
+    monkeypatch: pytest.MonkeyPatch,
+    resolvable: Collection[str] | AllowAllWorkerEnvVars,
+    resolves: bool,
 ):
     monkeypatch.setenv(ENV_NAME, SENTINEL)
     ref = temporal_worker_env_ref(ENV_NAME)
@@ -235,7 +242,7 @@ def test_a_reference_resolves_only_from_a_variable_the_worker_allows(
     assert _as_dict(built.tool_config)["headers"]["X-Token"] == expected
 
 
-def test_star_anywhere_in_the_resolvable_names_resolves_every_name(
+def test_a_star_in_the_resolvable_names_is_an_ordinary_name(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv(ENV_NAME, SENTINEL)
@@ -245,8 +252,8 @@ def test_star_anywhere_in_the_resolvable_names_resolves_every_name(
     built = _build_tool(received, _WorkerEnvRefResolver([OTHER_ENV_NAME, "*"]))
 
     assert isinstance(built, HostedMCPTool)
-    assert _as_dict(built.tool_config)["authorization"] == SENTINEL
-    assert _as_dict(built.tool_config)["headers"]["X-Token"] == SENTINEL
+    assert _as_dict(built.tool_config)["authorization"] == ref
+    assert _as_dict(built.tool_config)["headers"]["X-Token"] == ref
 
 
 def test_a_glob_in_the_resolvable_names_matches_no_name(
@@ -657,7 +664,7 @@ def test_a_worker_env_ref_with_no_closing_brace_is_passed_through(
         _hosted_mcp_tool(truncated, truncated)
     )
 
-    built = _build_tool(received, _WorkerEnvRefResolver(["*"]))
+    built = _build_tool(received, _WorkerEnvRefResolver(AllowAllWorkerEnvVars()))
 
     assert isinstance(built, HostedMCPTool)
     assert _as_dict(built.tool_config)["authorization"] == truncated
@@ -683,6 +690,16 @@ def test_a_value_packed_with_unclosed_references_does_not_stall_the_resolver():
 def test_a_bare_string_is_rejected_as_the_resolvable_variable_names():
     with pytest.raises(TypeError, match="resolvable_worker_env_vars"):
         _WorkerEnvRefResolver(ENV_NAME)
+
+
+def test_the_allow_all_class_itself_is_rejected_as_the_resolvable_variable_names():
+    with pytest.raises(TypeError, match=r"AllowAllWorkerEnvVars\(\)"):
+        _WorkerEnvRefResolver(AllowAllWorkerEnvVars)  # type: ignore[arg-type]
+
+
+def test_the_plugin_rejects_a_bare_string_as_the_resolvable_variable_names():
+    with pytest.raises(TypeError, match="resolvable_worker_env_vars"):
+        OpenAIAgentsPlugin(resolvable_worker_env_vars=ENV_NAME)
 
 
 async def _no_stream_events() -> AsyncIterator[TResponseStreamEvent]:
@@ -865,3 +882,27 @@ async def test_an_agent_environment_forwards_the_variables_it_names_to_the_worke
     assert tool_config["headers"] == {
         "X-Token": temporal_worker_env_ref(OTHER_ENV_NAME)
     }
+
+
+async def test_re_entering_an_agent_environment_keeps_the_variables_it_names(
+    monkeypatch: pytest.MonkeyPatch, client: Client
+):
+    monkeypatch.setenv(ENV_NAME, SENTINEL)
+    model = _ToolRecordingModel()
+    names = [ENV_NAME]
+    env = AgentEnvironment(model=model, resolvable_worker_env_vars=names)
+
+    async with env:
+        pass
+    names.clear()
+
+    async with env:
+        client = env.applied_on_client(client)
+        async with new_worker(client, WorkerEnvRefAgentWorkflow) as worker:
+            await client.execute_workflow(
+                WorkerEnvRefAgentWorkflow.run,
+                id=f"agent-environment-re-entry-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+    assert _hosted_mcp_config_the_model_received(model)["authorization"] == SENTINEL

@@ -3,12 +3,35 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Collection, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Literal
 
 from agents.sandbox.manifest import EnvValue
 
 from temporalio import workflow
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
+    _is_resolvable,
+    _snapshot_resolvable_env_vars,
+)
 from temporalio.exceptions import ApplicationError
+
+_resolvable_worker_env_vars: ContextVar[frozenset[str] | AllowAllWorkerEnvVars] = (
+    ContextVar("temporal_resolvable_worker_env_vars")
+)
+
+
+@contextmanager
+def _resolvable_worker_env_vars_scope(  # type:ignore[reportUnusedFunction]
+    names: Collection[str] | AllowAllWorkerEnvVars,
+) -> Iterator[None]:
+    token = _resolvable_worker_env_vars.set(_snapshot_resolvable_env_vars(names))
+    try:
+        yield
+    finally:
+        _resolvable_worker_env_vars.reset(token)
 
 
 class TemporalWorkerEnvValue(EnvValue):
@@ -18,59 +41,46 @@ class TemporalWorkerEnvValue(EnvValue):
         This class is experimental and may change in future versions.
         Use with caution in production environments.
 
-    Use it wherever a sandbox environment value should come from the worker's
-    environment rather than being written into the manifest. It carries the name
-    of the variable, and the worker reads the value when the sandbox environment
-    is needed. Only the name is recorded in workflow history.
-
-    ::
-
-        from agents.sandbox import Manifest
-        from agents.sandbox.manifest import Environment
-
-        from temporalio.contrib.openai_agents import TemporalWorkerEnvValue
-
-        manifest = Manifest(
-            environment=Environment(
-                value={
-                    "OPENAI_API_KEY": TemporalWorkerEnvValue(key="OPENAI_API_KEY"),
-                    "REGION": "us-west-2",
-                }
-            )
-        )
-
-    Set the variable on every worker that runs sandbox activities. The two
-    names need not match: ``{"OPENAI_API_KEY": TemporalWorkerEnvValue(key="PROD_KEY")}``
-    reads ``PROD_KEY`` on the worker and sets ``OPENAI_API_KEY`` inside the
-    sandbox.
+    Put one in a sandbox manifest's ``Environment`` in place of the value
+    itself. Only the name travels in the manifest, and the worker reads the
+    value when the sandbox environment is needed. Every worker that runs sandbox
+    activities must set the variable and name it in
+    ``OpenAIAgentsPlugin(resolvable_worker_env_vars=[...])``.
     """
 
     type: Literal["temporal.worker_env_value"] = "temporal.worker_env_value"  # type: ignore[assignment]
-    """Discriminator for this environment value type."""
 
-    key: str
+    name: str
     """Name of the environment variable to read on the worker."""
 
     async def resolve(self) -> str:
         """Return the value read from the worker's environment.
 
         Raises:
-            ApplicationError: If :py:attr:`key` is unset or empty, or if called
-                from workflow code. Non-retryable, with
-                ``type="TemporalWorkerEnvValueUnresolved"``.
+            ApplicationError: If the variable is not resolvable on this worker,
+                is unset or empty, or if called from workflow code.
         """
         if workflow.in_workflow():
             raise ApplicationError(
-                "TemporalWorkerEnvValue.resolve() must run on a worker, not in workflow "
-                "code: it reads the process environment, which is non-deterministic on "
-                "replay and would pull the value into workflow state.",
+                "TemporalWorkerEnvValue.resolve() must run in an activity: it reads the "
+                "process environment, which is non-deterministic on replay and would "
+                "pull the value into workflow state.",
                 type="TemporalWorkerEnvValueUnresolved",
                 non_retryable=True,
             )
-        value = os.environ.get(self.key)
+        resolvable = _resolvable_worker_env_vars.get(frozenset())
+        if not _is_resolvable(resolvable, self.name):
+            raise ApplicationError(
+                f"TemporalWorkerEnvValue environment variable {self.name!r} is not "
+                "resolvable on this worker. Name it in "
+                "OpenAIAgentsPlugin(resolvable_worker_env_vars=[...]).",
+                type="TemporalWorkerEnvValueUnresolved",
+                non_retryable=True,
+            )
+        value = os.environ.get(self.name)
         if not value:
             raise ApplicationError(
-                f"TemporalWorkerEnvValue environment variable {self.key!r} is not set, "
+                f"TemporalWorkerEnvValue environment variable {self.name!r} is not set, "
                 "or is empty, in the worker process environment.",
                 type="TemporalWorkerEnvValueUnresolved",
                 non_retryable=True,

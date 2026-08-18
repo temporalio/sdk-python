@@ -127,18 +127,16 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
 
 
 def _reject_host_path_grants(manifest: Manifest | None) -> None:
-    """Reject path grants bound to a host path before the manifest reaches a payload."""
     # Imported here because workflow.py imports this module.
     from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
     if manifest is None:
         return
-    # Names the sandbox-side path, never host_path: this message is recorded in
-    # the WorkflowExecutionFailed event.
+    # Sandbox-side paths only: this message reaches the workflow failure event.
     bound = [g.path for g in manifest.extra_path_grants if g.host_path is not None]
     if bound:
         raise AgentsWorkflowError(
             "Sandbox path grants with a host_path are not supported by the Temporal OpenAI "
-            f"Agents plugin (found: {', '.join(bound)}). The host path is recorded in "
-            "workflow history in plaintext. Remove host_path from these grants."
+            f"Agents plugin (found: {', '.join(bound)}). A grant's host_path is written "
+            "into the activity argument in plaintext. Remove host_path from these grants."
         )

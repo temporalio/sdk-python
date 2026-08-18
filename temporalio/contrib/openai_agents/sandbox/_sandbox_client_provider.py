@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import io
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -13,6 +13,10 @@ from agents.sandbox.session.sandbox_client import BaseSandboxClient
 from agents.sandbox.session.sandbox_session import SandboxSession
 
 from temporalio import activity
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
+    _snapshot_resolvable_env_vars,
+)
 from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
     CreateSessionArgs,
     ExecArgs,
@@ -36,6 +40,9 @@ from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
 from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
     ExecResult as ExecResultModel,
 )
+from temporalio.contrib.openai_agents.sandbox._temporal_worker_env_value import (
+    _resolvable_worker_env_vars_scope,
+)
 from temporalio.exceptions import ApplicationError
 
 
@@ -52,6 +59,15 @@ def _translate_sandbox_errors() -> Iterator[None]:
                 str(e), type=str(e.error_code), non_retryable=True
             ) from e
         raise
+
+
+@contextmanager
+def _sandbox_activity_scope(
+    resolvable_worker_env_vars: frozenset[str] | AllowAllWorkerEnvVars,
+) -> Iterator[None]:
+    with _resolvable_worker_env_vars_scope(resolvable_worker_env_vars):
+        with _translate_sandbox_errors():
+            yield
 
 
 class SandboxClientProvider:
@@ -109,15 +125,18 @@ class SandboxClientProvider:
             self._sessions[key] = await self._client.resume(args.state)
         return self._sessions[key]
 
-    def _get_activities(self) -> Sequence[Callable[..., Any]]:
+    def _get_activities(
+        self, resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars
+    ) -> Sequence[Callable[..., Any]]:
         """Return all activity callables for registration with a Temporal Worker."""
         prefix = self._name
+        resolvable = _snapshot_resolvable_env_vars(resolvable_worker_env_vars)
 
         # -- Client-level operations (lifecycle) --
 
         @activity.defn(name=f"{prefix}-sandbox_client_create")
         async def create_session(args: CreateSessionArgs) -> SessionResult:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._client.create(
                     snapshot=args.snapshot_spec,
                     manifest=args.manifest,
@@ -130,7 +149,7 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_client_resume")
         async def resume_session(args: ResumeSessionArgs) -> SessionResult:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._client.resume(args.state)
                 self._sessions[str(session.state.session_id)] = session
                 return SessionResult(
@@ -139,7 +158,7 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_client_delete")
         async def delete_session(args: StopArgs) -> None:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 await self._client.delete(session)
                 return None
@@ -148,7 +167,7 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_session_exec")
         async def exec_(args: ExecArgs) -> ExecResultModel:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 result = await session.exec(
                     *args.command,
@@ -164,21 +183,21 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_session_read")
         async def read(args: ReadArgs) -> ReadResult:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 handle = await session.read(Path(args.path))
                 return ReadResult(data=handle.read())
 
         @activity.defn(name=f"{prefix}-sandbox_session_write")
         async def write(args: WriteArgs) -> None:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 await session.write(Path(args.path), io.BytesIO(args.data))
                 return None
 
         @activity.defn(name=f"{prefix}-sandbox_session_running")
         async def running(args: RunningArgs) -> RunningResult:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 return RunningResult(is_running=await session.running())
 
@@ -186,21 +205,21 @@ class SandboxClientProvider:
         async def persist_workspace(
             args: PersistWorkspaceArgs,
         ) -> PersistWorkspaceResult:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 stream = await session.persist_workspace()
                 return PersistWorkspaceResult(data=stream.read())
 
         @activity.defn(name=f"{prefix}-sandbox_session_hydrate_workspace")
         async def hydrate_workspace(args: HydrateWorkspaceArgs) -> None:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 await session.hydrate_workspace(io.BytesIO(args.data))
                 return None
 
         @activity.defn(name=f"{prefix}-sandbox_session_pty_exec_start")
         async def pty_exec_start(args: PtyExecStartArgs) -> PtyExecUpdateResult:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 update = await session.pty_exec_start(
                     *args.command,
@@ -220,7 +239,7 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_session_pty_write_stdin")
         async def pty_write_stdin(args: PtyWriteStdinArgs) -> PtyExecUpdateResult:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 update = await session.pty_write_stdin(
                     session_id=args.session_id,
@@ -237,14 +256,14 @@ class SandboxClientProvider:
 
         @activity.defn(name=f"{prefix}-sandbox_session_start")
         async def start(args: StartArgs) -> None:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 await session.start()
                 return None
 
         @activity.defn(name=f"{prefix}-sandbox_session_stop")
         async def session_stop(args: StopArgs) -> None:
-            with _translate_sandbox_errors():
+            with _sandbox_activity_scope(resolvable):
                 session = await self._session(args)
                 await session.stop()
                 return None
@@ -256,7 +275,7 @@ class SandboxClientProvider:
             if session is None:
                 return None
             try:
-                with _translate_sandbox_errors():
+                with _sandbox_activity_scope(resolvable):
                     await session.shutdown()
             except ApplicationError:
                 # Terminal failure: the session is dead, so evict it before

@@ -487,11 +487,36 @@ A stateless factory that declares no parameters — like the `lambda: MCPServerS
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
 
-## Secrets for Hosted Tools
+## Secrets from the Worker's Environment
 
 ⚠️ **Experimental** - This functionality is subject to change prior to General Availability.
 
-Use `temporal_worker_env_ref()` for a hosted tool credential that should come from the worker's environment rather than being written into your workflow. Pass it the *name of an environment variable*, in place of the credential itself:
+A credential an agent needs can stay in the worker process's environment instead of being written into your workflow. Where the value would otherwise go, you name the environment variable that holds it, and the worker reads that variable when the value is actually needed.
+
+There are two forms, and which one you use follows from where the value goes:
+
+- For a hosted tool credential, use `temporal_worker_env_ref()`. It is substituted only in the fields listed under [Hosted Tool Credentials](#hosted-tool-credentials).
+- For a sandbox environment variable, use `TemporalWorkerEnvValue`.
+
+Both are gated by `resolvable_worker_env_vars`, an allowlist of the variable names a worker is willing to read. On every worker that runs model or sandbox activities, set the variable and add its name to that list:
+
+```python
+plugin = OpenAIAgentsPlugin(resolvable_worker_env_vars=["MY_MCP_TOKEN"])
+```
+
+Names are matched exactly, with no globbing. Passing `AllowAllWorkerEnvVars()` in place of the list makes every environment variable on the worker resolvable, so a workflow-authored sandbox manifest can name any variable on the worker and have its value land inside the container.
+
+```python
+from temporalio.contrib.openai_agents import AllowAllWorkerEnvVars
+
+plugin = OpenAIAgentsPlugin(resolvable_worker_env_vars=AllowAllWorkerEnvVars())
+```
+
+The reference form never raises. A name the worker does not allow is sent on as the reference string, and a name it allows resolves to whatever the variable holds — an empty string when that variable is unset or empty.
+
+### Hosted Tool Credentials
+
+Pass `temporal_worker_env_ref()` the *name of an environment variable*, in place of the credential itself:
 
 ```python
 from agents import HostedMCPTool
@@ -507,14 +532,6 @@ tool = HostedMCPTool(
 )
 ```
 
-Every worker that runs model activities must both set `MY_MCP_TOKEN` and name it as resolvable:
-
-```python
-plugin = OpenAIAgentsPlugin(resolvable_worker_env_vars=["MY_MCP_TOKEN"])
-```
-
-Names are matched exactly, with no globbing, and `"*"` anywhere in the list allows every environment variable on the worker.
-
 A reference can sit inside a larger value: in `"Bearer " + temporal_worker_env_ref("MY_MCP_TOKEN")`, the reference is replaced in place and the rest of the string is sent unchanged.
 
 The environment variable's value is substituted in these fields and no others:
@@ -522,6 +539,28 @@ The environment variable's value is substituted in these fields and no others:
 - `authorization`, and the value of each entry in `headers`, in a `HostedMCPTool`'s `tool_config`
 - `value` in each entry of `network_policy.domain_secrets` under a hosted `ShellTool`'s `environment`
 - `value` in each entry of `network_policy.domain_secrets` under the `container` in a `CodeInterpreterTool`'s `tool_config`
+
+### Sandbox Environment Variables
+
+Put a `TemporalWorkerEnvValue` in the environment of a [sandbox](#sandbox-support) manifest, in place of the value itself:
+
+```python
+from agents.sandbox import Manifest
+from agents.sandbox.manifest import Environment
+
+from temporalio.contrib.openai_agents import TemporalWorkerEnvValue
+
+manifest = Manifest(
+    environment=Environment(
+        value={
+            "OPENAI_API_KEY": TemporalWorkerEnvValue(name="PROD_OPENAI_KEY"),
+            "REGION": "us-west-2",
+        }
+    )
+)
+```
+
+Pass that manifest to `SandboxRunConfig(manifest=...)`. This reads `PROD_OPENAI_KEY` on the worker and sets `OPENAI_API_KEY` inside the sandbox, so the two names need not match.
 
 ## Sandbox Support
 
@@ -647,48 +686,6 @@ result = await Runner.run(
     )),
 )
 ```
-
-### Environment Variables
-
-Use `TemporalWorkerEnvValue` for a sandbox environment value that should come from the worker's environment rather than being written into the manifest — a secret especially. It carries the name of a variable, and the worker reads that variable when the sandbox environment is needed:
-
-```python
-from agents import RunConfig, Runner
-from agents.sandbox import Manifest, SandboxRunConfig
-from agents.sandbox.manifest import Environment
-from agents.extensions.sandbox.daytona import DaytonaSandboxClientOptions
-
-from temporalio.contrib.openai_agents import TemporalWorkerEnvValue
-from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
-
-manifest = Manifest(
-    environment=Environment(
-        value={
-            "OPENAI_API_KEY": TemporalWorkerEnvValue(key="PROD_OPENAI_KEY"),
-            "REGION": "us-west-2",
-        }
-    )
-)
-
-result = await Runner.run(
-    agent, prompt,
-    run_config=RunConfig(sandbox=SandboxRunConfig(
-        client=temporal_sandbox_client("daytona"),
-        options=DaytonaSandboxClientOptions(pause_on_exit=False),
-        manifest=manifest,
-    )),
-)
-```
-
-This reads `PROD_OPENAI_KEY` on the worker and sets `OPENAI_API_KEY` inside the sandbox; the two names need not match. Set the variable on every worker that runs sandbox activities — if it is missing or empty there, the run fails with a non-retryable error naming it.
-
-Keep secrets out of inline file contents (`File(content=...)`), environment fields on client options such as `DaytonaSandboxClientOptions.env_vars`, and credential fields on client options such as `CloudflareSandboxClientOptions.api_key`.
-
-### Unsupported Inputs
-
-Path grants that bind a host path are rejected. Grant paths inside the sandbox instead.
-
-A live sandbox session passed to `SandboxRunConfig(session=...)` is also rejected — the plugin needs to create the session itself so its work runs in activities.
 
 ## Streaming
 
