@@ -267,7 +267,7 @@ def activity_node(
         This function is experimental and may change in future versions.
         Use with caution in production environments.
 
-    The returned :class:`~google.adk.workflow.FunctionNode` can be placed in a
+    The returned ``google.adk.workflow.FunctionNode`` can be placed in a
     ``Workflow(edges=[...])`` graph or invoked from a dynamic node via
     ``ctx.run_node(...)``. The previous node's output (``node_input``) is
     passed to the activity: directly for a single-parameter activity, or bound
