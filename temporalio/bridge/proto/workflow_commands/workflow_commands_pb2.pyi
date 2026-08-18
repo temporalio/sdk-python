@@ -23,6 +23,7 @@ import google.protobuf.timestamp_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -79,6 +80,7 @@ class WorkflowCommand(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     USER_METADATA_FIELD_NUMBER: builtins.int
+    EVENT_GROUP_MARKERS_FIELD_NUMBER: builtins.int
     START_TIMER_FIELD_NUMBER: builtins.int
     SCHEDULE_ACTIVITY_FIELD_NUMBER: builtins.int
     RESPOND_TO_QUERY_FIELD_NUMBER: builtins.int
@@ -106,6 +108,16 @@ class WorkflowCommand(google.protobuf.message.Message):
         """User metadata that may or may not be persisted into history depending on the command type.
         Lang layers are expected to expose the setting of the internals of this metadata on a
         per-command basis where applicable.
+        """
+    @property
+    def event_group_markers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+    ]:
+        """Event group markers attached to the command. These are forwarded onto
+        the corresponding server-side Command, and consequently surfaced on the
+        resulting HistoryEvent. See `temporal/api/sdk/v1/event_group_marker.proto`.
         """
     @property
     def start_timer(self) -> global___StartTimer: ...
@@ -169,6 +181,10 @@ class WorkflowCommand(google.protobuf.message.Message):
         self,
         *,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        event_group_markers: collections.abc.Iterable[
+            temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+        ]
         | None = ...,
         start_timer: global___StartTimer | None = ...,
         schedule_activity: global___ScheduleActivity | None = ...,
@@ -268,6 +284,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
             b"continue_as_new_workflow_execution",
+            "event_group_markers",
+            b"event_group_markers",
             "fail_workflow_execution",
             b"fail_workflow_execution",
             "modify_workflow_properties",
