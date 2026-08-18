@@ -12,9 +12,6 @@ resolution-markers = [
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P2W"
 
-[options.exclude-newer-package]
-google-adk = false
-
 [[package]]
 name = "aioboto3"
 version = "15.5.0"
@@ -1302,7 +1299,7 @@ wheels = [
 [[package]]
 name = "google-adk"
 version = "2.7.1"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/google/adk-python?rev=8f85107cca7fa9d88eea5ca60e32b85173b4ec7c#8f85107cca7fa9d88eea5ca60e32b85173b4ec7c" }
 dependencies = [
     { name = "aiohttp" },
     { name = "aiosqlite" },
@@ -1329,10 +1326,6 @@ dependencies = [
     { name = "uvicorn" },
     { name = "watchdog" },
     { name = "websockets" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/02/55/63336b5cd9679a32b36cb14971a7461811db20126bb63cb092fe653b8d54/google_adk-2.7.1.tar.gz", hash = "sha256:0485bfba1a04960a3784eb67531491475be1a3f8acefcc5c880a906857ecb3e2", size = 3806947, upload-time = "2026-08-17T18:33:11.841Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a4/ed/6b3da8b43525d9b28a95836abb1042abc26fe1e8be9f63eb01c18b70d4d4/google_adk-2.7.1-py3-none-any.whl", hash = "sha256:cd21e37c9846a80086fd880924aa5548e625ef85178122b40cda81ef5316129f", size = 4396591, upload-time = "2026-08-17T18:33:09.596Z" },
 ]
 
 [[package]]
@@ -4810,7 +4803,7 @@ dev = [
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
     { name = "deepagents", marker = "python_full_version >= '3.11' and extra == 'deepagents'", specifier = ">=0.6.12,<0.7" },
-    { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=2.5.0,<3" },
+    { name = "google-adk", marker = "extra == 'google-adk'", git = "https://github.com/google/adk-python?rev=8f85107cca7fa9d88eea5ca60e32b85173b4ec7c" },
     { name = "google-genai", marker = "extra == 'google-genai'", specifier = ">=2.10.0,<3.0.0" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "langchain", marker = "python_full_version >= '3.11' and extra == 'deepagents'", specifier = ">=1.3.11,<2" },
