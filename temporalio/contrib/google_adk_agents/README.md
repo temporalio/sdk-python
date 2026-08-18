@@ -379,15 +379,15 @@ pending across `run_async` turns.
 > **Replay-safety note:** HITL resume matches recorded human responses against
 > generated interrupt/function-call ids, so those ids must regenerate
 > identically on replay. The plugin installs ADK's platform time/uuid/random
-> providers as process-wide defaults to guarantee this. On google-adk versions
-> where `RequestInput` ids bypass the platform seam, pass an explicit
-> `interrupt_id` to `RequestInput(...)` (as the examples here do).
+> providers as process-wide defaults, so the ids ADK generates (including
+> default `RequestInput` interrupt ids) derive from `workflow.uuid4()` and
+> replay identically.
 
 ## Determinism Notes
 
-- The plugin patches ADK's `google.adk.platform` time, uuid, and (on ADK
-  versions that expose it) random providers to `workflow.now()`,
-  `workflow.uuid4()`, and `workflow.random()` inside workflows.
+- The plugin patches ADK's `google.adk.platform` time, uuid, and random
+  providers to `workflow.now()`, `workflow.uuid4()`, and `workflow.random()`
+  inside workflows.
 - ADK node `timeout=`/`RetryConfig` map onto durable timers
   (`asyncio.wait_for`/`asyncio.sleep`). For activity-backed nodes, prefer
   Temporal activity timeouts and `retry_policy` via `activity_node(...)`

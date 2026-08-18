@@ -49,13 +49,6 @@ from temporalio.worker import Replayer, Worker
 TASK_QUEUE = "adk-graph-task-queue"
 
 
-def _adk_has_random_seam() -> bool:
-    """Whether ADK exposes the platform random provider seam."""
-    import importlib.util
-
-    return importlib.util.find_spec("google.adk.platform._random") is not None
-
-
 @activity.defn
 async def fetch_data(query: str) -> str:
     """Activity that fetches data for a query."""
@@ -424,10 +417,6 @@ async def test_graph_node_retry(client: Client):
 
 @pytest.mark.asyncio
 async def test_graph_node_retry_jitter_replay_safe(client: Client):
-    if not _adk_has_random_seam():
-        pytest.skip(
-            "requires google-adk with the platform random seam (upstream PR pending)"
-        )
     client = _adk_client(client)
     async with _worker(client):
         handle = await client.start_workflow(

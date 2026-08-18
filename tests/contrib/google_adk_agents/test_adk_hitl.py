@@ -53,17 +53,6 @@ TASK_QUEUE = "adk-hitl-task-queue"
 _ACTIVITY_EXECUTIONS: dict[str, list[Any]] = {}
 
 
-def _adk_routes_interrupt_ids_through_platform() -> bool:
-    """Whether ADK mints default RequestInput ids via the platform uuid seam."""
-    import google.adk.platform.uuid as platform_uuid
-
-    platform_uuid.set_id_provider(lambda: "probe-id")
-    try:
-        return RequestInput().interrupt_id == "probe-id"  # type: ignore
-    finally:
-        platform_uuid.reset_id_provider()
-
-
 @activity.defn
 async def danger_activity(target: str) -> str:
     """Activity gated behind human confirmation."""
@@ -443,11 +432,6 @@ async def test_hitl_multiple_pending_partial_response(client: Client):
 
 @pytest.mark.asyncio
 async def test_default_interrupt_id_replay_safe(client: Client):
-    if not _adk_routes_interrupt_ids_through_platform():
-        pytest.skip(
-            "requires google-adk with RequestInput ids routed through the"
-            " platform uuid seam (upstream PR pending)"
-        )
     client = _adk_client(client)
     async with _worker(client):
         handle = await client.start_workflow(

@@ -53,13 +53,14 @@ def setup_deterministic_runtime():
         This function is experimental and may change in future versions.
         Use with caution in production environments.
 
-    Installs Temporal-aware time, uuid, and (when the seam exists) random
-    providers as the process-wide defaults for ADK's ``google.adk.platform``
-    seams. Inside a workflow they derive from ``workflow.now()`` /
-    ``workflow.uuid4()`` / ``workflow.random()`` so replays are
-    deterministic; outside a workflow they fall back to the real primitives.
+    Installs Temporal-aware time, uuid, and random providers as the
+    process-wide defaults for ADK's ``google.adk.platform`` seams. Inside a
+    workflow they derive from ``workflow.now()`` / ``workflow.uuid4()`` /
+    ``workflow.random()`` so replays are deterministic; outside a workflow
+    they fall back to the real primitives.
     """
     try:
+        import google.adk.platform._random
         import google.adk.platform.time
         import google.adk.platform.uuid
 
@@ -74,6 +75,13 @@ def setup_deterministic_runtime():
                 return str(workflow.uuid4())
             return str(uuid.uuid4())
 
+        _local_random = random.Random()
+
+        def _deterministic_random_provider() -> random.Random:
+            if workflow.in_workflow():
+                return workflow.random()
+            return _local_random
+
         _install_provider(
             google.adk.platform.time,
             "_time_provider_context_var",
@@ -84,23 +92,6 @@ def setup_deterministic_runtime():
             "_id_provider_context_var",
             _deterministic_id_provider,
         )
-    except ImportError:
-        pass
-    except Exception as e:
-        print(f"Warning: Failed to set deterministic runtime providers: {e}")
-
-    try:
-        # Available on ADK versions that route retry jitter through the
-        # platform random seam; a no-op ImportError on older versions.
-        import google.adk.platform._random  # type: ignore
-
-        _local_random = random.Random()
-
-        def _deterministic_random_provider() -> random.Random:
-            if workflow.in_workflow():
-                return workflow.random()
-            return _local_random
-
         _install_provider(
             google.adk.platform._random,
             "_random_provider_context_var",
@@ -109,7 +100,7 @@ def setup_deterministic_runtime():
     except ImportError:
         pass
     except Exception as e:
-        print(f"Warning: Failed to set deterministic random provider: {e}")
+        print(f"Warning: Failed to set deterministic runtime providers: {e}")
 
 
 class GoogleAdkPlugin(SimplePlugin):
