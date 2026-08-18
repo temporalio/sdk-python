@@ -14,6 +14,7 @@ from typing import (
     Any,
     NoReturn,
     ParamSpec,
+    TypeGuard,
     TypeVar,
     cast,
 )
@@ -50,6 +51,15 @@ from ._interceptor import (
 )
 
 _TEMPORAL_FAILURE_PROTO_TYPE = "temporal.api.failure.v1.Failure"
+
+_PAYLOAD_VALIDATION_ERROR_TYPE = "PayloadValidationError"
+""":py:attr:`temporalio.exceptions.ApplicationError.type` a data converter uses to
+say that it understood a Nexus operation's input but considers it invalid.
+
+When non-retryable, such an error is reported as a
+:py:attr:`nexusrpc.HandlerErrorType.BAD_REQUEST` handler error rather than as a
+handler-side :py:attr:`nexusrpc.HandlerErrorType.INTERNAL` error.
+"""
 
 
 @dataclass
@@ -505,6 +515,17 @@ class _PayloadTransformVisitor(VisitorFunctions):
         payloads.extend(new_payloads)
 
 
+def _is_payload_validation_error(err: BaseException) -> TypeGuard[ApplicationError]:
+    """Whether err is a non-retryable :py:class:`ApplicationError` whose type is
+    exactly :py:data:`_PAYLOAD_VALIDATION_ERROR_TYPE`.
+    """
+    return (
+        isinstance(err, ApplicationError)
+        and err.non_retryable
+        and err.type == _PAYLOAD_VALIDATION_ERROR_TYPE
+    )
+
+
 @dataclass
 class _DummyPayloadSerializer:
     data_converter: temporalio.converter.DataConverter
@@ -542,6 +563,14 @@ class _DummyPayloadSerializer:
                 _PayloadTransformVisitor(dc._decode_payload_sequence), payload
             )
         except Exception as err:
+            if _is_payload_validation_error(err):
+                # The data converter decoded the input and rejected it, so this
+                # is the caller's fault rather than a handler-side error.
+                raise nexusrpc.HandlerError(
+                    "Invalid operation input",
+                    type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+                    retryable_override=False,
+                ) from err
             raise nexusrpc.HandlerError(
                 "Payload codec failed to decode Nexus operation input",
                 type=nexusrpc.HandlerErrorType.INTERNAL,
@@ -554,6 +583,15 @@ class _DummyPayloadSerializer:
             )
             return input
         except Exception as err:
+            if _is_payload_validation_error(err):
+                # The data converter converted the input and rejected it, so
+                # distinguish it from input that will never decode into the
+                # expected type.
+                raise nexusrpc.HandlerError(
+                    "Invalid operation input",
+                    type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+                    retryable_override=False,
+                ) from err
             raise nexusrpc.HandlerError(
                 "Payload converter failed to decode Nexus operation input",
                 type=nexusrpc.HandlerErrorType.BAD_REQUEST,
