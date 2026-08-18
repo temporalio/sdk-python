@@ -627,7 +627,7 @@ The name passed to `temporal_sandbox_client()` must exactly match the name used 
 
 ### Multiple Backends
 
-A single workflow can target different backends by name. Register all backends on the worker and reference each by name in the workflow. Each backend's options class ships with that backend: `DaytonaSandboxClientOptions` in `agents.extensions.sandbox.daytona`, `UnixLocalSandboxClientOptions` in `agents.sandbox.sandboxes.unix_local`.
+A single workflow can target different backends by name. Register all backends on the worker and reference each by name in the workflow:
 
 ```python
 # Run a task on the "daytona" backend
