@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import time
 import uuid
@@ -30,6 +31,8 @@ from temporalio.api.workflowservice.v1 import DeleteNexusOperationExecutionReque
 from temporalio.client import CloudOperationsClient
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
+
+logger = logging.getLogger(__name__)
 
 
 @nexusrpc.service
@@ -112,12 +115,21 @@ class _CloudNexusEndpointClient:
         )
         # Cloud reports endpoint activation before the Workflow Service can always
         # resolve it. A successful disposable start request verifies that propagation.
+        attempts = 0
         while True:
+            attempts += 1
             try:
                 await nexus_client.start_operation(
                     CloudNexusEndpointReadinessService.ready,
                     None,
                     id=operation_id,
+                )
+                logger.info(
+                    "Cloud Nexus endpoint %s accepted readiness operation %s "
+                    "after %d attempt(s)",
+                    endpoint_name,
+                    operation_id,
+                    attempts,
                 )
                 break
             except RPCError as err:
@@ -131,7 +143,19 @@ class _CloudNexusEndpointClient:
                         f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
                         "to become available"
                     ) from err
+                if attempts == 1:
+                    logger.info(
+                        "Cloud Nexus endpoint %s is not yet resolvable; retrying "
+                        "readiness operation %s",
+                        endpoint_name,
+                        operation_id,
+                    )
                 await asyncio.sleep(1)
+        logger.info(
+            "Deleting Cloud Nexus readiness operation %s for endpoint %s",
+            operation_id,
+            endpoint_name,
+        )
         await env.client.workflow_service.delete_nexus_operation_execution(
             DeleteNexusOperationExecutionRequest(
                 namespace=env.client.namespace,
@@ -171,6 +195,11 @@ async def cloud_nexus_endpoints(
     endpoints: list[Endpoint] = []
 
     async def create_nexus_endpoint(endpoint_name: str, task_queue: str) -> Endpoint:
+        logger.info(
+            "Creating Cloud Nexus endpoint %s for task queue %s",
+            endpoint_name,
+            task_queue,
+        )
         response = await cloud_nexus_endpoint_client.client.cloud_service.create_nexus_endpoint(
             CreateNexusEndpointRequest(
                 spec=EndpointSpec(
@@ -202,9 +231,15 @@ async def cloud_nexus_endpoints(
             response.endpoint_id
         )
         endpoints[-1] = endpoint
+        logger.info(
+            "Cloud Nexus endpoint %s (%s) is active; checking Workflow Service readiness",
+            endpoint_name,
+            endpoint.id,
+        )
         await cloud_nexus_endpoint_client.wait_for_endpoint_readiness(
             env, endpoint_name
         )
+        logger.info("Cloud Nexus endpoint %s is ready for the test", endpoint_name)
         return endpoint
 
     monkeypatch.setattr(env, "create_nexus_endpoint", create_nexus_endpoint)
@@ -212,6 +247,9 @@ async def cloud_nexus_endpoints(
         yield
     finally:
         for endpoint in reversed(endpoints):
+            logger.info(
+                "Deleting Cloud Nexus endpoint %s (%s)", endpoint.spec.name, endpoint.id
+            )
             response = await cloud_nexus_endpoint_client.client.cloud_service.delete_nexus_endpoint(
                 DeleteNexusEndpointRequest(
                     endpoint_id=endpoint.id,
