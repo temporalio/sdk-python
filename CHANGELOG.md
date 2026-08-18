@@ -64,6 +64,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Standalone activity start requests now include a unique request ID so RPC retries are deduplicated.
 - OpenTelemetry trace and span IDs propagated by concurrent workers no longer
   interfere with each other, preserving the correct parent-child hierarchy.
 - The `google-adk` extra now depends on `mcp`, so fresh installs of
