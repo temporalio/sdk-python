@@ -5,6 +5,7 @@ import time
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from datetime import timedelta
 
 import nexusrpc
 import pytest
@@ -28,7 +29,7 @@ from temporalio.api.cloud.nexus.v1 import (
 from temporalio.api.cloud.operation.v1 import AsyncOperation
 from temporalio.api.cloud.resource.v1 import ResourceState
 from temporalio.api.workflowservice.v1 import DeleteNexusOperationExecutionRequest
-from temporalio.client import CloudOperationsClient
+from temporalio.client import CloudOperationsClient, NexusOperationFailureError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 
@@ -109,29 +110,23 @@ class _CloudNexusEndpointClient:
         self, env: WorkflowEnvironment, endpoint_name: str
     ) -> None:
         deadline = time.monotonic() + 10 * 60
-        operation_id = f"cloud-nexus-readiness-{uuid.uuid4()}"
         nexus_client = env.client.create_nexus_client(
             CloudNexusEndpointReadinessService, endpoint_name
         )
         # Cloud reports endpoint activation before the Workflow Service can always
-        # resolve it. A successful disposable start request verifies that propagation.
+        # resolve it. Waiting for the disposable operation's terminal state verifies
+        # routing, which happens asynchronously after its start request is accepted.
         attempts = 0
         while True:
             attempts += 1
+            operation_id = f"cloud-nexus-readiness-{uuid.uuid4()}"
             try:
-                await nexus_client.start_operation(
+                operation = await nexus_client.start_operation(
                     CloudNexusEndpointReadinessService.ready,
                     None,
                     id=operation_id,
+                    schedule_to_close_timeout=timedelta(seconds=5),
                 )
-                logger.info(
-                    "Cloud Nexus endpoint %s accepted readiness operation %s "
-                    "after %d attempt(s)",
-                    endpoint_name,
-                    operation_id,
-                    attempts,
-                )
-                break
             except RPCError as err:
                 if (
                     err.status != RPCStatusCode.NOT_FOUND
@@ -151,17 +146,45 @@ class _CloudNexusEndpointClient:
                         operation_id,
                     )
                 await asyncio.sleep(1)
-        logger.info(
-            "Deleting Cloud Nexus readiness operation %s for endpoint %s",
-            operation_id,
-            endpoint_name,
-        )
-        await env.client.workflow_service.delete_nexus_operation_execution(
-            DeleteNexusOperationExecutionRequest(
-                namespace=env.client.namespace,
-                operation_id=operation_id,
+                continue
+            try:
+                await operation.result()
+            except NexusOperationFailureError as err:
+                if str(err.cause) == "nexus endpoint not found":
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError(
+                            f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
+                            "to become available"
+                        ) from err
+                    if attempts == 1:
+                        logger.info(
+                            "Cloud Nexus endpoint %s is not yet routable; retrying "
+                            "readiness operation %s",
+                            endpoint_name,
+                            operation_id,
+                        )
+                    await asyncio.sleep(1)
+                    continue
+            finally:
+                logger.info(
+                    "Deleting Cloud Nexus readiness operation %s for endpoint %s",
+                    operation_id,
+                    endpoint_name,
+                )
+                await env.client.workflow_service.delete_nexus_operation_execution(
+                    DeleteNexusOperationExecutionRequest(
+                        namespace=env.client.namespace,
+                        operation_id=operation_id,
+                    )
+                )
+            logger.info(
+                "Cloud Nexus endpoint %s completed readiness operation %s after "
+                "%d attempt(s)",
+                endpoint_name,
+                operation_id,
+                attempts,
             )
-        )
+            break
 
 
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
