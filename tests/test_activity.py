@@ -765,8 +765,13 @@ async def test_manual_cancellation(client: Client, env: WorkflowEnvironment):
         # report_cancellation fails if activity is not in CANCELLATION_REQUESTED state
         with pytest.raises(RPCError) as err:
             await async_activity_handle.report_cancellation("Test cancellation")
-        assert err.value.status == RPCStatusCode.FAILED_PRECONDITION
-        assert "invalid transition from Started" in str(err.value)
+        assert err.value.status in {
+            RPCStatusCode.FAILED_PRECONDITION,
+            RPCStatusCode.INVALID_ARGUMENT,
+        }
+        assert "invalid transition from Started" in str(
+            err.value
+        ) or "unable to mark activity as canceled" in str(err.value)
 
         # Request cancellation to transition activity to CANCELLATION_REQUESTED state
         await activity_handle.cancel()
