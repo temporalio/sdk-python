@@ -20,6 +20,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
+  `ReplaySafeLoggerProvider` (and exported `ReplaySafeTracerProvider`): wrap an
+  OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
+  Google ADK) are not duplicated on replay. `GoogleAdkPlugin` warns when a global OTel
+  provider is not replay-safe.
 - Added `LoggingConfig.format` to select compact, pretty, or newline-delimited JSON output for
   Core logs written to the console.
 
@@ -38,6 +43,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- The `opentelemetry` and `lambda-worker-otel` extras now require
+  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.26`, matching what
+  `temporalio.contrib.opentelemetry` already required in practice.
 - `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
   for repeated type hints instead of rebuilding their schemas for every
   payload, greatly speeding up decode of non-model hints such as discriminated
@@ -64,6 +72,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.opentelemetry` replay-safe spans now delegate
+  `Span.add_link` to the wrapped span. Previously the wrapper inherited
+  OpenTelemetry's non-abstract no-op default, silently dropping links added
+  after span creation.
 - Standalone activity start requests now include a unique request ID so RPC retries are deduplicated.
 - OpenTelemetry trace and span IDs propagated by concurrent workers no longer
   interfere with each other, preserving the correct parent-child hierarchy.
