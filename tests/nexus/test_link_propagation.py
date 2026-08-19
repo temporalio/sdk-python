@@ -158,9 +158,6 @@ def _start_input(start_signal: str | None = None) -> StartWorkflowInput:
         rpc_timeout=None,
         request_eager_start=False,
         priority=temporalio.common.Priority.default,
-        callbacks=[],
-        links=[],
-        request_id=None,
         versioning_override=None,
     )
 
@@ -442,34 +439,38 @@ async def test_start_from_nexus_context_sets_all_on_conflict_options() -> None:
     assert sent.on_conflict_options.attach_request_id
     assert sent.on_conflict_options.attach_completion_callbacks
     assert sent.on_conflict_options.attach_links
+    assert sent.request_id
+    assert sent.request_id != "req-id"
+    assert len(sent.completion_callbacks) == 0
 
 
 @pytest.mark.usefixtures("nexus_ctx")
-async def test_backing_workflow_start_sets_on_conflict_options_without_duplicating_links() -> (
-    None
-):
+async def test_backing_workflow_start_gets_nexus_request_fields() -> None:
     workflow_service = mock.MagicMock()
     workflow_service.start_workflow_execution = mock.AsyncMock(
         return_value=_start_response()
     )
     impl = _make_client_impl(workflow_service)
 
-    # The nexus-backing workflow carries its inbound links via input.links (start_workflow
-    # forwards them as links=), so the build path must enable on_conflict_options but must not
-    # also re-add the context's request links.
-    start_input = _start_input()
-    start_input.links = [_inbound_nexus_link()]
     with temporalio.nexus._operation_context._nexus_backing_start_context():
-        await impl.start_workflow(start_input)
+        await impl.start_workflow(_start_input())
 
     sent = workflow_service.start_workflow_execution.call_args.args[0]
     assert sent.HasField("on_conflict_options")
     assert sent.on_conflict_options.attach_request_id
     assert sent.on_conflict_options.attach_completion_callbacks
     assert sent.on_conflict_options.attach_links
-    # The single inbound link appears exactly once, not duplicated.
     assert len(sent.links) == 1
     assert sent.links[0] == _inbound_nexus_link()
+    assert sent.request_id == "req-id"
+    assert len(sent.completion_callbacks) == 1
+    operation_token = temporalio.nexus._token.OperationToken.decode(
+        sent.completion_callbacks[0].nexus.header["nexus-operation-token"]
+    )
+    assert operation_token.type is temporalio.nexus._token.OperationTokenType.WORKFLOW
+    assert operation_token.namespace == NAMESPACE
+    assert operation_token.workflow_id == WORKFLOW_ID
+    assert list(sent.completion_callbacks[0].links) == [_inbound_nexus_link()]
 
 
 async def test_start_outside_nexus_context_leaves_on_conflict_options_unset() -> None:

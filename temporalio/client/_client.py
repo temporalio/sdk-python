@@ -22,7 +22,6 @@ from nexusrpc import OutputT
 from typing_extensions import Required, Self, TypedDict
 
 import temporalio.activity
-import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
@@ -63,7 +62,6 @@ from ._activity import (
     AsyncActivityHandle,
     AsyncActivityIDReference,
 )
-from ._callback import Callback
 from ._impl import _ClientImpl
 from ._interceptor import (
     CountActivitiesInput,
@@ -560,12 +558,6 @@ class Client:
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: temporalio.common.VersioningOverride | None = None,
-        # The following options should not be considered part of the public API. They
-        # are deliberately not exposed in overloads, and are not subject to any
-        # backwards compatibility guarantees.
-        callbacks: Sequence[Callback] = [],
-        links: Sequence[temporalio.api.common.v1.Link] = [],
-        request_id: str | None = None,
         stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
@@ -657,9 +649,6 @@ class Client:
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
                 priority=priority,
-                callbacks=callbacks,
-                links=links,
-                request_id=request_id,
             )
         )
 

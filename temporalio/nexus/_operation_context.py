@@ -667,23 +667,14 @@ async def _start_nexus_backing_workflow(
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
     versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> WorkflowHandle[ReturnType]:
-    # We must pass nexus_completion_callbacks, links, and request_id,
-    # but these are deliberately not exposed in overloads, hence the type-check
-    # violation.
-
     # Here we are starting a "nexus-backing" workflow. That means that the StartWorkflow request
     # contains nexus-specific data such as a completion callback (used by the handler server
     # namespace to deliver the result to the caller namespace when the workflow reaches a
     # terminal state) and inbound links to the caller workflow (attached to history events of
     # the workflow started in the handler namespace, and displayed in the UI).
     with _nexus_backing_start_context():
-        token = OperationToken(
-            type=OperationTokenType.WORKFLOW,
-            namespace=temporal_context.client.namespace,
-            workflow_id=id,
-        ).encode()
-        wf_handle = await temporal_context.client.start_workflow(  # type: ignore
-            workflow=workflow,
+        wf_handle = await temporal_context.client.start_workflow(
+            workflow=workflow,  # type: ignore
             arg=arg,
             args=args,
             id=id,
@@ -708,9 +699,6 @@ async def _start_nexus_backing_workflow(
             request_eager_start=request_eager_start,
             priority=priority,
             versioning_override=versioning_override,
-            callbacks=temporal_context._get_callbacks(token),
-            links=temporal_context._get_request_links(),
-            request_id=temporal_context.nexus_context.request_id,
         )
 
     return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
@@ -758,6 +746,56 @@ async def _start_nexus_operation_workflow_update(  # pyright: ignore[reportUnuse
         links=temporal_context._get_request_links(),
         request_id=temporal_context.nexus_context.request_id,
     )
+
+
+def _apply_nexus_context_to_start_workflow_request(  # pyright: ignore[reportUnusedFunction]
+    req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
+) -> None:
+    """Apply the current Nexus operation context to a workflow start request.
+
+    This is a no-op outside a Nexus operation context. Within one, it attaches
+    inbound links and configures conflict handling to preserve Nexus metadata.
+    The Nexus request ID and completion callbacks are added only when the
+    workflow is backing the Nexus operation.
+    """
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None:
+        req.on_conflict_options.attach_request_id = True
+        req.on_conflict_options.attach_completion_callbacks = True
+        req.on_conflict_options.attach_links = True
+
+        request_links = nexus_ctx._get_request_links()
+
+        # Links are duplicated on request for compatibility with older server versions.
+        req.links.extend(request_links)
+
+        if _in_nexus_backing_start_context():
+            req.request_id = nexus_ctx.nexus_context.request_id
+            callbacks = nexus_ctx._get_callbacks(
+                OperationToken(
+                    type=OperationTokenType.WORKFLOW,
+                    namespace=nexus_ctx.client.namespace,
+                    workflow_id=req.workflow_id,
+                ).encode()
+            )
+            req.completion_callbacks.extend(
+                temporalio.api.common.v1.Callback(
+                    nexus=temporalio.api.common.v1.Callback.Nexus(
+                        url=callback.url,
+                        header=callback.headers,
+                    ),
+                    links=request_links,
+                )
+                for callback in callbacks
+            )
+
+
+def _apply_start_workflow_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
+    workflow_handle: temporalio.client.WorkflowHandle[Any, Any],
+) -> None:
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None:
+        nexus_ctx._add_start_workflow_response_link(workflow_handle)
 
 
 def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnusedFunction]
