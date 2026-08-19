@@ -20,12 +20,12 @@ from agents.sandbox import SandboxAgent
 from typing_extensions import Unpack
 
 from temporalio import workflow
+from temporalio.contrib.openai_agents._errors import AgentsWorkflowError
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
 from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_client import (
     TemporalSandboxClient,
 )
-from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 
 # Recursively replace models in all agents

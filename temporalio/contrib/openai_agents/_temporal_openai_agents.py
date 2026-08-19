@@ -20,6 +20,7 @@ from agents.tracing.provider import DefaultTraceProvider
 from openai._models import construct_type
 
 import temporalio.api.common.v1
+from temporalio.contrib.openai_agents._errors import AgentsWorkflowError
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import (
@@ -35,7 +36,6 @@ from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsContextPropagationInterceptor,
 )
-from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from temporalio.contrib.opentelemetry._tracer_provider import ReplaySafeTracerProvider
 from temporalio.contrib.pydantic import (
     PydanticJSONPlainPayloadConverter,

@@ -16,6 +16,7 @@ from agents.sandbox.snapshot import SnapshotBase, SnapshotSpec, SnapshotSpecUnio
 from pydantic.type_adapter import TypeAdapter
 
 from temporalio import workflow
+from temporalio.contrib.openai_agents._errors import AgentsWorkflowError
 from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
     CreateSessionArgs,
     ResumeSessionArgs,
@@ -127,9 +128,6 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
 
 
 def _reject_host_path_grants(manifest: Manifest | None) -> None:
-    # Imported here because workflow.py imports this module.
-    from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
-
     if manifest is None:
         return
     # Sandbox-side paths only: this message reaches the workflow failure event.

@@ -4,6 +4,7 @@ This module provides compatibility between the
 `OpenAI Agents SDK <https://github.com/openai/openai-agents-python>`_ and Temporal workflows.
 """
 
+from temporalio.contrib.openai_agents._errors import AgentsWorkflowError
 from temporalio.contrib.openai_agents._mcp import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
@@ -23,7 +24,6 @@ from temporalio.contrib.openai_agents.sandbox._sandbox_client_provider import (
 from temporalio.contrib.openai_agents.sandbox._temporal_worker_env_value import (
     TemporalWorkerEnvValue,
 )
-from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 from . import testing, workflow
 
