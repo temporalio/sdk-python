@@ -28,7 +28,6 @@ from temporalio.api.cloud.nexus.v1 import (
 )
 from temporalio.api.cloud.operation.v1 import AsyncOperation
 from temporalio.api.cloud.resource.v1 import ResourceState
-from temporalio.api.workflowservice.v1 import DeleteNexusOperationExecutionRequest
 from temporalio.client import CloudOperationsClient, NexusOperationFailureError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
@@ -173,18 +172,6 @@ class _CloudNexusEndpointClient:
                         )
                     await asyncio.sleep(1)
                     continue
-            finally:
-                logger.info(
-                    "Deleting Cloud Nexus readiness operation %s for endpoint %s",
-                    operation_id,
-                    endpoint_name,
-                )
-                await env.client.workflow_service.delete_nexus_operation_execution(
-                    DeleteNexusOperationExecutionRequest(
-                        namespace=env.client.namespace,
-                        operation_id=operation_id,
-                    )
-                )
             logger.info(
                 "Cloud Nexus endpoint %s completed readiness operation %s after "
                 "%d attempt(s)",
