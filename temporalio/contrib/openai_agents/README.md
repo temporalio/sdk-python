@@ -595,12 +595,12 @@ Register one or more `SandboxClientProvider` instances with the plugin. Each pro
 
 ```python
 import asyncio
-import docker
+from datetime import timedelta
 from temporalio.client import Client
 from temporalio.worker import Worker
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, SandboxClientProvider, ModelActivityParameters
 from agents.extensions.sandbox.daytona import DaytonaSandboxClient
-from agents.extensions.sandbox.unix_local import UnixLocalSandboxClient
+from agents.sandbox.sandboxes.unix_local import UnixLocalSandboxClient
 
 async def main():
     client = await Client.connect(
@@ -638,6 +638,7 @@ from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
 from agents import Runner
 from agents.sandbox import SandboxAgent, SandboxRunConfig
 from agents.run import RunConfig
+from agents.extensions.sandbox.daytona import DaytonaSandboxClientOptions
 
 @workflow.defn
 class MyWorkflow:
