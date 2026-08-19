@@ -150,7 +150,10 @@ class _CloudNexusEndpointClient:
             try:
                 await operation.result()
             except NexusOperationFailureError as err:
-                if str(err.cause) == "nexus endpoint not found":
+                if str(err.cause) in {
+                    "endpoint not registered",
+                    "nexus endpoint not found",
+                }:
                     if time.monotonic() >= deadline:
                         raise TimeoutError(
                             f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
