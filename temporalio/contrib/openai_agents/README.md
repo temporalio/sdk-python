@@ -487,6 +487,42 @@ A stateless factory that declares no parameters — like the `lambda: MCPServerS
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
 
+## Secrets for Hosted Tools
+
+⚠️ **Experimental** - This functionality is subject to change prior to General Availability.
+
+Use `temporal_worker_env_ref()` for a hosted tool credential that should come from the worker's environment rather than being written into your workflow. Pass it the *name of an environment variable*, in place of the credential itself:
+
+```python
+from agents import HostedMCPTool
+from temporalio.contrib.openai_agents import temporal_worker_env_ref
+
+tool = HostedMCPTool(
+    tool_config={
+        "type": "mcp",
+        "server_label": "my_server",
+        "server_url": "https://example.com/mcp",
+        "authorization": temporal_worker_env_ref("MY_MCP_TOKEN"),
+    }
+)
+```
+
+Every worker that runs model activities must both set `MY_MCP_TOKEN` and name it as resolvable:
+
+```python
+plugin = OpenAIAgentsPlugin(resolvable_worker_env_vars=["MY_MCP_TOKEN"])
+```
+
+Names are matched exactly, with no globbing, and `"*"` anywhere in the list allows every environment variable on the worker.
+
+A reference can sit inside a larger value: in `"Bearer " + temporal_worker_env_ref("MY_MCP_TOKEN")`, the reference is replaced in place and the rest of the string is sent unchanged.
+
+The environment variable's value is substituted in these fields and no others:
+
+- `authorization`, and the value of each entry in `headers`, in a `HostedMCPTool`'s `tool_config`
+- `value` in each entry of `network_policy.domain_secrets` under a hosted `ShellTool`'s `environment`
+- `value` in each entry of `network_policy.domain_secrets` under the `container` in a `CodeInterpreterTool`'s `tool_config`
+
 ## Sandbox Support
 
 ⚠️ **Pre-release** - This functionality is subject to change prior to General Availability.
@@ -520,12 +556,12 @@ Register one or more `SandboxClientProvider` instances with the plugin. Each pro
 
 ```python
 import asyncio
-import docker
+from datetime import timedelta
 from temporalio.client import Client
 from temporalio.worker import Worker
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, SandboxClientProvider, ModelActivityParameters
 from agents.extensions.sandbox.daytona import DaytonaSandboxClient
-from agents.extensions.sandbox.unix_local import UnixLocalSandboxClient
+from agents.sandbox.sandboxes.unix_local import UnixLocalSandboxClient
 
 async def main():
     client = await Client.connect(
@@ -563,6 +599,7 @@ from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client
 from agents import Runner
 from agents.sandbox import SandboxAgent, SandboxRunConfig
 from agents.run import RunConfig
+from agents.extensions.sandbox.daytona import DaytonaSandboxClientOptions
 
 @workflow.defn
 class MyWorkflow:
@@ -719,6 +756,7 @@ Certain tools are not suitable for a distributed computing environment, so these
 | HostedMCPTool       |    Yes    |
 | ImageGenerationTool |    Yes    |
 | CodeInterpreterTool |    Yes    |
+| ShellTool           |    Yes    |
 | ComputerTool        |    No     |
 
 #### Tool Context

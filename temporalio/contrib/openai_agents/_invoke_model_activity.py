@@ -4,6 +4,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 """
 
 import enum
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, NoReturn
@@ -46,6 +47,9 @@ from typing_extensions import Required, TypedDict
 
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import auto_heartbeater
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    _WorkerEnvRefResolver,
+)
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
@@ -223,7 +227,7 @@ async def _noop_shell_executor(*_a: Any, **_kw: Any) -> str:
     return ""
 
 
-def _build_tool(tool: ToolInput) -> Tool:
+def _build_tool(tool: ToolInput, env_refs: _WorkerEnvRefResolver) -> Tool:
     """Reconstruct a Tool from its data-conversion-friendly input form."""
     if isinstance(
         tool,
@@ -231,22 +235,29 @@ def _build_tool(tool: ToolInput) -> Tool:
             FileSearchTool,
             WebSearchTool,
             ImageGenerationTool,
-            CodeInterpreterTool,
             LocalShellTool,
             ToolSearchTool,
         ),
     ):
         return tool
+    elif isinstance(tool, CodeInterpreterTool):
+        return CodeInterpreterTool(
+            tool_config=env_refs.resolve_code_interpreter_tool_config(tool.tool_config)
+        )
     elif isinstance(tool, ShellToolInput):
+        environment = env_refs.resolve_shell_tool_environment(tool.environment)
+        # Only a local environment takes an executor.
         return ShellTool(
             name=tool.name,
-            environment=tool.environment,
-            executor=_noop_shell_executor,
+            environment=environment,
+            executor=_noop_shell_executor if environment["type"] == "local" else None,
         )
     elif isinstance(tool, ApplyPatchToolInput):
         return ApplyPatchTool(name=tool.name, editor=_NoopApplyPatchEditor())
     elif isinstance(tool, HostedMCPToolInput):
-        return HostedMCPTool(tool_config=tool.tool_config)
+        return HostedMCPTool(
+            tool_config=env_refs.resolve_mcp_tool_config(tool.tool_config)
+        )
     elif isinstance(tool, CustomToolInput):
         return CustomTool(
             name=tool.tool_config["name"],
@@ -269,8 +280,9 @@ def _build_tool(tool: ToolInput) -> Tool:
 
 def _build_tools_and_handoffs(
     input: ActivityModelInput,
+    env_refs: _WorkerEnvRefResolver,
 ) -> tuple[list[Tool], list[Handoff[Any, Any]]]:
-    tools = [_build_tool(x) for x in input.get("tools", [])]
+    tools = [_build_tool(x, env_refs) for x in input.get("tools", [])]
     handoffs: list[Handoff[Any, Any]] = [
         Handoff(
             tool_name=x.tool_name,
@@ -327,18 +339,23 @@ class ModelActivity:
     Disabling retries in your model of choice is recommended to allow activity retries to define the retry model.
     """
 
-    def __init__(self, model_provider: ModelProvider | None = None):
+    def __init__(
+        self,
+        model_provider: ModelProvider | None = None,
+        resolvable_worker_env_vars: Collection[str] = (),
+    ):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider or OpenAIProvider(
             openai_client=AsyncOpenAI(max_retries=0)
         )
+        self._env_refs = _WorkerEnvRefResolver(resolvable_worker_env_vars)
 
     @activity.defn
     @auto_heartbeater
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
         model = self._model_provider.get_model(input.get("model_name"))
-        tools, handoffs = _build_tools_and_handoffs(input)
+        tools, handoffs = _build_tools_and_handoffs(input, self._env_refs)
 
         try:
             return await model.get_response(
@@ -382,7 +399,7 @@ class ModelActivity:
         trip ``heartbeat_timeout``.
         """
         model = self._model_provider.get_model(input.get("model_name"))
-        tools, handoffs = _build_tools_and_handoffs(input)
+        tools, handoffs = _build_tools_and_handoffs(input, self._env_refs)
 
         topic = input["streaming_topic"]
         batch_interval = input.get(

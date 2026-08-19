@@ -35,15 +35,28 @@ workflowservice_request_response_proto = (
     / "v1"
     / "request_response.proto"
 )
+NEX_GEN_VERSION = "0.2.1"
 
 
 def nex_gen_command() -> list[str]:
     if bin_path := os.environ.get("NEX_GEN_BIN"):
         return [bin_path]
 
-    if shutil.which("nex-gen") is None:
-        subprocess.check_call(["cargo", "install", "--locked", "nex-gen", "--force"])
-    return ["nex-gen"]
+    if shutil.which("nexgen") is None:
+        subprocess.check_call(
+            [
+                "cargo",
+                "install",
+                "--locked",
+                "nex-gen",
+                "--version",
+                NEX_GEN_VERSION,
+                "--features",
+                "advanced",
+                "--force",
+            ]
+        )
+    return ["nexgen"]
 
 
 def build_descriptor_set(descriptor_path: Path) -> None:
@@ -114,13 +127,10 @@ def generate_nexus_system_api() -> None:
         subprocess.check_call(
             [
                 *command,
-                "generate",
-                "--lang",
                 "python",
-                "--input",
                 str(wit_path),
-                "--input",
                 str(wit_deps_dir),
+                "--native-api",
                 "--support-file",
                 str(python_support_path),
                 "--descriptors",

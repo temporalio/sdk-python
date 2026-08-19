@@ -11,9 +11,13 @@ from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
 
 import temporalio.api.common.v1
+import temporalio.api.failure.v1
 import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice_pb2
 import temporalio.converter
+import temporalio.exceptions
 import temporalio.nexus.system as nexus_system
+import temporalio.nexus.system.workflow_service as workflow_service
+import temporalio.nexus.system.workflow_service.models as workflow_service_models
 from temporalio import workflow
 from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge._visitor_functions import VisitorFunctions
@@ -21,7 +25,13 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
     WorkflowActivationCompletion,
 )
 from temporalio.client import Client
-from temporalio.converter import ExternalStorage, PayloadCodec
+from temporalio.converter import (
+    ExternalStorage,
+    PayloadCodec,
+    SerializationContext,
+    WithSerializationContext,
+    WorkflowSerializationContext,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
@@ -36,6 +46,77 @@ from tests.test_extstore import InMemoryTestDriver
 
 interceptor_traces: list[tuple[str, object]] = []
 SYSTEM_NEXUS_PAYLOAD_METADATA_KEY = "__temporal_system_payload"
+
+
+@dataclasses.dataclass(frozen=True)
+class _FailureTransferValue:
+    error: BaseException
+
+
+class _FailureTransferValueConverter(
+    temporalio.converter.TransferTypeConverter[
+        _FailureTransferValue, temporalio.api.failure.v1.Failure
+    ]
+):
+    transfer_type = temporalio.api.failure.v1.Failure
+
+    def to_transfer_type(
+        self, value: _FailureTransferValue
+    ) -> temporalio.api.failure.v1.Failure:
+        failure = temporalio.api.failure.v1.Failure()
+        nexus_system._current_user_failure_converter().to_failure(
+            value.error,
+            nexus_system._current_user_payload_converter(),
+            failure,
+        )
+        return failure
+
+    def from_transfer_type(
+        self,
+        value: temporalio.api.failure.v1.Failure,
+        type_hint: type[_FailureTransferValue],
+    ) -> _FailureTransferValue:
+        assert type_hint is _FailureTransferValue
+        return _FailureTransferValue(
+            nexus_system._current_user_failure_converter().from_failure(
+                value,
+                nexus_system._current_user_payload_converter(),
+            )
+        )
+
+
+temporalio.converter.transfer_type_convertible(_FailureTransferValueConverter)(
+    _FailureTransferValue
+)
+
+
+class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
+    def __init__(
+        self, expected_payload_converter: temporalio.converter.PayloadConverter
+    ) -> None:
+        super().__init__()
+        self.expected_payload_converter = expected_payload_converter
+        self.to_failure_calls = 0
+        self.from_failure_calls = 0
+
+    def to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: temporalio.converter.PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        assert payload_converter is self.expected_payload_converter
+        self.to_failure_calls += 1
+        super().to_failure(exception, payload_converter, failure)
+
+    def from_failure(
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        payload_converter: temporalio.converter.PayloadConverter,
+    ) -> BaseException:
+        assert payload_converter is self.expected_payload_converter
+        self.from_failure_calls += 1
+        return super().from_failure(failure, payload_converter)
 
 
 @workflow.defn
@@ -54,6 +135,32 @@ class ExternalHandleSignalWithStartWorkflowCaller:
             static_details="details-value",
         )
         return started_handle.id
+
+
+def test_signal_with_start_serialization_context() -> None:
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="test-workflow",
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+    )
+    operation_info = workflow_service.__nexus_operation_registry__[
+        (
+            "temporal.api.workflowservice.v1.WorkflowService",
+            "SignalWithStartWorkflowExecution",
+        )
+    ]
+
+    assert operation_info.serialization_context is not None
+    context = nexus_system._get_serialization_context(
+        "temporal.api.workflowservice.v1.WorkflowService",
+        "SignalWithStartWorkflowExecution",
+        request,
+    )
+    assert isinstance(context, WorkflowSerializationContext)
+    assert context.namespace == "target-namespace"
+    assert context.workflow_id == "target-workflow-id"
 
 
 class RejectOuterSystemNexusCodec(PayloadCodec):
@@ -99,6 +206,34 @@ class RejectOuterSystemNexusCodec(PayloadCodec):
         return decoded
 
 
+class CaptureSystemNexusPayloadContextCodec(PayloadCodec, WithSerializationContext):
+    def __init__(
+        self,
+        captured_contexts: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ) -> None:
+        self._captured_contexts = captured_contexts
+        self._context = context
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> CaptureSystemNexusPayloadContextCodec:
+        return CaptureSystemNexusPayloadContextCodec(self._captured_contexts, context)
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        for payload in payloads:
+            if payload.data in {b'"workflow-input"', b'"signal-input"'}:
+                self._captured_contexts.append(self._context)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+
 class TracingWorkflowInterceptor(Interceptor):
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
@@ -136,13 +271,10 @@ def _assert_start_nexus_operation_interceptor_trace() -> None:
     trace_name, trace_value = interceptor_traces.pop()
     assert trace_name == "workflow.start_nexus_operation"
     trace_input = cast(StartNexusOperationInput[Any, Any], trace_value)
-    request = cast(
-        workflowservice_pb2.SignalWithStartWorkflowExecutionRequest,
-        trace_input.input,
-    )
-    assert request.workflow_id == "system-nexus-workflow-id"
-    assert request.signal_name == "test-signal"
-    assert request.workflow_type.name == "test-workflow"
+    request = trace_input.input
+    assert request.id == "system-nexus-workflow-id"
+    assert request.signal == "test-signal"
+    assert request.workflow == "test-workflow"
 
 
 class _MarkingPayloadVisitor(VisitorFunctions):
@@ -182,14 +314,14 @@ def _new_schedule_nexus_completion(
 
 
 def _new_system_nexus_request_payload() -> temporalio.api.common.v1.Payload:
-    nested_payload = temporalio.converter.PayloadConverter.default.to_payload(
-        "workflow-input"
-    )
+    data_converter = temporalio.converter.default()
+    nested_payload = data_converter.payload_converter.to_payload("workflow-input")
     assert nested_payload is not None
     request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest()
     request.input.payloads.add().CopyFrom(nested_payload)
     payload = nexus_system._get_payload_converter(
-        temporalio.converter.PayloadConverter.default
+        data_converter.payload_converter,
+        data_converter.failure_converter,
     ).to_payload(request)
     assert payload is not None
     return payload
@@ -211,8 +343,10 @@ async def test_schedule_marked_system_nexus_payload_ignores_endpoint() -> None:
     await PayloadVisitor().visit(visitor, completion)
 
     schedule = completion.successful.commands[0].schedule_nexus_operation
+    data_converter = temporalio.converter.default()
     decoded = nexus_system._get_payload_converter(
-        temporalio.converter.PayloadConverter.default
+        data_converter.payload_converter,
+        data_converter.failure_converter,
     ).from_payload(schedule.input)
     assert isinstance(
         decoded, workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
@@ -236,8 +370,10 @@ async def test_schedule_unmarked_system_nexus_payload_visits_input_as_regular_pa
 
     schedule = completion.successful.commands[0].schedule_nexus_operation
     assert schedule.input.metadata["visited"] == b"true"
+    data_converter = temporalio.converter.default()
     decoded = nexus_system._get_payload_converter(
-        temporalio.converter.default().payload_converter
+        data_converter.payload_converter,
+        data_converter.failure_converter,
     ).from_payload(schedule.input)
     assert isinstance(
         decoded, workflowservice_pb2.SignalWithStartWorkflowExecutionRequest
@@ -360,8 +496,10 @@ def _field_is_repeated(field: FieldDescriptor) -> bool:
     ],
 )
 def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
+    data_converter = temporalio.converter.default()
     payload_converter = nexus_system._get_payload_converter(
-        temporalio.converter.PayloadConverter.default
+        data_converter.payload_converter,
+        data_converter.failure_converter,
     )
     proto_value = _build_proto_sample(message_type)
     payload = payload_converter.to_payload(proto_value)
@@ -372,6 +510,65 @@ def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
     roundtripped = payload_converter.from_payload(payload, message_type)
     assert isinstance(roundtripped, message_type)
     assert roundtripped == proto_value
+
+
+def test_system_nexus_uses_user_failure_converter() -> None:
+    payload_converter = temporalio.converter.default().payload_converter
+    failure_converter = _TrackingFailureConverter(payload_converter)
+    system_converter = nexus_system._get_payload_converter(
+        payload_converter, failure_converter
+    )
+
+    payload = system_converter.to_payload(
+        _FailureTransferValue(RuntimeError("test failure"))
+    )
+    converted = system_converter.from_payload(payload, _FailureTransferValue)
+
+    assert isinstance(converted, _FailureTransferValue)
+    assert isinstance(converted.error, temporalio.exceptions.ApplicationError)
+    assert converted.error.message == "test failure"
+    assert converted.error.type == "RuntimeError"
+    assert failure_converter.to_failure_calls == 1
+    assert failure_converter.from_failure_calls == 1
+    with pytest.raises(RuntimeError, match="converter context is not active"):
+        nexus_system._current_user_payload_converter()
+    with pytest.raises(RuntimeError, match="converter context is not active"):
+        nexus_system._current_user_failure_converter()
+
+
+def test_system_nexus_payload_converter_restores_user_context_on_failure() -> None:
+    outer_data_converter = temporalio.converter.default()
+    outer_converters = nexus_system._SystemNexusUserConverters(
+        outer_data_converter.payload_converter,
+        outer_data_converter.failure_converter,
+    )
+    inner_data_converter = temporalio.converter.DataConverter()
+
+    class RaisingFailureConverter(temporalio.converter.DefaultFailureConverter):
+        def to_failure(
+            self,
+            exception: BaseException,
+            payload_converter: temporalio.converter.PayloadConverter,
+            failure: temporalio.api.failure.v1.Failure,
+        ) -> None:
+            assert payload_converter is inner_data_converter.payload_converter
+            raise ValueError("conversion failed")
+
+    inner_system_converter = nexus_system._get_payload_converter(
+        inner_data_converter.payload_converter,
+        RaisingFailureConverter(),
+    )
+
+    with nexus_system._user_converter_context(outer_converters):
+        assert nexus_system._current_user_converters() is outer_converters
+        with pytest.raises(ValueError, match="conversion failed"):
+            inner_system_converter.to_payload(
+                _FailureTransferValue(RuntimeError("test failure"))
+            )
+        assert nexus_system._current_user_converters() is outer_converters
+
+    with pytest.raises(RuntimeError, match="converter context is not active"):
+        nexus_system._current_user_converters()
 
 
 # Cloud namespaces created by CI do not have the System Nexus dynamic config.
@@ -428,3 +625,62 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
         },
     )
     _assert_start_nexus_operation_interceptor_trace()
+
+
+# Cloud namespaces created by CI do not have the System Nexus dynamic config.
+@pytest.mark.requires_local_server
+async def test_signal_with_start_uses_target_workflow_serialization_context(
+    env: WorkflowEnvironment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    captured_contexts: list[SerializationContext | None] = []
+    system_payload_converter_wrap_count = 0
+    original_get_payload_converter = nexus_system._get_payload_converter
+
+    def capture_get_payload_converter(
+        user_payload_converter: temporalio.converter.PayloadConverter,
+        user_failure_converter: temporalio.converter.FailureConverter,
+    ) -> temporalio.converter.PayloadConverter:
+        nonlocal system_payload_converter_wrap_count
+        system_payload_converter_wrap_count += 1
+        return original_get_payload_converter(
+            user_payload_converter, user_failure_converter
+        )
+
+    monkeypatch.setattr(
+        nexus_system, "_get_payload_converter", capture_get_payload_converter
+    )
+    caller_config = env.client.config()
+    caller_config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=CaptureSystemNexusPayloadContextCodec(captured_contexts),
+    )
+    caller_client = Client(**caller_config)
+    caller_task_queue = str(uuid.uuid4())
+    target_workflow_id = "system-nexus-workflow-id"
+
+    async with Worker(
+        caller_client,
+        task_queue=caller_task_queue,
+        workflows=[ExternalHandleSignalWithStartWorkflowCaller],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        result = await caller_client.execute_workflow(
+            ExternalHandleSignalWithStartWorkflowCaller.run,
+            args=[str(uuid.uuid4())],
+            id=str(uuid.uuid4()),
+            task_queue=caller_task_queue,
+            execution_timeout=timedelta(seconds=5),
+        )
+
+    assert result == target_workflow_id
+    assert system_payload_converter_wrap_count >= 2
+    assert len(captured_contexts) >= 2
+    assert all(
+        isinstance(context, WorkflowSerializationContext)
+        and context.workflow_id == target_workflow_id
+        for context in captured_contexts
+    )

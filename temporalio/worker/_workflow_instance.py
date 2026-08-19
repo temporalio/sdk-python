@@ -1032,10 +1032,24 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Handle the four oneof variants of NexusOperationResult
         result = job.result
         if result.HasField("completed"):
+            payload_converter = handle._payload_converter
+            if temporalio.nexus.system.is_system_endpoint(handle._input.endpoint):
+                serialization_context = (
+                    temporalio.nexus.system._get_serialization_context(
+                        handle._input.service,
+                        handle._input.operation_name,
+                        handle._input.input,
+                    )
+                )
+                if serialization_context is not None:
+                    payload_converter = temporalio.nexus.system._get_payload_converter(
+                        self._payload_converter_with_context(serialization_context),
+                        self._failure_converter_with_context(serialization_context),
+                    )
             [output] = self._convert_payloads(
                 [result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
-                handle._payload_converter,
+                payload_converter,
             )
             handle._resolve_success(output)
         elif result.HasField("failed"):
@@ -2133,13 +2147,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ),
             )
 
-        payload_converter = (
-            temporalio.nexus.system._get_payload_converter(
-                self._workflow_context_payload_converter
+        if temporalio.nexus.system.is_system_endpoint(input.endpoint):
+            payload_converter = temporalio.nexus.system._get_payload_converter(
+                self._workflow_context_payload_converter,
+                self._workflow_context_failure_converter,
             )
-            if temporalio.nexus.system.is_system_endpoint(input.endpoint)
-            else self._context_free_payload_converter
-        )
+        else:
+            payload_converter = self._context_free_payload_converter
         handle = _NexusOperationHandle(
             self,
             self._next_seq("nexus_operation"),
@@ -2382,9 +2396,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
             and command_info.command_seq in self._pending_nexus_operations
         ):
-            # Use empty context for nexus operations: users will never want to encrypt using a
-            # key derived from caller workflow context because the caller workflow context is
-            # not available on the handler side for decryption.
+            nexus_operation = self._pending_nexus_operations[command_info.command_seq]
+            if temporalio.nexus.system.is_system_endpoint(
+                nexus_operation._input.endpoint
+            ):
+                return temporalio.nexus.system._get_serialization_context(
+                    nexus_operation._input.service,
+                    nexus_operation._input.operation_name,
+                    nexus_operation._input.input,
+                )
+            # Other Nexus operations have no context because the caller workflow context is
+            # unavailable on the handler side for decryption.
             return None
 
         else:

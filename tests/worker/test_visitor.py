@@ -233,8 +233,10 @@ async def test_system_nexus_envelope_is_detected_in_generic_payload_field():
     system_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest(
         input=Payloads(payloads=[Payload(data=b"workflow-input")]),
     )
+    data_converter = temporalio.converter.default()
     payload_converter = nexus_system._get_payload_converter(
-        temporalio.converter.default().payload_converter
+        data_converter.payload_converter,
+        data_converter.failure_converter,
     )
     system_payload = payload_converter.to_payload(system_request)
     assert system_payload is not None
@@ -409,8 +411,9 @@ async def test_system_nexus_envelope_visit_is_bounded():
             finally:
                 active_visits -= 1
 
+    data_converter = temporalio.converter.default()
     payload_converter = nexus_system._get_payload_converter(
-        temporalio.converter.PayloadConverter.default
+        data_converter.payload_converter, data_converter.failure_converter
     )
     system_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest(
         input=Payloads(payloads=[Payload(data=b"workflow-input")]),

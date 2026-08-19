@@ -8,7 +8,6 @@ import typing
 
 import typing_extensions
 
-import temporalio.api.workflowservice.v1.request_response_pb2
 import temporalio.common
 
 if typing.TYPE_CHECKING:
@@ -16,6 +15,7 @@ if typing.TYPE_CHECKING:
 
 from ..models import (
     SignalWithStartWorkflowRequest,
+    SignalWithStartWorkflowResponse,
     UserMetadata,
 )
 
@@ -33,15 +33,14 @@ async def _signal_with_start_workflow(
         get_external_workflow_handle,
     )
 
-    request_proto = request.to_proto()
     nexus_client = create_nexus_client(
         service="temporal.api.workflowservice.v1.WorkflowService",
         endpoint="__temporal_system",
     )
     handle = await nexus_client.start_operation(
         operation="SignalWithStartWorkflowExecution",
-        input=request_proto,
-        output_type=temporalio.api.workflowservice.v1.request_response_pb2.SignalWithStartWorkflowExecutionResponse,
+        input=request,
+        output_type=SignalWithStartWorkflowResponse,
     )
     result = await handle
     return get_external_workflow_handle(request.id, run_id=result.run_id)
@@ -61,7 +60,6 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
     task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
     retry_policy: temporalio.common.RetryPolicy | None = ...,
@@ -74,101 +72,6 @@ async def signal_with_start_workflow(
     static_summary: str | None = ...,
     static_details: str | None = ...,
 ) -> ExternalWorkflowHandle[object]: ...
-
-
-# Overload case:
-# - workflow name with optional list-form workflow arguments
-# - signal name with optional list-form signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: str,
-    *,
-    args: list[typing.Any] | None = ...,
-    id: str,
-    task_queue: str,
-    signal: str,
-    signal_args: list[typing.Any] | None = ...,
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[object]: ...
-
-
-# Overload case:
-# - workflow method callable with typed positional workflow arguments
-# - signal name with optional list-form signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[
-        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
-        collections.abc.Awaitable[WorkflowResult],
-    ],
-    *args: typing_extensions.Unpack[WorkflowArgs],
-    id: str,
-    task_queue: str,
-    signal: str,
-    signal_args: list[typing.Any] | None = ...,
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
-
-
-# Overload case:
-# - workflow method callable with list-form workflow arguments
-# - signal name with optional list-form signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[
-        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
-        collections.abc.Awaitable[WorkflowResult],
-    ],
-    *,
-    args: list[typing.Any],
-    id: str,
-    task_queue: str,
-    signal: str,
-    signal_args: list[typing.Any] | None = ...,
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
 
 
 # Overload case:
@@ -186,105 +89,6 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
     task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
-
-
-# Overload case:
-# - workflow name with optional list-form workflow arguments
-# - signal method callable with no signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: str,
-    *,
-    args: list[typing.Any] | None = ...,
-    id: str,
-    task_queue: str,
-    signal: collections.abc.Callable[
-        [SelfType], None | collections.abc.Awaitable[None]
-    ],
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
-
-
-# Overload case:
-# - workflow method callable with typed positional workflow arguments
-# - signal method callable with no signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[
-        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
-        collections.abc.Awaitable[WorkflowResult],
-    ],
-    *args: typing_extensions.Unpack[WorkflowArgs],
-    id: str,
-    task_queue: str,
-    signal: collections.abc.Callable[
-        [SelfType], None | collections.abc.Awaitable[None]
-    ],
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
-
-
-# Overload case:
-# - workflow method callable with list-form workflow arguments
-# - signal method callable with no signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[
-        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
-        collections.abc.Awaitable[WorkflowResult],
-    ],
-    *,
-    args: list[typing.Any],
-    id: str,
-    task_queue: str,
-    signal: collections.abc.Callable[
-        [SelfType], None | collections.abc.Awaitable[None]
-    ],
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
     retry_policy: temporalio.common.RetryPolicy | None = ...,
@@ -315,108 +119,6 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
     task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
-
-
-# Overload case:
-# - workflow name with optional list-form workflow arguments
-# - signal method callable with a typed single signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: str,
-    *,
-    args: list[typing.Any] | None = ...,
-    id: str,
-    task_queue: str,
-    signal: collections.abc.Callable[
-        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
-    ],
-    signal_args: SignalArg,
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
-
-
-# Overload case:
-# - workflow method callable with typed positional workflow arguments
-# - signal method callable with a typed single signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[
-        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
-        collections.abc.Awaitable[WorkflowResult],
-    ],
-    *args: typing_extensions.Unpack[WorkflowArgs],
-    id: str,
-    task_queue: str,
-    signal: collections.abc.Callable[
-        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
-    ],
-    signal_args: SignalArg,
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
-    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
-    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
-    retry_policy: temporalio.common.RetryPolicy | None = ...,
-    cron_schedule: str | None = ...,
-    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
-    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
-    priority: temporalio.common.Priority | None = ...,
-    versioning_override: temporalio.common.VersioningOverride | None = ...,
-    start_delay: datetime.timedelta | None = ...,
-    static_summary: str | None = ...,
-    static_details: str | None = ...,
-) -> ExternalWorkflowHandle[SelfType]: ...
-
-
-# Overload case:
-# - workflow method callable with list-form workflow arguments
-# - signal method callable with a typed single signal arguments
-@typing.overload
-async def signal_with_start_workflow(
-    workflow: collections.abc.Callable[
-        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
-        collections.abc.Awaitable[WorkflowResult],
-    ],
-    *,
-    args: list[typing.Any],
-    id: str,
-    task_queue: str,
-    signal: collections.abc.Callable[
-        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
-    ],
-    signal_args: SignalArg,
-    execution_timeout: datetime.timedelta | None = ...,
-    run_timeout: datetime.timedelta | None = ...,
-    task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
     retry_policy: temporalio.common.RetryPolicy | None = ...,
@@ -445,7 +147,6 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
     task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
     retry_policy: temporalio.common.RetryPolicy | None = ...,
@@ -458,6 +159,96 @@ async def signal_with_start_workflow(
     static_summary: str | None = ...,
     static_details: str | None = ...,
 ) -> ExternalWorkflowHandle[object]: ...
+
+
+# Overload case:
+# - workflow name with optional list-form workflow arguments
+# - signal name with optional list-form signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: str,
+    *,
+    args: list[typing.Any] | None = ...,
+    id: str,
+    task_queue: str,
+    signal: str,
+    signal_args: list[typing.Any] | None = ...,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[object]: ...
+
+
+# Overload case:
+# - workflow name with optional list-form workflow arguments
+# - signal method callable with no signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: str,
+    *,
+    args: list[typing.Any] | None = ...,
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType], None | collections.abc.Awaitable[None]
+    ],
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow name with optional list-form workflow arguments
+# - signal method callable with a typed single signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: str,
+    *,
+    args: list[typing.Any] | None = ...,
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
+    ],
+    signal_args: SignalArg,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
 # Overload case:
@@ -475,7 +266,6 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
     task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
     retry_policy: temporalio.common.RetryPolicy | None = ...,
@@ -488,6 +278,102 @@ async def signal_with_start_workflow(
     static_summary: str | None = ...,
     static_details: str | None = ...,
 ) -> ExternalWorkflowHandle[object]: ...
+
+
+# Overload case:
+# - workflow method callable with typed positional workflow arguments
+# - signal name with optional list-form signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
+    *args: typing_extensions.Unpack[WorkflowArgs],
+    id: str,
+    task_queue: str,
+    signal: str,
+    signal_args: list[typing.Any] | None = ...,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow method callable with typed positional workflow arguments
+# - signal method callable with no signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
+    *args: typing_extensions.Unpack[WorkflowArgs],
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType], None | collections.abc.Awaitable[None]
+    ],
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow method callable with typed positional workflow arguments
+# - signal method callable with a typed single signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
+    *args: typing_extensions.Unpack[WorkflowArgs],
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
+    ],
+    signal_args: SignalArg,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
 
 
 # Overload case:
@@ -507,7 +393,105 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
     task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow method callable with list-form workflow arguments
+# - signal name with optional list-form signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
+    *,
+    args: list[typing.Any],
+    id: str,
+    task_queue: str,
+    signal: str,
+    signal_args: list[typing.Any] | None = ...,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow method callable with list-form workflow arguments
+# - signal method callable with no signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
+    *,
+    args: list[typing.Any],
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType], None | collections.abc.Awaitable[None]
+    ],
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
+    id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
+    retry_policy: temporalio.common.RetryPolicy | None = ...,
+    cron_schedule: str | None = ...,
+    memo: collections.abc.Mapping[str, typing.Any] | None = ...,
+    search_attributes: temporalio.common.TypedSearchAttributes | None = ...,
+    priority: temporalio.common.Priority | None = ...,
+    versioning_override: temporalio.common.VersioningOverride | None = ...,
+    start_delay: datetime.timedelta | None = ...,
+    static_summary: str | None = ...,
+    static_details: str | None = ...,
+) -> ExternalWorkflowHandle[SelfType]: ...
+
+
+# Overload case:
+# - workflow method callable with list-form workflow arguments
+# - signal method callable with a typed single signal arguments
+@typing.overload
+async def signal_with_start_workflow(
+    workflow: collections.abc.Callable[
+        [SelfType, typing_extensions.Unpack[WorkflowArgs]],
+        collections.abc.Awaitable[WorkflowResult],
+    ],
+    *,
+    args: list[typing.Any],
+    id: str,
+    task_queue: str,
+    signal: collections.abc.Callable[
+        [SelfType, SignalArg], None | collections.abc.Awaitable[None]
+    ],
+    signal_args: SignalArg,
+    execution_timeout: datetime.timedelta | None = ...,
+    run_timeout: datetime.timedelta | None = ...,
+    task_timeout: datetime.timedelta | None = ...,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
     retry_policy: temporalio.common.RetryPolicy | None = ...,
@@ -540,7 +524,6 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = ...,
     run_timeout: datetime.timedelta | None = ...,
     task_timeout: datetime.timedelta | None = ...,
-    request_id: str | None = ...,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = ...,
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy | None = ...,
     retry_policy: temporalio.common.RetryPolicy | None = ...,
@@ -566,7 +549,6 @@ async def signal_with_start_workflow(
     execution_timeout: datetime.timedelta | None = None,
     run_timeout: datetime.timedelta | None = None,
     task_timeout: datetime.timedelta | None = None,
-    request_id: str | None = None,
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = (
         temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE
     ),
@@ -605,7 +587,6 @@ async def signal_with_start_workflow(
             continue-as-new.
         run_timeout: Timeout of a single workflow run.
         task_timeout: Timeout of a single workflow task.
-        request_id: Request ID used to deduplicate workflow start requests.
         id_reuse_policy: Behavior when a closed workflow with the same ID exists.
             Default is allow-duplicate.
         id_conflict_policy: Behavior when a workflow is currently running with the same
@@ -629,6 +610,11 @@ async def signal_with_start_workflow(
     Returns:
         A workflow handle to the started workflow.
     """
+    if positional_args and args is not None:
+        raise TypeError("cannot specify both positional arguments and args")
+    normalized_args: list[typing.Any] | None = (
+        list(positional_args) if positional_args else args
+    )
     normalized_signal_args: list[typing.Any] | None
     if signal_args is None:
         normalized_signal_args = None
@@ -636,11 +622,6 @@ async def signal_with_start_workflow(
         normalized_signal_args = typing.cast(list[typing.Any], signal_args)
     else:
         normalized_signal_args = [signal_args]
-    if positional_args and args is not None:
-        raise TypeError("cannot specify both positional arguments and args")
-    normalized_args: list[typing.Any] | None = (
-        list(positional_args) if positional_args else args
-    )
     user_metadata = (
         None
         if static_summary is None and static_details is None
@@ -659,7 +640,6 @@ async def signal_with_start_workflow(
         execution_timeout=execution_timeout,
         run_timeout=run_timeout,
         task_timeout=task_timeout,
-        request_id=request_id,
         id_reuse_policy=id_reuse_policy,
         id_conflict_policy=id_conflict_policy,
         retry_policy=retry_policy,

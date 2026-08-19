@@ -13,6 +13,9 @@ from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
 )
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    temporal_worker_env_ref,
+)
 from temporalio.contrib.openai_agents.sandbox._sandbox_client_provider import (
     SandboxClientProvider,
 )
@@ -28,6 +31,7 @@ __all__ = [
     "SandboxClientProvider",
     "StatelessMCPServerProvider",
     "StatefulMCPServerProvider",
+    "temporal_worker_env_ref",
     "testing",
     "workflow",
 ]

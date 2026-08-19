@@ -627,6 +627,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         req = temporalio.api.workflowservice.v1.StartActivityExecutionRequest(
             namespace=self._client.namespace,
             identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
             activity_id=input.id,
             activity_type=temporalio.api.common.v1.ActivityType(
                 name=input.activity_type
@@ -677,8 +678,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Set priority
         req.priority.CopyFrom(input.priority._to_proto())
 
-        # Add request_id, links, and completion callbacks from the Nexus context
-        # if not in a Nexus context, this is a no-op
+        # Nexus starts use the inbound request ID so retries across the Nexus
+        # boundary resolve to the same activity execution.
         temporalio.nexus._operation_context._apply_nexus_context_to_start_activity_request(
             req
         )
