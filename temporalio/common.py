@@ -1472,23 +1472,6 @@ def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:  # type:ignore
     return args
 
 
-def _positional_or_args(  # type:ignore[reportUnusedFunction]
-    arg: Any, positional: Sequence[Any], args: Sequence[Any]
-) -> Sequence[Any]:
-    # Like _arg_or_args, but also folds in trailing positional args captured by a
-    # *args_rest parameter. `arg` is the first positional (or _arg_unset), and
-    # `positional` is everything after it. Passing anything positionally is
-    # mutually exclusive with the keyword `args=` form.
-    combined = list(positional)
-    if arg is not _arg_unset:
-        combined.insert(0, arg)
-    if combined:
-        if args:
-            raise ValueError("Cannot have positional args and args")
-        return combined
-    return args
-
-
 def _apply_headers(  # type:ignore[reportUnusedFunction]
     source: Mapping[str, temporalio.api.common.v1.Payload] | None,
     dest: google.protobuf.internal.containers.MessageMap[

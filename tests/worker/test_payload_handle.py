@@ -62,28 +62,6 @@ class ForwardToIgnoreWorkflow:
 
 
 @activity.defn
-async def consume_prefixed(prefix: str, data: ValueHandle[str]) -> int:
-    # A multi-arg activity: one plain value and one handle. Exercises the
-    # positional multi-arg call path end to end.
-    value = await data.get_value()
-    return len(prefix) + len(value)
-
-
-@workflow.defn
-class ForwardMixedMultiArgWorkflow:
-    @workflow.run
-    async def run(self, data: ValueHandle[str]) -> int:
-        # Forward the handle as the second positional arg of a two-arg activity,
-        # mixed with a plain value, via the strongly-typed positional overloads.
-        return await workflow.execute_activity(
-            consume_prefixed,
-            "pre-",
-            data,
-            start_to_close_timeout=timedelta(seconds=30),
-        )
-
-
-@activity.defn
 async def produce_big() -> str:
     # An ordinary activity returning a large value; it is unchanged / unaware of
     # handles. The value is offloaded to external storage on completion.
@@ -192,24 +170,6 @@ async def test_activity_materializes_handle_once(env: WorkflowEnvironment) -> No
         )
     assert result == len(_BIG)
     # Downloaded exactly once, at the point the activity materialized it.
-    assert driver._retrieve_calls == 1
-
-
-async def test_mixed_multi_arg_positional_forward(env: WorkflowEnvironment) -> None:
-    driver = InMemoryTestDriver()
-    client = await _client(env, driver)
-    async with new_worker(
-        client, ForwardMixedMultiArgWorkflow, activities=[consume_prefixed]
-    ) as worker:
-        result = await client.execute_workflow(
-            ForwardMixedMultiArgWorkflow.run,
-            args=[_BIG],
-            id=f"wf-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-    # Plain arg is inline; the forwarded handle is downloaded exactly once, when
-    # the activity materializes it.
-    assert result == len("pre-") + len(_BIG)
     assert driver._retrieve_calls == 1
 
 

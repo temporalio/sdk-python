@@ -21,9 +21,6 @@ from ..types import (
     MethodSyncSingleParam,
     MultiParamSpec,
     ParamType,
-    ParamType2,
-    ParamType3,
-    ParamType4,
     ReturnType,
     SelfType,
 )
@@ -193,146 +190,6 @@ def start_activity(
 ) -> ActivityHandle[ReturnType]: ...
 
 
-# Overloads for two/three/four-param activities. Each positional arg accepts the
-# declared type OR a ValueHandle of it, so a workflow can forward a held handle
-# through the typed call API, mixed freely with plain values, and the handle's
-# inner type is still checked against the corresponding parameter. Passing args
-# positionally (rather than the loosely-typed args= keyword below, which is not
-# handle-checked) is what enables this; beyond four params, use args=.
-@overload
-def start_activity(
-    activity: Callable[[ParamType, ParamType2], Awaitable[ReturnType]],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ActivityHandle[ReturnType]: ...
-
-
-@overload
-def start_activity(
-    activity: Callable[[ParamType, ParamType2], ReturnType],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ActivityHandle[ReturnType]: ...
-
-
-@overload
-def start_activity(
-    activity: Callable[[ParamType, ParamType2, ParamType3], Awaitable[ReturnType]],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ActivityHandle[ReturnType]: ...
-
-
-@overload
-def start_activity(
-    activity: Callable[[ParamType, ParamType2, ParamType3], ReturnType],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ActivityHandle[ReturnType]: ...
-
-
-@overload
-def start_activity(
-    activity: Callable[
-        [ParamType, ParamType2, ParamType3, ParamType4], Awaitable[ReturnType]
-    ],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    arg4: ParamType4 | temporalio.common.ValueHandle[ParamType4],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ActivityHandle[ReturnType]: ...
-
-
-@overload
-def start_activity(
-    activity: Callable[[ParamType, ParamType2, ParamType3, ParamType4], ReturnType],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    arg4: ParamType4 | temporalio.common.ValueHandle[ParamType4],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ActivityHandle[ReturnType]: ...
-
-
 # Overload for async multi-param activity
 @overload
 def start_activity(
@@ -398,7 +255,7 @@ def start_activity(
 def start_activity(
     activity: Any,
     arg: Any = temporalio.common._arg_unset,
-    *args_rest: Any,
+    *,
     args: Sequence[Any] = [],
     task_queue: str | None = None,
     result_type: type | None = None,
@@ -455,7 +312,7 @@ def start_activity(
     """
     return _Runtime.current().workflow_start_activity(
         activity,
-        *temporalio.common._positional_or_args(arg, args_rest, args),
+        *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
         result_type=result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
@@ -549,146 +406,6 @@ async def execute_activity(
 ) -> ReturnType: ...
 
 
-# Overloads for two/three/four-param activities. Each positional arg accepts the
-# declared type OR a ValueHandle of it, so a workflow can forward a held handle
-# through the typed call API, mixed freely with plain values, and the handle's
-# inner type is still checked against the corresponding parameter. Passing args
-# positionally (rather than the loosely-typed args= keyword below, which is not
-# handle-checked) is what enables this; beyond four params, use args=.
-@overload
-async def execute_activity(
-    activity: Callable[[ParamType, ParamType2], Awaitable[ReturnType]],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ReturnType: ...
-
-
-@overload
-async def execute_activity(
-    activity: Callable[[ParamType, ParamType2], ReturnType],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ReturnType: ...
-
-
-@overload
-async def execute_activity(
-    activity: Callable[[ParamType, ParamType2, ParamType3], Awaitable[ReturnType]],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ReturnType: ...
-
-
-@overload
-async def execute_activity(
-    activity: Callable[[ParamType, ParamType2, ParamType3], ReturnType],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ReturnType: ...
-
-
-@overload
-async def execute_activity(
-    activity: Callable[
-        [ParamType, ParamType2, ParamType3, ParamType4], Awaitable[ReturnType]
-    ],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    arg4: ParamType4 | temporalio.common.ValueHandle[ParamType4],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ReturnType: ...
-
-
-@overload
-async def execute_activity(
-    activity: Callable[[ParamType, ParamType2, ParamType3, ParamType4], ReturnType],
-    arg1: ParamType | temporalio.common.ValueHandle[ParamType],
-    arg2: ParamType2 | temporalio.common.ValueHandle[ParamType2],
-    arg3: ParamType3 | temporalio.common.ValueHandle[ParamType3],
-    arg4: ParamType4 | temporalio.common.ValueHandle[ParamType4],
-    /,
-    *,
-    task_queue: str | None = None,
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    start_to_close_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    retry_policy: temporalio.common.RetryPolicy | None = None,
-    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: str | None = None,
-    versioning_intent: VersioningIntent | None = None,
-    summary: str | None = None,
-    priority: temporalio.common.Priority = temporalio.common.Priority.default,
-) -> ReturnType: ...
-
-
 # Overload for async multi-param activity
 @overload
 async def execute_activity(
@@ -754,7 +471,7 @@ async def execute_activity(
 async def execute_activity(
     activity: Any,
     arg: Any = temporalio.common._arg_unset,
-    *args_rest: Any,
+    *,
     args: Sequence[Any] = [],
     task_queue: str | None = None,
     result_type: type | None = None,
@@ -777,7 +494,7 @@ async def execute_activity(
     # we don't miss new parameters
     return await _Runtime.current().workflow_start_activity(
         activity,
-        *temporalio.common._positional_or_args(arg, args_rest, args),
+        *temporalio.common._arg_or_args(arg, args),
         task_queue=task_queue,
         result_type=result_type,
         schedule_to_close_timeout=schedule_to_close_timeout,
