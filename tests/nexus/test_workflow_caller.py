@@ -71,6 +71,7 @@ from tests.helpers.nexus import (
     links_from_workflow_execution_started_event,
     make_nexus_endpoint_name,
 )
+from tests.nexus.conftest import NexusEndpoint
 
 # TODO(nexus-preview): test worker shutdown, wait_all_completed, drain etc
 
@@ -663,9 +664,7 @@ class WorkflowRunHeaderTestCallerWorkflow:
 #
 
 
-async def test_sync_operation_happy_path(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
-):
+async def test_sync_operation_happy_path(client: Client, nexus_endpoint: NexusEndpoint):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
         client,
@@ -723,7 +722,7 @@ class NexusInfoCallerWorkflow:
 
 
 async def test_nexus_info_includes_namespace(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     endpoint_name = nexus_endpoint.name
@@ -747,7 +746,7 @@ async def test_nexus_info_includes_namespace(
 
 
 async def test_workflow_run_operation_happy_path(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -898,7 +897,7 @@ class _HeaderAddingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
 async def test_start_operation_headers(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """Test headers from workflow and interceptors are propagated to start operation handler."""
     if env.supports_time_skipping:
@@ -942,8 +941,7 @@ async def test_start_operation_headers(
 
 async def test_workflow_run_operation_headers(
     client: Client,
-    env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """Test that headers are propagated to @workflow_run_operation handlers."""
     task_queue = nexus_endpoint.task_queue
@@ -971,7 +969,7 @@ async def test_workflow_run_operation_headers(
 async def test_cancel_operation_headers(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """Test headers from workflow and interceptor are propagated to cancel operation handler."""
     if env.supports_time_skipping:
@@ -1029,7 +1027,7 @@ async def test_sync_response(
     request_cancel: bool,
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -1102,7 +1100,7 @@ async def test_async_response(
     request_cancel: bool,
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -1263,7 +1261,7 @@ async def test_untyped_caller(
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
     response_type: ResponseType,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -1418,7 +1416,7 @@ class ServiceInterfaceAndImplCallerWorkflow:
 
 
 async def test_service_interface_and_implementation_names(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, nexus_endpoint: NexusEndpoint
 ):
     # Note that:
     # - The caller can specify the service & operation via a reference to either the
@@ -1545,7 +1543,7 @@ class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWork
 async def test_workflow_run_operation_can_execute_workflow_before_starting_backing_workflow(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -1599,8 +1597,7 @@ class ExecuteNexusOperationWithSummaryWorkflow:
 
 async def test_nexus_operation_summary(
     client: Client,
-    env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -1880,7 +1877,9 @@ class OverloadTestCallerWorkflow:
     ],
 )
 async def test_workflow_run_operation_overloads(
-    client: Client, env: WorkflowEnvironment, op: str, nexus_endpoint
+    client: Client,
+    op: str,
+    nexus_endpoint: NexusEndpoint,
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -1948,7 +1947,7 @@ class CustomMetricsWorkflow:
 
 
 async def test_workflow_caller_custom_metrics(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
 
@@ -2020,7 +2019,7 @@ async def test_workflow_caller_custom_metrics(
 
 
 async def test_workflow_caller_buffered_metrics(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     # Create runtime with metric buffer
     buffer = MetricBuffer(10000)
@@ -2198,7 +2197,7 @@ class TestAsyncAndNonAsyncCancel:
         client: Client,
         env: WorkflowEnvironment,
         use_async_cancel: bool,
-        nexus_endpoint,
+        nexus_endpoint: NexusEndpoint,
     ):
         """Test that both async and non-async cancel methods work for TaskExecutor-based operations."""
         if env.supports_time_skipping:
@@ -2244,7 +2243,7 @@ class TestAsyncAndNonAsyncCancel:
 async def test_request_deadline_is_accessible_in_operation(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """Test that request_deadline is accessible in StartOperationContext."""
     if env.supports_time_skipping:

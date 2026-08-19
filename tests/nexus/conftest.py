@@ -213,7 +213,7 @@ async def cloud_nexus_endpoints(
             )
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture  # type: ignore[reportUntypedFunctionDecorator]
 async def nexus_endpoint(
     cloud_nexus_endpoint_client: _CloudNexusEndpointClient | None,
     env: WorkflowEnvironment,

@@ -9,6 +9,7 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.nexus.conftest import NexusEndpoint
 
 
 @workflow.defn
@@ -52,7 +53,7 @@ class IncrementCallerWorkflow:
 async def test_run_nexus_service_from_programmatically_created_service_handler(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")

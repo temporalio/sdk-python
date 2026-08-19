@@ -24,6 +24,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import LogCapturer, assert_event_subsequence, assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.nexus.conftest import NexusEndpoint
 
 
 @dataclass
@@ -260,7 +261,7 @@ class CallerWorkflow:
 async def test_cancellation_type(
     env: WorkflowEnvironment,
     cancellation_type_name: str,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     cancellation_type = workflow.NexusOperationCancellationType[cancellation_type_name]
     global test_context

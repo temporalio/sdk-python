@@ -22,6 +22,7 @@ from temporalio.nexus._token import OperationToken, OperationTokenType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.nexus.conftest import NexusEndpoint
 
 
 @dataclass
@@ -134,7 +135,7 @@ async def test_workflow_run_operation(
     client: Client,
     env: WorkflowEnvironment,
     service_handler_cls: type[Any],
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -160,7 +161,7 @@ async def test_workflow_run_operation(
 async def test_request_deadline_is_accessible_in_workflow_run_operation(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """Test that request_deadline is accessible in WorkflowRunOperationContext."""
     if env.supports_time_skipping:
@@ -193,7 +194,7 @@ async def test_request_deadline_is_accessible_in_workflow_run_operation(
 async def test_workflow_run_operation_includes_token_in_callback(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")

@@ -55,6 +55,7 @@ from tests.helpers.nexus import (
     make_nexus_endpoint_name,
     workflow_event_link_event_type,
 )
+from tests.nexus.conftest import NexusEndpoint
 
 EventType = temporalio.api.enums.v1.EventType
 
@@ -266,7 +267,7 @@ def _assert_backlink(
 async def test_sync_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -315,7 +316,7 @@ async def test_sync_signal_operation_links(
 async def test_async_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -400,7 +401,7 @@ def _assert_standalone_forward_link(
 async def test_standalone_sync_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -439,7 +440,7 @@ async def test_standalone_sync_signal_operation_links(
 async def test_standalone_async_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -497,7 +498,7 @@ async def test_standalone_async_signal_operation_links(
 async def test_start_from_handler_attaches_on_conflict_options(
     client: Client,
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")

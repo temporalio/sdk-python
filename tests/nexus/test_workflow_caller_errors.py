@@ -41,6 +41,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import LogCapturer, assert_eq_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.nexus.conftest import NexusEndpoint
 
 operation_invocation_counts = Counter[str]()
 
@@ -169,7 +170,10 @@ class RPCErrorCallerWorkflow:
     ],
 )
 async def test_nexus_operation_is_retried(
-    client: Client, env: WorkflowEnvironment, operation_name: str, nexus_endpoint
+    client: Client,
+    env: WorkflowEnvironment,
+    operation_name: str,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -228,7 +232,7 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
     operation_name: str,
     handler_error_type: nexusrpc.HandlerErrorType,
     handler_error_message: str,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -308,7 +312,7 @@ class StartTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_timeout_of_nexus_start_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -387,7 +391,7 @@ class ScheduleToStartTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_schedule_to_start_timeout_of_nexus_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -460,7 +464,7 @@ class StartToCloseTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_start_to_close_timeout_of_nexus_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -538,7 +542,7 @@ class CancellationTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_timeout_of_nexus_cancel_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -588,7 +592,7 @@ async def test_rpc_error_fails_without_retry(
     env: WorkflowEnvironment,
     status_code: RPCStatusCode,
     expected_handler_error_type: nexusrpc.HandlerErrorType,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -645,7 +649,7 @@ async def test_rpc_error_is_retried(
     client: Client,
     env: WorkflowEnvironment,
     status_code: RPCStatusCode,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -717,7 +721,7 @@ class FailingFromPayloadsConverter(DefaultPayloadConverter):
 
 
 async def test_nexus_operation_retried_on_codec_decode_failure(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -758,7 +762,7 @@ async def test_nexus_operation_retried_on_codec_decode_failure(
 
 
 async def test_nexus_operation_fails_without_retry_on_converter_failure(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")

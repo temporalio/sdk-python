@@ -9,9 +9,9 @@ from nexusrpc.handler import service_handler
 from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.nexus.conftest import NexusEndpoint
 
 
 @dataclass
@@ -88,7 +88,7 @@ class CallerWorkflow:
 
 
 async def test_multiple_operation_invocations_can_connect_to_same_handler_workflow(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     workflow_id = str(uuid.uuid4())

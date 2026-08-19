@@ -39,6 +39,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.types import MethodAsyncSingleParam
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.nexus.conftest import NexusEndpoint
 from tests.test_extstore import InMemoryTestDriver
 
 PAYLOAD_SIZE = 4096
@@ -179,7 +180,7 @@ def _cause_chain(err: BaseException) -> list[BaseException]:
 
 
 async def test_nexus_operation_input_offloaded_and_retrieved(
-    env: WorkflowEnvironment, nexus_endpoint
+    env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """The offloaded operation input is retrieved before the handler runs."""
     if env.supports_time_skipping:
@@ -197,7 +198,7 @@ async def test_nexus_operation_input_offloaded_and_retrieved(
 
 async def test_nexus_operation_sync_result_offloaded_and_retrieved(
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """A large synchronous result is offloaded and retrieved by the caller."""
     if env.supports_time_skipping:
@@ -215,7 +216,7 @@ async def test_nexus_operation_sync_result_offloaded_and_retrieved(
 
 async def test_nexus_operation_transient_retrieve_failure_recovers(
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """A transient retrieve failure fails the task retryably; it then recovers."""
     if env.supports_time_skipping:
@@ -232,7 +233,7 @@ async def test_nexus_operation_transient_retrieve_failure_recovers(
 
 async def test_nexus_operation_transient_store_failure_recovers(
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """A transient store failure fails the task retryably; it then recovers."""
     if env.supports_time_skipping:
@@ -260,7 +261,7 @@ class PermanentFailStoreDriver(InMemoryTestDriver):
 
 async def test_nexus_operation_store_failure_fails_operation(
     env: WorkflowEnvironment,
-    nexus_endpoint,
+    nexus_endpoint: NexusEndpoint,
 ):
     """A non-retryable store failure fails the operation and surfaces the driver
     error to the caller (deterministically, with no retries)."""

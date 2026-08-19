@@ -64,6 +64,7 @@ from tests.helpers.nexus import (
     expected_workflow_event_link,
     links_from_workflow_execution_started_event,
 )
+from tests.nexus.conftest import NexusEndpoint
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -193,7 +194,7 @@ class StandaloneTestServiceHandler:
 
 
 async def test_start_sync_operation_and_get_result(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start a sync nexus operation, call handle.result(), verify return value."""
     if env.supports_time_skipping:
@@ -231,7 +232,7 @@ async def test_start_sync_operation_and_get_result(
 
 
 async def test_start_async_operation_and_poll_result(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start a workflow_run operation, poll result, verify."""
     if env.supports_time_skipping:
@@ -263,7 +264,7 @@ async def test_start_async_operation_and_poll_result(
 
 
 async def test_started_workflow_has_link_to_standalone_nexus_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start a workflow_run operation and verify its workflow links back to the Nexus op."""
     if env.supports_time_skipping:
@@ -318,7 +319,7 @@ async def test_started_workflow_has_link_to_standalone_nexus_operation(
 
 
 async def test_execute_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Use execute_operation convenience method, verify it returns result directly."""
     if env.supports_time_skipping:
@@ -351,7 +352,7 @@ async def test_execute_operation(
 
 
 async def test_execute_operation_named_service(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Verify that the name on the service decorator is respected by the standalone nexus client"""
     if env.supports_time_skipping:
@@ -385,7 +386,9 @@ async def test_execute_operation_named_service(
         assert result.value == "execute"
 
 
-async def test_errors(client: Client, env: WorkflowEnvironment, nexus_endpoint):
+async def test_errors(
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
+):
     """Execute operations that raise errors"""
     if env.supports_time_skipping:
         pytest.skip(
@@ -444,7 +447,7 @@ async def test_errors(client: Client, env: WorkflowEnvironment, nexus_endpoint):
 
 
 async def test_describe_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start op, get result first, then describe, verify fields populated."""
     if env.supports_time_skipping:
@@ -491,7 +494,7 @@ async def test_describe_operation(
 
 
 async def test_cancel_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start blocking async op, cancel it, verify awaiting result raises NexusOperationFailureError
     from a CancelledError.
@@ -533,7 +536,7 @@ async def test_cancel_operation(
 
 
 async def test_terminate_operation(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start blocking async op, terminate it, verify awaiting the result raises NexusOperationFailureError
     from a TerminatedError.
@@ -575,7 +578,7 @@ async def test_terminate_operation(
 
 
 async def test_list_operations(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start multiple ops, list them, verify iteration yields correct results."""
     if env.supports_time_skipping:
@@ -623,7 +626,7 @@ async def test_list_operations(
 
 
 async def test_count_operations(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start ops, count, verify count."""
     if env.supports_time_skipping:
@@ -666,7 +669,7 @@ async def test_count_operations(
 
 
 async def test_get_nexus_operation_handle(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start op, get result, then get handle by ID and get result again."""
     if env.supports_time_skipping:
@@ -711,7 +714,7 @@ async def test_get_nexus_operation_handle(
 
 
 async def test_id_conflict_policy_use_existing(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start op, re-start with USE_EXISTING, verify same op/run ID and expected result"""
     if env.supports_time_skipping:
@@ -776,7 +779,7 @@ async def test_id_conflict_policy_use_existing(
 
 
 async def test_id_conflict_policy_fail(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Start op, re-start with FAIL, verify raises NexusOperationAlreadyStartedError."""
     if env.supports_time_skipping:
@@ -890,7 +893,7 @@ class _RecordingInterceptor(Interceptor):
 
 
 async def test_interceptor_receives_inputs(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     """Custom OutboundInterceptor records calls, verify correct input types."""
     if env.supports_time_skipping:

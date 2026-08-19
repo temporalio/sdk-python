@@ -39,6 +39,7 @@ from tests.helpers.nexus import (
     expected_nexus_operation_link,
     make_nexus_endpoint_name,
 )
+from tests.nexus.conftest import NexusEndpoint
 
 
 @dataclass
@@ -426,7 +427,7 @@ class EchoWorkflowCaller:
 
 
 async def test_temporal_operation_start_workflow(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -455,7 +456,7 @@ async def test_temporal_operation_start_workflow(
 
 
 async def test_temporal_operation_update_workflow(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ) -> None:
     if (
         env.supports_time_skipping
@@ -836,7 +837,7 @@ class CancelBlockingWorkflowCaller:
 
 
 async def test_temporal_operation_cancel_workflow(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -869,7 +870,7 @@ async def test_temporal_operation_cancel_workflow(
 
 
 async def test_customized_temporal_operation_cancel_workflow(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -942,7 +943,7 @@ class FailedStartRollbackWorkflowCaller:
 
 
 async def test_temporal_operation_double_start_raises_handler_err(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -969,7 +970,7 @@ async def test_temporal_operation_double_start_raises_handler_err(
 
 
 async def test_temporal_operation_concurrent_start_raises_handler_err(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -989,7 +990,7 @@ async def test_temporal_operation_concurrent_start_raises_handler_err(
 
 
 async def test_temporal_operation_failed_start_allows_retry(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     conflict_id = f"failed-start-rollback-{uuid.uuid4()}"
@@ -1022,7 +1023,7 @@ async def test_temporal_operation_failed_start_allows_retry(
 
 
 async def test_temporal_operation_mixed_start_raises_handler_err(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -1066,7 +1067,7 @@ class SyncResultCaller:
 
 
 async def test_temporal_operation_sync_result(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -1095,7 +1096,7 @@ async def test_temporal_operation_sync_result(
 
 
 async def test_temporal_operation_start_activity(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -1121,7 +1122,7 @@ async def test_temporal_operation_start_activity(
 
 
 async def test_temporal_operation_backing_activity_does_not_duplicate_links(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -1181,7 +1182,7 @@ async def test_temporal_operation_backing_activity_does_not_duplicate_links(
 
 
 async def test_temporal_operation_start_activity_raises_error(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -1219,7 +1220,7 @@ async def test_temporal_operation_start_activity_raises_error(
 
 
 async def test_temporal_operation_cancel_activity(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -1255,7 +1256,7 @@ async def test_temporal_operation_cancel_activity(
 
 
 async def test_customized_temporal_operation_cancel_activity(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -1295,7 +1296,7 @@ async def test_customized_temporal_operation_cancel_activity(
 
 
 async def test_temporal_operation_double_start_activity_raises_handler_err(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
@@ -1463,7 +1464,9 @@ class TemporalOperationOverloadTestCallerWorkflow:
     ],
 )
 async def test_temporal_operation_overloads(
-    client: Client, env: WorkflowEnvironment, op: str, nexus_endpoint
+    client: Client,
+    op: str,
+    nexus_endpoint: NexusEndpoint,
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -1490,7 +1493,7 @@ async def test_temporal_operation_overloads(
 
 
 async def test_temporal_operation_includes_token_in_callback(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     task_queue = nexus_endpoint.task_queue
     async with Worker(
@@ -1571,7 +1574,7 @@ class UpdatableWorkflow:
 
 
 async def test_temporal_operation_includes_activity_token_in_callback(
-    client: Client, env: WorkflowEnvironment, nexus_endpoint
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip(
