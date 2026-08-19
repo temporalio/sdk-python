@@ -224,6 +224,7 @@ class CallerWorkflow:
 async def test_cancellation_type(
     env: WorkflowEnvironment,
     cancellation_type_name: str,
+    nexus_endpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -233,17 +234,14 @@ async def test_cancellation_type(
     test_context = TestContext(cancellation_type=cancellation_type)
 
     client = env.client
+    task_queue = nexus_endpoint.task_queue
 
     async with Worker(
         client,
-        task_queue=str(uuid.uuid4()),
+        task_queue=task_queue,
         workflows=[CallerWorkflow, HandlerWorkflow],
         nexus_service_handlers=[ServiceHandler()],
     ) as worker:
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(worker.task_queue), worker.task_queue
-        )
-
         # Start the caller workflow, wait for the nexus op to have started and retrieve the nexus op
         # token
         with_start_workflow = WithStartWorkflowOperation(

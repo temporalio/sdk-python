@@ -266,12 +266,12 @@ def _assert_backlink(
 async def test_sync_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    task_queue = nexus_endpoint.task_queue
     callee_id = f"callee-{uuid.uuid4()}"
     caller_id = f"caller-{uuid.uuid4()}"
 
@@ -315,12 +315,12 @@ async def test_sync_signal_operation_links(
 async def test_async_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    task_queue = nexus_endpoint.task_queue
     callee_id = f"async-callee-{uuid.uuid4()}"
     caller_id = f"async-caller-{uuid.uuid4()}"
 
@@ -400,12 +400,12 @@ def _assert_standalone_forward_link(
 async def test_standalone_sync_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    task_queue = nexus_endpoint.task_queue
     callee_id = f"standalone-callee-{uuid.uuid4()}"
     operation_id = f"standalone-op-{uuid.uuid4()}"
 
@@ -439,12 +439,12 @@ async def test_standalone_sync_signal_operation_links(
 async def test_standalone_async_signal_operation_links(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    task_queue = nexus_endpoint.task_queue
     callee_id = f"standalone-async-callee-{uuid.uuid4()}"
     operation_id = f"standalone-async-op-{uuid.uuid4()}"
 
@@ -497,12 +497,12 @@ async def test_standalone_async_signal_operation_links(
 async def test_start_from_handler_attaches_on_conflict_options(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    task_queue = nexus_endpoint.task_queue
     callee_id = f"conflict-callee-{uuid.uuid4()}"
     operation_id = f"conflict-op-{uuid.uuid4()}"
 

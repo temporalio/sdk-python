@@ -88,9 +88,9 @@ class CallerWorkflow:
 
 
 async def test_multiple_operation_invocations_can_connect_to_same_handler_workflow(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, nexus_endpoint
 ):
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     workflow_id = str(uuid.uuid4())
 
     async with Worker(
@@ -99,9 +99,6 @@ async def test_multiple_operation_invocations_can_connect_to_same_handler_workfl
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
         caller_handle = await client.start_workflow(
             CallerWorkflow.run,
             args=[

@@ -10,6 +10,7 @@ from datetime import timedelta
 import nexusrpc
 import pytest
 import pytest_asyncio
+from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 from temporalio.api.cloud.cloudservice.v1 import (
     CreateNexusEndpointRequest,
@@ -31,13 +32,10 @@ from temporalio.api.cloud.resource.v1 import ResourceState
 from temporalio.client import CloudOperationsClient, NexusOperationFailureError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 logger = logging.getLogger(__name__)
-
-
-@nexusrpc.service
-class CloudNexusEndpointReadinessService:
-    ready: nexusrpc.Operation[None, None]
 
 
 @dataclass
@@ -105,81 +103,23 @@ class _CloudNexusEndpointClient:
                 )
             await asyncio.sleep(1)
 
-    async def wait_for_endpoint_readiness(
-        self, env: WorkflowEnvironment, endpoint_name: str
-    ) -> None:
-        deadline = time.monotonic() + 10 * 60
-        nexus_client = env.client.create_nexus_client(
-            CloudNexusEndpointReadinessService, endpoint_name
-        )
-        # Cloud reports endpoint activation before the Workflow Service can always
-        # resolve it. Waiting for the disposable operation's terminal state verifies
-        # routing, which happens asynchronously after its start request is accepted.
-        attempts = 0
-        while True:
-            attempts += 1
-            operation_id = f"cloud-nexus-readiness-{uuid.uuid4()}"
-            try:
-                operation = await nexus_client.start_operation(
-                    CloudNexusEndpointReadinessService.ready,
-                    None,
-                    id=operation_id,
-                    schedule_to_close_timeout=timedelta(seconds=5),
-                )
-            except RPCError as err:
-                if (
-                    err.status != RPCStatusCode.NOT_FOUND
-                    or str(err) != "endpoint not found"
-                ):
-                    raise
-                if time.monotonic() >= deadline:
-                    raise TimeoutError(
-                        f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
-                        "to become available"
-                    ) from err
-                if attempts == 1:
-                    logger.info(
-                        "Cloud Nexus endpoint %s is not yet resolvable; retrying "
-                        "readiness operation %s",
-                        endpoint_name,
-                        operation_id,
-                    )
-                await asyncio.sleep(1)
-                continue
-            try:
-                print(
-                    "Waiting for Cloud Nexus endpoint "
-                    f"{endpoint_name} readiness operation {operation_id}",
-                    flush=True,
-                )
-                await operation.result()
-            except NexusOperationFailureError as err:
-                if str(err.cause) in {
-                    "endpoint not registered",
-                    "nexus endpoint not found",
-                }:
-                    if time.monotonic() >= deadline:
-                        raise TimeoutError(
-                            f"Timed out waiting for Cloud Nexus endpoint {endpoint_name} "
-                            "to become available"
-                        ) from err
-                    if attempts == 1:
-                        logger.info(
-                            "Cloud Nexus endpoint %s is not yet routable; retrying "
-                            "readiness operation %s",
-                            endpoint_name,
-                            operation_id,
-                        )
-                    await asyncio.sleep(1)
-                    continue
-            logger.info(
-                "Cloud Nexus endpoint %s completed readiness operation %s after "
-                "%d attempt(s)",
-                endpoint_name,
-                operation_id,
-                attempts,
-            )
-            break
+
+@dataclass(frozen=True)
+class NexusEndpoint:
+    name: str
+    task_queue: str
+
+
+@nexusrpc.service
+class _EndpointReadinessService:
+    ready: nexusrpc.Operation[None, None]
+
+
+@service_handler(service=_EndpointReadinessService)
+class _EndpointReadinessHandler:
+    @sync_operation
+    async def ready(self, _ctx: StartOperationContext, _input: None) -> None:
+        return None
 
 
 @pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
@@ -250,14 +190,8 @@ async def cloud_nexus_endpoints(
         )
         endpoints[-1] = endpoint
         logger.info(
-            "Cloud Nexus endpoint %s (%s) is active; checking Workflow Service readiness",
-            endpoint_name,
-            endpoint.id,
+            "Cloud Nexus endpoint %s (%s) is active", endpoint_name, endpoint.id
         )
-        await cloud_nexus_endpoint_client.wait_for_endpoint_readiness(
-            env, endpoint_name
-        )
-        logger.info("Cloud Nexus endpoint %s is ready for the test", endpoint_name)
         return endpoint
 
     monkeypatch.setattr(env, "create_nexus_endpoint", create_nexus_endpoint)
@@ -277,3 +211,71 @@ async def cloud_nexus_endpoints(
             await cloud_nexus_endpoint_client.wait_for_operation(
                 response.async_operation
             )
+
+
+@pytest_asyncio.fixture
+async def nexus_endpoint(
+    cloud_nexus_endpoint_client: _CloudNexusEndpointClient | None,
+    env: WorkflowEnvironment,
+) -> NexusEndpoint:
+    """Create and, on Cloud, route-check a Nexus endpoint before a test worker."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint = NexusEndpoint(
+        name=make_nexus_endpoint_name(task_queue), task_queue=task_queue
+    )
+    await env.create_nexus_endpoint(endpoint.name, endpoint.task_queue)
+
+    if cloud_nexus_endpoint_client is None:
+        return endpoint
+
+    deadline = time.monotonic() + 10 * 60
+    nexus_client = env.client.create_nexus_client(
+        _EndpointReadinessService, endpoint.name
+    )
+    attempt = 0
+    async with Worker(
+        env.client,
+        task_queue=endpoint.task_queue,
+        nexus_service_handlers=[_EndpointReadinessHandler()],
+    ):
+        while True:
+            attempt += 1
+            try:
+                operation = await nexus_client.start_operation(
+                    _EndpointReadinessService.ready,
+                    None,
+                    id=f"cloud-nexus-readiness-{uuid.uuid4()}",
+                    schedule_to_close_timeout=timedelta(seconds=10),
+                )
+                await asyncio.wait_for(operation.result(), timeout=15)
+                break
+            except RPCError as err:
+                retryable = (
+                    err.status == RPCStatusCode.NOT_FOUND
+                    and str(err) == "endpoint not found"
+                )
+            except NexusOperationFailureError as err:
+                retryable = str(err.cause) in {
+                    "endpoint not registered",
+                    "nexus endpoint not found",
+                }
+            except TimeoutError:
+                retryable = True
+            if not retryable:
+                raise
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Timed out waiting for Cloud Nexus endpoint {endpoint.name} "
+                    "to route operations"
+                )
+            logger.info(
+                "Cloud Nexus endpoint %s did not route readiness operation on "
+                "attempt %d; retrying",
+                endpoint.name,
+                attempt,
+            )
+            await asyncio.sleep(1)
+    return endpoint

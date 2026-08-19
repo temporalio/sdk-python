@@ -52,11 +52,12 @@ class IncrementCallerWorkflow:
 async def test_run_nexus_service_from_programmatically_created_service_handler(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
 
     service_handler = nexusrpc.handler._core.ServiceHandler(
         service=nexusrpc.ServiceDefinition(
@@ -75,7 +76,6 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
         },
     )
 
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
     async with Worker(
         client,
         task_queue=task_queue,

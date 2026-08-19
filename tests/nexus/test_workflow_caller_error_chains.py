@@ -623,21 +623,21 @@ class ErrorTestCallerWorkflow:
     ids=lambda tc: tc.name,
 )
 async def test_errors_raised_by_nexus_operation(
-    client: Client, env: WorkflowEnvironment, test_case: ErrorTestCase
+    client: Client,
+    env: WorkflowEnvironment,
+    test_case: ErrorTestCase,
+    nexus_endpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     async with Worker(
         client,
         nexus_service_handlers=[ErrorTestService()],
         workflows=[ErrorTestCallerWorkflow],
         task_queue=task_queue,
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
         await client.execute_workflow(
             ErrorTestCallerWorkflow.run,
             ErrorTestInput(

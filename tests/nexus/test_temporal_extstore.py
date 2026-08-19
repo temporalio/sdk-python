@@ -150,9 +150,9 @@ async def _run_caller(
     env: WorkflowEnvironment,
     driver: InMemoryTestDriver,
     workflow_run: MethodAsyncSingleParam[Any, str, int],
+    task_queue: str,
 ) -> int:
     client = _client_with_extstore(env, driver)
-    task_queue = str(uuid.uuid4())
     async with Worker(
         client,
         task_queue=task_queue,
@@ -160,9 +160,6 @@ async def _run_caller(
         nexus_service_handlers=[ExtStoreNexusServiceHandler()],
         workflow_runner=UnsandboxedWorkflowRunner(),
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
         return await client.execute_workflow(
             workflow_run,
             task_queue,
@@ -181,13 +178,17 @@ def _cause_chain(err: BaseException) -> list[BaseException]:
     return chain
 
 
-async def test_nexus_operation_input_offloaded_and_retrieved(env: WorkflowEnvironment):
+async def test_nexus_operation_input_offloaded_and_retrieved(
+    env: WorkflowEnvironment, nexus_endpoint
+):
     """The offloaded operation input is retrieved before the handler runs."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = InMemoryTestDriver()
-    result = await _run_caller(env, driver, SizeOpCallerWorkflow.run)
+    result = await _run_caller(
+        env, driver, SizeOpCallerWorkflow.run, nexus_endpoint.task_queue
+    )
 
     assert result == PAYLOAD_SIZE
     assert driver._store_calls >= 1
@@ -196,13 +197,16 @@ async def test_nexus_operation_input_offloaded_and_retrieved(env: WorkflowEnviro
 
 async def test_nexus_operation_sync_result_offloaded_and_retrieved(
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ):
     """A large synchronous result is offloaded and retrieved by the caller."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = InMemoryTestDriver()
-    result = await _run_caller(env, driver, BigResultOpCallerWorkflow.run)
+    result = await _run_caller(
+        env, driver, BigResultOpCallerWorkflow.run, nexus_endpoint.task_queue
+    )
 
     assert result == PAYLOAD_SIZE
     assert driver._store_calls >= 1
@@ -211,13 +215,16 @@ async def test_nexus_operation_sync_result_offloaded_and_retrieved(
 
 async def test_nexus_operation_transient_retrieve_failure_recovers(
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ):
     """A transient retrieve failure fails the task retryably; it then recovers."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = TransientFailureDriver(fail_first_retrieve=True)
-    result = await _run_caller(env, driver, SizeOpCallerWorkflow.run)
+    result = await _run_caller(
+        env, driver, SizeOpCallerWorkflow.run, nexus_endpoint.task_queue
+    )
 
     assert result == PAYLOAD_SIZE
     assert driver.retrieve_attempts >= 2
@@ -225,13 +232,16 @@ async def test_nexus_operation_transient_retrieve_failure_recovers(
 
 async def test_nexus_operation_transient_store_failure_recovers(
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ):
     """A transient store failure fails the task retryably; it then recovers."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = TransientFailureDriver(fail_first_store=True)
-    result = await _run_caller(env, driver, BigResultOpCallerWorkflow.run)
+    result = await _run_caller(
+        env, driver, BigResultOpCallerWorkflow.run, nexus_endpoint.task_queue
+    )
 
     assert result == PAYLOAD_SIZE
     assert driver.store_attempts >= 2
@@ -250,6 +260,7 @@ class PermanentFailStoreDriver(InMemoryTestDriver):
 
 async def test_nexus_operation_store_failure_fails_operation(
     env: WorkflowEnvironment,
+    nexus_endpoint,
 ):
     """A non-retryable store failure fails the operation and surfaces the driver
     error to the caller (deterministically, with no retries)."""
@@ -258,7 +269,9 @@ async def test_nexus_operation_store_failure_fails_operation(
 
     driver = PermanentFailStoreDriver()
     with pytest.raises(WorkflowFailureError) as exc_info:
-        await _run_caller(env, driver, BigResultOpCallerWorkflow.run)
+        await _run_caller(
+            env, driver, BigResultOpCallerWorkflow.run, nexus_endpoint.task_queue
+        )
 
     causes = _cause_chain(exc_info.value)
     assert [type(c) for c in causes] == [

@@ -260,6 +260,7 @@ class CallerWorkflow:
 async def test_cancellation_type(
     env: WorkflowEnvironment,
     cancellation_type_name: str,
+    nexus_endpoint,
 ):
     cancellation_type = workflow.NexusOperationCancellationType[cancellation_type_name]
     global test_context
@@ -269,6 +270,7 @@ async def test_cancellation_type(
     )
 
     client = env.client
+    task_queue = nexus_endpoint.task_queue
 
     log_capturer = LogCapturer()
     with log_capturer.logs_captured(
@@ -276,14 +278,10 @@ async def test_cancellation_type(
     ):
         async with Worker(
             client,
-            task_queue=str(uuid.uuid4()),
+            task_queue=task_queue,
             workflows=[CallerWorkflow, HandlerWorkflow],
             nexus_service_handlers=[ServiceHandler()],
         ) as worker:
-            await env.create_nexus_endpoint(
-                make_nexus_endpoint_name(worker.task_queue), worker.task_queue
-            )
-
             # Start the caller workflow, wait for the nexus op to have started and retrieve the nexus op
             # token
             with_start_workflow = WithStartWorkflowOperation(
