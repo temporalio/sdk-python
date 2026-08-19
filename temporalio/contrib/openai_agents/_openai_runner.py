@@ -20,12 +20,12 @@ from agents.sandbox import SandboxAgent
 from typing_extensions import Unpack
 
 from temporalio import workflow
+from temporalio.contrib.openai_agents._errors import AgentsWorkflowError
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
 from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_client import (
     TemporalSandboxClient,
 )
-from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 
 # Recursively replace models in all agents
@@ -195,6 +195,12 @@ class TemporalOpenAIRunner(AgentRunner):
                     "For example:\n"
                     "  from temporalio.contrib.openai_agents.workflow import temporal_sandbox_client\n"
                     "  run_config = RunConfig(sandbox=SandboxRunConfig(client=temporal_sandbox_client('my-backend')))"
+                )
+            elif run_config.sandbox.session is not None:
+                raise AgentsWorkflowError(
+                    "run_config.sandbox.session is not supported by the Temporal OpenAI Agents "
+                    "plugin. A live sandbox session is not a durable construct in a workflow. "
+                    "Pass run_config.sandbox.client=temporal_sandbox_client(name) instead."
                 )
             elif run_config.sandbox.client is None:
                 raise ValueError(

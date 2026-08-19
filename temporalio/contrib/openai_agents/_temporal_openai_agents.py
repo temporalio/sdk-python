@@ -20,6 +20,7 @@ from agents.tracing.provider import DefaultTraceProvider
 from openai._models import construct_type
 
 import temporalio.api.common.v1
+from temporalio.contrib.openai_agents._errors import AgentsWorkflowError
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import (
@@ -28,10 +29,13 @@ from temporalio.contrib.openai_agents._openai_runner import (
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
+from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
+    _snapshot_resolvable_env_vars,
+)
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsContextPropagationInterceptor,
 )
-from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from temporalio.contrib.opentelemetry._tracer_provider import ReplaySafeTracerProvider
 from temporalio.contrib.pydantic import (
     PydanticJSONPlainPayloadConverter,
@@ -295,7 +299,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         register_activities: bool = True,
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
-        resolvable_worker_env_vars: Collection[str] = (),
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -324,9 +328,10 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 Warning: use_otel_instrumentation is experimental and behavior may change in future versions.
                 Use with caution in production environments.
             resolvable_worker_env_vars: Names of the environment variables that
-                ``temporal_worker_env_ref()`` may read on this worker. Names are
-                matched exactly, with no globbing; ``"*"``
-                anywhere in the collection allows every name.
+                ``temporal_worker_env_ref()`` and ``TemporalWorkerEnvValue`` may
+                read on this worker. Names are matched exactly, with no globbing;
+                pass ``AllowAllWorkerEnvVars()`` in place of the names to allow
+                every variable.
                 Warning: resolvable_worker_env_vars is experimental and behavior may change in future versions.
                 Use with caution in production environments.
 
@@ -349,6 +354,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
         self._use_otel_instrumentation = use_otel_instrumentation
 
+        resolvable_env_vars = _snapshot_resolvable_env_vars(resolvable_worker_env_vars)
+
         # Delay activity construction until they are actually needed
         def add_activities(
             activities: Sequence[Callable] | None,
@@ -357,7 +364,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 return activities or []
 
             model_activity = ModelActivity(
-                model_provider, resolvable_worker_env_vars=resolvable_worker_env_vars
+                model_provider, resolvable_worker_env_vars=resolvable_env_vars
             )
             new_activities = [
                 model_activity.invoke_model_activity,
@@ -380,7 +387,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 )
 
             for sandbox_provider in sandbox_clients:
-                new_activities.extend(sandbox_provider._get_activities())
+                new_activities.extend(
+                    sandbox_provider._get_activities(resolvable_env_vars)
+                )
 
             return list(activities or []) + new_activities
 

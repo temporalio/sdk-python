@@ -40,6 +40,14 @@ to include examples, links to docs, or any other relevant information.
   `uuid.uuid1()`/`uuid.uuid4()` restrictions.
 - **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
   Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
+- **Experimental**: `temporalio.contrib.openai_agents.temporal_worker_env_ref` names an environment
+  variable the worker reads for a hosted tool credential, keeping it out of workflow history.
+- **Experimental**: `temporalio.contrib.openai_agents.TemporalWorkerEnvValue` names an environment
+  variable the worker reads for a sandbox environment value, keeping it out of workflow history.
+- **Experimental**: `OpenAIAgentsPlugin(resolvable_worker_env_vars=...)` allowlists the environment
+  variable names a worker will read.
+- **Experimental**: `temporalio.contrib.openai_agents.AllowAllWorkerEnvVars` allowlists every
+  environment variable name on the worker.
 
 ### Changed
 
@@ -69,6 +77,12 @@ to include examples, links to docs, or any other relevant information.
 ### Deprecated
 
 ### :boom: Breaking Changes
+
+- The `openai-agents` extra now requires `openai-agents>=0.19.2,<0.20`, up from `>=0.17.5` with no
+  upper bound.
+- `temporalio.contrib.openai_agents` now rejects a sandbox `SandboxPathGrant` bound to a
+  `host_path`.
+- `temporalio.contrib.openai_agents` now rejects `run_config.sandbox.session`.
 
 ### Fixed
 

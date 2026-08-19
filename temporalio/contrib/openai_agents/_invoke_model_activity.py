@@ -48,6 +48,7 @@ from typing_extensions import Required, TypedDict
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import auto_heartbeater
 from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
     _WorkerEnvRefResolver,
 )
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
@@ -342,7 +343,7 @@ class ModelActivity:
     def __init__(
         self,
         model_provider: ModelProvider | None = None,
-        resolvable_worker_env_vars: Collection[str] = (),
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider or OpenAIProvider(

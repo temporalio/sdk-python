@@ -1,7 +1,8 @@
-"""References to secrets held in the Temporal Worker's environment."""
+"""Worker-environment secrets: the reference form, and the allowlist both forms share."""
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 from collections.abc import Collection, Mapping, MutableMapping
@@ -14,7 +15,50 @@ _REF_PREFIX = "temporal.worker_env_ref:"
 
 _REF_PATTERN = re.compile(re.escape(_REF_PREFIX) + r"\{([^}{]*)\}")
 
-_ANY_ENV_VAR = "*"
+
+@dataclasses.dataclass(frozen=True)
+class AllowAllWorkerEnvVars:
+    """Make every environment variable on the worker resolvable.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    Pass an instance in place of a list of names::
+
+        OpenAIAgentsPlugin(resolvable_worker_env_vars=AllowAllWorkerEnvVars())
+
+    This grants far more on the sandbox form than on the hosted tool form. A
+    sandbox manifest is written in workflow code, so allowing every name lets a
+    workflow name any variable on the worker and have its value set inside the
+    sandbox container, where a shell command the model composes can read it.
+    """
+
+
+def _snapshot_resolvable_env_vars(
+    resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars,
+) -> frozenset[str] | AllowAllWorkerEnvVars:
+    if isinstance(resolvable_worker_env_vars, AllowAllWorkerEnvVars):
+        return resolvable_worker_env_vars
+    if isinstance(resolvable_worker_env_vars, str):
+        raise TypeError(
+            "resolvable_worker_env_vars takes a collection of environment variable "
+            'names, such as ["MY_MCP_TOKEN"], or AllowAllWorkerEnvVars(). A single '
+            "string is read as the collection of its characters, so pass a list even "
+            "for one name."
+        )
+    if cast(object, resolvable_worker_env_vars) is AllowAllWorkerEnvVars:
+        raise TypeError(
+            "resolvable_worker_env_vars takes an AllowAllWorkerEnvVars instance, not "
+            "the class itself. Pass AllowAllWorkerEnvVars()."
+        )
+    return frozenset(resolvable_worker_env_vars)
+
+
+def _is_resolvable(
+    resolvable: frozenset[str] | AllowAllWorkerEnvVars, name: str
+) -> bool:
+    return isinstance(resolvable, AllowAllWorkerEnvVars) or name in resolvable
 
 
 def temporal_worker_env_ref(name: str) -> str:
@@ -45,19 +89,16 @@ def temporal_worker_env_ref(name: str) -> str:
 
 
 class _WorkerEnvRefResolver:  # type:ignore[reportUnusedClass]
-    def __init__(self, resolvable_worker_env_vars: Collection[str]) -> None:
-        if isinstance(resolvable_worker_env_vars, str):
-            raise TypeError(
-                "resolvable_worker_env_vars takes a collection of environment variable "
-                'names, such as ["MY_MCP_TOKEN"]. A single string is read as the '
-                "collection of its characters, so pass a list even for one name."
-            )
-        self._allowed = frozenset(resolvable_worker_env_vars)
+    def __init__(
+        self,
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars,
+    ) -> None:
+        self._allowed = _snapshot_resolvable_env_vars(resolvable_worker_env_vars)
 
     def _resolve_ref(self, value: str) -> str:
         def substitute(match: re.Match[str]) -> str:
             name = match.group(1)
-            if _ANY_ENV_VAR not in self._allowed and name not in self._allowed:
+            if not _is_resolvable(self._allowed, name):
                 return match.group(0)
             return os.environ.get(name, "")
 
