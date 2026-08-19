@@ -15,6 +15,31 @@ class PayloadCodec(ABC):
     Commonly used for compression or encryption.
     """
 
+    decode_requires_context: bool = False
+    """Whether correctly decoding a payload *requires* the serialization context.
+
+    This is a correctness certification, not a usage disclosure: it is not about
+    whether :py:meth:`decode` reads the context (a codec that reads it only for
+    logging still requires none) but whether the decoded *result* depends on it.
+    ``True`` means decoding the same bytes under a different serialization context
+    could change the result, so a value cannot be forwarded across contexts by
+    reference without carrying its origin context. ``False`` certifies that decode
+    is *invariant* to the context, which lets a
+    :py:class:`temporalio.common.ValueHandle` forward by reference across contexts
+    with no envelope.
+
+    The default is ``False`` because most codecs are context-invariant
+    (compression, single-key encryption) and rarely retrofit a declaration, so a
+    conservative default would leave handle forwarding unused for exactly the
+    custom-codec deployments it most benefits. A codec whose decode *does* depend
+    on the context (for example encryption that derives its key from the context)
+    must set this ``True``; one that forgets forwards plain and fails at the
+    destination, loudly for authenticated encryption.
+
+    .. warning::
+        This API is experimental.
+    """
+
     @abstractmethod
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]

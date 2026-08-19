@@ -104,6 +104,32 @@ class DataConverter(WithSerializationContext):
             self.payload_converter_class()
         )
 
+    @property
+    def decode_requires_context(self) -> bool:
+        """Whether the inbound decode path *requires* the serialization context.
+
+        Aggregates the codec's
+        :py:attr:`~temporalio.converter.PayloadCodec.decode_requires_context` and
+        the payload converter's
+        :py:attr:`~temporalio.converter.PayloadConverter.deserialize_requires_context`:
+        True if either requires the context. External-storage retrieval is
+        claim-based and never requires it, so it does not contribute.
+
+        This is the single boolean the forward-time wrap-or-not decision reads:
+        when False, a :py:class:`temporalio.common.ValueHandle` forwards by
+        reference across contexts with no envelope; when True, a forward across
+        contexts must carry the origin context or fall back to eager materialize.
+
+        .. warning::
+            This API is experimental.
+        """
+        codec_requires = (
+            self.payload_codec.decode_requires_context
+            if self.payload_codec is not None
+            else False
+        )
+        return codec_requires or self.payload_converter.deserialize_requires_context
+
     async def encode(
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
@@ -119,6 +145,27 @@ class DataConverter(WithSerializationContext):
             same number as values given, but must be at least one and cannot be
             more than was given.
         """
+        # A non-pending ValueHandle among the values is being *forwarded* by
+        # reference (a pending one is a fresh produce, encoded under this context,
+        # and is safe to store). Decide whether the forward needs the origin context
+        # carried: it does exactly when the decode path is context-dependent, since
+        # otherwise the destination would decode under the wrong context.
+        if self.decode_requires_context and any(
+            isinstance(value, ValueHandle) and not value._pending for value in values
+        ):
+            # This is where the reference would be wrapped in a ContextBoundPayload
+            # carrying its origin context (skipping the wrap if it already is one).
+            # That envelope type is not implemented yet, so rather than forward a
+            # reference that will mis-decode downstream, fail fast with guidance.
+            raise RuntimeError(
+                "[TMPRL1108] Cannot forward a ValueHandle by reference under a "
+                "context-dependent codec or converter (decode_requires_context is "
+                "True): the referenced bytes would decode under the wrong "
+                "serialization context at their destination. Carrying the origin "
+                "context requires the ContextBoundPayload envelope, which is not yet "
+                "implemented. Acquire the value with ValueHandle.get_value() and pass "
+                "it by value instead, or configure a context-independent codec."
+            )
         # Realize any pending (deferred-store) value handles here, at commit.
         # This is where a deferred create_value_handle actually stores. If a
         # producing activity faults before returning its result, encode is never
@@ -247,9 +294,7 @@ class DataConverter(WithSerializationContext):
             _pending_metadata=metadata,
         )
 
-    async def _realize_value_handle(
-        self, handle: ValueHandle[Any]
-    ) -> ValueHandle[Any]:
+    async def _realize_value_handle(self, handle: ValueHandle[Any]) -> ValueHandle[Any]:
         """Store a pending handle's converted value now, returning a realized handle.
 
         The value was already converted at create time; this runs the deferred,

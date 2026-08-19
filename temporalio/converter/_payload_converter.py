@@ -140,6 +140,22 @@ class PayloadConverter(ABC):
     default: ClassVar[PayloadConverter]
     """Default payload converter."""
 
+    deserialize_requires_context: bool = False
+    """Whether correctly deserializing a payload *requires* the serialization context.
+
+    The converter-side counterpart to
+    :py:attr:`temporalio.converter.PayloadCodec.decode_requires_context`, and a
+    correctness certification with the same meaning: ``True`` means deserializing
+    the same payload under a different serialization context could change the
+    result; ``False`` (the default) certifies deserialization is *invariant* to the
+    context. Nearly all converters, the built-in JSON/protobuf/binary ones
+    included, are invariant, so the default matches; a converter that genuinely
+    depends on the context must set this ``True``.
+
+    .. warning::
+        This API is experimental.
+    """
+
     @abstractmethod
     def to_payloads(
         self, values: Sequence[Any]

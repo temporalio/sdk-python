@@ -193,3 +193,71 @@ async def test_pending_handle_dropped_without_commit_is_never_stored() -> None:
     # orphaned.
     _ = await dc.create_value_handle(_BIG, metadata={"pages": "42"})
     assert driver._store_calls == 0
+
+
+class _PassthroughCodec(PayloadCodec):
+    """No-op codec used to exercise the context-requirement declaration."""
+
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return list(payloads)
+
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return list(payloads)
+
+
+async def test_decode_requires_context_declaration() -> None:
+    # The declaration certifies whether correct decode/deserialize is *invariant*
+    # to the serialization context. It is the single boolean the forward-time
+    # wrap-or-not decision reads: False means a handle can forward by reference
+    # across contexts with no envelope; True means the origin must be carried.
+
+    # No codec + default converter: nothing requires the context, path is clear.
+    dc = DataConverter()
+    assert dc.payload_converter.deserialize_requires_context is False
+    assert dc.decode_requires_context is False
+
+    class _ContextCodec(_PassthroughCodec):
+        decode_requires_context = True
+
+    # An undeclared codec is optimistically assumed context-invariant (the default):
+    # most codecs are, and a context-dependent one must opt in rather than the many
+    # context-invariant ones having to opt out.
+    assert _PassthroughCodec().decode_requires_context is False
+    assert DataConverter(payload_codec=_PassthroughCodec()).decode_requires_context is False
+
+    # A context-requiring codec (e.g. context-keyed encryption) opts in and flips
+    # the aggregate, so forwarding across contexts would need the origin carried.
+    assert DataConverter(payload_codec=_ContextCodec()).decode_requires_context is True
+
+
+async def test_forwarding_handle_gated_by_context_requirement() -> None:
+    # Context-independent (the default): forwarding a handle by reference is safe,
+    # so encode does not fire the guard and the forward succeeds.
+    driver = InMemoryTestDriver()
+    dc = _storage_converter(driver)
+    [reference] = await dc.encode([_BIG])
+    [handle] = await dc.decode([reference], [ValueHandle[str]])
+    forwarded = await dc.encode([handle])
+    assert len(forwarded) == 1
+
+    # Context-dependent: forwarding the same handle by reference would decode under
+    # the wrong context at its destination, and the ContextBoundPayload envelope
+    # that would carry the origin is not implemented, so encode fails fast.
+    class _ContextCodec(_PassthroughCodec):
+        decode_requires_context = True
+
+    dc2 = DataConverter(
+        payload_codec=_ContextCodec(),
+        external_storage=ExternalStorage(
+            drivers=[InMemoryTestDriver()], payload_size_threshold=0
+        ),
+    )
+    [ref2] = await dc2.encode([_BIG])
+    [handle2] = await dc2.decode([ref2], [ValueHandle[str]])
+    with pytest.raises(RuntimeError, match="TMPRL1108"):
+        await dc2.encode([handle2])
+
+    # A *pending* handle (a fresh produce, not a forward) is unaffected: it is
+    # realized and stored under this context regardless of the declaration.
+    pending = await dc2.create_value_handle(_BIG)
+    [_produced] = await dc2.encode([pending])
