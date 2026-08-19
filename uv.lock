@@ -4711,6 +4711,11 @@ aioboto3 = [
     { name = "aioboto3" },
     { name = "types-aioboto3", extra = ["s3"] },
 ]
+cloud-run-worker-otel = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "opentelemetry-sdk" },
+]
 deepagents = [
     { name = "deepagents", marker = "python_full_version >= '3.11'" },
     { name = "langchain", marker = "python_full_version >= '3.11'" },
@@ -4817,9 +4822,12 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
     { name = "nexus-rpc", specifier = "==1.4.0" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.19.2,<0.20" },
+    { name = "opentelemetry-api", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.26,<2" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
+    { name = "opentelemetry-sdk", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-sdk-extension-aws", marker = "extra == 'lambda-worker-otel'", specifier = ">=2.0.0,<3" },
@@ -4832,7 +4840,7 @@ requires-dist = [
     { name = "types-protobuf", specifier = ">=3.20,<8.0.0" },
     { name = "typing-extensions", specifier = ">=4.2.0,<5" },
 ]
-provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "deepagents", "lambda-worker-otel", "aioboto3", "google-genai", "strands-agents"]
+provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "deepagents", "lambda-worker-otel", "cloud-run-worker-otel", "aioboto3", "google-genai", "strands-agents"]
 
 [package.metadata.requires-dev]
 dev = [
