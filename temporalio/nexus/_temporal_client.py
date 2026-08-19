@@ -149,7 +149,7 @@ class TemporalNexusClient(ABC):
     async def start_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str | None = None,
@@ -309,7 +309,7 @@ class TemporalNexusClient(ABC):
         update: temporalio.workflow.UpdateMethodMultiParam[
             [Any, ParamType], ReturnType
         ],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         update_id: str | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},

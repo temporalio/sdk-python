@@ -7,7 +7,6 @@ from typing import Any, Concatenate, Generic, NoReturn, TypedDict, overload
 
 import temporalio.bridge.proto.child_workflow
 import temporalio.common
-import temporalio.converter
 
 from ..types import (
     MethodAsyncNoParam,
@@ -92,7 +91,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
     async def signal(
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
     ) -> None: ...
 
     @overload
@@ -220,7 +219,7 @@ async def start_child_workflow(
 @overload
 async def start_child_workflow(
     workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     id: str | None = None,
     task_queue: str | None = None,
@@ -423,7 +422,7 @@ async def execute_child_workflow(
 @overload
 async def execute_child_workflow(
     workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     id: str | None = None,
     task_queue: str | None = None,
@@ -589,7 +588,7 @@ class ExternalWorkflowHandle(Generic[SelfType]):
     async def signal(
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
     ) -> None: ...
 
     @overload
@@ -732,7 +731,7 @@ def continue_as_new(
 # Overload for single-param workflow
 @overload
 def continue_as_new(
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     workflow: MethodAsyncSingleParam[SelfType, ParamType, Any],
     task_queue: str | None = None,

@@ -372,7 +372,7 @@ class WorkflowRunOperationContext(StartOperationContext):
     async def start_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str | None = None,

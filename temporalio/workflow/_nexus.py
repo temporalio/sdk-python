@@ -11,6 +11,7 @@ import nexusrpc.handler
 from nexusrpc import InputT, OutputT
 
 import temporalio.bridge.proto.nexus
+import temporalio.common
 import temporalio.nexus
 from temporalio.types import NexusServiceType
 
@@ -103,7 +104,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     async def start_operation(
         self,
         operation: nexusrpc.Operation[InputT, OutputT],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -140,7 +141,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             [NexusServiceType, temporalio.nexus.WorkflowRunOperationContext, InputT],
             Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -160,7 +161,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             Awaitable[OutputT],
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -180,7 +181,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -199,7 +200,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         operation: Callable[
             [NexusServiceType], nexusrpc.handler.OperationHandler[InputT, OutputT]
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -224,7 +225,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             ],
             Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -274,7 +275,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     async def execute_operation(
         self,
         operation: nexusrpc.Operation[InputT, OutputT],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -311,7 +312,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             [NexusServiceType, temporalio.nexus.WorkflowRunOperationContext, InputT],
             Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -331,7 +332,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             Awaitable[OutputT],
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -351,7 +352,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             [NexusServiceType, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -371,7 +372,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             [NexusServiceType],
             nexusrpc.handler.OperationHandler[InputT, OutputT],
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,
@@ -396,7 +397,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             ],
             Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
         ],
-        input: InputT,
+        input: InputT | temporalio.common.ValueHandle[InputT],
         *,
         output_type: type[OutputT] | None = None,
         schedule_to_close_timeout: timedelta | None = None,

@@ -552,7 +552,7 @@ def start_activity_class(
 @overload
 def start_activity_class(
     activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -572,7 +572,7 @@ def start_activity_class(
 @overload
 def start_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -709,7 +709,7 @@ async def execute_activity_class(
 @overload
 async def execute_activity_class(
     activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -729,7 +729,7 @@ async def execute_activity_class(
 @overload
 async def execute_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -866,7 +866,7 @@ def start_activity_method(
 @overload
 def start_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -886,7 +886,7 @@ def start_activity_method(
 @overload
 def start_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1023,7 +1023,7 @@ async def execute_activity_method(
 @overload
 async def execute_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1043,7 +1043,7 @@ async def execute_activity_method(
 @overload
 async def execute_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1191,7 +1191,7 @@ def start_local_activity(
 @overload
 def start_local_activity(
     activity: CallableAsyncSingleParam[ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1208,7 +1208,7 @@ def start_local_activity(
 @overload
 def start_local_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1371,7 +1371,7 @@ async def execute_local_activity(
 @overload
 async def execute_local_activity(
     activity: CallableAsyncSingleParam[ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1388,7 +1388,7 @@ async def execute_local_activity(
 @overload
 async def execute_local_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1524,7 +1524,7 @@ def start_local_activity_class(
 @overload
 def start_local_activity_class(
     activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1540,7 +1540,7 @@ def start_local_activity_class(
 @overload
 def start_local_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1653,7 +1653,7 @@ async def execute_local_activity_class(
 @overload
 async def execute_local_activity_class(
     activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1670,7 +1670,7 @@ async def execute_local_activity_class(
 @overload
 async def execute_local_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1788,7 +1788,7 @@ def start_local_activity_method(
 @overload
 def start_local_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1805,7 +1805,7 @@ def start_local_activity_method(
 @overload
 def start_local_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1921,7 +1921,7 @@ async def execute_local_activity_method(
 @overload
 async def execute_local_activity_method(
     activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -1938,7 +1938,7 @@ async def execute_local_activity_method(
 @overload
 async def execute_local_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
-    arg: ParamType,
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
