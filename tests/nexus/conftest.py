@@ -148,6 +148,11 @@ class _CloudNexusEndpointClient:
                 await asyncio.sleep(1)
                 continue
             try:
+                print(
+                    "Waiting for Cloud Nexus endpoint "
+                    f"{endpoint_name} readiness operation {operation_id}",
+                    flush=True,
+                )
                 await operation.result()
             except NexusOperationFailureError as err:
                 if str(err.cause) in {
