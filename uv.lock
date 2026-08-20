@@ -4825,7 +4825,7 @@ requires-dist = [
     { name = "opentelemetry-api", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.26,<2" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.11.1,<2" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },

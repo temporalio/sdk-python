@@ -47,7 +47,7 @@ lambda-worker-otel = [
 cloud-run-worker-otel = [
   "opentelemetry-api>=1.26,<2",
   "opentelemetry-sdk>=1.26,<2",
-  "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
+  "opentelemetry-exporter-otlp-proto-grpc>=1.26,<2",
 ]
 aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
 google-genai = ["google-genai>=2.10.0,<3.0.0"]
