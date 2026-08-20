@@ -1139,6 +1139,81 @@ async def test_temporal_operation_start_activity(
         assert result == "test"
 
 
+async def test_temporal_operation_can_start_multiple_activities_with_same_id(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    activity_id = str(uuid.uuid4())
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+    @service_handler
+    class MultipleActivitiesHandler:
+        def __init__(self) -> None:
+            self.first_activity_run_id: str | None = None
+            self.start_completed = asyncio.Event()
+
+        @nexus.temporal_operation
+        async def start_activities(
+            self,
+            _ctx: nexus.TemporalStartOperationContext,
+            client: nexus.TemporalNexusClient,
+            _input: None,
+        ) -> nexus.TemporalOperationResult[str]:
+            try:
+                first_handle = await nexus.client().start_activity(
+                    echo_activity,
+                    Input(value="first", task_queue=task_queue),
+                    id=activity_id,
+                    task_queue=task_queue,
+                    schedule_to_close_timeout=timedelta(seconds=5),
+                )
+                assert first_handle.run_id
+                self.first_activity_run_id = first_handle.run_id
+                await first_handle.result()
+
+                return await client.start_activity(
+                    echo_activity,
+                    Input(value="second", task_queue=task_queue),
+                    id=activity_id,
+                    schedule_to_close_timeout=timedelta(seconds=5),
+                )
+            finally:
+                self.start_completed.set()
+
+    handler = MultipleActivitiesHandler()
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[handler],
+        activities=[echo_activity],
+    ):
+        nexus_client = client.create_nexus_client(
+            MultipleActivitiesHandler, endpoint_name
+        )
+        operation_handle = await nexus_client.start_operation(
+            MultipleActivitiesHandler.start_activities,
+            None,
+            id=str(uuid.uuid4()),
+        )
+        await asyncio.wait_for(handler.start_completed.wait(), timeout=15)
+
+        assert handler.first_activity_run_id
+        first_result = await client.get_activity_handle(
+            activity_id, run_id=handler.first_activity_run_id, result_type=str
+        ).result()
+        second_result = await client.get_activity_handle(
+            activity_id, result_type=str
+        ).result()
+        assert [first_result, second_result] == ["first", "second"]
+        assert await operation_handle.result() == second_result
+
+
 async def test_temporal_operation_backing_activity_does_not_duplicate_links(
     client: Client, env: WorkflowEnvironment
 ):
