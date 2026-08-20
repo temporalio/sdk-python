@@ -200,9 +200,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
-        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
-        if nexus_ctx is not None:
-            nexus_ctx._add_start_workflow_response_link(handle)
+        temporalio.nexus._operation_context._apply_start_workflow_response_to_nexus_context(
+            handle
+        )
         return handle
 
     async def _build_start_workflow_execution_request(
@@ -214,40 +214,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # and UpdateWithStartStartWorkflowInput. UpdateWithStartStartWorkflowInput does
         # not have the following two fields so they are handled here.
         req.request_eager_execution = input.request_eager_start
-        if input.request_id:
-            req.request_id = input.request_id
 
-        req.completion_callbacks.extend(
-            temporalio.api.common.v1.Callback(
-                nexus=temporalio.api.common.v1.Callback.Nexus(
-                    url=callback.url,
-                    header=callback.headers,
-                ),
-                links=input.links,
-            )
-            for callback in input.callbacks
+        temporalio.nexus._operation_context._apply_nexus_context_to_start_workflow_request(
+            req
         )
-        # Links are duplicated on request for compatibility with older server versions.
-        req.links.extend(input.links)
-
-        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
-        if nexus_ctx is not None:
-            # This start was issued from inside a Nexus operation handler. If the workflow ID
-            # conflict policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING and a conflict is
-            # detected, attach this request's request ID, completion callbacks, and links to
-            # the existing run. The TemporalNexusClient and WorkflowRunOperationContext are
-            # responsible for setting the callbacks correctly, so it is safe to enable all
-            # on-conflict options whenever we are invoked from an operation handler.
-            req.on_conflict_options.attach_request_id = True
-            req.on_conflict_options.attach_completion_callbacks = True
-            req.on_conflict_options.attach_links = True
-            # The nexus-backing workflow already carries its inbound links via input.links
-            # (start_workflow forwards them as links=...). A plain start_workflow issued from
-            # inside a Nexus operation handler must forward the inbound Nexus task links
-            # explicitly so the started callee's WorkflowExecutionStarted event links back to
-            # the caller.
-            if not temporalio.nexus._operation_context._in_nexus_backing_start_context():
-                req.links.extend(nexus_ctx._get_request_links())
 
         return req
 
