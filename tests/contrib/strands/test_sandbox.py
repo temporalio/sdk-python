@@ -295,10 +295,14 @@ class ErrorSandbox(RecordingSandbox):
     ) -> AsyncGenerator[StreamChunk | ExecutionResult, None]:
         self.attempts += 1
         if self.always_timeout:
-            raise SandboxTimeoutError(timeout)
+            # The backing sandbox enforces its own limit, not the requested one.
+            raise SandboxTimeoutError(90)
         if self.attempts == 1:
             raise RuntimeError("transient")
         yield ExecutionResult(0, "retried", "")
+
+    async def read_file(self, path: str, **kwargs: Any) -> bytes:
+        raise FileNotFoundError(f"cat: {path}: No such file or directory")
 
     async def list_files(self, path: str, **kwargs: Any) -> list[FileInfo]:
         raise SandboxPathNotFoundError(path)
@@ -307,7 +311,7 @@ class ErrorSandbox(RecordingSandbox):
 @workflow.defn
 class SandboxErrorWorkflow:
     @workflow.run
-    async def run(self) -> tuple[str, bool, bool]:
+    async def run(self) -> tuple[str, bool, bool, str, str]:
         retried = TemporalSandbox(
             "retried",
             start_to_close_timeout=timedelta(seconds=15),
@@ -323,6 +327,15 @@ class SandboxErrorWorkflow:
         else:
             path_error = False
 
+        # A plain FileNotFoundError from the sandbox arrives as the sandbox
+        # subclass, keeping the backing environment's own message.
+        try:
+            await retried.read_file("/missing")
+        except SandboxPathNotFoundError as err:
+            read_message = str(err)
+        else:
+            read_message = ""
+
         # No retry policy: a timeout must surface on the first attempt rather
         # than retrying under Temporal's unlimited-attempt default. The
         # schedule-to-close timeout bounds the failure if that ever regresses.
@@ -333,11 +346,13 @@ class SandboxErrorWorkflow:
         )
         try:
             await failing.execute("command", timeout=4)
-        except SandboxTimeoutError:
+        except SandboxTimeoutError as err:
             timeout_error = True
+            timeout_message = str(err)
         else:
             timeout_error = False
-        return result.stdout, path_error, timeout_error
+            timeout_message = ""
+        return result.stdout, path_error, timeout_error, read_message, timeout_message
 
 
 async def test_sandbox_retries_and_reconstructs_errors(client: Client):
@@ -361,6 +376,12 @@ async def test_sandbox_retries_and_reconstructs_errors(client: Client):
             task_queue=task_queue,
         )
 
-    assert result == ("retried", True, True)
+    assert result == (
+        "retried",
+        True,
+        True,
+        "cat: /missing: No such file or directory",
+        "Execution timed out after 90 seconds",
+    )
     assert retried.attempts == 2
     assert failing.attempts == 1

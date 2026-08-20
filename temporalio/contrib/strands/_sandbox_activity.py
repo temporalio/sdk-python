@@ -10,7 +10,7 @@ from strands.sandbox import (
     Sandbox,
     StreamChunk,
 )
-from strands.sandbox.errors import SandboxPathNotFoundError, SandboxTimeoutError
+from strands.sandbox.errors import SandboxTimeoutError
 
 from temporalio import activity
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
@@ -118,7 +118,7 @@ class SandboxActivities:
         async def read_file(input: _PathInput) -> bytes:
             try:
                 return await self._get_sandbox().read_file(input.path, **input.kwargs)
-            except SandboxPathNotFoundError as err:
+            except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
         @activity.defn(name=_activity_name(self._name, "write-file"))
@@ -130,7 +130,7 @@ class SandboxActivities:
                     base64.b64decode(input.content_base64),
                     **input.kwargs,
                 )
-            except SandboxPathNotFoundError as err:
+            except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
         @activity.defn(name=_activity_name(self._name, "remove-file"))
@@ -138,7 +138,7 @@ class SandboxActivities:
         async def remove_file(input: _PathInput) -> None:
             try:
                 await self._get_sandbox().remove_file(input.path, **input.kwargs)
-            except SandboxPathNotFoundError as err:
+            except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
         @activity.defn(name=_activity_name(self._name, "list-files"))
@@ -146,7 +146,7 @@ class SandboxActivities:
         async def list_files(input: _PathInput) -> list[FileInfo]:
             try:
                 return await self._get_sandbox().list_files(input.path, **input.kwargs)
-            except SandboxPathNotFoundError as err:
+            except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
         return [execute, execute_code, read_file, write_file, remove_file, list_files]
@@ -195,7 +195,10 @@ def _timeout_error(err: SandboxTimeoutError, timeout: float | None) -> Applicati
     )
 
 
-def _path_not_found_error(err: SandboxPathNotFoundError, path: str) -> ApplicationError:
+def _path_not_found_error(err: FileNotFoundError, path: str) -> ApplicationError:
+    # Strands documents FileNotFoundError, not SandboxPathNotFoundError, for
+    # read/remove/list; only list_files raises the sandbox-specific subclass.
+    # Either way the path is missing on every attempt, so retrying is futile.
     return ApplicationError(
         str(err),
         path,

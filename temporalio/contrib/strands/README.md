@@ -177,7 +177,7 @@ code, and filesystem operation as a Temporal Activity. Register the real
 worker-side sandbox under a name, then select that name in workflow code:
 
 ```python
-from strands.sandbox import DockerSandbox
+from strands.sandbox.docker import DockerSandbox
 from temporalio.contrib.strands import StrandsPlugin, TemporalAgent, TemporalSandbox
 
 # workflow
@@ -202,11 +202,21 @@ shared by all activities for that name for the worker's lifetime, so tools see
 the same filesystem and working state. Provisioning and teardown of the backing
 environment remain the application's responsibility.
 
-`SandboxTimeoutError` and `SandboxPathNotFoundError` cross the activity
-boundary as non-retryable failures and are re-raised inside the workflow, so a
-command that exceeds its `timeout` or a path that does not exist surfaces to the
-agent on the first attempt instead of retrying. Other sandbox failures are
-retried under the `retry_policy` you pass to `TemporalSandbox`.
+That cache is per worker *process*, while successive sandbox activities from one
+workflow are routed independently across the task queue. With more than one
+worker on the queue, a `write-file` can land on one worker and the following
+`read-file` on another, so the factory must point at state the whole queue
+shares — a named Docker container, an SSH host — rather than a per-process
+temporary directory. A single worker on the queue also satisfies this.
+
+`SandboxTimeoutError` and any `FileNotFoundError` — including its
+`SandboxPathNotFoundError` subclass — cross the activity boundary as
+non-retryable failures and are re-raised inside the workflow with the sandbox's
+own message, so a command that exceeds its `timeout` or a path that does not
+exist surfaces to the agent on the first attempt instead of retrying. Other
+sandbox failures, including the `OSError` that Strands documents for a failed
+`write_file`, are retried under the `retry_policy` you pass to
+`TemporalSandbox`.
 
 By default, `TemporalSandbox.get_tools()` vends `sandbox_bash` and
 `sandbox_file_editor`. A tool passed explicitly through `TemporalAgent(tools=...)`

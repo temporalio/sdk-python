@@ -1,7 +1,7 @@
 import base64
 from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypeVar
 
 from strands.sandbox import ExecutionResult, FileInfo, OutputFile, Sandbox, StreamChunk
 from strands.sandbox.errors import SandboxPathNotFoundError, SandboxTimeoutError
@@ -24,6 +24,8 @@ from ._sandbox_activity import (
     _StreamItem,
     _WriteFileInput,
 )
+
+_ErrorT = TypeVar("_ErrorT", bound=OSError)
 
 
 class TemporalSandbox(Sandbox):
@@ -162,11 +164,21 @@ class TemporalSandbox(Sandbox):
             if isinstance(cause, ApplicationError):
                 if cause.type == SANDBOX_TIMEOUT_ERROR_TYPE:
                     seconds = cause.details[0] if cause.details else None
-                    raise SandboxTimeoutError(seconds) from err
+                    raise _with_message(SandboxTimeoutError(seconds), cause) from err
                 if cause.type == SANDBOX_PATH_NOT_FOUND_ERROR_TYPE:
                     path = cause.details[0] if cause.details else ""
-                    raise SandboxPathNotFoundError(path) from err
+                    raise _with_message(SandboxPathNotFoundError(path), cause) from err
             raise
+
+
+def _with_message(error: _ErrorT, cause: ApplicationError) -> _ErrorT:
+    # The details only carry what the workflow needs to rebuild the error type.
+    # Restore the sandbox's own message so a timeout reports the duration the
+    # sandbox actually enforced, not the one the caller requested, and a missing
+    # path keeps whatever the backing environment said about it.
+    if cause.message:
+        error.args = (cause.message,)
+    return error
 
 
 def _item_from_json(value: Any) -> StreamChunk | ExecutionResult:
