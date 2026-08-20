@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.strands` now supports durable Strands
+  sandboxes through `TemporalSandbox` and worker-side factories registered with
+  `StrandsPlugin(sandboxes=...)`, with optional live Workflow Streams output.
 - Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
   `ReplaySafeLoggerProvider` (and exported `ReplaySafeTracerProvider`): wrap an
   OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
