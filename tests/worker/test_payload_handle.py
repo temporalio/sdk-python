@@ -72,11 +72,12 @@ async def produce_big() -> str:
 class ResultAsHandleConsumeWorkflow:
     @workflow.run
     async def run(self) -> int:
-        # Upgrade an unchanged activity's result to a handle, then forward it to
-        # an activity that materializes it.
-        handle = await workflow.start_activity(
-            produce_big, start_to_close_timeout=timedelta(seconds=30)
-        ).as_value_handle()
+        # Declare at the call site that an unchanged activity's result is consumed
+        # as a handle, then forward it to an activity that materializes it.
+        handle = await workflow.execute_activity(
+            workflow.as_value_handle(produce_big),
+            start_to_close_timeout=timedelta(seconds=30),
+        )
         return await workflow.execute_activity(
             consume_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -86,9 +87,10 @@ class ResultAsHandleConsumeWorkflow:
 class ResultAsHandlePassThroughWorkflow:
     @workflow.run
     async def run(self) -> str:
-        handle = await workflow.start_activity(
-            produce_big, start_to_close_timeout=timedelta(seconds=30)
-        ).as_value_handle()
+        handle = await workflow.execute_activity(
+            workflow.as_value_handle(produce_big),
+            start_to_close_timeout=timedelta(seconds=30),
+        )
         return await workflow.execute_activity(
             ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -105,10 +107,11 @@ class ChildProducerWorkflow:
 class ParentChildResultAsHandleWorkflow:
     @workflow.run
     async def run(self) -> str:
-        # Upgrade an unchanged child workflow's result to a handle and forward it
-        # without materializing it in this (parent) workflow.
-        child = await workflow.start_child_workflow(ChildProducerWorkflow.run)
-        handle = await child.as_value_handle()
+        # An unchanged child workflow's result, declared at the call site as a
+        # handle, forwarded without materializing it in this (parent) workflow.
+        handle = await workflow.execute_child_workflow(
+            workflow.as_value_handle(ChildProducerWorkflow.run)
+        )
         return await workflow.execute_activity(
             ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
@@ -134,6 +137,40 @@ class ProbeMetadataThenForwardWorkflow:
         # Forward the handle to an activity that materializes it.
         return await workflow.execute_activity(
             consume_handle, handle, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+@workflow.defn
+class LocalActivityResultAsHandleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Local activities resolve through the same pending-activity path, so the
+        # call-site declaration works there unchanged.
+        handle = await workflow.execute_local_activity(
+            workflow.as_value_handle(produce_big),
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        return await workflow.execute_activity(
+            ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+class ProducerActivities:
+    @activity.defn
+    async def produce(self) -> str:
+        return _BIG
+
+
+@workflow.defn
+class MethodResultAsHandleWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        handle = await workflow.execute_activity_method(
+            workflow.as_value_handle(ProducerActivities.produce),
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        return await workflow.execute_activity(
+            ignore_handle, handle, start_to_close_timeout=timedelta(seconds=30)
         )
 
 
@@ -285,3 +322,42 @@ async def test_activity_creates_handle_with_probeable_metadata(
     # forwarded the handle without any download.
     assert driver._store_calls == 1
     assert driver._retrieve_calls == 1
+
+
+async def test_local_activity_result_as_handle_pass_through(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = InMemoryTestDriver()
+    client = await _client(env, driver)
+    async with new_worker(
+        client,
+        LocalActivityResultAsHandleWorkflow,
+        activities=[produce_big, ignore_handle],
+    ) as worker:
+        result = await client.execute_workflow(
+            LocalActivityResultAsHandleWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == "ignored"
+    assert driver._retrieve_calls == 0
+
+
+async def test_activity_method_result_as_handle_pass_through(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = InMemoryTestDriver()
+    client = await _client(env, driver)
+    activities = ProducerActivities()
+    async with new_worker(
+        client,
+        MethodResultAsHandleWorkflow,
+        activities=[activities.produce, ignore_handle],
+    ) as worker:
+        result = await client.execute_workflow(
+            MethodResultAsHandleWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == "ignored"
+    assert driver._retrieve_calls == 0

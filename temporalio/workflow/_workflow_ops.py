@@ -68,19 +68,6 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         """Run ID for the workflow."""
         raise NotImplementedError
 
-    def as_value_handle(
-        self,
-    ) -> ChildWorkflowHandle[SelfType, temporalio.common.ValueHandle[ReturnType]]:
-        """Consume this child workflow's result as a lazy ValueHandle.
-
-        The child workflow is unchanged and still returns its declared type;
-        awaiting this handle yields a
-        :py:class:`temporalio.common.ValueHandle` of that type instead of
-        the materialized value. If the result was offloaded to external storage
-        it is not downloaded into the parent workflow.
-        """
-        raise NotImplementedError
-
     @overload
     async def signal(
         self,

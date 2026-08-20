@@ -147,6 +147,9 @@ from ._sandbox import (
     logger,
     unsafe,
 )
+from ._value_handles import (
+    as_value_handle,
+)
 from ._workflow_ops import (
     ChildWorkflowCancellationType,
     ChildWorkflowConfig,
@@ -259,6 +262,7 @@ __all__ = [
     "ExternalWorkflowHandle",
     "ParentClosePolicy",
     "all_handlers_finished",
+    "as_value_handle",
     "continue_as_new",
     "execute_child_workflow",
     "get_dynamic_query_handler",

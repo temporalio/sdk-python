@@ -14,6 +14,7 @@ from collections.abc import Sequence
 
 import pytest
 
+from temporalio import workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.common import ValueHandle
 from temporalio.converter import (
@@ -21,6 +22,8 @@ from temporalio.converter import (
     ExternalStorage,
     PayloadCodec,
 )
+from temporalio.converter._payload_handle import _upgrade_result_hint
+from temporalio.workflow._value_handles import _unwrap_value_handle_call
 from tests.test_extstore import InMemoryTestDriver
 
 # A value large enough to be worth offloading; threshold=0 offloads everything.
@@ -223,7 +226,10 @@ async def test_decode_requires_context_declaration() -> None:
     # most codecs are, and a context-dependent one must opt in rather than the many
     # context-invariant ones having to opt out.
     assert _PassthroughCodec().decode_requires_context is False
-    assert DataConverter(payload_codec=_PassthroughCodec()).decode_requires_context is False
+    assert (
+        DataConverter(payload_codec=_PassthroughCodec()).decode_requires_context
+        is False
+    )
 
     # A context-requiring codec (e.g. context-keyed encryption) opts in and flips
     # the aggregate, so forwarding across contexts would need the origin carried.
@@ -261,3 +267,37 @@ async def test_forwarding_handle_gated_by_context_requirement() -> None:
     # realized and stored under this context regardless of the declaration.
     pending = await dc2.create_value_handle(_BIG)
     [_produced] = await dc2.encode([pending])
+
+
+def test_as_value_handle_declares_intent_without_calling() -> None:
+    async def produce() -> str:
+        return _BIG
+
+    declared = workflow.as_value_handle(produce)
+    # The marker carries the callable rather than replacing or invoking it, so the
+    # start call can still resolve the activity definition from it.
+    assert _unwrap_value_handle_call(declared) == (produce, True)
+    # Re-declaring is a no-op rather than a nested marker.
+    assert _unwrap_value_handle_call(workflow.as_value_handle(declared)) == (
+        produce,
+        True,
+    )
+    # An undeclared target is unchanged.
+    assert _unwrap_value_handle_call(produce) == (produce, False)
+
+
+def test_as_value_handle_rejects_non_callable_targets() -> None:
+    # A dynamic (string-named) call has no callable to wrap; the error points at
+    # result_type=ValueHandle[T] instead of silently declaring nothing.
+    with pytest.raises(TypeError) as err:
+        workflow.as_value_handle("my_activity")  # type: ignore[call-overload]
+    assert "result_type=ValueHandle[T]" in str(err.value)
+    with pytest.raises(TypeError):
+        workflow.as_value_handle(42)  # type: ignore[call-overload]
+
+
+def test_upgrade_result_hint_is_idempotent() -> None:
+    assert _upgrade_result_hint(str) == ValueHandle[str]
+    assert _upgrade_result_hint(ValueHandle[str]) == ValueHandle[str]
+    # An unknown declared type still defers, just without a type to acquire into.
+    assert _upgrade_result_hint(None) is ValueHandle

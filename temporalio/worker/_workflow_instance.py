@@ -1567,6 +1567,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
+        activity, result_as_handle = (
+            temporalio.workflow._value_handles._unwrap_value_handle_call(activity)
+        )
         # Get activity definition if it's callable
         name: str
         arg_types: list[type] | None = None
@@ -1582,6 +1585,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
+        if result_as_handle:
+            ret_type = temporalio.converter._payload_handle._upgrade_result_hint(
+                ret_type
+            )
 
         return self._outbound.start_activity(
             StartActivityInput(
@@ -1631,6 +1638,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
+        workflow, result_as_handle = (
+            temporalio.workflow._value_handles._unwrap_value_handle_call(workflow)
+        )
         # Use definition if callable
         name: str
         arg_types: list[type] | None = None
@@ -1646,6 +1656,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             ret_type = defn.ret_type
         else:
             raise TypeError("Workflow must be a string or callable")
+        if result_as_handle:
+            ret_type = temporalio.converter._payload_handle._upgrade_result_hint(
+                ret_type
+            )
 
         return await self._outbound.start_child_workflow(
             StartChildWorkflowInput(
@@ -1687,6 +1701,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         activity_id: str | None,
         summary: str | None,
     ) -> temporalio.workflow.ActivityHandle[Any]:
+        activity, result_as_handle = (
+            temporalio.workflow._value_handles._unwrap_value_handle_call(activity)
+        )
         # Get activity definition if it's callable
         name: str
         arg_types: list[type] | None = None
@@ -1702,6 +1719,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             ret_type = defn.ret_type
         else:
             raise TypeError("Activity must be a string or callable")
+        if result_as_handle:
+            ret_type = temporalio.converter._payload_handle._upgrade_result_hint(
+                ret_type
+            )
 
         cast(_WorkflowExternFunctions, self._extern_functions)[
             "__temporal_assert_local_activity_valid"
@@ -3285,12 +3306,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             )
         )
 
-    def as_value_handle(self) -> temporalio.workflow.ActivityHandle[Any]:
-        ph = temporalio.converter._payload_handle
-        if not ph._is_payload_handle_hint(self._input.ret_type):
-            self._input.ret_type = ph._payload_handle_hint(self._input.ret_type)
-        return self
-
     def cancel(self, msg: Any | None = None) -> bool:
         # Allow the cancel to go through for the task even if we're deleting,
         # just don't do any commands
@@ -3443,12 +3458,6 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._failure_converter = self._instance._failure_converter_with_context(
             workflow_context
         )
-
-    def as_value_handle(self) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
-        ph = temporalio.converter._payload_handle
-        if not ph._is_payload_handle_hint(self._input.ret_type):
-            self._input.ret_type = ph._payload_handle_hint(self._input.ret_type)
-        return self
 
     @property
     def id(self) -> str:

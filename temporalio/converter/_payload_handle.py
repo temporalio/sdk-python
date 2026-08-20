@@ -38,15 +38,19 @@ def _payload_handle_inner_type(hint: Any) -> Optional[type]:
     return args[0] if args else None
 
 
-def _payload_handle_hint(inner_type: Optional[type]) -> Any:
-    """Build a ``ValueHandle[inner_type]`` hint (bare if ``inner_type`` is None).
+def _upgrade_result_hint(ret_type: Any) -> Any:
+    """Upgrade a call's result type so its result is consumed as a handle.
 
-    Used to upgrade a call's result type so an unchanged activity/child result
-    is consumed as a handle: the declared return type becomes the handle's ``T``.
+    The declared return type becomes the handle's ``T``
+    (``ValueHandle[ret_type]``, or bare ``ValueHandle`` if the type is unknown).
+    Idempotent, so a callee that already returns a ``ValueHandle`` is not
+    double-wrapped.
     """
+    if _is_payload_handle_hint(ret_type):
+        return ret_type
     return (
-        ValueHandle[inner_type]  # type: ignore[valid-type]
-        if inner_type is not None
+        ValueHandle[ret_type]  # type: ignore[valid-type]
+        if ret_type is not None
         else ValueHandle
     )
 
