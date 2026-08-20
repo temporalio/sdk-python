@@ -608,5 +608,6 @@ class _TracingWorkflowOutboundInterceptor(
             f"StartNexusOperation:{input.service}/{input.operation_name}",
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
-            input.headers = _context_to_headers(input.headers)
+            if hasattr(input.input, "headers"):
+                input.input.headers = _context_to_headers(input.input.headers or {})
             return await super().start_system_nexus_operation(input)
