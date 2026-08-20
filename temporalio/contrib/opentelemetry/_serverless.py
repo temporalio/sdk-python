@@ -140,7 +140,7 @@ def build_otlp_span_processor(
         ImportError: If the OTLP gRPC exporter is not installed. The caller
             decides whether to warn and continue or re-raise.
     """
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[reportMissingTypeStubs]
         OTLPSpanExporter,
     )
 
