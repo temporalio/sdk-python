@@ -2197,22 +2197,51 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _outbound_start_system_nexus_operation(
         self, input: StartSystemNexusOperationInput[Any, OutputT]
     ) -> _NexusOperationHandle[OutputT]:
-        temporalio.nexus.system._apply_headers_to_request(input.input, input.headers)
-        return await self._outbound_start_nexus_operation(
-            StartNexusOperationInput(
-                endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
-                service=input.service,
-                operation=input.operation,
-                input=input.input,
-                output_type=input.output_type,
-                schedule_to_close_timeout=input.schedule_to_close_timeout,
-                schedule_to_start_timeout=input.schedule_to_start_timeout,
-                start_to_close_timeout=input.start_to_close_timeout,
-                cancellation_type=input.cancellation_type,
-                headers=None,
-                summary=input.summary,
-            )
+        nexus_input = StartNexusOperationInput(
+            endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+            service=input.service,
+            operation=input.operation,
+            input=input.input,
+            output_type=input.output_type,
+            schedule_to_close_timeout=input.schedule_to_close_timeout,
+            schedule_to_start_timeout=input.schedule_to_start_timeout,
+            start_to_close_timeout=input.start_to_close_timeout,
+            cancellation_type=input.cancellation_type,
+            headers=None,
+            summary=input.summary,
         )
+        handle: _NexusOperationHandle[OutputT]
+
+        async def operation_handle_fn() -> OutputT:
+            return cast(
+                OutputT,
+                await self._await_temporal_operation(
+                    handle._result_fut,
+                    lambda _err, command: handle._apply_cancel_command(command),
+                ),
+            )
+
+        payload_converter = temporalio.nexus.system._get_payload_converter(
+            self._workflow_context_payload_converter,
+            self._workflow_context_failure_converter,
+            input.headers,
+        )
+        handle = _NexusOperationHandle(
+            self,
+            self._next_seq("nexus_operation"),
+            nexus_input,
+            operation_handle_fn(),
+            payload_converter,
+        )
+        handle._apply_schedule_command()
+        self._pending_nexus_operations[handle._seq] = handle
+
+        await self._await_temporal_operation(
+            handle._start_fut,
+            lambda _err, command: handle._apply_cancel_command(command),
+            reraise_on_workflow_cancellation=True,
+        )
+        return handle
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.

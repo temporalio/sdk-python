@@ -12,8 +12,6 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from google.protobuf.message import Message
-
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.converter
@@ -93,27 +91,31 @@ class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
     """Payload converter for system Nexus outer envelopes."""
 
     _user_converters: _SystemNexusUserConverters
-    _outer_payload_converter: temporalio.converter.PayloadConverter
+    _outer_payload_converter: _TemporalTransferTypePayloadConverter
+    _headers: Mapping[str, temporalio.api.common.v1.Payload] | None
 
     def __init__(
         self,
         user_payload_converter: temporalio.converter.PayloadConverter,
         user_failure_converter: temporalio.converter.FailureConverter,
+        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
     ) -> None:
         """Create a payload converter for system Nexus outer envelopes."""
         self._user_converters = _SystemNexusUserConverters(
             user_payload_converter, user_failure_converter
         )
-        self._outer_payload_converter = _TemporalTransferTypePayloadConverter.wrap(
+
+        self._outer_payload_converter = _TemporalTransferTypePayloadConverter(
             _SystemNexusOuterPayloadConverter()
         )
+        self._headers = headers
 
     def to_payloads(
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
         with _user_converter_context(self._user_converters):
-            return self._outer_payload_converter.to_payloads(values)
+            return self._outer_payload_converter.to_payloads(values, self._headers)
 
     def from_payloads(
         self,
@@ -134,23 +136,13 @@ def is_system_endpoint(endpoint: str) -> bool:
     return endpoint == TEMPORAL_SYSTEM_ENDPOINT
 
 
-def _apply_headers_to_request(
-    request: Message,
-    headers: Mapping[str, temporalio.api.common.v1.Payload],
-) -> None:
-    """Apply headers to a system request when it supports Temporal headers."""
-    if not headers or "header" not in request.DESCRIPTOR.fields_by_name:
-        return
-    request_header = getattr(request, "header")
-    for key, payload in headers.items():
-        request_header.fields[key].CopyFrom(payload)
-
-
 def _is_system_payload(payload: temporalio.api.common.v1.Payload) -> bool:
     return (
         payload.metadata.get(_SYSTEM_PAYLOAD_METADATA_KEY)
         == _SYSTEM_PAYLOAD_METADATA_VALUE
     )
+
+
 async def maybe_visit_payload(
     payload: temporalio.api.common.v1.Payload,
     visitor_functions: VisitorFunctions,
@@ -175,9 +167,12 @@ async def maybe_visit_payload(
 def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
     user_payload_converter: temporalio.converter.PayloadConverter,
     user_failure_converter: temporalio.converter.FailureConverter,
+    headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
 ) -> temporalio.converter.PayloadConverter:
     """Return the fixed payload converter for system Nexus outer envelopes."""
-    return _SystemNexusPayloadConverter(user_payload_converter, user_failure_converter)
+    return _SystemNexusPayloadConverter(
+        user_payload_converter, user_failure_converter, headers
+    )
 
 
 def _get_serialization_context(  # pyright: ignore[reportUnusedFunction]

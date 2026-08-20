@@ -88,6 +88,34 @@ class TracingWorkflowActionActivity:
     fail_on_non_replay_before_complete: bool = False
 
 
+@workflow.defn
+class LegacySignalWithStartHeaderWorkflow:
+    def __init__(self) -> None:
+        self._signaled = False
+
+    @workflow.run
+    async def run(self) -> bool:
+        await workflow.wait_condition(lambda: self._signaled)
+        return "_tracer-data" in workflow.info().headers
+
+    @workflow.signal
+    def notify(self) -> None:
+        self._signaled = True
+
+
+@workflow.defn
+class LegacySignalWithStartCallerWorkflow:
+    @workflow.run
+    async def run(self, target_id: str, task_queue: str) -> str:
+        handle = await workflow.signal_with_start_workflow(
+            LegacySignalWithStartHeaderWorkflow.run,
+            id=target_id,
+            task_queue=task_queue,
+            signal=LegacySignalWithStartHeaderWorkflow.notify,
+        )
+        return handle.id
+
+
 @dataclass
 class TracingWorkflowActionContinueAsNew:
     param: TracingWorkflowParam
@@ -227,6 +255,38 @@ class TracingWorkflow:
     @update.validator
     def update_validator(self) -> None:
         pass
+
+
+async def test_legacy_otel_workflow_signal_with_start_propagates_trace_headers(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+    provider = TracerProvider()
+    tracer = provider.get_tracer(__name__)
+    config = client.config()
+    config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=f"signal-with-start-{uuid.uuid4()}",
+        workflows=[
+            LegacySignalWithStartCallerWorkflow,
+            LegacySignalWithStartHeaderWorkflow,
+        ],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ) as worker:
+        target_id = f"signal-with-start-target-{uuid.uuid4()}"
+        with tracer.start_as_current_span("signal-with-start"):
+            caller = await client.start_workflow(
+                LegacySignalWithStartCallerWorkflow.run,
+                args=[target_id, worker.task_queue],
+                id=f"signal-with-start-caller-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert await caller.result() == target_id
+        assert await client.get_workflow_handle(target_id).result() is True
 
 
 async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
