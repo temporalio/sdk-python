@@ -4715,6 +4715,7 @@ cloud-run-worker-otel = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-sdk" },
+    { name = "protobuf" },
 ]
 deepagents = [
     { name = "deepagents", marker = "python_full_version >= '3.11'" },
@@ -4825,7 +4826,7 @@ requires-dist = [
     { name = "opentelemetry-api", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.26,<2" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
@@ -4833,6 +4834,7 @@ requires-dist = [
     { name = "opentelemetry-sdk-extension-aws", marker = "extra == 'lambda-worker-otel'", specifier = ">=2.0.0,<3" },
     { name = "opentelemetry-semantic-conventions", marker = "extra == 'lambda-worker-otel'", specifier = ">=0.40b0,<1" },
     { name = "protobuf", specifier = ">=3.20,<8.0.0" },
+    { name = "protobuf", marker = "extra == 'cloud-run-worker-otel'", specifier = "<7" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.0.0,<3" },
     { name = "python-dateutil", marker = "python_full_version < '3.11'", specifier = ">=2.8.2,<3" },
     { name = "strands-agents", marker = "extra == 'strands-agents'", specifier = ">=1.39.0" },
