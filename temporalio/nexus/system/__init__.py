@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -91,31 +91,28 @@ class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
     """Payload converter for system Nexus outer envelopes."""
 
     _user_converters: _SystemNexusUserConverters
-    _outer_payload_converter: _TemporalTransferTypePayloadConverter
-    _headers: Mapping[str, temporalio.api.common.v1.Payload] | None
+    _outer_payload_converter: temporalio.converter.PayloadConverter
 
     def __init__(
         self,
         user_payload_converter: temporalio.converter.PayloadConverter,
         user_failure_converter: temporalio.converter.FailureConverter,
-        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
     ) -> None:
         """Create a payload converter for system Nexus outer envelopes."""
         self._user_converters = _SystemNexusUserConverters(
             user_payload_converter, user_failure_converter
         )
 
-        self._outer_payload_converter = _TemporalTransferTypePayloadConverter(
+        self._outer_payload_converter = _TemporalTransferTypePayloadConverter.wrap(
             _SystemNexusOuterPayloadConverter()
         )
-        self._headers = headers
 
     def to_payloads(
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
         with _user_converter_context(self._user_converters):
-            return self._outer_payload_converter.to_payloads(values, self._headers)
+            return self._outer_payload_converter.to_payloads(values)
 
     def from_payloads(
         self,
@@ -167,12 +164,9 @@ async def maybe_visit_payload(
 def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
     user_payload_converter: temporalio.converter.PayloadConverter,
     user_failure_converter: temporalio.converter.FailureConverter,
-    headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
 ) -> temporalio.converter.PayloadConverter:
     """Return the fixed payload converter for system Nexus outer envelopes."""
-    return _SystemNexusPayloadConverter(
-        user_payload_converter, user_failure_converter, headers
-    )
+    return _SystemNexusPayloadConverter(user_payload_converter, user_failure_converter)
 
 
 def _get_serialization_context(  # pyright: ignore[reportUnusedFunction]

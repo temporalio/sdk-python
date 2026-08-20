@@ -355,12 +355,6 @@ class StartSystemNexusOperationInput(Generic[InputT, OutputT]):
     service: str
     operation: nexusrpc.Operation[InputT, OutputT] | str | Callable[..., Any]
     input: InputT
-    schedule_to_close_timeout: timedelta | None
-    schedule_to_start_timeout: timedelta | None
-    start_to_close_timeout: timedelta | None
-    cancellation_type: temporalio.workflow.NexusOperationCancellationType
-    headers: Mapping[str, temporalio.api.common.v1.Payload]
-    summary: str | None
     output_type: type[OutputT] | None = None
 
     @property

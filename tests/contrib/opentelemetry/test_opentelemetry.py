@@ -257,6 +257,8 @@ class TracingWorkflow:
         pass
 
 
+# Cloud namespaces created by CI do not have the System Nexus dynamic config.
+@pytest.mark.requires_local_server
 async def test_legacy_otel_workflow_signal_with_start_propagates_trace_headers(
     client: Client, env: WorkflowEnvironment
 ):

@@ -613,9 +613,7 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
         return _TemporalTransferTypePayloadConverter(payload_converter)
 
     def to_payloads(
-        self,
-        values: Sequence[Any],
-        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
+        self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
         transfer_type_values: list[Any] = []
@@ -623,16 +621,6 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
             converter = _get_transfer_type_converter(type(value))
             if converter is not None:
                 value = converter.to_transfer_type(value)
-            if (
-                headers
-                and isinstance(value, google.protobuf.message.Message)
-                and "header" in value.DESCRIPTOR.fields_by_name
-            ):
-                # System Nexus starts with generated models, so headers can only be
-                # applied after conversion to a request protobuf and before encoding.
-                temporalio.common._apply_headers(
-                    headers, getattr(value, "header").fields
-                )
             transfer_type_values.append(value)
         return self._inner_payload_converter.to_payloads(transfer_type_values)
 
