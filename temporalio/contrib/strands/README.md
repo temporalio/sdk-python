@@ -218,6 +218,12 @@ sandbox failures, including the `OSError` that Strands documents for a failed
 `write_file`, are retried under the `retry_policy` you pass to
 `TemporalSandbox`.
 
+Like all Temporal Activities, sandbox operations have at-least-once execution
+semantics. A worker can finish a command or filesystem mutation and fail before
+recording its result, causing a retry to perform the operation again. Use a
+bounded `retry_policy`, and make commands and mutations idempotent when repeated
+execution would be unsafe.
+
 By default, `TemporalSandbox.get_tools()` vends `sandbox_bash` and
 `sandbox_file_editor`. A tool passed explicitly through `TemporalAgent(tools=...)`
 with either name takes precedence, following Strands' normal sandbox-tool
@@ -230,13 +236,19 @@ workflow. The activity publishes each `StreamChunk` as it arrives; the final
 `ExecutionResult` is returned only through the buffered activity result:
 
 ```python
+from datetime import timedelta
+
 from strands.sandbox import StreamChunk
 from temporalio.contrib.strands import TemporalSandbox
 from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 
 # workflow __init__
 self.stream = WorkflowStream()
-self.sandbox = TemporalSandbox("build", streaming_topic="sandbox-events")
+self.sandbox = TemporalSandbox(
+    "build",
+    start_to_close_timeout=timedelta(minutes=5),
+    streaming_topic="sandbox-events",
+)
 
 # external client
 async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
