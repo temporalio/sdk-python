@@ -177,15 +177,22 @@ class SandboxActivities:
                         topic.publish(item)
             return items
         except SandboxTimeoutError as err:
-            raise ApplicationError(
-                str(err),
-                timeout,
-                type=SANDBOX_TIMEOUT_ERROR_TYPE,
-            ) from err
+            raise _timeout_error(err, timeout) from err
 
 
 def _activity_name(sandbox_name: str, operation: str) -> str:
     return f"{sandbox_name}-sandbox-{operation}"
+
+
+def _timeout_error(err: SandboxTimeoutError, timeout: float | None) -> ApplicationError:
+    # A timeout is the deterministic outcome the caller asked for, so retrying
+    # just repeats it. Surface it to workflow code on the first attempt instead.
+    return ApplicationError(
+        str(err),
+        timeout,
+        type=SANDBOX_TIMEOUT_ERROR_TYPE,
+        non_retryable=True,
+    )
 
 
 def _path_not_found_error(err: SandboxPathNotFoundError, path: str) -> ApplicationError:

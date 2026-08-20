@@ -202,6 +202,12 @@ shared by all activities for that name for the worker's lifetime, so tools see
 the same filesystem and working state. Provisioning and teardown of the backing
 environment remain the application's responsibility.
 
+`SandboxTimeoutError` and `SandboxPathNotFoundError` cross the activity
+boundary as non-retryable failures and are re-raised inside the workflow, so a
+command that exceeds its `timeout` or a path that does not exist surfaces to the
+agent on the first attempt instead of retrying. Other sandbox failures are
+retried under the `retry_policy` you pass to `TemporalSandbox`.
+
 By default, `TemporalSandbox.get_tools()` vends `sandbox_bash` and
 `sandbox_file_editor`. A tool passed explicitly through `TemporalAgent(tools=...)`
 with either name takes precedence, following Strands' normal sandbox-tool

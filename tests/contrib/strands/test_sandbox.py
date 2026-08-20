@@ -294,8 +294,10 @@ class ErrorSandbox(RecordingSandbox):
         **kwargs: Any,
     ) -> AsyncGenerator[StreamChunk | ExecutionResult, None]:
         self.attempts += 1
-        if self.always_timeout or self.attempts == 1:
+        if self.always_timeout:
             raise SandboxTimeoutError(timeout)
+        if self.attempts == 1:
+            raise RuntimeError("transient")
         yield ExecutionResult(0, "retried", "")
 
     async def list_files(self, path: str, **kwargs: Any) -> list[FileInfo]:
@@ -321,10 +323,13 @@ class SandboxErrorWorkflow:
         else:
             path_error = False
 
+        # No retry policy: a timeout must surface on the first attempt rather
+        # than retrying under Temporal's unlimited-attempt default. The
+        # schedule-to-close timeout bounds the failure if that ever regresses.
         failing = TemporalSandbox(
             "failing",
-            start_to_close_timeout=timedelta(seconds=15),
-            retry_policy=RetryPolicy(maximum_attempts=1),
+            start_to_close_timeout=timedelta(seconds=5),
+            schedule_to_close_timeout=timedelta(seconds=15),
         )
         try:
             await failing.execute("command", timeout=4)
