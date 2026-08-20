@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added `temporalio.converter.create_payload_validation_error` to create the
+  non-retryable application error used when a converted payload fails validation.
 - Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
   `ReplaySafeLoggerProvider` (and exported `ReplaySafeTracerProvider`): wrap an
   OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
