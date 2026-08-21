@@ -30,6 +30,7 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._payload_handle
 import temporalio.nexus
 from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge._visitor_functions import PayloadSequence, VisitorFunctions
@@ -546,35 +547,43 @@ class _DummyPayloadSerializer:
         # payload untouched.
         payload = temporalio.api.common.v1.Payload()
         payload.CopyFrom(self.payload)
-        try:
-            await PayloadVisitor(skip_search_attributes=True).visit(
-                _PayloadTransformVisitor(dc._external_retrieve_payload_sequence),
-                payload,
-            )
-        except Exception as err:
-            raise nexusrpc.HandlerError(
-                "Failed to retrieve Nexus operation input from external storage",
-                type=nexusrpc.HandlerErrorType.INTERNAL,
-                retryable_override=True,
-            ) from err
-
-        try:
-            await PayloadVisitor(skip_search_attributes=True, skip_headers=True).visit(
-                _PayloadTransformVisitor(dc._decode_payload_sequence), payload
-            )
-        except Exception as err:
-            if _is_payload_validation_error(err):
-                # The data converter decoded the input and rejected it, so this
-                # is the caller's fault rather than a handler-side error.
+        # An operation whose input type is a ValueHandle defers acquisition, so
+        # neither external-storage retrieval nor codec decode runs here: the
+        # handler receives a handle it can forward without paying for the bytes,
+        # and acquiring its value later runs exactly the pipeline skipped here.
+        defer = as_type is not None and (
+            temporalio.converter._payload_handle._is_payload_handle_hint(as_type)
+        )
+        if not defer:
+            try:
+                await PayloadVisitor(skip_search_attributes=True).visit(
+                    _PayloadTransformVisitor(dc._external_retrieve_payload_sequence),
+                    payload,
+                )
+            except Exception as err:
                 raise nexusrpc.HandlerError(
-                    "Invalid operation input",
-                    type=nexusrpc.HandlerErrorType.BAD_REQUEST,
-                    retryable_override=False,
+                    "Failed to retrieve Nexus operation input from external storage",
+                    type=nexusrpc.HandlerErrorType.INTERNAL,
+                    retryable_override=True,
                 ) from err
-            raise nexusrpc.HandlerError(
-                "Payload codec failed to decode Nexus operation input",
-                type=nexusrpc.HandlerErrorType.INTERNAL,
-            ) from err
+
+            try:
+                await PayloadVisitor(
+                    skip_search_attributes=True, skip_headers=True
+                ).visit(_PayloadTransformVisitor(dc._decode_payload_sequence), payload)
+            except Exception as err:
+                if _is_payload_validation_error(err):
+                    # The data converter decoded the input and rejected it, so
+                    # this is the caller's fault rather than a handler-side error.
+                    raise nexusrpc.HandlerError(
+                        "Invalid operation input",
+                        type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+                        retryable_override=False,
+                    ) from err
+                raise nexusrpc.HandlerError(
+                    "Payload codec failed to decode Nexus operation input",
+                    type=nexusrpc.HandlerErrorType.INTERNAL,
+                ) from err
 
         try:
             [input] = dc.payload_converter.from_payloads(

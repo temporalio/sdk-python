@@ -1,11 +1,12 @@
 """Value handles across a Nexus boundary.
 
 Forwarding a handle *into* an operation is the handler's contract to declare: it
-may receive a ``ValueHandle`` and forward it on, or receive the value and have its
-own worker resolve the reference. Whether that reference resolves is a property of
-the deployment (does the handler's side share the caller's external storage), and
-it fails loudly at resolution time when it does not -- so the SDK does not refuse
-it.
+may receive a ``ValueHandle`` and forward it on -- in which case the boundary
+retrieves nothing and the reference travels on -- or receive the value and have
+its own worker resolve the reference. Whether that reference resolves is a
+property of the deployment (does the handler's side share the caller's external
+storage), and it fails loudly at resolution time when it does not, so the SDK
+does not refuse it.
 
 Deferring an operation's *result* is different: a Nexus resolution is not one of
 the command types the worker defers, so a handle there would wrap an
@@ -19,7 +20,6 @@ import uuid
 from datetime import timedelta
 
 import nexusrpc
-import pytest
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 import temporalio.nexus
@@ -99,21 +99,10 @@ class NexusResultAsHandleWorkflow:
         )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "A forwarded reference is not retrievable after a Nexus hop on this "
-        "branch's base. The claim survives in Payload.data, but the transport "
-        "drops the Payload.external_payloads side-field, and _decode_reference "
-        "here uses that field's presence as its 'is this a reference' guard. "
-        "origin/main has since removed that guard, so re-check this after a "
-        "rebase -- and check the remaining half too: Nexus input deserialization "
-        "applies the payload codec but never external-storage retrieval."
-    ),
-    strict=True,
-)
 async def test_handle_forwards_through_a_nexus_operation(
     env: WorkflowEnvironment,
 ) -> None:
+    """A handle crosses the boundary and the handler's side reads the value."""
     global _handler_task_queue
     driver = InMemoryTestDriver()
     client: Client = await _client(env, driver)
@@ -142,11 +131,10 @@ async def test_handle_forwards_through_a_nexus_operation(
         )
 
     assert result == len(_BIG)
-    # Uploaded once by the caller; downloaded once, at the activity on the
-    # handler side that actually reads it. Neither workflow nor the operation
-    # handler ever downloaded it.
-    assert driver._store_calls == 1
-    assert driver._retrieve_calls == 1
+    # Uploaded once by the caller, downloaded once by the activity that reads it.
+    # The operation handler and both workflows only routed the reference, so the
+    # Nexus hop cost nothing: the boundary preserves the deferral.
+    assert (driver._store_calls, driver._retrieve_calls) == (1, 1)
 
 
 async def test_nexus_result_as_handle_is_rejected(env: WorkflowEnvironment) -> None:
