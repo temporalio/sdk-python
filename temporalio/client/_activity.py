@@ -317,6 +317,31 @@ class ActivityExecutionDescription(ActivityExecution):
     raw_callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo]
     """Underlying protobuf callbacks"""
 
+    schedule_to_close_timeout: timedelta | None
+    """Total time the caller is willing to wait, including retries."""
+
+    schedule_to_start_timeout: timedelta | None
+    """Maximum time the task may wait in the task queue."""
+
+    start_to_close_timeout: timedelta | None
+    """Maximum time for a single attempt."""
+
+    heartbeat_timeout: timedelta | None
+    """Maximum allowed time between heartbeats."""
+
+    start_delay: timedelta | None
+    """Delay before the first attempt is made available for dispatch.
+
+    Not applied to retry attempts.
+    """
+
+    execution_time: datetime | None
+    """Time the first attempt was made available for dispatch.
+
+    Equals scheduled_time plus start_delay; equal to scheduled_time when no
+    start delay is set.
+    """
+
     raw_input: Sequence[temporalio.api.common.v1.Payload] | None
     """Raw payloads of the activity's input arguments.
 
@@ -468,13 +493,41 @@ class ActivityExecutionDescription(ActivityExecution):
                 if info.HasField("next_attempt_schedule_time")
                 else None
             ),
+            execution_time=(
+                info.execution_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("execution_time")
+                else None
+            ),
             failure=decoded_failure,
+            heartbeat_timeout=(
+                info.heartbeat_timeout.ToTimedelta()
+                if info.HasField("heartbeat_timeout")
+                else None
+            ),
             input=decoded_input,
             paused=getattr(info, "paused", False),
             raw_heartbeat_details=decoded_heartbeat_details,
             raw_input=input_payloads,
             raw_outcome=raw_outcome,
             result=decoded_result,
+            schedule_to_close_timeout=(
+                info.schedule_to_close_timeout.ToTimedelta()
+                if info.HasField("schedule_to_close_timeout")
+                else None
+            ),
+            schedule_to_start_timeout=(
+                info.schedule_to_start_timeout.ToTimedelta()
+                if info.HasField("schedule_to_start_timeout")
+                else None
+            ),
+            start_delay=(
+                info.start_delay.ToTimedelta() if info.HasField("start_delay") else None
+            ),
+            start_to_close_timeout=(
+                info.start_to_close_timeout.ToTimedelta()
+                if info.HasField("start_to_close_timeout")
+                else None
+            ),
             raw_info=info,
             retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy)
             if info.HasField("retry_policy")
