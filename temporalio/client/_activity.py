@@ -890,10 +890,17 @@ class ActivityHandle(Generic[ReturnType]):
         self,
         *,
         long_poll_token: bytes | None = None,
+        include_input: bool = False,
+        include_outcome: bool = False,
+        include_heartbeat_details: bool = False,
+        include_last_failure: bool = False,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionDescription:
         """Describe the activity execution.
+
+        The payload-bearing fields are opt-in because they can be arbitrarily
+        large; request them only when needed.
 
         .. warning::
            This API is experimental.
@@ -901,6 +908,12 @@ class ActivityHandle(Generic[ReturnType]):
         Args:
             long_poll_token: Token from a previous describe response. If provided,
                 the request will long-poll until the activity state changes.
+            include_input: If true and the activity received input, include the input.
+            include_outcome: If true and the activity is closed, include the outcome.
+            include_heartbeat_details: If true and the activity recorded heartbeat
+                details, include them.
+            include_last_failure: If true and the activity has a failed attempt,
+                include the last failure.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
@@ -912,10 +925,10 @@ class ActivityHandle(Generic[ReturnType]):
                 activity_id=self._id,
                 activity_run_id=self._run_id,
                 long_poll_token=long_poll_token,
-                include_input=False,
-                include_outcome=False,
-                include_heartbeat_details=False,
-                include_last_failure=False,
+                include_input=include_input,
+                include_outcome=include_outcome,
+                include_heartbeat_details=include_heartbeat_details,
+                include_last_failure=include_last_failure,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
