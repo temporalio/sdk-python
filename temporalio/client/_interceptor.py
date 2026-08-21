@@ -291,6 +291,24 @@ class UnpauseActivityInput:
 
 
 @dataclass
+class ResetActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.reset_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    keep_paused: bool
+    jitter: timedelta | None
+    restore_original_options: bool
+    reset_heartbeat: bool
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
 class DescribeActivityInput:
     """Input for :py:meth:`OutboundInterceptor.describe_activity`.
 
@@ -834,6 +852,14 @@ class OutboundInterceptor:
            This API is experimental.
         """
         await self.next.unpause_activity(input)
+
+    async def reset_activity(self, input: ResetActivityInput) -> None:
+        """Called for every :py:meth:`ActivityHandle.reset` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        await self.next.reset_activity(input)
 
     async def describe_activity(
         self, input: DescribeActivityInput
