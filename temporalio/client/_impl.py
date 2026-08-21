@@ -706,6 +706,18 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
+        # The server is expected to omit payload fields that were not requested, but
+        # older or buggy servers may return them anyway, which would make the
+        # description's has_* accessors disagree with what was asked for.
+        if not input.include_input:
+            resp.ClearField("input")
+        if not input.include_outcome:
+            resp.ClearField("outcome")
+        if not input.include_heartbeat_details:
+            resp.info.ClearField("heartbeat_details")
+        if not input.include_last_failure:
+            resp.info.ClearField("last_failure")
+
         return await ActivityExecutionDescription._from_execution_info(
             info=resp.info,
             long_poll_token=resp.long_poll_token or None,
