@@ -1292,7 +1292,17 @@ class ActivityHandle(Generic[ReturnType]):
 
         Returns:
             The activity options as resolved by the server after the update.
+
+        Raises:
+            ValueError: If ``updates`` is empty.
         """
+        # An update naming nothing would send an empty field mask and silently change
+        # nothing. Fail here rather than making a round trip that looks like it worked.
+        if not updates:
+            raise ValueError(
+                "update_options requires at least one update; use "
+                "restore_original_options() to revert options"
+            )
         return await self._client._impl.update_activity_options(
             UpdateActivityOptionsInput(
                 activity_id=self._id,
