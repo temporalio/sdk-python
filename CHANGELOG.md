@@ -88,6 +88,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Client header encoding no longer mutates interceptor-provided payloads, preventing
+  update-with-start from encoding a shared header twice when
+  `HeaderCodecBehavior.CODEC` is enabled ([#1769](https://github.com/temporalio/sdk-python/issues/1769)).
 - `temporalio.contrib.opentelemetry` replay-safe spans now delegate
   `Span.add_link` to the wrapped span. Previously the wrapper inherited
   OpenTelemetry's non-abstract no-op default, silently dropping links added
