@@ -88,6 +88,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `create_payload_validation_error(None)` now creates an application error with no
+  details instead of encoding `None` as a detail.
 - `temporalio.contrib.opentelemetry` replay-safe spans now delegate
   `Span.add_link` to the wrapped span. Previously the wrapper inherited
   OpenTelemetry's non-abstract no-op default, silently dropping links added
