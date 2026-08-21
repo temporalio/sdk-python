@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    TypeVar,
     cast,
 )
 
@@ -54,6 +55,7 @@ from ._interceptor import (
     ResetActivityInput,
     TerminateActivityInput,
     UnpauseActivityInput,
+    UpdateActivityOptionsInput,
 )
 
 if TYPE_CHECKING:
@@ -556,6 +558,147 @@ class PendingActivityState(IntEnum):
     PAUSE_REQUESTED = int(
         temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSE_REQUESTED
     )
+
+
+ActivityOptionValueType = TypeVar("ActivityOptionValueType")
+
+
+@dataclass(frozen=True)
+class ActivityOptionsKey(Generic[ActivityOptionValueType]):
+    """Typed key for one updatable activity option.
+
+    Use the keys on :py:class:`ActivityOptionsKeys` rather than constructing
+    these directly.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    name: str
+    """Field-mask path this key updates."""
+
+    def value_set(
+        self, value: ActivityOptionValueType
+    ) -> ActivityOptionsUpdate[ActivityOptionValueType]:
+        """Create an update that sets this option to the given value."""
+        return ActivityOptionsUpdate(self, value)
+
+    def value_unset(self) -> ActivityOptionsUpdate[ActivityOptionValueType]:
+        """Create an update that clears this option server-side."""
+        return ActivityOptionsUpdate(self, None)
+
+
+@dataclass(frozen=True)
+class ActivityOptionsUpdate(Generic[ActivityOptionValueType]):
+    """A single change to an activity's options.
+
+    An option not represented by any update in the call is left untouched; an
+    update carrying None clears the option.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    key: ActivityOptionsKey[ActivityOptionValueType]
+    """Option being changed."""
+
+    value: ActivityOptionValueType | None
+    """Value being set, or None to clear the option."""
+
+
+class ActivityOptionsKeys:
+    """The activity options that :py:meth:`ActivityHandle.update_options` can change.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    task_queue: ActivityOptionsKey[str] = ActivityOptionsKey("task_queue.name")
+    schedule_to_close_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "schedule_to_close_timeout"
+    )
+    schedule_to_start_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "schedule_to_start_timeout"
+    )
+    start_to_close_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "start_to_close_timeout"
+    )
+    heartbeat_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "heartbeat_timeout"
+    )
+    start_delay: ActivityOptionsKey[timedelta] = ActivityOptionsKey("start_delay")
+    retry_policy: ActivityOptionsKey[temporalio.common.RetryPolicy] = (
+        ActivityOptionsKey("retry_policy")
+    )
+    priority: ActivityOptionsKey[temporalio.common.Priority] = ActivityOptionsKey(
+        "priority"
+    )
+
+
+@dataclass(frozen=True)
+class ActivityExecutionOptions:
+    """An activity's options as resolved by the server.
+
+    Returned by :py:meth:`ActivityHandle.update_options` and
+    :py:meth:`ActivityHandle.restore_original_options`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    task_queue: str | None
+    schedule_to_close_timeout: timedelta | None
+    schedule_to_start_timeout: timedelta | None
+    start_to_close_timeout: timedelta | None
+    heartbeat_timeout: timedelta | None
+    start_delay: timedelta | None
+    retry_policy: temporalio.common.RetryPolicy | None
+    priority: temporalio.common.Priority | None
+
+    @staticmethod
+    def _from_proto(
+        options: temporalio.api.activity.v1.ActivityOptions,
+    ) -> ActivityExecutionOptions:
+        return ActivityExecutionOptions(
+            task_queue=options.task_queue.name
+            if options.HasField("task_queue")
+            else None,
+            schedule_to_close_timeout=(
+                options.schedule_to_close_timeout.ToTimedelta()
+                if options.HasField("schedule_to_close_timeout")
+                else None
+            ),
+            schedule_to_start_timeout=(
+                options.schedule_to_start_timeout.ToTimedelta()
+                if options.HasField("schedule_to_start_timeout")
+                else None
+            ),
+            start_to_close_timeout=(
+                options.start_to_close_timeout.ToTimedelta()
+                if options.HasField("start_to_close_timeout")
+                else None
+            ),
+            heartbeat_timeout=(
+                options.heartbeat_timeout.ToTimedelta()
+                if options.HasField("heartbeat_timeout")
+                else None
+            ),
+            start_delay=(
+                options.start_delay.ToTimedelta()
+                if options.HasField("start_delay")
+                else None
+            ),
+            retry_policy=(
+                temporalio.common.RetryPolicy.from_proto(options.retry_policy)
+                if options.HasField("retry_policy")
+                else None
+            ),
+            priority=(
+                temporalio.common.Priority._from_proto(options.priority)
+                if options.HasField("priority")
+                else None
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -1065,6 +1208,74 @@ class ActivityHandle(Generic[ReturnType]):
                 jitter=jitter,
                 restore_original_options=restore_original_options,
                 reset_heartbeat=reset_heartbeat,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def update_options(
+        self,
+        updates: Sequence[ActivityOptionsUpdate[Any]],
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityExecutionOptions:
+        """Update the activity's options.
+
+        Only the options named by ``updates`` are changed; anything not named is
+        left as-is. An update created with
+        :py:meth:`ActivityOptionsKey.value_unset` clears that option.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            updates: Options to change, built from :py:class:`ActivityOptionsKeys`.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            The activity options as resolved by the server after the update.
+        """
+        return await self._client._impl.update_activity_options(
+            UpdateActivityOptionsInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                updates=updates,
+                restore_original=False,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def restore_original_options(
+        self,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityExecutionOptions:
+        """Restore the activity's options to the ones it was created with.
+
+        This is a separate call rather than an option on
+        :py:meth:`update_options` because the server rejects a request that
+        combines the restore flag with any other option.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            The activity options as resolved by the server after the restore.
+        """
+        return await self._client._impl.update_activity_options(
+            UpdateActivityOptionsInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                updates=[],
+                restore_original=True,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )

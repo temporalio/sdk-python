@@ -29,7 +29,9 @@ if TYPE_CHECKING:
         ActivityExecutionAsyncIterator,
         ActivityExecutionCount,
         ActivityExecutionDescription,
+        ActivityExecutionOptions,
         ActivityHandle,
+        ActivityOptionsUpdate,
         AsyncActivityIDReference,
     )
     from ._nexus import (
@@ -304,6 +306,22 @@ class ResetActivityInput:
     jitter: timedelta | None
     restore_original_options: bool
     reset_heartbeat: bool
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class UpdateActivityOptionsInput:
+    """Input for :py:meth:`OutboundInterceptor.update_activity_options`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    updates: Sequence[ActivityOptionsUpdate[Any]]
+    restore_original: bool
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -860,6 +878,17 @@ class OutboundInterceptor:
            This API is experimental.
         """
         await self.next.reset_activity(input)
+
+    async def update_activity_options(
+        self, input: UpdateActivityOptionsInput
+    ) -> ActivityExecutionOptions:
+        """Called for every :py:meth:`ActivityHandle.update_options` and
+        :py:meth:`ActivityHandle.restore_original_options` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        return await self.next.update_activity_options(input)
 
     async def describe_activity(
         self, input: DescribeActivityInput

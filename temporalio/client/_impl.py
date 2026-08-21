@@ -50,6 +50,7 @@ from ._activity import (
     ActivityExecutionAsyncIterator,
     ActivityExecutionCount,
     ActivityExecutionDescription,
+    ActivityExecutionOptions,
     ActivityHandle,
     AsyncActivityIDReference,
 )
@@ -104,6 +105,7 @@ from ._interceptor import (
     TriggerScheduleInput,
     UnpauseActivityInput,
     UnpauseScheduleInput,
+    UpdateActivityOptionsInput,
     UpdateScheduleInput,
     UpdateWithStartStartWorkflowInput,
     UpdateWithStartUpdateWorkflowInput,
@@ -745,6 +747,42 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
+
+    async def update_activity_options(
+        self, input: UpdateActivityOptionsInput
+    ) -> ActivityExecutionOptions:
+        """Update or restore an activity's options."""
+        req = temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+        )
+        if input.restore_original:
+            req.restore_original = True
+        else:
+            for update in input.updates:
+                req.update_mask.paths.append(update.key.name)
+                if update.value is None:
+                    continue
+                name = update.key.name
+                if name == "task_queue.name":
+                    req.activity_options.task_queue.name = update.value
+                elif name == "retry_policy":
+                    update.value.apply_to_proto(req.activity_options.retry_policy)
+                elif name == "priority":
+                    req.activity_options.priority.CopyFrom(update.value._to_proto())
+                else:
+                    getattr(req.activity_options, name).FromTimedelta(update.value)
+
+        resp = await self._client.workflow_service.update_activity_execution_options(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return ActivityExecutionOptions._from_proto(resp.activity_options)
 
     async def describe_activity(
         self, input: DescribeActivityInput
