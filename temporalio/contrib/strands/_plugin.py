@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import timedelta
 
 from strands.models import BedrockModel, Model
+from strands.sandbox import Sandbox
 from strands.tools.mcp import MCPClient
 
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -14,6 +15,7 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 from ._failure_converter import StrandsFailureConverter
 from ._model_activity import ModelActivity
+from ._sandbox_activity import SandboxActivities
 from ._temporal_mcp_client import (
     _evict_connection,
     build_call_tool_activity,
@@ -39,6 +41,11 @@ class StrandsPlugin(SimplePlugin):
     ``mcp_connection_idle_timeout`` controls how long a worker-process MCP
     connection is kept open between ``call-tool`` activities before it is
     disconnected; the timer resets on every reuse. Defaults to 5 minutes.
+
+    When ``sandboxes`` is supplied, registers a stable set of name-prefixed
+    activities for every sandbox factory. Each factory is called lazily and
+    its sandbox is shared by those activities for the worker's lifetime. Use
+    the same name in workflow-side ``TemporalSandbox(name)`` instances.
     """
 
     def __init__(
@@ -46,9 +53,10 @@ class StrandsPlugin(SimplePlugin):
         *,
         models: dict[str, Callable[[], Model]] | None = None,
         mcp_clients: dict[str, Callable[[], MCPClient]] | None = None,
+        sandboxes: dict[str, Callable[[], Sandbox]] | None = None,
         mcp_connection_idle_timeout: timedelta | None = None,
     ) -> None:
-        """Build the plugin from optional model and MCP transport factories.
+        """Build the plugin from optional model, MCP, and sandbox factories.
 
         If ``models`` is omitted, registers a single ``BedrockModel()`` factory
         under the name ``"bedrock"``, matching Strands' own implicit default.
@@ -61,6 +69,9 @@ class StrandsPlugin(SimplePlugin):
         if models:
             ma = ModelActivity(models, default_name=default_name)
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
+
+        for name, sandbox_factory in (sandboxes or {}).items():
+            activities.extend(SandboxActivities(name, sandbox_factory).activities())
 
         mcp_clients = mcp_clients or {}
         for server, client_factory in mcp_clients.items():

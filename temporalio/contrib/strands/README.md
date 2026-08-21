@@ -170,6 +170,110 @@ async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
     print(item.data)
 ```
 
+## Sandboxes
+
+`TemporalSandbox` implements Strands' sandbox API by scheduling every command,
+code, and filesystem operation as a Temporal Activity. Register the real
+worker-side sandbox under a name, then select that name in workflow code:
+
+```python
+from strands.sandbox.docker import DockerSandbox
+from temporalio.contrib.strands import StrandsPlugin, TemporalAgent, TemporalSandbox
+
+# workflow
+agent = TemporalAgent(
+    sandbox=TemporalSandbox(
+        "build",
+        start_to_close_timeout=timedelta(minutes=5),
+    ),
+)
+
+# worker
+Worker(
+    ...,
+    plugins=[StrandsPlugin(sandboxes={
+        "build": lambda: DockerSandbox("agent-build-container"),
+    })],
+)
+```
+
+The factory is called lazily on first use. Its sandbox instance is cached and
+shared by all activities for that name for the worker's lifetime, so tools see
+the same filesystem and working state. Provisioning and teardown of the backing
+environment remain the application's responsibility.
+
+That cache is per worker *process*, while successive sandbox activities from one
+workflow are routed independently across the task queue. With more than one
+worker on the queue, a `write-file` can land on one worker and the following
+`read-file` on another, so the factory must point at state the whole queue
+shares — a named Docker container, an SSH host — rather than a per-process
+temporary directory. A single worker on the queue also satisfies this.
+
+`SandboxTimeoutError` and any `FileNotFoundError` — including its
+`SandboxPathNotFoundError` subclass — cross the activity boundary as
+non-retryable failures and are re-raised inside the workflow with the sandbox's
+own message, so a command that exceeds its `timeout` or a path that does not
+exist surfaces to the agent on the first attempt instead of retrying. Other
+sandbox failures, including the `OSError` that Strands documents for a failed
+`write_file`, are retried under the `retry_policy` you pass to
+`TemporalSandbox`.
+
+Like all Temporal Activities, sandbox operations have at-least-once execution
+semantics. A worker can finish a command or filesystem mutation and fail before
+recording its result, causing a retry to perform the operation again. Use a
+bounded `retry_policy`, and make commands and mutations idempotent when repeated
+execution would be unsafe.
+
+By default, `TemporalSandbox.get_tools()` vends `sandbox_bash` and
+`sandbox_file_editor`. A tool passed explicitly through `TemporalAgent(tools=...)`
+with either name takes precedence, following Strands' normal sandbox-tool
+override behavior.
+
+Execution output is always buffered into the activity result so workflow replay
+observes the same ordered `StreamChunk` and `ExecutionResult` values. For live,
+observer-facing output, set `streaming_topic` and host a `WorkflowStream` on the
+workflow. The activity publishes each `StreamChunk` as it arrives; the final
+`ExecutionResult` is returned only through the buffered activity result:
+
+```python
+from datetime import timedelta
+
+from strands.sandbox import StreamChunk
+from temporalio.contrib.strands import TemporalSandbox
+from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
+
+# workflow __init__
+self.stream = WorkflowStream()
+self.sandbox = TemporalSandbox(
+    "build",
+    start_to_close_timeout=timedelta(minutes=5),
+    streaming_topic="sandbox-events",
+)
+
+# external client
+async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
+    ["sandbox-events"], result_type=StreamChunk
+):
+    print(item.data.stream_type, item.data.data)
+```
+
+The topic is an observer-facing merged log. If sandbox executions overlap,
+their chunks may interleave. Use different `streaming_topic` values when the
+consumer needs separate logs; workflow code still receives the correctly
+separated, complete buffered result for each call. Because publications are
+observer-facing side effects of an activity attempt, a failed attempt that
+Temporal retries may leave chunks in the topic before the retry publishes its
+own output.
+
+Streaming is disabled by default. When `streaming_topic=None`, sandbox
+activities do not construct a `WorkflowStreamClient` and the workflow does not
+need to host a `WorkflowStream`.
+
+All arguments and results cross Temporal's payload boundary and enter workflow
+history. Keep command output and files within the server's configured payload
+size limits; use external storage for large artifacts. In particular, `env`
+values are recorded in history and must not contain secrets.
+
 ## Tools
 
 Decorate non-deterministic tools with `@activity.defn`, or if you're importing tools from `strands_tools`, wrap them in a thin async function. Then, register the activity on the worker via `Worker(activities=[...])` and pass it to the agent with `workflow.activity_as_tool(activity, **options)` along with any activity options (e.g. `start_to_close_timeout`):
