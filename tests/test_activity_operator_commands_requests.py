@@ -149,6 +149,29 @@ async def test_update_options_requires_at_least_one_update(client: Client):
     assert "at least one update" in str(err.value)
 
 
+async def test_restore_original_cannot_be_combined_with_updates(client: Client):
+    # Not reachable through the handle methods, but an interceptor can build this input
+    # and the server would reject it. Silently dropping the updates would be worse.
+    from temporalio.client import UpdateActivityOptionsInput
+
+    with pytest.raises(ValueError) as err:
+        await client._impl.update_activity_options(
+            UpdateActivityOptionsInput(
+                activity_id="act-1",
+                activity_run_id=None,
+                updates=[
+                    ActivityOptionsKeys.heartbeat_timeout.value_set(
+                        timedelta(seconds=25)
+                    )
+                ],
+                restore_original=True,
+                rpc_metadata={},
+                rpc_timeout=None,
+            )
+        )
+    assert "cannot be combined" in str(err.value)
+
+
 async def test_update_options_masks_only_changed_options(
     client: Client, captured: _CapturedService
 ):

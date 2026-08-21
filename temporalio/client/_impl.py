@@ -752,6 +752,13 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: UpdateActivityOptionsInput
     ) -> ActivityExecutionOptions:
         """Update or restore an activity's options."""
+        # The server does not allow the restore flag alongside individual changes. The
+        # public handle methods never build that combination, but an interceptor can, and
+        # silently dropping the updates would be worse than refusing them.
+        if input.restore_original and input.updates:
+            raise ValueError(
+                "restore_original cannot be combined with individual option updates"
+            )
         req = temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest(
             namespace=self._client.namespace,
             activity_id=input.activity_id,
