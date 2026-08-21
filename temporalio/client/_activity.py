@@ -529,6 +529,9 @@ class ActivityExecutionStatus(IntEnum):
     TIMED_OUT = int(
         temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TIMED_OUT
     )
+    PAUSED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_PAUSED
+    )
 
 
 class PendingActivityState(IntEnum):
