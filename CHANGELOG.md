@@ -20,6 +20,16 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added standalone-activity operator commands to `ActivityHandle`: `pause`, `unpause`,
+  `reset`, `update_options` and `restore_original_options`. Options are updated with
+  `ActivityOptionsKeys` entries (e.g.
+  `ActivityOptionsKeys.start_to_close_timeout.value_set(timedelta(seconds=90))`), and
+  `update_options` returns the resulting `ActivityExecutionOptions`.
+- Added opt-in payload fields to `ActivityHandle.describe`: `include_input`,
+  `include_outcome`, `include_heartbeat_details` and `include_last_failure`, all default
+  `False`. `ActivityExecutionDescription` gained `input`, `result`, `failure` and the
+  corresponding `has_input`/`has_result` accessors, along with the activity's timeouts,
+  `start_delay` and `execution_time`.
 - Added `temporalio.converter.create_payload_validation_error` to create the
   non-retryable application error used when a converted payload fails validation.
 - Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
