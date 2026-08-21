@@ -1,10 +1,9 @@
 """Converter-internal helpers for value handles.
 
-The user-facing :py:class:`temporalio.common.ValueHandle` type and the
-``AsHandle`` marker live in :py:mod:`temporalio.common`, next to
-:py:class:`temporalio.common.RawValue`. This module holds only the
-converter-internal helpers that recognize handle type hints and build handles
-during payload conversion.
+The user-facing :py:class:`temporalio.common.ValueHandle` type lives in
+:py:mod:`temporalio.common`, next to :py:class:`temporalio.common.RawValue`. This
+module holds only the converter-internal helpers that recognize handle type hints
+and build handles during payload conversion.
 """
 
 from __future__ import annotations
@@ -15,25 +14,17 @@ from typing import Any, Optional, get_args, get_origin
 import temporalio.api.common.v1
 from temporalio.common import (
     _HANDLE_METADATA_PREFIX,
-    AsHandle,
     ValueHandle,
 )
 
 
 def _is_payload_handle_hint(hint: Any) -> bool:
-    """Return True for ``ValueHandle``, ``ValueHandle[T]``, or ``Annotated[T, AsHandle]``."""
-    return (
-        hint is ValueHandle
-        or get_origin(hint) is ValueHandle
-        or AsHandle in getattr(hint, "__metadata__", ())
-    )
+    """Return True for ``ValueHandle`` or ``ValueHandle[T]``."""
+    return hint is ValueHandle or get_origin(hint) is ValueHandle
 
 
 def _payload_handle_inner_type(hint: Any) -> Optional[type]:
-    """Return ``T`` from ``ValueHandle[T]`` or ``Annotated[T, AsHandle]``, else None."""
-    # Annotated[T, AsHandle]: the base type T is the inner (materialized) type.
-    if AsHandle in getattr(hint, "__metadata__", ()):
-        return hint.__origin__
+    """Return ``T`` from ``ValueHandle[T]``, else None."""
     args = get_args(hint)
     return args[0] if args else None
 

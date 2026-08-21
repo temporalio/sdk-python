@@ -81,6 +81,18 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         arg: ParamType | temporalio.common.ValueHandle[ParamType],
     ) -> None: ...
 
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def signal(
+        self,
+        signal: MethodSyncOrAsyncSingleParam[
+            SelfType, temporalio.common.ValueHandle[ParamType], None
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    ) -> None: ...
+
     @overload
     async def signal(
         self,
@@ -206,6 +218,38 @@ async def start_child_workflow(
 @overload
 async def start_child_workflow(
     workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    id: str | None = None,
+    task_queue: str | None = None,
+    cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+    parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def start_child_workflow(
+    workflow: MethodAsyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     id: str | None = None,
@@ -433,6 +477,38 @@ async def execute_child_workflow(
 ) -> ReturnType: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_child_workflow(
+    workflow: MethodAsyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    id: str | None = None,
+    task_queue: str | None = None,
+    cancellation_type: ChildWorkflowCancellationType = ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+    parent_close_policy: ParentClosePolicy = ParentClosePolicy.TERMINATE,
+    execution_timeout: timedelta | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cron_schedule: str = "",
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    static_summary: str | None = None,
+    static_details: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ReturnType: ...
+
+
 # Overload for multi-param workflow
 @overload
 async def execute_child_workflow(
@@ -575,6 +651,18 @@ class ExternalWorkflowHandle(Generic[SelfType]):
     async def signal(
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    ) -> None: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def signal(
+        self,
+        signal: MethodSyncOrAsyncSingleParam[
+            SelfType, temporalio.common.ValueHandle[ParamType], None
+        ],
         arg: ParamType | temporalio.common.ValueHandle[ParamType],
     ) -> None: ...
 
@@ -721,6 +809,31 @@ def continue_as_new(
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     workflow: MethodAsyncSingleParam[SelfType, ParamType, Any],
+    task_queue: str | None = None,
+    run_timeout: timedelta | None = None,
+    task_timeout: timedelta | None = None,
+    backoff_start_interval: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    memo: Mapping[str, Any] | None = None,
+    search_attributes: None
+    | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ) = None,
+    versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+) -> NoReturn: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def continue_as_new(
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    workflow: MethodAsyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], Any
+    ],
     task_queue: str | None = None,
     run_timeout: timedelta | None = None,
     task_timeout: timedelta | None = None,

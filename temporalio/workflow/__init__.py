@@ -8,6 +8,7 @@ from temporalio.nexus.system.workflow_service import (
 )
 
 # END GENERATED NEXUS SYSTEM EXPORTS
+from ..common import as_value_handle
 from ..types import (
     AnyType,
     CallableAsyncNoParam,
@@ -146,9 +147,6 @@ from ._sandbox import (
     _sandbox_unrestricted,
     logger,
     unsafe,
-)
-from ._value_handles import (
-    as_value_handle,
 )
 from ._workflow_ops import (
     ChildWorkflowCancellationType,

@@ -588,7 +588,31 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     def __init__(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        memo: Mapping[str, Any] | None = None,
+        typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    ) -> None: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    def __init__(
+        self,
+        workflow: MethodAsyncSingleParam[
+            SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,

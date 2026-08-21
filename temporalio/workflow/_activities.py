@@ -158,10 +158,58 @@ def start_activity(
 ) -> ActivityHandle[ReturnType]: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_activity(
+    activity: CallableAsyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ActivityHandle[ReturnType]: ...
+
+
 # Overload for sync single-param activity
 @overload
 def start_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ActivityHandle[ReturnType]: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_activity(
+    activity: CallableSyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
@@ -374,10 +422,58 @@ async def execute_activity(
 ) -> ReturnType: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_activity(
+    activity: CallableAsyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ReturnType: ...
+
+
 # Overload for sync single-param activity
 @overload
 async def execute_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ReturnType: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_activity(
+    activity: CallableSyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
@@ -556,10 +652,58 @@ def start_activity_class(
 ) -> ActivityHandle[ReturnType]: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_activity_class(
+    activity: type[
+        CallableAsyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ActivityHandle[ReturnType]: ...
+
+
 # Overload for sync single-param activity
 @overload
 def start_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ActivityHandle[ReturnType]: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_activity_class(
+    activity: type[
+        CallableSyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
@@ -713,10 +857,58 @@ async def execute_activity_class(
 ) -> ReturnType: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_activity_class(
+    activity: type[
+        CallableAsyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ReturnType: ...
+
+
 # Overload for sync single-param activity
 @overload
 async def execute_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ReturnType: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_activity_class(
+    activity: type[
+        CallableSyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
@@ -870,10 +1062,58 @@ def start_activity_method(
 ) -> ActivityHandle[ReturnType]: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_activity_method(
+    activity: MethodAsyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ActivityHandle[ReturnType]: ...
+
+
 # Overload for sync single-param activity
 @overload
 def start_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ActivityHandle[ReturnType]: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_activity_method(
+    activity: MethodSyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
@@ -1027,10 +1267,58 @@ async def execute_activity_method(
 ) -> ReturnType: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_activity_method(
+    activity: MethodAsyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ReturnType: ...
+
+
 # Overload for sync single-param activity
 @overload
 async def execute_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority = temporalio.common.Priority.default,
+) -> ReturnType: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_activity_method(
+    activity: MethodSyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     task_queue: str | None = None,
@@ -1192,10 +1480,52 @@ def start_local_activity(
 ) -> ActivityHandle[ReturnType]: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_local_activity(
+    activity: CallableAsyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ActivityHandle[ReturnType]: ...
+
+
 # Overload for sync single-param activity
 @overload
 def start_local_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ActivityHandle[ReturnType]: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_local_activity(
+    activity: CallableSyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1372,10 +1702,52 @@ async def execute_local_activity(
 ) -> ReturnType: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_local_activity(
+    activity: CallableAsyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ReturnType: ...
+
+
 # Overload for sync single-param activity
 @overload
 async def execute_local_activity(
     activity: CallableSyncSingleParam[ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ReturnType: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_local_activity(
+    activity: CallableSyncSingleParam[
+        temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1524,10 +1896,50 @@ def start_local_activity_class(
 ) -> ActivityHandle[ReturnType]: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_local_activity_class(
+    activity: type[
+        CallableAsyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+) -> ActivityHandle[ReturnType]: ...
+
+
 # Overload for sync single-param activity
 @overload
 def start_local_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+) -> ActivityHandle[ReturnType]: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_local_activity_class(
+    activity: type[
+        CallableSyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1654,10 +2066,52 @@ async def execute_local_activity_class(
 ) -> ReturnType: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_local_activity_class(
+    activity: type[
+        CallableAsyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ReturnType: ...
+
+
 # Overload for sync single-param activity
 @overload
 async def execute_local_activity_class(
     activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ReturnType: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_local_activity_class(
+    activity: type[
+        CallableSyncSingleParam[temporalio.common.ValueHandle[ParamType], ReturnType]
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1789,10 +2243,52 @@ def start_local_activity_method(
 ) -> ActivityHandle[ReturnType]: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_local_activity_method(
+    activity: MethodAsyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ActivityHandle[ReturnType]: ...
+
+
 # Overload for sync single-param activity
 @overload
 def start_local_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ActivityHandle[ReturnType]: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+def start_local_activity_method(
+    activity: MethodSyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -1922,10 +2418,52 @@ async def execute_local_activity_method(
 ) -> ReturnType: ...
 
 
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_local_activity_method(
+    activity: MethodAsyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ReturnType: ...
+
+
 # Overload for sync single-param activity
 @overload
 async def execute_local_activity_method(
     activity: MethodSyncSingleParam[SelfType, ParamType, ReturnType],
+    arg: ParamType | temporalio.common.ValueHandle[ParamType],
+    *,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    local_retry_threshold: timedelta | None = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
+    summary: str | None = None,
+) -> ReturnType: ...
+
+
+# Same, for a callee that declares its parameter as a ValueHandle: the caller
+# may still pass the plain value, so a callee deferring its input does not
+# change what callers pass.
+@overload
+async def execute_local_activity_method(
+    activity: MethodSyncSingleParam[
+        SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+    ],
     arg: ParamType | temporalio.common.ValueHandle[ParamType],
     *,
     schedule_to_close_timeout: timedelta | None = None,

@@ -25,6 +25,7 @@ import temporalio.activity
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._payload_handle
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -429,7 +430,44 @@ class Client:
     async def start_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> WorkflowHandle[SelfType, ReturnType]: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def start_workflow(
+        self,
+        workflow: MethodAsyncSingleParam[
+            SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -619,9 +657,19 @@ class Client:
         temporalio.common._warn_on_deprecated_search_attributes(
             search_attributes, stack_level=stack_level
         )
+        workflow, result_as_handle = temporalio.common._unwrap_value_handle_call(
+            workflow
+        )
         name, result_type_from_type_hint = (
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
+        if result_as_handle:
+            result_type_from_type_hint = (
+                temporalio.converter._payload_handle._upgrade_result_hint(
+                    result_type or result_type_from_type_hint
+                )
+            )
+            result_type = None
         return await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,
@@ -689,7 +737,44 @@ class Client:
     async def execute_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        cron_schedule: str = "",
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
+    ) -> ReturnType: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def execute_workflow(
+        self,
+        workflow: MethodAsyncSingleParam[
+            SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -938,7 +1023,24 @@ class Client:
         update: temporalio.workflow.UpdateMethodMultiParam[
             [SelfType, ParamType], LocalReturnType
         ],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> LocalReturnType: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def execute_update_with_start_workflow(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            [SelfType, temporalio.common.ValueHandle[ParamType]], LocalReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: str | None = None,
@@ -1056,7 +1158,25 @@ class Client:
         update: temporalio.workflow.UpdateMethodMultiParam[
             [SelfType, ParamType], LocalReturnType
         ],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
+        wait_for_stage: WorkflowUpdateStage,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> WorkflowUpdateHandle[LocalReturnType]: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def start_update_with_start_workflow(
+        self,
+        update: temporalio.workflow.UpdateMethodMultiParam[
+            [SelfType, temporalio.common.ValueHandle[ParamType]], LocalReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
@@ -1342,7 +1462,35 @@ class Client:
     async def start_activity(
         self,
         activity: CallableAsyncSingleParam[ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableAsyncSingleParam[
+            temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -1366,7 +1514,35 @@ class Client:
     async def start_activity(
         self,
         activity: CallableSyncSingleParam[ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableSyncSingleParam[
+            temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -1596,7 +1772,35 @@ class Client:
     async def execute_activity(
         self,
         activity: CallableAsyncSingleParam[ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def execute_activity(
+        self,
+        activity: CallableAsyncSingleParam[
+            temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -1620,7 +1824,35 @@ class Client:
     async def execute_activity(
         self,
         activity: CallableSyncSingleParam[ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def execute_activity(
+        self,
+        activity: CallableSyncSingleParam[
+            temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -1827,7 +2059,37 @@ class Client:
     async def start_activity_class(
         self,
         activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[
+            CallableAsyncSingleParam[
+                temporalio.common.ValueHandle[ParamType], ReturnType
+            ]
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -1851,7 +2113,37 @@ class Client:
     async def start_activity_class(
         self,
         activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[
+            CallableSyncSingleParam[
+                temporalio.common.ValueHandle[ParamType], ReturnType
+            ]
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -2021,7 +2313,37 @@ class Client:
     async def execute_activity_class(
         self,
         activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[
+            CallableAsyncSingleParam[
+                temporalio.common.ValueHandle[ParamType], ReturnType
+            ]
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -2045,7 +2367,37 @@ class Client:
     async def execute_activity_class(
         self,
         activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[
+            CallableSyncSingleParam[
+                temporalio.common.ValueHandle[ParamType], ReturnType
+            ]
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -2192,7 +2544,35 @@ class Client:
     async def start_activity_method(
         self,
         activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def start_activity_method(
+        self,
+        activity: MethodAsyncSingleParam[
+            SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,
@@ -2341,7 +2721,35 @@ class Client:
     async def execute_activity_method(
         self,
         activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
-        arg: ParamType,
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # Same, for a callee that declares its parameter as a ValueHandle: the caller
+    # may still pass the plain value, so a callee deferring its input does not
+    # change what callers pass.
+    @overload
+    async def execute_activity_method(
+        self,
+        activity: MethodAsyncSingleParam[
+            SelfType, temporalio.common.ValueHandle[ParamType], ReturnType
+        ],
+        arg: ParamType | temporalio.common.ValueHandle[ParamType],
         *,
         id: str,
         task_queue: str,

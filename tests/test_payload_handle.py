@@ -16,14 +16,13 @@ import pytest
 
 from temporalio import workflow
 from temporalio.api.common.v1 import Payload
-from temporalio.common import ValueHandle
+from temporalio.common import ValueHandle, _unwrap_value_handle_call
 from temporalio.converter import (
     DataConverter,
     ExternalStorage,
     PayloadCodec,
 )
 from temporalio.converter._payload_handle import _upgrade_result_hint
-from temporalio.workflow._value_handles import _unwrap_value_handle_call
 from tests.test_extstore import InMemoryTestDriver
 
 # A value large enough to be worth offloading; threshold=0 offloads everything.

@@ -1567,8 +1567,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
-        activity, result_as_handle = (
-            temporalio.workflow._value_handles._unwrap_value_handle_call(activity)
+        activity, result_as_handle = temporalio.common._unwrap_value_handle_call(
+            activity
         )
         # Get activity definition if it's callable
         name: str
@@ -1638,8 +1638,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
-        workflow, result_as_handle = (
-            temporalio.workflow._value_handles._unwrap_value_handle_call(workflow)
+        workflow, result_as_handle = temporalio.common._unwrap_value_handle_call(
+            workflow
         )
         # Use definition if callable
         name: str
@@ -1701,8 +1701,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         activity_id: str | None,
         summary: str | None,
     ) -> temporalio.workflow.ActivityHandle[Any]:
-        activity, result_as_handle = (
-            temporalio.workflow._value_handles._unwrap_value_handle_call(activity)
+        activity, result_as_handle = temporalio.common._unwrap_value_handle_call(
+            activity
         )
         # Get activity definition if it's callable
         name: str
@@ -1760,6 +1760,26 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         headers: Mapping[str, str] | None,
         summary: str | None,
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        # Forwarding a handle *into* an operation is the handler's contract to
+        # declare: it may take a ValueHandle and forward it on, or take the value
+        # and have its own worker resolve the reference. Deferring the operation's
+        # *result*, though, is not supported: a Nexus resolution is not one of the
+        # command types the worker defers, so a handle here would wrap an
+        # already-decoded payload and decode it a second time on acquisition.
+        operation, result_as_handle = temporalio.common._unwrap_value_handle_call(
+            operation
+        )
+        if result_as_handle or (
+            output_type is not None
+            and temporalio.converter._payload_handle._is_payload_handle_hint(
+                output_type
+            )
+        ):
+            raise RuntimeError(
+                "[TMPRL1111] Cannot consume a Nexus operation result as a "
+                "ValueHandle: Nexus results are not deferrable. Let the operation "
+                "return its value and pass it to an activity as a handle instead."
+            )
         # start_nexus_operation
         return await self._outbound.start_nexus_operation(
             StartNexusOperationInput(
