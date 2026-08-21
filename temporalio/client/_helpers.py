@@ -35,9 +35,12 @@ async def _apply_headers(  # pyright: ignore[reportUnusedFunction]
     if source is None:
         return
     if encode_headers:
-        for payload in source.values():
-            payload.CopyFrom(await data_converter._transform_outbound_payload(payload))
-    temporalio.common._apply_headers(source, dest)
+        for key, payload in source.items():
+            dest[key].CopyFrom(
+                await data_converter._transform_outbound_payload(payload)
+            )
+    else:
+        temporalio.common._apply_headers(source, dest)
 
 
 def _history_from_json(  # pyright: ignore[reportUnusedFunction]
