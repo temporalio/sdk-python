@@ -709,6 +709,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         return await ActivityExecutionDescription._from_execution_info(
             info=resp.info,
             long_poll_token=resp.long_poll_token or None,
+            raw_input=resp.input if resp.HasField("input") else None,
+            raw_outcome=resp.outcome if resp.HasField("outcome") else None,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
                 ActivitySerializationContext(

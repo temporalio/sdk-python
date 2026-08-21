@@ -312,6 +312,59 @@ class ActivityExecutionDescription(ActivityExecution):
     raw_callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo]
     """Underlying protobuf callbacks"""
 
+    raw_input: Sequence[temporalio.api.common.v1.Payload] | None
+    """Raw payloads of the activity's input arguments.
+
+    None unless the describe call set ``include_input``. Use this when the
+    decoded :py:attr:`input` needs type hints to convert correctly.
+    """
+
+    input: Sequence[Any] | None
+    """Deserialized input arguments, one element per argument.
+
+    None unless the describe call set ``include_input``.
+    """
+
+    raw_outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None
+    """Raw outcome the activity closed with.
+
+    None unless the describe call set ``include_outcome`` and the activity is
+    closed.
+    """
+
+    result: Any
+    """Deserialized result the activity closed with.
+
+    None when the activity is still running, closed with a failure, or
+    ``include_outcome`` was not requested.
+    """
+
+    failure: BaseException | None
+    """Failure the activity closed with.
+
+    None when the activity did not close with a failure, or when
+    ``include_outcome`` was not requested. This is the terminal outcome;
+    :py:attr:`last_failure` is the failure of the most recent attempt, which may
+    be set while the activity is still retrying.
+    """
+
+    @property
+    def has_input(self) -> bool:
+        """Whether the activity's input is present.
+
+        False unless the describe call set ``include_input``.
+        """
+        return self.raw_input is not None
+
+    @property
+    def has_result(self) -> bool:
+        """Whether the activity closed with a successful result.
+
+        False while the activity is still running, when it closed with a
+        failure, and unless the describe call set ``include_outcome``.
+        """
+        return self.raw_outcome is not None and self.raw_outcome.HasField("result")
+
     @classmethod
     async def _from_execution_info(
         cls,
@@ -320,6 +373,8 @@ class ActivityExecutionDescription(ActivityExecution):
         namespace: str,
         data_converter: temporalio.converter.DataConverter,
         callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo],
+        raw_input: temporalio.api.common.v1.Payloads | None = None,
+        raw_outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None = None,
     ) -> Self:
         """Create from raw proto activity execution info."""
         # Decode heartbeat details if present
@@ -330,6 +385,23 @@ class ActivityExecutionDescription(ActivityExecution):
             decoded_heartbeat_details = await data_converter.payload_codec.decode(
                 decoded_heartbeat_details
             )
+
+        input_payloads: Sequence[temporalio.api.common.v1.Payload] | None = None
+        decoded_input: Sequence[Any] | None = None
+        if raw_input is not None:
+            input_payloads = raw_input.payloads
+            decoded_input = await data_converter.decode(input_payloads)
+
+        decoded_result: Any = None
+        decoded_failure: BaseException | None = None
+        if raw_outcome is not None:
+            if raw_outcome.HasField("result"):
+                results = await data_converter.decode(raw_outcome.result.payloads)
+                decoded_result = results[0] if results else None
+            elif raw_outcome.HasField("failure"):
+                decoded_failure = await data_converter.decode_failure(
+                    raw_outcome.failure
+                )
 
         return cls(
             activity_id=info.activity_id,
@@ -391,8 +463,13 @@ class ActivityExecutionDescription(ActivityExecution):
                 if info.HasField("next_attempt_schedule_time")
                 else None
             ),
+            failure=decoded_failure,
+            input=decoded_input,
             paused=getattr(info, "paused", False),
             raw_heartbeat_details=decoded_heartbeat_details,
+            raw_input=input_payloads,
+            raw_outcome=raw_outcome,
+            result=decoded_result,
             raw_info=info,
             retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy)
             if info.HasField("retry_policy")
