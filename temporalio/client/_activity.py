@@ -912,6 +912,10 @@ class ActivityHandle(Generic[ReturnType]):
                 activity_id=self._id,
                 activity_run_id=self._run_id,
                 long_poll_token=long_poll_token,
+                include_input=False,
+                include_outcome=False,
+                include_heartbeat_details=False,
+                include_last_failure=False,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
