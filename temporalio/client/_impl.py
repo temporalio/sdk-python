@@ -87,6 +87,7 @@ from ._interceptor import (
     ListSchedulesInput,
     ListWorkflowsInput,
     OutboundInterceptor,
+    PauseActivityInput,
     PauseScheduleInput,
     QueryWorkflowInput,
     ReportCancellationAsyncActivityInput,
@@ -100,6 +101,7 @@ from ._interceptor import (
     TerminateNexusOperationInput,
     TerminateWorkflowInput,
     TriggerScheduleInput,
+    UnpauseActivityInput,
     UnpauseScheduleInput,
     UpdateScheduleInput,
     UpdateWithStartStartWorkflowInput,
@@ -682,6 +684,41 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 reason=input.reason or "",
                 identity=self._client.identity,
             ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def pause_activity(self, input: PauseActivityInput) -> None:
+        """Pause an activity."""
+        await self._client.workflow_service.pause_activity_execution(
+            temporalio.api.workflowservice.v1.PauseActivityExecutionRequest(
+                namespace=self._client.namespace,
+                activity_id=input.activity_id,
+                run_id=input.activity_run_id or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                reason=input.reason or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def unpause_activity(self, input: UnpauseActivityInput) -> None:
+        """Unpause an activity."""
+        req = temporalio.api.workflowservice.v1.UnpauseActivityExecutionRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+            reason=input.reason or "",
+        )
+        if input.jitter is not None:
+            req.jitter.FromTimedelta(input.jitter)
+        await self._client.workflow_service.unpause_activity_execution(
+            req,
             retry=True,
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,

@@ -49,8 +49,10 @@ from ._interceptor import (
     DescribeActivityInput,
     FailAsyncActivityInput,
     HeartbeatAsyncActivityInput,
+    PauseActivityInput,
     ReportCancellationAsyncActivityInput,
     TerminateActivityInput,
+    UnpauseActivityInput,
 )
 
 if TYPE_CHECKING:
@@ -958,6 +960,67 @@ class ActivityHandle(Generic[ReturnType]):
                 activity_id=self._id,
                 activity_run_id=self._run_id,
                 reason=reason,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def pause(
+        self,
+        *,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Pause the activity.
+
+        A paused activity is not scheduled or retried until it is unpaused via
+        :py:meth:`unpause`.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            reason: Reason for pausing. Recorded and available via describe.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.pause_activity(
+            PauseActivityInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                reason=reason,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def unpause(
+        self,
+        *,
+        reason: str | None = None,
+        jitter: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Unpause the activity, allowing it to be scheduled or retried again.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            reason: Reason for unpausing. Recorded on the server.
+            jitter: If set, the activity starts at a random time within this
+                duration rather than immediately.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.unpause_activity(
+            UnpauseActivityInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                reason=reason,
+                jitter=jitter,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
