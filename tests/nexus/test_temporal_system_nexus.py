@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any, cast
 
+import nexusrpc
 import pytest
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
@@ -41,6 +42,7 @@ from temporalio.worker import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+from temporalio.worker._nexus import _NexusPayloadSerializer
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
 from tests.test_extstore import InMemoryTestDriver
 
@@ -166,6 +168,7 @@ def test_signal_with_start_serialization_context() -> None:
 class RejectOuterSystemNexusCodec(PayloadCodec):
     def __init__(self) -> None:
         self.encode_count = 0
+        self.decode_count = 0
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
@@ -202,6 +205,7 @@ class RejectOuterSystemNexusCodec(PayloadCodec):
                 raise RuntimeError(
                     "outer system nexus envelope should not be codec decoded"
                 )
+            self.decode_count += 1
             decoded.append(payload)
         return decoded
 
@@ -331,6 +335,88 @@ def _new_unmarked_system_nexus_request_payload() -> temporalio.api.common.v1.Pay
     payload = _new_system_nexus_request_payload()
     del payload.metadata[SYSTEM_NEXUS_PAYLOAD_METADATA_KEY]
     return payload
+
+
+async def test_nexus_payload_serializer_decodes_system_input() -> None:
+    """A marked system request is decoded into its generated Nexus model."""
+    data_converter = temporalio.converter.default()
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="test-workflow",
+        args=["workflow-input"],
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+    )
+    payload = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
+        data_converter.failure_converter,
+    ).to_payload(request)
+    assert payload is not None
+    assert payload.metadata[SYSTEM_NEXUS_PAYLOAD_METADATA_KEY] == b"true"
+    assert payload.metadata["encoding"] == b"binary/protobuf"
+
+    decoded = await _NexusPayloadSerializer(
+        data_converter=data_converter,
+        payload=payload,
+    ).deserialize(
+        nexusrpc.Content(headers={}, data=b""),
+        as_type=workflow_service_models.SignalWithStartWorkflowRequest,
+    )
+
+    assert decoded == request
+
+
+async def test_nexus_payload_serializer_codec_skips_outer_envelope() -> None:
+    """The codec decodes nested user payloads but not the outer system envelope."""
+    codec = RejectOuterSystemNexusCodec()
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=codec,
+    )
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="test-workflow",
+        args=["workflow-input"],
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+    )
+    payload = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
+        data_converter.failure_converter,
+    ).to_payload(request)
+    assert payload is not None
+
+    decoded = await _NexusPayloadSerializer(
+        data_converter=data_converter,
+        payload=payload,
+    ).deserialize(
+        nexusrpc.Content(headers={}, data=b""),
+        as_type=workflow_service_models.SignalWithStartWorkflowRequest,
+    )
+
+    assert codec.decode_count == 1
+    assert codec.encode_count == 0
+    assert decoded == request
+
+
+async def test_nexus_payload_serializer_uses_user_converter() -> None:
+    """An unmarked Nexus input continues to use the configured user converter."""
+    data_converter = temporalio.converter.default()
+    payload = data_converter.payload_converter.to_payload("ordinary-input")
+    assert payload is not None
+    assert SYSTEM_NEXUS_PAYLOAD_METADATA_KEY not in payload.metadata
+
+    decoded = await _NexusPayloadSerializer(
+        data_converter=data_converter,
+        payload=payload,
+    ).deserialize(
+        nexusrpc.Content(headers={}, data=b""),
+        as_type=str,
+    )
+
+    assert decoded == "ordinary-input"
 
 
 async def test_schedule_marked_system_nexus_payload_ignores_endpoint() -> None:

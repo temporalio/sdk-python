@@ -44,7 +44,7 @@ from temporalio.exceptions import (
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from temporalio.worker._nexus import _DummyPayloadSerializer
+from temporalio.worker._nexus import _NexusPayloadSerializer
 from tests.helpers import LogCapturer, assert_eq_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
@@ -884,7 +884,7 @@ def _converter_class_raising(error: Exception) -> type[DefaultPayloadConverter]:
 
 async def _deserialize_input(data_converter: DataConverter) -> Any:
     [payload] = DataConverter.default.payload_converter.to_payloads(["input"])
-    serializer = _DummyPayloadSerializer(data_converter=data_converter, payload=payload)
+    serializer = _NexusPayloadSerializer(data_converter=data_converter, payload=payload)
     return await serializer.deserialize(nexusrpc.Content(headers={}, data=b""))
 
 
