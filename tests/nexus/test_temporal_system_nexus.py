@@ -337,7 +337,7 @@ def _new_unmarked_system_nexus_request_payload() -> temporalio.api.common.v1.Pay
     return payload
 
 
-async def test_nexus_payload_serializer_decodes_marked_system_input() -> None:
+async def test_nexus_payload_serializer_decodes_system_input() -> None:
     """A marked system request is decoded into its generated Nexus model."""
     data_converter = temporalio.converter.default()
     request = workflow_service_models.SignalWithStartWorkflowRequest(
@@ -367,9 +367,7 @@ async def test_nexus_payload_serializer_decodes_marked_system_input() -> None:
     assert decoded == request
 
 
-async def test_nexus_payload_serializer_decodes_nested_payloads_before_model_conversion() -> (
-    None
-):
+async def test_nexus_payload_serializer_codec_skips_outer_envelope() -> None:
     """The codec decodes nested user payloads but not the outer system envelope."""
     codec = RejectOuterSystemNexusCodec()
     data_converter = dataclasses.replace(
@@ -403,9 +401,7 @@ async def test_nexus_payload_serializer_decodes_nested_payloads_before_model_con
     assert decoded == request
 
 
-async def test_nexus_payload_serializer_uses_user_converter_for_unmarked_input() -> (
-    None
-):
+async def test_nexus_payload_serializer_uses_user_converter() -> None:
     """An unmarked Nexus input continues to use the configured user converter."""
     data_converter = temporalio.converter.default()
     payload = data_converter.payload_converter.to_payload("ordinary-input")
