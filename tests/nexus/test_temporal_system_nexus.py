@@ -36,6 +36,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
     StartNexusOperationInput,
+    StartSystemNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
@@ -253,6 +254,12 @@ class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         interceptor_traces.append(("workflow.start_nexus_operation", input))
         return await super().start_nexus_operation(input)
 
+    async def start_system_nexus_operation(
+        self, input: StartSystemNexusOperationInput[Any, Any]
+    ) -> workflow.NexusOperationHandle[Any]:
+        interceptor_traces.append(("workflow.start_system_nexus_operation", input))
+        return await super().start_system_nexus_operation(input)
+
 
 def _assert_stored_payloads_include(
     driver: InMemoryTestDriver, expected_payload_data: set[bytes]
@@ -269,8 +276,8 @@ def _assert_stored_payloads_include(
 def _assert_start_nexus_operation_interceptor_trace() -> None:
     assert len(interceptor_traces) == 1
     trace_name, trace_value = interceptor_traces.pop()
-    assert trace_name == "workflow.start_nexus_operation"
-    trace_input = cast(StartNexusOperationInput[Any, Any], trace_value)
+    assert trace_name == "workflow.start_system_nexus_operation"
+    trace_input = cast(StartSystemNexusOperationInput[Any, Any], trace_value)
     request = trace_input.input
     assert request.id == "system-nexus-workflow-id"
     assert request.signal == "test-signal"

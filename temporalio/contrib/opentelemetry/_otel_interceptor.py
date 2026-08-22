@@ -600,3 +600,14 @@ class _TracingWorkflowOutboundInterceptor(
         ):
             input.headers = _context_to_nexus_headers(input.headers or {})
             return await super().start_nexus_operation(input)
+
+    async def start_system_nexus_operation(
+        self, input: temporalio.worker.StartSystemNexusOperationInput[Any, Any]
+    ) -> temporalio.workflow.NexusOperationHandle[Any]:
+        with self._workflow_maybe_span(
+            f"StartNexusOperation:{input.service}/{input.operation_name}",
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+        ):
+            if hasattr(input.input, "headers"):
+                input.input.headers = _context_to_headers(input.input.headers or {})
+            return await super().start_system_nexus_operation(input)

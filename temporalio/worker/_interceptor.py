@@ -349,6 +349,29 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
 
 
 @dataclass
+class StartSystemNexusOperationInput(Generic[InputT, OutputT]):
+    """Input for :py:meth:`WorkflowOutboundInterceptor.start_system_nexus_operation`."""
+
+    service: str
+    operation: nexusrpc.Operation[InputT, OutputT] | str | Callable[..., Any]
+    input: InputT
+    output_type: type[OutputT] | None = None
+
+    @property
+    def operation_name(self) -> str:
+        """Get the name of the Nexus operation."""
+        if isinstance(self.operation, nexusrpc.Operation):
+            return self.operation.name
+        elif isinstance(self.operation, str):
+            return self.operation
+        elif callable(self.operation):
+            _, op = temporalio.nexus._util.get_operation_factory(self.operation)
+            if isinstance(op, nexusrpc.Operation):
+                return op.name
+        raise ValueError(f"Operation is not a Nexus operation: {self.operation}")
+
+
+@dataclass
 class StartLocalActivityInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.start_local_activity`."""
 
@@ -480,6 +503,12 @@ class WorkflowOutboundInterceptor:
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         """Called for every :py:func:`temporalio.workflow.NexusClient.start_operation` call."""
         return await self.next.start_nexus_operation(input)
+
+    async def start_system_nexus_operation(
+        self, input: StartSystemNexusOperationInput[InputT, OutputT]
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        """Called for every Temporal System Nexus operation started by a workflow."""
+        return await self.next.start_system_nexus_operation(input)
 
 
 @dataclass

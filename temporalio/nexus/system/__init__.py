@@ -102,6 +102,7 @@ class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
         self._user_converters = _SystemNexusUserConverters(
             user_payload_converter, user_failure_converter
         )
+
         self._outer_payload_converter = _TemporalTransferTypePayloadConverter.wrap(
             _SystemNexusOuterPayloadConverter()
         )
