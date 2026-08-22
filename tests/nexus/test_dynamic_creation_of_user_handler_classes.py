@@ -9,10 +9,7 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
-
-# Cloud CI's namespace credentials cannot manage Nexus endpoints.
-# See https://github.com/temporalio/sdk-python/issues/1704.
-pytestmark = pytest.mark.requires_local_server
+from tests.nexus.conftest import NexusEndpoint
 
 
 @workflow.defn
@@ -56,11 +53,12 @@ class IncrementCallerWorkflow:
 async def test_run_nexus_service_from_programmatically_created_service_handler(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
 
     service_handler = nexusrpc.handler._core.ServiceHandler(
         service=nexusrpc.ServiceDefinition(
@@ -79,7 +77,6 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
         },
     )
 
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
     async with Worker(
         client,
         task_queue=task_queue,

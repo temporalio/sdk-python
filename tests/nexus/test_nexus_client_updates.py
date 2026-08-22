@@ -3,7 +3,6 @@
 import uuid
 
 import nexusrpc
-import pytest
 from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 import temporalio.nexus
@@ -11,10 +10,6 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-
-# Cloud CI's namespace credentials cannot manage Nexus endpoints.
-# See https://github.com/temporalio/sdk-python/issues/1704.
-pytestmark = pytest.mark.requires_local_server
 
 
 @nexusrpc.service

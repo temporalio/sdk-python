@@ -47,10 +47,7 @@ from temporalio.worker import Worker
 from temporalio.worker._nexus import _DummyPayloadSerializer
 from tests.helpers import LogCapturer, assert_eq_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
-
-# Cloud CI's namespace credentials cannot manage Nexus endpoints.
-# See https://github.com/temporalio/sdk-python/issues/1704.
-pytestmark = pytest.mark.requires_local_server
+from tests.nexus.conftest import NexusEndpoint
 
 operation_invocation_counts = Counter[str]()
 
@@ -179,7 +176,10 @@ class RPCErrorCallerWorkflow:
     ],
 )
 async def test_nexus_operation_is_retried(
-    client: Client, env: WorkflowEnvironment, operation_name: str
+    client: Client,
+    env: WorkflowEnvironment,
+    operation_name: str,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -187,7 +187,7 @@ async def test_nexus_operation_is_retried(
     input = ErrorTestInput(
         service_name="ErrorTestService",
         operation_name=operation_name,
-        task_queue=str(uuid.uuid4()),
+        task_queue=nexus_endpoint.task_queue,
         id=str(uuid.uuid4()),
     )
     async with Worker(
@@ -197,9 +197,6 @@ async def test_nexus_operation_is_retried(
         workflows=[CallerWorkflow],
         task_queue=input.task_queue,
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(input.task_queue), input.task_queue
-        )
         asyncio.create_task(
             client.execute_workflow(
                 CallerWorkflow.run,
@@ -241,6 +238,7 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
     operation_name: str,
     handler_error_type: nexusrpc.HandlerErrorType,
     handler_error_message: str,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -252,7 +250,7 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
             else "NonExistentService"
         ),
         operation_name=operation_name,
-        task_queue=str(uuid.uuid4()),
+        task_queue=nexus_endpoint.task_queue,
         id=str(uuid.uuid4()),
     )
     async with Worker(
@@ -262,9 +260,6 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
         workflows=[CallerWorkflow],
         task_queue=input.task_queue,
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(input.task_queue), input.task_queue
-        )
         try:
             await client.execute_workflow(
                 CallerWorkflow.run,
@@ -323,12 +318,12 @@ class StartTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_timeout_of_nexus_start_operation(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     async with Worker(
         client,
         nexus_service_handlers=[StartTimeoutTestService()],
@@ -336,9 +331,6 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
         task_queue=task_queue,
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
         try:
             await client.execute_workflow(
                 StartTimeoutTestCallerWorkflow.run,
@@ -405,12 +397,12 @@ class ScheduleToStartTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_schedule_to_start_timeout_of_nexus_operation(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     async with Worker(
         client,
         nexus_service_handlers=[ScheduleToStartTimeoutTestService()],
@@ -418,9 +410,6 @@ async def test_error_raised_by_schedule_to_start_timeout_of_nexus_operation(
         task_queue=task_queue,
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
         try:
             await client.execute_workflow(
                 ScheduleToStartTimeoutTestCallerWorkflow.run,
@@ -481,12 +470,12 @@ class StartToCloseTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_start_to_close_timeout_of_nexus_operation(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     async with Worker(
         client,
         nexus_service_handlers=[StartToCloseTimeoutTestService()],
@@ -494,9 +483,6 @@ async def test_error_raised_by_start_to_close_timeout_of_nexus_operation(
         task_queue=task_queue,
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
         try:
             await client.execute_workflow(
                 StartToCloseTimeoutTestCallerWorkflow.run,
@@ -562,12 +548,12 @@ class CancellationTimeoutTestCallerWorkflow:
 
 
 async def test_error_raised_by_timeout_of_nexus_cancel_operation(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     async with Worker(
         client,
         nexus_service_handlers=[CancellationTimeoutTestService()],
@@ -575,9 +561,6 @@ async def test_error_raised_by_timeout_of_nexus_cancel_operation(
         task_queue=task_queue,
     ):
         with LogCapturer().logs_captured(logger) as capturer:
-            await env.create_nexus_endpoint(
-                make_nexus_endpoint_name(task_queue), task_queue
-            )
             try:
                 await client.execute_workflow(
                     CancellationTimeoutTestCallerWorkflow.run,
@@ -615,13 +598,14 @@ async def test_rpc_error_fails_without_retry(
     env: WorkflowEnvironment,
     status_code: RPCStatusCode,
     expected_handler_error_type: nexusrpc.HandlerErrorType,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     input = RPCErrorInput(
         status_code_value=status_code.value,
-        task_queue=str(uuid.uuid4()),
+        task_queue=nexus_endpoint.task_queue,
         id=str(uuid.uuid4()),
     )
     async with Worker(
@@ -631,9 +615,6 @@ async def test_rpc_error_fails_without_retry(
         workflows=[RPCErrorCallerWorkflow],
         task_queue=input.task_queue,
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(input.task_queue), input.task_queue
-        )
         try:
             await client.execute_workflow(
                 RPCErrorCallerWorkflow.run,
@@ -674,13 +655,14 @@ async def test_rpc_error_is_retried(
     client: Client,
     env: WorkflowEnvironment,
     status_code: RPCStatusCode,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     input = RPCErrorInput(
         status_code_value=status_code.value,
-        task_queue=str(uuid.uuid4()),
+        task_queue=nexus_endpoint.task_queue,
         id=str(uuid.uuid4()),
     )
     async with Worker(
@@ -690,10 +672,6 @@ async def test_rpc_error_is_retried(
         workflows=[RPCErrorCallerWorkflow],
         task_queue=input.task_queue,
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(input.task_queue), input.task_queue
-        )
-
         handle = await client.start_workflow(
             RPCErrorCallerWorkflow.run,
             input,
@@ -749,12 +727,12 @@ class FailingFromPayloadsConverter(DefaultPayloadConverter):
 
 
 async def test_nexus_operation_retried_on_codec_decode_failure(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     codec = FailOnFirstDecodeCodec()
     handler_client = Client(
         client.service_client,
@@ -780,9 +758,6 @@ async def test_nexus_operation_retried_on_codec_decode_failure(
             task_queue=task_queue,
         ),
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(input.task_queue), input.task_queue
-        )
         await client.execute_workflow(
             CallerWorkflow.run,
             input,
@@ -793,12 +768,12 @@ async def test_nexus_operation_retried_on_codec_decode_failure(
 
 
 async def test_nexus_operation_fails_without_retry_on_converter_failure(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, nexus_endpoint: NexusEndpoint
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
+    task_queue = nexus_endpoint.task_queue
     handler_client = Client(
         client.service_client,
         namespace=client.namespace,
@@ -825,9 +800,6 @@ async def test_nexus_operation_fails_without_retry_on_converter_failure(
             task_queue=task_queue,
         ),
     ):
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(input.task_queue), input.task_queue
-        )
         try:
             await client.execute_workflow(
                 CallerWorkflow.run,
