@@ -690,15 +690,27 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 namespace=self._client.namespace,
                 activity_id=input.activity_id,
                 run_id=input.activity_run_id or "",
-                long_poll_token=input.long_poll_token or b"",
+                include_input=input.include_input,
+                include_outcome=input.include_outcome,
+                include_heartbeat_details=input.include_heartbeat_details,
+                include_last_failure=input.include_last_failure,
             ),
             retry=True,
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        return await ActivityExecutionDescription._from_execution_info(
-            info=resp.info,
-            long_poll_token=resp.long_poll_token or None,
+        # Erase unrequested fields if server sent them anyway (can happen with old server)
+        if not input.include_input:
+            resp.ClearField("input")
+        if not input.include_outcome:
+            resp.ClearField("outcome")
+        if not input.include_heartbeat_details:
+            resp.info.ClearField("heartbeat_details")
+        if not input.include_last_failure:
+            resp.info.ClearField("last_failure")
+
+        return ActivityExecutionDescription._from_resp(
+            resp=resp,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
                 ActivitySerializationContext(
@@ -711,7 +723,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     is_local=False,
                 )
             ),
-            callbacks=resp.callbacks,
         )
 
     def list_activities(

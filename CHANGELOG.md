@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
+- New properties and methods in ActivityExecution and ActivityExecutionDescription.
+
 ### Changed
 
 ### Deprecated
@@ -30,6 +33,10 @@ to include examples, links to docs, or any other relevant information.
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale
   annotation fails type checking rather than at runtime.
+- client.ActivityExecution and client.ActivityExecutionDescription had some fields removed or renamed
+  to match RPC API. Dataclass equality method has been disabled for these types.
+- ActivityHandle.describe() long-poll token was removed.  The functionality can still be used manually
+  through raw gRPC API.
 
 ### Fixed
 
