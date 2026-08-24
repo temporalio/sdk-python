@@ -308,11 +308,18 @@ def _sdk_core_release_notes(version: str, path: str) -> list[str]:
         )
     except subprocess.CalledProcessError:
         _git(["fetch", "--quiet", "origin", "main"], cwd=submodule_path)
-        notes = _sdk_core_changelog_entries(
-            previous_commit,
-            current_commit,
-            submodule_path,
-        )
+        try:
+            notes = _sdk_core_changelog_entries(
+                previous_commit,
+                current_commit,
+                submodule_path,
+            )
+        except subprocess.CalledProcessError as error:
+            output = error.output.strip() if error.output else str(error)
+            raise RuntimeError(
+                "SDK Core changelog-release-notes failed after fetching origin/main:\n"
+                f"{output}"
+            ) from error
     if not notes:
         return []
 
