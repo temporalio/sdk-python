@@ -1360,9 +1360,6 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> ActivityExecutionDescription:
         """Describe the activity execution.
 
-        The payload-bearing fields are opt-in because they can be arbitrarily
-        large; request them only when needed.
-
         .. warning::
            This API is experimental.
 
