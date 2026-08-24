@@ -396,17 +396,21 @@ class ActivityExecutionDescription(ActivityExecution):
         return self.raw_outcome is not None and self.raw_outcome.HasField("result")
 
     @classmethod
-    async def _from_execution_info(
+    async def _from_describe_response(
         cls,
-        info: temporalio.api.activity.v1.ActivityExecutionInfo,
-        long_poll_token: bytes | None,
+        resp: temporalio.api.workflowservice.v1.DescribeActivityExecutionResponse,
         namespace: str,
         data_converter: temporalio.converter.DataConverter,
-        callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo],
-        raw_input: temporalio.api.common.v1.Payloads | None = None,
-        raw_outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None = None,
     ) -> Self:
-        """Create from raw proto activity execution info."""
+        """Create from a raw proto describe response.
+
+        Takes the whole response rather than its info: ``input`` and ``outcome`` are
+        siblings of ``info``, not fields of it, so they are unreachable from the info
+        message alone.
+        """
+        info = resp.info
+        raw_input = resp.input if resp.HasField("input") else None
+        raw_outcome = resp.outcome if resp.HasField("outcome") else None
         # Decode heartbeat details if present
         decoded_heartbeat_details: Sequence[temporalio.api.common.v1.Payload] = (
             info.heartbeat_details.payloads
@@ -486,7 +490,7 @@ class ActivityExecutionDescription(ActivityExecution):
                 else None
             ),
             last_worker_identity=info.last_worker_identity,
-            long_poll_token=long_poll_token or None,
+            long_poll_token=resp.long_poll_token or None,
             namespace=namespace,
             next_attempt_schedule_time=(
                 info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
@@ -548,7 +552,7 @@ class ActivityExecutionDescription(ActivityExecution):
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
                 info.search_attributes
             ),
-            raw_callbacks=callbacks,
+            raw_callbacks=resp.callbacks,
         )
 
 

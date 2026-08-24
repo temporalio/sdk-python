@@ -822,11 +822,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if not input.include_last_failure:
             resp.info.ClearField("last_failure")
 
-        return await ActivityExecutionDescription._from_execution_info(
-            info=resp.info,
-            long_poll_token=resp.long_poll_token or None,
-            raw_input=resp.input if resp.HasField("input") else None,
-            raw_outcome=resp.outcome if resp.HasField("outcome") else None,
+        return await ActivityExecutionDescription._from_describe_response(
+            resp,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
                 ActivitySerializationContext(
@@ -839,7 +836,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     is_local=False,
                 )
             ),
-            callbacks=resp.callbacks,
         )
 
     def list_activities(
