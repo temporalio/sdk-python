@@ -302,6 +302,9 @@ class ActivityExecutionDescription(ActivityExecution):
     paused: bool
     """Whether the activity is paused."""
 
+    raw_description: temporalio.api.workflowservice.v1.DescribeActivityExecutionResponse
+    """Underlying protobuf description."""
+
     raw_heartbeat_details: Sequence[temporalio.api.common.v1.Payload]
     """Details from the last heartbeat."""
 
@@ -342,24 +345,11 @@ class ActivityExecutionDescription(ActivityExecution):
     start delay is set.
     """
 
-    raw_input: Sequence[temporalio.api.common.v1.Payload] | None
-    """Raw payloads of the activity's input arguments.
-
-    None unless the describe call set ``include_input``. Use this when the
-    decoded :py:attr:`input` needs type hints to convert correctly.
-    """
-
-    input: Sequence[Any] | None
+    input: Sequence[Any]
     """Deserialized input arguments, one element per argument.
 
-    None unless the describe call set ``include_input``.
-    """
-
-    raw_outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None
-    """Raw outcome the activity closed with.
-
-    None unless the describe call set ``include_outcome`` and the activity is
-    closed.
+    Empty unless the describe call set ``include_input``. For the undecoded
+    payloads, see ``raw_description.input``.
     """
 
     result: Any
@@ -379,21 +369,13 @@ class ActivityExecutionDescription(ActivityExecution):
     """
 
     @property
-    def has_input(self) -> bool:
-        """Whether the activity's input is present.
-
-        False unless the describe call set ``include_input``.
-        """
-        return self.raw_input is not None
-
-    @property
     def has_result(self) -> bool:
         """Whether the activity closed with a successful result.
 
         False while the activity is still running, when it closed with a
         failure, and unless the describe call set ``include_outcome``.
         """
-        return self.raw_outcome is not None and self.raw_outcome.HasField("result")
+        return self.raw_description.outcome.HasField("result")
 
     @classmethod
     async def _from_describe_response(
@@ -404,8 +386,6 @@ class ActivityExecutionDescription(ActivityExecution):
     ) -> Self:
         """Create from a raw proto describe response."""
         info = resp.info
-        raw_input = resp.input if resp.HasField("input") else None
-        raw_outcome = resp.outcome if resp.HasField("outcome") else None
         # Decode heartbeat details if present
         decoded_heartbeat_details: Sequence[temporalio.api.common.v1.Payload] = (
             info.heartbeat_details.payloads
@@ -415,22 +395,23 @@ class ActivityExecutionDescription(ActivityExecution):
                 decoded_heartbeat_details
             )
 
-        input_payloads: Sequence[temporalio.api.common.v1.Payload] | None = None
-        decoded_input: Sequence[Any] | None = None
-        if raw_input is not None:
-            input_payloads = raw_input.payloads
-            decoded_input = await data_converter.decode(input_payloads)
+        # Protobuf reads an unset submessage as an empty one rather than None, so an
+        # absent input is already an empty payload list and needs no presence check.
+        input_payloads: Sequence[temporalio.api.common.v1.Payload] = resp.input.payloads
+        decoded_input: Sequence[Any] = (
+            await data_converter.decode(input_payloads) if input_payloads else []
+        )
 
+        # An absent outcome carries neither arm of its oneof, so testing the arms is
+        # enough on its own.
+        outcome = resp.outcome
         decoded_result: Any = None
         decoded_failure: BaseException | None = None
-        if raw_outcome is not None:
-            if raw_outcome.HasField("result"):
-                results = await data_converter.decode(raw_outcome.result.payloads)
-                decoded_result = results[0] if results else None
-            elif raw_outcome.HasField("failure"):
-                decoded_failure = await data_converter.decode_failure(
-                    raw_outcome.failure
-                )
+        if outcome.HasField("result"):
+            results = await data_converter.decode(outcome.result.payloads)
+            decoded_result = results[0] if results else None
+        elif outcome.HasField("failure"):
+            decoded_failure = await data_converter.decode_failure(outcome.failure)
 
         return cls(
             activity_id=info.activity_id,
@@ -506,8 +487,7 @@ class ActivityExecutionDescription(ActivityExecution):
             input=decoded_input,
             paused=getattr(info, "paused", False),
             raw_heartbeat_details=decoded_heartbeat_details,
-            raw_input=input_payloads,
-            raw_outcome=raw_outcome,
+            raw_description=resp,
             result=decoded_result,
             schedule_to_close_timeout=(
                 info.schedule_to_close_timeout.ToTimedelta()

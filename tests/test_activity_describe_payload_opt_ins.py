@@ -70,6 +70,19 @@ def client(captured: _CapturedDescribe) -> Client:
     return Client(service_client=service_client, namespace="test-namespace")
 
 
+async def test_description_exposes_the_whole_response(client: Client):
+    # raw_description is the entire describe response, matching WorkflowExecutionDescription
+    # and ScheduleDescription. It is the only raw accessor: the undecoded input and the
+    # outcome are reached through it rather than duplicated as separate fields.
+    desc = await client.get_activity_handle("act-1").describe(
+        include_input=True, include_outcome=True
+    )
+
+    assert desc.raw_description.info.activity_id == "act-1"
+    assert len(desc.raw_description.input.payloads) == len(desc.input)
+    assert desc.raw_description.outcome.HasField("result") == desc.has_result
+
+
 async def test_describe_defaults_ask_for_nothing(
     client: Client, captured: _CapturedDescribe
 ):
@@ -110,8 +123,8 @@ async def test_unrequested_payloads_are_stripped(client: Client):
     # The stub returns every payload field regardless of what was asked for.
     desc = await client.get_activity_handle("act-1").describe()
 
-    assert not desc.has_input
-    assert desc.input is None
+    assert desc.raw_description.input.payloads == []
+    assert desc.input == []
     assert not desc.has_result
     assert desc.result is None
     assert desc.failure is None
@@ -127,7 +140,7 @@ async def test_requested_payloads_are_kept(client: Client):
         include_last_failure=True,
     )
 
-    assert desc.has_input
+    assert desc.raw_description.input.payloads
     assert desc.input == ["x"]
     assert desc.has_result
     assert desc.result == "x"
@@ -139,7 +152,7 @@ async def test_stripping_is_per_field(client: Client):
     # Asking for one payload must not let the others through.
     desc = await client.get_activity_handle("act-1").describe(include_input=True)
 
-    assert desc.has_input
+    assert desc.raw_description.input.payloads
     assert not desc.has_result
     assert len(desc.raw_heartbeat_details) == 0
     assert desc.last_failure is None

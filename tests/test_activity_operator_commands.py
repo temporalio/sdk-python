@@ -447,14 +447,14 @@ async def test_describe_input_and_result_are_opt_in(
         assert await handle.result() == "ping-echoed"
 
         bare = await handle.describe()
-        assert not bare.has_input
-        assert bare.input is None
+        assert not bare.raw_description.input.payloads
+        assert bare.input == []
         assert not bare.has_result
         assert bare.result is None
         assert bare.failure is None
 
         desc = await handle.describe(include_input=True, include_outcome=True)
-        assert desc.has_input
+        assert desc.raw_description.input.payloads
         assert desc.input == ["ping"]
         assert desc.has_result
         assert desc.result == "ping-echoed"
