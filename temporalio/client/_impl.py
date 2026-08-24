@@ -780,8 +780,17 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     update.value.apply_to_proto(req.activity_options.retry_policy)
                 elif name == "priority":
                     req.activity_options.priority.CopyFrom(update.value._to_proto())
-                else:
+                elif name in (
+                    "schedule_to_close_timeout",
+                    "schedule_to_start_timeout",
+                    "start_to_close_timeout",
+                    "heartbeat_timeout",
+                    "start_delay",
+                ):
                     getattr(req.activity_options, name).FromTimedelta(update.value)
+                else:
+                    # Reached only if a key is added without a conversion for it here.
+                    raise ValueError(f"No conversion for activity option {name!r}")
 
         resp = await self._client.workflow_service.update_activity_execution_options(
             req,
