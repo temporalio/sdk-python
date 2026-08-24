@@ -20,6 +20,20 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.32.0] - 2026-08-24
+
+### Added
+
 - Added `temporalio.converter.create_payload_validation_error` to create the
   non-retryable application error used when a converted payload fails validation.
 - Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
@@ -76,8 +90,6 @@ to include examples, links to docs, or any other relevant information.
   message becomes specific to validation. Any other decode failure, and a
   retryable `PayloadValidationError`, keep their existing treatment.
 
-### Deprecated
-
 ### :boom: Breaking Changes
 
 - The `openai-agents` extra now requires `openai-agents>=0.19.2,<0.20`, up from `>=0.17.5` with no
@@ -108,8 +120,6 @@ to include examples, links to docs, or any other relevant information.
 - `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
   is passed for `run_config`. (openai-agents >= 0.19.0 accepts `dict` run
   configs at its public runner API)
-
-### Security
 
 ## [1.31.0] - 2026-07-29
 
