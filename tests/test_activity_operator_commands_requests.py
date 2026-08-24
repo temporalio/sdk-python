@@ -127,6 +127,20 @@ async def test_reset_flags_default_off(client: Client, captured: _CapturedServic
     assert not reset.reset_heartbeat
 
 
+async def test_reset_flags_reach_the_request(
+    client: Client, captured: _CapturedService
+):
+    handle = client.get_activity_handle("act-1")
+    await handle.reset(
+        keep_paused=True, restore_original_options=True, reset_heartbeat=True
+    )
+
+    reset = captured.requests["reset"]
+    assert reset.keep_paused
+    assert reset.restore_original_options
+    assert reset.reset_heartbeat
+
+
 async def test_restore_original_options_is_exclusive(
     client: Client, captured: _CapturedService
 ):

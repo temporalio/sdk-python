@@ -1,6 +1,5 @@
 """Tests for the standalone-activity operator commands: pause, unpause, reset and
-update_options. Each asserts an observable server-side state change rather than a
-successful RPC.
+update_options.
 """
 
 from __future__ import annotations
@@ -26,10 +25,6 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eventually
 
-# A running activity does not transition straight to PAUSED on pause: the server records
-# PAUSE_REQUESTED and only moves to PAUSED once the worker drops the attempt. A
-# long-running heartbeating activity that has not yet noticed the pause stays in
-# PAUSE_REQUESTED, so both states count as "paused" for an observability assertion.
 PAUSED_STATES = (PendingActivityState.PAUSED, PendingActivityState.PAUSE_REQUESTED)
 
 
@@ -71,12 +66,7 @@ async def always_fail_activity() -> None:
 
 @activity.defn
 async def heartbeat_once_activity() -> None:
-    """Records heartbeat details on attempt 1, then blocks waiting for cancellation.
-
-    The heartbeat runs on its own, not adjacent to any completion RPC, so the details
-    reliably persist and are observable via describe. Later attempts do not heartbeat, so
-    any operator-driven clearing of the details stays observable.
-    """
+    """Records heartbeat details on attempt 1, then blocks waiting for cancellation."""
     if activity.info().attempt == 1:
         activity.heartbeat("hb-details")
     while True:
@@ -358,6 +348,7 @@ async def test_update_options_on_paused_activity(
         assert updated.start_to_close_timeout == timedelta(seconds=99)
 
         desc = await handle.describe()
+        assert desc.start_to_close_timeout == timedelta(seconds=99)
         assert desc.run_state in PAUSED_STATES
         await handle.terminate(reason="cleanup")
 
@@ -383,9 +374,14 @@ async def test_reset_restores_original_options(
 ):
     _skip_if_unsupported(env)
     task_queue = str(uuid.uuid4())
-    async with Worker(client, task_queue=task_queue, activities=[slow_activity]):
-        handle = await _start_running_slow_activity(
-            client, task_queue, start_to_close_timeout=timedelta(seconds=45)
+    async with Worker(client, task_queue=task_queue, activities=[quick_activity]):
+        # Delayed start means the restore happens quickly.
+        handle = await client.start_activity(
+            quick_activity,
+            id=f"act-{uuid.uuid4()}",
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(seconds=45),
+            start_delay=timedelta(seconds=300),
         )
         await handle.update_options(
             [
@@ -397,15 +393,13 @@ async def test_reset_restores_original_options(
 
         await handle.reset(restore_original_options=True)
 
-        # restore_original_options reverts to the value the activity was created with.
         # restore_original_options reverts the changed option to the value the
-        # activity was created with. The server defers the restore while a worker
-        # is mid-attempt, so allow a long window for the worker to yield.
+        # activity was created with.
         async def check() -> None:
             desc = await handle.describe()
             assert desc.start_to_close_timeout == timedelta(seconds=45)
 
-        await assert_eventually(check, timeout=timedelta(seconds=60))
+        await assert_eventually(check)
         await handle.terminate(reason="cleanup")
 
 
