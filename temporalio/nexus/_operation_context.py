@@ -720,32 +720,88 @@ async def _start_nexus_operation_workflow_update(  # pyright: ignore[reportUnuse
 ) -> temporalio.client.WorkflowUpdateHandle[Any]:
     # Default update ID to the Nexus request ID for retry-safety (matches sdk-go).
     update_id = update_id or temporal_context.nexus_context.request_id
-    # This token is different from the actual token returned to the caller
-    # because return token will have the run_id that is unknowable before
-    # making the call. If run_id is passed, then it will be the same
-    token = OperationToken(
-        type=OperationTokenType.UPDATE_WORKFLOW,
-        namespace=temporal_context.client.namespace,
-        workflow_id=workflow_id,
-        update_id=update_id,
-        run_id=run_id,
-    ).encode()
     workflow_handle = temporal_context.client.get_workflow_handle(
         workflow_id, run_id=run_id, first_execution_run_id=first_execution_run_id
     )
-    return await workflow_handle._start_update(
-        update,
-        arg,
-        args=args,
-        wait_for_stage=temporalio.client.WorkflowUpdateStage.ACCEPTED,  # hardcoded as nexus only supports async updates
-        id=update_id,
-        result_type=result_type,
-        rpc_metadata=rpc_metadata,
-        rpc_timeout=rpc_timeout,
-        callbacks=temporal_context._get_callbacks(token),
-        links=temporal_context._get_request_links(),
-        request_id=temporal_context.nexus_context.request_id,
-    )
+    with _nexus_backing_start_context():
+        return await workflow_handle._start_update(
+            update,
+            arg,
+            args=args,
+            wait_for_stage=temporalio.client.WorkflowUpdateStage.ACCEPTED,  # hardcoded as nexus only supports async updates
+            id=update_id,
+            result_type=result_type,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+
+def _apply_nexus_context_to_start_workflow_update_request(  # pyright: ignore[reportUnusedFunction]
+    req: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest,
+) -> None:
+    """Apply the current Nexus operation context to a Workflow Update request.
+
+    This is a no-op unless the update is backing the current Nexus operation.
+    """
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None and _in_nexus_backing_start_context():
+        request_links = nexus_ctx._get_request_links()
+        req.request.request_id = nexus_ctx.nexus_context.request_id
+        req.request.links.extend(request_links)
+        callbacks = nexus_ctx._get_callbacks(
+            OperationToken(
+                type=OperationTokenType.UPDATE_WORKFLOW,
+                namespace=nexus_ctx.client.namespace,
+                workflow_id=req.workflow_execution.workflow_id,
+                update_id=req.request.meta.update_id,
+                run_id=req.workflow_execution.run_id or None,
+            ).encode()
+        )
+        req.request.completion_callbacks.extend(
+            temporalio.api.common.v1.Callback(
+                nexus=temporalio.api.common.v1.Callback.Nexus(
+                    url=callback.url,
+                    header=callback.headers,
+                ),
+                links=request_links,
+            )
+            for callback in callbacks
+        )
+
+
+def _apply_start_workflow_update_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
+    resp: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse,
+) -> None:
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None and resp.HasField("link"):
+        nexus_ctx._add_response_link(resp.link)
+
+
+def _apply_nexus_context_to_signal_workflow_request(  # pyright: ignore[reportUnusedFunction]
+    req: temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest,
+) -> None:
+    """Apply the current Nexus operation context to a workflow signal request."""
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None:
+        req.links.extend(nexus_ctx._get_request_links())
+
+
+def _apply_signal_workflow_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
+    resp: temporalio.api.workflowservice.v1.SignalWorkflowExecutionResponse,
+) -> None:
+    """Apply a workflow signal response link to the current Nexus context."""
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None and resp.HasField("link"):
+        nexus_ctx._add_response_link(resp.link)
+
+
+def _apply_nexus_context_to_signal_with_start_workflow_request(  # pyright: ignore[reportUnusedFunction]
+    req: temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
+) -> None:
+    """Apply the current Nexus operation context to a signal-with-start request."""
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None and not _in_nexus_backing_start_context():
+        req.links.extend(nexus_ctx._get_request_links())
 
 
 def _apply_nexus_context_to_start_workflow_request(  # pyright: ignore[reportUnusedFunction]
