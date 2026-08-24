@@ -265,6 +265,8 @@ async def test_legacy_otel_workflow_signal_with_start_propagates_trace_headers(
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
     provider = TracerProvider()
+    exporter = InMemorySpanExporter()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = provider.get_tracer(__name__)
     config = client.config()
     config["interceptors"] = [TracingInterceptor(tracer)]
@@ -289,6 +291,7 @@ async def test_legacy_otel_workflow_signal_with_start_propagates_trace_headers(
             )
             assert await caller.result() == target_id
         assert await client.get_workflow_handle(target_id).result() is True
+    assert any(span.name == "SignalWithStart" for span in exporter.get_finished_spans())
 
 
 async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):

@@ -58,6 +58,14 @@ _CarrierDict: TypeAlias = dict[str, opentelemetry.propagators.textmap.CarrierVal
 _ContextT = TypeVar("_ContextT", bound=nexusrpc.handler.OperationContext)
 
 
+def _system_nexus_operation_span_name(service: str, operation: str) -> str:
+    match operation:
+        case "SignalWithStartWorkflowExecution":
+            return "SignalWithStart"
+        case _:
+            return f"StartSystemNexusOperation:{service}/{operation}"
+
+
 class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interceptor):
     """Interceptor that supports client and worker OpenTelemetry span creation
     and propagation.
@@ -836,7 +844,7 @@ class _TracingWorkflowOutboundInterceptor(
         if hasattr(input.input, "headers"):
             input.input.headers = input.input.headers or {}
             self.root._completed_span(
-                f"StartNexusOperation:{input.service}/{input.operation_name}",
+                _system_nexus_operation_span_name(input.service, input.operation_name),
                 kind=opentelemetry.trace.SpanKind.CLIENT,
                 add_to_outbound=cast(_InputWithHeaders, input.input),
             )
