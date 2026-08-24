@@ -402,12 +402,7 @@ class ActivityExecutionDescription(ActivityExecution):
         namespace: str,
         data_converter: temporalio.converter.DataConverter,
     ) -> Self:
-        """Create from a raw proto describe response.
-
-        Takes the whole response rather than its info: ``input`` and ``outcome`` are
-        siblings of ``info``, not fields of it, so they are unreachable from the info
-        message alone.
-        """
+        """Create from a raw proto describe response."""
         info = resp.info
         raw_input = resp.input if resp.HasField("input") else None
         raw_outcome = resp.outcome if resp.HasField("outcome") else None
