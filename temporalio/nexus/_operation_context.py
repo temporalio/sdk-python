@@ -777,6 +777,15 @@ def _apply_start_workflow_update_response_to_nexus_context(  # pyright: ignore[r
         nexus_ctx._add_response_link(resp.link)
 
 
+def _apply_query_workflow_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
+    resp: temporalio.api.workflowservice.v1.QueryWorkflowResponse,
+) -> None:
+    """Apply a workflow query response link to the current Nexus context."""
+    nexus_ctx = _try_start_operation_context()
+    if nexus_ctx is not None and resp.HasField("link"):
+        nexus_ctx._add_response_link(resp.link)
+
+
 def _apply_nexus_context_to_signal_workflow_request(  # pyright: ignore[reportUnusedFunction]
     req: temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest,
 ) -> None:
