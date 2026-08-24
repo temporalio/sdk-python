@@ -645,3 +645,8 @@ class PayloadVisitor:
             await self._visit_temporal_api_common_v1_Header(fs, o.header)
         if o.HasField("user_metadata"):
             await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
+
+    async def _visit_temporal_api_workflowservice_v1_SignalWithStartWorkflowExecutionResponse(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
