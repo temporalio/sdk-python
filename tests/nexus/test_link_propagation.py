@@ -596,8 +596,6 @@ async def test_start_outside_nexus_context_leaves_on_conflict_options_unset() ->
 # ── workflow update ──────────────────────────────────────────────────────────────
 
 
-
-
 def _workflow_update_response(
     link: temporalio.api.common.v1.Link | None = None,
 ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse:
