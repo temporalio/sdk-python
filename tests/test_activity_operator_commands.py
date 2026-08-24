@@ -523,9 +523,6 @@ async def test_reset_preserves_heartbeat_by_default(
         await handle.pause(reason="hold")
         await _assert_eventually_paused(handle)
 
-        # Reset no longer clears heartbeat details by default (api#848, server
-        # temporal#11417); the flag must be set explicitly. keep_paused so that
-        # no new attempt starts and re-heartbeats behind our back.
         await handle.reset(keep_paused=True)
         # Give the server time to persist any state change, then confirm the
         # details survived it.
