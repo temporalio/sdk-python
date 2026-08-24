@@ -1,8 +1,9 @@
 """Unit tests for Nexus link propagation.
 
-These exercise link propagation when a Nexus operation handler signals or starts a
-workflow or activity against a mocked workflow service. End-to-end signal backlinks
-require a server with EnableCHASMSignalBacklinks enabled and are not covered here.
+These exercise link propagation when a Nexus operation handler signals a workflow or
+starts a workflow, workflow update, or activity against a mocked workflow service.
+End-to-end signal backlinks require a server with EnableCHASMSignalBacklinks enabled
+and are not covered here.
 """
 
 from __future__ import annotations
@@ -27,7 +28,9 @@ from nexusrpc.handler._decorators import operation_handler
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.nexus.v1
+import temporalio.api.update.v1
 import temporalio.api.workflowservice.v1
+import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus._link_conversion
@@ -38,6 +41,8 @@ from temporalio.client._interceptor import (
     SignalWorkflowInput,
     StartActivityInput,
     StartWorkflowInput,
+    StartWorkflowUpdateInput,
+    UpdateWithStartUpdateWorkflowInput,
 )
 from temporalio.nexus._operation_context import _TemporalStartOperationContext
 from temporalio.worker._nexus import _NexusTaskCancellation, _NexusWorker
@@ -88,7 +93,7 @@ def nexus_ctx() -> Generator[_TemporalStartOperationContext]:
         request_id="req-id",
         callback_url="https://callback.example",
         inbound_links=[inbound],
-        callback_headers={},
+        callback_headers={"callback-header": "value"},
         task_cancellation=_NexusTaskCancellation(),
     )
     ctx = temporalio.nexus._operation_context._TemporalStartOperationContext(
@@ -183,6 +188,33 @@ def _start_activity_input() -> StartActivityInput:
         headers={},
         rpc_metadata={},
         rpc_timeout=None,
+    )
+
+
+def _start_workflow_update_input() -> StartWorkflowUpdateInput:
+    return StartWorkflowUpdateInput(
+        id=WORKFLOW_ID,
+        run_id="target-run",
+        first_execution_run_id=None,
+        update_id="update-id",
+        update="test-update",
+        args=[],
+        wait_for_stage=temporalio.client.WorkflowUpdateStage.ACCEPTED,
+        headers={},
+        ret_type=None,
+        rpc_metadata={},
+        rpc_timeout=None,
+    )
+
+
+def _update_with_start_update_input() -> UpdateWithStartUpdateWorkflowInput:
+    return UpdateWithStartUpdateWorkflowInput(
+        update_id="update-id",
+        update="test-update",
+        args=[],
+        wait_for_stage=temporalio.client.WorkflowUpdateStage.ACCEPTED,
+        headers={},
+        ret_type=None,
     )
 
 
@@ -486,7 +518,105 @@ async def test_start_outside_nexus_context_leaves_on_conflict_options_unset() ->
     assert not sent.HasField("on_conflict_options")
 
 
-# ── activity start ──────────────────────────────────────────────────────────────────────────
+# ── workflow update ──────────────────────────────────────────────────────────────
+
+
+def _workflow_update_response(
+    link: temporalio.api.common.v1.Link | None = None,
+) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse:
+    response = temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse(
+        update_ref=temporalio.api.update.v1.UpdateRef(
+            workflow_execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=WORKFLOW_ID,
+                run_id="target-run",
+            ),
+            update_id="update-id",
+        ),
+        stage=temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED,
+    )
+    if link is not None:
+        response.link.CopyFrom(link)
+    return response
+
+
+async def test_backing_workflow_update_gets_nexus_request_fields_and_backlink(
+    nexus_ctx: _TemporalStartOperationContext,
+) -> None:
+    response_link = _workflow_event_link(
+        WORKFLOW_ID,
+        "target-run",
+        temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_UPDATE_ACCEPTED,
+    )
+    workflow_service = mock.MagicMock()
+    workflow_service.update_workflow_execution = mock.AsyncMock(
+        return_value=_workflow_update_response(response_link)
+    )
+    impl = _make_client_impl(workflow_service)
+
+    with temporalio.nexus._operation_context._nexus_backing_start_context():
+        handle = await impl.start_workflow_update(_start_workflow_update_input())
+
+    assert handle.id == "update-id"
+    assert handle.workflow_id == WORKFLOW_ID
+    assert handle.workflow_run_id == "target-run"
+
+    sent = workflow_service.update_workflow_execution.call_args.args[0]
+    assert sent.request.request_id == "req-id"
+    assert list(sent.request.links) == [_inbound_nexus_link()]
+    assert len(sent.request.completion_callbacks) == 1
+    callback = sent.request.completion_callbacks[0]
+    assert callback.nexus.url == "https://callback.example"
+    assert callback.nexus.header["callback-header"] == "value"
+    operation_token = temporalio.nexus._token.OperationToken.decode(
+        callback.nexus.header["nexus-operation-token"]
+    )
+    assert (
+        operation_token.type
+        is temporalio.nexus._token.OperationTokenType.UPDATE_WORKFLOW
+    )
+    assert operation_token.namespace == NAMESPACE
+    assert operation_token.workflow_id == WORKFLOW_ID
+    assert operation_token.update_id == "update-id"
+    assert operation_token.run_id == "target-run"
+    assert list(callback.links) == [_inbound_nexus_link()]
+
+    assert len(nexus_ctx.nexus_context.outbound_links) == 1
+    assert WORKFLOW_ID in _outbound_link_urls(nexus_ctx)[0]
+
+
+async def test_non_backing_workflow_update_does_not_get_nexus_request_fields(
+    nexus_ctx: _TemporalStartOperationContext,
+) -> None:
+    workflow_service = mock.MagicMock()
+    workflow_service.update_workflow_execution = mock.AsyncMock(
+        return_value=_workflow_update_response()
+    )
+    impl = _make_client_impl(workflow_service)
+
+    await impl.start_workflow_update(_start_workflow_update_input())
+
+    sent = workflow_service.update_workflow_execution.call_args.args[0]
+    assert not sent.request.request_id
+    assert len(sent.request.links) == 0
+    assert len(sent.request.completion_callbacks) == 0
+    assert nexus_ctx.nexus_context.outbound_links == []
+
+
+@pytest.mark.usefixtures("nexus_ctx")
+async def test_update_with_start_does_not_get_nexus_request_fields() -> None:
+    impl = _make_client_impl(mock.MagicMock())
+
+    with temporalio.nexus._operation_context._nexus_backing_start_context():
+        req = await impl._build_update_workflow_execution_request(
+            _update_with_start_update_input(), WORKFLOW_ID
+        )
+
+    assert not req.request.request_id
+    assert len(req.request.links) == 0
+    assert len(req.request.completion_callbacks) == 0
+
+
+# ── activity start ─────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.usefixtures("nexus_ctx")
