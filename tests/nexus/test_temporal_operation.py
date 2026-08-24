@@ -44,6 +44,9 @@ from tests.helpers.nexus import (
 # See https://github.com/temporalio/sdk-python/issues/1704.
 pytestmark = pytest.mark.requires_local_server
 
+# Query response links require a newer server than the shared test environment.
+_QUERY_LINK_DEV_SERVER_DOWNLOAD_VERSION = "v1.8.3-server-1.32.0-162.0"
+
 
 @dataclass
 class Input:
@@ -851,7 +854,14 @@ class QueryWorkflowCaller:
         return await client.execute_operation(TestService.query_op, input.value)
 
 
-async def test_temporal_operation_query_workflow(
+async def test_temporal_operation_query_workflow() -> None:
+    async with await WorkflowEnvironment.start_local(
+        dev_server_download_version=_QUERY_LINK_DEV_SERVER_DOWNLOAD_VERSION
+    ) as env:
+        await _assert_temporal_operation_query_workflow(env.client, env)
+
+
+async def _assert_temporal_operation_query_workflow(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     task_queue = str(uuid.uuid4())
@@ -890,8 +900,6 @@ async def test_temporal_operation_query_workflow(
             target_history = await target_handle.fetch_history()
             assert not any(event.links for event in target_history.events)
 
-            if not completed_event.links:
-                pytest.skip("server did not return a Workflow Query response link")
             assert target_handle.result_run_id is not None
             assert Link(
                 workflow=Link.Workflow(
