@@ -206,10 +206,12 @@ async def test_otel_workflow_signal_with_start_propagates_trace_headers(
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
+    exporter = InMemorySpanExporter()
     provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
     config = client.config()
-    config["plugins"] = [OpenTelemetryPlugin()]
+    config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
     client = Client(**config)
 
     async with new_worker(
@@ -226,6 +228,7 @@ async def test_otel_workflow_signal_with_start_propagates_trace_headers(
             )
             assert await caller.result() == target_id
         assert await client.get_workflow_handle(target_id).result() is True
+    assert any(span.name == "SignalWithStart" for span in exporter.get_finished_spans())
 
 
 @workflow.defn
