@@ -810,9 +810,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        # The server is expected to omit payload fields that were not requested, but
-        # older or buggy servers may return them anyway, which would make the
-        # description's has_* accessors disagree with what was asked for.
+        # Remove present but unrequested flags, in case the server sent them anyway.
         if not input.include_input:
             resp.ClearField("input")
         if not input.include_outcome:
