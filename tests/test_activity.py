@@ -225,7 +225,6 @@ class TestDescribe:
             assert await desc_failure.result(int) is None
             assert isinstance(await desc_failure.outcome_failure(), ApplicationError)
             assert await desc_failure.heartbeat_details([str]) is None
-            x = await desc_failure.last_failure()
             assert isinstance(await desc_failure.last_failure(), ApplicationError)
 
 

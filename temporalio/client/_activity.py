@@ -16,7 +16,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
-    cast,
 )
 
 from typing_extensions import Self
@@ -24,7 +23,6 @@ from typing_extensions import Self
 import temporalio.api.activity.v1
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
-import temporalio.api.failure.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
@@ -214,9 +212,12 @@ class ActivityExecution:
     @classmethod
     def _from_raw_info(
         cls,
-        info: temporalio.api.activity.v1.ActivityExecutionListInfo,
+        info: (
+            temporalio.api.activity.v1.ActivityExecutionListInfo
+            | temporalio.api.activity.v1.ActivityExecutionInfo
+        ),
         namespace: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> Self:
         """Create from raw proto activity list info."""
         return cls(
@@ -329,7 +330,7 @@ class ActivityExecutionDescription(ActivityExecution):
     Zero if the activity has not sent any heartbeats or if the server didn't report heartbeat count.
     """
 
-    raw_info: temporalio.api.activity.v1.ActivityExecutionInfo = field(repr=False)
+    raw_info: temporalio.api.activity.v1.ActivityExecutionInfo = field(repr=False)  # type: ignore[reportIncompatibleVariableOverride]
     """Underlying protobuf info."""
 
     raw_callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo] = field(repr=False)
@@ -352,7 +353,7 @@ class ActivityExecutionDescription(ActivityExecution):
         resp: temporalio.api.workflowservice.v1.DescribeActivityExecutionResponse,
         namespace: str,
         data_converter: temporalio.converter.DataConverter,
-        **kwargs,
+        **kwargs: Any,
     ) -> Self:
         """Create from raw proto activity execution info."""
         return cls._from_raw_info(
@@ -518,7 +519,7 @@ class ActivityExecutionDescription(ActivityExecution):
         Always false if `include_outcome` was false in the `describe` call.
         Type hints can be provided to aid data conversion.
         """
-        if not self.has_result():
+        if self.raw_outcome is None or not self.raw_outcome.HasField("result"):
             return None
         type_hints = [type_hint] if type_hint is not None else None
         results = await self.data_converter.decode_wrapper(
@@ -550,7 +551,7 @@ class ActivityExecutionDescription(ActivityExecution):
         """
         return (
             await self.data_converter.decode_failure(self.raw_outcome.failure)
-            if self.has_outcome_failure()
+            if self.raw_outcome is not None and self.raw_outcome.HasField("failure")
             else None
         )
 
