@@ -64,6 +64,8 @@ to include examples, links to docs, or any other relevant information.
   variable names a worker will read.
 - **Experimental**: `temporalio.contrib.openai_agents.AllowAllWorkerEnvVars` allowlists every
   environment variable name on the worker.
+- Added Nexus operation link propagation for Workflow Queries issued from operation handlers. The
+  queried Workflow link returned by the server is attached to the caller's Nexus operation event.
 
 ### Changed
 

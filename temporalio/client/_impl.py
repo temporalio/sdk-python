@@ -436,6 +436,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 raise WorkflowQueryFailedError(err.message)
             else:
                 raise
+        temporalio.nexus._operation_context._apply_query_workflow_response_to_nexus_context(
+            resp
+        )
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
                 WorkflowExecutionStatus(resp.query_rejected.status)

@@ -44,6 +44,9 @@ from tests.helpers.nexus import (
 # See https://github.com/temporalio/sdk-python/issues/1704.
 pytestmark = pytest.mark.requires_local_server
 
+# Query response links require a newer server than the shared test environment.
+_QUERY_LINK_DEV_SERVER_DOWNLOAD_VERSION = "v1.8.3-server-1.32.0-162.0"
+
 
 @dataclass
 class Input:
@@ -116,6 +119,7 @@ class TestService:
     sync_result: Operation[Input, str]
     custom_cancel: Operation[str, None]
     update_op: Operation[Input, str]
+    query_op: Operation[str, bool]
     echo_activity: Operation[Input, str]
     error_activity: Operation[Input, None]
     blocking_activity: Operation[str, None]
@@ -291,6 +295,17 @@ class TestServiceHandler:
             input.update_value,
             update_id=input.update_id,
         )
+
+    @nexus.temporal_operation
+    async def query_op(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: str,
+    ) -> nexus.TemporalOperationResult[bool]:
+        handle = client.client.get_workflow_handle(input)
+        result = await handle.query(BlockingWorkflow.query_done)
+        return nexus.TemporalOperationResult.sync(result)
 
     @nexus.temporal_operation
     async def echo_activity(
@@ -823,6 +838,79 @@ class BlockingWorkflow:
     @workflow.update
     async def unblock(self):
         self.done = True
+
+    @workflow.query
+    def query_done(self) -> bool:
+        return self.done
+
+
+@workflow.defn
+class QueryWorkflowCaller:
+    @workflow.run
+    async def run(self, input: Input) -> bool:
+        client = workflow.create_nexus_client(
+            service=TestService, endpoint=make_nexus_endpoint_name(input.task_queue)
+        )
+        return await client.execute_operation(TestService.query_op, input.value)
+
+
+async def test_temporal_operation_query_workflow() -> None:
+    async with await WorkflowEnvironment.start_local(
+        dev_server_download_version=_QUERY_LINK_DEV_SERVER_DOWNLOAD_VERSION
+    ) as env:
+        await _assert_temporal_operation_query_workflow(env.client, env)
+
+
+async def _assert_temporal_operation_query_workflow(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    target_workflow_id = f"query-target-{uuid.uuid4()}"
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[BlockingWorkflow, QueryWorkflowCaller],
+    ):
+        target_handle = await client.start_workflow(
+            BlockingWorkflow.run,
+            id=target_workflow_id,
+            task_queue=task_queue,
+        )
+        caller_handle = await client.start_workflow(
+            QueryWorkflowCaller.run,
+            Input(value=target_workflow_id, task_queue=task_queue),
+            id=f"query-caller-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        try:
+            assert not await caller_handle.result()
+
+            caller_history = await caller_handle.fetch_history()
+            completed_event = next(
+                event
+                for event in caller_history.events
+                if event.event_type == EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED
+            )
+
+            target_history = await target_handle.fetch_history()
+            assert not any(event.links for event in target_history.events)
+
+            assert target_handle.result_run_id is not None
+            assert Link(
+                workflow=Link.Workflow(
+                    namespace=client.namespace,
+                    workflow_id=target_workflow_id,
+                    run_id=target_handle.result_run_id,
+                    reason="Query processed",
+                )
+            ) in list(completed_event.links)
+        finally:
+            await target_handle.cancel()
 
 
 @workflow.defn
