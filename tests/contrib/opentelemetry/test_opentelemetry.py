@@ -291,7 +291,10 @@ async def test_legacy_otel_workflow_signal_with_start_propagates_trace_headers(
             )
             assert await caller.result() == target_id
         assert await client.get_workflow_handle(target_id).result() is True
-    assert any(span.name == "SignalWithStart" for span in exporter.get_finished_spans())
+    assert any(
+        span.name == "SignalWithStartWorkflow"
+        for span in exporter.get_finished_spans()
+    )
 
 
 async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):

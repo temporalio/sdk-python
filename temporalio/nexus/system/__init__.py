@@ -27,7 +27,7 @@ TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
 def _system_nexus_operation_span_name(service: str, operation: str) -> str:
     match operation:
         case "SignalWithStartWorkflowExecution":
-            return "SignalWithStart"
+            return "SignalWithStartWorkflow"
         case _:
             return f"StartSystemNexusOperation:{service}/{operation}"
 
