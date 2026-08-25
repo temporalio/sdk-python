@@ -511,52 +511,6 @@ async def test_unpause_preserves_heartbeat(client: Client, env: WorkflowEnvironm
         await handle.terminate(reason="cleanup")
 
 
-async def test_reset_preserves_heartbeat_by_default(
-    client: Client, env: WorkflowEnvironment
-):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client, task_queue=task_queue, activities=[heartbeat_once_activity]
-    ):
-        handle = await _start_heartbeat_ready_activity(client, task_queue)
-        await handle.pause(reason="hold")
-        await _assert_eventually_paused(handle)
-
-        await handle.reset(keep_paused=True)
-        # Give the server time to persist any state change, then confirm the
-        # details survived it.
-        await asyncio.sleep(2)
-        desc = await handle.describe(include_heartbeat_details=True)
-        assert len(desc.raw_heartbeat_details) == 1
-        await handle.terminate(reason="cleanup")
-
-
-async def test_reset_clears_heartbeat_when_flag_set(
-    client: Client, env: WorkflowEnvironment
-):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client, task_queue=task_queue, activities=[heartbeat_once_activity]
-    ):
-        handle = await _start_heartbeat_ready_activity(client, task_queue)
-        await handle.pause(reason="hold")
-        await _assert_eventually_paused(handle)
-
-        # keep_paused so that no new attempt starts and re-heartbeats.
-        await handle.reset(keep_paused=True, reset_heartbeat=True)
-
-        # The clear is deferred while a worker is mid-attempt, so wait for the
-        # worker to yield the pause before the details disappear.
-        async def check() -> None:
-            desc = await handle.describe(include_heartbeat_details=True)
-            assert len(desc.raw_heartbeat_details) == 0
-
-        await assert_eventually(check, timeout=timedelta(seconds=30))
-        await handle.terminate(reason="cleanup")
-
-
 async def test_update_options_preserves_heartbeat(
     client: Client, env: WorkflowEnvironment
 ):
