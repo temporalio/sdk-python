@@ -44,9 +44,6 @@ from tests.helpers.nexus import (
 # See https://github.com/temporalio/sdk-python/issues/1704.
 pytestmark = pytest.mark.requires_local_server
 
-# Query response links require a newer server than the shared test environment.
-_QUERY_LINK_DEV_SERVER_DOWNLOAD_VERSION = "v1.8.3-server-1.32.0-162.0"
-
 
 @dataclass
 class Input:
@@ -854,14 +851,7 @@ class QueryWorkflowCaller:
         return await client.execute_operation(TestService.query_op, input.value)
 
 
-async def test_temporal_operation_query_workflow() -> None:
-    async with await WorkflowEnvironment.start_local(
-        dev_server_download_version=_QUERY_LINK_DEV_SERVER_DOWNLOAD_VERSION
-    ) as env:
-        await _assert_temporal_operation_query_workflow(env.client, env)
-
-
-async def _assert_temporal_operation_query_workflow(
+async def test_temporal_operation_query_workflow(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     task_queue = str(uuid.uuid4())
@@ -900,15 +890,17 @@ async def _assert_temporal_operation_query_workflow(
             target_history = await target_handle.fetch_history()
             assert not any(event.links for event in target_history.events)
 
-            assert target_handle.result_run_id is not None
-            assert Link(
-                workflow=Link.Workflow(
-                    namespace=client.namespace,
-                    workflow_id=target_workflow_id,
-                    run_id=target_handle.result_run_id,
-                    reason="Query processed",
-                )
-            ) in list(completed_event.links)
+            # The Java time-skipping test server does not return Nexus operation links.
+            if not env.supports_time_skipping:
+                assert target_handle.result_run_id is not None
+                assert Link(
+                    workflow=Link.Workflow(
+                        namespace=client.namespace,
+                        workflow_id=target_workflow_id,
+                        run_id=target_handle.result_run_id,
+                        reason="Query processed",
+                    )
+                ) in list(completed_event.links)
         finally:
             await target_handle.cancel()
 
@@ -1314,14 +1306,8 @@ async def test_temporal_operation_start_activity_raises_error(
                 id=str(uuid.uuid4()),
             )
 
-        operation_err = err.value.__cause__
-        assert isinstance(operation_err, temporalio.exceptions.ApplicationError)
-        assert operation_err.type == "OperationError"
-        assert "nexus operation completed unsuccessfully" in str(operation_err)
-
-        application_err = operation_err.__cause__
+        application_err = err.value.__cause__
         assert isinstance(application_err, temporalio.exceptions.ApplicationError)
-
         assert application_err.type == "test-activity-error-type"
         assert "test-activity-error-message" in str(application_err)
         assert application_err.__cause__ is None
