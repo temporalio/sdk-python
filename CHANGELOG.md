@@ -175,6 +175,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Continue-as-new requests from workflow update handlers now fail the workflow
+  task instead of leaving the update unresolved.
 - Marked system Nexus envelope payloads so nested payloads can be detected and
   visited after the envelope is already stored as a payload.
 
