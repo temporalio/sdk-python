@@ -393,8 +393,6 @@ async def test_reset_restores_original_options(
 
         await handle.reset(restore_original_options=True)
 
-        # restore_original_options reverts the changed option to the value the
-        # activity was created with.
         async def check() -> None:
             desc = await handle.describe()
             assert desc.start_to_close_timeout == timedelta(seconds=45)
