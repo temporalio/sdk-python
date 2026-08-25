@@ -154,8 +154,6 @@ async def test_update_options_requires_at_least_one_update(client: Client):
 
 
 async def test_restore_original_cannot_be_combined_with_updates(client: Client):
-    # Not reachable through the handle methods, but an interceptor can build this input
-    # and the server would reject it. Silently dropping the updates would be worse.
     from temporalio.client import UpdateActivityOptionsInput
 
     with pytest.raises(ValueError) as err:
