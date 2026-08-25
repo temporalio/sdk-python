@@ -1,8 +1,4 @@
 """Unit tests for the opt-in describe payload fields (api#792).
-
-Two things that a live server cannot demonstrate on its own: that the flags the caller
-set actually reach the request, and that payloads a server returns without being asked
-are dropped client-side so the has_* accessors always agree with the request.
 """
 
 from __future__ import annotations
@@ -30,7 +26,7 @@ def _payloads() -> temporalio.api.common.v1.Payloads:
     )
 
 
-def _over_sharing_response() -> (
+def _unrequested_fields_response() -> (
     temporalio.api.workflowservice.v1.DescribeActivityExecutionResponse
 ):
     """A response carrying every payload field, as an older or buggy server might send."""
@@ -52,7 +48,7 @@ class _CapturedDescribe:
 
         async def record(req: Any, **_kwargs: Any) -> Any:
             self.request = req
-            return _over_sharing_response()
+            return _unrequested_fields_response()
 
         self.describe_activity_execution = AsyncMock(side_effect=record)
 
