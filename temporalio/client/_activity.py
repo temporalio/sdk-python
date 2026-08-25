@@ -1275,8 +1275,6 @@ class ActivityHandle(Generic[ReturnType]):
         Raises:
             ValueError: If ``updates`` is empty.
         """
-        # An update naming nothing would send an empty field mask and silently change
-        # nothing. Fail here rather than making a round trip that looks like it worked.
         if not updates:
             raise ValueError(
                 "update_options requires at least one update; use "

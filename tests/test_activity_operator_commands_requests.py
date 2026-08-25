@@ -147,8 +147,6 @@ async def test_restore_original_options_is_exclusive(
 
 
 async def test_update_options_requires_at_least_one_update(client: Client):
-    # An empty update would send an empty mask and silently change nothing, so it is
-    # rejected before the round trip.
     handle = client.get_activity_handle("act-1")
     with pytest.raises(ValueError) as err:
         await handle.update_options([])
