@@ -480,7 +480,6 @@ class InitializeWorkflow(google.protobuf.message.Message):
     START_TIME_FIELD_NUMBER: builtins.int
     ROOT_WORKFLOW_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
-    ORIGINATING_EVENT_ID_FIELD_NUMBER: builtins.int
     ORIGINAL_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
@@ -584,8 +583,6 @@ class InitializeWorkflow(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority of this workflow execution"""
-    originating_event_id: builtins.int
-    """Event ID of the `WORKFLOW_EXECUTION_STARTED` history event that triggered this job."""
     original_execution_run_id: builtins.str
     """The run id recorded on the `WORKFLOW_EXECUTION_STARTED` event. Unlike the execution's current
     run id, this value is preserved across workflow resets. Mirrors the `original_execution_run_id`
@@ -631,7 +628,6 @@ class InitializeWorkflow(google.protobuf.message.Message):
         root_workflow: temporalio.api.common.v1.message_pb2.WorkflowExecution
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
-        originating_event_id: builtins.int = ...,
         original_execution_run_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
@@ -696,8 +692,6 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"memo",
             "original_execution_run_id",
             b"original_execution_run_id",
-            "originating_event_id",
-            b"originating_event_id",
             "parent_workflow_info",
             b"parent_workflow_info",
             "priority",

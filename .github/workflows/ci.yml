@@ -238,6 +238,7 @@ jobs:
       - run: uv add --dev --python 3.10 "googleapis-common-protos==1.70.0"
       - run: uv add --python 3.10 "protobuf<4"
       - run: uv sync --all-extras
+      - run: cargo install --locked nexgen --version 0.2.2 --features advanced --force
       - run: poe build-develop
       - run: poe gen-protos
       - name: Check generation unchanged

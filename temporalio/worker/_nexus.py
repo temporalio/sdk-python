@@ -31,6 +31,7 @@ import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus
+import temporalio.nexus.system
 from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge._visitor_functions import PayloadSequence, VisitorFunctions
 from temporalio.bridge.worker import PollShutdownError
@@ -428,7 +429,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             _worker_shutdown_event=self._worker_shutdown_event,
         ).set()
         input = LazyValue(
-            serializer=_DummyPayloadSerializer(
+            serializer=_NexusPayloadSerializer(
                 data_converter=self._data_converter,
                 payload=start_request.payload,
             ),
@@ -527,7 +528,7 @@ def _is_payload_validation_error(err: BaseException) -> TypeGuard[ApplicationErr
 
 
 @dataclass
-class _DummyPayloadSerializer:
+class _NexusPayloadSerializer:
     data_converter: temporalio.converter.DataConverter
     payload: temporalio.api.common.v1.Payload
 
@@ -577,7 +578,13 @@ class _DummyPayloadSerializer:
             ) from err
 
         try:
-            [input] = dc.payload_converter.from_payloads(
+            payload_converter = dc.payload_converter
+            if temporalio.nexus.system._is_system_payload(payload):
+                payload_converter = temporalio.nexus.system._get_payload_converter(
+                    dc.payload_converter,
+                    dc.failure_converter,
+                )
+            [input] = payload_converter.from_payloads(
                 [payload],
                 type_hints=[as_type] if as_type else None,
             )

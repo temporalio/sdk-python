@@ -1102,8 +1102,19 @@ class CancelWorkflowExecution(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    DETAILS_FIELD_NUMBER: builtins.int
+    @property
+    def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     def __init__(
         self,
+        *,
+        details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["details", b"details"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["details", b"details"]
     ) -> None: ...
 
 global___CancelWorkflowExecution = CancelWorkflowExecution

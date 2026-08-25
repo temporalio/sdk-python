@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, IntEnum
@@ -13,6 +13,7 @@ import pytest
 
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
+import temporalio.worker
 from temporalio import activity, workflow
 from temporalio.client import (
     Client,
@@ -26,9 +27,11 @@ from temporalio.client import (
     WorkflowUpdateStage,
 )
 from temporalio.common import (
+    HeaderCodecBehavior,
     WorkflowIDConflictPolicy,
     WorkflowIDReusePolicy,
 )
+from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
@@ -471,6 +474,70 @@ class SimpleClientOutboundInterceptor(OutboundInterceptor):
         return await super().start_update_with_start_workflow(input)
 
 
+class HeaderSharingCodec(PayloadCodec):
+    def __init__(self) -> None:
+        self.already_encoded_payloads = 0
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        for payload in payloads:
+            if payload.metadata.get("header-sharing-codec") == b"true":
+                self.already_encoded_payloads += 1
+        return [
+            temporalio.api.common.v1.Payload(
+                metadata={"header-sharing-codec": b"true"},
+                data=payload.SerializeToString(),
+            )
+            for payload in payloads
+        ]
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        decoded_payloads = []
+        for payload in payloads:
+            if payload.metadata.get("header-sharing-codec") != b"true":
+                decoded_payloads.append(payload)
+                continue
+            decoded = temporalio.api.common.v1.Payload()
+            decoded.ParseFromString(payload.data)
+            decoded_payloads.append(decoded)
+        return decoded_payloads
+
+
+class HeaderSharingInterceptor(Interceptor):
+    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
+        return HeaderSharingOutboundInterceptor(super().intercept_client(next))
+
+
+class HeaderSharingOutboundInterceptor(OutboundInterceptor):
+    async def start_update_with_start_workflow(
+        self, input: StartWorkflowUpdateWithStartInput
+    ) -> WorkflowUpdateHandle[Any]:
+        header = temporalio.api.common.v1.Payload(data=b"test-header")
+        input.start_workflow_input.headers = {"test-header": header}
+        input.update_workflow_input.headers = {"test-header": header}
+        return await super().start_update_with_start_workflow(input)
+
+
+class HeaderSharingWorkerInterceptor(temporalio.worker.Interceptor):
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> type[temporalio.worker.WorkflowInboundInterceptor] | None:
+        return HeaderSharingWorkflowInboundInterceptor
+
+
+class HeaderSharingWorkflowInboundInterceptor(
+    temporalio.worker.WorkflowInboundInterceptor
+):
+    async def handle_update_handler(
+        self, input: temporalio.worker.HandleUpdateInput
+    ) -> Any:
+        assert input.headers["test-header"].data == b"test-header"
+        return await super().handle_update_handler(input)
+
+
 @workflow.defn
 class UpdateWithStartInterceptorWorkflow:
     def __init__(self) -> None:
@@ -516,6 +583,44 @@ async def test_update_with_start_client_outbound_interceptor(
 
         wf_handle = await start_op.workflow_handle()
         assert await wf_handle.result() == "intercepted-workflow-arg"
+
+
+# Verify fix for https://github.com/temporalio/sdk-python/issues/1769
+async def test_update_with_start_does_not_encode_shared_interceptor_header_twice(
+    client: Client,
+    env: WorkflowEnvironment,
+):
+    if env.supports_time_skipping:
+        pytest.skip("TODO: make update_with_start_tests pass under Java test server")
+    codec = HeaderSharingCodec()
+    intercepted_client = Client(
+        **{
+            **client.config(),
+            "data_converter": DataConverter(payload_codec=codec),
+            "header_codec_behavior": HeaderCodecBehavior.CODEC,
+            "interceptors": [HeaderSharingInterceptor()],
+        }  # type: ignore
+    )
+    async with new_worker(
+        intercepted_client,
+        UpdateWithStartInterceptorWorkflow,
+        interceptors=[HeaderSharingWorkerInterceptor()],
+    ) as worker:
+        start_workflow_operation = WithStartWorkflowOperation(
+            UpdateWithStartInterceptorWorkflow.run,
+            "wf-arg",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
+        update_result = await intercepted_client.execute_update_with_start_workflow(
+            UpdateWithStartInterceptorWorkflow.my_update,
+            "update-arg",
+            start_workflow_operation=start_workflow_operation,
+        )
+
+    assert update_result == "update-arg"
+    assert codec.already_encoded_payloads == 0
 
 
 def test_with_start_workflow_operation_requires_conflict_policy():
