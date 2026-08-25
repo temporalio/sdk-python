@@ -1285,7 +1285,6 @@ class WorkflowServiceServicer(object):
 
     def DescribeDeployment(self, request, context):
         """Describes a worker deployment.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1293,9 +1292,7 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def DescribeWorkerDeploymentVersion(self, request, context):
-        """Describes a worker deployment version.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Describes a worker deployment version."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1303,7 +1300,6 @@ class WorkflowServiceServicer(object):
     def ListDeployments(self, request, context):
         """Lists worker deployments in the namespace. Optionally can filter based on deployment series
         name.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `ListWorkerDeployments`.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1317,7 +1313,6 @@ class WorkflowServiceServicer(object):
         Calculating reachability is relatively expensive. Therefore, server might return a recently
         cached value. In such a case, the `last_update_time` will inform you about the actual
         reachability calculation time.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1326,7 +1321,6 @@ class WorkflowServiceServicer(object):
 
     def GetCurrentDeployment(self, request, context):
         """Returns the current deployment (and its info) for a given deployment series.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1336,7 +1330,6 @@ class WorkflowServiceServicer(object):
     def SetCurrentDeployment(self, request, context):
         """Sets a deployment as the current deployment for its deployment series. Can optionally update
         the metadata of the deployment as well.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1346,16 +1339,13 @@ class WorkflowServiceServicer(object):
     def SetWorkerDeploymentCurrentVersion(self, request, context):
         """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
         Version if it is the Version being set as Current.
-        Experimental. This API might significantly change or be removed in a future release.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
     def DescribeWorkerDeployment(self, request, context):
-        """Describes a Worker Deployment.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Describes a Worker Deployment."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1363,7 +1353,6 @@ class WorkflowServiceServicer(object):
     def DeleteWorkerDeployment(self, request, context):
         """Deletes records of (an old) Deployment. A deployment can only be deleted if
         it has no Version in it.
-        Experimental. This API might significantly change or be removed in a future release.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1376,7 +1365,6 @@ class WorkflowServiceServicer(object):
         - It has no active pollers (none of the task queues in the Version have pollers)
         - It is not draining (see WorkerDeploymentVersionInfo.drainage_info). This condition
         can be skipped by passing `skip-drainage=true`.
-        Experimental. This API might significantly change or be removed in a future release.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1385,16 +1373,13 @@ class WorkflowServiceServicer(object):
     def SetWorkerDeploymentRampingVersion(self, request, context):
         """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
         gradual ramp to unversioned workers too.
-        Experimental. This API might significantly change or be removed in a future release.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
     def ListWorkerDeployments(self, request, context):
-        """Lists all Worker Deployments that are tracked in the Namespace.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Lists all Worker Deployments that are tracked in the Namespace."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1436,9 +1421,7 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def UpdateWorkerDeploymentVersionMetadata(self, request, context):
-        """Updates the user-given metadata attached to a Worker Deployment Version.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Updates the user-given metadata attached to a Worker Deployment Version."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
