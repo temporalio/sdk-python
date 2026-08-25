@@ -1,5 +1,4 @@
-"""Unit tests for the opt-in describe payload fields (api#792).
-"""
+"""Unit tests for the opt-in describe payload fields."""
 
 from __future__ import annotations
 
@@ -16,11 +15,11 @@ from temporalio.client import Client
 from temporalio.service import ServiceClient
 
 
-def _payloads() -> temporalio.api.common.v1.Payloads:
+def _payloads(value: str) -> temporalio.api.common.v1.Payloads:
     return temporalio.api.common.v1.Payloads(
         payloads=[
             temporalio.api.common.v1.Payload(
-                metadata={"encoding": b"json/plain"}, data=b'"x"'
+                metadata={"encoding": b"json/plain"}, data=f'"{value}"'.encode()
             )
         ]
     )
@@ -34,11 +33,13 @@ def _unrequested_fields_response() -> (
         info=temporalio.api.activity.v1.ActivityExecutionInfo(
             activity_id="act-1",
             activity_type=temporalio.api.common.v1.ActivityType(name="my-activity"),
-            heartbeat_details=_payloads(),
+            heartbeat_details=_payloads("hb"),
             last_failure=temporalio.api.failure.v1.Failure(message="last-boom"),
         ),
-        input=_payloads(),
-        outcome=temporalio.api.activity.v1.ActivityExecutionOutcome(result=_payloads()),
+        input=_payloads("in"),
+        outcome=temporalio.api.activity.v1.ActivityExecutionOutcome(
+            result=_payloads("out")
+        ),
     )
 
 
@@ -67,16 +68,19 @@ def client(captured: _CapturedDescribe) -> Client:
 
 
 async def test_description_exposes_the_whole_response(client: Client):
-    # raw_description is the entire describe response, matching WorkflowExecutionDescription
-    # and ScheduleDescription. It is the only raw accessor: the undecoded input and the
-    # outcome are reached through it rather than duplicated as separate fields.
     desc = await client.get_activity_handle("act-1").describe(
         include_input=True, include_outcome=True
     )
 
     assert desc.raw_description.info.activity_id == "act-1"
-    assert len(desc.raw_description.input.payloads) == len(desc.input)
-    assert desc.raw_description.outcome.HasField("result") == desc.has_result
+
+    assert desc.input == ["in"]
+    assert [p.data for p in desc.raw_description.input.payloads] == [b'"in"']
+
+    assert desc.has_result
+    assert desc.result == "out"
+    assert desc.raw_description.outcome.HasField("result")
+    assert [p.data for p in desc.raw_description.outcome.result.payloads] == [b'"out"']
 
 
 async def test_describe_defaults_ask_for_nothing(
@@ -137,9 +141,9 @@ async def test_requested_payloads_are_kept(client: Client):
     )
 
     assert desc.raw_description.input.payloads
-    assert desc.input == ["x"]
+    assert desc.input == ["in"]
     assert desc.has_result
-    assert desc.result == "x"
+    assert desc.result == "out"
     assert len(desc.raw_heartbeat_details) == 1
     assert desc.last_failure is not None
 
