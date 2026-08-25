@@ -15,6 +15,7 @@ from typing import Any
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.exceptions
 from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.converter import BinaryProtoPayloadConverter, CompositePayloadConverter
 from temporalio.converter._payload_converter import (
@@ -154,7 +155,14 @@ async def maybe_visit_payload(
 
     payload_visitor = PayloadVisitor(skip_search_attributes=skip_search_attributes)
     checkpoint = visitor_functions.checkpoint()
-    await payload_visitor.visit(visitor_functions, value)
+    try:
+        await payload_visitor.visit(visitor_functions, value)
+    except ValueError as err:
+        if not str(err).startswith("Unknown root message type: "):
+            raise
+        raise temporalio.exceptions.ApplicationError(
+            f"Unknown Temporal system payload: {value.DESCRIPTOR.full_name}"
+        ) from err
     if checkpoint is not None:
         await visitor_functions.drain_since(checkpoint)
     return payload_converter.to_payload(value)
