@@ -395,15 +395,11 @@ class ActivityExecutionDescription(ActivityExecution):
                 decoded_heartbeat_details
             )
 
-        # Protobuf reads an unset submessage as an empty one rather than None, so an
-        # absent input is already an empty payload list and needs no presence check.
         input_payloads: Sequence[temporalio.api.common.v1.Payload] = resp.input.payloads
         decoded_input: Sequence[Any] = (
             await data_converter.decode(input_payloads) if input_payloads else []
         )
 
-        # An absent outcome carries neither arm of its oneof, so testing the arms is
-        # enough on its own.
         outcome = resp.outcome
         decoded_result: Any = None
         decoded_failure: BaseException | None = None
