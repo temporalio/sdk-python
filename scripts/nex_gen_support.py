@@ -167,6 +167,21 @@ def memo_to_proto(
     return message
 
 
+def header_from_proto(
+    proto: common_pb2.Header,
+) -> collections.abc.Mapping[str, object]:
+    return {key: _payload_to_value(value) for key, value in proto.fields.items()}
+
+
+def header_to_proto(
+    header: collections.abc.Mapping[str, object],
+) -> common_pb2.Header:
+    message = common_pb2.Header()
+    for key, value in header.items():
+        message.fields[key].CopyFrom(_value_to_payload(value))
+    return message
+
+
 def duration_from_proto(proto: google.protobuf.duration_pb2.Duration) -> timedelta:
     return proto.ToTimedelta()
 

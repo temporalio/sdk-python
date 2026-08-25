@@ -556,9 +556,9 @@ class _ResourceExhaustedScopeEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESOURCE_EXHAUSTED_SCOPE_UNSPECIFIED: _ResourceExhaustedScope.ValueType  # 0
     RESOURCE_EXHAUSTED_SCOPE_NAMESPACE: _ResourceExhaustedScope.ValueType  # 1
-    """Exhausted resource is a system-level resource."""
-    RESOURCE_EXHAUSTED_SCOPE_SYSTEM: _ResourceExhaustedScope.ValueType  # 2
     """Exhausted resource is a namespace-level resource."""
+    RESOURCE_EXHAUSTED_SCOPE_SYSTEM: _ResourceExhaustedScope.ValueType  # 2
+    """Exhausted resource is a system-level resource."""
 
 class ResourceExhaustedScope(
     _ResourceExhaustedScope, metaclass=_ResourceExhaustedScopeEnumTypeWrapper
@@ -566,7 +566,7 @@ class ResourceExhaustedScope(
 
 RESOURCE_EXHAUSTED_SCOPE_UNSPECIFIED: ResourceExhaustedScope.ValueType  # 0
 RESOURCE_EXHAUSTED_SCOPE_NAMESPACE: ResourceExhaustedScope.ValueType  # 1
-"""Exhausted resource is a system-level resource."""
-RESOURCE_EXHAUSTED_SCOPE_SYSTEM: ResourceExhaustedScope.ValueType  # 2
 """Exhausted resource is a namespace-level resource."""
+RESOURCE_EXHAUSTED_SCOPE_SYSTEM: ResourceExhaustedScope.ValueType  # 2
+"""Exhausted resource is a system-level resource."""
 global___ResourceExhaustedScope = ResourceExhaustedScope

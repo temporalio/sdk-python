@@ -5,21 +5,88 @@ isort:skip_file
 
 import builtins
 import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.failure.v1.message_pb2
 
-if sys.version_info >= (3, 8):
+if sys.version_info >= (3, 10):
     import typing as typing_extensions
 else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+
+class _ActivityTaskFailedCause:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _ActivityTaskFailedCauseEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _ActivityTaskFailedCause.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    ACTIVITY_TASK_FAILED_CAUSE_UNSPECIFIED: _ActivityTaskFailedCause.ValueType  # 0
+    ACTIVITY_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: (
+        _ActivityTaskFailedCause.ValueType
+    )  # 1
+    """A payload-bearing field on a request the worker sent for this activity task exceeded the
+    per-field size limit configured on the server for the namespace.
+    Check the activity task failure message for more information.
+    """
+    ACTIVITY_TASK_FAILED_CAUSE_EXTERNAL_STORAGE_FAILURE: (
+        _ActivityTaskFailedCause.ValueType
+    )  # 2
+    """The worker failed to offload a payload to, or retrieve one from, external storage while
+    processing this activity task.
+    Check the activity task failure message for more information.
+    """
+    ACTIVITY_TASK_FAILED_CAUSE_ACTIVITY_WORKER_UNHANDLED_FAILURE: (
+        _ActivityTaskFailedCause.ValueType
+    )  # 3
+    """The default cause for an activity task failure reported by a worker; a more specific cause
+    takes precedence whenever the condition is recognized.
+    Check the activity task failure message for more information.
+    """
+
+class ActivityTaskFailedCause(
+    _ActivityTaskFailedCause, metaclass=_ActivityTaskFailedCauseEnumTypeWrapper
+):
+    """
+    A well-known condition that caused an activity task to fail. Lang reports one alongside the
+    failure so core can categorize activity failures instead of treating them all alike; it becomes
+    the `failure_reason` metric label, so the set of values is deliberately small and bounded.
+    """
+
+ACTIVITY_TASK_FAILED_CAUSE_UNSPECIFIED: ActivityTaskFailedCause.ValueType  # 0
+ACTIVITY_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: ActivityTaskFailedCause.ValueType  # 1
+"""A payload-bearing field on a request the worker sent for this activity task exceeded the
+per-field size limit configured on the server for the namespace.
+Check the activity task failure message for more information.
+"""
+ACTIVITY_TASK_FAILED_CAUSE_EXTERNAL_STORAGE_FAILURE: (
+    ActivityTaskFailedCause.ValueType
+)  # 2
+"""The worker failed to offload a payload to, or retrieve one from, external storage while
+processing this activity task.
+Check the activity task failure message for more information.
+"""
+ACTIVITY_TASK_FAILED_CAUSE_ACTIVITY_WORKER_UNHANDLED_FAILURE: (
+    ActivityTaskFailedCause.ValueType
+)  # 3
+"""The default cause for an activity task failure reported by a worker; a more specific cause
+takes precedence whenever the condition is recognized.
+Check the activity task failure message for more information.
+"""
+global___ActivityTaskFailedCause = ActivityTaskFailedCause
 
 class ActivityExecutionResult(google.protobuf.message.Message):
     """Used to report activity completions to core"""
@@ -180,18 +247,25 @@ class Failure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FAILURE_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
+    cause: global___ActivityTaskFailedCause.ValueType
+    """Only meaningful on ActivityExecutionResult (lang -> core); ignored on ActivityResolution,
+    which reuses this message.
+    """
     def __init__(
         self,
         *,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        cause: global___ActivityTaskFailedCause.ValueType = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self,
+        field_name: typing_extensions.Literal["cause", b"cause", "failure", b"failure"],
     ) -> None: ...
 
 global___Failure = Failure

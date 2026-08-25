@@ -347,6 +347,7 @@ async def test_nexus_payload_serializer_decodes_system_input() -> None:
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
+        headers={"test-header": "header-value"},
     )
     payload = nexus_system._get_payload_converter(
         data_converter.payload_converter,
