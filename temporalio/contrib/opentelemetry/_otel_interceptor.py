@@ -611,6 +611,6 @@ class _TracingWorkflowOutboundInterceptor(
             ),
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
-            if hasattr(input.input, "headers"):
-                input.input.headers = _context_to_headers(input.input.headers or {})
+            if temporalio.nexus.system._has_payload_headers(input.input):
+                input.input.headers = _context_to_headers(input.input.headers)
             return await super().start_system_nexus_operation(input)

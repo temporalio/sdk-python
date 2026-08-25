@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, get_args, get_origin, get_type_hints
 
 import temporalio.api.common.v1
 import temporalio.common
@@ -22,6 +22,25 @@ from temporalio.converter._payload_converter import (
 )
 
 TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
+
+
+def _has_payload_headers(value: Any) -> bool:
+    headers = getattr(value, "headers", None)
+    if not isinstance(headers, Mapping):
+        return False
+    header_type = get_type_hints(type(value)).get("headers")
+    for possible_type in get_args(header_type) or (header_type,):
+        if get_origin(possible_type) is Mapping:
+            key_type, value_type = get_args(possible_type)
+            if key_type is str and (
+                value_type is Any
+                or (
+                    isinstance(value_type, type)
+                    and issubclass(temporalio.api.common.v1.Payload, value_type)
+                )
+            ):
+                return True
+    return False
 
 
 def _system_nexus_operation_span_name(service: str, operation: str) -> str:

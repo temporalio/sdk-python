@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from typing import Any, cast
 
@@ -147,6 +147,7 @@ def test_signal_with_start_serialization_context() -> None:
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
+        headers={},
     )
     operation_info = workflow_service.__nexus_operation_registry__[
         (
@@ -164,6 +165,23 @@ def test_signal_with_start_serialization_context() -> None:
     assert isinstance(context, WorkflowSerializationContext)
     assert context.namespace == "target-namespace"
     assert context.workflow_id == "target-workflow-id"
+
+
+def test_system_nexus_payload_header_detection() -> None:
+    class NexusInput:
+        headers: Mapping[str, str] = {}
+
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="test-workflow",
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+        headers={},
+    )
+
+    assert nexus_system._has_payload_headers(request)
+    assert not nexus_system._has_payload_headers(NexusInput())
 
 
 class RejectOuterSystemNexusCodec(PayloadCodec):
