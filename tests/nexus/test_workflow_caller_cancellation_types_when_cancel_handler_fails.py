@@ -66,9 +66,9 @@ class HandlerWorkflow:
             # For WAIT_REQUESTED, we want to prove that the future can be unblocked before the
             # handler workflow completes.
             await self.caller_op_future_resolved.wait()
-        elif (
-            test_context.cancellation_type
-            == workflow.NexusOperationCancellationType.WAIT_COMPLETED
+        elif test_context.cancellation_type in (
+            workflow.NexusOperationCancellationType.TRY_CANCEL,
+            workflow.NexusOperationCancellationType.WAIT_COMPLETED,
         ):
             await self.release_completion.wait()
 
@@ -319,13 +319,15 @@ async def check_behavior_for_try_cancel(
     caller_wf: WorkflowHandle[Any, CancellationResult],
     handler_wf: WorkflowHandle[Any, None],
 ) -> None:
-    await handler_wf.result()
+    await test_context.cancel_handler_released
 
     cancel_request_failed = EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED
     async for event in caller_wf.fetch_history_events(wait_new_event=True):
         if event.event_type == cancel_request_failed:
             break
 
+    await handler_wf.signal(HandlerWorkflow.set_release_completion)
+    await handler_wf.result()
     await caller_wf.signal(CallerWorkflow.release)
     result = await caller_wf.result()
     assert result.error_type == "NexusOperationError"
