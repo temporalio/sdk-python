@@ -890,15 +890,17 @@ async def test_temporal_operation_query_workflow(
             target_history = await target_handle.fetch_history()
             assert not any(event.links for event in target_history.events)
 
-            assert target_handle.result_run_id is not None
-            assert Link(
-                workflow=Link.Workflow(
-                    namespace=client.namespace,
-                    workflow_id=target_workflow_id,
-                    run_id=target_handle.result_run_id,
-                    reason="Query processed",
-                )
-            ) in list(completed_event.links)
+            # The Java time-skipping test server does not return Nexus operation links.
+            if not env.supports_time_skipping:
+                assert target_handle.result_run_id is not None
+                assert Link(
+                    workflow=Link.Workflow(
+                        namespace=client.namespace,
+                        workflow_id=target_workflow_id,
+                        run_id=target_handle.result_run_id,
+                        reason="Query processed",
+                    )
+                ) in list(completed_event.links)
         finally:
             await target_handle.cancel()
 
