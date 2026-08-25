@@ -97,6 +97,7 @@ class GoogleCloudRunMetadata:
         return WorkerDeploymentConfig(
             version=self.worker_deployment_version,
             use_worker_versioning=True,
+            default_versioning_behavior=temporalio.common.VersioningBehavior.PINNED,
         )
 
 

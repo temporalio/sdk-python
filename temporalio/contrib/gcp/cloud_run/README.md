@@ -67,7 +67,8 @@ performs a single synchronous HTTP GET to the metadata server for the instance i
 - `worker_deployment_version` -- a `WorkerDeploymentVersion` whose `deployment_name` is the Cloud
   Run workload name and whose `build_id` is the Cloud Run revision, for use with Worker Versioning.
 - `worker_deployment_config` -- a `WorkerDeploymentConfig` wrapping that version with
-  `use_worker_versioning=True`, ready to pass to `Worker(..., deployment_config=...)`.
+  `use_worker_versioning=True` and `default_versioning_behavior=VersioningBehavior.PINNED` (a
+  per-workflow behavior takes precedence), ready to pass to `Worker(..., deployment_config=...)`.
 
 Because the metadata server is only reachable from within Cloud Run, calling this helper elsewhere
 raises a clear error. It uses only the Python standard library and adds no new dependencies.
