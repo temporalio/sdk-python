@@ -24,7 +24,7 @@ from temporalio.converter._payload_converter import (
 TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
 
 
-def _has_payload_headers(value: Any) -> bool:
+def _has_payload_headers(value: Any) -> bool:  # pyright: ignore[reportUnusedFunction]
     headers = getattr(value, "headers", None)
     if not isinstance(headers, Mapping):
         return False
@@ -43,7 +43,9 @@ def _has_payload_headers(value: Any) -> bool:
     return False
 
 
-def _system_nexus_operation_span_name(service: str, operation: str) -> str:
+def _system_nexus_operation_span_name(  # pyright: ignore[reportUnusedFunction]
+    service: str, operation: str
+) -> str:
     match operation:
         case "SignalWithStartWorkflowExecution":
             return "SignalWithStartWorkflow"
