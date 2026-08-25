@@ -147,7 +147,6 @@ def test_signal_with_start_serialization_context() -> None:
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
-        headers={},
     )
     operation_info = workflow_service.__nexus_operation_registry__[
         (
@@ -177,7 +176,6 @@ def test_system_nexus_payload_header_detection() -> None:
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
-        headers={},
     )
 
     assert nexus_system._has_payload_headers(request)

@@ -650,6 +650,5 @@ async def signal_with_start_workflow(
         versioning_override=versioning_override,
         start_delay=start_delay,
         user_metadata=user_metadata,
-        headers={},
     )
     return await _signal_with_start_workflow(request)

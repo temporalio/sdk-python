@@ -25,9 +25,6 @@ TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
 
 
 def _has_payload_headers(value: Any) -> bool:  # pyright: ignore[reportUnusedFunction]
-    headers = getattr(value, "headers", None)
-    if not isinstance(headers, Mapping):
-        return False
     header_type = get_type_hints(type(value)).get("headers")
     for possible_type in get_args(header_type) or (header_type,):
         if get_origin(possible_type) is Mapping:

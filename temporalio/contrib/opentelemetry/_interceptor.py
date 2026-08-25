@@ -835,6 +835,7 @@ class _TracingWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartSystemNexusOperationInput[Any, Any]
     ) -> temporalio.workflow.NexusOperationHandle[Any]:
         if temporalio.nexus.system._has_payload_headers(input.input):
+            input.input.headers = input.input.headers or {}
             self.root._completed_span(
                 temporalio.nexus.system._system_nexus_operation_span_name(
                     input.service, input.operation_name
