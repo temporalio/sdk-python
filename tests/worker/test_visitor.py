@@ -333,7 +333,7 @@ async def test_unknown_system_nexus_payload_raises_application_error():
         err.value.message == "Unknown Temporal system payload: "
         "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse"
     )
-    assert err.value.non_retryable
+    assert not err.value.non_retryable
 
 
 async def test_concurrent_throughput():

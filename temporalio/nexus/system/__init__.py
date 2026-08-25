@@ -161,8 +161,7 @@ async def maybe_visit_payload(
         if not str(err).startswith("Unknown root message type: "):
             raise
         raise temporalio.exceptions.ApplicationError(
-            f"Unknown Temporal system payload: {value.DESCRIPTOR.full_name}",
-            non_retryable=True,
+            f"Unknown Temporal system payload: {value.DESCRIPTOR.full_name}"
         ) from err
     if checkpoint is not None:
         await visitor_functions.drain_since(checkpoint)
