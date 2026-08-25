@@ -32,6 +32,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.client
 import temporalio.converter
+import temporalio.nexus.system
 import temporalio.worker
 import temporalio.workflow
 from temporalio.contrib.opentelemetry._tracer_provider import (
@@ -56,14 +57,6 @@ default_text_map_propagator = opentelemetry.propagators.composite.CompositePropa
 """Default text map propagator used by :py:class:`TracingInterceptor`."""
 
 _CarrierDict: TypeAlias = dict[str, opentelemetry.propagators.textmap.CarrierValT]
-
-
-def _system_nexus_operation_span_name(service: str, operation: str) -> str:
-    match operation:
-        case "SignalWithStartWorkflowExecution":
-            return "SignalWithStart"
-        case _:
-            return f"StartSystemNexusOperation:{service}/{operation}"
 
 
 def _context_to_headers(
@@ -613,7 +606,9 @@ class _TracingWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartSystemNexusOperationInput[Any, Any]
     ) -> temporalio.workflow.NexusOperationHandle[Any]:
         with self._workflow_maybe_span(
-            _system_nexus_operation_span_name(input.service, input.operation_name),
+            temporalio.nexus.system._system_nexus_operation_span_name(
+                input.service, input.operation_name
+            ),
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
             if hasattr(input.input, "headers"):

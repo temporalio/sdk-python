@@ -24,6 +24,14 @@ from temporalio.converter._payload_converter import (
 TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
 
 
+def _system_nexus_operation_span_name(service: str, operation: str) -> str:
+    match operation:
+        case "SignalWithStartWorkflowExecution":
+            return "SignalWithStart"
+        case _:
+            return f"StartSystemNexusOperation:{service}/{operation}"
+
+
 @dataclass(frozen=True)
 class _SystemNexusUserConverters:
     payload_converter: temporalio.converter.PayloadConverter
