@@ -1,8 +1,5 @@
 """Tests that each operator command on ActivityHandle routes through its own outbound
-interceptor method, carrying the caller's arguments.
-
-The routing does not depend on server behavior, so these run against a stubbed service
-rather than a live server.
+interceptor method, carrying the caller's arguments. Uses a stubbed service.
 """
 
 from __future__ import annotations
@@ -115,7 +112,6 @@ async def test_interceptor_invokes_each_operator_command(
         "update_activity_options",
     ]
 
-    # Every command identifies the same activity.
     for name, input in interceptor.traces:
         assert input.activity_id == "act-1", name
         assert input.activity_run_id == "run-1", name
@@ -144,8 +140,6 @@ async def test_restore_original_options_routes_through_update(
     handle = client.get_activity_handle("act-1")
     await handle.restore_original_options()
 
-    # restore_original_options is its own handle method but shares the update interceptor,
-    # distinguished by the restore_original flag and an empty set of updates.
     name, input = interceptor.traces[0]
     assert name == "update_activity_options"
     assert input.restore_original
