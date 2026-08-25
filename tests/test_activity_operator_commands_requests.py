@@ -1,8 +1,4 @@
-"""Unit tests for the operator-command request fields the server does not surface back.
-
-Identity, the per-call request ID, the reason and the jitter cannot be checked by
-observing activity state, so they are asserted directly on the outgoing requests.
-"""
+"""Unit tests for the operator-command request fields the server does not surface back."""
 
 from __future__ import annotations
 
@@ -19,7 +15,7 @@ from temporalio.service import ServiceClient
 
 
 class _CapturedService:
-    """Stands in for the raw gRPC workflow service, recording each request."""
+    """Capture operator command requests."""
 
     def __init__(self) -> None:
         self.requests: dict[str, Any] = {}
@@ -122,8 +118,6 @@ async def test_reset_flags_default_off(client: Client, captured: _CapturedServic
     reset = captured.requests["reset"]
     assert not reset.keep_paused
     assert not reset.restore_original_options
-    # As of api#848 and server temporal#11417 a reset carries the persisted heartbeat
-    # details into the new attempt unless the caller asks otherwise.
     assert not reset.reset_heartbeat
 
 
@@ -149,8 +143,6 @@ async def test_restore_original_options_is_exclusive(
 
     update = captured.requests["update"]
     assert update.restore_original
-    # The server rejects the restore flag alongside individual changes, so the mask must
-    # name nothing.
     assert list(update.update_mask.paths) == []
 
 
