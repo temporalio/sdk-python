@@ -6,8 +6,9 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   changelog-check:
     name: Changelog checkpoint
-    uses: temporalio/.github/.github/workflows/changelog.yml@6f052b395a527ab62ec33e5e0d7d1faf551bb8b7
+    uses: temporalio/.github/.github/workflows/changelog.yml@d8129c755fbd1d3f18c5a7a5420d5754acc63e3f
