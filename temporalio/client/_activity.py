@@ -682,13 +682,28 @@ class ActivityExecutionOptions:
     """
 
     task_queue: str | None
+    """Task queue the activity is scheduled on."""
+
     schedule_to_close_timeout: timedelta | None
+    """Total time the caller is willing to wait, including retries."""
+
     schedule_to_start_timeout: timedelta | None
+    """Maximum time the activity may wait to be picked up by a worker."""
+
     start_to_close_timeout: timedelta | None
+    """Maximum time for a single attempt."""
+
     heartbeat_timeout: timedelta | None
+    """Maximum allowed time between heartbeats."""
+
     start_delay: timedelta | None
+    """Delay before the first attempt is made available for dispatch."""
+
     retry_policy: temporalio.common.RetryPolicy | None
+    """Retry policy in effect for the activity."""
+
     priority: temporalio.common.Priority | None
+    """Priority of the activity."""
 
     @staticmethod
     def _from_proto(
