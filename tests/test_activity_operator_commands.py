@@ -65,6 +65,19 @@ async def always_fail_activity() -> None:
 
 
 @activity.defn
+async def heartbeat_fail_increment(value: int) -> int:
+    """Heartbeats, fails the first attempt, then succeeds.
+
+    One execution of this carries input, a result, heartbeat details and a last failure
+    all at once, which is what lets a single describe exercise every payload field.
+    """
+    activity.heartbeat("heartbeat details")
+    if activity.info().attempt == 1:
+        raise ApplicationError("deliberate first-attempt failure")
+    return value + 1
+
+
+@activity.defn
 async def heartbeat_once_activity() -> None:
     """Records heartbeat details on attempt 1, then blocks waiting for cancellation."""
     if activity.info().attempt == 1:
@@ -401,28 +414,6 @@ async def test_reset_restores_original_options(
         await handle.terminate(reason="cleanup")
 
 
-async def test_describe_payload_fields_are_opt_in(
-    client: Client, env: WorkflowEnvironment
-):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client, task_queue=task_queue, activities=[heartbeat_once_activity]
-    ):
-        handle = await _start_heartbeat_ready_activity(client, task_queue)
-
-        # The payload-bearing describe fields are opt-in (api#792). Assert the default
-        # really is "off" rather than the SDK quietly requesting everything: same
-        # activity, same moment, two describes.
-        bare = await handle.describe()
-        assert len(bare.raw_heartbeat_details) == 0
-
-        opted_in = await handle.describe(include_heartbeat_details=True)
-        assert len(opted_in.raw_heartbeat_details) == 1
-
-        await handle.terminate(reason="cleanup")
-
-
 async def test_describe_reports_total_heartbeat_count(
     client: Client, env: WorkflowEnvironment
 ):
@@ -441,42 +432,56 @@ async def test_describe_reports_total_heartbeat_count(
         await handle.terminate(reason="cleanup")
 
 
-async def test_describe_input_and_result_are_opt_in(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_describe_payloads(client: Client, env: WorkflowEnvironment):
     _skip_if_unsupported(env)
     task_queue = str(uuid.uuid4())
-    async with Worker(client, task_queue=task_queue, activities=[echo_activity]):
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[heartbeat_fail_increment, always_fail_activity],
+    ):
         handle = await client.start_activity(
-            echo_activity,
-            args=("ping",),
+            heartbeat_fail_increment,
+            args=(1,),
             id=f"act-{uuid.uuid4()}",
             task_queue=task_queue,
             start_to_close_timeout=timedelta(seconds=60),
+            heartbeat_timeout=timedelta(seconds=5),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(seconds=0.1),
+                backoff_coefficient=1.0,
+                maximum_attempts=2,
+            ),
         )
-        assert await handle.result() == "ping-echoed"
+        assert await handle.result() == 2
 
+        # Nothing requested: every payload field is absent, and the decoded accessors
+        # agree with the has_* flags rather than merely being falsy.
         bare = await handle.describe()
-        assert not bare.raw_description.input.payloads
-        assert bare.input == []
         assert not bare.has_result
+        assert bare.input == []
         assert bare.result is None
         assert bare.failure is None
+        assert len(bare.raw_heartbeat_details) == 0
+        assert bare.last_failure is None
 
-        desc = await handle.describe(include_input=True, include_outcome=True)
-        assert desc.raw_description.input.payloads
-        assert desc.input == ["ping"]
-        assert desc.has_result
-        assert desc.result == "ping-echoed"
-        # A successful outcome has no failure arm.
-        assert desc.failure is None
+        # All four requested. The activity succeeded on its second attempt, so it has a
+        # result and a last_failure at the same time, and no terminal failure.
+        full = await handle.describe(
+            include_input=True,
+            include_outcome=True,
+            include_heartbeat_details=True,
+            include_last_failure=True,
+        )
+        assert full.input == [1]
+        assert full.has_result
+        assert full.result == 2
+        assert full.failure is None
+        assert len(full.raw_heartbeat_details) == 1
+        assert isinstance(full.last_failure, ApplicationError)
 
-
-async def test_describe_outcome_failure(client: Client, env: WorkflowEnvironment):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(client, task_queue=task_queue, activities=[always_fail_activity]):
-        handle = await client.start_activity(
+        # The other arm of the oneof, on an activity that never succeeds.
+        failed = await client.start_activity(
             always_fail_activity,
             id=f"act-{uuid.uuid4()}",
             task_queue=task_queue,
@@ -484,11 +489,9 @@ async def test_describe_outcome_failure(client: Client, env: WorkflowEnvironment
             retry_policy=RetryPolicy(maximum_attempts=1),
         )
         with pytest.raises(Exception):
-            await handle.result()
+            await failed.result()
 
-        # The other arm of the oneof: a terminally failed activity has a failure and no
-        # result.
-        desc = await handle.describe(include_outcome=True)
+        desc = await failed.describe(include_outcome=True, include_last_failure=True)
         assert not desc.has_result
         assert desc.result is None
         assert isinstance(desc.failure, ApplicationError)
