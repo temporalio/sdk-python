@@ -124,12 +124,20 @@ class VisitorGenerator:
 
         The generated code defines async visitor functions for each reachable
         protobuf message type starting from WorkflowActivation, including support
-        for repeated fields and map entries, and a convenience entrypoint
-        function `visit`.
+        for repeated fields and map entries. Payload-free roots get no-op methods
+        so the `visit` entrypoint recognizes them as supported.
         """
 
-        for r in roots:
-            self.walk(r)
+        for root in roots:
+            if not self.walk(root):
+                self.methods.append(
+                    f"""\
+    async def _visit_{name_for(root)}(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+"""
+                )
 
         header = """
 from __future__ import annotations

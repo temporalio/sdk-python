@@ -107,15 +107,17 @@ class NewTypeMessage:
     data: dict[MyNewTypeStr, str]
 
 
-def test_create_payload_validation_error() -> None:
-    details = {"violations": [{"path": "some.path", "reason": "must be an int"}]}
-
+@pytest.mark.parametrize(
+    "details",
+    [None, {"violations": [{"path": "some.path", "reason": "must be an int"}]}],
+)
+def test_create_payload_validation_error(details: Any) -> None:
     err = create_payload_validation_error(details)
 
     assert err.message == "Payload validation failed"
     assert err.type == "PayloadValidationError"
     assert err.non_retryable
-    assert err.details == (details,)
+    assert err.details == (() if details is None else (details,))
 
     failure = Failure()
     DataConverter.default.failure_converter.to_failure(
@@ -123,7 +125,7 @@ def test_create_payload_validation_error() -> None:
     )
     assert DataConverter.default.payload_converter.from_payloads(
         failure.application_failure_info.details.payloads
-    ) == [details]
+    ) == ([] if details is None else [details])
 
 
 async def test_converter_default():

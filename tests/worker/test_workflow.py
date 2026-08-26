@@ -5326,6 +5326,7 @@ async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
 
 bad_validator_fail_ct = 0
 task_fail_ct = 0
+continue_as_new_update_task_fail_ct = 0
 
 
 @workflow.defn
@@ -5408,6 +5409,14 @@ class UpdateHandlersWorkflow:
         if task_fail_ct < 1:
             task_fail_ct += 1
             raise RuntimeError("intentional failure")
+
+    @workflow.update
+    def continue_as_new_for_task_failure(self) -> str:
+        global continue_as_new_update_task_fail_ct
+        if continue_as_new_update_task_fail_ct < 1:
+            continue_as_new_update_task_fail_ct += 1
+            workflow.continue_as_new()
+        return "recovered after task failure"
 
 
 async def test_workflow_update_handlers_happy(client: Client):
@@ -5549,6 +5558,31 @@ async def test_workflow_update_task_fails(client: Client):
         global task_fail_ct, bad_validator_fail_ct
         assert task_fail_ct == 1
         assert bad_validator_fail_ct == 2
+
+
+async def test_workflow_update_continue_as_new_fails_task(client: Client):
+    # Continue-as-new is a control-flow BaseException. From an update handler
+    # it must fail the workflow task, then retry the update rather than letting
+    # the detached update task escape without completing the protocol message.
+    global continue_as_new_update_task_fail_ct
+    continue_as_new_update_task_fail_ct = 0
+    async with new_worker(
+        client, UpdateHandlersWorkflow, workflow_runner=UnsandboxedWorkflowRunner()
+    ) as worker:
+        handle = await client.start_workflow(
+            UpdateHandlersWorkflow.run,
+            id=f"update-continue-as-new-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=timedelta(seconds=1),
+        )
+        result = await asyncio.wait_for(
+            handle.execute_update(
+                UpdateHandlersWorkflow.continue_as_new_for_task_failure
+            ),
+            timeout=timedelta(seconds=10).total_seconds(),
+        )
+        assert result == "recovered after task failure"
+        assert continue_as_new_update_task_fail_ct == 1
 
 
 @workflow.defn
