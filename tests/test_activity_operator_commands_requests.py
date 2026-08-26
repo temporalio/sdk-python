@@ -146,6 +146,30 @@ async def test_restore_original_options_is_exclusive(
     assert list(update.update_mask.paths) == []
 
 
+async def test_value_unset_clears_the_option(
+    client: Client, captured: _CapturedService
+):
+    # Clearing is the third state: the path is named in the mask so the server acts on it,
+    # but the proto field is left unset so the value goes away rather than being set.
+    handle = client.get_activity_handle("act-1")
+    await handle.update_options(
+        [
+            ActivityOptionsKeys.heartbeat_timeout.value_unset(),
+            ActivityOptionsKeys.start_to_close_timeout.value_set(timedelta(seconds=90)),
+        ]
+    )
+
+    update = captured.requests["update"]
+    assert sorted(update.update_mask.paths) == [
+        "heartbeat_timeout",
+        "start_to_close_timeout",
+    ]
+    assert not update.activity_options.HasField("heartbeat_timeout")
+    assert update.activity_options.start_to_close_timeout.ToTimedelta() == timedelta(
+        seconds=90
+    )
+
+
 async def test_update_options_requires_at_least_one_update(client: Client):
     handle = client.get_activity_handle("act-1")
     with pytest.raises(ValueError) as err:
