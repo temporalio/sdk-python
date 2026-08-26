@@ -1,1 +1,1 @@
-DEV_SERVER_DOWNLOAD_VERSION = "v1.7.4-standalone-nexus-operations"
+DEV_SERVER_DOWNLOAD_VERSION = "v1.8.3-server-1.32.0-162.0"
