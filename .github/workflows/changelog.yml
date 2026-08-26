@@ -1,0 +1,13 @@
+name: Changelog
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  changelog-check:
+    name: Changelog checkpoint
+    uses: temporalio/.github/.github/workflows/changelog.yml@6f052b395a527ab62ec33e5e0d7d1faf551bb8b7
