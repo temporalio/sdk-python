@@ -423,6 +423,24 @@ async def test_describe_payload_fields_are_opt_in(
         await handle.terminate(reason="cleanup")
 
 
+async def test_describe_reports_total_heartbeat_count(
+    client: Client, env: WorkflowEnvironment
+):
+    _skip_if_unsupported(env)
+    task_queue = str(uuid.uuid4())
+    async with Worker(client, task_queue=task_queue, activities=[slow_activity]):
+        # The count tracks heartbeats the server recordedy.
+        handle = await _start_running_slow_activity(
+            client, task_queue, heartbeat_timeout=timedelta(seconds=3)
+        )
+
+        async def check() -> None:
+            assert (await handle.describe()).total_heartbeat_count >= 2
+
+        await assert_eventually(check, timeout=timedelta(seconds=20))
+        await handle.terminate(reason="cleanup")
+
+
 async def test_describe_input_and_result_are_opt_in(
     client: Client, env: WorkflowEnvironment
 ):

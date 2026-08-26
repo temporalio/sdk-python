@@ -269,6 +269,9 @@ class ActivityExecutionDescription(ActivityExecution):
     attempt: int
     """Current attempt number."""
 
+    total_heartbeat_count: int
+    """Total number of heartbeats recorded across all attempts."""
+
     canceled_reason: str | None
     """Reason for cancellation, if cancel was requested."""
 
@@ -416,6 +419,7 @@ class ActivityExecutionDescription(ActivityExecution):
                 info.activity_type.name if info.HasField("activity_type") else ""
             ),
             attempt=info.attempt,
+            total_heartbeat_count=info.total_heartbeat_count,
             canceled_reason=info.canceled_reason or None,
             close_time=(
                 info.close_time.ToDatetime(tzinfo=timezone.utc)
