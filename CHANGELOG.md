@@ -22,6 +22,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- System Nexus Signal-with-Start Workflow operations now use the typed
+  `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
+  the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
+
 ### Deprecated
 
 ### :boom: Breaking Changes
