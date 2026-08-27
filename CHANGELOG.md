@@ -20,16 +20,17 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- Added stable `temporalio.contrib.mcp` support for MCP Python SDK v2. Its
-  workflow-side `MCPClient` runs tools, prompts, and resources as Activities,
-  fully paginates list operations, and caches tool discovery by default.
+- Added an `mcp` extra pinning MCP Python SDK v2, for use alongside the
+  `openai-agents` extra.
 
 ### Changed
 
 - `OpenAIAgentsPlugin` now accepts named OpenAI `MCPServer` factories through
-  `mcp_servers`. The shared `temporalio.contrib.mcp` Activity layer adapts these
-  servers without replacing their OpenAI-specific configuration. Parameterless
-  modern connections are reused for up to five idle minutes by default.
+  `mcp_servers`, and `workflow.temporal_mcp_server()` proxies them durably from
+  workflow code. Each MCP operation runs as an Activity, list operations are
+  fully paginated, and tool discovery is cached by default. The servers keep
+  their OpenAI-specific configuration. Parameterless modern connections are
+  reused for up to five idle minutes by default.
 
 ### Deprecated
 
@@ -46,6 +47,11 @@ to include examples, links to docs, or any other relevant information.
   deprecated provider APIs continue to work with MCP v1, while the new
   `mcp_servers` API requires MCP v2. Existing Activity history contracts remain
   supported.
+- MCP v1 and MCP v2 cannot coexist in one environment, so the `mcp` extra cannot
+  be installed alongside the extras that require MCP v1. Resolution fails for
+  `uv add "temporalio[mcp,google-adk]"` and for
+  `uv add "temporalio[mcp,strands-agents]"`; install those integrations in
+  separate environments.
 
 ### Fixed
 

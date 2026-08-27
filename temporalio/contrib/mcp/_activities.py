@@ -65,7 +65,7 @@ class _MCPActivities:
                     for value in await self._run(
                         server,
                         parsed,
-                        lambda backend: backend.list_tools(parsed.meta),
+                        lambda backend: backend.list_tools(),
                     )
                 ]
 
@@ -95,7 +95,7 @@ class _MCPActivities:
                     for value in await self._run(
                         server,
                         parsed,
-                        lambda backend: backend.list_prompts(parsed.meta),
+                        lambda backend: backend.list_prompts(),
                     )
                 ]
 
@@ -110,7 +110,6 @@ class _MCPActivities:
                     lambda backend: backend.get_prompt(
                         parsed.name,
                         parsed.arguments,
-                        parsed.meta,
                     ),
                 )
                 return _dump(result)
@@ -125,7 +124,7 @@ class _MCPActivities:
                     for value in await self._run(
                         server,
                         parsed,
-                        lambda backend: backend.list_resources(parsed.meta),
+                        lambda backend: backend.list_resources(),
                     )
                 ]
 
@@ -139,7 +138,7 @@ class _MCPActivities:
                     for value in await self._run(
                         server,
                         parsed,
-                        lambda backend: backend.list_resource_templates(parsed.meta),
+                        lambda backend: backend.list_resource_templates(),
                     )
                 ]
 
@@ -151,10 +150,7 @@ class _MCPActivities:
                 result = await self._run(
                     server,
                     parsed,
-                    lambda backend: backend.read_resource(
-                        parsed.uri,
-                        parsed.meta,
-                    ),
+                    lambda backend: backend.read_resource(parsed.uri),
                 )
                 return _dump(result)
 

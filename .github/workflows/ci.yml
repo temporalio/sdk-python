@@ -113,8 +113,7 @@ jobs:
         if: ${{ matrix.docsTarget }}
         run: >-
           poe test-mcp-v1 -s tests/contrib/openai_agents/test_openai.py
-          -k 'legacy_mcp_apis_are_deprecated or mcp_server'
-          --junit-xml=junit-xml/openai-mcp-v1.xml
+          -m mcp_v1 --junit-xml=junit-xml/openai-mcp-v1.xml
 
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

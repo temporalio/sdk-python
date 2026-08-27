@@ -54,8 +54,7 @@ class _OpenAIMCPServerBackend:
         session = getattr(self._server, "session", None)
         return getattr(session, "protocol_version", None) in MODERN_PROTOCOL_VERSIONS
 
-    async def list_tools(self, meta: RequestParamsMeta | None) -> list[Tool]:
-        del meta
+    async def list_tools(self) -> list[Tool]:
         return await self._server.list_tools()
 
     async def call_tool(
@@ -68,27 +67,18 @@ class _OpenAIMCPServerBackend:
             name, arguments, cast(dict[str, Any] | None, meta)
         )
 
-    async def list_prompts(self, meta: RequestParamsMeta | None) -> list[Prompt]:
-        del meta
+    async def list_prompts(self) -> list[Prompt]:
         return (await self._server.list_prompts()).prompts
 
     async def get_prompt(
-        self,
-        name: str,
-        arguments: dict[str, str] | None,
-        meta: RequestParamsMeta | None,
+        self, name: str, arguments: dict[str, str] | None
     ) -> GetPromptResult:
-        del meta
         return await self._server.get_prompt(name, arguments)
 
-    async def list_resources(self, meta: RequestParamsMeta | None) -> list[Resource]:
-        del meta
+    async def list_resources(self) -> list[Resource]:
         return await self._list_all("list_resources", "resources")
 
-    async def list_resource_templates(
-        self, meta: RequestParamsMeta | None
-    ) -> list[ResourceTemplate]:
-        del meta
+    async def list_resource_templates(self) -> list[ResourceTemplate]:
         return await self._list_all("list_resource_templates", "resource_templates")
 
     async def _list_all(self, method: str, field: str) -> list[Any]:
@@ -106,10 +96,7 @@ class _OpenAIMCPServerBackend:
                 raise ValueError("MCP server returned a repeated pagination cursor")
             cursor = next_cursor
 
-    async def read_resource(
-        self, uri: str, meta: RequestParamsMeta | None
-    ) -> ReadResourceResult:
-        del meta
+    async def read_resource(self, uri: str) -> ReadResourceResult:
         return await self._server.read_resource(uri)
 
 

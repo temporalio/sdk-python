@@ -2461,6 +2461,7 @@ def get_tracking_server(name: str):
     return TrackingMCPServer(name)
 
 
+@pytest.mark.mcp_v1
 def test_legacy_mcp_apis_are_deprecated():
     with pytest.warns(DeprecationWarning, match="StatelessMCPServerProvider"):
         stateless_provider = StatelessMCPServerProvider(
@@ -2480,6 +2481,7 @@ def test_legacy_mcp_apis_are_deprecated():
         openai_agents.OpenAIAgentsPlugin(mcp_server_providers=[stateless_provider])
 
 
+@pytest.mark.mcp_v1
 def test_mcp_servers_requires_v2():
     from importlib.metadata import version
 
@@ -2496,6 +2498,7 @@ def test_mcp_servers_requires_v2():
 @pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.parametrize("stateful", [True, False])
 @pytest.mark.parametrize("caching", [True, False])
+@pytest.mark.mcp_v1
 async def test_mcp_server(
     client: Client, use_local_model: bool, stateful: bool, caching: bool
 ):
@@ -2597,6 +2600,7 @@ async def test_mcp_server(
 
 
 @pytest.mark.parametrize("stateful", [True, False])
+@pytest.mark.mcp_v1
 async def test_mcp_server_factory_argument(client: Client, stateful: bool):
     def factory(args: Any | None) -> MCPServer:
         print("Invoking factory: ", args)
@@ -2643,6 +2647,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
                 )
 
 
+@pytest.mark.mcp_v1
 async def test_stateful_mcp_server_no_worker(client: Client):
     server = StatefulMCPServerProvider(
         "Filesystem-Server",

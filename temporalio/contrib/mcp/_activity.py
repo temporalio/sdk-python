@@ -11,13 +11,15 @@ from mcp.types import RequestParamsMeta
 @dataclasses.dataclass
 class _MCPRequest:
     factory_argument: Any = None
-    meta: RequestParamsMeta | None = None
 
 
 @dataclasses.dataclass
 class _CallToolRequest(_MCPRequest):
     name: str = ""
     arguments: dict[str, Any] | None = None
+    # Only call_tool has a caller that supplies request metadata: the OpenAI
+    # Agents base MCPServer resolves it per tool call.
+    meta: RequestParamsMeta | None = None
 
 
 @dataclasses.dataclass

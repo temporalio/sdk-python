@@ -374,9 +374,8 @@ Tools that run in the workflow can also update OpenAI Agents context, which is r
 
 ## MCP Support
 
-This integration uses MCP Python SDK v2 through the
-`temporalio.contrib.mcp` package. Register named OpenAI MCP server factories on the worker,
-then reference the same name from workflow code:
+This integration uses MCP Python SDK v2. Register named OpenAI MCP server
+factories on the worker, then reference the same name from workflow code:
 
 ```python
 from agents.mcp import MCPServerStreamableHttp

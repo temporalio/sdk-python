@@ -51,17 +51,12 @@ class _MCPClientBackend:
     def cacheable(self) -> bool:
         return self._client.protocol_version in MODERN_PROTOCOL_VERSIONS
 
-    async def _list_all(
-        self,
-        method: str,
-        field: str,
-        meta: RequestParamsMeta | None,
-    ) -> list[Any]:
+    async def _list_all(self, method: str, field: str) -> list[Any]:
         values: list[Any] = []
         cursor: str | None = None
         seen_cursors: set[str | None] = set()
         while True:
-            options: dict[str, Any] = {"cursor": cursor, "meta": meta}
+            options: dict[str, Any] = {"cursor": cursor}
             if method == "list_tools":
                 options["cache_mode"] = "bypass"
             result = await getattr(self._client, method)(**options)
@@ -74,8 +69,8 @@ class _MCPClientBackend:
                 raise ValueError("MCP server returned a repeated pagination cursor")
             cursor = next_cursor
 
-    async def list_tools(self, meta: RequestParamsMeta | None) -> list[Tool]:
-        return await self._list_all("list_tools", "tools", meta)
+    async def list_tools(self) -> list[Tool]:
+        return await self._list_all("list_tools", "tools")
 
     async def call_tool(
         self,
@@ -85,31 +80,22 @@ class _MCPClientBackend:
     ) -> CallToolResult:
         return await self._client.call_tool(name, arguments, meta=meta)
 
-    async def list_prompts(self, meta: RequestParamsMeta | None) -> list[Prompt]:
-        return await self._list_all("list_prompts", "prompts", meta)
+    async def list_prompts(self) -> list[Prompt]:
+        return await self._list_all("list_prompts", "prompts")
 
     async def get_prompt(
-        self,
-        name: str,
-        arguments: dict[str, str] | None,
-        meta: RequestParamsMeta | None,
+        self, name: str, arguments: dict[str, str] | None
     ) -> GetPromptResult:
-        return await self._client.get_prompt(name, arguments, meta=meta)
+        return await self._client.get_prompt(name, arguments)
 
-    async def list_resources(self, meta: RequestParamsMeta | None) -> list[Resource]:
-        return await self._list_all("list_resources", "resources", meta)
+    async def list_resources(self) -> list[Resource]:
+        return await self._list_all("list_resources", "resources")
 
-    async def list_resource_templates(
-        self, meta: RequestParamsMeta | None
-    ) -> list[ResourceTemplate]:
-        return await self._list_all(
-            "list_resource_templates", "resource_templates", meta
-        )
+    async def list_resource_templates(self) -> list[ResourceTemplate]:
+        return await self._list_all("list_resource_templates", "resource_templates")
 
-    async def read_resource(
-        self, uri: str, meta: RequestParamsMeta | None
-    ) -> ReadResourceResult:
-        return await self._client.read_resource(uri, meta=meta)
+    async def read_resource(self, uri: str) -> ReadResourceResult:
+        return await self._client.read_resource(uri)
 
 
 def _mcp_client_backend_factory(

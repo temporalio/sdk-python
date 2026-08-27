@@ -1,4 +1,10 @@
-"""Workflow-side durable MCP client."""
+"""Workflow-side durable MCP client, shared by the contrib integrations.
+
+Nothing here is public API. Reach it through an integration's own surface,
+e.g. ``temporalio.contrib.openai_agents.workflow.temporal_mcp_server()``.
+"""
+
+# pyright: reportUnusedClass=false
 
 from __future__ import annotations
 
@@ -28,7 +34,7 @@ from temporalio.contrib.mcp._activity import (
 from temporalio.workflow import ActivityConfig
 
 
-class MCPClient:
+class _MCPClient:
     """A durable workflow proxy for an MCP Python SDK v2 client.
 
     Each operation executes as an Activity. Tool discovery is cached for the
@@ -64,11 +70,8 @@ class MCPClient:
         """Return the cached tools, or ``None`` when no list is cached."""
         return self._tools
 
-    def _request(self, meta: RequestParamsMeta | None = None) -> _MCPRequest:
-        return _MCPRequest(
-            factory_argument=self._factory_argument,
-            meta=meta,
-        )
+    def _request(self) -> _MCPRequest:
+        return _MCPRequest(factory_argument=self._factory_argument)
 
     async def _execute(
         self, operation: str, request: _MCPRequest, result_type: Any
@@ -80,12 +83,12 @@ class MCPClient:
             **self._activity_config,
         )
 
-    async def list_tools(self, *, meta: RequestParamsMeta | None = None) -> list[Tool]:
+    async def list_tools(self) -> list[Tool]:
         """List all tools, following every pagination cursor."""
         if self._cache_tools_list and self._tools is not None:
             return self._tools
         values = await self._execute(
-            "list-tools", self._request(meta), list[dict[str, Any]]
+            "list-tools", self._request(), list[dict[str, Any]]
         )
         tools = [Tool.model_validate(value) for value in values]
         if self._cache_tools_list:
@@ -99,7 +102,11 @@ class MCPClient:
         *,
         meta: RequestParamsMeta | None = None,
     ) -> CallToolResult:
-        """Call a tool."""
+        """Call a tool.
+
+        ``meta`` is the only request metadata carried by this client, because
+        ``call_tool`` is the only operation with a caller that supplies it.
+        """
         request = _CallToolRequest(
             factory_argument=self._factory_argument,
             meta=meta,
@@ -109,63 +116,46 @@ class MCPClient:
         value = await self._execute("call-tool", request, dict[str, Any])
         return CallToolResult.model_validate(value)
 
-    async def list_prompts(
-        self, *, meta: RequestParamsMeta | None = None
-    ) -> list[Prompt]:
+    async def list_prompts(self) -> list[Prompt]:
         """List all prompts, following every pagination cursor."""
         values = await self._execute(
-            "list-prompts", self._request(meta), list[dict[str, Any]]
+            "list-prompts", self._request(), list[dict[str, Any]]
         )
         return [Prompt.model_validate(value) for value in values]
 
     async def get_prompt(
-        self,
-        name: str,
-        arguments: dict[str, str] | None = None,
-        *,
-        meta: RequestParamsMeta | None = None,
+        self, name: str, arguments: dict[str, str] | None = None
     ) -> GetPromptResult:
         """Get a prompt."""
         request = _GetPromptRequest(
             factory_argument=self._factory_argument,
-            meta=meta,
             name=name,
             arguments=arguments,
         )
         value = await self._execute("get-prompt", request, dict[str, Any])
         return GetPromptResult.model_validate(value)
 
-    async def list_resources(
-        self, *, meta: RequestParamsMeta | None = None
-    ) -> list[Resource]:
+    async def list_resources(self) -> list[Resource]:
         """List all resources, following every pagination cursor."""
         values = await self._execute(
-            "list-resources", self._request(meta), list[dict[str, Any]]
+            "list-resources", self._request(), list[dict[str, Any]]
         )
         return [Resource.model_validate(value) for value in values]
 
-    async def list_resource_templates(
-        self, *, meta: RequestParamsMeta | None = None
-    ) -> list[ResourceTemplate]:
+    async def list_resource_templates(self) -> list[ResourceTemplate]:
         """List all resource templates, following every pagination cursor."""
         values = await self._execute(
             "list-resource-templates",
-            self._request(meta),
+            self._request(),
             list[dict[str, Any]],
         )
         return [ResourceTemplate.model_validate(value) for value in values]
 
-    async def read_resource(
-        self, uri: str, *, meta: RequestParamsMeta | None = None
-    ) -> ReadResourceResult:
+    async def read_resource(self, uri: str) -> ReadResourceResult:
         """Read a resource."""
         request = _ReadResourceRequest(
             factory_argument=self._factory_argument,
-            meta=meta,
             uri=uri,
         )
         value = await self._execute("read-resource", request, dict[str, Any])
         return ReadResourceResult.model_validate(value)
-
-
-__all__ = ["MCPClient"]

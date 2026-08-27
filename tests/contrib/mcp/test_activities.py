@@ -39,31 +39,20 @@ class FakeClient:
         return ("one", "next") if cursor is None else ("two", None)
 
     async def list_tools(
-        self,
-        *,
-        cursor: str | None,
-        meta: dict[str, Any] | None,
-        cache_mode: str,
+        self, *, cursor: str | None, cache_mode: str
     ) -> ListToolsResult:
         assert cache_mode == "bypass"
-        self.metas.append(meta)
         name, next_cursor = self._page(cursor)
         return ListToolsResult(
             tools=[Tool(name=name, input_schema={"type": "object"})],
             next_cursor=next_cursor,
         )
 
-    async def list_prompts(
-        self, *, cursor: str | None, meta: dict[str, Any] | None
-    ) -> ListPromptsResult:
-        self.metas.append(meta)
+    async def list_prompts(self, *, cursor: str | None) -> ListPromptsResult:
         name, next_cursor = self._page(cursor)
         return ListPromptsResult(prompts=[Prompt(name=name)], next_cursor=next_cursor)
 
-    async def list_resources(
-        self, *, cursor: str | None, meta: dict[str, Any] | None
-    ) -> ListResourcesResult:
-        self.metas.append(meta)
+    async def list_resources(self, *, cursor: str | None) -> ListResourcesResult:
         name, next_cursor = self._page(cursor)
         return ListResourcesResult(
             resources=[Resource(name=name, uri=f"test://{name}")],
@@ -71,9 +60,8 @@ class FakeClient:
         )
 
     async def list_resource_templates(
-        self, *, cursor: str | None, meta: dict[str, Any] | None
+        self, *, cursor: str | None
     ) -> ListResourceTemplatesResult:
-        self.metas.append(meta)
         name, next_cursor = self._page(cursor)
         return ListResourceTemplatesResult(
             resource_templates=[
@@ -93,21 +81,13 @@ class FakeClient:
         return CallToolResult(content=[TextContent(text=name)])
 
     async def get_prompt(
-        self,
-        name: str,
-        _arguments: dict[str, str] | None,
-        *,
-        meta: dict[str, Any] | None,
+        self, name: str, _arguments: dict[str, str] | None
     ) -> GetPromptResult:
-        self.metas.append(meta)
         return GetPromptResult(
             messages=[PromptMessage(role="user", content=TextContent(text=name))]
         )
 
-    async def read_resource(
-        self, uri: str, *, meta: dict[str, Any] | None
-    ) -> ReadResourceResult:
-        self.metas.append(meta)
+    async def read_resource(self, uri: str) -> ReadResourceResult:
         return ReadResourceResult(
             contents=[TextResourceContents(uri=uri, text="contents")]
         )
@@ -124,10 +104,7 @@ async def test_operations_are_plain_json_and_lists_are_fully_paginated() -> None
         definition = activity._Definition.from_callable(fn)
         assert definition is not None and definition.name is not None
         functions[definition.name] = fn
-    request = {
-        "factory_argument": None,
-        "meta": {"trace": "value"},
-    }
+    request: dict[str, Any] = {"factory_argument": None}
     try:
         for operation, expected_key in (
             ("list-tools", "name"),
@@ -141,7 +118,7 @@ async def test_operations_are_plain_json_and_lists_are_fully_paginated() -> None
             assert [item[expected_key] for item in result] == ["one", "two"]
 
         tool_result = await functions["temporalio.contrib.mcp.test.call-tool"](
-            {**request, "name": "echo", "arguments": {}}
+            {**request, "name": "echo", "arguments": {}, "meta": {"trace": "value"}}
         )
         assert tool_result["content"][0]["text"] == "echo"
 
@@ -154,6 +131,8 @@ async def test_operations_are_plain_json_and_lists_are_fully_paginated() -> None
             {**request, "uri": "test://resource"}
         )
         assert resource_result["contents"][0]["text"] == "contents"
-        assert all(meta == {"trace": "value"} for meta in client.metas)
+
+        # call_tool is the only operation that carries request metadata.
+        assert client.metas == [{"trace": "value"}]
     finally:
         await support._pool.close()

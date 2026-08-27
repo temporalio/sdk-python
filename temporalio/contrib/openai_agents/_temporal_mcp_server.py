@@ -21,12 +21,12 @@ from mcp.types import (
     Tool,
 )
 
-from temporalio.contrib.mcp.workflow import MCPClient
+from temporalio.contrib.mcp._workflow import _MCPClient
 
 
 class _TemporalMCPServer(MCPServer):
     def __init__(
-        self, client: MCPClient, *, tool_filter: ToolFilter = None, **kwargs: Any
+        self, client: _MCPClient, *, tool_filter: ToolFilter = None, **kwargs: Any
     ) -> None:
         self._client = client
         self._tool_filter = tool_filter
