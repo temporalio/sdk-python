@@ -94,6 +94,9 @@ jobs:
 
       # Poe syncs these MCP v1 integrations into their own environment, leaving
       # the default MCP v2 environment intact.
+      - name: Type-check MCP v1 integrations
+        if: ${{ matrix.docsTarget }}
+        run: poe lint-types-mcp-v1
       - name: Test MCP v1 integrations
         if: ${{ matrix.docsTarget }}
         run: >-

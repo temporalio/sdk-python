@@ -170,6 +170,20 @@ test = "uv run pytest -n auto --dist=worksteal --ignore=tests/contrib/google_adk
 sync-mcp-v1 = { cmd = "uv sync --no-default-groups --group dev-mcp-v1", env = { UV_PROJECT_ENVIRONMENT = ".venv-mcp-v1" }, executor = { type = "simple" } }
 test-mcp-v1 = { cmd = "uv run --no-default-groups --group dev-mcp-v1 pytest -n auto --dist=worksteal", env = { UV_PROJECT_ENVIRONMENT = ".venv-mcp-v1" }, executor = { type = "simple" } }
 
+[tool.poe.tasks.lint-types-mcp-v1]
+shell = """
+uv run --no-default-groups --group dev-mcp-v1 mypy \
+  --namespace-packages --check-untyped-defs \
+  temporalio/contrib/google_adk_agents/*.py \
+  temporalio/contrib/google_genai/*.py \
+  temporalio/contrib/strands/*.py \
+  tests/contrib/google_adk_agents/*.py \
+  tests/contrib/google_genai/*.py \
+  tests/contrib/strands/*.py
+"""
+env = { UV_PROJECT_ENVIRONMENT = ".venv-mcp-v1" }
+executor = { type = "simple" }
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
