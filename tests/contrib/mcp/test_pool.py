@@ -284,18 +284,37 @@ async def test_idle_timeout_evicts_the_connection() -> None:
         await pool.close()
 
 
-async def test_close_leaves_no_state_for_the_loop() -> None:
+async def test_close_leaves_no_state_for_the_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     server = echo_server()
 
     def factory() -> _MCPClientBackend:
         return _MCPClientBackend(Client(server))
 
-    pool = _MCPConnectionPool({"echo": factory}, timedelta(milliseconds=10))
+    pool = _MCPConnectionPool({"echo": factory}, timedelta(milliseconds=50))
     async with pool.backend("echo", factory_argument=None):
         pass
     assert pool._locks
 
-    await pool.close()
+    record = next(iter(pool._records.values()))
+    original_close = record.close
+    close_started = asyncio.Event()
+    allow_close = asyncio.Event()
+
+    async def delayed_close() -> None:
+        close_started.set()
+        await allow_close.wait()
+        await original_close()
+
+    # Keep close in progress until the idle timer would have fired. This makes
+    # the teardown race deterministic on event loops where it is otherwise rare.
+    monkeypatch.setattr(record, "close", delayed_close)
+    close_task = asyncio.create_task(pool.close())
+    await close_started.wait()
+    await asyncio.sleep(0.1)
+    allow_close.set()
+    await close_task
 
     # Locks are keyed by event loop alongside the records, so leaving them
     # behind keeps every loop the pool has served alive.

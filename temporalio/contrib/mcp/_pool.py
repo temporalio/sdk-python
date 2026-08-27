@@ -56,6 +56,9 @@ class _ConnectionRecord:
 
     def acquire(self) -> None:
         self._inflight += 1
+        self.cancel_idle()
+
+    def cancel_idle(self) -> None:
         if self._idle_handle is not None:
             self._idle_handle.cancel()
             self._idle_handle = None
@@ -81,9 +84,7 @@ class _ConnectionRecord:
         await asyncio.shield(self._close_task)
 
     async def _close(self) -> None:
-        if self._idle_handle is not None:
-            self._idle_handle.cancel()
-            self._idle_handle = None
+        self.cancel_idle()
         self._stop.set()
         if not self._ready.done():
             self._owner.cancel()
@@ -194,7 +195,7 @@ class _MCPConnectionPool:
         # The event loop holds only a weak reference to a task, so an unretained
         # eviction can be garbage collected part way through and leave the
         # connection open until the pool closes. Holding it here also lets
-        # close() cancel evictions rather than orphan them on a closing loop.
+        # close() await evictions rather than orphan them on a closing loop.
         self._evictions.add(task)
         task.add_done_callback(self._evictions.discard)
 
@@ -234,21 +235,23 @@ class _MCPConnectionPool:
             for (record_loop, _), record in list(self._records.items())
             if record_loop is loop
         ]
-        # Every record for this loop is closed below, so a pending eviction has
-        # nothing left to do. Cancelling and awaiting it here keeps it from
-        # outliving the loop it was created on.
+        # Disarm timers before yielding so none can create a new eviction after
+        # the snapshot below.
+        for record in records:
+            record.cancel_idle()
         evictions = [task for task in self._evictions if task.get_loop() is loop]
-        for task in evictions:
-            task.cancel()
-        # Drop the locks along with the records; otherwise the pool keeps every
-        # event loop it has ever served alive through these keys.
+        # An eviction may already have unmapped its record, so let it finish
+        # closing that record rather than cancelling it part way through.
+        if evictions:
+            await asyncio.gather(*evictions, return_exceptions=True)
+            self._evictions.difference_update(evictions)
+        if records:
+            await asyncio.gather(*(record.close() for record in records))
+        # Drop the locks along with the records only after eviction tasks have
+        # settled; _unmap() creates a lock when an eviction runs.
         for key in list(self._records):
             if key[0] is loop:
                 self._records.pop(key, None)
         for key in list(self._locks):
             if key[0] is loop:
                 self._locks.pop(key, None)
-        if evictions:
-            await asyncio.gather(*evictions, return_exceptions=True)
-        if records:
-            await asyncio.gather(*(record.close() for record in records))

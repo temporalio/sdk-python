@@ -249,7 +249,7 @@ jobs:
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
       - run: uv remove google-adk --optional google-adk
-      - run: uv add --dev --python 3.10 "googleapis-common-protos==1.70.0"
+      - run: uv add --group dev-common --python 3.10 "googleapis-common-protos==1.70.0"
       - run: uv add --python 3.10 "protobuf<4"
       - run: uv sync
       - run: cargo install --locked nexgen --version 0.2.2 --features advanced --force
