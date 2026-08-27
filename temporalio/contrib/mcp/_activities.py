@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -179,7 +180,18 @@ class _MCPActivities:
 
     @asynccontextmanager
     async def run_context(self) -> AsyncIterator[None]:
+        body_completed = False
         try:
             yield
+            body_completed = True
         finally:
-            await self._pool.close()
+            close_task = asyncio.create_task(self._pool.close())
+            try:
+                await asyncio.shield(close_task)
+            except asyncio.CancelledError:
+                # Worker context exit cancels its wrapper after the inner run
+                # completes. Finish MCP cleanup without swallowing cancellation
+                # received while the worker was still running.
+                if not body_completed:
+                    raise
+                await close_task
