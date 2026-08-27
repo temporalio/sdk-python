@@ -25,14 +25,11 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_event_subsequence, assert_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.nexus.conftest import NexusEndpoint
 from tests.nexus.test_workflow_caller_cancellation_types import (
     get_event_time,
     has_event,
 )
-
-# Cloud CI's namespace credentials cannot manage Nexus endpoints.
-# See https://github.com/temporalio/sdk-python/issues/1704.
-pytestmark = pytest.mark.requires_local_server
 
 
 @dataclass
@@ -228,6 +225,7 @@ class CallerWorkflow:
 async def test_cancellation_type(
     env: WorkflowEnvironment,
     cancellation_type_name: str,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -237,17 +235,14 @@ async def test_cancellation_type(
     test_context = TestContext(cancellation_type=cancellation_type)
 
     client = env.client
+    task_queue = nexus_endpoint.task_queue
 
     async with Worker(
         client,
-        task_queue=str(uuid.uuid4()),
+        task_queue=task_queue,
         workflows=[CallerWorkflow, HandlerWorkflow],
         nexus_service_handlers=[ServiceHandler()],
     ) as worker:
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(worker.task_queue), worker.task_queue
-        )
-
         # Start the caller workflow, wait for the nexus op to have started and retrieve the nexus op
         # token
         with_start_workflow = WithStartWorkflowOperation(
