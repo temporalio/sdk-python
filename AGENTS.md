@@ -52,7 +52,7 @@ document as a quick reference when submitting pull requests.
 The common local commands are:
 
 ```bash
-uv sync --all-extras
+uv sync
 poe build-develop
 poe lint
 poe test
@@ -63,6 +63,7 @@ For focused iteration, prefer:
 
 ```bash
 poe test -s -k <test_or_pattern>
+poe test-mcp-v1 -s <google_adk_or_strands_test>
 uv run pytest tests/path/test_file.py::test_name
 ```
 

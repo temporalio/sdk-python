@@ -56,7 +56,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
+      - run: uv sync
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
       - run: poe build-develop
@@ -92,17 +92,8 @@ jobs:
           npx doctoc README.md
           [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
 
-      # These integrations require MCP v1, which cannot coexist with the MCP v2
-      # environment used above. Run them after all v2 tests and docs are complete.
-      - name: Sync MCP v1 integrations
-        if: ${{ matrix.docsTarget }}
-        run: >-
-          uv sync --no-default-groups --group dev-mcp-v1
-          --extra openai-agents --extra google-adk --extra google-genai
-          --extra strands-agents
-      - name: Type-check MCP v1 integrations
-        if: ${{ matrix.docsTarget }}
-        run: poe lint-types-mcp-v1
+      # Poe syncs these MCP v1 integrations into their own environment, leaving
+      # the default MCP v2 environment intact.
       - name: Test MCP v1 integrations
         if: ${{ matrix.docsTarget }}
         run: >-
@@ -183,7 +174,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
+      - run: uv sync
       # Develop build so the FIPS extension is importable, then run the suite
       # against it to confirm the aws-lc-rs stack works end to end (not just links).
       - run: poe build-develop-fips
@@ -225,7 +216,7 @@ jobs:
         with:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
-      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
+      - run: uv sync
       - name: Build Alpine wheel
         run: uv run cibuildwheel --output-dir dist
         env:
@@ -260,7 +251,7 @@ jobs:
       - run: uv remove google-adk --optional google-adk
       - run: uv add --dev --python 3.10 "googleapis-common-protos==1.70.0"
       - run: uv add --python 3.10 "protobuf<4"
-      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
+      - run: uv sync
       - run: cargo install --locked nexgen --version 0.2.2 --features advanced --force
       - run: poe build-develop
       - run: poe gen-protos
@@ -297,7 +288,7 @@ jobs:
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
       - run: uv lock --upgrade
-      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
+      - run: uv sync
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
@@ -335,7 +326,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
+      - run: uv sync
       - run: poe build-develop
       - name: Generate Cloud test certificates
         run: |

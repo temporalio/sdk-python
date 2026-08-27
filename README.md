@@ -2044,7 +2044,7 @@ cd sdk-python
 Install the dependencies:
 
 ```bash
-uv sync --all-extras
+uv sync
 ```
 
 #### Build
@@ -2167,7 +2167,7 @@ installing dependencies:
 ```bash
 git clone --recursive https://github.com/temporalio/sdk-python.git
 cd sdk-python
-uv sync --all-extras
+uv sync
 ```
 
 Now compile the Rust extension in develop mode which is quicker than release mode:
@@ -2200,6 +2200,17 @@ To execute a single test:
 poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 ```
 
+The default development environment uses MCP v2. Google ADK and Strands tests use
+MCP v1 in a separate `.venv-mcp-v1` environment, which Poe creates and updates
+automatically:
+
+```bash
+poe test-mcp-v1 -s tests/contrib/google_adk_agents tests/contrib/strands
+```
+
+Run `poe sync-mcp-v1` separately when an editor or another tool needs the MCP v1
+environment without running tests.
+
 **Temporal Server**
 
 - Tests that use the workflow test environment run against the [Temporal CLI dev server](https://docs.temporal.io/cli#start-dev-server).
@@ -2218,9 +2229,9 @@ poe gen-protos-docker
 ```
 
 Alternatively: to generate protobuf code, you must be on Python <= 3.10, and then run `uv add
-"protobuf<4"` + `uv sync --all-extras`. Then the protobuf files can be generated via `poe
+"protobuf<4"` + `uv sync`. Then the protobuf files can be generated via `poe
 gen-protos` followed by `poe format`. Do not commit `uv.lock` or `pyproject.toml` changes. To go
-back from this downgrade, restore both of those files and run `uv sync --all-extras`. Tests can be
+back from this downgrade, restore both of those files and run `uv sync`. Tests can be
 run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running
 tests.
 

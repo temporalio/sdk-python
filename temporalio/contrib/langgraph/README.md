@@ -299,7 +299,7 @@ Use Workflow state for per-run memory, or an external database (Postgres/Redis/e
 Install dependencies:
 
 ```sh
-uv sync --all-extras
+uv sync
 ```
 
 Run the test suite:

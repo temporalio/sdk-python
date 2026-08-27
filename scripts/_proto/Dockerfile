@@ -11,7 +11,7 @@ RUN mkdir -p ./temporalio/api
 RUN uv remove google-adk --optional google-adk
 RUN uv add --dev "googleapis-common-protos==1.70.0"
 RUN uv add "protobuf<4"
-RUN uv sync --all-extras --no-extra google-adk --no-extra strands-agents
+RUN uv sync
 RUN uv run scripts/gen_protos.py
 
 CMD ["sh", "-c", "cp -r ./temporalio/api/* /api_new && cp -r ./temporalio/bridge/proto/* /bridge_new"]

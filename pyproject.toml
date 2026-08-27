@@ -82,6 +82,13 @@ dev-common = [
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
   "moto[s3,server]>=5",
+  "grpcio>=1.48.2,<2",
+  "opentelemetry-api>=1.26,<2",
+  "opentelemetry-sdk>=1.26,<2",
+  "pydantic>=2.0.0,<3",
+  "aioboto3>=10.4.0",
+  "types-aioboto3[s3]>=10.4.0",
+  "google-genai>=2.10.0,<3.0.0",
   "langgraph>=1.1.0",
   "langsmith>=0.7.34,<0.9",
   "deepagents>=0.6.12,<0.7; python_version >= '3.11'",
@@ -95,11 +102,10 @@ dev-common = [
   "pytest-flakefinder>=1.1.0",
   "async-timeout>=4.0,<6; python_version < '3.11'",
 ]
+# MCP v1 cannot share an environment with MCP v2, so the v1 profile includes all
+# dependencies it needs and its Poe tasks target a separate virtual environment.
 dev = [
   { include-group = "dev-common" },
-  { include-group = "dev-mcp-v2" },
-]
-dev-mcp-v2 = [
   "openinference-instrumentation-openai-agents>=0.1.0",
   "openai-agents>=0.20,<0.21; python_version >= '3.14'",
   "openai-agents[litellm]>=0.20,<0.21; python_version < '3.14'",
@@ -109,6 +115,9 @@ dev-mcp-v1 = [
   { include-group = "dev-common" },
   "openinference-instrumentation-openai-agents>=0.1.0",
   "openinference-instrumentation-google-adk>=0.1.11",
+  "openai-agents>=0.20,<0.21; python_version >= '3.14'",
+  "openai-agents[litellm]>=0.20,<0.21; python_version < '3.14'",
+  "google-adk>=2.2.0,<3",
   "strands-agents>=1.39.0",
   "strands-agents-tools>=0.5.2",
   "mcp>=1.24,<2",
@@ -156,10 +165,10 @@ lint-types = [
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ." },
   { cmd = "uv run basedpyright" },
 ]
-lint-types-mcp-v1 = "uv run --no-default-groups --group dev-mcp-v1 --extra openai-agents --extra google-adk --extra google-genai --extra strands-agents mypy --config-file mypy-mcp-v1.ini temporalio/contrib/google_adk_agents temporalio/contrib/google_genai temporalio/contrib/strands tests/contrib/google_adk_agents tests/contrib/google_genai tests/contrib/strands"
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest -n auto --dist=worksteal --ignore=tests/contrib/google_adk_agents --ignore=tests/contrib/google_genai/test_gemini_mcp.py --ignore=tests/contrib/strands"
-test-mcp-v1 = "uv run --no-default-groups --group dev-mcp-v1 --extra openai-agents --extra google-adk --extra google-genai --extra strands-agents pytest -n auto --dist=worksteal"
+sync-mcp-v1 = { cmd = "uv sync --no-default-groups --group dev-mcp-v1", env = { UV_PROJECT_ENVIRONMENT = ".venv-mcp-v1" }, executor = { type = "simple" } }
+test-mcp-v1 = { cmd = "uv run --no-default-groups --group dev-mcp-v1 pytest -n auto --dist=worksteal", env = { UV_PROJECT_ENVIRONMENT = ".venv-mcp-v1" }, executor = { type = "simple" } }
 
 
 [tool.pytest.ini_options]
@@ -329,18 +338,6 @@ conflicts = [
   ],
   [
     { group = "dev" },
-    { extra = "strands-agents" },
-  ],
-  [
-    { group = "dev-mcp-v1" },
-    { group = "dev-mcp-v2" },
-  ],
-  [
-    { group = "dev-mcp-v2" },
-    { extra = "google-adk" },
-  ],
-  [
-    { group = "dev-mcp-v2" },
     { extra = "strands-agents" },
   ],
   [
