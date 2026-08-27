@@ -455,8 +455,6 @@ async def test_describe_payloads(client: Client, env: WorkflowEnvironment):
         )
         assert await handle.result() == 2
 
-        # Nothing requested: every payload field is absent, and the decoded accessors
-        # agree with the has_* flags rather than merely being falsy.
         bare = await handle.describe()
         assert not bare.has_result
         assert bare.input == []
@@ -465,8 +463,6 @@ async def test_describe_payloads(client: Client, env: WorkflowEnvironment):
         assert len(bare.raw_heartbeat_details) == 0
         assert bare.last_failure is None
 
-        # All four requested. The activity succeeded on its second attempt, so it has a
-        # result and a last_failure at the same time, and no terminal failure.
         full = await handle.describe(
             include_input=True,
             include_outcome=True,
@@ -480,7 +476,6 @@ async def test_describe_payloads(client: Client, env: WorkflowEnvironment):
         assert len(full.raw_heartbeat_details) == 1
         assert isinstance(full.last_failure, ApplicationError)
 
-        # The other arm of the oneof, on an activity that never succeeds.
         failed = await client.start_activity(
             always_fail_activity,
             id=f"act-{uuid.uuid4()}",
