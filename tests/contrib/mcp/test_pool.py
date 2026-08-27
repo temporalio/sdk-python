@@ -252,3 +252,53 @@ async def test_pending_eviction_does_not_close_an_in_use_connection() -> None:
         assert created == 1
     finally:
         await pool.close()
+
+
+async def test_idle_timeout_evicts_the_connection() -> None:
+    server = echo_server()
+    created = 0
+
+    def factory() -> _MCPClientBackend:
+        nonlocal created
+        created += 1
+        return _MCPClientBackend(Client(server))
+
+    pool = _MCPConnectionPool({"echo": factory}, timedelta(milliseconds=10))
+    try:
+        async with pool.backend("echo", factory_argument=None):
+            pass
+        assert created == 1
+
+        # The eviction runs in a task the pool must keep a strong reference to;
+        # an unretained one can be collected before it closes the connection.
+        for _ in range(100):
+            if not pool._records:
+                break
+            await asyncio.sleep(0.01)
+        assert not pool._records
+
+        async with pool.backend("echo", factory_argument=None):
+            pass
+        assert created == 2
+    finally:
+        await pool.close()
+
+
+async def test_close_leaves_no_state_for_the_loop() -> None:
+    server = echo_server()
+
+    def factory() -> _MCPClientBackend:
+        return _MCPClientBackend(Client(server))
+
+    pool = _MCPConnectionPool({"echo": factory}, timedelta(milliseconds=10))
+    async with pool.backend("echo", factory_argument=None):
+        pass
+    assert pool._locks
+
+    await pool.close()
+
+    # Locks are keyed by event loop alongside the records, so leaving them
+    # behind keeps every loop the pool has served alive.
+    assert not pool._records
+    assert not pool._locks
+    assert not pool._evictions

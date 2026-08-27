@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any, TypeVar
@@ -168,7 +168,7 @@ class _MCPActivities:
         return activities
 
     @asynccontextmanager
-    async def run_context(self):
+    async def run_context(self) -> AsyncIterator[None]:
         try:
             yield
         finally:

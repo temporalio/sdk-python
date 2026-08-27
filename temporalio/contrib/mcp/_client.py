@@ -1,10 +1,9 @@
-# pyright: reportUnusedClass=false, reportUnusedFunction=false
+# pyright: reportUnusedClass=false
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from types import TracebackType
-from typing import Any, cast
+from typing import Any
 
 from mcp import Client
 from mcp.types import (
@@ -18,12 +17,6 @@ from mcp.types import (
     Tool,
 )
 from mcp_types.version import MODERN_PROTOCOL_VERSIONS
-
-from temporalio.contrib.mcp._backend import (
-    _NOT_SUPPLIED,
-    _FactoryInvoker,
-    _MCPBackendFactory,
-)
 
 
 class _MCPClientBackend:
@@ -93,15 +86,3 @@ class _MCPClientBackend:
 
     async def read_resource(self, uri: str) -> ReadResourceResult:
         return await self._client.read_resource(uri)
-
-
-def _mcp_client_backend_factory(
-    name: str,
-    factory: Callable[[], Client] | Callable[[Any], Client],
-) -> _MCPBackendFactory:
-    invoke = _FactoryInvoker(name, factory)
-
-    def create(argument: Any = _NOT_SUPPLIED) -> _MCPClientBackend:
-        return _MCPClientBackend(cast(Client, invoke(argument)))
-
-    return create

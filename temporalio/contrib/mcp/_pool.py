@@ -111,6 +111,7 @@ class _MCPConnectionPool:
             tuple[asyncio.AbstractEventLoop, str], _ConnectionRecord
         ] = {}
         self._locks: dict[tuple[asyncio.AbstractEventLoop, str], asyncio.Lock] = {}
+        self._evictions: set[asyncio.Task[None]] = set()
 
     def _key(self, server: str) -> tuple[asyncio.AbstractEventLoop, str]:
         return asyncio.get_running_loop(), server
@@ -189,7 +190,13 @@ class _MCPConnectionPool:
         key: tuple[asyncio.AbstractEventLoop, str],
         record: _ConnectionRecord,
     ) -> None:
-        asyncio.create_task(self._evict(key, record, only_if_idle=True))
+        task = asyncio.create_task(self._evict(key, record, only_if_idle=True))
+        # The event loop holds only a weak reference to a task, so an unretained
+        # eviction can be garbage collected part way through and leave the
+        # connection open until the pool closes. Holding it here also lets
+        # close() cancel evictions rather than orphan them on a closing loop.
+        self._evictions.add(task)
+        task.add_done_callback(self._evictions.discard)
 
     async def _unmap(
         self,
@@ -227,8 +234,21 @@ class _MCPConnectionPool:
             for (record_loop, _), record in list(self._records.items())
             if record_loop is loop
         ]
-        for key, _record in list(self._records.items()):
+        # Every record for this loop is closed below, so a pending eviction has
+        # nothing left to do. Cancelling and awaiting it here keeps it from
+        # outliving the loop it was created on.
+        evictions = [task for task in self._evictions if task.get_loop() is loop]
+        for task in evictions:
+            task.cancel()
+        # Drop the locks along with the records; otherwise the pool keeps every
+        # event loop it has ever served alive through these keys.
+        for key in list(self._records):
             if key[0] is loop:
                 self._records.pop(key, None)
+        for key in list(self._locks):
+            if key[0] is loop:
+                self._locks.pop(key, None)
+        if evictions:
+            await asyncio.gather(*evictions, return_exceptions=True)
         if records:
             await asyncio.gather(*(record.close() for record in records))
