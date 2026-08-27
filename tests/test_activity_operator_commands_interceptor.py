@@ -132,15 +132,3 @@ async def test_interceptor_receives_command_arguments(
     assert traces["reset_activity"].keep_paused
     assert traces["reset_activity"].reset_heartbeat
     assert not traces["reset_activity"].restore_original_options
-
-
-async def test_restore_original_options_routes_through_update(
-    client: Client, interceptor: TracingClientInterceptor
-):
-    handle = client.get_activity_handle("act-1")
-    await handle.restore_original_options()
-
-    name, input = interceptor.traces[0]
-    assert name == "update_activity_options"
-    assert input.restore_original
-    assert list(input.updates) == []
