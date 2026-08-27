@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import functools
 import inspect
+import warnings
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
@@ -134,6 +135,10 @@ class _StatelessMCPServerReference(MCPServer):  # type:ignore[reportUnusedClass]
 class StatelessMCPServerProvider:
     """A stateless MCP server implementation for Temporal workflows.
 
+    .. deprecated:: 1.33
+        Use ``OpenAIAgentsPlugin(mcp_servers=...)`` and
+        ``workflow.temporal_mcp_server()`` instead.
+
     This class wraps a function to create MCP servers to make them stateless by executing each MCP operation
     as a separate Temporal activity. Each operation (list_tools, call_tool, etc.) will
     connect to the underlying server, execute the operation, and then clean up the connection.
@@ -155,6 +160,13 @@ class StatelessMCPServerProvider:
                 so that state is not shared between workflow runs. It may accept a single positional parameter, which
                 receives a ``factory_argument`` from the workflow.
         """
+        warnings.warn(
+            "StatelessMCPServerProvider is deprecated; use "
+            "OpenAIAgentsPlugin(mcp_servers=...) and "
+            "workflow.temporal_mcp_server() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._server_factory = server_factory
 
         # Cache whether the server factory needs to be provided with arguments
@@ -415,6 +427,10 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):  # ty
 class StatefulMCPServerProvider:
     """A stateful MCP server implementation for Temporal workflows.
 
+    .. deprecated:: 1.33
+        Use ``OpenAIAgentsPlugin(mcp_servers=...)`` and
+        ``workflow.temporal_mcp_server()`` instead.
+
     This class wraps a function to create MCP servers to maintain a persistent connection throughout
     the workflow execution. It creates a dedicated worker that stays connected to
     the MCP server and processes operations on a dedicated task queue.
@@ -441,6 +457,13 @@ class StatefulMCPServerProvider:
                 so that state is not shared between workflow runs. It receives an optional ``factory_argument`` from the
                 workflow.
         """
+        warnings.warn(
+            "StatefulMCPServerProvider is deprecated; use "
+            "OpenAIAgentsPlugin(mcp_servers=...) and "
+            "workflow.temporal_mcp_server() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._server_factory = server_factory
         self._name = name + "-stateful"
         self._connect_handle: ActivityHandle | None = None

@@ -4,12 +4,21 @@ import dataclasses
 import json
 import threading
 import typing
-from collections.abc import AsyncIterator, Callable, Collection, Iterator, Sequence
+import warnings
+from collections.abc import (
+    AsyncIterator,
+    Callable,
+    Collection,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 
 import pydantic
 from agents import ModelProvider, Trace, set_trace_provider
+from agents.mcp import MCPServer
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
@@ -254,8 +263,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
     Example:
         >>> from temporalio.client import Client
         >>> from temporalio.worker import Worker
-        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters, StatelessMCPServerProvider
-        >>> from agents.mcp import MCPServerStdio
+        >>> from agents.mcp import MCPServerStreamableHttp
+        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
         >>> from datetime import timedelta
         >>>
         >>> # Configure model parameters
@@ -264,16 +273,11 @@ class OpenAIAgentsPlugin(SimplePlugin):
         ...     retry_policy=RetryPolicy(maximum_attempts=3)
         ... )
         >>>
-        >>> # Create MCP servers
-        >>> filesystem_server = StatelessMCPServerProvider(MCPServerStdio(
-        ...     name="Filesystem Server",
-        ...     params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}
-        ... ))
-        >>>
-        >>> # Create plugin with MCP servers
         >>> plugin = OpenAIAgentsPlugin(
         ...     model_params=model_params,
-        ...     mcp_server_providers=[filesystem_server]
+        ...     mcp_servers={"filesystem": lambda: MCPServerStreamableHttp(
+        ...         name="filesystem", params={"url": "https://example.com/mcp"}
+        ...     )}
         ... )
         >>>
         >>> # Use with client and worker
@@ -300,6 +304,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
         resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
+        *,
+        mcp_servers: Mapping[str, Callable[..., MCPServer]] | None = None,
+        mcp_connection_idle_timeout: timedelta | None = timedelta(minutes=5),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -308,10 +315,16 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 of model calls. If None, default parameters will be used.
             model_provider: Optional model provider for custom model implementations.
                 Useful for testing or custom model integrations.
-            mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
-                Each server will be wrapped in a TemporalMCPServer if not already wrapped,
-                and their activities will be automatically registered with the worker.
-                The plugin manages the connection lifecycle of these servers.
+            mcp_server_providers: Legacy MCP server providers to register with the
+                worker. Deprecated; use ``mcp_servers`` for new MCP v2
+                integrations.
+            mcp_servers: Named OpenAI MCP server factories to register on the worker.
+                A parameterless factory's modern connection is cached between
+                Activities. A factory called with a workflow ``factory_argument``
+                always creates a fresh server for that Activity.
+            mcp_connection_idle_timeout: How long an idle modern MCP connection
+                remains cached. Defaults to five minutes. None disables idle
+                eviction, and zero disables reuse.
             sandbox_clients: Sequence of named sandbox client providers to register
                 on the worker.  Each provider pairs a unique name with a real
                 ``BaseSandboxClient`` (e.g. ``DaytonaSandboxClient``,
@@ -353,6 +366,36 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 )
 
         self._use_otel_instrumentation = use_otel_instrumentation
+        if mcp_server_providers:
+            warnings.warn(
+                "mcp_server_providers is deprecated; use mcp_servers with "
+                "workflow.temporal_mcp_server() instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        mcp_activities = None
+        if mcp_servers:
+            # The shared Activity layer requires MCP v2, but the legacy OpenAI
+            # provider path remains importable with MCP v1.
+            try:
+                from temporalio.contrib.mcp._activities import _MCPActivities
+                from temporalio.contrib.openai_agents._mcp_backend import (
+                    _mcp_server_backend_factory,
+                )
+            except ImportError as err:
+                raise RuntimeError(
+                    "mcp_servers requires MCP Python SDK v2; use the deprecated "
+                    "mcp_server_providers API when running with MCP v1"
+                ) from err
+
+            mcp_activities = _MCPActivities(
+                {
+                    name: _mcp_server_backend_factory(factory)
+                    for name, factory in mcp_servers.items()
+                },
+                idle_timeout=mcp_connection_idle_timeout,
+            )
 
         resolvable_env_vars = _snapshot_resolvable_env_vars(resolvable_worker_env_vars)
 
@@ -371,12 +414,14 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 model_activity.invoke_model_activity_streaming,
             ]
 
+            if mcp_activities:
+                new_activities.extend(mcp_activities.activities)
+
             server_names = [server.name for server in mcp_server_providers]
             if len(server_names) != len(set(server_names)):
                 raise ValueError(
                     "More than one mcp server registered with the same name. Please provide unique names."
                 )
-
             for mcp_server in mcp_server_providers:
                 new_activities.extend(mcp_server._get_activities())
 
@@ -431,12 +476,21 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
-            with self.tracing_context():
-                with _set_open_ai_agent_temporal_overrides(
-                    model_params,
-                    start_spans_in_replay=use_otel_instrumentation,
-                ):
-                    yield
+            if mcp_activities:
+                async with mcp_activities.run_context():
+                    with self.tracing_context():
+                        with _set_open_ai_agent_temporal_overrides(
+                            model_params,
+                            start_spans_in_replay=use_otel_instrumentation,
+                        ):
+                            yield
+            else:
+                with self.tracing_context():
+                    with _set_open_ai_agent_temporal_overrides(
+                        model_params,
+                        start_spans_in_replay=use_otel_instrumentation,
+                    ):
+                        yield
 
         super().__init__(
             name="OpenAIAgentsPlugin",

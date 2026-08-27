@@ -67,7 +67,7 @@ jobs:
           workspaces: temporalio/bridge -> target
           key: ${{ env.pythonLocation }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
 
       # Add the source dist only for Linux x64 for now
       - if: ${{ matrix.package-suffix == 'linux-amd64' }}

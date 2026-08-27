@@ -1,6 +1,8 @@
 """Testing utilities for OpenAI agents."""
 
-from collections.abc import AsyncIterator, Callable, Collection, Sequence
+import hashlib
+from collections.abc import AsyncIterator, Callable, Collection, Mapping, Sequence
+from datetime import timedelta
 from typing import Any
 
 from agents import (
@@ -16,6 +18,7 @@ from agents import (
     Usage,
 )
 from agents.items import TResponseOutputItem, TResponseStreamEvent
+from agents.mcp import MCPServer
 from openai.types.responses import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
@@ -72,15 +75,22 @@ class ResponseBuilders:
         )
 
     @staticmethod
-    def tool_call(arguments: str, name: str) -> ModelResponse:
+    def tool_call(
+        arguments: str,
+        name: str,
+        *,
+        call_id: str | None = None,
+        item_id: str | None = None,
+    ) -> ModelResponse:
         """Create a ModelResponse with a function tool call."""
+        identity = hashlib.sha256(f"{name}\0{arguments}".encode()).hexdigest()[:16]
         return ResponseBuilders.model_response(
             ResponseFunctionToolCall(
                 arguments=arguments,
-                call_id="call",
+                call_id=call_id or f"call-{identity}",
                 name=name,
                 type="function_call",
-                id="id",
+                id=item_id or f"item-{identity}",
                 status="completed",
             )
         )
@@ -186,6 +196,9 @@ class AgentEnvironment:
         add_temporal_spans: bool = True,
         use_otel_instrumentation: bool = False,
         resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
+        *,
+        mcp_servers: Mapping[str, Callable[..., MCPServer]] | None = None,
+        mcp_connection_idle_timeout: timedelta | None = timedelta(minutes=5),
     ) -> None:
         """Initialize the AgentEnvironment.
 
@@ -200,7 +213,12 @@ class AgentEnvironment:
                 Equivalent to model_provider=TestModelProvider(model).
                 Only one of model_provider or model should be provided.
                 If both are provided, model_provider will be used.
-            mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
+            mcp_server_providers: Legacy MCP server providers to register with the
+                worker. Deprecated; use ``mcp_servers`` for new MCP v2
+                integrations.
+            mcp_servers: Named OpenAI MCP server factories to register with the worker.
+            mcp_connection_idle_timeout: How long idle modern connections are reused.
+                None disables idle eviction, and zero disables reuse.
             register_activities: Whether to register activities during worker execution.
             add_temporal_spans: Whether to add temporal spans to traces
             use_otel_instrumentation: If set to true, enable open telemetry instrumentation.
@@ -220,6 +238,8 @@ class AgentEnvironment:
         elif model is not None:
             self._model_provider = TestModelProvider(model)
         self._mcp_server_providers = mcp_server_providers
+        self._mcp_servers = mcp_servers
+        self._mcp_connection_idle_timeout = mcp_connection_idle_timeout
         self._register_activities = register_activities
         self._plugin: OpenAIAgentsPlugin | None = None
         self._add_temporal_spans = add_temporal_spans
@@ -235,6 +255,8 @@ class AgentEnvironment:
             model_params=self._model_params,
             model_provider=self._model_provider,
             mcp_server_providers=self._mcp_server_providers,
+            mcp_servers=self._mcp_servers,
+            mcp_connection_idle_timeout=self._mcp_connection_idle_timeout,
             register_activities=self._register_activities,
             add_temporal_spans=self._add_temporal_spans,
             use_otel_instrumentation=self._use_otel_instrumentation,

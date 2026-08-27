@@ -56,7 +56,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
       - run: poe build-develop
@@ -73,14 +73,6 @@ jobs:
         timeout-minutes: 10
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      - name: "Upload junit-xml artifacts"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--${{ matrix.python }}--${{ matrix.os }}
-          path: junit-xml
-          retention-days: 14
-
       # Do docs stuff (only on one host)
       - name: Build API docs
         if: ${{ matrix.docsTarget }}
@@ -99,6 +91,38 @@ jobs:
         run: |
           npx doctoc README.md
           [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
+
+      # These integrations require MCP v1, which cannot coexist with the MCP v2
+      # environment used above. Run them after all v2 tests and docs are complete.
+      - name: Sync MCP v1 integrations
+        if: ${{ matrix.docsTarget }}
+        run: >-
+          uv sync --no-default-groups --group dev-mcp-v1
+          --extra openai-agents --extra google-adk --extra google-genai
+          --extra strands-agents
+      - name: Type-check MCP v1 integrations
+        if: ${{ matrix.docsTarget }}
+        run: poe lint-types-mcp-v1
+      - name: Test MCP v1 integrations
+        if: ${{ matrix.docsTarget }}
+        run: >-
+          poe test-mcp-v1 -s tests/contrib/google_adk_agents
+          tests/contrib/google_genai tests/contrib/strands
+          --junit-xml=junit-xml/mcp-v1-integrations.xml
+      - name: Test deprecated OpenAI MCP APIs with MCP v1
+        if: ${{ matrix.docsTarget }}
+        run: >-
+          poe test-mcp-v1 -s tests/contrib/openai_agents/test_openai.py
+          -k 'legacy_mcp_apis_are_deprecated or mcp_server'
+          --junit-xml=junit-xml/openai-mcp-v1.xml
+
+      - name: "Upload junit-xml artifacts"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--${{ matrix.python }}--${{ matrix.os }}
+          path: junit-xml
+          retention-days: 14
 
   # Verify the optional FIPS build: the Rust core must link aws-lc-fips-sys
   # (aws-lc-rs FIPS mode) and must NOT link `ring` (the cargo-tree guard, ported
@@ -160,7 +184,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
       # Develop build so the FIPS extension is importable, then run the suite
       # against it to confirm the aws-lc-rs stack works end to end (not just links).
       - run: poe build-develop-fips
@@ -202,7 +226,7 @@ jobs:
         with:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
       - name: Build Alpine wheel
         run: uv run cibuildwheel --output-dir dist
         env:
@@ -237,7 +261,7 @@ jobs:
       - run: uv remove google-adk --optional google-adk
       - run: uv add --dev --python 3.10 "googleapis-common-protos==1.70.0"
       - run: uv add --python 3.10 "protobuf<4"
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
       - run: cargo install --locked nexgen --version 0.2.2 --features advanced --force
       - run: poe build-develop
       - run: poe gen-protos
@@ -274,7 +298,7 @@ jobs:
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
       - run: uv lock --upgrade
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
@@ -312,7 +336,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
       - run: poe build-develop
       - name: Generate Cloud test certificates
         run: |

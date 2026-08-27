@@ -155,16 +155,25 @@ class TemporalOpenAIRunner(AgentRunner):
             )
 
             for s in starting_agent.mcp_servers:
-                if not isinstance(
+                if isinstance(
                     s,
                     (
                         _StatelessMCPServerReference,
                         _StatefulMCPServerReference,
                     ),
                 ):
-                    raise ValueError(
-                        f"Unknown mcp_server type {type(s)} may not work durably."
-                    )
+                    continue
+                # Avoid importing the MCP v2-only proxy while validating a
+                # workflow that uses the legacy MCP v1 provider path.
+                if (
+                    type(s).__module__
+                    == "temporalio.contrib.openai_agents._temporal_mcp_server"
+                    and type(s).__name__ == "_TemporalMCPServer"
+                ):
+                    continue
+                raise ValueError(
+                    f"Unknown mcp_server type {type(s)} may not work durably."
+                )
 
         if isinstance(kwargs.get("session"), SQLiteSession):
             raise ValueError("Temporal workflows don't support SQLite sessions.")

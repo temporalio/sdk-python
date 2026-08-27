@@ -52,7 +52,7 @@ jobs:
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       # Build
       - run: uv tool install poethepoet
-      - run: uv sync --all-extras
+      - run: uv sync --all-extras --no-extra google-adk --no-extra strands-agents
       - run: poe build-develop-with-release
       
       # Run a bunch of bench tests. We run multiple times since results vary.

@@ -28,7 +28,8 @@ classifiers = [
 grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.26,<2", "opentelemetry-sdk>=1.26,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
-openai-agents = ["openai-agents>=0.19.2,<0.20", "mcp>=1.9.4, <2"]
+openai-agents = ["openai-agents>=0.20,<0.21", "mcp>=1.24,<3"]
+mcp = ["mcp>=2,<3"]
 google-adk = ["google-adk>=2.2.0,<3", "mcp>=1.24,<2"]
 langgraph = ["langgraph>=1.1.0"]
 langsmith = ["langsmith>=0.7.34,<0.9"]
@@ -55,7 +56,7 @@ Documentation = "https://docs.temporal.io/docs/python"
 "Bug Tracker" = "https://github.com/temporalio/sdk-python/issues"
 
 [dependency-groups]
-dev = [
+dev-common = [
   "basedpyright==1.34.0",
   "cibuildwheel>=2.22.0,<3",
   "cryptography>=46",
@@ -73,14 +74,10 @@ dev = [
   "toml>=0.10.2,<0.11",
   "twine>=4.0.1,<5",
   "maturin>=1.8.2",
-  "openinference-instrumentation-openai-agents>=0.1.0",
   "pytest-cov>=6.1.1",
   "httpx>=0.28.1",
   "pytest-pretty>=1.3.0",
-  "openai-agents>=0.19.2,<0.20; python_version >= '3.14'",
-  "openai-agents[litellm]>=0.19.2,<0.20; python_version < '3.14'",
   "litellm>=1.83.0",
-  "openinference-instrumentation-google-adk>=0.1.11",
   "googleapis-common-protos>=1.75.0,<2",
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
@@ -97,9 +94,24 @@ dev = [
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
   "pytest-flakefinder>=1.1.0",
   "async-timeout>=4.0,<6; python_version < '3.11'",
+]
+dev = [
+  { include-group = "dev-common" },
+  { include-group = "dev-mcp-v2" },
+]
+dev-mcp-v2 = [
+  "openinference-instrumentation-openai-agents>=0.1.0",
+  "openai-agents>=0.20,<0.21; python_version >= '3.14'",
+  "openai-agents[litellm]>=0.20,<0.21; python_version < '3.14'",
+  "mcp>=2,<3",
+]
+dev-mcp-v1 = [
+  { include-group = "dev-common" },
+  "openinference-instrumentation-openai-agents>=0.1.0",
+  "openinference-instrumentation-google-adk>=0.1.11",
   "strands-agents>=1.39.0",
   "strands-agents-tools>=0.5.2",
-  "mcp>=1.9.4,<2",
+  "mcp>=1.24,<2",
 ]
 
 [tool.poe.tasks]
@@ -144,8 +156,10 @@ lint-types = [
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ." },
   { cmd = "uv run basedpyright" },
 ]
+lint-types-mcp-v1 = "uv run --no-default-groups --group dev-mcp-v1 --extra openai-agents --extra google-adk --extra google-genai --extra strands-agents mypy --config-file mypy-mcp-v1.ini temporalio/contrib/google_adk_agents temporalio/contrib/google_genai temporalio/contrib/strands tests/contrib/google_adk_agents tests/contrib/google_genai tests/contrib/strands"
 run-bench = "uv run python scripts/run_bench.py"
-test = "uv run pytest -n auto --dist=worksteal"
+test = "uv run pytest -n auto --dist=worksteal --ignore=tests/contrib/google_adk_agents --ignore=tests/contrib/google_genai/test_gemini_mcp.py --ignore=tests/contrib/strands"
+test-mcp-v1 = "uv run --no-default-groups --group dev-mcp-v1 --extra openai-agents --extra google-adk --extra google-genai --extra strands-agents pytest -n auto --dist=worksteal"
 
 
 [tool.pytest.ini_options]
@@ -187,7 +201,22 @@ exclude = [
   # Ignore generated code
   'temporalio/api',
   'temporalio/bridge/proto',
+  # These integrations require MCP v1 and are checked in the dev-mcp-v1 CI profile.
+  'temporalio/contrib/google_adk_agents',
+  'temporalio/contrib/google_genai',
+  'temporalio/contrib/strands',
+  'tests/contrib/google_adk_agents',
+  'tests/contrib/google_genai/echo_mcp_server.py',
+  'tests/contrib/strands',
 ]
+
+[[tool.mypy.overrides]]
+module = [
+  "temporalio.contrib.google_adk_agents.*",
+  "temporalio.contrib.google_genai._temporal_mcp",
+  "temporalio.contrib.strands.*",
+]
+follow_imports = "skip"
 
 [tool.pydocstyle]
 convention = "google"
@@ -259,6 +288,13 @@ exclude = [
   "temporalio/bridge/proto",
   "temporalio/bridge/_visitor.py",
   "tests/worker/workflow_sandbox/testmodules/proto",
+  # These integrations require MCP v1 and are checked in the dev-mcp-v1 CI profile.
+  "temporalio/contrib/google_adk_agents",
+  "temporalio/contrib/google_genai/_temporal_mcp.py",
+  "temporalio/contrib/strands",
+  "tests/contrib/google_adk_agents",
+  "tests/contrib/google_genai/echo_mcp_server.py",
+  "tests/contrib/strands",
 ]
 
 [tool.ruff]
@@ -276,6 +312,44 @@ include = ["LICENSE"]
 exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 
 [tool.uv]
+conflicts = [
+  [
+    { group = "dev" },
+    { group = "dev-mcp-v1" },
+  ],
+  [
+    { group = "dev" },
+    { extra = "google-adk" },
+  ],
+  [
+    { group = "dev" },
+    { extra = "strands-agents" },
+  ],
+  [
+    { group = "dev-mcp-v1" },
+    { group = "dev-mcp-v2" },
+  ],
+  [
+    { group = "dev-mcp-v2" },
+    { extra = "google-adk" },
+  ],
+  [
+    { group = "dev-mcp-v2" },
+    { extra = "strands-agents" },
+  ],
+  [
+    { group = "dev-mcp-v1" },
+    { extra = "mcp" },
+  ],
+  [
+    { extra = "mcp" },
+    { extra = "google-adk" },
+  ],
+  [
+    { extra = "mcp" },
+    { extra = "strands-agents" },
+  ],
+]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"

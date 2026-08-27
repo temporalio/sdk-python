@@ -287,6 +287,9 @@ def stateless_mcp_server(
 ) -> "MCPServer":
     """A stateless MCP server implementation for Temporal workflows.
 
+    .. deprecated:: 1.33
+        Use :py:func:`temporal_mcp_server` instead.
+
     This uses a TemporalMCPServer of the same name registered with the OpenAIAgents plugin to implement
     durable MCP operations statelessly.
 
@@ -308,6 +311,13 @@ def stateless_mcp_server(
         factory_argument: Optional argument to be provided to the factory when producing an MCPServer.
                Must not contain secrets.
     """
+    import warnings
+
+    warnings.warn(
+        "stateless_mcp_server() is deprecated; use temporal_mcp_server() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from temporalio.contrib.openai_agents._mcp import (
         _StatelessMCPServerReference,
     )
@@ -324,6 +334,9 @@ def stateful_mcp_server(
     factory_argument: Any | None = None,
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
+
+    .. deprecated:: 1.33
+        Use :py:func:`temporal_mcp_server` instead.
 
     This wraps an MCP server to maintain a persistent connection throughout
     the workflow execution. It creates a dedicated worker that stays connected to
@@ -351,12 +364,72 @@ def stateful_mcp_server(
         factory_argument: Optional argument to be provided to the factory when producing an MCPServer.
                Must not contain secrets.
     """
+    import warnings
+
+    warnings.warn(
+        "stateful_mcp_server() is deprecated; use temporal_mcp_server() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from temporalio.contrib.openai_agents._mcp import (
         _StatefulMCPServerReference,
     )
 
     return _StatefulMCPServerReference(
         name, config, server_session_config, factory_argument
+    )
+
+
+def temporal_mcp_server(
+    name: str,
+    activity_config: ActivityConfig | None = None,
+    cache_tools_list: bool = True,
+    factory_argument: Any = None,
+    **server_options: Any,
+) -> "MCPServer":
+    """Create a durable MCP v2 server proxy for an OpenAI agent in a workflow.
+
+    MCP operations execute as Activities using the server factory registered as
+    ``OpenAIAgentsPlugin(mcp_servers={name: factory})``. The tool list is cached
+    in workflow state by default. Set ``cache_tools_list=False`` to list tools on
+    every OpenAI Agents turn.
+
+    .. warning::
+        Do not pass secrets, credentials, or API keys through ``factory_argument``. It is an
+        activity argument, so it is recorded in workflow history and, without a payload codec,
+        visible in the web UI. Resolve credentials worker-side inside the server factory
+        instead.
+
+    Args:
+        name: Name matching a server factory registered on the plugin.
+        activity_config: Activity options for MCP operations. Defaults to a
+            one-minute start-to-close timeout.
+        cache_tools_list: Whether to cache the tool list for this object.
+        factory_argument: Non-secret value passed to the worker-side factory.
+            A non-None value creates a fresh server for every Activity instead
+            of using the worker connection cache.
+        server_options: OpenAI Agents ``MCPServer`` options such as
+            ``require_approval`` and ``failure_error_function``.
+    """
+    try:
+        from temporalio.contrib.mcp.workflow import MCPClient
+        from temporalio.contrib.openai_agents._temporal_mcp_server import (
+            _TemporalMCPServer,
+        )
+    except ImportError as err:
+        raise RuntimeError(
+            "temporal_mcp_server() requires MCP Python SDK v2; use the deprecated "
+            "stateless_mcp_server() or stateful_mcp_server() API with MCP v1"
+        ) from err
+
+    return _TemporalMCPServer(
+        MCPClient(
+            name,
+            activity_config=activity_config,
+            cache_tools_list=cache_tools_list,
+            factory_argument=factory_argument,
+        ),
+        **server_options,
     )
 
 
