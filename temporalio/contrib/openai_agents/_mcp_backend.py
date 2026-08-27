@@ -19,16 +19,13 @@ from mcp.types import (
 )
 from mcp_types.version import MODERN_PROTOCOL_VERSIONS
 
-from temporalio.contrib.mcp._backend import _MCPBackendFactory
+from temporalio.contrib.mcp._backend import (
+    _NOT_SUPPLIED,
+    _FactoryInvoker,
+    _MCPBackendFactory,
+)
 
 _MCPServerFactory = Callable[[], MCPServer] | Callable[[Any], MCPServer]
-
-
-class _NotSupplied:
-    pass
-
-
-_NOT_SUPPLIED = _NotSupplied()
 
 
 class _OpenAIMCPServerBackend:
@@ -100,12 +97,12 @@ class _OpenAIMCPServerBackend:
         return await self._server.read_resource(uri)
 
 
-def _mcp_server_backend_factory(factory: _MCPServerFactory) -> _MCPBackendFactory:
+def _mcp_server_backend_factory(
+    name: str, factory: _MCPServerFactory
+) -> _MCPBackendFactory:
+    invoke = _FactoryInvoker(name, factory)
+
     def create(argument: Any = _NOT_SUPPLIED) -> _OpenAIMCPServerBackend:
-        if argument is _NOT_SUPPLIED:
-            server = cast(Callable[[], MCPServer], factory)()
-        else:
-            server = cast(Callable[[Any], MCPServer], factory)(argument)
-        return _OpenAIMCPServerBackend(server)
+        return _OpenAIMCPServerBackend(cast(MCPServer, invoke(argument)))
 
     return create

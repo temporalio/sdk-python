@@ -201,9 +201,12 @@ class _MCPConnectionPool:
         """Drop the cached record, returning whether it may now be closed."""
         lock = self._locks.setdefault(key, asyncio.Lock())
         async with lock:
+            # The idle check applies even when the record is no longer mapped:
+            # a failing operation unmaps the record while others are still in
+            # flight on it, and a pending eviction must not close it early.
+            if only_if_idle and not record.idle:
+                return False
             if self._records.get(key) is record:
-                if only_if_idle and not record.idle:
-                    return False
                 self._records.pop(key, None)
         return True
 

@@ -205,3 +205,50 @@ async def test_failure_does_not_close_a_concurrently_used_connection() -> None:
 def test_negative_idle_timeout_rejected() -> None:
     with pytest.raises(ValueError, match="cannot be negative"):
         _MCPConnectionPool({}, timedelta(seconds=-1))
+
+
+async def test_pending_eviction_does_not_close_an_in_use_connection() -> None:
+    server = echo_server()
+    created = 0
+
+    def factory() -> _MCPClientBackend:
+        nonlocal created
+        created += 1
+        return _MCPClientBackend(Client(server))
+
+    pool = _MCPConnectionPool({"echo": factory}, timedelta(minutes=5))
+    try:
+        async with pool.backend("echo", factory_argument=None):
+            pass
+        key = next(iter(pool._records))
+        record = pool._records[key]
+
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def survivor() -> Any:
+            async with pool.backend("echo", factory_argument=None) as client:
+                entered.set()
+                await release.wait()
+                return await client.call_tool("echo", {"value": "hi"}, None)
+
+        task = asyncio.create_task(survivor())
+        await entered.wait()
+
+        # A peer failure retires and unmaps the record while the survivor is
+        # still in flight on it.
+        with pytest.raises(RuntimeError, match="connection failed"):
+            async with pool.backend("echo", factory_argument=None):
+                raise RuntimeError("connection failed")
+
+        # An idle-eviction task armed before either operation acquired the
+        # record now runs. It cannot be cancelled once created, so it must
+        # notice the record is still in use rather than closing the transport.
+        await pool._evict(key, record, only_if_idle=True)
+
+        release.set()
+        result = await task
+        assert result.is_error is False
+        assert created == 1
+    finally:
+        await pool.close()

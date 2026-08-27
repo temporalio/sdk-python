@@ -319,7 +319,10 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 worker. Deprecated; use ``mcp_servers`` for new MCP v2
                 integrations.
             mcp_servers: Named OpenAI MCP server factories to register on the worker.
-                A parameterless factory's modern connection is cached between
+                Each factory may declare at most one positional parameter, which
+                receives the workflow's ``factory_argument`` (``None`` when the
+                workflow supplied none); a factory declaring more raises here. A
+                parameterless factory's modern connection is cached between
                 Activities. A factory called with a workflow ``factory_argument``
                 always creates a fresh server for that Activity.
             mcp_connection_idle_timeout: How long an idle modern MCP connection
@@ -391,7 +394,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
             mcp_activities = _MCPActivities(
                 {
-                    name: _mcp_server_backend_factory(factory)
+                    name: _mcp_server_backend_factory(name, factory)
                     for name, factory in mcp_servers.items()
                 },
                 idle_timeout=mcp_connection_idle_timeout,

@@ -19,14 +19,11 @@ from mcp.types import (
 )
 from mcp_types.version import MODERN_PROTOCOL_VERSIONS
 
-from temporalio.contrib.mcp._backend import _MCPBackendFactory
-
-
-class _NotSupplied:
-    pass
-
-
-_NOT_SUPPLIED = _NotSupplied()
+from temporalio.contrib.mcp._backend import (
+    _NOT_SUPPLIED,
+    _FactoryInvoker,
+    _MCPBackendFactory,
+)
 
 
 class _MCPClientBackend:
@@ -99,13 +96,12 @@ class _MCPClientBackend:
 
 
 def _mcp_client_backend_factory(
+    name: str,
     factory: Callable[[], Client] | Callable[[Any], Client],
 ) -> _MCPBackendFactory:
+    invoke = _FactoryInvoker(name, factory)
+
     def create(argument: Any = _NOT_SUPPLIED) -> _MCPClientBackend:
-        if argument is _NOT_SUPPLIED:
-            client = cast(Callable[[], Client], factory)()
-        else:
-            client = cast(Callable[[Any], Client], factory)(argument)
-        return _MCPClientBackend(client)
+        return _MCPClientBackend(cast(Client, invoke(argument)))
 
     return create
