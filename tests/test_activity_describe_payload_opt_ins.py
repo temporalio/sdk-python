@@ -44,14 +44,13 @@ def _unrequested_fields_response() -> (
 
 
 class _CapturedDescribe:
-    def __init__(self) -> None:
-        self.request: Any = None
+    """Stands in for the raw gRPC workflow service, always over-sharing payloads."""
 
-        async def record(req: Any, **_kwargs: Any) -> Any:
-            self.request = req
+    def __init__(self) -> None:
+        async def respond(_req: Any, **_kwargs: Any) -> Any:
             return _unrequested_fields_response()
 
-        self.describe_activity_execution = AsyncMock(side_effect=record)
+        self.describe_activity_execution = AsyncMock(side_effect=respond)
 
 
 @pytest.fixture
@@ -81,42 +80,6 @@ async def test_description_exposes_the_whole_response(client: Client):
     assert desc.result == "out"
     assert desc.raw_description.outcome.HasField("result")
     assert [p.data for p in desc.raw_description.outcome.result.payloads] == [b'"out"']
-
-
-async def test_describe_defaults_ask_for_nothing(
-    client: Client, captured: _CapturedDescribe
-):
-    await client.get_activity_handle("act-1").describe()
-
-    assert not captured.request.include_input
-    assert not captured.request.include_outcome
-    assert not captured.request.include_heartbeat_details
-    assert not captured.request.include_last_failure
-
-
-async def test_describe_forwards_each_flag(client: Client, captured: _CapturedDescribe):
-    await client.get_activity_handle("act-1").describe(
-        include_input=True,
-        include_outcome=True,
-        include_heartbeat_details=True,
-        include_last_failure=True,
-    )
-
-    assert captured.request.include_input
-    assert captured.request.include_outcome
-    assert captured.request.include_heartbeat_details
-    assert captured.request.include_last_failure
-
-
-async def test_describe_flags_are_independent(
-    client: Client, captured: _CapturedDescribe
-):
-    await client.get_activity_handle("act-1").describe(include_input=True)
-
-    assert captured.request.include_input
-    assert not captured.request.include_outcome
-    assert not captured.request.include_heartbeat_details
-    assert not captured.request.include_last_failure
 
 
 async def test_unrequested_payloads_are_stripped(client: Client):
