@@ -43,8 +43,8 @@ def _unrequested_fields_response() -> (
     )
 
 
-class _CapturedDescribe:
-    """Stands in for the raw gRPC workflow service, always over-sharing payloads."""
+class _DescribeReturnsUnrequestedPayloads:
+    """Stands in for the raw gRPC workflow service, always returning all payloads."""
 
     def __init__(self) -> None:
         async def respond(_req: Any, **_kwargs: Any) -> Any:
@@ -54,12 +54,12 @@ class _CapturedDescribe:
 
 
 @pytest.fixture
-def captured() -> _CapturedDescribe:
-    return _CapturedDescribe()
+def captured() -> _DescribeReturnsUnrequestedPayloads:
+    return _DescribeReturnsUnrequestedPayloads()
 
 
 @pytest.fixture
-def client(captured: _CapturedDescribe) -> Client:
+def client(captured: _DescribeReturnsUnrequestedPayloads) -> Client:
     service_client = Mock(spec=ServiceClient)
     service_client.workflow_service = captured
     service_client.config = Mock(identity="test-identity")
