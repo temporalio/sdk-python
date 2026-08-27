@@ -9,7 +9,7 @@ network connections, and credentials remain in worker-side Activities.
 Install the integration with:
 
 ```bash
-pip install "temporalio[mcp]"
+uv add "temporalio[mcp]"
 ```
 
 ## Usage
