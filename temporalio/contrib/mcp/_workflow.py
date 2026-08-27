@@ -1,8 +1,4 @@
-"""Workflow-side durable MCP client, shared by the contrib integrations.
-
-Nothing here is public API. Reach it through an integration's own surface,
-e.g. ``temporalio.contrib.openai_agents.workflow.temporal_mcp_server()``.
-"""
+"""Workflow-side durable MCP client."""
 
 # pyright: reportUnusedClass=false
 
@@ -15,12 +11,12 @@ from typing import Any
 from mcp.types import (
     CallToolResult,
     GetPromptResult,
-    Prompt,
+    ListPromptsResult,
+    ListResourcesResult,
+    ListResourceTemplatesResult,
+    ListToolsResult,
     ReadResourceResult,
     RequestParamsMeta,
-    Resource,
-    ResourceTemplate,
-    Tool,
 )
 
 from temporalio import workflow
@@ -34,13 +30,20 @@ from temporalio.contrib.mcp._activity import (
 from temporalio.workflow import ActivityConfig
 
 
-class _MCPClient:
+class TemporalMCPClient:
     """A durable workflow proxy for an MCP Python SDK v2 client.
+
+    This class is experimental and may change in future versions.
 
     Each operation executes as an Activity. Tool discovery is cached for the
     lifetime of this object by default. A non-None ``factory_argument`` selects
     a fresh worker-side client for every Activity. The argument is recorded in
     workflow history and must not contain secrets.
+
+    This class intentionally does not inherit from ``mcp.Client`` or
+    ``mcp.ClientSession``. It exposes the request/response operations that can
+    cross a durable Activity boundary, while the real transport lifecycle stays
+    on the worker.
     """
 
     def __init__(
@@ -57,7 +60,7 @@ class _MCPClient:
             "start_to_close_timeout": timedelta(minutes=1)
         }
         self._cache_tools_list = cache_tools_list
-        self._tools: list[Tool] | None = None
+        self._tools: ListToolsResult | None = None
         self._factory_argument = factory_argument
 
     @property
@@ -66,8 +69,8 @@ class _MCPClient:
         return self._name
 
     @property
-    def cached_tools(self) -> list[Tool] | None:
-        """Return the cached tools, or ``None`` when no list is cached."""
+    def cached_tools(self) -> ListToolsResult | None:
+        """Return the cached tool result, or ``None`` when none is cached."""
         return self._tools
 
     def _request(self) -> _MCPRequest:
@@ -83,14 +86,12 @@ class _MCPClient:
             **self._activity_config,
         )
 
-    async def list_tools(self) -> list[Tool]:
-        """List all tools, following every pagination cursor."""
+    async def list_tools(self) -> ListToolsResult:
+        """List all tools in one Activity, following every pagination cursor."""
         if self._cache_tools_list and self._tools is not None:
             return self._tools
-        values = await self._execute(
-            "list-tools", self._request(), list[dict[str, Any]]
-        )
-        tools = [Tool.model_validate(value) for value in values]
+        value = await self._execute("list-tools", self._request(), dict[str, Any])
+        tools = ListToolsResult.model_validate(value)
         if self._cache_tools_list:
             self._tools = tools
         return tools
@@ -116,12 +117,10 @@ class _MCPClient:
         value = await self._execute("call-tool", request, dict[str, Any])
         return CallToolResult.model_validate(value)
 
-    async def list_prompts(self) -> list[Prompt]:
-        """List all prompts, following every pagination cursor."""
-        values = await self._execute(
-            "list-prompts", self._request(), list[dict[str, Any]]
-        )
-        return [Prompt.model_validate(value) for value in values]
+    async def list_prompts(self) -> ListPromptsResult:
+        """List all prompts in one Activity, following every pagination cursor."""
+        value = await self._execute("list-prompts", self._request(), dict[str, Any])
+        return ListPromptsResult.model_validate(value)
 
     async def get_prompt(
         self, name: str, arguments: dict[str, str] | None = None
@@ -135,21 +134,19 @@ class _MCPClient:
         value = await self._execute("get-prompt", request, dict[str, Any])
         return GetPromptResult.model_validate(value)
 
-    async def list_resources(self) -> list[Resource]:
-        """List all resources, following every pagination cursor."""
-        values = await self._execute(
-            "list-resources", self._request(), list[dict[str, Any]]
-        )
-        return [Resource.model_validate(value) for value in values]
+    async def list_resources(self) -> ListResourcesResult:
+        """List all resources in one Activity, following every pagination cursor."""
+        value = await self._execute("list-resources", self._request(), dict[str, Any])
+        return ListResourcesResult.model_validate(value)
 
-    async def list_resource_templates(self) -> list[ResourceTemplate]:
+    async def list_resource_templates(self) -> ListResourceTemplatesResult:
         """List all resource templates, following every pagination cursor."""
-        values = await self._execute(
+        value = await self._execute(
             "list-resource-templates",
             self._request(),
-            list[dict[str, Any]],
+            dict[str, Any],
         )
-        return [ResourceTemplate.model_validate(value) for value in values]
+        return ListResourceTemplatesResult.model_validate(value)
 
     async def read_resource(self, uri: str) -> ReadResourceResult:
         """Read a resource."""
@@ -159,3 +156,8 @@ class _MCPClient:
         )
         value = await self._execute("read-resource", request, dict[str, Any])
         return ReadResourceResult.model_validate(value)
+
+
+# Kept as an internal alias while contrib integrations migrate to the public
+# name. It is not exported from ``temporalio.contrib.mcp``.
+_MCPClient = TemporalMCPClient

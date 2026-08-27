@@ -22,6 +22,11 @@ to include examples, links to docs, or any other relevant information.
 
 - Added an `mcp` extra pinning MCP Python SDK v2, for use alongside the
   `openai-agents` extra.
+- Added experimental `temporalio.contrib.mcp.MCPPlugin` and
+  `TemporalMCPClient` for using stdio, streamable HTTP, in-process, and custom
+  MCP Python SDK v2 clients from native workflow code. Tools, prompts, and
+  resources run durably through Activities, with fully paginated list results
+  and replay-safe tool discovery caching.
 
 ### Changed
 
@@ -54,6 +59,9 @@ to include examples, links to docs, or any other relevant information.
   separate environments.
 
 ### Fixed
+
+- The `Worker` async context manager now waits for plugin run-context cleanup
+  after worker shutdown instead of cancelling it.
 
 ### Security
 

@@ -7,6 +7,12 @@ from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any, TypeVar
 
+from mcp.types import (
+    ListPromptsResult,
+    ListResourcesResult,
+    ListResourceTemplatesResult,
+    ListToolsResult,
+)
 from pydantic import BaseModel
 
 from temporalio import activity
@@ -58,16 +64,17 @@ class _MCPActivities:
             @activity.defn(name=_activity_name(server, "list-tools"))
             async def list_tools(
                 request: dict[str, Any], server: str = server
-            ) -> list[dict[str, Any]]:
+            ) -> dict[str, Any]:
                 parsed = _MCPRequest(**request)
-                return [
-                    _dump(value)
-                    for value in await self._run(
-                        server,
-                        parsed,
-                        lambda backend: backend.list_tools(),
+                return _dump(
+                    ListToolsResult(
+                        tools=await self._run(
+                            server,
+                            parsed,
+                            lambda backend: backend.list_tools(),
+                        )
                     )
-                ]
+                )
 
             @activity.defn(name=_activity_name(server, "call-tool"))
             async def call_tool(
@@ -88,16 +95,17 @@ class _MCPActivities:
             @activity.defn(name=_activity_name(server, "list-prompts"))
             async def list_prompts(
                 request: dict[str, Any], server: str = server
-            ) -> list[dict[str, Any]]:
+            ) -> dict[str, Any]:
                 parsed = _MCPRequest(**request)
-                return [
-                    _dump(value)
-                    for value in await self._run(
-                        server,
-                        parsed,
-                        lambda backend: backend.list_prompts(),
+                return _dump(
+                    ListPromptsResult(
+                        prompts=await self._run(
+                            server,
+                            parsed,
+                            lambda backend: backend.list_prompts(),
+                        )
                     )
-                ]
+                )
 
             @activity.defn(name=_activity_name(server, "get-prompt"))
             async def get_prompt(
@@ -117,30 +125,32 @@ class _MCPActivities:
             @activity.defn(name=_activity_name(server, "list-resources"))
             async def list_resources(
                 request: dict[str, Any], server: str = server
-            ) -> list[dict[str, Any]]:
+            ) -> dict[str, Any]:
                 parsed = _MCPRequest(**request)
-                return [
-                    _dump(value)
-                    for value in await self._run(
-                        server,
-                        parsed,
-                        lambda backend: backend.list_resources(),
+                return _dump(
+                    ListResourcesResult(
+                        resources=await self._run(
+                            server,
+                            parsed,
+                            lambda backend: backend.list_resources(),
+                        )
                     )
-                ]
+                )
 
             @activity.defn(name=_activity_name(server, "list-resource-templates"))
             async def list_resource_templates(
                 request: dict[str, Any], server: str = server
-            ) -> list[dict[str, Any]]:
+            ) -> dict[str, Any]:
                 parsed = _MCPRequest(**request)
-                return [
-                    _dump(value)
-                    for value in await self._run(
-                        server,
-                        parsed,
-                        lambda backend: backend.list_resource_templates(),
+                return _dump(
+                    ListResourceTemplatesResult(
+                        resource_templates=await self._run(
+                            server,
+                            parsed,
+                            lambda backend: backend.list_resource_templates(),
+                        )
                     )
-                ]
+                )
 
             @activity.defn(name=_activity_name(server, "read-resource"))
             async def read_resource(

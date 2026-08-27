@@ -965,8 +965,11 @@ class Worker:
         if not self._async_context_run_task:
             raise RuntimeError("Never started")
         await self.shutdown()
-        # Cancel our run task
-        self._async_context_run_task.cancel()
+        # The worker's shutdown event is set before plugin run contexts unwind.
+        # Let those contexts finish so their cleanup is not mistaken for a
+        # fatal worker cancellation and propagated into the caller.
+        if not self._async_context_run_task.done():
+            await self._async_context_run_task
         # Only re-raise our exception if present and exc_type is cancel
         if exc_type is asyncio.CancelledError and self._async_context_run_exception:
             raise self._async_context_run_exception

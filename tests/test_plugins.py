@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 import uuid
 import warnings
@@ -331,6 +332,26 @@ async def test_simple_plugins(client: Client) -> None:
         HelloWorkflow,
         HelloWorkflow2,
     ]
+
+
+async def test_worker_awaits_plugin_run_context_cleanup(client: Client) -> None:
+    cleaned_up = False
+
+    @asynccontextmanager
+    async def run_context() -> AsyncIterator[None]:
+        nonlocal cleaned_up
+        try:
+            yield
+        finally:
+            await asyncio.sleep(0)
+            cleaned_up = True
+
+    plugin = SimplePlugin("RunContextPlugin", run_context=run_context)
+    async with new_worker(client, activities=[never_run_activity], plugins=[plugin]):
+        pass
+
+    assert cleaned_up
+    await asyncio.sleep(0)
 
 
 async def test_simple_plugins_callables(client: Client) -> None:

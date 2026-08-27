@@ -21,12 +21,16 @@ from mcp.types import (
     Tool,
 )
 
-from temporalio.contrib.mcp._workflow import _MCPClient
+from temporalio.contrib.mcp._workflow import TemporalMCPClient
 
 
 class _TemporalMCPServer(MCPServer):
     def __init__(
-        self, client: _MCPClient, *, tool_filter: ToolFilter = None, **kwargs: Any
+        self,
+        client: TemporalMCPClient,
+        *,
+        tool_filter: ToolFilter = None,
+        **kwargs: Any,
     ) -> None:
         self._client = client
         self._tool_filter = tool_filter
@@ -47,7 +51,7 @@ class _TemporalMCPServer(MCPServer):
         run_context: RunContextWrapper[Any] | None = None,
         agent: AgentBase | None = None,
     ) -> list[Tool]:
-        tools = await self._client.list_tools()
+        tools = (await self._client.list_tools()).tools
         if self._tool_filter is None:
             return tools
         if isinstance(self._tool_filter, dict):
@@ -76,7 +80,8 @@ class _TemporalMCPServer(MCPServer):
 
     @property
     def cached_tools(self) -> list[Tool] | None:
-        return self._client.cached_tools
+        result = self._client.cached_tools
+        return result.tools if result is not None else None
 
     async def call_tool(
         self,
@@ -89,7 +94,7 @@ class _TemporalMCPServer(MCPServer):
         )
 
     async def list_prompts(self) -> ListPromptsResult:
-        return ListPromptsResult(prompts=await self._client.list_prompts())
+        return await self._client.list_prompts()
 
     async def get_prompt(
         self, name: str, arguments: dict[str, Any] | None = None
@@ -106,7 +111,7 @@ class _TemporalMCPServer(MCPServer):
             raise ValueError(
                 "Temporal MCP servers return fully paginated resource lists"
             )
-        return ListResourcesResult(resources=await self._client.list_resources())
+        return await self._client.list_resources()
 
     async def list_resource_templates(
         self, cursor: str | None = None
@@ -115,9 +120,7 @@ class _TemporalMCPServer(MCPServer):
             raise ValueError(
                 "Temporal MCP servers return fully paginated resource template lists"
             )
-        return ListResourceTemplatesResult(
-            resource_templates=await self._client.list_resource_templates()
-        )
+        return await self._client.list_resource_templates()
 
     async def read_resource(self, uri: str) -> ReadResourceResult:
         return await self._client.read_resource(uri)

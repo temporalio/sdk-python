@@ -106,16 +106,17 @@ async def test_operations_are_plain_json_and_lists_are_fully_paginated() -> None
         functions[definition.name] = fn
     request: dict[str, Any] = {"factory_argument": None}
     try:
-        for operation, expected_key in (
-            ("list-tools", "name"),
-            ("list-prompts", "name"),
-            ("list-resources", "name"),
-            ("list-resource-templates", "name"),
+        for operation, result_key in (
+            ("list-tools", "tools"),
+            ("list-prompts", "prompts"),
+            ("list-resources", "resources"),
+            ("list-resource-templates", "resource_templates"),
         ):
             result = await functions[f"temporalio.contrib.mcp.test.{operation}"](
                 request
             )
-            assert [item[expected_key] for item in result] == ["one", "two"]
+            assert [item["name"] for item in result[result_key]] == ["one", "two"]
+            assert result["next_cursor"] is None
 
         tool_result = await functions["temporalio.contrib.mcp.test.call-tool"](
             {**request, "name": "echo", "arguments": {}, "meta": {"trace": "value"}}

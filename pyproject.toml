@@ -248,7 +248,6 @@ intersphinx = [
 ]
 privacy = [
   "PRIVATE:temporalio.bridge",
-  "PRIVATE:temporalio.contrib.mcp",
   "PRIVATE:temporalio.types",
   "PRIVATE:temporalio.worker.workflow_sandbox.restrictions",
   "PRIVATE:temporalio.worker.workflow_sandbox.runner",
