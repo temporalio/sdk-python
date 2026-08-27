@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
@@ -15,7 +15,10 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 from ._failure_converter import StrandsFailureConverter
 from ._model_activity import ModelActivity
-from ._sandbox_activity import SandboxActivities
+from ._sandbox_activity import (
+    SandboxActivities,
+    SandboxWorkflowContext,
+)
 from ._temporal_mcp_client import (
     _evict_connection,
     build_call_tool_activity,
@@ -43,9 +46,11 @@ class StrandsPlugin(SimplePlugin):
     disconnected; the timer resets on every reuse. Defaults to 5 minutes.
 
     When ``sandboxes`` is supplied, registers a stable set of name-prefixed
-    activities for every sandbox factory. Each factory is called lazily and
-    its sandbox is shared by those activities for the worker's lifetime. Use
-    the same name in workflow-side ``TemporalSandbox(name)`` instances.
+    activities for every sandbox factory. Each factory receives the owning
+    Workflow chain's context and may return a sandbox directly or awaitably.
+    Worker-local adapters are cached until ``sandbox_cache_idle_timeout``
+    elapses. Use the same name in workflow-side ``TemporalSandbox(name)``
+    instances.
     """
 
     def __init__(
@@ -53,8 +58,16 @@ class StrandsPlugin(SimplePlugin):
         *,
         models: dict[str, Callable[[], Model]] | None = None,
         mcp_clients: dict[str, Callable[[], MCPClient]] | None = None,
-        sandboxes: dict[str, Callable[[], Sandbox]] | None = None,
+        sandboxes: dict[
+            str,
+            Callable[
+                [SandboxWorkflowContext],
+                Sandbox | Awaitable[Sandbox],
+            ],
+        ]
+        | None = None,
         mcp_connection_idle_timeout: timedelta | None = None,
+        sandbox_cache_idle_timeout: timedelta | None = None,
     ) -> None:
         """Build the plugin from optional model, MCP, and sandbox factories.
 
@@ -70,8 +83,12 @@ class StrandsPlugin(SimplePlugin):
             ma = ModelActivity(models, default_name=default_name)
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
 
-        for name, sandbox_factory in (sandboxes or {}).items():
-            activities.extend(SandboxActivities(name, sandbox_factory).activities())
+        sandbox_activity_groups = [
+            SandboxActivities(name, sandbox_factory, sandbox_cache_idle_timeout)
+            for name, sandbox_factory in (sandboxes or {}).items()
+        ]
+        for sandbox_activities in sandbox_activity_groups:
+            activities.extend(sandbox_activities.activities())
 
         mcp_clients = mcp_clients or {}
         for server, client_factory in mcp_clients.items():
@@ -91,6 +108,8 @@ class StrandsPlugin(SimplePlugin):
             try:
                 yield
             finally:
+                for sandbox_activities in sandbox_activity_groups:
+                    await sandbox_activities.aclose()
                 for server in mcp_clients:
                     await _evict_connection(server)
 

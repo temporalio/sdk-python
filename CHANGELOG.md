@@ -20,8 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- **Experimental**: `temporalio.contrib.strands` now supports durable Strands
-  sandboxes through `TemporalSandbox` and worker-side factories registered with
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  context-aware worker-side factories registered with
   `StrandsPlugin(sandboxes=...)`, with optional live Workflow Streams output.
 - Added `temporalio.converter.create_payload_validation_error` to create the
   non-retryable application error used when a converted payload fails validation.

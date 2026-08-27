@@ -152,6 +152,7 @@ class TemporalSandbox(Sandbox):
     async def _execute(
         self, operation: str, input: Any, *, result_type: type | None = None
     ) -> Any:
+        input.first_execution_run_id = workflow.info().first_execution_run_id
         try:
             return await workflow.execute_activity(
                 _activity_name(self._name, operation),

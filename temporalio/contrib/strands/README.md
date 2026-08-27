@@ -178,7 +178,20 @@ worker-side sandbox under a name, then select that name in workflow code:
 
 ```python
 from strands.sandbox.docker import DockerSandbox
-from temporalio.contrib.strands import StrandsPlugin, TemporalAgent, TemporalSandbox
+from temporalio.contrib.strands import (
+    SandboxWorkflowContext,
+    StrandsPlugin,
+    TemporalAgent,
+    TemporalSandbox,
+)
+
+async def build_sandbox(context: SandboxWorkflowContext) -> DockerSandbox:
+    # Application-specific and idempotent: return the existing container when
+    # another activity worker has already provisioned this Workflow's sandbox.
+    container = await get_or_create_build_container(
+        context.first_execution_run_id
+    )
+    return DockerSandbox(container.name)
 
 # workflow
 agent = TemporalAgent(
@@ -192,22 +205,42 @@ agent = TemporalAgent(
 Worker(
     ...,
     plugins=[StrandsPlugin(sandboxes={
-        "build": lambda: DockerSandbox("agent-build-container"),
+        "build": build_sandbox,
     })],
 )
 ```
 
-The factory is called lazily on first use. Its sandbox instance is cached and
-shared by all activities for that name for the worker's lifetime, so tools see
-the same filesystem and working state. Provisioning and teardown of the backing
-environment remain the application's responsibility.
+The factory is called lazily with a `SandboxWorkflowContext` that identifies the
+Workflow's namespace, Workflow ID, and first execution Run ID. Each Workflow
+chain gets a separate sandbox for each registered name. Retries,
+Continue-As-New, Reset, and Cron runs belong to the same chain and therefore use
+the same sandbox; unrelated Workflow chains do not share one. Multiple
+`TemporalSandbox` objects with the same name in one chain intentionally share
+that chain's sandbox.
+
+Factories may be synchronous or asynchronous. Synchronous factories must only
+construct a lightweight adapter and must not block the activity event loop;
+use an asynchronous factory for remote lookup or provisioning. A factory may
+run more than once for the same context after cache eviction or on different
+workers, so provisioning must be idempotent. Strands' `DockerSandbox` only
+connects to an already-running container; it does not create one.
+
+Worker-local adapters are reused until they have been idle for five minutes.
+Set `sandbox_cache_idle_timeout` on `StrandsPlugin` to change that duration.
+Eviction only drops the local adapter. Provisioning, teardown, and cleanup of
+orphaned backing environments remain the application's responsibility; use a
+backend TTL or reaper for workflows that are terminated before normal cleanup.
 
 That cache is per worker *process*, while successive sandbox activities from one
 workflow are routed independently across the task queue. With more than one
 worker on the queue, a `write-file` can land on one worker and the following
-`read-file` on another, so the factory must point at state the whole queue
-shares — a named Docker container, an SSH host — rather than a per-process
-temporary directory. A single worker on the queue also satisfies this.
+`read-file` on another. The context factory must therefore reconnect every
+worker to the same Workflow-scoped backing environment rather than relying on
+per-process state. A single worker on the queue also satisfies this.
+
+Reset does not roll back commands or filesystem mutations already performed in
+the external sandbox, just as it does not roll back other Activity side effects.
+Account for that when resetting a Workflow that uses a sandbox.
 
 `SandboxTimeoutError` and any `FileNotFoundError` — including its
 `SandboxPathNotFoundError` subclass — cross the activity boundary as

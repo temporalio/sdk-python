@@ -1,5 +1,10 @@
+from __future__ import annotations
+
+import asyncio
 import base64
-from collections.abc import AsyncGenerator, Callable
+import inspect
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
@@ -20,10 +25,28 @@ from ._heartbeat_decorator import auto_heartbeater
 
 SANDBOX_TIMEOUT_ERROR_TYPE = "StrandsSandboxTimeoutError"
 SANDBOX_PATH_NOT_FOUND_ERROR_TYPE = "StrandsSandboxPathNotFoundError"
+_SANDBOX_CACHE_IDLE_TIMEOUT = timedelta(minutes=5)
+
+
+@dataclass(frozen=True)
+class SandboxWorkflowContext:
+    """Identity of the Workflow chain that owns a worker-side sandbox."""
+
+    namespace: str
+    workflow_id: str
+    first_execution_run_id: str
+
+
+SandboxFactory = Callable[[SandboxWorkflowContext], Sandbox | Awaitable[Sandbox]]
 
 
 @dataclass
-class _ExecuteInput:
+class _WorkflowScopedInput:
+    first_execution_run_id: str = field(default="", kw_only=True)
+
+
+@dataclass
+class _ExecuteInput(_WorkflowScopedInput):
     command: str
     timeout: float | None = None
     cwd: str | None = None
@@ -34,7 +57,7 @@ class _ExecuteInput:
 
 
 @dataclass
-class _ExecuteCodeInput:
+class _ExecuteCodeInput(_WorkflowScopedInput):
     code: str
     language: str
     timeout: float | None = None
@@ -46,7 +69,7 @@ class _ExecuteCodeInput:
 
 
 @dataclass
-class _PathInput:
+class _PathInput(_WorkflowScopedInput):
     path: str
     kwargs: dict[str, Any] = field(default_factory=dict)
 
@@ -61,19 +84,130 @@ class _StreamItem:
     value: dict[str, Any]
 
 
-class SandboxActivities:
-    """Lazily resolves one registered sandbox and exposes its activities."""
+class _SandboxRecord:
+    def __init__(
+        self,
+        owner: SandboxActivities,
+        context: SandboxWorkflowContext,
+        factory: SandboxFactory,
+        idle_timeout: timedelta,
+    ) -> None:
+        self._owner = owner
+        self._context = context
+        self._idle_timeout = idle_timeout
+        self._inflight = 0
+        self._idle_handle: asyncio.TimerHandle | None = None
+        self._sandbox_task = asyncio.create_task(self._create(factory))
 
-    def __init__(self, name: str, factory: Callable[[], Sandbox]) -> None:
-        """Store a sandbox name and its lazy worker-side factory."""
+    async def _create(self, factory: SandboxFactory) -> Sandbox:
+        sandbox = factory(self._context)
+        if inspect.isawaitable(sandbox):
+            return await sandbox
+        return sandbox
+
+    def acquire(self) -> None:
+        self._inflight += 1
+        if self._idle_handle is not None:
+            self._idle_handle.cancel()
+            self._idle_handle = None
+
+    def release(self) -> None:
+        self._inflight -= 1
+        if self._inflight == 0 and self._owner._has_record(self._context, self):
+            self._idle_handle = asyncio.get_running_loop().call_later(
+                self._idle_timeout.total_seconds(), self._on_idle
+            )
+
+    def _on_idle(self) -> None:
+        self._idle_handle = None
+        if self._inflight == 0:
+            self._owner._evict(self._context, self)
+
+    async def sandbox(self) -> Sandbox:
+        return await asyncio.shield(self._sandbox_task)
+
+    def creation_done(self) -> bool:
+        return self._sandbox_task.done()
+
+    async def aclose(self) -> None:
+        if self._idle_handle is not None:
+            self._idle_handle.cancel()
+            self._idle_handle = None
+        if not self._sandbox_task.done():
+            self._sandbox_task.cancel()
+        try:
+            await self._sandbox_task
+        except BaseException:
+            pass
+
+
+class SandboxActivities:
+    """Lazily resolves Workflow-scoped sandboxes and exposes their activities."""
+
+    def __init__(
+        self,
+        name: str,
+        factory: SandboxFactory,
+        idle_timeout: timedelta | None = None,
+    ) -> None:
+        """Store a sandbox name and its Workflow-scoped worker-side factory."""
         self._name = name
         self._factory = factory
-        self._sandbox: Sandbox | None = None
+        self._idle_timeout = (
+            idle_timeout if idle_timeout is not None else _SANDBOX_CACHE_IDLE_TIMEOUT
+        )
+        if self._idle_timeout <= timedelta(0):
+            raise ValueError("Sandbox cache idle timeout must be positive")
+        self._records: dict[SandboxWorkflowContext, _SandboxRecord] = {}
 
-    def _get_sandbox(self) -> Sandbox:
-        if self._sandbox is None:
-            self._sandbox = self._factory()
-        return self._sandbox
+    @asynccontextmanager
+    async def _sandbox(
+        self, input: _WorkflowScopedInput
+    ) -> AsyncGenerator[Sandbox, None]:
+        info = activity.info()
+        if not info.workflow_id or not input.first_execution_run_id:
+            raise RuntimeError("Sandbox activities must be started by a Workflow")
+        context = SandboxWorkflowContext(
+            namespace=info.namespace,
+            workflow_id=info.workflow_id,
+            first_execution_run_id=input.first_execution_run_id,
+        )
+        record = self._records.get(context)
+        if record is None:
+            record = _SandboxRecord(self, context, self._factory, self._idle_timeout)
+            self._records[context] = record
+        record.acquire()
+        try:
+            try:
+                sandbox = await record.sandbox()
+            except asyncio.CancelledError:
+                # One cancelled activity must not cancel or evict initialization
+                # that another activity for the same Workflow is awaiting.
+                if record.creation_done():
+                    self._evict(context, record)
+                raise
+            except BaseException:
+                self._evict(context, record)
+                raise
+            yield sandbox
+        finally:
+            record.release()
+
+    def _has_record(
+        self, context: SandboxWorkflowContext, record: _SandboxRecord
+    ) -> bool:
+        return self._records.get(context) is record
+
+    def _evict(self, context: SandboxWorkflowContext, record: _SandboxRecord) -> None:
+        if self._has_record(context, record):
+            del self._records[context]
+
+    async def aclose(self) -> None:
+        """Cancel cache timers and discard all worker-local sandbox adapters."""
+        records = list(self._records.values())
+        self._records.clear()
+        for record in records:
+            await record.aclose()
 
     def activities(self) -> list[Callable[..., Any]]:
         """Build stable, name-prefixed activities for this sandbox."""
@@ -81,43 +215,46 @@ class SandboxActivities:
         @activity.defn(name=_activity_name(self._name, "execute"))
         @auto_heartbeater
         async def execute(input: _ExecuteInput) -> list[_StreamItem]:
-            return await self._run_stream(
-                self._get_sandbox().execute_streaming(
-                    input.command,
+            async with self._sandbox(input) as sandbox:
+                return await self._run_stream(
+                    sandbox.execute_streaming(
+                        input.command,
+                        timeout=input.timeout,
+                        cwd=input.cwd,
+                        env=input.env,
+                        **input.kwargs,
+                    ),
                     timeout=input.timeout,
-                    cwd=input.cwd,
-                    env=input.env,
-                    **input.kwargs,
-                ),
-                timeout=input.timeout,
-                streaming_topic=input.streaming_topic,
-                streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
-            )
+                    streaming_topic=input.streaming_topic,
+                    streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
+                )
 
         @activity.defn(name=_activity_name(self._name, "execute-code"))
         @auto_heartbeater
         async def execute_code(
             input: _ExecuteCodeInput,
         ) -> list[_StreamItem]:
-            return await self._run_stream(
-                self._get_sandbox().execute_code_streaming(
-                    input.code,
-                    input.language,
+            async with self._sandbox(input) as sandbox:
+                return await self._run_stream(
+                    sandbox.execute_code_streaming(
+                        input.code,
+                        input.language,
+                        timeout=input.timeout,
+                        cwd=input.cwd,
+                        env=input.env,
+                        **input.kwargs,
+                    ),
                     timeout=input.timeout,
-                    cwd=input.cwd,
-                    env=input.env,
-                    **input.kwargs,
-                ),
-                timeout=input.timeout,
-                streaming_topic=input.streaming_topic,
-                streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
-            )
+                    streaming_topic=input.streaming_topic,
+                    streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
+                )
 
         @activity.defn(name=_activity_name(self._name, "read-file"))
         @auto_heartbeater
         async def read_file(input: _PathInput) -> bytes:
             try:
-                return await self._get_sandbox().read_file(input.path, **input.kwargs)
+                async with self._sandbox(input) as sandbox:
+                    return await sandbox.read_file(input.path, **input.kwargs)
             except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
@@ -125,11 +262,12 @@ class SandboxActivities:
         @auto_heartbeater
         async def write_file(input: _WriteFileInput) -> None:
             try:
-                await self._get_sandbox().write_file(
-                    input.path,
-                    base64.b64decode(input.content_base64),
-                    **input.kwargs,
-                )
+                async with self._sandbox(input) as sandbox:
+                    await sandbox.write_file(
+                        input.path,
+                        base64.b64decode(input.content_base64),
+                        **input.kwargs,
+                    )
             except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
@@ -137,7 +275,8 @@ class SandboxActivities:
         @auto_heartbeater
         async def remove_file(input: _PathInput) -> None:
             try:
-                await self._get_sandbox().remove_file(input.path, **input.kwargs)
+                async with self._sandbox(input) as sandbox:
+                    await sandbox.remove_file(input.path, **input.kwargs)
             except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
@@ -145,7 +284,8 @@ class SandboxActivities:
         @auto_heartbeater
         async def list_files(input: _PathInput) -> list[FileInfo]:
             try:
-                return await self._get_sandbox().list_files(input.path, **input.kwargs)
+                async with self._sandbox(input) as sandbox:
+                    return await sandbox.list_files(input.path, **input.kwargs)
             except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
