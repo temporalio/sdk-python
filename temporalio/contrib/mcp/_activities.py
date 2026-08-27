@@ -35,8 +35,6 @@ class _MCPActivities:
         factories: dict[str, _MCPBackendFactory],
         idle_timeout: timedelta | None = timedelta(minutes=5),
     ) -> None:
-        if len(factories) != len(set(factories)):
-            raise ValueError("MCP client names must be unique")
         self._factories = dict(factories)
         self._pool = _MCPConnectionPool(self._factories, idle_timeout)
         self.activities = self._build_activities()

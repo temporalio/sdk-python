@@ -135,7 +135,7 @@ class _StatelessMCPServerReference(MCPServer):  # type:ignore[reportUnusedClass]
 class StatelessMCPServerProvider:
     """A stateless MCP server implementation for Temporal workflows.
 
-    .. deprecated:: 1.33
+    .. deprecated:: 1.32
         Use ``OpenAIAgentsPlugin(mcp_servers=...)`` and
         ``workflow.temporal_mcp_server()`` instead.
 
@@ -427,7 +427,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):  # ty
 class StatefulMCPServerProvider:
     """A stateful MCP server implementation for Temporal workflows.
 
-    .. deprecated:: 1.33
+    .. deprecated:: 1.32
         Use ``OpenAIAgentsPlugin(mcp_servers=...)`` and
         ``workflow.temporal_mcp_server()`` instead.
 

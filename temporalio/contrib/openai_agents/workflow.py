@@ -287,7 +287,7 @@ def stateless_mcp_server(
 ) -> "MCPServer":
     """A stateless MCP server implementation for Temporal workflows.
 
-    .. deprecated:: 1.33
+    .. deprecated:: 1.32
         Use :py:func:`temporal_mcp_server` instead.
 
     This uses a TemporalMCPServer of the same name registered with the OpenAIAgents plugin to implement
@@ -335,7 +335,7 @@ def stateful_mcp_server(
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
 
-    .. deprecated:: 1.33
+    .. deprecated:: 1.32
         Use :py:func:`temporal_mcp_server` instead.
 
     This wraps an MCP server to maintain a persistent connection throughout

@@ -23,6 +23,7 @@ class _ConnectionRecord:
         self._idle_handle: asyncio.TimerHandle | None = None
         self._close_task: asyncio.Task[None] | None = None
         self._failure: BaseException | None = None
+        self._retired = False
 
     async def _run(self, factory: Callable[[], _MCPBackend]) -> None:
         try:
@@ -45,6 +46,13 @@ class _ConnectionRecord:
     @property
     def idle(self) -> bool:
         return self._inflight == 0
+
+    @property
+    def retired(self) -> bool:
+        return self._retired
+
+    def retire(self) -> None:
+        self._retired = True
 
     def acquire(self) -> None:
         self._inflight += 1
@@ -153,7 +161,14 @@ class _MCPConnectionPool:
             raise
         finally:
             if failed:
-                await self._evict(key, record)
+                # Retire the connection so no later operation reuses it, but
+                # leave the transport open for operations still in flight on
+                # it. The last operation to release the record closes it.
+                record.retire()
+                await self._unmap(key, record)
+            if record.retired:
+                if record.release(timedelta(0), lambda: None):
+                    await record.close()
             elif cached:
                 if self._idle_timeout is None:
                     record.release(None, lambda: None)
@@ -176,6 +191,22 @@ class _MCPConnectionPool:
     ) -> None:
         asyncio.create_task(self._evict(key, record, only_if_idle=True))
 
+    async def _unmap(
+        self,
+        key: tuple[asyncio.AbstractEventLoop, str],
+        record: _ConnectionRecord,
+        *,
+        only_if_idle: bool = False,
+    ) -> bool:
+        """Drop the cached record, returning whether it may now be closed."""
+        lock = self._locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            if self._records.get(key) is record:
+                if only_if_idle and not record.idle:
+                    return False
+                self._records.pop(key, None)
+        return True
+
     async def _evict(
         self,
         key: tuple[asyncio.AbstractEventLoop, str],
@@ -183,13 +214,8 @@ class _MCPConnectionPool:
         *,
         only_if_idle: bool = False,
     ) -> None:
-        lock = self._locks.setdefault(key, asyncio.Lock())
-        async with lock:
-            if self._records.get(key) is record:
-                if only_if_idle and not record.idle:
-                    return
-                self._records.pop(key, None)
-        await record.close()
+        if await self._unmap(key, record, only_if_idle=only_if_idle):
+            await record.close()
 
     async def close(self) -> None:
         loop = asyncio.get_running_loop()

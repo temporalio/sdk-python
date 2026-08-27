@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 from typing import Any, cast
 
@@ -153,6 +154,48 @@ async def test_operation_failure_evicts_connection() -> None:
             "echo",
             factory_argument=None,
         ):
+            pass
+        assert created == 2
+    finally:
+        await pool.close()
+
+
+async def test_failure_does_not_close_a_concurrently_used_connection() -> None:
+    server = echo_server()
+    created = 0
+
+    def factory() -> _MCPClientBackend:
+        nonlocal created
+        created += 1
+        return _MCPClientBackend(Client(server))
+
+    pool = _MCPConnectionPool({"echo": factory}, timedelta(minutes=5))
+    try:
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def survivor() -> Any:
+            async with pool.backend("echo", factory_argument=None) as client:
+                entered.set()
+                await release.wait()
+                return await client.call_tool("echo", {"value": "hi"}, None)
+
+        task = asyncio.create_task(survivor())
+        await entered.wait()
+
+        # A peer operation failing must not tear the shared connection out from
+        # under the operation still in flight on it.
+        with pytest.raises(RuntimeError, match="connection failed"):
+            async with pool.backend("echo", factory_argument=None):
+                raise RuntimeError("connection failed")
+
+        release.set()
+        result = await task
+        assert result.is_error is False
+        assert created == 1
+
+        # The retired connection is still not handed to later operations.
+        async with pool.backend("echo", factory_argument=None):
             pass
         assert created == 2
     finally:
