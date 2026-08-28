@@ -172,14 +172,25 @@ test-mcp-v1 = { cmd = "uv run --no-default-groups --group dev-mcp-v1 pytest -n a
 
 [tool.poe.tasks.lint-types-mcp-v1]
 shell = """
-uv run --no-default-groups --group dev-mcp-v1 mypy \
-  --namespace-packages --check-untyped-defs \
-  temporalio/contrib/google_adk_agents/*.py \
-  temporalio/contrib/google_genai/*.py \
-  temporalio/contrib/strands/*.py \
-  tests/contrib/google_adk_agents/*.py \
-  tests/contrib/google_genai/*.py \
+set -e
+MCP_V1_TYPECHECK_PATHS="
+  temporalio/contrib/google_adk_agents/*.py
+  temporalio/contrib/google_genai/*.py
+  temporalio/contrib/strands/*.py
+  temporalio/contrib/openai_agents/_mcp.py
+  tests/contrib/google_adk_agents/*.py
+  tests/contrib/google_genai/*.py
   tests/contrib/strands/*.py
+  tests/contrib/openai_agents/test_openai.py
+"
+uv run --no-default-groups --group dev-mcp-v1 pyright \
+  $MCP_V1_TYPECHECK_PATHS
+uv run --no-default-groups --group dev-mcp-v1 mypy \
+  --cache-dir .mypy_cache/mcp-v1 --follow-imports=skip \
+  --namespace-packages --check-untyped-defs \
+  $MCP_V1_TYPECHECK_PATHS
+uv run --no-default-groups --group dev-mcp-v1 basedpyright \
+  $MCP_V1_TYPECHECK_PATHS
 """
 env = { UV_PROJECT_ENVIRONMENT = ".venv-mcp-v1" }
 executor = { type = "simple" }
