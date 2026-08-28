@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, cast
 from uuid import uuid4
@@ -203,7 +204,7 @@ def test_callable_worker_side_tool_filter_is_rejected() -> None:
         return value
 
     with pytest.raises(ApplicationError) as err:
-        _mcp_server_backend_factory("hello", factory)()
+        cast(Callable[[], Any], _mcp_server_backend_factory("hello", factory))()
     assert err.value.non_retryable
     assert "temporal_mcp_server()" in str(err.value)
 
@@ -214,4 +215,4 @@ def test_static_worker_side_tool_filter_is_allowed() -> None:
         value.tool_filter = {"blocked_tool_names": ["say_hello"]}  # type: ignore[attr-defined]
         return value
 
-    _mcp_server_backend_factory("hello", factory)()
+    cast(Callable[[], Any], _mcp_server_backend_factory("hello", factory))()
