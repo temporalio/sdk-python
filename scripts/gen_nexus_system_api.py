@@ -11,7 +11,17 @@ import gen_protos
 
 base_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(base_dir))
-wit_input_dir = base_dir / "temporalio" / "nexus" / "system" / "wit"
+wit_input_dir = (
+    base_dir
+    / "temporalio"
+    / "bridge"
+    / "sdk-core"
+    / "crates"
+    / "protos"
+    / "protos"
+    / "api_upstream"
+    / "nexus"
+)
 wit_path = wit_input_dir / "workflow-service.wit"
 wit_deps_dir = wit_input_dir / "deps"
 python_support_path = base_dir / "scripts" / "nex_gen_support.py"
