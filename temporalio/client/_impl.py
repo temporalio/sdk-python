@@ -52,6 +52,7 @@ from ._activity import (
     ActivityExecutionDescription,
     ActivityExecutionOptions,
     ActivityHandle,
+    ActivityOptionsUpdate,
     AsyncActivityIDReference,
 )
 from ._exceptions import (
@@ -761,11 +762,14 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if input.restore_original:
             req.restore_original = True
         else:
+            # For repeated keys, later values override previous ones.
+            by_path: dict[str, ActivityOptionsUpdate[Any]] = {}
             for update in input.updates:
-                req.update_mask.paths.append(update.key.name)
+                by_path[update.key.name] = update
+            for name, update in by_path.items():
+                req.update_mask.paths.append(name)
                 if update.value is None:
                     continue
-                name = update.key.name
                 if name == "task_queue.name":
                     req.activity_options.task_queue.name = update.value
                 elif name == "retry_policy":

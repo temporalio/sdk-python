@@ -146,28 +146,48 @@ async def test_restore_original_options_is_exclusive(
     assert list(update.update_mask.paths) == []
 
 
-async def test_value_unset_clears_the_option(
+async def test_value_set_of_zero_sends_an_explicit_zero(
     client: Client, captured: _CapturedService
 ):
-    # Clearing is the third state: the path is named in the mask so the server acts on it,
-    # but the proto field is left unset so the value goes away rather than being set.
+    handle = client.get_activity_handle("act-1")
+    await handle.update_options(
+        [ActivityOptionsKeys.heartbeat_timeout.value_set(timedelta(0))]
+    )
+
+    update = captured.requests["update"]
+    assert sorted(update.update_mask.paths) == ["heartbeat_timeout"]
+    # Present and zero, which is distinct from absent: the caller asked for zero.
+    assert update.activity_options.HasField("heartbeat_timeout")
+    assert update.activity_options.heartbeat_timeout.ToTimedelta() == timedelta(0)
+
+
+async def test_value_unset_names_the_path_but_leaves_the_field_absent(
+    client: Client, captured: _CapturedService
+):
+    handle = client.get_activity_handle("act-1")
+    await handle.update_options([ActivityOptionsKeys.heartbeat_timeout.value_unset()])
+
+    update = captured.requests["update"]
+    assert sorted(update.update_mask.paths) == ["heartbeat_timeout"]
+    # Absent, which is how the server is told to clear the option.
+    assert not update.activity_options.HasField("heartbeat_timeout")
+
+
+async def test_a_repeated_key_resolves_to_its_last_update(
+    client: Client, captured: _CapturedService
+):
     handle = client.get_activity_handle("act-1")
     await handle.update_options(
         [
+            ActivityOptionsKeys.heartbeat_timeout.value_set(timedelta(seconds=5)),
             ActivityOptionsKeys.heartbeat_timeout.value_unset(),
-            ActivityOptionsKeys.start_to_close_timeout.value_set(timedelta(seconds=90)),
         ]
     )
 
     update = captured.requests["update"]
-    assert sorted(update.update_mask.paths) == [
-        "heartbeat_timeout",
-        "start_to_close_timeout",
-    ]
+    # The later unset wins, and the path is named once.
+    assert sorted(update.update_mask.paths) == ["heartbeat_timeout"]
     assert not update.activity_options.HasField("heartbeat_timeout")
-    assert update.activity_options.start_to_close_timeout.ToTimedelta() == timedelta(
-        seconds=90
-    )
 
 
 async def test_update_options_requires_at_least_one_update(client: Client):
