@@ -26,6 +26,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- Experimental external storage: `ExternalStorage.driver_selector` is now called with a
+  `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
+  the new type carries the same `target` field. Since selectors are plain callables, a stale
+  annotation fails type checking rather than at runtime.
+
 ### Fixed
 
 ### Security
