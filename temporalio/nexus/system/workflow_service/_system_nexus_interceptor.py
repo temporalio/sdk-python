@@ -58,7 +58,7 @@ class _SystemNexusWorkflowOutboundInterceptorBase(abc.ABC):
     ) -> temporalio.workflow.NexusOperationHandle[
         models.SignalWithStartWorkflowResponse
     ]:
-        """Intercept the System Nexus temporal.api.workflowservice.v1.WorkflowService/SignalWithStartWorkflowExecution operation."""
+        """Intercept the SignalWithStartWorkflow operation."""
         return await self._next_system_nexus_interceptor().start_signal_with_start_workflow(
             request
         )
