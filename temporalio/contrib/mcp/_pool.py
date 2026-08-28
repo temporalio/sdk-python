@@ -158,6 +158,12 @@ class _MCPConnectionPool:
         failed = False
         try:
             yield await record.backend()
+        except asyncio.CancelledError:
+            # Cancelling an operation leaves the transport healthy: the MCP
+            # client cancels the in-flight request on the wire. Retiring the
+            # connection here would make one cancelled Activity force every
+            # other workflow sharing it to reconnect.
+            raise
         except BaseException:
             failed = True
             raise

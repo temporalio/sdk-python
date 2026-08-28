@@ -24,6 +24,7 @@ from temporalio.contrib.mcp._backend import (
     _FactoryInvoker,
     _MCPBackendFactory,
 )
+from temporalio.exceptions import ApplicationError
 
 _MCPServerFactory = Callable[[], MCPServer] | Callable[[Any], MCPServer]
 
@@ -97,12 +98,32 @@ class _OpenAIMCPServerBackend:
         return await self._server.read_resource(uri)
 
 
+def _reject_dynamic_tool_filter(name: str, server: MCPServer) -> None:
+    """Fail fast on a worker-side filter that can never be applied.
+
+    A callable ``tool_filter`` needs the run context and agent, which exist only
+    in the workflow, so the Agents SDK rejects one on the worker side and the
+    list-tools Activity would otherwise retry forever. A static filter needs
+    neither and is applied here as usual.
+    """
+    if callable(getattr(server, "tool_filter", None)):
+        raise ApplicationError(
+            f"MCP server {name!r} sets a callable tool_filter on its worker-side "
+            "MCPServer, which cannot be applied there because the run context "
+            "and agent it receives exist only in the workflow; pass the filter "
+            "to temporal_mcp_server() instead",
+            non_retryable=True,
+        )
+
+
 def _mcp_server_backend_factory(
     name: str, factory: _MCPServerFactory
 ) -> _MCPBackendFactory:
     invoke = _FactoryInvoker(name, factory)
 
     def create(argument: Any = _NOT_SUPPLIED) -> _OpenAIMCPServerBackend:
-        return _OpenAIMCPServerBackend(cast(MCPServer, invoke(argument)))
+        server = cast(MCPServer, invoke(argument))
+        _reject_dynamic_tool_filter(name, server)
+        return _OpenAIMCPServerBackend(server)
 
     return create

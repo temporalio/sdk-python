@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -29,6 +30,11 @@ from temporalio.contrib.mcp._pool import _MCPConnectionPool
 
 _Result = TypeVar("_Result")
 
+logger = logging.getLogger(__name__)
+
+# Upper bound on how long worker shutdown waits for MCP transports to close.
+_CLOSE_TIMEOUT_SECONDS = 10.0
+
 
 def _dump(model: BaseModel) -> dict[str, Any]:
     return model.model_dump(mode="json")
@@ -44,6 +50,7 @@ class _MCPActivities:
     ) -> None:
         self._factories = dict(factories)
         self._pool = _MCPConnectionPool(self._factories, idle_timeout)
+        self._abandoned_closes: set[asyncio.Task[None]] = set()
         self.activities = self._build_activities()
 
     async def _run(
@@ -194,4 +201,21 @@ class _MCPActivities:
                 # received while the worker was still running.
                 if not body_completed:
                     raise
-                await close_task
+                await self._finish_close(close_task)
+
+    async def _finish_close(self, close_task: asyncio.Task[None]) -> None:
+        """Wait a bounded time for a close whose cancellation was swallowed."""
+        try:
+            await asyncio.wait_for(asyncio.shield(close_task), _CLOSE_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            # An unresponsive MCP server must not hang worker shutdown
+            # indefinitely, especially now that there is no cancellation left to
+            # break out with. Leave the close running, but strongly referenced
+            # so it is not garbage collected part way through.
+            self._abandoned_closes.add(close_task)
+            close_task.add_done_callback(self._abandoned_closes.discard)
+            logger.warning(
+                "Timed out after %s seconds closing MCP connections; "
+                "an MCP server may not have shut down cleanly.",
+                _CLOSE_TIMEOUT_SECONDS,
+            )

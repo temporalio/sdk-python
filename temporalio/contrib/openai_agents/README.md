@@ -404,7 +404,9 @@ Configure transport, connection, retry, and message-handling behavior on the
 worker-side OpenAI `MCPServer`. Configure workflow-facing behavior such as
 `tool_filter`, `require_approval`, `failure_error_function`, and metadata
 resolvers on `temporal_mcp_server(...)`, where the OpenAI agent can use it.
-Custom `MCPServer` method implementations still execute worker-side.
+Custom `MCPServer` method implementations still execute worker-side. A callable
+`tool_filter` on the worker-side server is rejected, because the run context and
+agent it receives exist only in the workflow.
 
 Every MCP operation is a Temporal Activity. The workflow-side tool list is
 cached by default; pass `cache_tools_list=False` to refresh it on every Agents

@@ -13,11 +13,15 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import ModelActivityParameters
+from temporalio.contrib.openai_agents._mcp_backend import (
+    _mcp_server_backend_factory,
+)
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
     ResponseBuilders,
     TestModel,
 )
+from temporalio.exceptions import ApplicationError
 from tests.helpers import new_worker
 
 
@@ -190,3 +194,24 @@ async def test_factory_argument_uses_fresh_client_per_activity(
 
     assert result == "Hi Tom and Tim!"
     assert arguments == [{"tenant": "acme"}] * 3
+
+
+def test_callable_worker_side_tool_filter_is_rejected() -> None:
+    def factory() -> AgentsMCPServer:
+        value = InProcessMCPServer(server())
+        value.tool_filter = lambda context, tool: True  # type: ignore[attr-defined]
+        return value
+
+    with pytest.raises(ApplicationError) as err:
+        _mcp_server_backend_factory("hello", factory)()
+    assert err.value.non_retryable
+    assert "temporal_mcp_server()" in str(err.value)
+
+
+def test_static_worker_side_tool_filter_is_allowed() -> None:
+    def factory() -> AgentsMCPServer:
+        value = InProcessMCPServer(server())
+        value.tool_filter = {"blocked_tool_names": ["say_hello"]}  # type: ignore[attr-defined]
+        return value
+
+    _mcp_server_backend_factory("hello", factory)()
