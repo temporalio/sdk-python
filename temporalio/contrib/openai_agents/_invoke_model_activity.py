@@ -311,8 +311,6 @@ def _raise_for_openai_status(e: APIStatusError) -> NoReturn:
             retry_after = timedelta(seconds=float(retry_after_header))
 
     should_retry_header = e.response.headers.get("x-should-retry")
-    if should_retry_header == "true":
-        raise e
     if should_retry_header == "false":
         raise ApplicationError(
             "Non retryable OpenAI error",
@@ -323,9 +321,12 @@ def _raise_for_openai_status(e: APIStatusError) -> NoReturn:
     # Retry on 408 (Request Timeout), 409 (Conflict / often transient
     # state mismatch), 429 (Too Many Requests / rate-limited), and any
     # 5xx (server-side errors). All other 4xx codes are caller errors
-    # that won't recover on retry.
+    # that won't recover on retry, unless the server explicitly asks for
+    # a retry via x-should-retry.
     retryable = (
-        e.response.status_code in [408, 409, 429] or e.response.status_code >= 500
+        should_retry_header == "true"
+        or e.response.status_code in [408, 409, 429]
+        or e.response.status_code >= 500
     )
     raise ApplicationError(
         f"{'Retryable' if retryable else 'Non retryable'} OpenAI status code: "

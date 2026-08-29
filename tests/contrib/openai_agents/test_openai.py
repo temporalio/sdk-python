@@ -87,7 +87,10 @@ from temporalio.contrib.openai_agents import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
 )
-from temporalio.contrib.openai_agents._invoke_model_activity import _build_tool
+from temporalio.contrib.openai_agents._invoke_model_activity import (
+    _build_tool,
+    _raise_for_openai_status,
+)
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import (
     _coerce_run_config,
@@ -1482,6 +1485,65 @@ async def test_exception_handling(client: Client):
     await assert_status_retry_behavior(400, client, should_retry=False)
     await assert_status_retry_behavior(403, client, should_retry=False)
     await assert_status_retry_behavior(404, client, should_retry=False)
+
+
+def _openai_status_error(status: int, headers: dict[str, str]) -> APIStatusError:
+    import httpx
+
+    return APIStatusError(
+        message="Something went wrong.",
+        response=httpx.Response(
+            status_code=status,
+            request=httpx.Request("GET", url=""),
+            headers=headers,
+        ),
+        body=None,
+    )
+
+
+def test_retry_after_ms_propagated_when_server_requests_retry():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(
+                429, {"x-should-retry": "true", "retry-after-ms": "5000"}
+            )
+        )
+    assert not err.value.non_retryable
+    assert err.value.next_retry_delay == timedelta(milliseconds=5000)
+
+
+def test_retry_after_seconds_propagated_when_server_requests_retry():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(429, {"x-should-retry": "true", "retry-after": "5"})
+        )
+    assert not err.value.non_retryable
+    assert err.value.next_retry_delay == timedelta(seconds=5)
+
+
+def test_should_retry_true_overrides_non_retryable_status():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(_openai_status_error(400, {"x-should-retry": "true"}))
+    assert not err.value.non_retryable
+
+
+def test_should_retry_false_stays_non_retryable():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(
+                429, {"x-should-retry": "false", "retry-after-ms": "5000"}
+            )
+        )
+    assert err.value.non_retryable
+    assert err.value.next_retry_delay == timedelta(milliseconds=5000)
+
+
+def test_retry_after_ms_takes_precedence_over_retry_after():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(429, {"retry-after-ms": "1500", "retry-after": "60"})
+        )
+    assert err.value.next_retry_delay == timedelta(milliseconds=1500)
 
 
 class CustomModelProvider(ModelProvider):
