@@ -13,8 +13,7 @@ from datetime import timedelta
 import pytest
 from google.adk import Agent
 
-# ADK 2.7 marks StreamingMode as a private re-export, while older supported
-# versions do not have the suggested google.adk.agents._streaming_mode module.
+# ADK 2.7 marks StreamingMode as a private re-export.
 from google.adk.agents.run_config import (
     RunConfig,
     StreamingMode,  # pyright: ignore[reportPrivateImportUsage]
