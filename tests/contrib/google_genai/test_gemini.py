@@ -292,8 +292,8 @@ class GeminiApiCallTracker:
         self, req: _GeminiUploadToFileSearchStoreRequest
     ) -> types.UploadToFileSearchStoreOperation:
         self.file_search_store_upload_requests.append(req)
-        return types.UploadToFileSearchStoreOperation.model_construct(
-            name="operations/test-op",
+        return types.UploadToFileSearchStoreOperation.model_validate(
+            {"name": "operations/test-op"}
         )
 
     @activity.defn
@@ -1387,8 +1387,8 @@ def _apply_plugin_with_mock_client(client: Client, mock_responses: list[str]) ->
     )
     gemini.aio.files.download = AsyncMock(return_value=b"mock download content")  # type: ignore[method-assign]
     gemini.aio.file_search_stores.upload_to_file_search_store = AsyncMock(  # type: ignore[method-assign]
-        return_value=types.UploadToFileSearchStoreOperation.model_construct(
-            name="operations/mock-op"
+        return_value=types.UploadToFileSearchStoreOperation.model_validate(
+            {"name": "operations/mock-op"}
         )
     )
 
