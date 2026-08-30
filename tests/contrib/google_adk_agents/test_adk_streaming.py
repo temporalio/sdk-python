@@ -12,7 +12,13 @@ from datetime import timedelta
 
 import pytest
 from google.adk import Agent
-from google.adk.agents.run_config import RunConfig, StreamingMode
+
+# ADK 2.7 marks StreamingMode as a private re-export, while older supported
+# versions do not have the suggested google.adk.agents._streaming_mode module.
+from google.adk.agents.run_config import (
+    RunConfig,
+    StreamingMode,  # pyright: ignore[reportPrivateImportUsage]
+)
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
