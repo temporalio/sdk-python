@@ -28,6 +28,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
+  model request retries are handled exclusively by Temporal.
+
 ### Security
 
 ## [1.32.0] - 2026-08-24
