@@ -16,7 +16,7 @@ from temporalio.service import ConnectConfig, ServiceClient
 from temporalio.worker import WorkerConfig
 
 
-class CloudRunPlugin(temporalio.plugin.SimplePlugin):
+class WorkerIDPlugin(temporalio.plugin.SimplePlugin):
     """Configure a Temporal client and worker from Google Cloud Run instance metadata.
 
     Install this plugin once when connecting the client; it automatically
@@ -63,7 +63,7 @@ class CloudRunPlugin(temporalio.plugin.SimplePlugin):
                 ``os.environ.get`` and exists primarily for testing. Ignored when
                 ``metadata`` is supplied.
         """
-        super().__init__("CloudRunPlugin")
+        super().__init__("WorkerIDPlugin")
         self._metadata = metadata
         self._timeout = timeout
         self._metadata_url = metadata_url

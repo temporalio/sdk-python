@@ -1,4 +1,4 @@
-"""Tests for the Google Cloud Run plugin."""
+"""Tests for the Google Cloud Run worker-ID plugin."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ import pytest
 
 from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
 from temporalio.contrib.gcp.cloud_run import (
-    CloudRunPlugin,
     GoogleCloudRunMetadata,
+    WorkerIDPlugin,
 )
 from temporalio.service import ConnectConfig, ServiceClient
 from temporalio.worker import WorkerConfig
@@ -50,7 +50,7 @@ def _service_client() -> ServiceClient:
 class TestClientIdentity:
     @pytest.mark.asyncio
     async def test_sets_identity_when_unset(self) -> None:
-        plugin = CloudRunPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
+        plugin = WorkerIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
         # ConnectConfig auto-fills identity with <pid>@<hostname> when none is given.
         config = ConnectConfig(target_host="localhost:7233")
         assert config.identity == f"{os.getpid()}@{socket.gethostname()}"
@@ -65,7 +65,7 @@ class TestClientIdentity:
 
     @pytest.mark.asyncio
     async def test_preserves_caller_identity(self) -> None:
-        plugin = CloudRunPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
+        plugin = WorkerIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
         config = ConnectConfig(target_host="localhost:7233", identity="my-identity")
         service_client = _service_client()
 
@@ -82,10 +82,10 @@ class TestClientIdentity:
 
 class TestConfigureWorker:
     def test_sets_pinned_deployment_config(self) -> None:
-        plugin = CloudRunPlugin(
+        plugin = WorkerIDPlugin(
             metadata=_metadata(instance_id="abc", name="my-pool", revision="rev-1")
         )
-        config = plugin.configure_worker(cast(WorkerConfig, {}))
+        config = plugin.configure_worker(WorkerConfig())
         deployment_config = config.get("deployment_config")
         assert deployment_config is not None
         assert deployment_config.use_worker_versioning is True
@@ -104,21 +104,21 @@ class TestConfigureWorker:
 class TestMetadataFetch:
     def test_construction_does_not_fetch(self) -> None:
         # A bad metadata URL must not raise at construction -- the fetch is lazy.
-        CloudRunPlugin(
+        WorkerIDPlugin(
             metadata_url=f"http://127.0.0.1:{_closed_port()}/instance/id",
             getenv={}.get,  # type: ignore[arg-type]
         )
 
     @pytest.mark.asyncio
     async def test_connect_fails_fast_off_platform(self) -> None:
-        plugin = CloudRunPlugin(
+        plugin = WorkerIDPlugin(
             timeout=1.0,
             metadata_url=f"http://127.0.0.1:{_closed_port()}/instance/id",
             getenv={}.get,  # type: ignore[arg-type]
         )
         config = ConnectConfig(target_host="localhost:7233")
 
-        async def connect(input: ConnectConfig) -> ServiceClient:
+        async def connect(_input: ConnectConfig) -> ServiceClient:
             raise AssertionError("should not connect when metadata is unavailable")
 
         with pytest.raises(RuntimeError, match="metadata server"):
@@ -130,17 +130,17 @@ class TestMetadataFetch:
     ) -> None:
         fetch = Mock(return_value=_metadata(instance_id="abc", revision="rev-1"))
         monkeypatch.setattr(
-            "temporalio.contrib.gcp.cloud_run._plugin.get_google_cloud_run_metadata",
+            "temporalio.contrib.gcp.cloud_run._worker_id_plugin.get_google_cloud_run_metadata",
             fetch,
         )
-        plugin = CloudRunPlugin()
+        plugin = WorkerIDPlugin()
         config = ConnectConfig(target_host="localhost:7233")
 
-        async def connect(input: ConnectConfig) -> ServiceClient:
+        async def connect(_input: ConnectConfig) -> ServiceClient:
             return _service_client()
 
         await plugin.connect_service_client(config, connect)
-        worker_config = plugin.configure_worker(cast(WorkerConfig, {}))
+        worker_config = plugin.configure_worker(WorkerConfig())
 
         # Fetched exactly once at connect; the worker hook reuses the cached value.
         fetch.assert_called_once()
