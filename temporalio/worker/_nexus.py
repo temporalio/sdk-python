@@ -28,6 +28,7 @@ import temporalio.api.nexus.v1
 import temporalio.bridge.proto.nexus
 import temporalio.bridge.worker
 import temporalio.client
+import temporalio.client._impl
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus
@@ -611,6 +612,12 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
     # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/worker/src/nexus.ts
     if isinstance(err, nexusrpc.HandlerError):
         return err
+    elif isinstance(err, temporalio.client._impl._StartActivityInputError):
+        handler_err = nexusrpc.HandlerError(
+            str(err),
+            type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+            retryable_override=False,
+        )
     elif isinstance(err, ApplicationError):
         handler_err = nexusrpc.HandlerError(
             message="Handler failed with non-retryable application error",

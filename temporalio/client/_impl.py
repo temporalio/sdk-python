@@ -136,6 +136,14 @@ if TYPE_CHECKING:
     from ._client import Client
 
 
+class _StartActivityInputError(temporalio.exceptions.TemporalError, ValueError):
+    """A caller-fixable problem with a :py:meth:`Client.start_activity` call.
+
+    Raised for preconditions on ``StartActivityInput`` that are checked before
+    any RPC is issued.
+    """
+
+
 class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     def __init__(self, client: Client) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
@@ -526,11 +534,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
         """Start an activity and return a handle to it."""
         if not (input.start_to_close_timeout or input.schedule_to_close_timeout):
-            raise ValueError(
+            raise _StartActivityInputError(
                 "Activity must have start_to_close_timeout or schedule_to_close_timeout"
             )
         if input.start_delay is not None and input.start_delay < timedelta(0):
-            raise ValueError("start_delay must be non-negative")
+            raise _StartActivityInputError("start_delay must be non-negative")
         req = await self._build_start_activity_execution_request(input)
 
         resp: temporalio.api.workflowservice.v1.StartActivityExecutionResponse

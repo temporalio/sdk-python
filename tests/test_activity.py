@@ -457,6 +457,19 @@ async def test_start_activity_rejects_negative_start_delay(client: Client):
         )
 
 
+async def test_start_activity_requires_a_timeout(client: Client):
+    with pytest.raises(
+        ValueError,
+        match="Activity must have start_to_close_timeout or schedule_to_close_timeout",
+    ):
+        await client.start_activity(
+            increment,
+            args=(1,),
+            id=str(uuid.uuid4()),
+            task_queue=str(uuid.uuid4()),
+        )
+
+
 async def test_get_result(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip(

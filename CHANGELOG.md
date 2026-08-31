@@ -28,6 +28,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Starting an activity from a Nexus operation handler without a
+  `start_to_close_timeout`/`schedule_to_close_timeout`, or with a negative
+  `start_delay`, now fails immediately with a non-retryable `BAD_REQUEST`
+  instead of retrying as an `INTERNAL` error until `schedule_to_close_timeout`
+  elapses.
+
 ### Security
 
 ## [1.32.0] - 2026-08-24

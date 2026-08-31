@@ -168,7 +168,7 @@ def _try_temporal_context() -> (
     return start_ctx or cancel_ctx
 
 
-def _try_start_operation_context() -> _TemporalStartOperationContext | None:  # pyright: ignore[reportUnusedFunction]
+def _try_start_operation_context() -> _TemporalStartOperationContext | None:
     """Return the active Nexus start-operation context, if any."""
     return _temporal_start_operation_context.get(None)
 
