@@ -570,13 +570,10 @@ def _proto_scalar_sample(field: FieldDescriptor, *, path: str) -> Any:
 
 
 def _field_is_repeated(field: FieldDescriptor) -> bool:
-    return bool(
-        getattr(
-            field,
-            "is_repeated",
-            getattr(field, "label") == FieldDescriptor.LABEL_REPEATED,
-        )
-    )
+    is_repeated = getattr(field, "is_repeated", None)
+    if is_repeated is not None:
+        return bool(is_repeated)
+    return getattr(field, "label") == FieldDescriptor.LABEL_REPEATED
 
 
 @pytest.mark.parametrize(
