@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
-from temporalio.contrib.gcp.cloud_run import (
+from temporalio.contrib.gcp.cloud_run.worker_id import (
     GoogleCloudRunMetadata,
     WorkerIDPlugin,
 )
@@ -130,7 +130,7 @@ class TestMetadataFetch:
     ) -> None:
         fetch = Mock(return_value=_metadata(instance_id="abc", revision="rev-1"))
         monkeypatch.setattr(
-            "temporalio.contrib.gcp.cloud_run._worker_id_plugin.get_google_cloud_run_metadata",
+            "temporalio.contrib.gcp.cloud_run.worker_id._worker_id_plugin.get_google_cloud_run_metadata",
             fetch,
         )
         plugin = WorkerIDPlugin()

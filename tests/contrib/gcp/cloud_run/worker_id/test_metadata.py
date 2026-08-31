@@ -1,4 +1,4 @@
-"""Tests for temporalio.contrib.gcp.cloud_run."""
+"""Tests for temporalio.contrib.gcp.cloud_run.worker_id."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
-from temporalio.contrib.gcp.cloud_run import (
+from temporalio.contrib.gcp.cloud_run.worker_id import (
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
 )

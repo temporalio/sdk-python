@@ -1,4 +1,4 @@
-# cloud_run
+# worker_id
 
 > ⚠️ **This package is currently at an experimental release stage.** ⚠️
 
@@ -24,7 +24,7 @@ wire up on the worker.
 import asyncio
 
 from temporalio.client import Client
-from temporalio.contrib.gcp.cloud_run import WorkerIDPlugin
+from temporalio.contrib.gcp.cloud_run.worker_id import WorkerIDPlugin
 from temporalio.worker import Worker
 
 from my_workflows import MyWorkflow
@@ -88,7 +88,7 @@ For advanced scenarios or unit tests you can bypass the metadata server by passi
 metadata object, or steer the fetch with `getenv` / `metadata_url` / `timeout`:
 
 ```python
-from temporalio.contrib.gcp.cloud_run import WorkerIDPlugin, get_google_cloud_run_metadata
+from temporalio.contrib.gcp.cloud_run.worker_id import WorkerIDPlugin, get_google_cloud_run_metadata
 
 metadata = get_google_cloud_run_metadata()
 plugin = WorkerIDPlugin(metadata=metadata)

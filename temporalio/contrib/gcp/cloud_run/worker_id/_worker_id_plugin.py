@@ -7,7 +7,7 @@ import socket
 from collections.abc import Awaitable, Callable
 
 import temporalio.plugin
-from temporalio.contrib.gcp.cloud_run._metadata import (
+from temporalio.contrib.gcp.cloud_run.worker_id._metadata import (
     CLOUD_RUN_METADATA_URL,
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
