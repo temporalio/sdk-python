@@ -22,6 +22,11 @@ import temporalio.common
 if TYPE_CHECKING:
     import temporalio.worker
 
+CLOUD_RUN_METADATA_URL = (
+    "http://metadata.google.internal/computeMetadata/v1/instance/id"
+)
+"""Default Cloud Run metadata server endpoint returning the unique instance id."""
+
 
 @dataclass(frozen=True)
 class GoogleCloudRunMetadata:
@@ -104,7 +109,7 @@ class GoogleCloudRunMetadata:
 def get_google_cloud_run_metadata(
     *,
     timeout: float = 2.0,
-    metadata_url: str = "http://metadata.google.internal/computeMetadata/v1/instance/id",
+    metadata_url: str = CLOUD_RUN_METADATA_URL,
     getenv: Callable[[str], str] = os.environ.get,  # type: ignore[assignment]
 ) -> GoogleCloudRunMetadata:
     """Read metadata identifying the current Google Cloud Run instance.
