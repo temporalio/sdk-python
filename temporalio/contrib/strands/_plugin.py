@@ -45,12 +45,12 @@ class StrandsPlugin(SimplePlugin):
     connection is kept open between ``call-tool`` activities before it is
     disconnected; the timer resets on every reuse. Defaults to 5 minutes.
 
-    When ``sandboxes`` is supplied, registers a stable set of name-prefixed
-    activities for every sandbox factory. Each factory receives the requesting
-    Workflow run's context and may return a sandbox directly or awaitably.
-    Worker-local adapters are cached by Workflow chain until
-    ``sandbox_cache_idle_timeout`` elapses. Use the same name in workflow-side
-    ``TemporalSandbox(name)`` instances.
+    When ``sandboxes`` is supplied, registers one stable set of activities that
+    dispatches each operation by sandbox name. Each factory receives the
+    requesting Workflow run's context and may return a sandbox directly or
+    awaitably. Worker-local adapters are cached by sandbox name and Workflow
+    chain until ``sandbox_cache_idle_timeout`` elapses. Use the same name in
+    workflow-side ``TemporalSandbox(name)`` instances.
     """
 
     def __init__(
@@ -83,11 +83,12 @@ class StrandsPlugin(SimplePlugin):
             ma = ModelActivity(models, default_name=default_name)
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
 
-        sandbox_activity_groups = [
-            SandboxActivities(name, sandbox_factory, sandbox_cache_idle_timeout)
-            for name, sandbox_factory in (sandboxes or {}).items()
-        ]
-        for sandbox_activities in sandbox_activity_groups:
+        sandbox_activities = (
+            SandboxActivities(sandboxes, sandbox_cache_idle_timeout)
+            if sandboxes
+            else None
+        )
+        if sandbox_activities is not None:
             activities.extend(sandbox_activities.activities())
 
         mcp_clients = mcp_clients or {}
@@ -108,7 +109,7 @@ class StrandsPlugin(SimplePlugin):
             try:
                 yield
             finally:
-                for sandbox_activities in sandbox_activity_groups:
+                if sandbox_activities is not None:
                     await sandbox_activities.aclose()
                 for server in mcp_clients:
                     await _evict_connection(server)

@@ -210,14 +210,19 @@ Worker(
 )
 ```
 
+The plugin registers one shared set of sandbox activities regardless of how
+many factories are configured. Each operation carries the selected sandbox
+name in its activity input so the worker can dispatch it to the matching
+factory.
+
 The factory is called lazily with a `SandboxWorkflowContext` containing the
 current `run_id` and a `chain` identity with the Workflow's namespace, Workflow
-ID, and first execution Run ID. The worker-local cache uses the chain identity,
-so each Workflow chain gets a separate sandbox for each registered name. Retries,
-Continue-As-New, Reset, and Cron runs belong to the same chain and therefore use
-the same sandbox; unrelated Workflow chains do not share one. Multiple
-`TemporalSandbox` objects with the same name in one chain intentionally share
-that chain's sandbox.
+ID, and first execution Run ID. The worker-local cache uses the sandbox name and
+chain identity, so each Workflow chain gets a separate sandbox for each
+registered name. Retries, Continue-As-New, Reset, and Cron runs belong to the
+same chain and therefore use the same sandbox; unrelated Workflow chains do not
+share one. Multiple `TemporalSandbox` objects with the same name in one chain
+intentionally share that chain's sandbox.
 
 The factory receives the current Run ID only when a worker-local cache entry is
 created. A later run in the same chain reuses a warm entry without calling the

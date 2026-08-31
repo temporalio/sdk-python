@@ -197,13 +197,13 @@ async def test_sandbox_operations_are_durable_and_cached(client: Client):
 
     history = await handle.fetch_history()
     assert get_activities(history) == [
-        "recording-sandbox-execute",
-        "recording-sandbox-execute-code",
-        "recording-sandbox-read-file",
-        "recording-sandbox-write-file",
-        "recording-sandbox-read-file",
-        "recording-sandbox-remove-file",
-        "recording-sandbox-list-files",
+        "strands-sandbox-execute",
+        "strands-sandbox-execute-code",
+        "strands-sandbox-read-file",
+        "strands-sandbox-write-file",
+        "strands-sandbox-read-file",
+        "strands-sandbox-remove-file",
+        "strands-sandbox-list-files",
     ]
     await Replayer(workflows=[SandboxWorkflow], plugins=[plugin]).replay_workflow(
         history
@@ -451,6 +451,20 @@ def test_sandbox_cache_idle_timeout_must_be_positive() -> None:
             sandboxes={"recording": lambda _: RecordingSandbox()},
             sandbox_cache_idle_timeout=timedelta(0),
         )
+
+
+def test_sandbox_factories_share_one_activity_set() -> None:
+    plugin = StrandsPlugin(
+        models={},
+        sandboxes={
+            "first": lambda _: RecordingSandbox(),
+            "second": lambda _: RecordingSandbox(),
+        },
+    )
+
+    assert plugin.activities is not None
+    assert not callable(plugin.activities)
+    assert len(plugin.activities) == 6
 
 
 def test_sandbox_workflow_context_separates_run_and_chain_identity() -> None:

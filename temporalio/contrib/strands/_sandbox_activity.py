@@ -25,6 +25,7 @@ from ._heartbeat_decorator import auto_heartbeater
 
 SANDBOX_TIMEOUT_ERROR_TYPE = "StrandsSandboxTimeoutError"
 SANDBOX_PATH_NOT_FOUND_ERROR_TYPE = "StrandsSandboxPathNotFoundError"
+SANDBOX_NOT_FOUND_ERROR_TYPE = "StrandsSandboxNotFoundError"
 _SANDBOX_CACHE_IDLE_TIMEOUT = timedelta(minutes=5)
 
 
@@ -61,10 +62,12 @@ class SandboxWorkflowContext:
 
 
 SandboxFactory = Callable[[SandboxWorkflowContext], Sandbox | Awaitable[Sandbox]]
+_SandboxKey = tuple[str, SandboxWorkflowChain]
 
 
 @dataclass
 class _WorkflowScopedInput:
+    sandbox_name: str = field(default="", kw_only=True)
     first_execution_run_id: str = field(default="", kw_only=True)
 
 
@@ -111,13 +114,14 @@ class _SandboxRecord:
     def __init__(
         self,
         owner: SandboxActivities,
+        key: _SandboxKey,
         context: SandboxWorkflowContext,
         factory: SandboxFactory,
         idle_timeout: timedelta,
     ) -> None:
         self._owner = owner
+        self._key = key
         self._context = context
-        self._chain = context.chain
         self._idle_timeout = idle_timeout
         self._inflight = 0
         self._idle_handle: asyncio.TimerHandle | None = None
@@ -137,7 +141,7 @@ class _SandboxRecord:
 
     def release(self) -> None:
         self._inflight -= 1
-        if self._inflight == 0 and self._owner._has_record(self._chain, self):
+        if self._inflight == 0 and self._owner._has_record(self._key, self):
             self._idle_handle = asyncio.get_running_loop().call_later(
                 self._idle_timeout.total_seconds(), self._on_idle
             )
@@ -145,7 +149,7 @@ class _SandboxRecord:
     def _on_idle(self) -> None:
         self._idle_handle = None
         if self._inflight == 0:
-            self._owner._evict(self._chain, self)
+            self._owner._evict(self._key, self)
 
     async def sandbox(self) -> Sandbox:
         return await asyncio.shield(self._sandbox_task)
@@ -170,19 +174,17 @@ class SandboxActivities:
 
     def __init__(
         self,
-        name: str,
-        factory: SandboxFactory,
+        factories: dict[str, SandboxFactory],
         idle_timeout: timedelta | None = None,
     ) -> None:
-        """Store a sandbox name and its Workflow-scoped worker-side factory."""
-        self._name = name
-        self._factory = factory
+        """Store named Workflow-scoped worker-side sandbox factories."""
+        self._factories = dict(factories)
         self._idle_timeout = (
             idle_timeout if idle_timeout is not None else _SANDBOX_CACHE_IDLE_TIMEOUT
         )
         if self._idle_timeout <= timedelta(0):
             raise ValueError("Sandbox cache idle timeout must be positive")
-        self._records: dict[SandboxWorkflowChain, _SandboxRecord] = {}
+        self._records: dict[_SandboxKey, _SandboxRecord] = {}
 
     @asynccontextmanager
     async def _sandbox(
@@ -203,10 +205,19 @@ class SandboxActivities:
             ),
             run_id=info.workflow_run_id,
         )
-        record = self._records.get(context.chain)
+        factory = self._factories.get(input.sandbox_name)
+        if factory is None:
+            raise ApplicationError(
+                f"Unknown sandbox name {input.sandbox_name!r}. "
+                f"Known: {sorted(self._factories)}",
+                type=SANDBOX_NOT_FOUND_ERROR_TYPE,
+                non_retryable=True,
+            )
+        key = (input.sandbox_name, context.chain)
+        record = self._records.get(key)
         if record is None:
-            record = _SandboxRecord(self, context, self._factory, self._idle_timeout)
-            self._records[context.chain] = record
+            record = _SandboxRecord(self, key, context, factory, self._idle_timeout)
+            self._records[key] = record
         record.acquire()
         try:
             try:
@@ -215,21 +226,21 @@ class SandboxActivities:
                 # One cancelled activity must not cancel or evict initialization
                 # that another activity for the same Workflow is awaiting.
                 if record.creation_done():
-                    self._evict(context.chain, record)
+                    self._evict(key, record)
                 raise
             except BaseException:
-                self._evict(context.chain, record)
+                self._evict(key, record)
                 raise
             yield sandbox
         finally:
             record.release()
 
-    def _has_record(self, chain: SandboxWorkflowChain, record: _SandboxRecord) -> bool:
-        return self._records.get(chain) is record
+    def _has_record(self, key: _SandboxKey, record: _SandboxRecord) -> bool:
+        return self._records.get(key) is record
 
-    def _evict(self, chain: SandboxWorkflowChain, record: _SandboxRecord) -> None:
-        if self._has_record(chain, record):
-            del self._records[chain]
+    def _evict(self, key: _SandboxKey, record: _SandboxRecord) -> None:
+        if self._has_record(key, record):
+            del self._records[key]
 
     async def aclose(self) -> None:
         """Cancel cache timers and discard all worker-local sandbox adapters."""
@@ -239,9 +250,9 @@ class SandboxActivities:
             await record.aclose()
 
     def activities(self) -> list[Callable[..., Any]]:
-        """Build stable, name-prefixed activities for this sandbox."""
+        """Build one stable activity set that dispatches by sandbox name."""
 
-        @activity.defn(name=_activity_name(self._name, "execute"))
+        @activity.defn(name=_activity_name("execute"))
         @auto_heartbeater
         async def execute(input: _ExecuteInput) -> list[_StreamItem]:
             async with self._sandbox(input) as sandbox:
@@ -258,7 +269,7 @@ class SandboxActivities:
                     streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
                 )
 
-        @activity.defn(name=_activity_name(self._name, "execute-code"))
+        @activity.defn(name=_activity_name("execute-code"))
         @auto_heartbeater
         async def execute_code(
             input: _ExecuteCodeInput,
@@ -278,7 +289,7 @@ class SandboxActivities:
                     streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
                 )
 
-        @activity.defn(name=_activity_name(self._name, "read-file"))
+        @activity.defn(name=_activity_name("read-file"))
         @auto_heartbeater
         async def read_file(input: _PathInput) -> bytes:
             try:
@@ -287,7 +298,7 @@ class SandboxActivities:
             except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
-        @activity.defn(name=_activity_name(self._name, "write-file"))
+        @activity.defn(name=_activity_name("write-file"))
         @auto_heartbeater
         async def write_file(input: _WriteFileInput) -> None:
             try:
@@ -300,7 +311,7 @@ class SandboxActivities:
             except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
-        @activity.defn(name=_activity_name(self._name, "remove-file"))
+        @activity.defn(name=_activity_name("remove-file"))
         @auto_heartbeater
         async def remove_file(input: _PathInput) -> None:
             try:
@@ -309,7 +320,7 @@ class SandboxActivities:
             except FileNotFoundError as err:
                 raise _path_not_found_error(err, input.path) from err
 
-        @activity.defn(name=_activity_name(self._name, "list-files"))
+        @activity.defn(name=_activity_name("list-files"))
         @auto_heartbeater
         async def list_files(input: _PathInput) -> list[FileInfo]:
             try:
@@ -349,8 +360,8 @@ class SandboxActivities:
             raise _timeout_error(err, timeout) from err
 
 
-def _activity_name(sandbox_name: str, operation: str) -> str:
-    return f"{sandbox_name}-sandbox-{operation}"
+def _activity_name(operation: str) -> str:
+    return f"strands-sandbox-{operation}"
 
 
 def _timeout_error(err: SandboxTimeoutError, timeout: float | None) -> ApplicationError:
