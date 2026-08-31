@@ -8,6 +8,7 @@ from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import enum_type_wrapper
 
 # @@protoc_insertion_point(imports)
 
@@ -25,8 +26,15 @@ from temporalio.api.failure.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n7temporal/sdk/core/activity_result/activity_result.proto\x12\x17\x63oresdk.activity_result\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/failure/v1/message.proto"\x95\x02\n\x17\x41\x63tivityExecutionResult\x12\x35\n\tcompleted\x18\x01 \x01(\x0b\x32 .coresdk.activity_result.SuccessH\x00\x12\x32\n\x06\x66\x61iled\x18\x02 \x01(\x0b\x32 .coresdk.activity_result.FailureH\x00\x12:\n\tcancelled\x18\x03 \x01(\x0b\x32%.coresdk.activity_result.CancellationH\x00\x12I\n\x13will_complete_async\x18\x04 \x01(\x0b\x32*.coresdk.activity_result.WillCompleteAsyncH\x00\x42\x08\n\x06status"\xfc\x01\n\x12\x41\x63tivityResolution\x12\x35\n\tcompleted\x18\x01 \x01(\x0b\x32 .coresdk.activity_result.SuccessH\x00\x12\x32\n\x06\x66\x61iled\x18\x02 \x01(\x0b\x32 .coresdk.activity_result.FailureH\x00\x12:\n\tcancelled\x18\x03 \x01(\x0b\x32%.coresdk.activity_result.CancellationH\x00\x12\x35\n\x07\x62\x61\x63koff\x18\x04 \x01(\x0b\x32".coresdk.activity_result.DoBackoffH\x00\x42\x08\n\x06status":\n\x07Success\x12/\n\x06result\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload"<\n\x07\x46\x61ilure\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"A\n\x0c\x43\x61ncellation\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"\x13\n\x11WillCompleteAsync"\x8d\x01\n\tDoBackoff\x12\x0f\n\x07\x61ttempt\x18\x01 \x01(\r\x12\x33\n\x10\x62\x61\x63koff_duration\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampB4\xea\x02\x31Temporalio::Internal::Bridge::Api::ActivityResultb\x06proto3'
+    b'\n7temporal/sdk/core/activity_result/activity_result.proto\x12\x17\x63oresdk.activity_result\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/failure/v1/message.proto"\x95\x02\n\x17\x41\x63tivityExecutionResult\x12\x35\n\tcompleted\x18\x01 \x01(\x0b\x32 .coresdk.activity_result.SuccessH\x00\x12\x32\n\x06\x66\x61iled\x18\x02 \x01(\x0b\x32 .coresdk.activity_result.FailureH\x00\x12:\n\tcancelled\x18\x03 \x01(\x0b\x32%.coresdk.activity_result.CancellationH\x00\x12I\n\x13will_complete_async\x18\x04 \x01(\x0b\x32*.coresdk.activity_result.WillCompleteAsyncH\x00\x42\x08\n\x06status"\xfc\x01\n\x12\x41\x63tivityResolution\x12\x35\n\tcompleted\x18\x01 \x01(\x0b\x32 .coresdk.activity_result.SuccessH\x00\x12\x32\n\x06\x66\x61iled\x18\x02 \x01(\x0b\x32 .coresdk.activity_result.FailureH\x00\x12:\n\tcancelled\x18\x03 \x01(\x0b\x32%.coresdk.activity_result.CancellationH\x00\x12\x35\n\x07\x62\x61\x63koff\x18\x04 \x01(\x0b\x32".coresdk.activity_result.DoBackoffH\x00\x42\x08\n\x06status":\n\x07Success\x12/\n\x06result\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload"}\n\x07\x46\x61ilure\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12?\n\x05\x63\x61use\x18\x02 \x01(\x0e\x32\x30.coresdk.activity_result.ActivityTaskFailedCause"A\n\x0c\x43\x61ncellation\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"\x13\n\x11WillCompleteAsync"\x8d\x01\n\tDoBackoff\x12\x0f\n\x07\x61ttempt\x18\x01 \x01(\r\x12\x33\n\x10\x62\x61\x63koff_duration\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp*\xf3\x01\n\x17\x41\x63tivityTaskFailedCause\x12*\n&ACTIVITY_TASK_FAILED_CAUSE_UNSPECIFIED\x10\x00\x12\x31\n-ACTIVITY_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE\x10\x01\x12\x37\n3ACTIVITY_TASK_FAILED_CAUSE_EXTERNAL_STORAGE_FAILURE\x10\x02\x12@\n<ACTIVITY_TASK_FAILED_CAUSE_ACTIVITY_WORKER_UNHANDLED_FAILURE\x10\x03\x42\x34\xea\x02\x31Temporalio::Internal::Bridge::Api::ActivityResultb\x06proto3'
 )
+
+_ACTIVITYTASKFAILEDCAUSE = DESCRIPTOR.enum_types_by_name["ActivityTaskFailedCause"]
+ActivityTaskFailedCause = enum_type_wrapper.EnumTypeWrapper(_ACTIVITYTASKFAILEDCAUSE)
+ACTIVITY_TASK_FAILED_CAUSE_UNSPECIFIED = 0
+ACTIVITY_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE = 1
+ACTIVITY_TASK_FAILED_CAUSE_EXTERNAL_STORAGE_FAILURE = 2
+ACTIVITY_TASK_FAILED_CAUSE_ACTIVITY_WORKER_UNHANDLED_FAILURE = 3
 
 
 _ACTIVITYEXECUTIONRESULT = DESCRIPTOR.message_types_by_name["ActivityExecutionResult"]
@@ -118,6 +126,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._serialized_options = (
         b"\352\0021Temporalio::Internal::Bridge::Api::ActivityResult"
     )
+    _ACTIVITYTASKFAILEDCAUSE._serialized_start = 1181
+    _ACTIVITYTASKFAILEDCAUSE._serialized_end = 1424
     _ACTIVITYEXECUTIONRESULT._serialized_start = 227
     _ACTIVITYEXECUTIONRESULT._serialized_end = 504
     _ACTIVITYRESOLUTION._serialized_start = 507
@@ -125,11 +135,11 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _SUCCESS._serialized_start = 761
     _SUCCESS._serialized_end = 819
     _FAILURE._serialized_start = 821
-    _FAILURE._serialized_end = 881
-    _CANCELLATION._serialized_start = 883
-    _CANCELLATION._serialized_end = 948
-    _WILLCOMPLETEASYNC._serialized_start = 950
-    _WILLCOMPLETEASYNC._serialized_end = 969
-    _DOBACKOFF._serialized_start = 972
-    _DOBACKOFF._serialized_end = 1113
+    _FAILURE._serialized_end = 946
+    _CANCELLATION._serialized_start = 948
+    _CANCELLATION._serialized_end = 1013
+    _WILLCOMPLETEASYNC._serialized_start = 1015
+    _WILLCOMPLETEASYNC._serialized_end = 1034
+    _DOBACKOFF._serialized_start = 1037
+    _DOBACKOFF._serialized_end = 1178
 # @@protoc_insertion_point(module_scope)

@@ -9,6 +9,7 @@ from google.protobuf.duration_pb2 import Duration
 import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice_pb2
 import temporalio.bridge.worker
 import temporalio.converter
+import temporalio.exceptions
 import temporalio.nexus.system as nexus_system
 from temporalio.api.common.v1.message_pb2 import (
     Payload,
@@ -264,6 +265,75 @@ async def test_system_nexus_envelope_is_detected_in_generic_payload_field():
     assert decoded.input.payloads[0].metadata["visited"] == b"True"
     assert visitor.visited_payload_count == 1
     assert visitor.system_envelope_count == 1
+
+
+async def test_system_nexus_envelope_without_payloads_is_visited():
+    class SystemNexusVisitor(Visitor):
+        def __init__(self) -> None:
+            self.system_envelope_count = 0
+
+        async def visit_system_nexus_envelope(self, payload: Payload) -> None:
+            _ = payload
+            self.system_envelope_count += 1
+
+    response = workflowservice_pb2.SignalWithStartWorkflowExecutionResponse(
+        run_id="test-run-id"
+    )
+    data_converter = temporalio.converter.default()
+    payload_converter = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
+        data_converter.failure_converter,
+    )
+    system_payload = payload_converter.to_payload(response)
+    assert system_payload is not None
+    completion = WorkflowActivationCompletion(
+        run_id="3",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    update_response=UpdateResponse(completed=system_payload),
+                )
+            ]
+        ),
+    )
+    visitor = SystemNexusVisitor()
+
+    await PayloadVisitor().visit(visitor, completion)
+
+    completed = completion.successful.commands[0].update_response.completed
+    assert payload_converter.from_payload(completed) == response
+    assert visitor.system_envelope_count == 1
+
+
+async def test_unknown_system_nexus_payload_raises_application_error():
+    data_converter = temporalio.converter.default()
+    payload_converter = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
+        data_converter.failure_converter,
+    )
+    system_payload = payload_converter.to_payload(
+        workflowservice_pb2.StartWorkflowExecutionResponse(run_id="test-run-id")
+    )
+    assert system_payload is not None
+    completion = WorkflowActivationCompletion(
+        run_id="3",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    update_response=UpdateResponse(completed=system_payload),
+                )
+            ]
+        ),
+    )
+
+    with pytest.raises(temporalio.exceptions.ApplicationError) as err:
+        await PayloadVisitor().visit(Visitor(), completion)
+
+    assert (
+        err.value.message == "Unknown Temporal system payload: "
+        "temporal.api.workflowservice.v1.StartWorkflowExecutionResponse"
+    )
+    assert not err.value.non_retryable
 
 
 async def test_concurrent_throughput():

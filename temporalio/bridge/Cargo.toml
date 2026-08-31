@@ -58,15 +58,15 @@ pythonize = "0.29"
 # default-features disabled so the rustls provider isn't pinned to `tls-ring`;
 # the bridge's tls-ring/tls-aws-lc features (above) select it. Re-add the
 # crate's non-TLS default (`envconfig`).
-temporalio-client = { version = "0.6", path = "./sdk-core/crates/client", default-features = false, features = [
+temporalio-client = { version = "0.7", path = "./sdk-core/crates/client", default-features = false, features = [
     "envconfig",
 ] }
-temporalio-common = { version = "0.6", path = "./sdk-core/crates/common", features = [
+temporalio-common = { version = "0.7", path = "./sdk-core/crates/common", features = [
     "envconfig", "otel"
 ]}
 # default-features disabled (drops the pinned `tls-ring`); re-add the non-TLS
 # defaults the bridge relied on (`envconfig`, `prometheus`) plus `ephemeral-server`.
-temporalio-sdk-core = { version = "0.6", path = "./sdk-core/crates/sdk-core", default-features = false, features = [
+temporalio-sdk-core = { version = "0.7", path = "./sdk-core/crates/sdk-core", default-features = false, features = [
     "ephemeral-server",
     "envconfig",
     "prometheus",

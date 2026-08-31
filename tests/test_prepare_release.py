@@ -91,6 +91,25 @@ def test_sdk_core_release_notes_embed_core_output(
     ]
 
 
+def test_sdk_core_release_notes_preserves_generator_failure_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    release_verify = _release_verify_module()
+    (tmp_path / ".git").mkdir()
+    monkeypatch.setattr(release_verify, "_previous_release_tag", lambda _version: "old")
+    monkeypatch.setattr(release_verify, "_gitlink", lambda revision, _path: revision)
+    monkeypatch.setattr(release_verify, "_git", lambda *_args, **_kwargs: "")
+    error = subprocess.CalledProcessError(101, ["cargo"], output="compiler output")
+    monkeypatch.setattr(
+        release_verify,
+        "_sdk_core_changelog_entries",
+        lambda *_args: (_ for _ in ()).throw(error),
+    )
+
+    with pytest.raises(RuntimeError, match="compiler output"):
+        release_verify._sdk_core_release_notes("1.30.0", str(tmp_path))
+
+
 def test_finalize_changelog_release() -> None:
     text = "## [Unreleased]\n\n### Added\n\n- A thing.\n"
     assert "## [1.30.0] - 2026-06-18" in finalize_changelog_release(
