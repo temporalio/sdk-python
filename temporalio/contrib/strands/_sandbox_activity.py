@@ -29,12 +29,35 @@ _SANDBOX_CACHE_IDLE_TIMEOUT = timedelta(minutes=5)
 
 
 @dataclass(frozen=True)
-class SandboxWorkflowContext:
-    """Identity of the Workflow chain that owns a worker-side sandbox."""
+class SandboxWorkflowChain:
+    """Identity shared by every run in a Workflow chain."""
 
     namespace: str
     workflow_id: str
     first_execution_run_id: str
+
+
+@dataclass(frozen=True)
+class SandboxWorkflowContext:
+    """Workflow execution requesting a worker-side sandbox."""
+
+    chain: SandboxWorkflowChain
+    run_id: str
+
+    @property
+    def namespace(self) -> str:
+        """Namespace containing the Workflow."""
+        return self.chain.namespace
+
+    @property
+    def workflow_id(self) -> str:
+        """Workflow ID shared by the execution chain."""
+        return self.chain.workflow_id
+
+    @property
+    def first_execution_run_id(self) -> str:
+        """Run ID identifying the execution chain."""
+        return self.chain.first_execution_run_id
 
 
 SandboxFactory = Callable[[SandboxWorkflowContext], Sandbox | Awaitable[Sandbox]]
@@ -94,6 +117,7 @@ class _SandboxRecord:
     ) -> None:
         self._owner = owner
         self._context = context
+        self._chain = context.chain
         self._idle_timeout = idle_timeout
         self._inflight = 0
         self._idle_handle: asyncio.TimerHandle | None = None
@@ -113,7 +137,7 @@ class _SandboxRecord:
 
     def release(self) -> None:
         self._inflight -= 1
-        if self._inflight == 0 and self._owner._has_record(self._context, self):
+        if self._inflight == 0 and self._owner._has_record(self._chain, self):
             self._idle_handle = asyncio.get_running_loop().call_later(
                 self._idle_timeout.total_seconds(), self._on_idle
             )
@@ -121,7 +145,7 @@ class _SandboxRecord:
     def _on_idle(self) -> None:
         self._idle_handle = None
         if self._inflight == 0:
-            self._owner._evict(self._context, self)
+            self._owner._evict(self._chain, self)
 
     async def sandbox(self) -> Sandbox:
         return await asyncio.shield(self._sandbox_task)
@@ -158,24 +182,31 @@ class SandboxActivities:
         )
         if self._idle_timeout <= timedelta(0):
             raise ValueError("Sandbox cache idle timeout must be positive")
-        self._records: dict[SandboxWorkflowContext, _SandboxRecord] = {}
+        self._records: dict[SandboxWorkflowChain, _SandboxRecord] = {}
 
     @asynccontextmanager
     async def _sandbox(
         self, input: _WorkflowScopedInput
     ) -> AsyncGenerator[Sandbox, None]:
         info = activity.info()
-        if not info.workflow_id or not input.first_execution_run_id:
+        if (
+            not info.workflow_id
+            or not info.workflow_run_id
+            or not input.first_execution_run_id
+        ):
             raise RuntimeError("Sandbox activities must be started by a Workflow")
         context = SandboxWorkflowContext(
-            namespace=info.namespace,
-            workflow_id=info.workflow_id,
-            first_execution_run_id=input.first_execution_run_id,
+            chain=SandboxWorkflowChain(
+                namespace=info.namespace,
+                workflow_id=info.workflow_id,
+                first_execution_run_id=input.first_execution_run_id,
+            ),
+            run_id=info.workflow_run_id,
         )
-        record = self._records.get(context)
+        record = self._records.get(context.chain)
         if record is None:
             record = _SandboxRecord(self, context, self._factory, self._idle_timeout)
-            self._records[context] = record
+            self._records[context.chain] = record
         record.acquire()
         try:
             try:
@@ -184,23 +215,21 @@ class SandboxActivities:
                 # One cancelled activity must not cancel or evict initialization
                 # that another activity for the same Workflow is awaiting.
                 if record.creation_done():
-                    self._evict(context, record)
+                    self._evict(context.chain, record)
                 raise
             except BaseException:
-                self._evict(context, record)
+                self._evict(context.chain, record)
                 raise
             yield sandbox
         finally:
             record.release()
 
-    def _has_record(
-        self, context: SandboxWorkflowContext, record: _SandboxRecord
-    ) -> bool:
-        return self._records.get(context) is record
+    def _has_record(self, chain: SandboxWorkflowChain, record: _SandboxRecord) -> bool:
+        return self._records.get(chain) is record
 
-    def _evict(self, context: SandboxWorkflowContext, record: _SandboxRecord) -> None:
-        if self._has_record(context, record):
-            del self._records[context]
+    def _evict(self, chain: SandboxWorkflowChain, record: _SandboxRecord) -> None:
+        if self._has_record(chain, record):
+            del self._records[chain]
 
     async def aclose(self) -> None:
         """Cancel cache timers and discard all worker-local sandbox adapters."""

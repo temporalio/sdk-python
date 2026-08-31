@@ -46,11 +46,11 @@ class StrandsPlugin(SimplePlugin):
     disconnected; the timer resets on every reuse. Defaults to 5 minutes.
 
     When ``sandboxes`` is supplied, registers a stable set of name-prefixed
-    activities for every sandbox factory. Each factory receives the owning
-    Workflow chain's context and may return a sandbox directly or awaitably.
-    Worker-local adapters are cached until ``sandbox_cache_idle_timeout``
-    elapses. Use the same name in workflow-side ``TemporalSandbox(name)``
-    instances.
+    activities for every sandbox factory. Each factory receives the requesting
+    Workflow run's context and may return a sandbox directly or awaitably.
+    Worker-local adapters are cached by Workflow chain until
+    ``sandbox_cache_idle_timeout`` elapses. Use the same name in workflow-side
+    ``TemporalSandbox(name)`` instances.
     """
 
     def __init__(

@@ -189,7 +189,7 @@ async def build_sandbox(context: SandboxWorkflowContext) -> DockerSandbox:
     # Application-specific and idempotent: return the existing container when
     # another activity worker has already provisioned this Workflow's sandbox.
     container = await get_or_create_build_container(
-        context.first_execution_run_id
+        context.chain.first_execution_run_id
     )
     return DockerSandbox(container.name)
 
@@ -210,13 +210,19 @@ Worker(
 )
 ```
 
-The factory is called lazily with a `SandboxWorkflowContext` that identifies the
-Workflow's namespace, Workflow ID, and first execution Run ID. Each Workflow
-chain gets a separate sandbox for each registered name. Retries,
+The factory is called lazily with a `SandboxWorkflowContext` containing the
+current `run_id` and a `chain` identity with the Workflow's namespace, Workflow
+ID, and first execution Run ID. The worker-local cache uses the chain identity,
+so each Workflow chain gets a separate sandbox for each registered name. Retries,
 Continue-As-New, Reset, and Cron runs belong to the same chain and therefore use
 the same sandbox; unrelated Workflow chains do not share one. Multiple
 `TemporalSandbox` objects with the same name in one chain intentionally share
 that chain's sandbox.
+
+The factory receives the current Run ID only when a worker-local cache entry is
+created. A later run in the same chain reuses a warm entry without calling the
+factory again. After eviction, the next factory call receives the Run ID of the
+run that recreates the entry.
 
 Factories may be synchronous or asynchronous. Synchronous factories must only
 construct a lightweight adapter and must not block the activity event loop;

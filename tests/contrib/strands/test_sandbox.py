@@ -13,6 +13,7 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.strands import (
+    SandboxWorkflowChain,
     SandboxWorkflowContext,
     StrandsPlugin,
     TemporalAgent,
@@ -161,9 +162,12 @@ async def test_sandbox_operations_are_durable_and_cached(client: Client):
     assert len(constructed) == 1
     assert contexts == [
         SandboxWorkflowContext(
-            namespace=client.namespace,
-            workflow_id=handle.id,
-            first_execution_run_id=handle.first_execution_run_id or "",
+            chain=SandboxWorkflowChain(
+                namespace=client.namespace,
+                workflow_id=handle.id,
+                first_execution_run_id=handle.first_execution_run_id or "",
+            ),
+            run_id=handle.result_run_id or "",
         )
     ]
     assert constructed[0].calls == [
@@ -297,6 +301,7 @@ async def test_sandbox_reused_across_continue_as_new(client: Client):
 
     assert len(contexts) == 1
     assert contexts[0].first_execution_run_id == handle.first_execution_run_id
+    assert contexts[0].run_id == handle.first_execution_run_id
 
 
 @workflow.defn
@@ -341,6 +346,7 @@ async def test_sandbox_reused_across_workflow_retry(client: Client):
 
     assert len(contexts) == 1
     assert contexts[0].first_execution_run_id == handle.first_execution_run_id
+    assert contexts[0].run_id == handle.first_execution_run_id
 
 
 @workflow.defn
@@ -445,6 +451,18 @@ def test_sandbox_cache_idle_timeout_must_be_positive() -> None:
             sandboxes={"recording": lambda _: RecordingSandbox()},
             sandbox_cache_idle_timeout=timedelta(0),
         )
+
+
+def test_sandbox_workflow_context_separates_run_and_chain_identity() -> None:
+    chain = SandboxWorkflowChain("namespace", "workflow", "first-run")
+    first = SandboxWorkflowContext(chain, "run-1")
+    second = SandboxWorkflowContext(chain, "run-2")
+
+    assert first != second
+    assert first.chain == second.chain
+    assert first.namespace == "namespace"
+    assert first.workflow_id == "workflow"
+    assert first.first_execution_run_id == "first-run"
 
 
 @tool(name="sandbox_bash")
