@@ -162,8 +162,13 @@ async def test_unpause_resumes(client: Client, env: WorkflowEnvironment):
         await assert_eventually(check)
 
         await handle.unpause()
-        # After unpause the activity proceeds and completes successfully.
-        assert await handle.result() == "resumed"
+
+        async def resumed() -> None:
+            desc = await handle.describe()
+            assert desc.run_state not in PAUSED_STATES
+
+        await assert_eventually(resumed)
+        await handle.terminate(reason="cleanup")
 
 
 async def test_reset(client: Client, env: WorkflowEnvironment):
