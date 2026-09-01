@@ -60,6 +60,10 @@ import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
+from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
+    _start_system_nexus_operation,
+    _SystemNexusWorkflowOutboundInterceptorTerminal,
+)
 from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
@@ -1732,7 +1736,23 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         headers: Mapping[str, str] | None,
         summary: str | None,
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        # start_nexus_operation
+        if temporalio.nexus.system.is_system_endpoint(endpoint):
+            return await _start_system_nexus_operation(
+                self._outbound,
+                StartNexusOperationInput(
+                    endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+                    service=service,
+                    operation=operation,
+                    input=input,
+                    output_type=output_type,
+                    schedule_to_close_timeout=schedule_to_close_timeout,
+                    schedule_to_start_timeout=schedule_to_start_timeout,
+                    start_to_close_timeout=start_to_close_timeout,
+                    cancellation_type=cancellation_type,
+                    headers=None,
+                    summary=summary,
+                ),
+            )
         return await self._outbound.start_nexus_operation(
             StartNexusOperationInput(
                 endpoint=endpoint,
@@ -3131,10 +3151,17 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
             return handler(*input.args)
 
 
-class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
+class _WorkflowOutboundImpl(
+    _SystemNexusWorkflowOutboundInterceptorTerminal, WorkflowOutboundInterceptor
+):
     def __init__(self, instance: _WorkflowInstanceImpl) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
         self._instance = instance
+
+    async def _outbound_start_nexus_operation(
+        self, input: StartNexusOperationInput[InputT, OutputT]
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        return await self._instance._outbound_start_nexus_operation(input)
 
     def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         self._instance._outbound_continue_as_new(input)
