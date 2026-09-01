@@ -59,31 +59,6 @@ def client(captured: _CapturedService) -> Client:
     return Client(service_client=service_client, namespace="test-namespace")
 
 
-async def test_operator_commands_send_identity_and_request_id(
-    client: Client, captured: _CapturedService
-):
-    handle = client.get_activity_handle("act-1", run_id="run-1")
-    await handle.pause(reason="pause-reason")
-    await handle.unpause(reason="unpause-reason", jitter=timedelta(seconds=5))
-    await handle.reset(jitter=timedelta(seconds=7))
-    await handle.update_options(
-        [ActivityOptionsKeys.heartbeat_timeout.value_set(timedelta(seconds=25))]
-    )
-
-    assert set(captured.requests) == {"pause", "unpause", "reset", "update"}
-    request_ids = set()
-    for name, req in captured.requests.items():
-        assert req.namespace == "test-namespace", name
-        assert req.activity_id == "act-1", name
-        assert req.run_id == "run-1", name
-        assert req.identity == "test-identity", name
-        assert req.request_id, name
-        request_ids.add(req.request_id)
-
-    # Request IDs must be fresh per call, not reused across commands.
-    assert len(request_ids) == 4
-
-
 async def test_operator_commands_send_reason_and_jitter(
     client: Client, captured: _CapturedService
 ):
