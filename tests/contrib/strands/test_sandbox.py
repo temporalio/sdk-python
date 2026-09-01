@@ -741,6 +741,88 @@ class ErrorSandbox(RecordingSandbox):
         raise SandboxPathNotFoundError(path)
 
 
+class FileTimeoutSandbox(RecordingSandbox):
+    def __init__(self) -> None:
+        super().__init__()
+        self.attempts = {
+            operation: 0 for operation in ("read", "write", "remove", "list")
+        }
+
+    def _record_attempt(self, operation: str) -> None:
+        self.attempts[operation] += 1
+
+    async def read_file(self, path: str, **kwargs: Any) -> bytes:
+        self._record_attempt("read")
+        raise SandboxTimeoutError(90)
+
+    async def write_file(self, path: str, content: bytes, **kwargs: Any) -> None:
+        self._record_attempt("write")
+        raise SandboxTimeoutError(90)
+
+    async def remove_file(self, path: str, **kwargs: Any) -> None:
+        self._record_attempt("remove")
+        raise SandboxTimeoutError(90)
+
+    async def list_files(self, path: str, **kwargs: Any) -> list[FileInfo]:
+        self._record_attempt("list")
+        raise SandboxTimeoutError(90)
+
+
+@workflow.defn
+class SandboxFileTimeoutWorkflow:
+    @workflow.run
+    async def run(self) -> list[str]:
+        sandbox = TemporalSandbox(
+            "file-timeouts",
+            start_to_close_timeout=timedelta(seconds=5),
+            schedule_to_close_timeout=timedelta(seconds=15),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(milliseconds=1), maximum_attempts=3
+            ),
+        )
+        messages: list[str] = []
+        try:
+            await sandbox.read_file("/file")
+        except SandboxTimeoutError as err:
+            messages.append(str(err))
+        try:
+            await sandbox.write_file("/file", b"value")
+        except SandboxTimeoutError as err:
+            messages.append(str(err))
+        try:
+            await sandbox.remove_file("/file")
+        except SandboxTimeoutError as err:
+            messages.append(str(err))
+        try:
+            await sandbox.list_files("/")
+        except SandboxTimeoutError as err:
+            messages.append(str(err))
+        return messages
+
+
+async def test_sandbox_file_timeouts_are_non_retryable_and_reconstructed(
+    client: Client,
+):
+    task_queue = f"test_sandbox_file_timeouts-{uuid4()}"
+    sandbox = FileTimeoutSandbox()
+    plugin = StrandsPlugin(models={}, sandboxes={"file-timeouts": lambda _: sandbox})
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[SandboxFileTimeoutWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        result = await client.execute_workflow(
+            SandboxFileTimeoutWorkflow.run,
+            id=f"test_sandbox_file_timeouts-{uuid4()}",
+            task_queue=task_queue,
+        )
+
+    assert result == ["Execution timed out after 90 seconds"] * 4
+    assert sandbox.attempts == {"read": 1, "write": 1, "remove": 1, "list": 1}
+
+
 @workflow.defn
 class SandboxErrorWorkflow:
     @workflow.run

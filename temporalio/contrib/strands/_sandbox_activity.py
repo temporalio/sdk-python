@@ -296,6 +296,8 @@ class SandboxActivities:
             async with self._sandbox(input) as sandbox:
                 try:
                     return await sandbox.read_file(input.path, **input.kwargs)
+                except SandboxTimeoutError as err:
+                    raise _timeout_error(err, None) from err
                 except FileNotFoundError as err:
                     raise _path_not_found_error(err, input.path) from err
 
@@ -309,6 +311,8 @@ class SandboxActivities:
                         base64.b64decode(input.content_base64),
                         **input.kwargs,
                     )
+                except SandboxTimeoutError as err:
+                    raise _timeout_error(err, None) from err
                 except FileNotFoundError as err:
                     raise _path_not_found_error(err, input.path) from err
 
@@ -318,6 +322,8 @@ class SandboxActivities:
             async with self._sandbox(input) as sandbox:
                 try:
                     await sandbox.remove_file(input.path, **input.kwargs)
+                except SandboxTimeoutError as err:
+                    raise _timeout_error(err, None) from err
                 except FileNotFoundError as err:
                     raise _path_not_found_error(err, input.path) from err
 
@@ -327,6 +333,8 @@ class SandboxActivities:
             async with self._sandbox(input) as sandbox:
                 try:
                     return await sandbox.list_files(input.path, **input.kwargs)
+                except SandboxTimeoutError as err:
+                    raise _timeout_error(err, None) from err
                 except FileNotFoundError as err:
                     raise _path_not_found_error(err, input.path) from err
 
