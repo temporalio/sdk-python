@@ -170,6 +170,154 @@ async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
     print(item.data)
 ```
 
+## Sandboxes
+
+`TemporalSandbox` implements Strands' sandbox API by scheduling every command,
+code, and filesystem operation as a Temporal Activity. Register the real
+worker-side sandbox under a name, then select that name in workflow code:
+
+```python
+from strands.sandbox.docker import DockerSandbox
+from temporalio.contrib.strands import (
+    SandboxWorkflowContext,
+    StrandsPlugin,
+    TemporalAgent,
+    TemporalSandbox,
+)
+
+async def build_sandbox(context: SandboxWorkflowContext) -> DockerSandbox:
+    # Application-specific and idempotent: return the existing container when
+    # another activity worker has already provisioned this Workflow's sandbox.
+    container = await get_or_create_build_container(
+        context.chain.first_execution_run_id
+    )
+    return DockerSandbox(container.name)
+
+# workflow
+agent = TemporalAgent(
+    sandbox=TemporalSandbox(
+        "build",
+        start_to_close_timeout=timedelta(minutes=5),
+    ),
+)
+
+# worker
+Worker(
+    ...,
+    plugins=[StrandsPlugin(sandboxes={
+        "build": build_sandbox,
+    })],
+)
+```
+
+The plugin registers one shared set of sandbox activities regardless of how
+many factories are configured. Each operation carries the selected sandbox
+name in its activity input so the worker can dispatch it to the matching
+factory.
+
+The factory is called lazily with a `SandboxWorkflowContext` containing the
+current `run_id` and a `chain` identity with the Workflow's namespace, Workflow
+ID, and first execution Run ID. The worker-local cache uses the sandbox name and
+chain identity, so each Workflow chain gets a separate sandbox for each
+registered name. Retries, Continue-As-New, Reset, and Cron runs belong to the
+same chain and therefore use the same sandbox; unrelated Workflow chains do not
+share one. Multiple `TemporalSandbox` objects with the same name in one chain
+intentionally share that chain's sandbox.
+
+The factory receives the current Run ID only when a worker-local cache entry is
+created. A later run in the same chain reuses a warm entry without calling the
+factory again. After eviction, the next factory call receives the Run ID of the
+run that recreates the entry.
+
+Factories may be synchronous or asynchronous. Synchronous factories must only
+construct a lightweight adapter and must not block the activity event loop;
+use an asynchronous factory for remote lookup or provisioning. A factory may
+run more than once for the same context after cache eviction or on different
+workers, so provisioning must be idempotent. Strands' `DockerSandbox` only
+connects to an already-running container; it does not create one.
+
+Worker-local adapters are reused until they have been idle for five minutes.
+Set `sandbox_cache_idle_timeout` on `StrandsPlugin` to change that duration.
+Eviction only drops the local adapter. Provisioning, teardown, and cleanup of
+orphaned backing environments remain the application's responsibility; use a
+backend TTL or reaper for workflows that are terminated before normal cleanup.
+
+That cache is per worker *process*, while successive sandbox activities from one
+workflow are routed independently across the task queue. With more than one
+worker on the queue, a `write-file` can land on one worker and the following
+`read-file` on another. The context factory must therefore reconnect every
+worker to the same Workflow-scoped backing environment rather than relying on
+per-process state. A single worker on the queue also satisfies this.
+
+Reset does not roll back commands or filesystem mutations already performed in
+the external sandbox, just as it does not roll back other Activity side effects.
+Account for that when resetting a Workflow that uses a sandbox.
+
+`SandboxTimeoutError` and any `FileNotFoundError` raised by a sandbox filesystem
+operation — including its `SandboxPathNotFoundError` subclass — cross the
+activity boundary as non-retryable failures and are re-raised inside the
+workflow with the sandbox's own message, so a command that exceeds its
+`timeout` or a path that does not exist surfaces to the agent on the first
+attempt instead of retrying. Factory failures and other sandbox failures,
+including the `OSError` that Strands documents for a failed `write_file`, are
+retried under the `retry_policy` you pass to `TemporalSandbox`.
+
+Like all Temporal Activities, sandbox operations have at-least-once execution
+semantics. A worker can finish a command or filesystem mutation and fail before
+recording its result, causing a retry to perform the operation again. Use a
+bounded `retry_policy`, and make commands and mutations idempotent when repeated
+execution would be unsafe.
+
+By default, `TemporalSandbox.get_tools()` vends `sandbox_shell` and
+`sandbox_file_editor`. A tool passed explicitly through `TemporalAgent(tools=...)`
+with either name takes precedence, following Strands' normal sandbox-tool
+override behavior.
+
+Execution output is always buffered into the activity result so workflow replay
+observes the same ordered `StreamChunk` and `ExecutionResult` values. For live,
+observer-facing output, set `streaming_topic` and host a `WorkflowStream` on the
+workflow. The activity publishes each `StreamChunk` as it arrives; the final
+`ExecutionResult` is returned only through the buffered activity result:
+
+```python
+from datetime import timedelta
+
+from strands.sandbox import StreamChunk
+from temporalio.contrib.strands import TemporalSandbox
+from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
+
+# workflow __init__
+self.stream = WorkflowStream()
+self.sandbox = TemporalSandbox(
+    "build",
+    start_to_close_timeout=timedelta(minutes=5),
+    streaming_topic="sandbox-events",
+)
+
+# external client
+async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
+    ["sandbox-events"], result_type=StreamChunk
+):
+    print(item.data.stream_type, item.data.data)
+```
+
+The topic is an observer-facing merged log. If sandbox executions overlap,
+their chunks may interleave. Use different `streaming_topic` values when the
+consumer needs separate logs; workflow code still receives the correctly
+separated, complete buffered result for each call. Because publications are
+observer-facing side effects of an activity attempt, a failed attempt that
+Temporal retries may leave chunks in the topic before the retry publishes its
+own output.
+
+Streaming is disabled by default. When `streaming_topic=None`, sandbox
+activities do not construct a `WorkflowStreamClient` and the workflow does not
+need to host a `WorkflowStream`.
+
+All arguments and results cross Temporal's payload boundary and enter workflow
+history. Keep command output and files within the server's configured payload
+size limits; use external storage for large artifacts. In particular, `env`
+values are recorded in history and must not contain secrets.
+
 ## Tools
 
 Decorate non-deterministic tools with `@activity.defn`, or if you're importing tools from `strands_tools`, wrap them in a thin async function. Then, register the activity on the worker via `Worker(activities=[...])` and pass it to the agent with `workflow.activity_as_tool(activity, **options)` along with any activity options (e.g. `start_to_close_timeout`):

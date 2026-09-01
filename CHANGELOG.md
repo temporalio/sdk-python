@@ -20,6 +20,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories with run and Workflow-chain context registered with
+  `StrandsPlugin(sandboxes=...)`, using one shared activity set with optional
+  live Workflow Streams output.
 ### Changed
 
 ### Deprecated
