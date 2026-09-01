@@ -6,8 +6,7 @@ from typing import Any, TypeVar
 from strands.sandbox import ExecutionResult, FileInfo, OutputFile, Sandbox, StreamChunk
 from strands.sandbox.errors import SandboxPathNotFoundError, SandboxTimeoutError
 from strands.types.tools import AgentTool
-from strands.vended_tools.bash import make_bash
-from strands.vended_tools.file_editor import make_file_editor
+from strands.vended_tools import make_bash, make_file_editor
 
 from temporalio import workflow
 from temporalio.common import Priority, RetryPolicy
