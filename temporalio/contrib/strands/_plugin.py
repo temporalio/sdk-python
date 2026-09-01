@@ -104,13 +104,21 @@ class StrandsPlugin(SimplePlugin):
                 )
             )
 
+        sandbox_run_contexts = 0
+
         @asynccontextmanager
         async def run_context() -> AsyncGenerator[None, None]:
+            nonlocal sandbox_run_contexts
+            if sandbox_activities is not None:
+                sandbox_run_contexts += 1
             try:
                 yield
             finally:
                 if sandbox_activities is not None:
-                    await sandbox_activities.aclose()
+                    sandbox_run_contexts -= 1
+                    # One plugin instance can be shared by multiple Workers.
+                    if sandbox_run_contexts == 0:
+                        await sandbox_activities.aclose()
                 for server in mcp_clients:
                     await _evict_connection(server)
 

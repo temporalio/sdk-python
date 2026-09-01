@@ -154,8 +154,10 @@ class _SandboxRecord:
     async def sandbox(self) -> Sandbox:
         return await asyncio.shield(self._sandbox_task)
 
-    def creation_done(self) -> bool:
-        return self._sandbox_task.done()
+    def creation_failed(self) -> bool:
+        return self._sandbox_task.done() and (
+            self._sandbox_task.cancelled() or self._sandbox_task.exception() is not None
+        )
 
     async def aclose(self) -> None:
         if self._idle_handle is not None:
@@ -211,7 +213,6 @@ class SandboxActivities:
                 f"Unknown sandbox name {input.sandbox_name!r}. "
                 f"Known: {sorted(self._factories)}",
                 type=SANDBOX_NOT_FOUND_ERROR_TYPE,
-                non_retryable=True,
             )
         key = (input.sandbox_name, context.chain)
         record = self._records.get(key)
@@ -223,9 +224,9 @@ class SandboxActivities:
             try:
                 sandbox = await record.sandbox()
             except asyncio.CancelledError:
-                # One cancelled activity must not cancel or evict initialization
-                # that another activity for the same Workflow is awaiting.
-                if record.creation_done():
+                # A cancelled waiter must not discard a sandbox that another
+                # activity for the same Workflow may already be using.
+                if record.creation_failed():
                     self._evict(key, record)
                 raise
             except BaseException:
@@ -292,42 +293,42 @@ class SandboxActivities:
         @activity.defn(name=_activity_name("read-file"))
         @auto_heartbeater
         async def read_file(input: _PathInput) -> bytes:
-            try:
-                async with self._sandbox(input) as sandbox:
+            async with self._sandbox(input) as sandbox:
+                try:
                     return await sandbox.read_file(input.path, **input.kwargs)
-            except FileNotFoundError as err:
-                raise _path_not_found_error(err, input.path) from err
+                except FileNotFoundError as err:
+                    raise _path_not_found_error(err, input.path) from err
 
         @activity.defn(name=_activity_name("write-file"))
         @auto_heartbeater
         async def write_file(input: _WriteFileInput) -> None:
-            try:
-                async with self._sandbox(input) as sandbox:
+            async with self._sandbox(input) as sandbox:
+                try:
                     await sandbox.write_file(
                         input.path,
                         base64.b64decode(input.content_base64),
                         **input.kwargs,
                     )
-            except FileNotFoundError as err:
-                raise _path_not_found_error(err, input.path) from err
+                except FileNotFoundError as err:
+                    raise _path_not_found_error(err, input.path) from err
 
         @activity.defn(name=_activity_name("remove-file"))
         @auto_heartbeater
         async def remove_file(input: _PathInput) -> None:
-            try:
-                async with self._sandbox(input) as sandbox:
+            async with self._sandbox(input) as sandbox:
+                try:
                     await sandbox.remove_file(input.path, **input.kwargs)
-            except FileNotFoundError as err:
-                raise _path_not_found_error(err, input.path) from err
+                except FileNotFoundError as err:
+                    raise _path_not_found_error(err, input.path) from err
 
         @activity.defn(name=_activity_name("list-files"))
         @auto_heartbeater
         async def list_files(input: _PathInput) -> list[FileInfo]:
-            try:
-                async with self._sandbox(input) as sandbox:
+            async with self._sandbox(input) as sandbox:
+                try:
                     return await sandbox.list_files(input.path, **input.kwargs)
-            except FileNotFoundError as err:
-                raise _path_not_found_error(err, input.path) from err
+                except FileNotFoundError as err:
+                    raise _path_not_found_error(err, input.path) from err
 
         return [execute, execute_code, read_file, write_file, remove_file, list_files]
 

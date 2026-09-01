@@ -9,6 +9,9 @@ import pytest
 from strands import SandboxPathNotFoundError, SandboxTimeoutError, tool
 from strands.sandbox import ExecutionResult, FileInfo, OutputFile, Sandbox, StreamChunk
 
+import temporalio.contrib.strands._sandbox_activity
+import temporalio.exceptions
+import temporalio.testing
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
@@ -442,6 +445,146 @@ async def test_sandbox_factory_is_single_flight_and_not_evicted_in_use(
 
     assert result == [b"\x00\xff", b"\x00\xff"]
     assert len(contexts) == 1
+
+
+async def test_cancelled_waiter_preserves_completed_sandbox(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    factory_calls = 0
+
+    def factory(_: SandboxWorkflowContext) -> RecordingSandbox:
+        nonlocal factory_calls
+        factory_calls += 1
+        return RecordingSandbox()
+
+    sandbox_activities = temporalio.contrib.strands._sandbox_activity.SandboxActivities(
+        {"recording": factory}
+    )
+    read_file = sandbox_activities.activities()[2]
+    input = temporalio.contrib.strands._sandbox_activity._PathInput(
+        "/binary",
+        sandbox_name="recording",
+        first_execution_run_id="first-run",
+    )
+    activity_environment = temporalio.testing.ActivityEnvironment()
+    original_sandbox = (
+        temporalio.contrib.strands._sandbox_activity._SandboxRecord.sandbox
+    )
+
+    async def cancel_after_creation(
+        record: temporalio.contrib.strands._sandbox_activity._SandboxRecord,
+    ) -> Sandbox:
+        await original_sandbox(record)
+        raise asyncio.CancelledError
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            temporalio.contrib.strands._sandbox_activity._SandboxRecord,
+            "sandbox",
+            cancel_after_creation,
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await activity_environment.run(read_file, input)
+
+    assert await activity_environment.run(read_file, input) == b"\x00\xff"
+    assert factory_calls == 1
+    await sandbox_activities.aclose()
+
+
+@pytest.mark.parametrize(
+    ("activity_index", "input"),
+    [
+        (
+            2,
+            temporalio.contrib.strands._sandbox_activity._PathInput("/missing"),
+        ),
+        (
+            3,
+            temporalio.contrib.strands._sandbox_activity._WriteFileInput(
+                "/missing", content_base64=""
+            ),
+        ),
+        (
+            4,
+            temporalio.contrib.strands._sandbox_activity._PathInput("/missing"),
+        ),
+        (
+            5,
+            temporalio.contrib.strands._sandbox_activity._PathInput("/missing"),
+        ),
+    ],
+    ids=["read", "write", "remove", "list"],
+)
+async def test_file_not_found_from_factory_remains_retryable(
+    activity_index: int,
+    input: temporalio.contrib.strands._sandbox_activity._WorkflowScopedInput,
+) -> None:
+    input.sandbox_name = "recording"
+    input.first_execution_run_id = "first-run"
+
+    def factory(_: SandboxWorkflowContext) -> Sandbox:
+        raise FileNotFoundError("transient factory failure")
+
+    sandbox_activities = temporalio.contrib.strands._sandbox_activity.SandboxActivities(
+        {"recording": factory}
+    )
+    activity_environment = temporalio.testing.ActivityEnvironment()
+
+    with pytest.raises(FileNotFoundError, match="transient factory failure"):
+        await activity_environment.run(
+            sandbox_activities.activities()[activity_index], input
+        )
+
+
+async def test_unknown_sandbox_name_is_retryable() -> None:
+    sandbox_activities = temporalio.contrib.strands._sandbox_activity.SandboxActivities(
+        {}
+    )
+    input = temporalio.contrib.strands._sandbox_activity._PathInput(
+        "/missing",
+        sandbox_name="missing",
+        first_execution_run_id="first-run",
+    )
+
+    with pytest.raises(temporalio.exceptions.ApplicationError) as err:
+        await temporalio.testing.ActivityEnvironment().run(
+            sandbox_activities.activities()[2], input
+        )
+
+    assert (
+        err.value.type
+        == temporalio.contrib.strands._sandbox_activity.SANDBOX_NOT_FOUND_ERROR_TYPE
+    )
+    assert not err.value.non_retryable
+
+
+async def test_shared_sandbox_cache_closes_after_last_run_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    close_calls = 0
+
+    async def aclose(
+        _: temporalio.contrib.strands._sandbox_activity.SandboxActivities,
+    ) -> None:
+        nonlocal close_calls
+        close_calls += 1
+
+    monkeypatch.setattr(
+        temporalio.contrib.strands._sandbox_activity.SandboxActivities,
+        "aclose",
+        aclose,
+    )
+    plugin = StrandsPlugin(
+        models={}, sandboxes={"recording": lambda _: RecordingSandbox()}
+    )
+    assert plugin.run_context is not None
+
+    async with plugin.run_context():
+        async with plugin.run_context():
+            pass
+        assert close_calls == 0
+
+    assert close_calls == 1
 
 
 def test_sandbox_cache_idle_timeout_must_be_positive() -> None:

@@ -253,14 +253,14 @@ Reset does not roll back commands or filesystem mutations already performed in
 the external sandbox, just as it does not roll back other Activity side effects.
 Account for that when resetting a Workflow that uses a sandbox.
 
-`SandboxTimeoutError` and any `FileNotFoundError` — including its
-`SandboxPathNotFoundError` subclass — cross the activity boundary as
-non-retryable failures and are re-raised inside the workflow with the sandbox's
-own message, so a command that exceeds its `timeout` or a path that does not
-exist surfaces to the agent on the first attempt instead of retrying. Other
-sandbox failures, including the `OSError` that Strands documents for a failed
-`write_file`, are retried under the `retry_policy` you pass to
-`TemporalSandbox`.
+`SandboxTimeoutError` and any `FileNotFoundError` raised by a sandbox filesystem
+operation — including its `SandboxPathNotFoundError` subclass — cross the
+activity boundary as non-retryable failures and are re-raised inside the
+workflow with the sandbox's own message, so a command that exceeds its
+`timeout` or a path that does not exist surfaces to the agent on the first
+attempt instead of retrying. Factory failures and other sandbox failures,
+including the `OSError` that Strands documents for a failed `write_file`, are
+retried under the `retry_policy` you pass to `TemporalSandbox`.
 
 Like all Temporal Activities, sandbox operations have at-least-once execution
 semantics. A worker can finish a command or filesystem mutation and fail before
