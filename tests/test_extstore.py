@@ -15,7 +15,9 @@ from temporalio.converter import (
     StorageDriver,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
+    StorageDriverSelectContext,
     StorageDriverStoreContext,
+    StorageDriverWorkflowInfo,
 )
 from temporalio.converter._extstore import _REFERENCE_ENCODING, _StorageReference
 from temporalio.converter._payload_converter import JSONProtoPayloadConverter
@@ -49,6 +51,7 @@ class InMemoryTestDriver(StorageDriver):
         self._storage: dict[str, bytes] = {}
         self._store_calls = 0
         self._retrieve_calls = 0
+        self._store_contexts: list[StorageDriverStoreContext] = []
 
     def name(self) -> str:
         return self._driver_name
@@ -59,6 +62,7 @@ class InMemoryTestDriver(StorageDriver):
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
         self._store_calls += 1
+        self._store_contexts.append(context)
         start_index = len(self._storage)
 
         entries = [
@@ -536,6 +540,35 @@ class TestMultiDriver:
         assert decoded[0] == large
         assert driver_a._retrieve_calls == 0  # never consulted
         assert driver_b._retrieve_calls == 1
+
+    async def test_selector_receives_select_context_with_target(self):
+        """The selector is handed a StorageDriverSelectContext -- not the
+        StorageDriverStoreContext the driver receives -- carrying the same
+        target."""
+        driver = InMemoryTestDriver("test-driver")
+        seen: list[object] = []
+
+        def selector(context: object, _payload: Payload) -> StorageDriver:
+            seen.append(context)
+            return driver
+
+        target = StorageDriverWorkflowInfo(
+            namespace="ns", id="wf-id", type="MyWorkflow", run_id="run-id"
+        )
+        storage = ExternalStorage(
+            drivers=[driver],
+            driver_selector=selector,
+            payload_size_threshold=50,
+        )._with_store_context(StorageDriverStoreContext(target=target))
+
+        converter = DataConverter(external_storage=storage)
+        await converter.encode(["x" * 200])
+
+        assert len(seen) == 1
+        assert isinstance(seen[0], StorageDriverSelectContext)
+        assert seen[0].target == target
+        assert isinstance(driver._store_contexts[0], StorageDriverStoreContext)
+        assert driver._store_contexts[0].target == target
 
     async def test_selector_routes_payloads_to_different_drivers_in_single_batch(self):
         """When a selector routes different payloads to different drivers, a

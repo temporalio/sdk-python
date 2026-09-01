@@ -187,7 +187,12 @@ exclude = [
   # Ignore generated code
   'temporalio/api',
   'temporalio/bridge/proto',
+  'temporalio/nexus/system/workflow_service',
 ]
+
+[[tool.mypy.overrides]]
+module = "temporalio.nexus.system.workflow_service.*"
+ignore_errors = true
 
 [tool.pydocstyle]
 convention = "google"
