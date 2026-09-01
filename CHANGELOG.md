@@ -28,6 +28,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
+  or callbacks to attach.
+
 ### Security
 
 ## [1.32.0] - 2026-08-24
