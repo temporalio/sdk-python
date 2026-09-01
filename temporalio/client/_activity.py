@@ -162,7 +162,7 @@ class ActivityExecutionAsyncIterator:
             return ret
 
 
-@dataclass(eq=False, kw_only=True)
+@dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecution:
     """Info for an activity execution not started by a workflow, from list response.
 
@@ -259,7 +259,7 @@ class ActivityExecution:
         )
 
 
-@dataclass(eq=False, kw_only=True)
+@dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecutionDescription(ActivityExecution):
     """Detailed information about an activity execution not started by a workflow.
 
@@ -330,7 +330,7 @@ class ActivityExecutionDescription(ActivityExecution):
     Zero if the activity has not sent any heartbeats or if the server didn't report heartbeat count.
     """
 
-    raw_info: temporalio.api.activity.v1.ActivityExecutionInfo = field(repr=False)  # type: ignore[reportIncompatibleVariableOverride]
+    raw_info: temporalio.api.activity.v1.ActivityExecutionInfo = field(repr=False)
     """Underlying protobuf info."""
 
     raw_callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo] = field(repr=False)
