@@ -79,9 +79,10 @@ Note: Use `agent.invoke_async(message)` instead of `agent(message)`. The synchro
 
 ## Models
 
-`StrandsPlugin(models=...)` takes a mapping of `name → factory`. Each factory is called lazily on first use (on the worker, outside the workflow sandbox) and the constructed model is cached for the worker's lifetime. `TemporalAgent(model="name", ...)` selects which factory to invoke and carries the activity options for that agent's model calls. If `models` is omitted, the plugin registers a single `BedrockModel()` factory under the name `"bedrock"`, matching Strands' own implicit default.
+`StrandsPlugin(models=...)` takes a mapping of `name → factory`. Each factory is called lazily on first use (on the worker, outside the workflow sandbox) and the constructed model is cached for the worker's lifetime. `TemporalAgent(model="name", ...)` selects which factory to invoke and carries the activity options for that agent's model calls. If `models` is omitted, the plugin registers a single `BedrockModel` factory under the name `"bedrock"` with Botocore retries disabled so Temporal owns retries.
 
 ```python
+from botocore.config import Config as BotocoreConfig
 from strands.models.anthropic import AnthropicModel
 from strands.models.bedrock import BedrockModel
 
@@ -101,7 +102,9 @@ class MultiModelWorkflow:
 # worker
 Worker(..., plugins=[StrandsPlugin(models={
     "claude": lambda: AnthropicModel(client_args={"api_key": "..."}),
-    "bedrock": lambda: BedrockModel(),
+    "bedrock": lambda: BedrockModel(
+        boto_client_config=BotocoreConfig(retries={"max_attempts": 0})
+    ),
 })])
 ```
 
@@ -109,7 +112,9 @@ Each `TemporalAgent` carries its own activity options (timeouts, retry policy, t
 
 ## Retries
 
-`TemporalAgent` disables Strands' built-in `ModelRetryStrategy` so retries are handled exclusively by Temporal. Configure retries via `retry_policy` on `TemporalAgent`, and on the activity options accepted by `workflow.activity_as_tool`, `workflow.activity_as_hook`, and `TemporalMCPClient`:
+`TemporalAgent` disables Strands' built-in `ModelRetryStrategy` so retries are handled exclusively by Temporal. The plugin's default Bedrock model also disables Botocore retries. When supplying your own model factory, disable that provider client's retries as shown in the Bedrock example above.
+
+Configure retries via `retry_policy` on `TemporalAgent`, and on the activity options accepted by `workflow.activity_as_tool`, `workflow.activity_as_hook`, and `TemporalMCPClient`:
 
 ```python
 from temporalio.common import RetryPolicy

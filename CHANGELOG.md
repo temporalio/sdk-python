@@ -37,6 +37,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
+  model request retries are handled exclusively by Temporal.
 - `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
   `retry-after` headers when OpenAI returns `x-should-retry: true`. Previously
   the delay the server asked for was discarded on that path and the activity
