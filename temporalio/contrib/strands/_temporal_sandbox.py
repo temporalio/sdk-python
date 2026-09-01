@@ -6,7 +6,12 @@ from typing import Any, TypeVar
 from strands.sandbox import ExecutionResult, FileInfo, OutputFile, Sandbox, StreamChunk
 from strands.sandbox.errors import SandboxPathNotFoundError, SandboxTimeoutError
 from strands.types.tools import AgentTool
-from strands.vended_tools import make_bash, make_file_editor
+
+# Strands 1.52 keeps make_bash importable until 2.0 but omits it from __all__.
+from strands.vended_tools import (
+    make_bash,  # pyright: ignore[reportPrivateImportUsage]
+    make_file_editor,
+)
 
 from temporalio import workflow
 from temporalio.common import Priority, RetryPolicy
